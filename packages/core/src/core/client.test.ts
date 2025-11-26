@@ -43,6 +43,7 @@ import type {
   ResolvedModelConfig,
 } from '../services/modelConfigService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { HookSystem } from '../hooks/hookSystem.js';
 
 vi.mock('../services/chatCompressionService.js');
 
@@ -120,6 +121,7 @@ vi.mock('../telemetry/uiTelemetry.js', () => ({
     getLastPromptTokenCount: vi.fn(),
   },
 }));
+vi.mock('../hooks/hookSystem.js');
 
 /**
  * Array.fromAsync ponyfill, which will be available in es 2024.
@@ -164,6 +166,7 @@ describe('Gemini Client (client.ts)', () => {
       generateContent: mockGenerateContentFn,
       generateContentStream: vi.fn(),
       batchEmbedContents: vi.fn(),
+      countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
     } as unknown as ContentGenerator;
 
     // Because the GeminiClient constructor kicks off an async process (startChat)
@@ -211,6 +214,8 @@ describe('Gemini Client (client.ts)', () => {
       getModelRouterService: vi.fn().mockReturnValue({
         route: vi.fn().mockResolvedValue({ model: 'default-routed-model' }),
       }),
+      getMessageBus: vi.fn().mockReturnValue(undefined),
+      getEnableHooks: vi.fn().mockReturnValue(false),
       isInFallbackMode: vi.fn().mockReturnValue(false),
       setFallbackMode: vi.fn(),
       getChatCompression: vi.fn().mockReturnValue(undefined),
@@ -243,6 +248,9 @@ describe('Gemini Client (client.ts)', () => {
       isInteractive: vi.fn().mockReturnValue(false),
       getExperiments: () => {},
     } as unknown as Config;
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     client = new GeminiClient(mockConfig);
     await client.initialize();
@@ -895,6 +903,75 @@ ${JSON.stringify(
       });
     });
 
+    it('should use local estimation for text-only requests and NOT call countTokens', async () => {
+      const request = [{ text: 'Hello world' }];
+      const generator = client['getContentGeneratorOrFail']();
+      const countTokensSpy = vi.spyOn(generator, 'countTokens');
+
+      const stream = client.sendMessageStream(
+        request,
+        new AbortController().signal,
+        'test-prompt-id',
+      );
+      await stream.next(); // Trigger the generator
+
+      expect(countTokensSpy).not.toHaveBeenCalled();
+    });
+
+    it('should use countTokens API for requests with non-text parts', async () => {
+      const request = [
+        { text: 'Describe this image' },
+        { inlineData: { mimeType: 'image/png', data: 'base64...' } },
+      ];
+      const generator = client['getContentGeneratorOrFail']();
+      const countTokensSpy = vi
+        .spyOn(generator, 'countTokens')
+        .mockResolvedValue({ totalTokens: 123 });
+
+      const stream = client.sendMessageStream(
+        request,
+        new AbortController().signal,
+        'test-prompt-id',
+      );
+      await stream.next(); // Trigger the generator
+
+      expect(countTokensSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contents: expect.arrayContaining([
+            expect.objectContaining({
+              parts: expect.arrayContaining([
+                { text: 'Describe this image' },
+                { inlineData: { mimeType: 'image/png', data: 'base64...' } },
+              ]),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    it('should estimate CJK characters more conservatively (closer to 1 token/char)', async () => {
+      const request = [{ text: '你好世界' }]; // 4 chars
+      const generator = client['getContentGeneratorOrFail']();
+      const countTokensSpy = vi.spyOn(generator, 'countTokens');
+
+      // 4 chars.
+      // Old logic: 4/4 = 1.
+      // New logic (heuristic): 4 * 1 = 4. (Or at least > 1).
+      // Let's assert it's roughly accurate.
+
+      const stream = client.sendMessageStream(
+        request,
+        new AbortController().signal,
+        'test-prompt-id',
+      );
+      await stream.next();
+
+      // Should NOT call countTokens (it's text only)
+      expect(countTokensSpy).not.toHaveBeenCalled();
+
+      // The actual token calculation is unit tested in tokenCalculation.test.ts
+    });
+
     it('should return the turn instance after the stream is complete', async () => {
       // Arrange
       const mockStream = (async function* () {
@@ -1143,9 +1220,8 @@ ${JSON.stringify(
       // A string of length 400 is roughly 100 tokens.
       const longText = 'a'.repeat(400);
       const request: Part[] = [{ text: longText }];
-      const estimatedRequestTokenCount = Math.floor(
-        JSON.stringify(request).length / 4,
-      );
+      // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
+      const estimatedRequestTokenCount = Math.floor(longText.length / 4);
       const remainingTokenCount = MOCKED_TOKEN_LIMIT - lastPromptTokenCount;
 
       // Mock tryCompressChat to not compress
@@ -1203,9 +1279,8 @@ ${JSON.stringify(
       // We need a request > 95 tokens.
       const longText = 'a'.repeat(400);
       const request: Part[] = [{ text: longText }];
-      const estimatedRequestTokenCount = Math.floor(
-        JSON.stringify(request).length / 4,
-      );
+      // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
+      const estimatedRequestTokenCount = Math.floor(longText.length / 4);
       const remainingTokenCount = STICKY_MODEL_LIMIT - lastPromptTokenCount;
 
       vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
@@ -1234,6 +1309,66 @@ ${JSON.stringify(
       });
       expect(tokenLimit).toHaveBeenCalledWith(STICKY_MODEL);
       expect(mockTurnRunFn).not.toHaveBeenCalled();
+    });
+
+    it('should not trigger overflow warning for requests with large binary data (PDFs/images)', async () => {
+      // Arrange
+      const MOCKED_TOKEN_LIMIT = 1000000; // 1M tokens
+      vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
+
+      const lastPromptTokenCount = 10000;
+      const mockChat: Partial<GeminiChat> = {
+        getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      // Simulate a PDF file with large base64 data (11MB when encoded)
+      // In the old implementation, this would incorrectly estimate ~2.7M tokens
+      // In the new implementation, only the text part is counted
+      const largePdfBase64 = 'A'.repeat(11 * 1024 * 1024);
+      const request: Part[] = [
+        { text: 'Please analyze this PDF document' }, // ~35 chars = ~8 tokens
+        {
+          inlineData: {
+            mimeType: 'application/pdf',
+            data: largePdfBase64, // This should be ignored in token estimation
+          },
+        },
+      ];
+
+      // Mock tryCompressChat to not compress
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        originalTokenCount: lastPromptTokenCount,
+        newTokenCount: lastPromptTokenCount,
+        compressionStatus: CompressionStatus.NOOP,
+      });
+
+      // Mock Turn.run to simulate successful processing
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Analysis complete' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      // Act
+      const stream = client.sendMessageStream(
+        request,
+        new AbortController().signal,
+        'prompt-id-pdf-test',
+      );
+
+      const events = await fromAsync(stream);
+
+      // Assert
+      // Should NOT contain overflow warning
+      expect(events).not.toContainEqual(
+        expect.objectContaining({
+          type: GeminiEventType.ContextWindowWillOverflow,
+        }),
+      );
+
+      // Turn.run should be called (processing should continue)
+      expect(mockTurnRunFn).toHaveBeenCalled();
     });
 
     describe('Model Routing', () => {

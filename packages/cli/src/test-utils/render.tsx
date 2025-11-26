@@ -148,6 +148,10 @@ const mockUIActions: UIActions = {
   closeSettingsDialog: vi.fn(),
   closeModelDialog: vi.fn(),
   openPermissionsDialog: vi.fn(),
+  openSessionBrowser: vi.fn(),
+  closeSessionBrowser: vi.fn(),
+  handleResumeSession: vi.fn(),
+  handleDeleteSession: vi.fn(),
   closePermissionsDialog: vi.fn(),
   setShellModeActive: vi.fn(),
   vimHandleInput: vi.fn(),
@@ -176,7 +180,7 @@ export const renderWithProviders = (
     width,
     mouseEventsEnabled = false,
     config = configProxy as unknown as Config,
-    useAlternateBuffer,
+    useAlternateBuffer = true,
     uiActions,
   }: {
     shellFocus?: boolean;

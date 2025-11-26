@@ -56,6 +56,7 @@ import {
   enterAlternateScreen,
   disableLineWrapping,
   shouldEnterAlternateScreen,
+  ExitCodes,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -112,7 +113,7 @@ export function validateDnsResolutionOrder(
   return defaultValue;
 }
 
-function getNodeMemoryArgs(isDebugMode: boolean): string[] {
+export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
   const heapStats = v8.getHeapStatistics();
   const currentMaxOldSpaceSizeMb = Math.floor(
@@ -310,7 +311,7 @@ export async function main() {
       'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.\n',
     );
     await runExitCleanup();
-    process.exit(1);
+    process.exit(ExitCodes.FATAL_INPUT_ERROR);
   }
 
   const isDebugMode = cliConfig.isDebugMode(argv);
@@ -396,7 +397,7 @@ export async function main() {
         } catch (err) {
           debugLogger.error('Error authenticating:', err);
           await runExitCleanup();
-          process.exit(1);
+          process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
         }
       }
       let stdinData = '';
@@ -433,7 +434,7 @@ export async function main() {
         start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),
       );
       await runExitCleanup();
-      process.exit(0);
+      process.exit(ExitCodes.SUCCESS);
     } else {
       // Relaunch app so we always have a child process that can be internally
       // restarted if needed.
@@ -452,7 +453,11 @@ export async function main() {
     createPolicyUpdater(policyEngine, messageBus);
 
     // Cleanup sessions after config initialization
-    await cleanupExpiredSessions(config, settings.merged);
+    try {
+      await cleanupExpiredSessions(config, settings.merged);
+    } catch (e) {
+      debugLogger.error('Failed to cleanup expired sessions:', e);
+    }
 
     if (config.getListExtensions()) {
       debugLogger.log('Installed extensions:');
@@ -460,14 +465,14 @@ export async function main() {
         debugLogger.log(`- ${extension.name}`);
       }
       await runExitCleanup();
-      process.exit(0);
+      process.exit(ExitCodes.SUCCESS);
     }
 
     // Handle --list-sessions flag
     if (config.getListSessions()) {
       await listSessions(config);
       await runExitCleanup();
-      process.exit(0);
+      process.exit(ExitCodes.SUCCESS);
     }
 
     // Handle --delete-session flag
@@ -475,7 +480,7 @@ export async function main() {
     if (sessionToDelete) {
       await deleteSession(config, sessionToDelete);
       await runExitCleanup();
-      process.exit(0);
+      process.exit(ExitCodes.SUCCESS);
     }
 
     const wasRaw = process.stdin.isRaw;
@@ -547,7 +552,7 @@ export async function main() {
           `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
         await runExitCleanup();
-        process.exit(1);
+        process.exit(ExitCodes.FATAL_INPUT_ERROR);
       }
     }
 
@@ -579,7 +584,7 @@ export async function main() {
         `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
       );
       await runExitCleanup();
-      process.exit(1);
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
     }
 
     const prompt_id = Math.random().toString(16).slice(2);
@@ -619,7 +624,7 @@ export async function main() {
     });
     // Call cleanup before process.exit, which causes cleanup to not run
     await runExitCleanup();
-    process.exit(0);
+    process.exit(ExitCodes.SUCCESS);
   }
 }
 
@@ -634,7 +639,7 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
   }
 }
 
-function initializeOutputListenersAndFlush() {
+export function initializeOutputListenersAndFlush() {
   // If there are no listeners for output, make sure we flush so output is not
   // lost.
   if (coreEvents.listenerCount(CoreEvent.Output) === 0) {
