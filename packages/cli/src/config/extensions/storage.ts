@@ -36,7 +36,7 @@ export class ExtensionStorage {
   }
 
   static getUserExtensionsDir(): string {
-    return new Storage(os.homedir()).getExtensionsDir();
+    return path.join(Storage.getConfigDir(), 'extensions');
   }
 
   static async createTmpDir(): Promise<string> {

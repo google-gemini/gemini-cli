@@ -99,7 +99,7 @@ interface SaveMemoryParams {
 }
 
 export function getGlobalMemoryFilePath(): string {
-  return path.join(Storage.getGlobalGeminiDir(), getCurrentGeminiMdFilename());
+  return path.join(Storage.getDataDir(), getCurrentGeminiMdFilename());
 }
 
 /**
@@ -237,7 +237,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
     try {
       if (modified_by_user && modified_content !== undefined) {
         // User modified the content in external editor, write it directly
-        await fs.mkdir(path.dirname(getGlobalMemoryFilePath()), {
+        await fs.mkdir(path.dirname(Storage.getGlobalMemoryDir()), {
           recursive: true,
         });
         await fs.writeFile(

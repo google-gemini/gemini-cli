@@ -86,6 +86,7 @@ describe('oauth2', () => {
         path.join(os.tmpdir(), 'gemini-cli-test-home-'),
       );
       vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+      fs.mkdirSync(path.join(tempHomeDir, GEMINI_DIR), { recursive: true });
     });
     afterEach(() => {
       fs.rmSync(tempHomeDir, { recursive: true, force: true });

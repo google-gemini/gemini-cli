@@ -6,28 +6,23 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { homedir } from 'node:os';
 import {
   FatalConfigError,
   getErrorMessage,
   isWithinRoot,
   ideContextStore,
-  GEMINI_DIR,
+  Storage,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
 
 export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
 
-export function getUserSettingsDir(): string {
-  return path.join(homedir(), GEMINI_DIR);
-}
-
 export function getTrustedFoldersPath(): string {
   if (process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH']) {
     return process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH'];
   }
-  return path.join(getUserSettingsDir(), TRUSTED_FOLDERS_FILENAME);
+  return path.join(Storage.getConfigDir(), TRUSTED_FOLDERS_FILENAME);
 }
 
 export enum TrustLevel {

@@ -13,6 +13,7 @@ import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { processImports } from './memoryImportProcessor.js';
 import type { FileFilteringOptions } from '../config/constants.js';
+import { Storage } from '../config/storage.js';
 import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { GEMINI_DIR } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
@@ -380,7 +381,7 @@ async function findUpwardGeminiFiles(
   let currentDir = path.resolve(startDir);
   const resolvedStopDir = path.resolve(stopDir);
   const geminiMdFilenames = getAllGeminiMdFilenames();
-  const globalGeminiDir = path.join(homedir(), GEMINI_DIR);
+  const globalGeminiStateDir = path.join(Storage.getStateDir());
 
   if (debugMode) {
     logger.debug(
@@ -389,7 +390,7 @@ async function findUpwardGeminiFiles(
   }
 
   while (true) {
-    if (currentDir === globalGeminiDir) {
+    if (currentDir === globalGeminiStateDir) {
       break;
     }
 

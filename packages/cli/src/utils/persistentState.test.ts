@@ -13,7 +13,7 @@ import { PersistentState } from './persistentState.js';
 vi.mock('node:fs');
 vi.mock('@google/gemini-cli-core', () => ({
   Storage: {
-    getGlobalGeminiDir: vi.fn(),
+    getStateDir: vi.fn(),
   },
   debugLogger: {
     warn: vi.fn(),
@@ -27,7 +27,7 @@ describe('PersistentState', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(Storage.getGlobalGeminiDir).mockReturnValue(mockDir);
+    vi.mocked(Storage.getStateDir).mockReturnValue(mockDir);
     persistentState = new PersistentState();
   });
 
