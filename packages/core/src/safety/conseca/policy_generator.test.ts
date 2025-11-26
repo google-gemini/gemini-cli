@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generatePolicy } from './policy_generator.js';
+import { SafetyCheckDecision } from '../protocol.js';
 import type { Config } from '../../config/config.js';
 import type { ContentGenerator } from '../../core/contentGenerator.js';
 
@@ -26,7 +27,7 @@ describe('policy_generator', () => {
   it('should return a policy object when content generator is available', async () => {
     const mockPolicy = {
       read_file: {
-        permissions: 'ALLOW',
+        permissions: SafetyCheckDecision.ALLOW,
         constraints: 'None',
         rationale: 'Test',
       },

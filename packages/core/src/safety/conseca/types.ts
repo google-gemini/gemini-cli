@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { SafetyCheckDecision } from '../protocol.js';
+
 export interface ToolPolicy {
-  permissions: 'ALLOW' | 'DENY' | 'ASK_USER';
+  permissions: SafetyCheckDecision;
   constraints: string;
   rationale: string;
 }

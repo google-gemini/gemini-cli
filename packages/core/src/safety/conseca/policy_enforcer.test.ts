@@ -42,7 +42,7 @@ describe('policy_enforcer', () => {
     const toolCall: FunctionCall = { name: 'testTool', args: {} };
     const policy = {
       testTool: {
-        permissions: 'ALLOW' as const,
+        permissions: SafetyCheckDecision.ALLOW,
         constraints: 'None',
         rationale: 'Test',
       },
@@ -80,7 +80,7 @@ describe('policy_enforcer', () => {
     const toolCall: FunctionCall = { name: 'testTool', args: {} };
     const policy = {
       testTool: {
-        permissions: 'ALLOW' as const,
+        permissions: SafetyCheckDecision.ALLOW,
         constraints: 'None',
         rationale: 'Test',
       },
@@ -149,7 +149,7 @@ describe('policy_enforcer', () => {
     const toolCall: FunctionCall = { name: 'testTool', args: {} };
     const policy = {
       testTool: {
-        permissions: 'ALLOW' as const,
+        permissions: SafetyCheckDecision.ALLOW,
         constraints: 'None',
         rationale: 'Test',
       },

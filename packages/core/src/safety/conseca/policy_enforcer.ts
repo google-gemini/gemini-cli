@@ -29,7 +29,7 @@ Evaluate the tool call against the policy.
 1. Check if the tool is allowed.
 2. Check if the arguments match the constraints.
 3. Output a JSON object with:
-   - "decision": "ALLOW" or "DENY".
+   - "decision": "allow" or "deny".
    - "reason": A brief explanation.
 
 Output strictly JSON.
