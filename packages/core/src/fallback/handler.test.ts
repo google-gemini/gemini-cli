@@ -76,7 +76,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     fallbackHandler: undefined,
     getFallbackModelHandler: vi.fn(),
     getModelAvailabilityService: vi.fn(() =>
-      createAvailabilityMock({ selected: FALLBACK_MODEL, skipped: [] }),
+      createAvailabilityMock({ selectedModel: FALLBACK_MODEL, skipped: [] }),
     ),
     getModel: vi.fn(() => MOCK_PRO_MODEL),
     getPreviewFeatures: vi.fn(() => false),
@@ -539,7 +539,7 @@ describe('handleFallback', () => {
     beforeEach(() => {
       vi.clearAllMocks();
       availability = createAvailabilityMock({
-        selected: 'gemini-1.5-flash',
+        selectedModel: 'gemini-1.5-flash',
         skipped: [],
       });
       policyHandler = vi.fn().mockResolvedValue('retry_once');
@@ -564,7 +564,7 @@ describe('handleFallback', () => {
     it('falls back to last resort when availability returns null', async () => {
       availability.selectFirstAvailable = vi
         .fn()
-        .mockReturnValue({ selected: null, skipped: [] });
+        .mockReturnValue({ selectedModel: null, skipped: [] });
       policyHandler.mockResolvedValue('retry_once');
 
       await handleFallback(policyConfig, MOCK_PRO_MODEL, AUTH_OAUTH);
@@ -593,7 +593,7 @@ describe('handleFallback', () => {
 
       try {
         availability.selectFirstAvailable = vi.fn().mockReturnValue({
-          selected: DEFAULT_GEMINI_FLASH_MODEL,
+          selectedModel: DEFAULT_GEMINI_FLASH_MODEL,
           skipped: [],
         });
 
@@ -633,7 +633,7 @@ describe('handleFallback', () => {
     it('successfully follows expected availability response for Preview Chain', async () => {
       availability.selectFirstAvailable = vi
         .fn()
-        .mockReturnValue({ selected: DEFAULT_GEMINI_MODEL, skipped: [] });
+        .mockReturnValue({ selectedModel: DEFAULT_GEMINI_MODEL, skipped: [] });
       policyHandler.mockResolvedValue('retry_once');
       vi.spyOn(policyConfig, 'getPreviewFeatures').mockReturnValue(true);
       vi.spyOn(policyConfig, 'getModel').mockReturnValue(PREVIEW_GEMINI_MODEL);

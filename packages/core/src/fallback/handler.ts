@@ -100,6 +100,7 @@ async function legacyHandleFallback(
       failedModel,
       fallbackModel,
       authType,
+      error,
     );
   } catch (handlerError) {
     console.error('Fallback UI handler failed:', handlerError);
@@ -134,11 +135,15 @@ async function handlePolicyDrivenFallback(
     candidates.map((policy) => policy.model),
   );
 
-  const lastResortPolicy =
-    candidates.find((policy) => policy.isLastResort) ??
-    candidates[candidates.length - 1];
+  let lastResortPolicy = candidates.find((policy) => policy.isLastResort);
+  if (!lastResortPolicy) {
+    debugLogger.warn(
+      'No isLastResort policy found in candidates, using last candidate as fallback.',
+    );
+    lastResortPolicy = candidates[candidates.length - 1];
+  }
 
-  const fallbackModel = selection.selected ?? lastResortPolicy.model;
+  const fallbackModel = selection.selectedModel ?? lastResortPolicy.model;
   const selectedPolicy =
     candidates.find((policy) => policy.model === fallbackModel) ??
     lastResortPolicy;
@@ -157,13 +162,14 @@ async function handlePolicyDrivenFallback(
       failedModel,
       fallbackModel,
       authType,
+      error,
     );
   }
 
   // This will be used in the future when FallbackRecommendation is passed through UI
   const recommendation: FallbackRecommendation = {
     ...selection,
-    selected: fallbackModel,
+    selectedModel: fallbackModel,
     action,
     failureKind,
     failedPolicy,
@@ -208,12 +214,16 @@ async function processIntent(
   failedModel: string,
   fallbackModel: string,
   authType?: string,
+  error?: unknown,
 ): Promise<boolean> {
   switch (intent) {
     case 'retry_always':
       // If the error is non-retryable, e.g. TerminalQuota Error, trigger a regular fallback to flash.
       // For all other errors, activate previewModel fallback.
-      if (shouldActivatePreviewFallback) {
+      if (
+        failedModel === PREVIEW_GEMINI_MODEL &&
+        !(error instanceof TerminalQuotaError)
+      ) {
         activatePreviewModelFallbackMode(config);
       } else {
         activateFallbackMode(config, authType);
