@@ -495,7 +495,9 @@ describe('mcp-client', () => {
       });
 
       it('with headers', async () => {
-        const transport = await createTransport(
+        // We need this to be an any type because we dig into its private state.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const transport: any = await createTransport(
           'test-server',
           {
             httpUrl: 'http://test-server',
@@ -530,7 +532,9 @@ describe('mcp-client', () => {
       });
 
       it('with headers', async () => {
-        const transport = await createTransport(
+        // We need this to be an any type because we dig into its private state.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const transport: any = await createTransport(
           'test-server',
           {
             url: 'http://test-server',
