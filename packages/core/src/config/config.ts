@@ -87,7 +87,7 @@ import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
-import { ApprovalMode, InProcessCheckerType } from '../policy/types.js';
+import { ApprovalMode } from '../policy/types.js';
 import { CheckerRunner } from '../safety/checker-runner.js';
 import { ContextBuilder } from '../safety/context-builder.js';
 import { CheckerRegistry } from '../safety/registry.js';
@@ -585,13 +585,6 @@ export class Config {
     if (this.safety.enableConseca) {
       debugLogger.log('[SAFETY] Registering Conseca Safety Checker');
       ConsecaSafetyChecker.getInstance().setConfig(this);
-      this.policyEngine.addChecker({
-        checker: {
-          type: 'in-process',
-          name: InProcessCheckerType.CONSECA,
-        },
-        priority: 100, // High priority
-      });
     }
 
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);

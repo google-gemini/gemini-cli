@@ -53,6 +53,14 @@ export class ConsecaSafetyChecker implements InProcessChecker {
       };
     }
 
+    if (!this.config.safety.enableConseca) {
+      debugLogger.debug('[Conseca] check skipped: Conseca is not enabled.');
+      return {
+        decision: SafetyCheckDecision.ALLOW,
+        reason: 'Conseca is disabled',
+      };
+    }
+
     const userPrompt = this.extractUserPrompt(input);
     let trustedContent = '';
 
