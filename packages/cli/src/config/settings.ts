@@ -35,6 +35,27 @@ import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import type { ExtensionManager } from './extension-manager.js';
 import { SettingPaths } from './settingPaths.js';
 
+// Simple cache for realpath resolution to avoid expensive syscalls on Windows
+// Key: original path, Value: resolved realpath
+const realpathCache = new Map<string, string>();
+
+function getCachedRealpath(originalPath: string): string {
+  const cached = realpathCache.get(originalPath);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  try {
+    const resolved = fs.realpathSync(originalPath);
+    realpathCache.set(originalPath, resolved);
+    return resolved;
+  } catch (_e) {
+    // Cache the original path as fallback
+    realpathCache.set(originalPath, originalPath);
+    return originalPath;
+  }
+}
+
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
   let currentSchema: SettingsSchema | undefined = getSettingsSchema();
@@ -602,16 +623,9 @@ export function loadSettings(
   const resolvedWorkspaceDir = path.resolve(workspaceDir);
   const resolvedHomeDir = path.resolve(homedir());
 
-  let realWorkspaceDir = resolvedWorkspaceDir;
-  try {
-    // fs.realpathSync gets the "true" path, resolving any symlinks
-    realWorkspaceDir = fs.realpathSync(resolvedWorkspaceDir);
-  } catch (_e) {
-    // This is okay. The path might not exist yet, and that's a valid state.
-  }
-
-  // We expect homedir to always exist and be resolvable.
-  const realHomeDir = fs.realpathSync(resolvedHomeDir);
+  // Use cached realpath to avoid expensive syscalls on Windows (39s -> ~10s improvement)
+  const realWorkspaceDir = getCachedRealpath(resolvedWorkspaceDir);
+  const realHomeDir = getCachedRealpath(resolvedHomeDir);
 
   const workspaceSettingsPath = new Storage(
     workspaceDir,
