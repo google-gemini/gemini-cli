@@ -12,6 +12,7 @@ import {
   beforeEach,
   afterEach,
   type Mocked,
+  type Mock,
 } from 'vitest';
 
 import type { GenerateContentResponse } from '@google/genai';
@@ -69,14 +70,6 @@ const mockContentGenerator = {
   embedContent: mockEmbedContent,
 } as unknown as Mocked<ContentGenerator>;
 
-const mockConfig = {
-  getSessionId: vi.fn().mockReturnValue('test-session-id'),
-  getContentGeneratorConfig: vi
-    .fn()
-    .mockReturnValue({ authType: AuthType.USE_GEMINI }),
-  getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
-} as unknown as Mocked<Config>;
-
 // Helper to create a mock GenerateContentResponse
 const createMockResponse = (text: string): GenerateContentResponse =>
   ({
@@ -87,6 +80,7 @@ describe('BaseLlmClient', () => {
   let client: BaseLlmClient;
   let abortController: AbortController;
   let defaultOptions: GenerateJsonOptions;
+  let mockConfig: Mocked<Config>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -94,12 +88,31 @@ describe('BaseLlmClient', () => {
     vi.mocked(getErrorMessage).mockImplementation((e) =>
       e instanceof Error ? e.message : String(e),
     );
+
+    mockConfig = {
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      getContentGeneratorConfig: vi
+        .fn()
+        .mockReturnValue({ authType: AuthType.USE_GEMINI }),
+      getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+      isInteractive: vi.fn().mockReturnValue(false),
+      modelConfigService: {
+        getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
+          model,
+          generateContentConfig: {
+            temperature: 0,
+            topP: 1,
+          },
+        })),
+      },
+    } as unknown as Mocked<Config>;
+
     client = new BaseLlmClient(mockContentGenerator, mockConfig);
     abortController = new AbortController();
     defaultOptions = {
+      modelConfigKey: { model: 'test-model' },
       contents: [{ role: 'user', parts: [{ text: 'Give me a color.' }] }],
       schema: { type: 'object', properties: { color: { type: 'string' } } },
-      model: 'test-model',
       abortSignal: abortController.signal,
       promptId: 'test-prompt-id',
     };
@@ -135,37 +148,14 @@ describe('BaseLlmClient', () => {
           contents: defaultOptions.contents,
           config: {
             abortSignal: defaultOptions.abortSignal,
-            temperature: 0,
-            topP: 1,
             responseJsonSchema: defaultOptions.schema,
             responseMimeType: 'application/json',
+            temperature: 0,
+            topP: 1,
             // Crucial: systemInstruction should NOT be in the config object if not provided
           },
         },
         'test-prompt-id',
-      );
-    });
-
-    it('should respect configuration overrides', async () => {
-      const mockResponse = createMockResponse('{"color": "red"}');
-      mockGenerateContent.mockResolvedValue(mockResponse);
-
-      const options: GenerateJsonOptions = {
-        ...defaultOptions,
-        config: { temperature: 0.8, topK: 10 },
-      };
-
-      await client.generateJson(options);
-
-      expect(mockGenerateContent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          config: expect.objectContaining({
-            temperature: 0.8,
-            topP: 1, // Default should remain if not overridden
-            topK: 10,
-          }),
-        }),
-        expect.any(String),
       );
     });
 
@@ -296,7 +286,7 @@ describe('BaseLlmClient', () => {
       const calls = vi.mocked(logMalformedJsonResponse).mock.calls;
       const lastCall = calls[calls.length - 1];
       const event = lastCall[1] as MalformedJsonResponseEvent;
-      expect(event.model).toBe('test-model');
+      expect(event.model).toBe(defaultOptions.modelConfigKey.model);
     });
 
     it('should handle extra whitespace correctly without logging malformed telemetry', async () => {
@@ -310,6 +300,45 @@ describe('BaseLlmClient', () => {
       expect(result).toEqual({ color: 'orange' });
       expect(logMalformedJsonResponse).not.toHaveBeenCalled();
     });
+
+    it('should use the resolved model name when logging malformed JSON telemetry', async () => {
+      const aliasModel = 'fast-alias';
+      const resolvedModel = 'gemini-1.5-flash';
+
+      // Override the mock for this specific test to simulate resolution
+      (
+        mockConfig.modelConfigService.getResolvedConfig as unknown as Mock
+      ).mockReturnValue({
+        model: resolvedModel,
+        generateContentConfig: {
+          temperature: 0,
+          topP: 1,
+        },
+      });
+
+      const malformedResponse = '```json\n{"color": "red"}\n```';
+      mockGenerateContent.mockResolvedValue(
+        createMockResponse(malformedResponse),
+      );
+
+      const options = {
+        ...defaultOptions,
+        modelConfigKey: { model: aliasModel },
+      };
+
+      const result = await client.generateJson(options);
+
+      expect(result).toEqual({ color: 'red' });
+
+      expect(logMalformedJsonResponse).toHaveBeenCalled();
+      const calls = vi.mocked(logMalformedJsonResponse).mock.calls;
+      const lastCall = calls[calls.length - 1];
+      const event = lastCall[1] as MalformedJsonResponseEvent;
+
+      // This is the key assertion: it should be the resolved model, not the alias
+      expect(event.model).toBe(resolvedModel);
+      expect(event.model).not.toBe(aliasModel);
+    });
   });
 
   describe('generateJson - Error Handling', () => {
@@ -317,14 +346,14 @@ describe('BaseLlmClient', () => {
       mockGenerateContent.mockResolvedValue(createMockResponse(''));
 
       await expect(client.generateJson(defaultOptions)).rejects.toThrow(
-        'Failed to generate JSON content: Retry attempts exhausted for invalid content',
+        'Failed to generate content: Retry attempts exhausted for invalid content',
       );
 
       // Verify error reporting details
       expect(reportError).toHaveBeenCalledTimes(1);
       expect(reportError).toHaveBeenCalledWith(
         expect.any(Error),
-        'API returned invalid content (empty or unparsable JSON) after all retries.',
+        'API returned invalid content after all retries.',
         defaultOptions.contents,
         'generateJson-invalid-content',
       );
@@ -335,13 +364,13 @@ describe('BaseLlmClient', () => {
       mockGenerateContent.mockResolvedValue(createMockResponse(invalidJson));
 
       await expect(client.generateJson(defaultOptions)).rejects.toThrow(
-        'Failed to generate JSON content: Retry attempts exhausted for invalid content',
+        'Failed to generate content: Retry attempts exhausted for invalid content',
       );
 
       expect(reportError).toHaveBeenCalledTimes(1);
       expect(reportError).toHaveBeenCalledWith(
         expect.any(Error),
-        'API returned invalid content (empty or unparsable JSON) after all retries.',
+        'API returned invalid content after all retries.',
         defaultOptions.contents,
         'generateJson-invalid-content',
       );
@@ -353,14 +382,14 @@ describe('BaseLlmClient', () => {
       mockGenerateContent.mockRejectedValue(apiError);
 
       await expect(client.generateJson(defaultOptions)).rejects.toThrow(
-        'Failed to generate JSON content: Service Unavailable (503)',
+        'Failed to generate content: Service Unavailable (503)',
       );
 
       // Verify generic error reporting
       expect(reportError).toHaveBeenCalledTimes(1);
       expect(reportError).toHaveBeenCalledWith(
         apiError,
-        'Error generating JSON content via API.',
+        'Error generating content via API.',
         defaultOptions.contents,
         'generateJson-api',
       );
@@ -472,6 +501,95 @@ describe('BaseLlmClient', () => {
 
       await expect(client.generateEmbedding(texts)).rejects.toThrow(
         'API Failure',
+      );
+    });
+  });
+
+  describe('generateContent', () => {
+    it('should call generateContent with correct parameters and utilize retry mechanism', async () => {
+      const mockResponse = createMockResponse('This is the content.');
+      mockGenerateContent.mockResolvedValue(mockResponse);
+
+      const options = {
+        modelConfigKey: { model: 'test-model' },
+        contents: [{ role: 'user', parts: [{ text: 'Give me content.' }] }],
+        abortSignal: abortController.signal,
+        promptId: 'content-prompt-id',
+      };
+
+      const result = await client.generateContent(options);
+
+      expect(result).toBe(mockResponse);
+
+      // Ensure the retry mechanism was engaged
+      expect(retryWithBackoff).toHaveBeenCalledTimes(1);
+      expect(retryWithBackoff).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({
+          shouldRetryOnContent: expect.any(Function),
+        }),
+      );
+
+      // Validate the parameters passed to the underlying generator
+      expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        {
+          model: 'test-model',
+          contents: options.contents,
+          config: {
+            abortSignal: options.abortSignal,
+            temperature: 0,
+            topP: 1,
+          },
+        },
+        'content-prompt-id',
+      );
+    });
+
+    it('should validate content using shouldRetryOnContent function', async () => {
+      const mockResponse = createMockResponse('Some valid content.');
+      mockGenerateContent.mockResolvedValue(mockResponse);
+
+      const options = {
+        modelConfigKey: { model: 'test-model' },
+        contents: [{ role: 'user', parts: [{ text: 'Give me content.' }] }],
+        abortSignal: abortController.signal,
+        promptId: 'content-prompt-id',
+      };
+
+      await client.generateContent(options);
+
+      const retryCall = vi.mocked(retryWithBackoff).mock.calls[0];
+      const shouldRetryOnContent = retryCall[1]?.shouldRetryOnContent;
+
+      // Valid content should not trigger retry
+      expect(shouldRetryOnContent!(mockResponse)).toBe(false);
+
+      // Empty response should trigger retry
+      expect(shouldRetryOnContent!(createMockResponse(''))).toBe(true);
+      expect(shouldRetryOnContent!(createMockResponse('   '))).toBe(true);
+    });
+
+    it('should throw and report error for empty response after retry exhaustion', async () => {
+      mockGenerateContent.mockResolvedValue(createMockResponse(''));
+      const options = {
+        modelConfigKey: { model: 'test-model' },
+        contents: [{ role: 'user', parts: [{ text: 'Give me content.' }] }],
+        abortSignal: abortController.signal,
+        promptId: 'content-prompt-id',
+      };
+
+      await expect(client.generateContent(options)).rejects.toThrow(
+        'Failed to generate content: Retry attempts exhausted for invalid content',
+      );
+
+      // Verify error reporting details
+      expect(reportError).toHaveBeenCalledTimes(1);
+      expect(reportError).toHaveBeenCalledWith(
+        expect.any(Error),
+        'API returned invalid content after all retries.',
+        options.contents,
+        'generateContent-invalid-content',
       );
     });
   });

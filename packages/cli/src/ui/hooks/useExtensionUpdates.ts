@@ -78,14 +78,15 @@ export const useConfirmUpdateRequests = () => {
 };
 
 export const useExtensionUpdates = (
-  extensions: GeminiCLIExtension[],
   extensionManager: ExtensionManager,
   addItem: UseHistoryManagerReturn['addItem'],
+  enableExtensionReloading: boolean,
 ) => {
   const [extensionsUpdateState, dispatchExtensionStateUpdate] = useReducer(
     extensionUpdatesReducer,
     initialExtensionUpdatesState,
   );
+  const extensions = extensionManager.getExtensions();
 
   useEffect(() => {
     const extensionsToCheck = extensions.filter((extension) => {
@@ -163,6 +164,7 @@ export const useExtensionUpdates = (
           extensionManager,
           currentState.status,
           dispatchExtensionStateUpdate,
+          enableExtensionReloading,
         );
         updatePromises.push(updatePromise);
         updatePromise
@@ -209,7 +211,13 @@ export const useExtensionUpdates = (
         });
       });
     }
-  }, [extensions, extensionManager, extensionsUpdateState, addItem]);
+  }, [
+    extensions,
+    extensionManager,
+    extensionsUpdateState,
+    addItem,
+    enableExtensionReloading,
+  ]);
 
   const extensionsUpdateStateComputed = useMemo(() => {
     const result = new Map<string, ExtensionUpdateState>();

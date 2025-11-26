@@ -49,6 +49,7 @@ import type {
   TaskMetadata,
   Thought,
   ThoughtSummary,
+  Citation,
 } from '../types.js';
 import type { PartUnion, Part as genAiPart } from '@google/genai';
 
@@ -112,7 +113,7 @@ export class Task {
   // state managed within the @gemini-cli/core module.
   async getMetadata(): Promise<TaskMetadata> {
     const toolRegistry = await this.config.getToolRegistry();
-    const mcpServers = this.config.getMcpServers() || {};
+    const mcpServers = this.config.getMcpClientManager()?.getMcpServers() || {};
     const serverStatuses = getAllMCPServerStatuses();
     const servers = Object.keys(mcpServers).map((serverName) => ({
       name: serverName,
@@ -435,7 +436,6 @@ export class Task {
       onToolCallsUpdate: this._schedulerToolCallsUpdate.bind(this),
       getPreferredEditor: () => 'vscode',
       config: this.config,
-      onEditorClose: () => {},
     });
     return scheduler;
   }
@@ -460,7 +460,7 @@ export class Task {
   ): Message {
     const messageParts: Part[] = [];
 
-    // Create a serializable version of the ToolCall (pick necesssary
+    // Create a serializable version of the ToolCall (pick necessary
     // properties/avoid methods causing circular reference errors)
     const serializableToolCall: Partial<ToolCall> = this._pickFields(
       tc,
@@ -637,6 +637,10 @@ export class Task {
       case GeminiEventType.Thought:
         logger.info('[Task] Sending agent thought...');
         this._sendThought(event.value, traceId);
+        break;
+      case GeminiEventType.Citation:
+        logger.info('[Task] Received citation from LLM stream.');
+        this._sendCitation(event.value);
         break;
       case GeminiEventType.ChatCompressed:
         break;
@@ -977,6 +981,20 @@ export class Task {
         undefined,
         traceId,
       ),
+    );
+  }
+
+  _sendCitation(citation: string) {
+    if (!citation || citation.trim() === '') {
+      return;
+    }
+    logger.info('[Task] Sending citation to event bus.');
+    const message = this._createTextMessage(citation);
+    const citationEvent: Citation = {
+      kind: CoderAgentEvent.CitationEvent,
+    };
+    this.eventBus?.publish(
+      this._createStatusUpdateEvent(this.taskState, citationEvent, message),
     );
   }
 }

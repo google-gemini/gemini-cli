@@ -25,6 +25,7 @@ import {
   ToolCallEvent,
   logToolOutputTruncated,
   ToolOutputTruncatedEvent,
+  runInDevTraceSpan,
 } from '../index.js';
 import { READ_FILE_TOOL_NAME, SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import type { Part, PartListUnion } from '@google/genai';
@@ -47,6 +48,10 @@ import { ShellToolInvocation } from '../tools/shell.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import {
+  fireToolNotificationHook,
+  executeToolWithHooks,
+} from './coreToolHookTriggers.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -328,7 +333,6 @@ interface CoreToolSchedulerOptions {
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
   getPreferredEditor: () => EditorType | undefined;
-  onEditorClose: () => void;
 }
 
 export class CoreToolScheduler {
@@ -345,7 +349,6 @@ export class CoreToolScheduler {
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
-  private onEditorClose: () => void;
   private isFinalizingToolCalls = false;
   private isScheduling = false;
   private isCancelling = false;
@@ -364,7 +367,6 @@ export class CoreToolScheduler {
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
-    this.onEditorClose = options.onEditorClose;
 
     // Subscribe to message bus for ASK_USER policy decisions
     // Use a static WeakMap to ensure we only subscribe ONCE per MessageBus instance
@@ -668,36 +670,42 @@ export class CoreToolScheduler {
     request: ToolCallRequestInfo | ToolCallRequestInfo[],
     signal: AbortSignal,
   ): Promise<void> {
-    if (this.isRunning() || this.isScheduling) {
-      return new Promise((resolve, reject) => {
-        const abortHandler = () => {
-          // Find and remove the request from the queue
-          const index = this.requestQueue.findIndex(
-            (item) => item.request === request,
-          );
-          if (index > -1) {
-            this.requestQueue.splice(index, 1);
-            reject(new Error('Tool call cancelled while in queue.'));
-          }
-        };
+    return runInDevTraceSpan(
+      { name: 'schedule' },
+      async ({ metadata: spanMetadata }) => {
+        spanMetadata.input = request;
+        if (this.isRunning() || this.isScheduling) {
+          return new Promise((resolve, reject) => {
+            const abortHandler = () => {
+              // Find and remove the request from the queue
+              const index = this.requestQueue.findIndex(
+                (item) => item.request === request,
+              );
+              if (index > -1) {
+                this.requestQueue.splice(index, 1);
+                reject(new Error('Tool call cancelled while in queue.'));
+              }
+            };
 
-        signal.addEventListener('abort', abortHandler, { once: true });
+            signal.addEventListener('abort', abortHandler, { once: true });
 
-        this.requestQueue.push({
-          request,
-          signal,
-          resolve: () => {
-            signal.removeEventListener('abort', abortHandler);
-            resolve();
-          },
-          reject: (reason?: Error) => {
-            signal.removeEventListener('abort', abortHandler);
-            reject(reason);
-          },
-        });
-      });
-    }
-    return this._schedule(request, signal);
+            this.requestQueue.push({
+              request,
+              signal,
+              resolve: () => {
+                signal.removeEventListener('abort', abortHandler);
+                resolve();
+              },
+              reject: (reason?: Error) => {
+                signal.removeEventListener('abort', abortHandler);
+                reject(reason);
+              },
+            });
+          });
+        }
+        return this._schedule(request, signal);
+      },
+    );
   }
 
   cancelAll(signal: AbortSignal): void {
@@ -863,6 +871,13 @@ export class CoreToolScheduler {
             );
             this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
           } else {
+            // Fire Notification hook before showing confirmation to user
+            const messageBus = this.config.getMessageBus();
+            const hooksEnabled = this.config.getEnableHooks();
+            if (hooksEnabled && messageBus) {
+              await fireToolNotificationHook(messageBus, confirmationDetails);
+            }
+
             // Allow IDE to resolve confirmation
             if (
               confirmationDetails.type === 'edit' &&
@@ -972,6 +987,15 @@ export class CoreToolScheduler {
           isModifying: true,
         } as ToolCallConfirmationDetails);
 
+        const contentOverrides =
+          waitingToolCall.confirmationDetails.type === 'edit'
+            ? {
+                currentContent:
+                  waitingToolCall.confirmationDetails.originalContent,
+                proposedContent: waitingToolCall.confirmationDetails.newContent,
+              }
+            : undefined;
+
         const { updatedParams, updatedDiff } = await modifyWithEditor<
           typeof waitingToolCall.request.args
         >(
@@ -979,7 +1003,7 @@ export class CoreToolScheduler {
           modifyContext as ModifyContext<typeof waitingToolCall.request.args>,
           editorType,
           signal,
-          this.onEditorClose,
+          contentOverrides,
         );
         this.setArgsInternal(callId, updatedParams);
         this.setStatusInternal(callId, 'awaiting_approval', signal, {
@@ -1090,135 +1114,164 @@ export class CoreToolScheduler {
             : undefined;
 
         const shellExecutionConfig = this.config.getShellExecutionConfig();
+        const hooksEnabled = this.config.getEnableHooks();
+        const messageBus = this.config.getMessageBus();
 
-        // TODO: Refactor to remove special casing for ShellToolInvocation.
-        // Introduce a generic callbacks object for the execute method to handle
-        // things like `onPid` and `onLiveOutput`. This will make the scheduler
-        // agnostic to the invocation type.
-        let promise: Promise<ToolResult>;
-        if (invocation instanceof ShellToolInvocation) {
-          const setPidCallback = (pid: number) => {
-            this.toolCalls = this.toolCalls.map((tc) =>
-              tc.request.callId === callId && tc.status === 'executing'
-                ? { ...tc, pid }
-                : tc,
-            );
-            this.notifyToolCallsUpdate();
-          };
-          promise = invocation.execute(
-            signal,
-            liveOutputCallback,
-            shellExecutionConfig,
-            setPidCallback,
-          );
-        } else {
-          promise = invocation.execute(
-            signal,
-            liveOutputCallback,
-            shellExecutionConfig,
-          );
-        }
-
-        try {
-          const toolResult: ToolResult = await promise;
-          if (signal.aborted) {
-            this.setStatusInternal(
-              callId,
-              'cancelled',
-              signal,
-              'User cancelled tool execution.',
-            );
-          } else if (toolResult.error === undefined) {
-            let content = toolResult.llmContent;
-            let outputFile: string | undefined = undefined;
-            const contentLength =
-              typeof content === 'string' ? content.length : undefined;
-            if (
-              typeof content === 'string' &&
-              toolName === SHELL_TOOL_NAME &&
-              this.config.getEnableToolOutputTruncation() &&
-              this.config.getTruncateToolOutputThreshold() > 0 &&
-              this.config.getTruncateToolOutputLines() > 0
-            ) {
-              const originalContentLength = content.length;
-              const threshold = this.config.getTruncateToolOutputThreshold();
-              const lines = this.config.getTruncateToolOutputLines();
-              const truncatedResult = await truncateAndSaveToFile(
-                content,
-                callId,
-                this.config.storage.getProjectTempDir(),
-                threshold,
-                lines,
+        await runInDevTraceSpan(
+          {
+            name: toolCall.tool.name,
+            attributes: { type: 'tool-call' },
+          },
+          async ({ metadata: spanMetadata }) => {
+            spanMetadata.input = {
+              request: toolCall.request,
+            };
+            // TODO: Refactor to remove special casing for ShellToolInvocation.
+            // Introduce a generic callbacks object for the execute method to handle
+            // things like `onPid` and `onLiveOutput`. This will make the scheduler
+            // agnostic to the invocation type.
+            let promise: Promise<ToolResult>;
+            if (invocation instanceof ShellToolInvocation) {
+              const setPidCallback = (pid: number) => {
+                this.toolCalls = this.toolCalls.map((tc) =>
+                  tc.request.callId === callId && tc.status === 'executing'
+                    ? { ...tc, pid }
+                    : tc,
+                );
+                this.notifyToolCallsUpdate();
+              };
+              promise = executeToolWithHooks(
+                invocation,
+                toolName,
+                signal,
+                messageBus,
+                hooksEnabled,
+                liveOutputCallback,
+                shellExecutionConfig,
+                setPidCallback,
               );
-              content = truncatedResult.content;
-              outputFile = truncatedResult.outputFile;
+            } else {
+              promise = executeToolWithHooks(
+                invocation,
+                toolName,
+                signal,
+                messageBus,
+                hooksEnabled,
+                liveOutputCallback,
+                shellExecutionConfig,
+              );
+            }
 
-              if (outputFile) {
-                logToolOutputTruncated(
-                  this.config,
-                  new ToolOutputTruncatedEvent(
-                    scheduledCall.request.prompt_id,
-                    {
-                      toolName,
-                      originalContentLength,
-                      truncatedContentLength: content.length,
-                      threshold,
-                      lines,
-                    },
+            try {
+              const toolResult: ToolResult = await promise;
+              spanMetadata.output = toolResult;
+              if (signal.aborted) {
+                this.setStatusInternal(
+                  callId,
+                  'cancelled',
+                  signal,
+                  'User cancelled tool execution.',
+                );
+              } else if (toolResult.error === undefined) {
+                let content = toolResult.llmContent;
+                let outputFile: string | undefined = undefined;
+                const contentLength =
+                  typeof content === 'string' ? content.length : undefined;
+                if (
+                  typeof content === 'string' &&
+                  toolName === SHELL_TOOL_NAME &&
+                  this.config.getEnableToolOutputTruncation() &&
+                  this.config.getTruncateToolOutputThreshold() > 0 &&
+                  this.config.getTruncateToolOutputLines() > 0
+                ) {
+                  const originalContentLength = content.length;
+                  const threshold =
+                    this.config.getTruncateToolOutputThreshold();
+                  const lines = this.config.getTruncateToolOutputLines();
+                  const truncatedResult = await truncateAndSaveToFile(
+                    content,
+                    callId,
+                    this.config.storage.getProjectTempDir(),
+                    threshold,
+                    lines,
+                  );
+                  content = truncatedResult.content;
+                  outputFile = truncatedResult.outputFile;
+
+                  if (outputFile) {
+                    logToolOutputTruncated(
+                      this.config,
+                      new ToolOutputTruncatedEvent(
+                        scheduledCall.request.prompt_id,
+                        {
+                          toolName,
+                          originalContentLength,
+                          truncatedContentLength: content.length,
+                          threshold,
+                          lines,
+                        },
+                      ),
+                    );
+                  }
+                }
+
+                const response = convertToFunctionResponse(
+                  toolName,
+                  callId,
+                  content,
+                );
+                const successResponse: ToolCallResponseInfo = {
+                  callId,
+                  responseParts: response,
+                  resultDisplay: toolResult.returnDisplay,
+                  error: undefined,
+                  errorType: undefined,
+                  outputFile,
+                  contentLength,
+                };
+                this.setStatusInternal(
+                  callId,
+                  'success',
+                  signal,
+                  successResponse,
+                );
+              } else {
+                // It is a failure
+                const error = new Error(toolResult.error.message);
+                const errorResponse = createErrorResponse(
+                  scheduledCall.request,
+                  error,
+                  toolResult.error.type,
+                );
+                this.setStatusInternal(callId, 'error', signal, errorResponse);
+              }
+            } catch (executionError: unknown) {
+              spanMetadata.error = executionError;
+              if (signal.aborted) {
+                this.setStatusInternal(
+                  callId,
+                  'cancelled',
+                  signal,
+                  'User cancelled tool execution.',
+                );
+              } else {
+                this.setStatusInternal(
+                  callId,
+                  'error',
+                  signal,
+                  createErrorResponse(
+                    scheduledCall.request,
+                    executionError instanceof Error
+                      ? executionError
+                      : new Error(String(executionError)),
+                    ToolErrorType.UNHANDLED_EXCEPTION,
                   ),
                 );
               }
             }
-
-            const response = convertToFunctionResponse(
-              toolName,
-              callId,
-              content,
-            );
-            const successResponse: ToolCallResponseInfo = {
-              callId,
-              responseParts: response,
-              resultDisplay: toolResult.returnDisplay,
-              error: undefined,
-              errorType: undefined,
-              outputFile,
-              contentLength,
-            };
-            this.setStatusInternal(callId, 'success', signal, successResponse);
-          } else {
-            // It is a failure
-            const error = new Error(toolResult.error.message);
-            const errorResponse = createErrorResponse(
-              scheduledCall.request,
-              error,
-              toolResult.error.type,
-            );
-            this.setStatusInternal(callId, 'error', signal, errorResponse);
-          }
-        } catch (executionError: unknown) {
-          if (signal.aborted) {
-            this.setStatusInternal(
-              callId,
-              'cancelled',
-              signal,
-              'User cancelled tool execution.',
-            );
-          } else {
-            this.setStatusInternal(
-              callId,
-              'error',
-              signal,
-              createErrorResponse(
-                scheduledCall.request,
-                executionError instanceof Error
-                  ? executionError
-                  : new Error(String(executionError)),
-                ToolErrorType.UNHANDLED_EXCEPTION,
-              ),
-            );
-          }
-        }
-        await this.checkAndNotifyCompletion(signal);
+            await this.checkAndNotifyCompletion(signal);
+          },
+        );
       }
     }
   }

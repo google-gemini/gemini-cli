@@ -38,7 +38,6 @@ export {
   logFlashFallback,
   logSlashCommand,
   logConversationFinishedEvent,
-  logKittySequenceOverflow,
   logChatCompression,
   logToolOutputTruncated,
   logExtensionEnable,
@@ -59,7 +58,6 @@ export {
   StartSessionEvent,
   ToolCallEvent,
   ConversationFinishedEvent,
-  KittySequenceOverflowEvent,
   ToolOutputTruncatedEvent,
   WebFetchFallbackAttemptEvent,
   ToolCallDecision,
@@ -126,6 +124,7 @@ export {
   recordBaselineComparison,
   isPerformanceMonitoringActive,
   recordFlickerFrame,
+  recordSlowRender,
   // Performance monitoring types
   PerformanceMetricType,
   MemoryMetricType,
@@ -137,3 +136,4 @@ export {
   GenAiProviderName,
   GenAiTokenType,
 } from './metrics.js';
+export { runInDevTraceSpan, type SpanMetadata } from './trace.js';

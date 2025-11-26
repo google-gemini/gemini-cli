@@ -13,6 +13,8 @@ import { disableCommand } from './extensions/disable.js';
 import { enableCommand } from './extensions/enable.js';
 import { linkCommand } from './extensions/link.js';
 import { newCommand } from './extensions/new.js';
+import { validateCommand } from './extensions/validate.js';
+import { initializeOutputListenersAndFlush } from '../gemini.js';
 
 export const extensionsCommand: CommandModule = {
   command: 'extensions <command>',
@@ -20,6 +22,7 @@ export const extensionsCommand: CommandModule = {
   describe: 'Manage Gemini CLI extensions.',
   builder: (yargs) =>
     yargs
+      .middleware(() => initializeOutputListenersAndFlush())
       .command(installCommand)
       .command(uninstallCommand)
       .command(listCommand)
@@ -28,6 +31,7 @@ export const extensionsCommand: CommandModule = {
       .command(enableCommand)
       .command(linkCommand)
       .command(newCommand)
+      .command(validateCommand)
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
   handler: () => {

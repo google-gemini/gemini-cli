@@ -11,6 +11,7 @@ import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 export async function handleList() {
   try {
@@ -19,9 +20,9 @@ export async function handleList() {
       workspaceDir,
       requestConsent: requestConsentNonInteractive,
       requestSetting: promptForSetting,
-      loadedSettings: loadSettings(workspaceDir),
+      settings: loadSettings(workspaceDir).merged,
     });
-    const extensions = extensionManager.loadExtensions();
+    const extensions = await extensionManager.loadExtensions();
     if (extensions.length === 0) {
       debugLogger.log('No extensions installed.');
       return;
@@ -45,5 +46,6 @@ export const listCommand: CommandModule = {
   builder: (yargs) => yargs,
   handler: async () => {
     await handleList();
+    await exitCli();
   },
 };

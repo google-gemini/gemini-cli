@@ -473,21 +473,6 @@ a few things you can try in order of recommendation:
     "loadMemoryFromIncludeDirectories": true
     ```
 
-- **`chatCompression`** (object):
-  - **Description:** Controls the settings for chat history compression, both
-    automatic and when manually invoked through the /compress command.
-  - **Properties:**
-    - **`contextPercentageThreshold`** (number): A value between 0 and 1 that
-      specifies the token threshold for compression as a percentage of the
-      model's total token limit. For example, a value of `0.6` will trigger
-      compression when the chat history exceeds 60% of the token limit.
-  - **Example:**
-    ```json
-    "chatCompression": {
-      "contextPercentageThreshold": 0.6
-    }
-    ```
-
 - **`showLineNumbers`** (boolean):
   - **Description:** Controls whether line numbers are displayed in code blocks
     in the CLI output.
@@ -626,6 +611,9 @@ the `excludedProjectEnvVars` setting in your `settings.json` file.
 - **`GEMINI_SANDBOX`**:
   - Alternative to the `sandbox` setting in `settings.json`.
   - Accepts `true`, `false`, `docker`, `podman`, or a custom command string.
+- **`HTTP_PROXY` / `HTTPS_PROXY`**:
+  - Specifies the proxy server to use for outgoing HTTP/HTTPS requests.
+  - Example: `export HTTPS_PROXY="http://proxy.example.com:8080"`
 - **`SEATBELT_PROFILE`** (macOS specific):
   - Switches the Seatbelt (`sandbox-exec`) profile on macOS.
   - `permissive-open`: (Default) Restricts writes to the project folder (and a
@@ -707,8 +695,6 @@ for that specific session.
 - **`--telemetry-log-prompts`**:
   - Enables logging of prompts for telemetry. See
     [telemetry](../cli/telemetry.md) for more information.
-- **`--checkpointing`**:
-  - Enables [checkpointing](../cli/checkpointing.md).
 - **`--extensions <extension_name ...>`** (**`-e <extension_name ...>`**):
   - Specifies a list of extensions to use for the session. If not provided, all
     available extensions are used.
@@ -716,9 +702,6 @@ for that specific session.
   - Example: `gemini -e my-extension -e my-other-extension`
 - **`--list-extensions`** (**`-l`**):
   - Lists all available extensions and exits.
-- **`--proxy`**:
-  - Sets the proxy for the CLI.
-  - Example: `--proxy http://localhost:7890`.
 - **`--include-directories <dir1,dir2,...>`**:
   - Includes additional directories in the workspace for multi-directory
     support.

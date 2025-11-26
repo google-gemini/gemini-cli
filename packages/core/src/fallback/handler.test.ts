@@ -20,9 +20,15 @@ import { AuthType } from '../core/contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL,
 } from '../config/models.js';
 import { logFlashFallback } from '../telemetry/index.js';
 import type { FallbackModelHandler } from './types.js';
+import { ModelNotFoundError } from '../utils/httpErrors.js';
+import {
+  RetryableQuotaError,
+  TerminalQuotaError,
+} from '../utils/googleQuotaErrors.js';
 
 // Mock the telemetry logger and event class
 vi.mock('../telemetry/index.js', () => ({
@@ -39,7 +45,13 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
     isInFallbackMode: vi.fn(() => false),
     setFallbackMode: vi.fn(),
+    isPreviewModelFallbackMode: vi.fn(() => false),
+    setPreviewModelFallbackMode: vi.fn(),
+    isPreviewModelBypassMode: vi.fn(() => false),
+    setPreviewModelBypassMode: vi.fn(),
     fallbackHandler: undefined,
+    getFallbackModelHandler: vi.fn(),
+    isInteractive: vi.fn(() => false),
     ...overrides,
   }) as unknown as Config;
 
@@ -73,14 +85,15 @@ describe('handleFallback', () => {
     expect(mockConfig.setFallbackMode).not.toHaveBeenCalled();
   });
 
-  it('should return null if the failed model is already the fallback model', async () => {
+  it('should still consult the handler if the failed model is the fallback model', async () => {
+    mockHandler.mockResolvedValue('stop');
     const result = await handleFallback(
       mockConfig,
       FALLBACK_MODEL, // Failed model is Flash
       AUTH_OAUTH,
     );
-    expect(result).toBeNull();
-    expect(mockHandler).not.toHaveBeenCalled();
+    expect(result).toBe(false);
+    expect(mockHandler).toHaveBeenCalled();
   });
 
   it('should return null if no fallbackHandler is injected in config', async () => {
@@ -95,9 +108,9 @@ describe('handleFallback', () => {
     expect(result).toBeNull();
   });
 
-  describe('when handler returns "retry"', () => {
+  describe('when handler returns "retry_always"', () => {
     it('should activate fallback mode, log telemetry, and return true', async () => {
-      mockHandler.mockResolvedValue('retry');
+      mockHandler.mockResolvedValue('retry_always');
 
       const result = await handleFallback(
         mockConfig,
@@ -127,22 +140,6 @@ describe('handleFallback', () => {
     });
   });
 
-  describe('when handler returns "auth"', () => {
-    it('should NOT activate fallback mode and return false', async () => {
-      mockHandler.mockResolvedValue('auth');
-
-      const result = await handleFallback(
-        mockConfig,
-        MOCK_PRO_MODEL,
-        AUTH_OAUTH,
-      );
-
-      expect(result).toBe(false);
-      expect(mockConfig.setFallbackMode).not.toHaveBeenCalled();
-      expect(logFlashFallback).not.toHaveBeenCalled();
-    });
-  });
-
   describe('when handler returns an unexpected value', () => {
     it('should log an error and return null', async () => {
       mockHandler.mockResolvedValue(null);
@@ -166,7 +163,7 @@ describe('handleFallback', () => {
 
   it('should pass the correct context (failedModel, fallbackModel, error) to the handler', async () => {
     const mockError = new Error('Quota Exceeded');
-    mockHandler.mockResolvedValue('retry');
+    mockHandler.mockResolvedValue('retry_always');
 
     await handleFallback(mockConfig, MOCK_PRO_MODEL, AUTH_OAUTH, mockError);
 
@@ -185,7 +182,7 @@ describe('handleFallback', () => {
       setFallbackMode: vi.fn(),
     });
 
-    mockHandler.mockResolvedValue('retry');
+    mockHandler.mockResolvedValue('retry_always');
 
     const result = await handleFallback(
       activeFallbackConfig,
@@ -214,5 +211,243 @@ describe('handleFallback', () => {
       handlerError,
     );
     expect(mockConfig.setFallbackMode).not.toHaveBeenCalled();
+  });
+
+  describe('Preview Model Fallback Logic', () => {
+    const previewModel = PREVIEW_GEMINI_MODEL;
+
+    it('should only set Preview Model bypass mode on retryable quota failure', async () => {
+      const mockGoogleApiError = {
+        code: 429,
+        message: 'mock error',
+        details: [],
+      };
+      const retryableQuotaError = new RetryableQuotaError(
+        'Capacity error',
+        mockGoogleApiError,
+        5,
+      );
+      await handleFallback(
+        mockConfig,
+        previewModel,
+        AUTH_OAUTH,
+        retryableQuotaError,
+      );
+      expect(mockConfig.setPreviewModelBypassMode).toHaveBeenCalledWith(true);
+    });
+
+    it('should not set Preview Model bypass mode on non-retryable quota failure', async () => {
+      const mockGoogleApiError = {
+        code: 429,
+        message: 'mock error',
+        details: [],
+      };
+      const terminalQuotaError = new TerminalQuotaError(
+        'quota error',
+        mockGoogleApiError,
+        5,
+      );
+      await handleFallback(
+        mockConfig,
+        previewModel,
+        AUTH_OAUTH,
+        terminalQuotaError,
+      );
+
+      expect(mockConfig.setPreviewModelBypassMode).not.toHaveBeenCalled();
+    });
+
+    it('should silently retry if Preview Model fallback mode is already active and error is retryable error', async () => {
+      vi.spyOn(mockConfig, 'isPreviewModelFallbackMode').mockReturnValue(true);
+      const mockGoogleApiError = {
+        code: 429,
+        message: 'mock error',
+        details: [],
+      };
+      const retryableQuotaError = new RetryableQuotaError(
+        'Capacity error',
+        mockGoogleApiError,
+        5,
+      );
+      const result = await handleFallback(
+        mockConfig,
+        previewModel,
+        AUTH_OAUTH,
+        retryableQuotaError,
+      );
+
+      expect(result).toBe(true);
+      expect(mockHandler).not.toHaveBeenCalled();
+    });
+
+    it('should activate Preview Model fallback mode when handler returns "retry_always" and is RetryableQuotaError', async () => {
+      mockHandler.mockResolvedValue('retry_always');
+      const mockGoogleApiError = {
+        code: 429,
+        message: 'mock error',
+        details: [],
+      };
+      const retryableQuotaError = new RetryableQuotaError(
+        'Capacity error',
+        mockGoogleApiError,
+        5,
+      );
+      const result = await handleFallback(
+        mockConfig,
+        previewModel,
+        AUTH_OAUTH,
+        retryableQuotaError,
+      );
+
+      expect(result).toBe(true);
+      expect(mockConfig.setPreviewModelBypassMode).toHaveBeenCalledWith(true);
+      expect(mockConfig.setPreviewModelFallbackMode).toHaveBeenCalledWith(true);
+    });
+
+    it('should activate regular fallback when handler returns "retry_always" and is TerminalQuotaError', async () => {
+      mockHandler.mockResolvedValue('retry_always');
+      const mockGoogleApiError = {
+        code: 503,
+        message: 'mock error',
+        details: [],
+      };
+      const terminalError = new TerminalQuotaError(
+        'Quota error',
+        mockGoogleApiError,
+        5,
+      );
+      const result = await handleFallback(
+        mockConfig,
+        previewModel,
+        AUTH_OAUTH,
+        terminalError,
+      );
+
+      expect(result).toBe(true);
+      expect(mockConfig.setPreviewModelFallbackMode).not.toBeCalled();
+      expect(mockConfig.setFallbackMode).toHaveBeenCalledWith(true);
+    });
+
+    it('should NOT set fallback mode if user chooses "retry_once"', async () => {
+      const mockGoogleApiError = {
+        code: 429,
+        message: 'mock error',
+        details: [],
+      };
+      const terminalQuotaError = new TerminalQuotaError(
+        'quota error',
+        mockGoogleApiError,
+        5,
+      );
+      mockHandler.mockResolvedValue('retry_once');
+
+      const result = await handleFallback(
+        mockConfig,
+        PREVIEW_GEMINI_MODEL,
+        AuthType.LOGIN_WITH_GOOGLE,
+        terminalQuotaError,
+      );
+
+      expect(result).toBe(true);
+      expect(mockConfig.setPreviewModelBypassMode).not.toHaveBeenCalled();
+      expect(mockConfig.setPreviewModelFallbackMode).not.toHaveBeenCalled();
+      expect(mockConfig.setFallbackMode).not.toHaveBeenCalled();
+    });
+
+    it('should pass DEFAULT_GEMINI_MODEL as fallback when Preview Model fails with Retryable Error', async () => {
+      const mockFallbackHandler = vi.fn().mockResolvedValue('stop');
+      vi.mocked(mockConfig.fallbackModelHandler!).mockImplementation(
+        mockFallbackHandler,
+      );
+      const mockGoogleApiError = {
+        code: 429,
+        message: 'mock error',
+        details: [],
+      };
+      const retryableQuotaError = new RetryableQuotaError(
+        'Capacity error',
+        mockGoogleApiError,
+        5,
+      );
+
+      await handleFallback(
+        mockConfig,
+        PREVIEW_GEMINI_MODEL,
+        AuthType.LOGIN_WITH_GOOGLE,
+        retryableQuotaError,
+      );
+
+      expect(mockConfig.fallbackModelHandler).toHaveBeenCalledWith(
+        PREVIEW_GEMINI_MODEL,
+        DEFAULT_GEMINI_MODEL,
+        retryableQuotaError,
+      );
+    });
+
+    it('should pass DEFAULT_GEMINI_MODEL as fallback when Preview Model fails with other error', async () => {
+      await handleFallback(
+        mockConfig,
+        PREVIEW_GEMINI_MODEL,
+        AuthType.LOGIN_WITH_GOOGLE,
+      );
+
+      expect(mockConfig.fallbackModelHandler).toHaveBeenCalledWith(
+        PREVIEW_GEMINI_MODEL,
+        DEFAULT_GEMINI_MODEL,
+        undefined,
+      );
+    });
+
+    it('should pass DEFAULT_GEMINI_FLASH_MODEL as fallback when Preview Model fails with other error', async () => {
+      const mockGoogleApiError = {
+        code: 429,
+        message: 'mock error',
+        details: [],
+      };
+      const terminalQuotaError = new TerminalQuotaError(
+        'quota error',
+        mockGoogleApiError,
+        5,
+      );
+      await handleFallback(
+        mockConfig,
+        PREVIEW_GEMINI_MODEL,
+        AuthType.LOGIN_WITH_GOOGLE,
+        terminalQuotaError,
+      );
+
+      expect(mockConfig.fallbackModelHandler).toHaveBeenCalledWith(
+        PREVIEW_GEMINI_MODEL,
+        DEFAULT_GEMINI_FLASH_MODEL,
+        terminalQuotaError,
+      );
+    });
+  });
+
+  it('should return null if ModelNotFoundError occurs for a non-preview model', async () => {
+    const modelNotFoundError = new ModelNotFoundError('Not found');
+    const result = await handleFallback(
+      mockConfig,
+      DEFAULT_GEMINI_MODEL, // Not preview model
+      AUTH_OAUTH,
+      modelNotFoundError,
+    );
+    expect(result).toBeNull();
+    expect(mockHandler).not.toHaveBeenCalled();
+  });
+
+  it('should consult handler if ModelNotFoundError occurs for preview model', async () => {
+    const modelNotFoundError = new ModelNotFoundError('Not found');
+    mockHandler.mockResolvedValue('retry_always');
+
+    const result = await handleFallback(
+      mockConfig,
+      PREVIEW_GEMINI_MODEL,
+      AUTH_OAUTH,
+      modelNotFoundError,
+    );
+
+    expect(result).toBe(true);
+    expect(mockHandler).toHaveBeenCalled();
   });
 });

@@ -17,6 +17,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 const COLOR_GREEN = '\u001b[32m';
 const COLOR_YELLOW = '\u001b[33m';
@@ -28,12 +29,12 @@ async function getMcpServersFromConfig(): Promise<
 > {
   const settings = loadSettings();
   const extensionManager = new ExtensionManager({
-    loadedSettings: settings,
+    settings: settings.merged,
     workspaceDir: process.cwd(),
     requestConsent: requestConsentNonInteractive,
     requestSetting: promptForSetting,
   });
-  const extensions = extensionManager.loadExtensions();
+  const extensions = await extensionManager.loadExtensions();
   const mcpServers = { ...(settings.merged.mcpServers || {}) };
   for (const extension of extensions) {
     Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
@@ -145,5 +146,6 @@ export const listCommand: CommandModule = {
   describe: 'List all configured MCP servers',
   handler: async () => {
     await listMcpServers();
+    await exitCli();
   },
 };
