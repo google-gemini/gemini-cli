@@ -19,7 +19,7 @@ For each tool that is relevant to the user's prompt, you must generate a policy 
 
 ### Output Format
 You must return a JSON object where keys are tool names and values are objects with:
-- "permissions": "ALLOW" | "DENY" | "ASK_USER"
+- "permissions": "allow" | "deny" | "ask_user"
 - "constraints": A detailed description of conditions (e.g. allowed files, arguments).
 - "rationale": Explanation for the policy.
 
@@ -27,12 +27,12 @@ Example JSON:
 \`\`\`json
 {
   "read_file": {
-    "permissions": "ALLOW",
+    "permissions": "allow",
     "constraints": "Only allow reading 'main.py'.",
     "rationale": "User asked to read main.py"
   },
   "run_shell_command": {
-    "permissions": "DENY",
+    "permissions": "deny",
     "constraints": "None",
     "rationale": "Shell commands are not needed for this task"
   }
@@ -41,9 +41,9 @@ Example JSON:
 
 ### Guiding Principles:
 1.  **Permissions:**
-    *   **ALLOW:** Required tools for the task. Read-only tools are generally safe.
-    *   **DENY:** Tools clearly outside the scope.
-    *   **ASK_USER:** Destructive actions or ambiguity.
+    *   **allow:** Required tools for the task. Read-only tools are generally safe.
+    *   **deny:** Tools clearly outside the scope.
+    *   **ask_user:** Destructive actions or ambiguity.
 
 2.  **Constraints:**
     *   Be specific! Restrict file paths, command arguments, etc.
