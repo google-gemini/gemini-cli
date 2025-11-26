@@ -11,13 +11,17 @@ import {
 } from '@google/gemini-cli-core';
 
 import { getErrorMessage } from '../../utils/errors.js';
-import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import {
+  INSTALL_WARNING_MESSAGE,
+  requestConsentNonInteractive,
+} from '../../config/extensions/consent.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface InstallArgs {
   path: string;
+  consent?: boolean;
 }
 
 export async function handleLink(args: InstallArgs) {
@@ -26,10 +30,17 @@ export async function handleLink(args: InstallArgs) {
       source: args.path,
       type: 'link',
     };
+    const requestConsent = args.consent
+      ? () => Promise.resolve(true)
+      : requestConsentNonInteractive;
+    if (args.consent) {
+      debugLogger.log('You have consented to the following:');
+      debugLogger.log(INSTALL_WARNING_MESSAGE);
+    }
     const workspaceDir = process.cwd();
     const extensionManager = new ExtensionManager({
       workspaceDir,
-      requestConsent: requestConsentNonInteractive,
+      requestConsent,
       requestSetting: promptForSetting,
       settings: loadSettings(workspaceDir).merged,
     });
@@ -55,10 +66,17 @@ export const linkCommand: CommandModule = {
         describe: 'The name of the extension to link.',
         type: 'string',
       })
+      .option('consent', {
+        describe:
+          'Acknowledge the security risks of installing an extension and skip the confirmation prompt.',
+        type: 'boolean',
+        default: false,
+      })
       .check((_) => true),
   handler: async (argv) => {
     await handleLink({
       path: argv['path'] as string,
+      consent: argv['consent'] as boolean | undefined,
     });
   },
 };
