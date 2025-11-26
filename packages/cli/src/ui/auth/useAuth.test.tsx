@@ -214,6 +214,23 @@ describe('useAuth', () => {
       });
     });
 
+    it('should prioritize env key over stored key when both are present', async () => {
+      mockLoadApiKey.mockResolvedValue('stored-key');
+      process.env['GEMINI_API_KEY'] = 'env-key';
+      const { result } = renderHook(() =>
+        useAuthCommand(createSettings(AuthType.USE_GEMINI), mockConfig),
+      );
+
+      await waitFor(() => {
+        expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
+          AuthType.USE_GEMINI,
+        );
+        expect(result.current.authState).toBe(AuthState.Authenticated);
+        // The environment key should take precedence
+        expect(result.current.apiKeyDefaultValue).toBe('env-key');
+      });
+    });
+
     it('should set error if validation fails', async () => {
       mockValidateAuthMethod.mockReturnValue('Validation Failed');
       const { result } = renderHook(() =>

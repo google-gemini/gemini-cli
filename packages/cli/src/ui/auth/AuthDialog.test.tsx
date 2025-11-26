@@ -17,13 +17,11 @@ import {
 import { AuthDialog } from './AuthDialog.js';
 import { AuthType, type Config, debugLogger } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
-import { SettingScope } from '../../config/settings.js';
 import { AuthState } from '../types.js';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { validateAuthMethodWithSettings } from './useAuth.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
-import { clearCachedCredentialFile } from '@google/gemini-cli-core';
 import { Text } from 'ink';
 import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
 
@@ -66,7 +64,6 @@ const mockedUseKeypress = useKeypress as Mock;
 const mockedRadioButtonSelect = RadioButtonSelect as Mock;
 const mockedValidateAuthMethod = validateAuthMethodWithSettings as Mock;
 const mockedRunExitCleanup = runExitCleanup as Mock;
-const mockedClearCachedCredentialFile = clearCachedCredentialFile as Mock;
 
 describe('AuthDialog', () => {
   let props: {
@@ -220,24 +217,48 @@ describe('AuthDialog', () => {
       expect(props.settings.setValue).not.toHaveBeenCalled();
     });
 
-    it('calls onSelect if validation passes', async () => {
+    it('skips API key dialog on initial setup if env var is present', async () => {
       mockedValidateAuthMethod.mockReturnValue(null);
+      process.env['GEMINI_API_KEY'] = 'test-key-from-env';
+      // props.settings.merged.security.auth.selectedType is undefined here, simulating initial setup
+
       renderWithProviders(<AuthDialog {...props} />);
       const { onSelect: handleAuthSelect } =
         mockedRadioButtonSelect.mock.calls[0][0];
       await handleAuthSelect(AuthType.USE_GEMINI);
 
-      expect(mockedValidateAuthMethod).toHaveBeenCalledWith(
-        AuthType.USE_GEMINI,
-        props.settings,
+      expect(props.setAuthState).toHaveBeenCalledWith(
+        AuthState.Unauthenticated,
       );
-      expect(props.onAuthError).not.toHaveBeenCalled();
-      expect(mockedClearCachedCredentialFile).toHaveBeenCalled();
-      expect(props.settings.setValue).toHaveBeenCalledWith(
-        SettingScope.User,
-        'security.auth.selectedType',
-        AuthType.USE_GEMINI,
+    });
+
+    it('shows API key dialog on initial setup if no env var is present', async () => {
+      mockedValidateAuthMethod.mockReturnValue(null);
+      // process.env['GEMINI_API_KEY'] is not set
+      // props.settings.merged.security.auth.selectedType is undefined here, simulating initial setup
+
+      renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+      await handleAuthSelect(AuthType.USE_GEMINI);
+
+      expect(props.setAuthState).toHaveBeenCalledWith(
+        AuthState.AwaitingApiKeyInput,
       );
+    });
+
+    it('shows API key dialog on re-auth to allow editing', async () => {
+      mockedValidateAuthMethod.mockReturnValue(null);
+      process.env['GEMINI_API_KEY'] = 'test-key-from-env';
+      // Simulate that the user has already authenticated once
+      props.settings.merged.security!.auth!.selectedType =
+        AuthType.LOGIN_WITH_GOOGLE;
+
+      renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+      await handleAuthSelect(AuthType.USE_GEMINI);
+
       expect(props.setAuthState).toHaveBeenCalledWith(
         AuthState.AwaitingApiKeyInput,
       );
