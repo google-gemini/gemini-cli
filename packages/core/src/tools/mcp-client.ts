@@ -35,6 +35,7 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 import type { CallableTool, FunctionCall, Part, Tool } from '@google/genai';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { McpAuthProvider } from '../mcp/auth-provider.js';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
@@ -425,7 +426,9 @@ function createTransportRequestInit(
  *
  * @param mcpServerConfig The MCP server configuration
  */
-function createAuthProvider(mcpServerConfig: MCPServerConfig) {
+function createAuthProvider(
+  mcpServerConfig: MCPServerConfig,
+): McpAuthProvider | undefined {
   if (
     mcpServerConfig.authProviderType ===
     AuthProviderType.SERVICE_ACCOUNT_IMPERSONATION
@@ -1333,8 +1336,9 @@ export async function createTransport(
 
   if (mcpServerConfig.httpUrl || mcpServerConfig.url) {
     const authProvider = createAuthProvider(mcpServerConfig);
+    const headers: Record<string, string> =
+      (await authProvider?.getRequestHeaders?.()) ?? {};
 
-    const headers: Record<string, string> = {};
     if (authProvider === undefined) {
       // Check if we have OAuth configuration or stored tokens
       let accessToken: string | null = null;
