@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.19.0-nightly.20251125.f6d97d448",
+  "version": "0.20.0-nightly.20251126.d2a6cff4d",
   "description": "Gemini CLI Core",
   "repository": {
     "type": "git",
@@ -26,7 +26,7 @@
     "@google/genai": "1.30.0",
     "@iarna/toml": "^2.2.5",
     "@joshua.litt/get-ripgrep": "^0.0.3",
-    "@modelcontextprotocol/sdk": "^1.22.0",
+    "@modelcontextprotocol/sdk": "^1.23.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "^0.203.0",
     "@opentelemetry/exporter-logs-otlp-http": "^0.203.0",
