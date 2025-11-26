@@ -7,6 +7,7 @@
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 import { join } from 'node:path';
+import { ExitCodes } from '@google/gemini-cli-core/src/index.js';
 
 describe('JSON output', () => {
   let rig: TestRig;
@@ -81,7 +82,7 @@ describe('JSON output', () => {
 
     expect(payload.error).toBeDefined();
     expect(payload.error.type).toBe('Error');
-    expect(payload.error.code).toBe(1);
+    expect(payload.error.code).toBe(ExitCodes.FATAL_AUTHENTICATION_ERROR);
     expect(payload.error.message).toContain(
       "enforced authentication type is 'gemini-api-key'",
     );
