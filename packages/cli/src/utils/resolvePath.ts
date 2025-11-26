@@ -7,7 +7,7 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-export function resolvePath(p: string): string {
+export function resolvePath(p: string, cwd: string = process.cwd()): string {
   if (!p) {
     return '';
   }
@@ -17,5 +17,5 @@ export function resolvePath(p: string): string {
   } else if (p === '~' || p.startsWith('~/')) {
     expandedPath = os.homedir() + p.substring(1);
   }
-  return path.normalize(expandedPath);
+  return path.resolve(cwd, expandedPath);
 }

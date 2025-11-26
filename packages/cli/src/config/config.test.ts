@@ -1336,6 +1336,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
+<<<<<<< HEAD
     expect(config.getModel()).toBe('gemini-2.5-flash-preview');
   });
 });
@@ -1354,36 +1355,171 @@ describe('loadCliConfig folderTrust', () => {
   });
 
   it('should be false when folderTrust is false', async () => {
+=======
+    expect(config.getModel()).toBe('gemini-8675309-ultra');
+  });
+});
+
+describe('loadCliConfig modelRouter', () => {
+  it('should use auto model when modelRouter is enabled and no model is provided', async () => {
     process.argv = ['node', 'script.js'];
-    const settings: Settings = {
-      security: {
-        folderTrust: {
-          enabled: false,
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          modelRouter: { enabled: true },
         },
       },
-    };
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+  });
+
+  it('should use default model when modelRouter is disabled and no model is provided', async () => {
+    process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          modelRouter: { enabled: false },
+        },
+      },
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
+  });
+
+  it('should prioritize argv over modelRouter', async () => {
+    process.argv = ['node', 'script.js', '--model', 'gemini-pro-vision'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          modelRouter: { enabled: true },
+        },
+      },
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('gemini-pro-vision');
+  });
+
+  it('should prioritize settings over modelRouter', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          modelRouter: { enabled: true },
+        },
+        model: {
+          name: 'gemini-pro-vision',
+        },
+      },
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('gemini-pro-vision');
+  });
+
+  it('should prioritize environment variable over modelRouter', async () => {
+    process.argv = ['node', 'script.js'];
+    vi.stubEnv('GEMINI_MODEL', 'gemini-pro-vision');
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          modelRouter: { enabled: true },
+        },
+      },
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('gemini-pro-vision');
+  });
+
+  it('should be enabled by default when modelRouter is not set in settings', async () => {
+>>>>>>> cce2f06a (refactor(settings): consolidate model router settings)
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+<<<<<<< HEAD
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getFolderTrust()).toBe(false);
+=======
+    const config = await loadCliConfig(
+      {},
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.getUseModelRouter()).toBe(false);
+>>>>>>> cce2f06a (refactor(settings): consolidate model router settings)
   });
 
-  it('should be true when folderTrust is true', async () => {
+  it('should be true when modelRouter.enabled is set to true in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {
-      security: {
-        folderTrust: {
-          enabled: true,
-        },
-      },
+      experimental: { modelRouter: { enabled: true } },
     };
+<<<<<<< HEAD
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getFolderTrust()).toBe(true);
+=======
+    const config = await loadCliConfig(
+      settings,
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.getUseModelRouter()).toBe(true);
+>>>>>>> cce2f06a (refactor(settings): consolidate model router settings)
   });
 
-  it('should be false by default', async () => {
+  it('should be false when modelRouter.enabled is explicitly set to false in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
+<<<<<<< HEAD
     const settings: Settings = {};
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getFolderTrust()).toBe(false);
@@ -1416,15 +1552,12 @@ describe('loadCliConfig with includeDirectories', () => {
       `${path.resolve(path.sep, 'cli', 'path1')},${path.join(mockCwd, 'cli', 'path2')}`,
     ];
     const argv = await parseArguments({} as Settings);
+=======
+>>>>>>> cce2f06a (refactor(settings): consolidate model router settings)
     const settings: Settings = {
-      context: {
-        includeDirectories: [
-          path.resolve(path.sep, 'settings', 'path1'),
-          path.join(os.homedir(), 'settings', 'path2'),
-          path.join(mockCwd, 'settings', 'path3'),
-        ],
-      },
+      experimental: { modelRouter: { enabled: false } },
     };
+<<<<<<< HEAD
     const config = await loadCliConfig(settings, 'test-session', argv);
     const expected = [
       mockCwd,
@@ -1514,6 +1647,19 @@ describe('loadCliConfig useRipgrep', () => {
     const settings: Settings = { tools: { useRipgrep: true } };
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getUseRipgrep()).toBe(true);
+=======
+    const config = await loadCliConfig(
+      settings,
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.getUseModelRouter()).toBe(false);
+>>>>>>> cce2f06a (refactor(settings): consolidate model router settings)
   });
 });
 

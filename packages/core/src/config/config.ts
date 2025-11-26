@@ -86,6 +86,7 @@ import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { FatalConfigError } from '../utils/errors.js';
 
 import { ApprovalMode } from '../policy/types.js';
 
@@ -290,7 +291,13 @@ export interface ConfigParameters {
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
+  modelRouter?: {
+    enabled?: boolean;
+    simpleTaskModel?: string;
+    complexTaskModel?: string;
+  };
   enableMessageBusIntegration?: boolean;
+<<<<<<< HEAD
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   continueOnFailedApiCall?: boolean;
@@ -308,6 +315,10 @@ export interface ConfigParameters {
   };
   previewFeatures?: boolean;
   enableModelAvailabilityService?: boolean;
+  simpleTaskModel?: string;
+  complexTaskModel?: string;
+=======
+>>>>>>> cce2f06a (refactor(settings): consolidate model router settings)
 }
 
 export class Config {
@@ -404,6 +415,8 @@ export class Config {
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
+  private useModelRouter: boolean;
+  private readonly initialUseModelRouter: boolean;
   private readonly enableMessageBusIntegration: boolean;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
   private readonly continueOnFailedApiCall: boolean;
@@ -424,6 +437,8 @@ export class Config {
   private previewModelFallbackMode = false;
   private previewModelBypassMode = false;
   private readonly enableModelAvailabilityService: boolean;
+  private readonly simpleTaskModel: string;
+  private readonly complexTaskModel: string;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -521,7 +536,20 @@ export class Config {
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
+<<<<<<< HEAD
     this.useWriteTodos = params.useWriteTodos ?? true;
+    this.initialUseModelRouter = params.useModelRouter ?? false;
+    this.useModelRouter = this.initialUseModelRouter;
+<<<<<<< HEAD
+=======
+    this.simpleTaskModel =
+      params.modelRouter?.simpleTaskModel ?? DEFAULT_GEMINI_FLASH_MODEL;
+    this.complexTaskModel =
+      params.modelRouter?.complexTaskModel ?? DEFAULT_GEMINI_MODEL;
+    this.validateModel('simpleTaskModel', this.simpleTaskModel);
+    this.validateModel('complexTaskModel', this.complexTaskModel);
+    this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
+>>>>>>> 446e448d (refactor(config): improve router and path configuration)
     this.enableHooks = params.enableHooks ?? false;
 
     // Enable MessageBus integration if:
@@ -544,6 +572,16 @@ export class Config {
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
+=======
+    this.useWriteTodos = params.useWriteTodos ?? false;
+    this.useModelRouter = params.modelRouter?.enabled ?? false;
+    this.enableMessageBusIntegration =
+      params.enableMessageBusIntegration ?? false;
+    this.simpleTaskModel =
+      params.modelRouter?.simpleTaskModel ?? DEFAULT_GEMINI_FLASH_MODEL;
+    this.complexTaskModel =
+      params.modelRouter?.complexTaskModel ?? DEFAULT_GEMINI_MODEL;
+>>>>>>> cce2f06a (refactor(settings): consolidate model router settings)
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir);
@@ -561,6 +599,8 @@ export class Config {
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
     this.experiments = params.experiments;
+    this.simpleTaskModel = params.simpleTaskModel ?? DEFAULT_GEMINI_FLASH_MODEL;
+    this.complexTaskModel = params.complexTaskModel ?? DEFAULT_GEMINI_MODEL;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -1354,6 +1394,18 @@ export class Config {
       : OutputFormat.TEXT;
   }
 
+  getUseModelRouter(): boolean {
+    return this.useModelRouter;
+  }
+
+  getSimpleTaskModel(): string {
+    return this.simpleTaskModel;
+  }
+
+  getComplexTaskModel(): string {
+    return this.complexTaskModel;
+  }
+
   async getGitService(): Promise<GitService> {
     if (!this.gitService) {
       this.gitService = new GitService(this.targetDir, this.storage);
@@ -1557,6 +1609,14 @@ export class Config {
       compact: false,
     });
     debugLogger.debug('Experiments loaded', summaryString);
+  }
+
+  private validateModel(settingName: string, modelName: string) {
+    if (!modelName || modelName.trim().length === 0) {
+      throw new FatalConfigError(
+        `Invalid model configuration: The setting "experimental.modelRouter.${settingName}" cannot be empty.`,
+      );
+    }
   }
 }
 // Export model constants for use in CLI

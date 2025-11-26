@@ -15,6 +15,7 @@ import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
+  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -395,7 +396,10 @@ export async function loadCliConfig(
   // directly to the Config constructor in core, and have core handle setGeminiMdFilename.
   // However, loadHierarchicalGeminiMemory is called *before* createServerConfig.
   if (settings.context?.fileName) {
-    setServerGeminiMdFilename(settings.context.fileName);
+    const resolvedFileNames = Array.isArray(settings.context.fileName)
+      ? settings.context.fileName.map((name) => resolvePath(name, cwd))
+      : resolvePath(settings.context.fileName, cwd);
+    setServerGeminiMdFilename(resolvedFileNames);
   } else {
     // Reset to default if not provided in settings.
     setServerGeminiMdFilename(getCurrentGeminiMdFilename());
@@ -414,8 +418,8 @@ export async function loadCliConfig(
   };
 
   const includeDirectories = (settings.context?.includeDirectories || [])
-    .map(resolvePath)
-    .concat((argv.includeDirectories || []).map(resolvePath));
+    .map((p) => resolvePath(p, cwd))
+    .concat((argv.includeDirectories || []).map((p) => resolvePath(p, cwd)));
 
   const extensionManager = new ExtensionManager({
     settings,
@@ -486,7 +490,7 @@ export async function loadCliConfig(
   // Force approval mode to default if the folder is not trusted.
   if (!trustedFolder && approvalMode !== ApprovalMode.DEFAULT) {
     debugLogger.warn(
-      `Approval mode overridden to "default" because the current folder is not trusted.`,
+      `Approval mode overridden to "default" because the current folder is not trusted.`, 
     );
     approvalMode = ApprovalMode.DEFAULT;
   }
@@ -497,6 +501,9 @@ export async function loadCliConfig(
       env: process.env as unknown as Record<string, string | undefined>,
       settings: settings.telemetry,
     });
+    if (telemetrySettings.outfile) {
+      telemetrySettings.outfile = resolvePath(telemetrySettings.outfile, cwd);
+    }
   } catch (err) {
     if (err instanceof FatalConfigError) {
       throw new FatalConfigError(
@@ -561,7 +568,11 @@ export async function loadCliConfig(
     extraExcludes.length > 0 ? extraExcludes : undefined,
   );
 
-  const defaultModel = DEFAULT_GEMINI_MODEL_AUTO;
+  const useModelRouterEnabled =
+    settings.experimental?.modelRouter?.enabled ?? true;
+  const defaultModel = useModelRouterEnabled
+    ? DEFAULT_GEMINI_MODEL_AUTO
+    : DEFAULT_GEMINI_MODEL;
   const resolvedModel: string =
     argv.model ||
     process.env['GEMINI_MODEL'] ||
@@ -654,11 +665,16 @@ export async function loadCliConfig(
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
+    modelRouter: { enabled: useModelRouterEnabled },
     enableMessageBusIntegration,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
-    fakeResponses: argv.fakeResponses,
-    recordResponses: argv.recordResponses,
+    fakeResponses: argv.fakeResponses
+      ? resolvePath(argv.fakeResponses, cwd)
+      : undefined,
+    recordResponses: argv.recordResponses
+      ? resolvePath(argv.recordResponses, cwd)
+      : undefined,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
     ptyInfo: ptyInfo?.name,
     modelConfigServiceConfig: settings.modelConfigs,
