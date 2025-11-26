@@ -51,6 +51,9 @@ describe('McpClientManager', () => {
       getGeminiClient: vi.fn().mockReturnValue({
         isInitialized: vi.fn(),
       }),
+      getMcpAutoRestartConfig: vi.fn().mockReturnValue({
+        enabled: false,
+      }),
     } as unknown as Config);
   });
 
