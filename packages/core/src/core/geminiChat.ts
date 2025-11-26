@@ -469,7 +469,7 @@ export class GeminiChat {
           : undefined,
     });
 
-    return this.processStreamResponse(model, streamResponse);
+    return this.processStreamResponse(effectiveModel, streamResponse);
   }
 
   /**
