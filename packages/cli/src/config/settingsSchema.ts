@@ -521,6 +521,16 @@ const SETTINGS_SCHEMA = {
           'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
       },
+      enableMouseInteraction: {
+        type: 'boolean',
+        label: 'Enable Mouse Interaction',
+        category: 'UI',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable mouse support for scrolling and clicking in the CLI. Disabling allows native terminal text selection and copy/paste. Requires alternate buffer mode.',
+        showInDialog: true,
+      },
       incrementalRendering: {
         type: 'boolean',
         label: 'Incremental Rendering',
