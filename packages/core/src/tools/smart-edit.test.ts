@@ -189,8 +189,16 @@ describe('SmartEditTool', () => {
         name: 'perform a flexible, whitespace-insensitive replacement',
         content: '  hello\n    world\n',
         old_string: 'hello\nworld',
-        new_string: 'goodbye\nmoon',
+        new_string: '  goodbye\n  moon',
         expected: '  goodbye\n  moon\n',
+        occurrences: 1,
+      },
+      {
+        name: 'perform a flexible, whitespace-insensitive replacement respecting new_string indentation',
+        content: '  hello\n    world\n',
+        old_string: '  hello\n  world',
+        new_string: '  goodbye\n    moon',
+        expected: '  goodbye\n    moon\n',
         occurrences: 1,
       },
       {
