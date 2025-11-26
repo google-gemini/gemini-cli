@@ -1,0 +1,14 @@
+[package]
+name = "landlock-runner"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[[bin]]
+name = "landlock-runner"
+path = "landlock-runner.rs"
+
+[dependencies]
+landlock = "0.4.2"
+libc = "0.2"
+enumflags2 = "0.7"

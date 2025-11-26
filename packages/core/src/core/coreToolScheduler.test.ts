@@ -20,7 +20,10 @@ import type {
   Config,
   ToolRegistry,
   AnyToolInvocation,
+  ToolErrorType,
+  ToolExecuteConfirmationDetails,
 } from '../index.js';
+import { ShellToolInvocation } from '../tools/shell.js';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
@@ -246,6 +249,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     storage: {
       getProjectTempDir: () => '/tmp',
     },
+    getEnableToolOutputTruncation: () => true,
     getTruncateToolOutputThreshold: () =>
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
     getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -498,6 +502,7 @@ describe('CoreToolScheduler', () => {
     const awaitingCall = (await waitForStatus(
       onToolCallsUpdate,
       'awaiting_approval',
+      20000,
     )) as WaitingToolCall;
 
     // Cancel the first tool via its confirmation handler
@@ -1394,6 +1399,163 @@ describe('CoreToolScheduler request queueing', () => {
     expect(statusUpdates).toContain('awaiting_approval');
     expect(executeFn).not.toHaveBeenCalled();
     expect(onAllToolCallsComplete).not.toHaveBeenCalled();
+  });
+
+  it('should prompt to relax per-tool sandbox and retry shell tool once', async () => {
+    class FakeShellInvocation extends ShellToolInvocation {
+      attempts = 0;
+      override async execute(): Promise<ToolResult> {
+        this.attempts += 1;
+        if (this.attempts === 1) {
+          return {
+            llmContent: '',
+            returnDisplay: 'Operation not permitted',
+            error: {
+              type: 'sandbox_denied' as ToolErrorType,
+              message: 'Denied',
+            },
+          };
+        }
+        return {
+          llmContent: 'ok',
+          returnDisplay: 'ok',
+        };
+      }
+    }
+
+    class FakeShellTool extends BaseDeclarativeTool<
+      { command: string },
+      ToolResult
+    > {
+      constructor(private readonly cfg: Config) {
+        super('run_shell_command', 'Shell', 'fake shell', Kind.Execute, {
+          type: 'object',
+          properties: { command: { type: 'string' } },
+        });
+      }
+
+      protected override createInvocation(params: {
+        command: string;
+      }): ShellToolInvocation {
+        return new FakeShellInvocation(this.cfg, params, new Set());
+      }
+    }
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = createMockConfig({
+      getToolSandbox: () => ({ mode: 'landlock' }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 80,
+        terminalHeight: 24,
+      }),
+    });
+    mockConfig.getToolSandbox = () => ({ mode: 'landlock' });
+    mockConfig.isInteractive = () => true;
+
+    let lastInvocation: FakeShellInvocation | undefined;
+    const tool = new FakeShellTool(mockConfig);
+    const createInvocationSpy = vi
+      .spyOn(
+        tool as unknown as {
+          createInvocation: (params: {
+            command: string;
+          }) => FakeShellInvocation;
+        },
+        'createInvocation',
+      )
+      .mockImplementation((params: { command: string }) => {
+        lastInvocation = new FakeShellInvocation(mockConfig, params, new Set());
+        return lastInvocation;
+      });
+    const toolRegistry = {
+      getTool: () => tool,
+      getToolByName: () => tool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByDisplayName: () => tool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    mockConfig.getToolRegistry = () => toolRegistry;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+    expect(mockConfig.getToolSandbox()).toBeDefined();
+    const statusSpy = vi.spyOn(
+      scheduler as unknown as {
+        setStatusInternal: (...args: unknown[]) => void;
+      },
+      'setStatusInternal',
+    );
+
+    const abortController = new AbortController();
+    const request = {
+      callId: 'sandboxed-shell',
+      name: 'run_shell_command',
+      args: { command: 'echo 1' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-sandbox',
+    };
+    await scheduler.schedule([request], abortController.signal);
+
+    expect(lastInvocation).toBeInstanceOf(ShellToolInvocation);
+
+    await vi.waitFor(() => {
+      expect(
+        statusSpy.mock.calls.some((call) => call[1] === 'awaiting_approval'),
+      ).toBe(true);
+    });
+
+    const getSandboxPromptCall = () =>
+      [...statusSpy.mock.calls].reverse().find((call) => {
+        if (call[1] !== 'awaiting_approval') return false;
+        const details = call[3] as ToolCallConfirmationDetails | undefined;
+        if (!details || details.type !== 'exec') return false;
+        const exec = details as ToolExecuteConfirmationDetails;
+        return Boolean(exec.danger && exec.hideAlways && exec.defaultToNo);
+      });
+
+    const sandboxPromptCall = await vi.waitFor(
+      () => {
+        const call = getSandboxPromptCall();
+        expect(call).toBeDefined();
+        return call;
+      },
+      { timeout: 5000 },
+    );
+
+    const confirmationDetails =
+      sandboxPromptCall?.[3] as ToolCallConfirmationDetails;
+    expect(confirmationDetails?.type).toBe('exec');
+    const execDetails = confirmationDetails as ToolExecuteConfirmationDetails;
+    expect(execDetails.danger).toBe(true);
+    expect(execDetails.hideAlways).toBe(true);
+    expect(execDetails.defaultToNo).toBe(true);
+    expect(execDetails.details).toContain('Operation not permitted');
+
+    await confirmationDetails!.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+
+    await vi.waitFor(() => {
+      expect(statusSpy.mock.calls.some((call) => call[1] === 'success')).toBe(
+        true,
+      );
+    });
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+    expect(lastInvocation?.attempts ?? 0).toBeGreaterThanOrEqual(2);
+    createInvocationSpy.mockRestore();
   }, 20000);
 
   it('should handle two synchronous calls to schedule', async () => {

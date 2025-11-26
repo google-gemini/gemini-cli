@@ -17,8 +17,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { execSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { execFileSync, execSync } from 'node:child_process';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 if (!process.cwd().includes('packages')) {
@@ -31,6 +31,103 @@ execSync('tsc --build', { stdio: 'inherit' });
 
 // copy .{md,json} files
 execSync('node ../../scripts/copy_files.js', { stdio: 'inherit' });
+
+// Build optional Rust helpers for sandboxing when present (core package, Linux only)
+const pkgPath = join(process.cwd(), 'package.json');
+const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+const isCore = pkg.name === '@google/gemini-cli-core';
+if (isCore && process.platform === 'linux') {
+  const runnerManifest = join(
+    process.cwd(),
+    'src',
+    'sandbox',
+    'linux',
+    'Cargo.toml',
+  );
+  const outputDir = join(process.cwd(), 'dist', 'bin');
+  mkdirSync(outputDir, { recursive: true });
+  const outPath = join(outputDir, 'landlock-runner');
+  console.log(`[build] Compiling landlock runner (static musl) to ${outPath}`);
+  const target = 'x86_64-unknown-linux-musl';
+  // Prefer using rustc directly; fall back to rustup to install target if missing.
+  const hasRustc = (() => {
+    try {
+      execSync('rustc --version', { stdio: 'ignore' });
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  })();
+  if (!hasRustc) {
+    console.error(
+      'rustc not found; install Rust toolchain to build the Landlock runner.',
+    );
+    process.exit(1);
+  }
+  const hasCargo = (() => {
+    try {
+      execSync('cargo --version', { stdio: 'ignore' });
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  })();
+  if (!hasCargo) {
+    console.error(
+      'cargo not found; install Rust toolchain to build the Landlock runner.',
+    );
+    process.exit(1);
+  }
+
+  const targetAvailable = (() => {
+    try {
+      const list = execFileSync('rustc', ['--print', 'target-list']).toString();
+      return list.split('\n').includes(target);
+    } catch (_e) {
+      return false;
+    }
+  })();
+
+  if (!targetAvailable) {
+    try {
+      execFileSync('rustup', ['--version'], { stdio: 'ignore' });
+      execFileSync('rustup', ['target', 'add', target], { stdio: 'inherit' });
+    } catch (_err) {
+      console.error(
+        '[build] Error: musl target x86_64-unknown-linux-musl not available. Install rustup and run: rustup target add x86_64-unknown-linux-musl',
+      );
+      process.exit(1);
+    }
+  }
+
+  const targetDir = join(process.cwd(), 'dist', 'rust-target');
+  try {
+    execFileSync(
+      'cargo',
+      [
+        'build',
+        '--release',
+        '--target',
+        target,
+        '--manifest-path',
+        runnerManifest,
+        '--target-dir',
+        targetDir,
+      ],
+      {
+        stdio: 'inherit',
+        env: { ...process.env, RUSTFLAGS: '-C target-feature=+crt-static' },
+      },
+    );
+    const builtPath = join(targetDir, target, 'release', 'landlock-runner');
+    copyFileSync(builtPath, outPath);
+  } catch (_err) {
+    console.error(
+      '[build] Error: failed to compile static Landlock runner with musl via cargo. Ensure musl toolchain is installed (musl-gcc) and rustc supports the target.',
+    );
+    process.exit(1);
+  }
+}
 
 // touch dist/.last_build
 writeFileSync(join(process.cwd(), 'dist', '.last_build'), '');

@@ -22,6 +22,11 @@ vi.mock('../services/shellExecutionService.js', () => ({
   ShellExecutionService: { execute: mockShellExecutionService },
 }));
 
+const mockEnsureLandlockRunner = vi.hoisted(() => vi.fn());
+vi.mock('../sandbox/linux/landlockRunner.js', () => ({
+  ensureLandlockRunner: mockEnsureLandlockRunner,
+}));
+
 vi.mock('node:os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
   return {
@@ -74,6 +79,7 @@ describe('ShellTool', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockEnsureLandlockRunner.mockReturnValue('/tmp/landlock-runner');
 
     tempRootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shell-test-'));
     fs.mkdirSync(path.join(tempRootDir, 'subdir'));
@@ -89,6 +95,7 @@ describe('ShellTool', () => {
       getWorkspaceContext: vi
         .fn()
         .mockReturnValue(new WorkspaceContext(tempRootDir)),
+      getToolSandbox: vi.fn().mockReturnValue(undefined),
       getGeminiClient: vi.fn(),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
       isInteractive: vi.fn().mockReturnValue(true),
@@ -269,6 +276,20 @@ describe('ShellTool', () => {
         false,
         {},
       );
+    });
+
+    it('should include /dev/null when using the landlock tool sandbox', async () => {
+      (mockConfig.getToolSandbox as Mock).mockReturnValue({ mode: 'landlock' });
+      delete process.env['SANDBOX'];
+
+      const invocation = shellTool.build({ command: 'echo hi >/dev/null' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution();
+      await promise;
+
+      const [sandboxedCommand] = mockShellExecutionService.mock.calls[0];
+      expect(sandboxedCommand).toContain('/dev/null');
+      expect(sandboxedCommand).toContain('/tmp/landlock-runner');
     });
 
     itWindowsOnly(

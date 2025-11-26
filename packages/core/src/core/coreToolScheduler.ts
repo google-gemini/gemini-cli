@@ -1172,6 +1172,53 @@ export class CoreToolScheduler {
                   signal,
                   'User cancelled tool execution.',
                 );
+              } else if (
+                toolResult.error?.type === ToolErrorType.SANDBOX_DENIED &&
+                invocation instanceof ShellToolInvocation &&
+                this.config.getToolSandbox()
+              ) {
+                const confirmationDetails: ToolCallConfirmationDetails = {
+                  type: 'exec',
+                  // Make this visually attention-grabbing; UI may render title prominently.
+                  title: '⚠️ Sandbox blocked tool call',
+                  command:
+                    'Command was blocked by the sandbox. Please review carefully.',
+                  rootCommand:
+                    invocation instanceof ShellToolInvocation
+                      ? invocation.getOriginalCommand()
+                      : toolName,
+                  danger: true,
+                  hideAlways: true,
+                  defaultToNo: true,
+                  details:
+                    typeof toolResult.returnDisplay === 'string'
+                      ? toolResult.returnDisplay
+                      : undefined,
+                  onConfirm: async (outcome: ToolConfirmationOutcome) => {
+                    if (outcome === ToolConfirmationOutcome.ProceedOnce) {
+                      invocation.disableSandboxForRetry();
+                      this.setStatusInternal(callId, 'scheduled', signal);
+                      await this.attemptExecutionOfScheduledCalls(signal);
+                    } else {
+                      this.setStatusInternal(
+                        callId,
+                        'cancelled',
+                        signal,
+                        'User declined to relax sandbox.',
+                      );
+                    }
+                    await this.checkAndNotifyCompletion(signal);
+                  },
+                };
+
+                this.setStatusInternal(
+                  callId,
+                  'awaiting_approval',
+                  signal,
+                  confirmationDetails,
+                );
+                await this.checkAndNotifyCompletion(signal);
+                return;
               } else if (toolResult.error === undefined) {
                 let content = toolResult.llmContent;
                 let outputFile: string | undefined = undefined;

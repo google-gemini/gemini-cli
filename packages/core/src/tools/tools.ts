@@ -656,6 +656,14 @@ export interface ToolExecuteConfirmationDetails {
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   command: string;
   rootCommand: string;
+  /** Optional: render as danger (e.g., red border/alert) */
+  danger?: boolean;
+  /** Optional: hide “allow always” choices */
+  hideAlways?: boolean;
+  /** Optional: default selection is “No/Cancel” when true */
+  defaultToNo?: boolean;
+  /** Optional: extra details to display in the prompt (e.g., error text) */
+  details?: string;
 }
 
 export interface ToolMcpConfirmationDetails {
