@@ -907,13 +907,6 @@ export class Config {
     if (this.safety.enableConseca) {
       debugLogger.log('[SAFETY] Registering Conseca Safety Checker');
       ConsecaSafetyChecker.getInstance().setConfig(this);
-      this.policyEngine.addChecker({
-        checker: {
-          type: 'in-process',
-          name: InProcessCheckerType.CONSECA,
-        },
-        priority: 100, // High priority
-      });
     }
 
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
