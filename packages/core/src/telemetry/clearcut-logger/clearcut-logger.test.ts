@@ -429,8 +429,8 @@ describe('ClearcutLogger', () => {
 
   describe('GITHUB_REPOSITORY metadata', () => {
     it('includes hashed repository when GITHUB_REPOSITORY is set', () => {
-      const { logger } = setup({});
       vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
+      const { logger } = setup({});
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
       const repositoryMetadata = event?.event_metadata[0].find(
@@ -444,8 +444,8 @@ describe('ClearcutLogger', () => {
     });
 
     it('hashes repository name consistently', () => {
-      const { logger } = setup({});
       vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
+      const { logger } = setup({});
 
       const event1 = logger?.createLogEvent(EventNames.API_ERROR, []);
       const event2 = logger?.createLogEvent(EventNames.API_ERROR, []);
@@ -467,10 +467,9 @@ describe('ClearcutLogger', () => {
     });
 
     it('produces different hashes for different repositories', () => {
-      const { logger } = setup({});
-
       vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
-      const event1 = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const { logger: logger1 } = setup({});
+      const event1 = logger1?.createLogEvent(EventNames.API_ERROR, []);
       const hash1 = event1?.event_metadata[0].find(
         (item) =>
           item.gemini_cli_key ===
@@ -478,7 +477,9 @@ describe('ClearcutLogger', () => {
       )?.value;
 
       vi.stubEnv('GITHUB_REPOSITORY', 'google/other-repo');
-      const event2 = logger?.createLogEvent(EventNames.API_ERROR, []);
+      ClearcutLogger.clearInstance();
+      const { logger: logger2 } = setup({});
+      const event2 = logger2?.createLogEvent(EventNames.API_ERROR, []);
       const hash2 = event2?.event_metadata[0].find(
         (item) =>
           item.gemini_cli_key ===

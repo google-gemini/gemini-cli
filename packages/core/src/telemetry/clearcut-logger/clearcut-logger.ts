@@ -194,6 +194,7 @@ export class ClearcutLogger {
   private promptId: string = '';
   private readonly installationManager: InstallationManager;
   private readonly userAccountManager: UserAccountManager;
+  private readonly hashedGHRepositoryName?: string;
 
   /**
    * Queue of pending events that need to be flushed to the server.  New events
@@ -223,6 +224,13 @@ export class ClearcutLogger {
     this.promptId = config?.getSessionId() ?? '';
     this.installationManager = new InstallationManager();
     this.userAccountManager = new UserAccountManager();
+
+    const ghRepositoryName = determineGHRepositoryName();
+    if (ghRepositoryName) {
+      this.hashedGHRepositoryName = createHash('sha256')
+        .update(ghRepositoryName)
+        .digest('hex');
+    }
   }
 
   static getInstance(config?: Config): ClearcutLogger | undefined {
@@ -303,7 +311,6 @@ export class ClearcutLogger {
     const email = this.userAccountManager.getCachedGoogleAccount();
     const surface = determineSurface();
     const ghWorkflowName = determineGHWorkflowName();
-    const ghRepositoryName = determineGHRepositoryName();
 
     const baseMetadata: EventValue[] = [
       ...data,
@@ -332,13 +339,10 @@ export class ClearcutLogger {
       });
     }
 
-    if (ghRepositoryName) {
-      const hashedRepositoryName = createHash('sha256')
-        .update(ghRepositoryName)
-        .digest('hex');
+    if (this.hashedGHRepositoryName) {
       baseMetadata.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
-        value: hashedRepositoryName,
+        value: this.hashedGHRepositoryName,
       });
     }
 
