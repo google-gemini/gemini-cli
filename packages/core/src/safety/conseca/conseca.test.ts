@@ -94,7 +94,7 @@ describe('ConsecaSafetyChecker', () => {
   it('getPolicy should return cached policy if user prompt matches', async () => {
     const mockPolicy = {
       tool: {
-        permissions: 'ALLOW' as const,
+        permissions: SafetyCheckDecision.ALLOW,
         constraints: 'None',
         rationale: 'Test',
       },
@@ -114,14 +114,14 @@ describe('ConsecaSafetyChecker', () => {
   it('getPolicy should generate new policy if user prompt changes', async () => {
     const mockPolicy1 = {
       tool1: {
-        permissions: 'ALLOW' as const,
+        permissions: SafetyCheckDecision.ALLOW,
         constraints: 'None',
         rationale: 'Test',
       },
     };
     const mockPolicy2 = {
       tool2: {
-        permissions: 'ALLOW' as const,
+        permissions: SafetyCheckDecision.ALLOW,
         constraints: 'None',
         rationale: 'Test',
       },
@@ -141,7 +141,7 @@ describe('ConsecaSafetyChecker', () => {
   it('check should call getPolicy and enforcePolicy', async () => {
     const mockPolicy = {
       tool: {
-        permissions: 'ALLOW' as const,
+        permissions: SafetyCheckDecision.ALLOW,
         constraints: 'None',
         rationale: 'Test',
       },
@@ -203,7 +203,7 @@ describe('ConsecaSafetyChecker', () => {
   it('should expose current state via helpers', async () => {
     const mockPolicy = {
       tool: {
-        permissions: 'ALLOW' as const,
+        permissions: SafetyCheckDecision.ALLOW,
         constraints: 'None',
         rationale: 'Test',
       },
@@ -220,7 +220,7 @@ describe('ConsecaSafetyChecker', () => {
   it('should log policy generation event when config is set', async () => {
     const mockPolicy = {
       tool: {
-        permissions: 'ALLOW' as const,
+        permissions: SafetyCheckDecision.ALLOW,
         constraints: 'None',
         rationale: 'Test',
       },
@@ -240,7 +240,7 @@ describe('ConsecaSafetyChecker', () => {
   it('should log verdict event on check', async () => {
     const mockPolicy = {
       tool: {
-        permissions: 'ALLOW' as const,
+        permissions: SafetyCheckDecision.ALLOW,
         constraints: 'None',
         rationale: 'Test',
       },
