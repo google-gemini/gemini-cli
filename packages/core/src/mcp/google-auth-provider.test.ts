@@ -204,7 +204,7 @@ describe('GoogleCredentialProvider', () => {
       );
       const headers = await providerWithHeaders.getRequestHeaders();
       expect(headers).toEqual({
-        'X-Goog-User-Project': 'config-project-id',
+        'x-goog-user-project': 'config-project-id',
       });
     });
   });

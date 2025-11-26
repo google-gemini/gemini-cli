@@ -1337,9 +1337,8 @@ export async function createTransport(
 
   if (mcpServerConfig.httpUrl || mcpServerConfig.url) {
     const authProvider = createAuthProvider(mcpServerConfig);
-    const headers: Record<string, string> = {
-      ...((await authProvider?.getRequestHeaders?.()) ?? {}),
-    };
+    const headers: Record<string, string> =
+      (await authProvider?.getRequestHeaders?.()) ?? {};
 
     if (authProvider === undefined) {
       // Check if we have OAuth configuration or stored tokens

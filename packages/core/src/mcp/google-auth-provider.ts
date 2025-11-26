@@ -141,8 +141,11 @@ export class GoogleCredentialProvider implements McpAuthProvider {
       (key) => key.toLowerCase() === 'x-goog-user-project',
     );
 
+    // If the header is present in the config (case-insensitive check), use the
+    // config's key and value. This prevents duplicate headers (e.g.
+    // 'x-goog-user-project' and 'X-Goog-User-Project') which can cause errors.
     if (userProjectHeaderKey) {
-      headers['X-Goog-User-Project'] = configHeaders[userProjectHeaderKey];
+      headers[userProjectHeaderKey] = configHeaders[userProjectHeaderKey];
     } else {
       const quotaProjectId = await this.getQuotaProjectId();
       if (quotaProjectId) {
