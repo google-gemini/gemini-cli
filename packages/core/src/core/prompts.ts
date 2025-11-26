@@ -114,7 +114,8 @@ export function getCoreSystemPrompt(
   const isGemini3 = desiredModel === PREVIEW_GEMINI_MODEL;
 
   const mandatesVariant = isGemini3
-    ? `- **Do not call tools in silence:** You must provide to the user very short and concise natural explanation (one sentence) before calling tools.`
+    ? `
+- **Do not call tools in silence:** You must provide to the user very short and concise natural explanation (one sentence) before calling tools.`
     : ``;
 
   const enableCodebaseInvestigator = config
@@ -144,8 +145,7 @@ export function getCoreSystemPrompt(
 - **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
-${mandatesVariant}`,
+- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandatesVariant}`,
 
       primaryWorkflows_prefix: `
 # Primary Workflows
