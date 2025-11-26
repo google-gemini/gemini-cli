@@ -30,7 +30,7 @@ export interface ModelAvailabilitySnapshot {
 }
 
 export interface ModelSelectionResult {
-  selected: ModelId | null;
+  selectedModel: ModelId | null;
   attempts?: number;
   skipped: Array<{
     model: ModelId;
@@ -107,12 +107,12 @@ export class ModelAvailabilityService {
         const state = this.health.get(model);
         // A sticky model is being attempted, so note that.
         const attempts = state?.status === 'sticky_retry' ? 1 : undefined;
-        return { selected: model, skipped, attempts };
+        return { selectedModel: model, skipped, attempts };
       } else {
         skipped.push({ model, reason: snapshot.reason ?? 'unknown' });
       }
     }
-    return { selected: null, skipped };
+    return { selectedModel: null, skipped };
   }
 
   resetTurn() {
