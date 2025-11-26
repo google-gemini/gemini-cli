@@ -264,7 +264,7 @@ ${(function () {
 - **Interactive Commands:** Some commands are interactive, meaning they can accept user input during their execution (e.g. ssh, vim). Only execute non-interactive commands. Use non-interactive versions of commands (e.g. \`npm init -y\` instead of \`npm init\`) when available. Interactive shell commands are not supported and may cause hangs until canceled by the user.`;
   } else {
     return `- **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`.
-- **Interactive Commands:** Use non-interactive commands; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.`;
+- **Interactive Commands:** Use non-interactive commands.`;
   }
 })()}
 - **Remembering Facts:** Use the '${MEMORY_TOOL_NAME}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information.${interactiveMode ? ` If unsure whether to save something, you can ask the user, "Should I remember that for you?"` : ''}
