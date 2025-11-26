@@ -16,7 +16,6 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import type { Config } from '../config/config.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
-import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 
 vi.mock('../core/tokenLimits.js');
 vi.mock('../telemetry/loggers.js');
@@ -105,7 +104,7 @@ describe('findCompressSplitPoint', () => {
 describe('modelStringToModelConfigAlias', () => {
   it('should return the default model for unexpected aliases', () => {
     expect(modelStringToModelConfigAlias('gemini-flash-flash')).toBe(
-      DEFAULT_GEMINI_MODEL,
+      'chat-compression-default',
     );
   });
 
@@ -155,6 +154,9 @@ describe('ChatCompressionService', () => {
         generateContent: mockGenerateContent,
       }),
       isInteractive: vi.fn().mockReturnValue(false),
+      getContentGenerator: vi.fn().mockReturnValue({
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
+      }),
     } as unknown as Config;
 
     vi.mocked(tokenLimit).mockReturnValue(1000);
@@ -286,6 +288,11 @@ describe('ChatCompressionService', () => {
         },
       ],
     } as unknown as GenerateContentResponse);
+
+    // Override mock to simulate high token count for this specific test
+    vi.mocked(mockConfig.getContentGenerator().countTokens).mockResolvedValue({
+      totalTokens: 10000,
+    });
 
     const result = await service.compress(
       mockChat,

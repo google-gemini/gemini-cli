@@ -203,5 +203,10 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-2.5-flash-lite',
       },
     },
+    'chat-compression-default': {
+      modelConfig: {
+        model: 'gemini-2.5-pro',
+      },
+    },
   },
 };

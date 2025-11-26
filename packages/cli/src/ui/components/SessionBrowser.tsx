@@ -28,7 +28,7 @@ export interface SessionBrowserProps {
   /** Callback when user selects a session to resume */
   onResumeSession: (session: SessionInfo) => void;
   /** Callback when user deletes a session */
-  onDeleteSession?: (session: SessionInfo) => void;
+  onDeleteSession: (session: SessionInfo) => Promise<void>;
   /** Callback when user exits the session browser */
   onExit: () => void;
 }
@@ -463,9 +463,11 @@ const SessionItem = ({
     }
   }
 
+  // Reserve a few characters for metadata like " (current)" so the name doesn't wrap awkwardly.
+  const reservedForMeta = additionalInfo ? additionalInfo.length + 1 : 0;
   const availableMessageWidth = Math.max(
     20,
-    terminalWidth - FIXED_SESSION_COLUMNS_WIDTH,
+    terminalWidth - FIXED_SESSION_COLUMNS_WIDTH - reservedForMeta,
   );
 
   const truncatedMessage =
@@ -759,7 +761,7 @@ export const useSessionBrowserInput = (
   moveSelection: (delta: number) => void,
   cycleSortOrder: () => void,
   onResumeSession: (session: SessionInfo) => void,
-  onDeleteSession: ((session: SessionInfo) => void) | undefined,
+  onDeleteSession: (session: SessionInfo) => Promise<void>,
   onExit: () => void,
 ) => {
   useKeypress(
@@ -817,38 +819,35 @@ export const useSessionBrowserInput = (
         else if (key.sequence === 'x' || key.sequence === 'X') {
           const selectedSession =
             state.filteredAndSortedSessions[state.activeIndex];
-          if (
-            selectedSession &&
-            !selectedSession.isCurrentSession &&
-            onDeleteSession
-          ) {
-            try {
-              onDeleteSession(selectedSession);
-              // Remove the session from the state
-              state.setSessions(
-                state.sessions.filter((s) => s.id !== selectedSession.id),
-              );
-
-              // Adjust active index if needed
-              if (
-                state.activeIndex >=
-                state.filteredAndSortedSessions.length - 1
-              ) {
-                state.setActiveIndex(
-                  Math.max(0, state.filteredAndSortedSessions.length - 2),
+          if (selectedSession && !selectedSession.isCurrentSession) {
+            onDeleteSession(selectedSession)
+              .then(() => {
+                // Remove the session from the state
+                state.setSessions(
+                  state.sessions.filter((s) => s.id !== selectedSession.id),
                 );
-              }
-            } catch (error) {
-              state.setError(
-                `Failed to delete session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              );
-            }
+
+                // Adjust active index if needed
+                if (
+                  state.activeIndex >=
+                  state.filteredAndSortedSessions.length - 1
+                ) {
+                  state.setActiveIndex(
+                    Math.max(0, state.filteredAndSortedSessions.length - 2),
+                  );
+                }
+              })
+              .catch((error) => {
+                state.setError(
+                  `Failed to delete session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                );
+              });
           }
         }
         // less-like u/d controls.
-        else if (key.sequence === 'd') {
+        else if (key.sequence === 'u') {
           moveSelection(-Math.round(SESSIONS_PER_PAGE / 2));
-        } else if (key.sequence === 'u') {
+        } else if (key.sequence === 'd') {
           moveSelection(Math.round(SESSIONS_PER_PAGE / 2));
         }
       }
