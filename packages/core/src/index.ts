@@ -47,6 +47,7 @@ export * from './core/apiKeyCredentialStorage.js';
 export * from './utils/paths.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
+export * from './utils/exitCodes.js';
 export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
 export * from './utils/getPty.js';
@@ -138,6 +139,9 @@ export * from './telemetry/index.js';
 export { sessionId } from './utils/session.js';
 export * from './utils/browser.js';
 export { Storage } from './config/storage.js';
+
+// Export hooks system
+export * from './hooks/index.js';
 
 // Export test utils
 export * from './test-utils/index.js';
