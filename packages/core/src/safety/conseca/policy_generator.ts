@@ -5,7 +5,7 @@
  */
 
 import type { Config } from '../../config/config.js';
-import type { SecurityPolicy } from './types.js';
+import type { SecurityPolicy, ToolPolicy } from './types.js';
 import { getResponseText } from '../../utils/partUtils.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../../config/models.js';
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -18,24 +18,34 @@ Your primary goal is to enforce the principle of least privilege. The policies y
 For each tool that is relevant to the user's prompt, you must generate a policy object.
 
 ### Output Format
-You must return a JSON object where keys are tool names and values are objects with:
-- "permissions": "allow" | "deny" | "ask_user"
-- "constraints": A detailed description of conditions (e.g. allowed files, arguments).
-- "rationale": Explanation for the policy.
+You must return a JSON object with a "policies" key, which is an array of objects. Each object must have:
+- "tool_name": The name of the tool.
+- "policy": An object with:
+  - "permissions": "allow" | "deny" | "ask_user"
+  - "constraints": A detailed description of conditions (e.g. allowed files, arguments).
+  - "rationale": Explanation for the policy.
 
 Example JSON:
 \`\`\`json
 {
-  "read_file": {
-    "permissions": "allow",
-    "constraints": "Only allow reading 'main.py'.",
-    "rationale": "User asked to read main.py"
-  },
-  "run_shell_command": {
-    "permissions": "deny",
-    "constraints": "None",
-    "rationale": "Shell commands are not needed for this task"
-  }
+  "policies": [
+    {
+      "tool_name": "read_file",
+      "policy": {
+        "permissions": "allow",
+        "constraints": "Only allow reading 'main.py'.",
+        "rationale": "User asked to read main.py"
+      }
+    },
+    {
+      "tool_name": "run_shell_command",
+      "policy": {
+        "permissions": "deny",
+        "constraints": "None",
+        "rationale": "Shell commands are not needed for this task"
+      }
+    }
+  ]
 }
 \`\`\`
 
@@ -56,6 +66,25 @@ User Prompt: "{{user_prompt}}"
 Trusted Tools (Context):
 {{trusted_content}}
 `;
+
+import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
+import type { Schema } from '@google/genai';
+
+const ToolPolicySchema = z.object({
+  permissions: z.enum(['allow', 'deny', 'ask_user']),
+  constraints: z.string(),
+  rationale: z.string(),
+});
+
+const SecurityPolicyResponseSchema = z.object({
+  policies: z.array(
+    z.object({
+      tool_name: z.string(),
+      policy: ToolPolicySchema,
+    }),
+  ),
+});
 
 export interface PolicyGenerationResult {
   policy: SecurityPolicy;
@@ -83,6 +112,9 @@ export async function generatePolicy(
         model,
         config: {
           responseMimeType: 'application/json',
+          responseSchema: zodToJsonSchema(SecurityPolicyResponseSchema, {
+            target: 'openApi3',
+          }) as unknown as Schema,
         },
         contents: [
           {
@@ -110,22 +142,17 @@ export async function generatePolicy(
       return { policy: {}, error: 'Empty response from policy generator' };
     }
 
-    let cleanText = responseText;
-    // Extract JSON from code block if present
-    const match = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (match) {
-      cleanText = match[1];
-    } else {
-      // Fallback: try to find the first '{' and last '}'
-      const firstOpen = responseText.indexOf('{');
-      const lastClose = responseText.lastIndexOf('}');
-      if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
-        cleanText = responseText.substring(firstOpen, lastClose + 1);
-      }
-    }
-
     try {
-      const policy = JSON.parse(cleanText) as SecurityPolicy;
+      const parsed = JSON.parse(responseText);
+      const policiesList = parsed.policies as Array<{
+        tool_name: string;
+        policy: ToolPolicy;
+      }>;
+      const policy: SecurityPolicy = {};
+      for (const item of policiesList) {
+        policy[item.tool_name] = item.policy;
+      }
+
       debugLogger.debug(`[Conseca] Policy Generation Parsed:`, policy);
       return { policy };
     } catch (parseError) {
@@ -135,11 +162,11 @@ export async function generatePolicy(
       );
       return {
         policy: {},
-        error: `JSON Parse Error: ${parseError instanceof Error ? parseError.message : String(parseError)}. Cleaned JSON: ${cleanText}`,
+        error: `JSON Parse Error: ${parseError instanceof Error ? parseError.message : String(parseError)}. Raw: ${responseText}`,
       };
     }
   } catch (error) {
-    console.error('Policy generation failed:', error);
+    debugLogger.error('Policy generation failed:', error);
     return {
       policy: {},
       error: `Policy generation failed: ${error instanceof Error ? error.message : String(error)}`,
