@@ -27,6 +27,10 @@ describe('Hooks System Integration', () => {
       await rig.setup(
         'should block tool execution when hook returns block decision',
         {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.block-tool.responses',
+          ),
           settings: {
             tools: {
               enableHooks: true,
@@ -76,6 +80,10 @@ describe('Hooks System Integration', () => {
       await rig.setup(
         'should allow tool execution when hook returns allow decision',
         {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.allow-tool.responses',
+          ),
           settings: {
             tools: {
               enableHooks: true,
@@ -122,6 +130,10 @@ describe('Hooks System Integration', () => {
       const command =
         'echo "{\\"hookSpecificOutput\\": {\\"hookEventName\\": \\"AfterTool\\", \\"additionalContext\\": \\"Security scan: File content appears safe\\"}}"';
       await rig.setup('should add additional context from AfterTool hooks', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.after-tool-context.responses',
+        ),
         settings: {
           tools: {
             enableHooks: true,
@@ -171,7 +183,12 @@ describe('Hooks System Integration', () => {
     it('should modify LLM requests with BeforeModel hooks', async () => {
       // Create a hook script that replaces the LLM request with a modified version
       // Note: Providing messages in the hook output REPLACES the entire conversation
-      await rig.setup('should modify LLM requests with BeforeModel hooks');
+      await rig.setup('should modify LLM requests with BeforeModel hooks', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.before-model.responses',
+        ),
+      });
       const hookScript = `#!/bin/bash
 echo '{
   "decision": "allow",
@@ -244,7 +261,12 @@ echo '{
 
   describe('AfterModel Hooks - LLM Response Modification', () => {
     it('should modify LLM responses with AfterModel hooks', async () => {
-      await rig.setup('should modify LLM responses with AfterModel hooks');
+      await rig.setup('should modify LLM responses with AfterModel hooks', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.after-model.responses',
+        ),
+      });
       // Create a hook script that modifies the LLM response
       const hookScript = `#!/bin/bash
 echo '{
@@ -310,6 +332,12 @@ echo '{
     it('should modify tool selection with BeforeToolSelection hooks', async () => {
       await rig.setup(
         'should modify tool selection with BeforeToolSelection hooks',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.before-tool-selection.responses',
+          ),
+        },
       );
       // Create a hook script that restricts available tools
       const hookScript = `#!/bin/bash
@@ -380,7 +408,12 @@ echo '{
 
   describe('BeforeAgent Hooks - Prompt Augmentation', () => {
     it('should augment prompts with BeforeAgent hooks', async () => {
-      await rig.setup('should augment prompts with BeforeAgent hooks');
+      await rig.setup('should augment prompts with BeforeAgent hooks', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.before-agent.responses',
+        ),
+      });
       // Create a hook script that adds context to the prompt
       const hookScript = `#!/bin/bash
 echo '{
@@ -488,6 +521,8 @@ echo '{
   });
 
   describe('Sequential Hook Execution', () => {
+    // Note: This test checks telemetry for hook context in API requests,
+    // which behaves differently with mocked responses. Keeping real LLM calls.
     it('should execute hooks sequentially when configured', async () => {
       await rig.setup('should execute hooks sequentially when configured');
       // Create two hooks that modify the input sequentially
@@ -502,7 +537,7 @@ echo '{
 
       const hook2Script = `#!/bin/bash
 echo '{
-  "decision": "allow", 
+  "decision": "allow",
   "hookSpecificOutput": {
     "hookEventName": "BeforeAgent",
     "additionalContext": "Step 2: Security check completed."
@@ -581,7 +616,12 @@ echo '{
 
   describe('Hook Input/Output Validation', () => {
     it('should provide correct input format to hooks', async () => {
-      await rig.setup('should provide correct input format to hooks');
+      await rig.setup('should provide correct input format to hooks', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.input-validation.responses',
+        ),
+      });
       // Create a hook script that validates the input format
       const hookScript = `#!/bin/bash
 # Read JSON input from stdin
@@ -640,6 +680,8 @@ fi`;
   });
 
   describe('Multiple Event Types', () => {
+    // Note: This test checks telemetry for hook context in API requests,
+    // which behaves differently with mocked responses. Keeping real LLM calls.
     it('should handle hooks for all major event types', async () => {
       await rig.setup('should handle hooks for all major event types');
       // Create hook scripts for different events
@@ -762,7 +804,12 @@ echo '{"decision": "allow", "hookSpecificOutput": {"hookEventName": "BeforeAgent
 
   describe('Hook Error Handling', () => {
     it('should handle hook failures gracefully', async () => {
-      await rig.setup('should handle hook failures gracefully');
+      await rig.setup('should handle hook failures gracefully', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.error-handling.responses',
+        ),
+      });
       // Create a hook script that fails
       const failingHookScript = `#!/bin/bash
 echo "Hook encountered an error" >&2
@@ -826,7 +873,12 @@ echo '{"decision": "allow", "reason": "Working hook succeeded"}'`;
 
   describe('Hook Telemetry and Observability', () => {
     it('should generate telemetry events for hook executions', async () => {
-      await rig.setup('should generate telemetry events for hook executions');
+      await rig.setup('should generate telemetry events for hook executions', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.telemetry.responses',
+        ),
+      });
       const hookScript = `#!/bin/bash
 echo '{"decision": "allow", "reason": "Telemetry test hook"}'`;
 
