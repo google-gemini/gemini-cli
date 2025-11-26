@@ -445,7 +445,7 @@ describe('<StatsDisplay />', () => {
 
       expect(output).toContain('Usage limit remaining');
       expect(output).toContain('75.0%');
-      expect(output).toContain('(Resets in 1hr 30m)');
+      expect(output).toContain('(Resets in 1h 30m)');
       expect(output).toMatchSnapshot();
 
       vi.useRealTimers();

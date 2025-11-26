@@ -78,14 +78,20 @@ const formatResetTime = (resetTime: string): string => {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
+  const fmt = (val: number, unit: 'hour' | 'minute') =>
+    new Intl.NumberFormat('en', {
+      style: 'unit',
+      unit,
+      unitDisplay: 'narrow',
+    }).format(val);
+
   if (hours > 0 && minutes > 0) {
-    return `(Resets in ${hours}hr ${minutes}m)`;
+    return `(Resets in ${fmt(hours, 'hour')} ${fmt(minutes, 'minute')})`;
   } else if (hours > 0) {
-    return `(Resets in ${hours}hr)`;
-  } else if (minutes > 0) {
-    return `(Resets in ${minutes}m)`;
+    return `(Resets in ${fmt(hours, 'hour')})`;
   }
-  return '';
+
+  return `(Resets in ${fmt(minutes, 'minute')})`;
 };
 
 const ModelUsageTable: React.FC<{
