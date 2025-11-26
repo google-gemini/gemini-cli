@@ -898,7 +898,7 @@ export const useGeminiStream = (
                 id: t.callId,
                 response: {
                   error:
-                    'PLAN MODE ACTIVE: This tool is blocked. You must complete the planning phase first. ' +
+                    'Wait! PLAN MODE ACTIVE: This tool is blocked. You must complete the planning phase first. ' +
                     'Present your plan to the user and wait for their confirmation before any modifications can be made.',
                 },
               },
