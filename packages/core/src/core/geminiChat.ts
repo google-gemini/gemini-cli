@@ -22,6 +22,7 @@ import { retryWithBackoff } from '../utils/retry.js';
 import type { Config } from '../config/config.js';
 import {
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_THINKING_MODE,
   PREVIEW_GEMINI_MODEL,
   getEffectiveModel,
   isGemini2Model,
@@ -45,6 +46,7 @@ import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -212,8 +214,8 @@ export class GeminiChat {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(config);
     this.chatRecordingService.initialize(resumedSessionData);
-    this.lastPromptTokenCount = Math.ceil(
-      JSON.stringify(this.history).length / 4,
+    this.lastPromptTokenCount = estimateTokenCountSync(
+      this.history.flatMap((c) => c.parts || []),
     );
   }
 
@@ -428,6 +430,14 @@ export class GeminiChat {
           thinkingLevel: ThinkingLevel.HIGH,
         };
         delete config.thinkingConfig?.thinkingBudget;
+      } else {
+        // The `gemini-3` configs use thinkingLevel, so we have to invert the
+        // change above.
+        config.thinkingConfig = {
+          ...config.thinkingConfig,
+          thinkingBudget: DEFAULT_THINKING_MODE,
+        };
+        delete config.thinkingConfig?.thinkingLevel;
       }
 
       return this.config.getContentGenerator().generateContentStream(
@@ -460,7 +470,7 @@ export class GeminiChat {
           : undefined,
     });
 
-    return this.processStreamResponse(model, streamResponse);
+    return this.processStreamResponse(effectiveModel, streamResponse);
   }
 
   /**
