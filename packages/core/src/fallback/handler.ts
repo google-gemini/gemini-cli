@@ -61,10 +61,12 @@ async function legacyHandleFallback(
   ) {
     return null;
   }
-
+  const shouldActivatePreviewFallback =
+    failedModel === PREVIEW_GEMINI_MODEL &&
+    !(error instanceof TerminalQuotaError);
   // Preview Model Specific Logic
-  if (failedModel === PREVIEW_GEMINI_MODEL) {
-    // Always set bypass mode for the immediate retry.
+  if (shouldActivatePreviewFallback) {
+    // Always set bypass mode for the immediate retry, for non-TerminalQuotaErrors.
     // This ensures the next attempt uses 2.5 Pro.
     config.setPreviewModelBypassMode(true);
 
@@ -75,10 +77,9 @@ async function legacyHandleFallback(
     }
   }
 
-  const fallbackModel =
-    failedModel === PREVIEW_GEMINI_MODEL
-      ? DEFAULT_GEMINI_MODEL
-      : DEFAULT_GEMINI_FLASH_MODEL;
+  const fallbackModel = shouldActivatePreviewFallback
+    ? DEFAULT_GEMINI_MODEL
+    : DEFAULT_GEMINI_FLASH_MODEL;
 
   // Consult UI Handler for Intent
   const fallbackModelHandler = config.fallbackModelHandler;
@@ -210,7 +211,9 @@ async function processIntent(
 ): Promise<boolean> {
   switch (intent) {
     case 'retry_always':
-      if (failedModel === PREVIEW_GEMINI_MODEL) {
+      // If the error is non-retryable, e.g. TerminalQuota Error, trigger a regular fallback to flash.
+      // For all other errors, activate previewModel fallback.
+      if (shouldActivatePreviewFallback) {
         activatePreviewModelFallbackMode(config);
       } else {
         activateFallbackMode(config, authType);
