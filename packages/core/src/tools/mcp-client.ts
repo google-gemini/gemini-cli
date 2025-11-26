@@ -35,6 +35,7 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 import type { CallableTool, FunctionCall, Part, Tool } from '@google/genai';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { McpAuthProvider } from '../mcp/auth-provider.js';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
@@ -419,8 +420,6 @@ function createTransportRequestInit(
     },
   };
 }
-
-import type { McpAuthProvider } from '../mcp/auth-provider.js';
 
 /**
  * Create an AuthProvider for the MCP Transport.
