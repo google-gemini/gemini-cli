@@ -8,12 +8,16 @@ import type { PartListUnion, Part } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 
 /**
- * Estimates token count for text parts synchronously using a heuristic.
+ * Estimates token count for parts synchronously using a heuristic.
+ * - Text: character-based heuristic (ASCII vs CJK).
+ * - Non-text (Tools, etc): JSON string length / 4.
  */
 export function estimateTokenCountSync(parts: Part[]): number {
   let totalTokens = 0;
   for (const part of parts) {
-    if (part.text) {
+    // Check for string type to correctly handle empty strings ("") as text
+    // (which have 0 tokens) rather than falling back to JSON stringification.
+    if (typeof part.text === 'string') {
       for (const char of part.text) {
         // Simple heuristic:
         // ASCII characters (0-127) are roughly 4 chars per token -> 0.25 tokens/char
@@ -25,6 +29,11 @@ export function estimateTokenCountSync(parts: Part[]): number {
           totalTokens += 1.3;
         }
       }
+    } else {
+      // For non-text parts (functionCall, functionResponse, executableCode, etc.),
+      // we fallback to the JSON string length heuristic.
+      // Note: This is an approximation.
+      totalTokens += JSON.stringify(part).length / 4;
     }
   }
   return Math.floor(totalTokens);
@@ -32,8 +41,8 @@ export function estimateTokenCountSync(parts: Part[]): number {
 
 /**
  * Calculates the token count of the request.
- * If the request contains only text, it estimates the token count locally.
- * If the request contains non-text parts (like images, tools), it uses the countTokens API.
+ * If the request contains only text or tools, it estimates the token count locally.
+ * If the request contains media (images, files), it uses the countTokens API.
  */
 export async function calculateRequestTokenCount(
   request: PartListUnion,
@@ -46,10 +55,10 @@ export async function calculateRequestTokenCount(
       ? [{ text: request }]
       : [request];
 
-  // Check if any part is missing text (implies it's a non-text part like image or tool call)
-  const hasNonText = parts.some((p) => typeof p.text !== 'string');
+  // Use countTokens API only for heavy media parts that are hard to estimate.
+  const hasMedia = parts.some((p) => 'inlineData' in p || 'fileData' in p);
 
-  if (hasNonText) {
+  if (hasMedia) {
     const response = await contentGenerator.countTokens({
       model,
       contents: [{ role: 'user', parts }],
