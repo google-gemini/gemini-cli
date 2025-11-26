@@ -925,9 +925,9 @@ const SETTINGS_SCHEMA = {
             label: 'Inactivity Timeout',
             category: 'Tools',
             requiresRestart: false,
-            default: 300000,
+            default: 300,
             description:
-              'The maximum time in milliseconds allowed without output from the shell command. Defaults to 5 minutes.',
+              'The maximum time in seconds allowed without output from the shell command. Defaults to 5 minutes.',
             showInDialog: false,
           },
         },

@@ -179,6 +179,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
       let isBinaryStream = false;
 
       const resetTimeout = () => {
+        if (timeoutMs <= 0) {
+          return;
+        }
         if (timeoutTimer) clearTimeout(timeoutTimer);
         timeoutTimer = setTimeout(() => {
           timeoutController.abort();

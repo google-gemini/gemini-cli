@@ -547,7 +547,7 @@ export class Config {
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
     this.shellToolInactivityTimeout =
-      params.shellToolInactivityTimeout ?? 5 * 60 * 1000; // 5 minutes
+      (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir);

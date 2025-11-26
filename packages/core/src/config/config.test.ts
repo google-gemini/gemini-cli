@@ -750,6 +750,22 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('Shell Tool Inactivity Timeout', () => {
+    it('should default to 300000ms (300 seconds) when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getShellToolInactivityTimeout()).toBe(300000);
+    });
+
+    it('should convert provided seconds to milliseconds', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        shellToolInactivityTimeout: 10, // 10 seconds
+      };
+      const config = new Config(params);
+      expect(config.getShellToolInactivityTimeout()).toBe(10000);
+    });
+  });
+
   describe('Model Router with Auth', () => {
     it('should disable model router by default for oauth-personal', async () => {
       const config = new Config({

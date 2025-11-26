@@ -396,9 +396,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`tools.shell.inactivityTimeout`** (number):
-  - **Description:** The maximum time in milliseconds allowed without output
-    from the shell command. Defaults to 5 minutes.
-  - **Default:** `300000`
+  - **Description:** The maximum time in seconds allowed without output from the
+    shell command. Defaults to 5 minutes.
+  - **Default:** `300`
 
 - **`tools.autoAccept`** (boolean):
   - **Description:** Automatically accept and execute tool calls that are
