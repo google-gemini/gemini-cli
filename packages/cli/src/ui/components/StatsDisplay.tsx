@@ -175,12 +175,14 @@ const ModelUsageTable: React.FC<{
               </Text>
             </Box>
             <Box width={usageLimitWidth} justifyContent="flex-end">
-              {bucket && (
-                <Text color={theme.text.secondary}>
-                  {(bucket.remainingFraction! * 100).toFixed(1)}%{' '}
-                  {formatResetTime(bucket.resetTime!)}
-                </Text>
-              )}
+              {bucket &&
+                bucket.remainingFraction != null &&
+                bucket.resetTime && (
+                  <Text color={theme.text.secondary}>
+                    {(bucket.remainingFraction * 100).toFixed(1)}%{' '}
+                    {formatResetTime(bucket.resetTime)}
+                  </Text>
+                )}
             </Box>
           </Box>
         );
