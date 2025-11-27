@@ -241,7 +241,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           nargs: 1,
           description:
-            'Base URL for Gemini API calls (e.g., http://localhost:8082). Overrides environment variables.',
+            'Base URL for Gemini API calls (e.g., http://localhost:8082).',
         })
         .deprecateOption(
           'prompt',

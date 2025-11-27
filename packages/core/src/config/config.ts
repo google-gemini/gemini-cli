@@ -580,7 +580,6 @@ export class Config {
       initializeTelemetry(this);
     }
 
-    // Set up HTTP tunnel proxy from HTTPS_PROXY/HTTP_PROXY environment variables
     const proxy = this.getProxy();
     if (proxy) {
       try {
