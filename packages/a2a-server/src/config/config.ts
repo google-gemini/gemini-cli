@@ -37,7 +37,7 @@ export async function loadConfig(
 
   const configParams: ConfigParameters = {
     sessionId: taskId,
-    model: DEFAULT_GEMINI_MODEL,
+    model: process.env['GEMINI_MODEL'] || DEFAULT_GEMINI_MODEL,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: undefined, // Sandbox might not be relevant for a server-side agent
     targetDir: workspaceDir, // Or a specific directory the agent operates on
