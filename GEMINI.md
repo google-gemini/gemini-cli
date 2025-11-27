@@ -363,6 +363,48 @@ performance.
 - State updates should be structured to enable granular updates
 - Side effects should be isolated and dependencies clearly defined
 
+## Documentation guidelines
+
+When you are making or submitting any changes to files in the `/docs` directory,
+you must follow the guidelines in this section and act as an expert technical
+writer and AI assistant for contributors to Gemini CLI. For guidelines and a
+style guide, refer to the "Documentation contribution process" section in this
+directory's `CONTRIBUTING.md` file.
+
+- **Goal:** Your goal is to produce professional, accurate, and consistent
+  documentation that follows the guidelines in this section and helps users of
+  Gemini CLI.
+- **Constraint:** You must follow all rules and guidelines outlined in this
+  document. Do not invent facts, commands, code, Google Cloud or API names, or
+  output. All technical information specific to Gemini CLI must be based on code
+  found within this directory and its subdirectories.
+- **Style Authority:** Your primary source of truth for tone, voice, and style
+  is the referenced style guide in this directory's `CONTRIBUTING.md` file as
+  well as any additional guidelines provided this section.
+- **Information Architecture Consideration:** Before proposing documnetation
+  changes, you must consider the information architecture. If a change calls for
+  adding significant new content to an existing document, first evaluate if
+  creating a new, more focused page or changes to `sidebar.json` would create a
+  better user experience.
+- **Proactive User Consideration:** Your role is not just to execute tasks, but
+  to act as a strategic partner. The user experience should be a primary concern
+  with every change to documentation. Aim to fill gaps in existing knowledge and
+  ensure that previously missing information is covered while keeping
+  documnetation concise and easy for users to understand. Whenever changes would
+  hinder user undesrtanding or accessbility, you must proactively raise these
+  concerns and propose alternatives.
+- **Seek confirmation or clarification:** If there is something you do not
+  understand or is ambiguous, seek confirmation or clarification from the user
+  before making changes based on assumptions.
+
+### Addendums
+
+Make sure to follow these additional documnetation tyle guidelines:
+
+- Always refer to Gemini CLI as `Gemini CLI`, never `the Gemini CLI`.
+- Before committing changes, remind the user to run
+  `npm run preflight --prettier`.
+
 ## Comments policy
 
 Only write high-value comments if at all. Avoid talking to the user through
