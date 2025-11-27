@@ -197,6 +197,7 @@ describe('InputPrompt', () => {
         completionEnd: -1,
         getCommandFromSuggestion: vi.fn().mockReturnValue(undefined),
       },
+      getCompletedText: vi.fn().mockReturnValue(null),
     };
     mockedUseCommandCompletion.mockReturnValue(mockCommandCompletion);
 
@@ -801,9 +802,10 @@ describe('InputPrompt', () => {
       suggestions: [suggestion],
       activeSuggestionIndex: 0,
       getCommandFromSuggestion: vi.fn().mockReturnValue(leafCommand),
+      getCompletedText: vi.fn().mockReturnValue('/leaf'),
       slashCompletionRange: {
         completionStart: 1,
-        completionEnd: 5, // length of "/leaf" - 1 (since 'leaf' is 4 chars, / is 1) -> wait, range logic needs to be right relative to buffer.
+        completionEnd: 3, // "/le" -> start at 1, end at 3
         getCommandFromSuggestion: vi.fn(),
       },
     });
@@ -825,6 +827,170 @@ describe('InputPrompt', () => {
       // Should submit the full command constructed from buffer + suggestion
       expect(props.onSubmit).toHaveBeenCalledWith('/leaf');
       // Should NOT handle autocomplete (which just fills text)
+      expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
+  it('should autocomplete parent commands with subcommands on Enter', async () => {
+    const mcpCommand: SlashCommand = {
+      name: 'mcp',
+      kind: CommandKind.BUILT_IN,
+      description: 'MCP management',
+      subCommands: [
+        {
+          name: 'list',
+          kind: CommandKind.BUILT_IN,
+          description: 'List MCP servers',
+          action: vi.fn(),
+        },
+      ],
+    };
+
+    const suggestion = { label: 'mcp', value: 'mcp' };
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [suggestion],
+      activeSuggestionIndex: 0,
+      getCommandFromSuggestion: vi.fn().mockReturnValue(mcpCommand),
+      getCompletedText: vi.fn().mockReturnValue('/mcp'),
+    });
+
+    props.buffer.setText('/mc');
+    props.buffer.lines = ['/mc'];
+    props.buffer.cursor = [0, 3];
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\r'); // Enter
+    });
+
+    await waitFor(() => {
+      // Should autocomplete to allow subcommand selection
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+      expect(props.onSubmit).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
+  it('should autocomplete commands with completion function on Enter', async () => {
+    const commandWithCompletion: SlashCommand = {
+      name: 'load',
+      kind: CommandKind.BUILT_IN,
+      description: 'Load a file',
+      action: vi.fn(),
+      completion: vi.fn(),
+    };
+
+    const suggestion = { label: 'load', value: 'load' };
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [suggestion],
+      activeSuggestionIndex: 0,
+      getCommandFromSuggestion: vi.fn().mockReturnValue(commandWithCompletion),
+      getCompletedText: vi.fn().mockReturnValue('/load'),
+    });
+
+    props.buffer.setText('/lo');
+    props.buffer.lines = ['/lo'];
+    props.buffer.cursor = [0, 3];
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\r'); // Enter
+    });
+
+    await waitFor(() => {
+      // Should autocomplete to allow argument entry
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+      expect(props.onSubmit).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
+  it('should autocomplete on Tab, even for executable commands', async () => {
+    const executableCommand: SlashCommand = {
+      name: 'about',
+      kind: CommandKind.BUILT_IN,
+      description: 'About info',
+      action: vi.fn(),
+    };
+
+    const suggestion = { label: 'about', value: 'about' };
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [suggestion],
+      activeSuggestionIndex: 0,
+      getCommandFromSuggestion: vi.fn().mockReturnValue(executableCommand),
+      getCompletedText: vi.fn().mockReturnValue('/about'),
+    });
+
+    props.buffer.setText('/ab');
+    props.buffer.lines = ['/ab'];
+    props.buffer.cursor = [0, 3];
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\t'); // Tab
+    });
+
+    await waitFor(() => {
+      // Tab always autocompletes, never executes
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+      expect(props.onSubmit).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
+  it('should auto-execute subcommands like /mcp list on Enter', async () => {
+    const listSubCommand: SlashCommand = {
+      name: 'list',
+      kind: CommandKind.BUILT_IN,
+      description: 'List MCP servers',
+      action: vi.fn(),
+    };
+
+    const suggestion = { label: 'list', value: 'list' };
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [suggestion],
+      activeSuggestionIndex: 0,
+      getCommandFromSuggestion: vi.fn().mockReturnValue(listSubCommand),
+      getCompletedText: vi.fn().mockReturnValue('/mcp list'),
+    });
+
+    props.buffer.setText('/mcp li');
+    props.buffer.lines = ['/mcp li'];
+    props.buffer.cursor = [0, 7];
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\r'); // Enter
+    });
+
+    await waitFor(() => {
+      // Should execute the full subcommand
+      expect(props.onSubmit).toHaveBeenCalledWith('/mcp list');
       expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
     });
     unmount();

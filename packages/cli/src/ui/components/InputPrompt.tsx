@@ -636,24 +636,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 const command = completion.getCommandFromSuggestion(suggestion);
 
                 if (command && isAutoExecutableCommand(command)) {
-                  // Construct the full command text by simulating what autocomplete would produce
-                  // Use slashCompletionRange to know where to replace
-                  const cursorRow = buffer.cursor[0];
-                  const currentLine = buffer.lines[cursorRow] || '';
-                  const start = completion.slashCompletionRange.completionStart;
-                  const end = completion.slashCompletionRange.completionEnd;
+                  // Use centralized logic to get the completed text
+                  const completedText = completion.getCompletedText(suggestion);
 
-                  // Build the complete command:
-                  // everything before start + suggestion.value + everything after end
-                  const fullCommandText =
-                    currentLine.substring(0, start) +
-                    suggestion.value +
-                    currentLine.substring(end);
-
-                  // Auto-execute: submit the complete command text
-                  setExpandedSuggestionIndex(-1);
-                  handleSubmit(fullCommandText.trim());
-                  return;
+                  if (completedText) {
+                    // Auto-execute: submit the complete command text
+                    setExpandedSuggestionIndex(-1);
+                    handleSubmit(completedText.trim());
+                    return;
+                  }
                 }
               }
 
