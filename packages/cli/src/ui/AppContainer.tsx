@@ -119,6 +119,7 @@ import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { enableSupportedProtocol } from './utils/kittyProtocolDetector.js';
 import { enableBracketedPaste } from './utils/bracketedPaste.js';
+import { useCustomLogo } from './hooks/useCustomLogo.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -214,6 +215,10 @@ export const AppContainer = (props: AppContainerProps) => {
     extensionManager,
     historyManager.addItem,
     config.getEnableExtensionReloading(),
+  );
+
+  const customLogoVariants = useCustomLogo(
+    settings.merged.ui?.customLogoVariantsFile,
   );
 
   const [isPermissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
@@ -379,6 +384,13 @@ export const AppContainer = (props: AppContainerProps) => {
     }
     setHistoryRemountKey((prev) => prev + 1);
   }, [setHistoryRemountKey, isAlternateBuffer, stdout]);
+
+  useEffect(() => {
+    if (customLogoVariants) {
+      refreshStatic();
+    }
+  }, [customLogoVariants, refreshStatic]);
+
   const handleEditorClose = useCallback(() => {
     if (
       shouldEnterAlternateScreen(isAlternateBuffer, config.getScreenReader())
@@ -1497,6 +1509,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         warningText: warningBannerText,
       },
       bannerVisible,
+      customLogoVariants,
     }),
     [
       isThemeDialogOpen,
@@ -1589,6 +1602,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       defaultBannerText,
       warningBannerText,
       bannerVisible,
+      customLogoVariants,
     ],
   );
 
