@@ -7,6 +7,7 @@
 import { debugLogger } from '@google/gemini-cli-core';
 import clipboardy from 'clipboardy';
 import type { SlashCommand } from '../commands/types.js';
+import { CommandKind } from '../commands/types.js';
 
 /**
  * Checks if a query string potentially represents an '@' command.
@@ -81,6 +82,7 @@ export const getUrlOpenCommand = (): string => {
  * - Has an action (is executable)
  * - Has no subcommands (is not a parent command)
  * - Has no completion function (doesn't expect arguments)
+ * - Is NOT a custom command from .toml files (they often accept arguments)
  *
  * @param command The slash command to check
  * @returns true if the command should auto-execute on Enter
@@ -89,6 +91,12 @@ export function isAutoExecutableCommand(
   command: SlashCommand | undefined,
 ): boolean {
   if (!command) {
+    return false;
+  }
+
+  // Custom commands from .toml files should not auto-execute
+  // They often accept arguments but have no completion metadata
+  if (command.kind === CommandKind.FILE) {
     return false;
   }
 

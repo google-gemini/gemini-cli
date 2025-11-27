@@ -996,6 +996,45 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should autocomplete custom commands from .toml files on Enter', async () => {
+    const customCommand: SlashCommand = {
+      name: 'find-capital',
+      kind: CommandKind.FILE,
+      description: 'Find capital of a country',
+      action: vi.fn(),
+    };
+
+    const suggestion = { label: 'find-capital', value: 'find-capital' };
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [suggestion],
+      activeSuggestionIndex: 0,
+      getCommandFromSuggestion: vi.fn().mockReturnValue(customCommand),
+      getCompletedText: vi.fn().mockReturnValue('/find-capital'),
+    });
+
+    props.buffer.setText('/find');
+    props.buffer.lines = ['/find'];
+    props.buffer.cursor = [0, 5];
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\r'); // Enter
+    });
+
+    await waitFor(() => {
+      // Should autocomplete to allow adding arguments
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+      expect(props.onSubmit).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
   it('should autocomplete an @-path on Enter without submitting', async () => {
     mockedUseCommandCompletion.mockReturnValue({
       ...mockCommandCompletion,
