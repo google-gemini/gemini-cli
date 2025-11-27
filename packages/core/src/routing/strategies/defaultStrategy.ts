@@ -4,30 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '../../config/config.js';
-import type { BaseLlmClient } from '../../core/baseLlmClient.js';
-import type {
+import { Config } from '../../config/config.js';
+import { GeminiClient } from '../../core/client.js';
+import {
   RoutingContext,
   RoutingDecision,
-  TerminalStrategy,
+  RoutingStrategy,
 } from '../routingStrategy.js';
-import { DEFAULT_GEMINI_MODEL } from '../../config/models.js';
 
-export class DefaultStrategy implements TerminalStrategy {
-  readonly name = 'default';
+/**
+ * This strategy maintains the original, non-routing behavior.
+ * It always selects the default model specified in the application configuration.
+ */
+export class DefaultStrategy implements RoutingStrategy {
+  constructor(private config: Config) {}
 
   async route(
     _context: RoutingContext,
-    _config: Config,
-    _baseLlmClient: BaseLlmClient,
+    _client: GeminiClient,
   ): Promise<RoutingDecision> {
     return {
-      model: DEFAULT_GEMINI_MODEL,
-      metadata: {
-        source: this.name,
-        latencyMs: 0,
-        reasoning: `Routing to default model: ${DEFAULT_GEMINI_MODEL}`,
-      },
+      model: this.config.getModel(),
+      reason: 'DefaultStrategy: Using model from config.',
     };
   }
 }

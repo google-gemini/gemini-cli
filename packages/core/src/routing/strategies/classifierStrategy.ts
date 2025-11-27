@@ -4,26 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { z } from 'zod';
-import type { BaseLlmClient } from '../../core/baseLlmClient.js';
-import { promptIdContext } from '../../utils/promptIdContext.js';
-import type {
+import { GeminiClient } from '../../core/client.js';
+import {
   RoutingContext,
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
 import {
-  GEMINI_MODEL_ALIAS_FLASH,
-  GEMINI_MODEL_ALIAS_PRO,
-  resolveModel,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
 } from '../../config/models.js';
-import { createUserContent, Type } from '@google/genai';
-import type { Config } from '../../config/config.js';
+import { getErrorMessage } from '../../utils/errors.js';
+import { createUserContent, GenerateContentConfig, Type } from '@google/genai';
+import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../../config/models.js';
 import {
   isFunctionCall,
   isFunctionResponse,
 } from '../../utils/messageInspectors.js';
-import { debugLogger } from '../../utils/debugLogger.js';
+
+const CLASSIFIER_GENERATION_CONFIG: GenerateContentConfig = {
+  temperature: 0,
+  maxOutputTokens: 200,
+};
 
 // The number of recent history turns to provide to the router for context.
 const HISTORY_TURNS_FOR_CONTEXT = 4;
@@ -33,19 +35,29 @@ const FLASH_MODEL = 'flash';
 const PRO_MODEL = 'pro';
 
 const CLASSIFIER_SYSTEM_PROMPT = `
-You are a specialized Task Routing AI. Your sole function is to analyze the user's request and classify its complexity. Choose between \`${FLASH_MODEL}\` (SIMPLE) or \`${PRO_MODEL}\` (COMPLEX).
+You are a specialized Task Routing AI for a software engineering assistant. Your sole function is to analyze a user's prompt and classify its complexity. You will choose between two models:
+
 1.  \`${FLASH_MODEL}\`: A fast, efficient model for simple, well-defined tasks.
 2.  \`${PRO_MODEL}\`: A powerful, advanced model for complex, open-ended, or multi-step tasks.
-<complexity_rubric>
-A task is COMPLEX (Choose \`${PRO_MODEL}\`) if it meets ONE OR MORE of the following criteria:
-1.  **High Operational Complexity (Est. 4+ Steps/Tool Calls):** Requires dependent actions, significant planning, or multiple coordinated changes.
-2.  **Strategic Planning & Conceptual Design:** Asking "how" or "why." Requires advice, architecture, or high-level strategy.
-3.  **High Ambiguity or Large Scope (Extensive Investigation):** Broadly defined requests requiring extensive investigation.
-4.  **Deep Debugging & Root Cause Analysis:** Diagnosing unknown or complex problems from symptoms.
-A task is SIMPLE (Choose \`${FLASH_MODEL}\`) if it is highly specific, bounded, and has Low Operational Complexity (Est. 1-3 tool calls). Operational simplicity overrides strategic phrasing.
-</complexity_rubric>
+
+**Classification Rubric:**
+
+* **Choose \`${FLASH_MODEL}\` if the prompt involves:**
+    * **Simple Questions:** Asking for syntax, definitions, or simple API usage (e.g., "what is the javascript syntax for a for loop?").
+    * **Boilerplate Generation:** Creating standard code snippets or files (e.g., "generate a python flask hello world app").
+    * **Single, Simple Tool Use:** A direct command that doesn't require context (e.g., "list the files in the current directory").
+    * **Self-Contained Operations:** All information needed to complete the task is in the prompt itself.
+
+* **Choose \`${PRO_MODEL}\` if the prompt involves:**
+    * **Complex Reasoning or Planning:** Requires thinking through multiple steps or dependencies (e.g., "plan the migration path for a legacy api").
+    * **Debugging:** Analyzing code with errors, especially when the context is large or the bug is non-obvious (e.g., "why am I getting a null pointer exception in this code block?").
+    * **Architectural Design:** Open-ended requests about system structure or best practices (e.g., "design a scalable microservices architecture for an e-commerce site").
+    * **Multi-File Context:** Requires reading, understanding, or modifying multiple files to fulfill the request (e.g., "refactor the User class and update all its usages across the codebase").
+    * **Ambiguity or Broad Scope:** The user's intent is unclear or requires significant clarification (e.g., "improve my project's performance").
+
 **Output Format:**
 Respond *only* in JSON format according to the following schema. Do not include any text outside the JSON structure.
+
 {
   "type": "object",
   "properties": {
@@ -60,49 +72,23 @@ Respond *only* in JSON format according to the following schema. Do not include 
   },
   "required": ["reasoning", "model_choice"]
 }
+
 --- EXAMPLES ---
-**Example 1 (Strategic Planning):**
-*User Prompt:* "How should I architect the data pipeline for this new analytics service?"
+
+**Example 1 (Simple Case):**
+*User Prompt:* "what is the syntax for an if statement in python?"
 *Your JSON Output:*
 {
-  "reasoning": "The user is asking for high-level architectural design and strategy. This falls under 'Strategic Planning & Conceptual Design'.",
-  "model_choice": "${PRO_MODEL}"
-}
-**Example 2 (Simple Tool Use):**
-*User Prompt:* "list the files in the current directory"
-*Your JSON Output:*
-{
-  "reasoning": "This is a direct command requiring a single tool call (ls). It has Low Operational Complexity (1 step).",
-  "model_choice": "${FLASH_MODEL}"
-}
-**Example 3 (High Operational Complexity):**
-*User Prompt:* "I need to add a new 'email' field to the User schema in 'src/models/user.ts', migrate the database, and update the registration endpoint."
-*Your JSON Output:*
-{
-  "reasoning": "This request involves multiple coordinated steps across different files and systems. This meets the criteria for High Operational Complexity (4+ steps).",
-  "model_choice": "${PRO_MODEL}"
-}
-**Example 4 (Simple Read):**
-*User Prompt:* "Read the contents of 'package.json'."
-*Your JSON Output:*
-{
-  "reasoning": "This is a direct command requiring a single read. It has Low Operational Complexity (1 step).",
+  "reasoning": "The user is asking a simple, self-contained syntax question. This directly matches the 'Simple Questions' criteria for the flash model.",
   "model_choice": "${FLASH_MODEL}"
 }
 
-**Example 5 (Deep Debugging):**
-*User Prompt:* "I'm getting an error 'Cannot read property 'map' of undefined' when I click the save button. Can you fix it?"
+**Example 2 (Complex Case):**
+*User Prompt:* "Refactor this component to use the new service layer and make sure all the tests pass."
 *Your JSON Output:*
 {
-  "reasoning": "The user is reporting an error symptom without a known cause. This requires investigation and falls under 'Deep Debugging'.",
+  "reasoning": "The request requires multi-file context (component, service layer, tests) and involves a complex, multi-step process (refactor and test). This aligns with the 'pro' criteria.",
   "model_choice": "${PRO_MODEL}"
-}
-**Example 6 (Simple Edit despite Phrasing):**
-*User Prompt:* "What is the best way to rename the variable 'data' to 'userData' in 'src/utils.js'?"
-*Your JSON Output:*
-{
-  "reasoning": "Although the user uses strategic language ('best way'), the underlying task is a localized edit. The operational complexity is low (1-2 steps).",
-  "model_choice": "${FLASH_MODEL}"
 }
 `;
 
@@ -122,86 +108,60 @@ const RESPONSE_SCHEMA = {
   required: ['reasoning', 'model_choice'],
 };
 
-const ClassifierResponseSchema = z.object({
-  reasoning: z.string(),
-  model_choice: z.enum([FLASH_MODEL, PRO_MODEL]),
-});
-
 export class ClassifierStrategy implements RoutingStrategy {
-  readonly name = 'classifier';
-
   async route(
     context: RoutingContext,
-    config: Config,
-    baseLlmClient: BaseLlmClient,
-  ): Promise<RoutingDecision | null> {
-    const startTime = Date.now();
+    client: GeminiClient,
+  ): Promise<RoutingDecision> {
+    const historySlice = context.history.slice(-HISTORY_SEARCH_WINDOW);
+
+    // The classifier only needs conversational text. Filter out tool-related turns.
+    const cleanHistory = historySlice.filter((content) => {
+      return !isFunctionCall(content) && !isFunctionResponse(content);
+    });
+
+    // Take the last N turns from the *cleaned* history.
+    const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
+
     try {
-      let promptId = promptIdContext.getStore();
-      if (!promptId) {
-        promptId = `classifier-router-fallback-${Date.now()}-${Math.random()
-          .toString(16)
-          .slice(2)}`;
-        debugLogger.warn(
-          `Could not find promptId in context. This is unexpected. Using a fallback ID: ${promptId}`,
-        );
-      }
-
-      const historySlice = context.history.slice(-HISTORY_SEARCH_WINDOW);
-
-      // Filter out tool-related turns.
-      // TODO - Consider using function req/res if they help accuracy.
-      const cleanHistory = historySlice.filter(
-        (content) => !isFunctionCall(content) && !isFunctionResponse(content),
+      const routerResponse = await client.generateJson(
+        [...finalHistory, createUserContent(context.request)],
+        RESPONSE_SCHEMA,
+        context.signal,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        {
+          systemInstruction: { parts: [{ text: CLASSIFIER_SYSTEM_PROMPT }] },
+          ...CLASSIFIER_GENERATION_CONFIG,
+        },
       );
 
-      // Take the last N turns from the *cleaned* history.
-      const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
-
-      const jsonResponse = await baseLlmClient.generateJson({
-        modelConfigKey: { model: 'classifier' },
-        contents: [...finalHistory, createUserContent(context.request)],
-        schema: RESPONSE_SCHEMA,
-        systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
-        abortSignal: context.signal,
-        promptId,
-      });
-
-      const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
-
-      const reasoning = routerResponse.reasoning;
-      const latencyMs = Date.now() - startTime;
-
       if (routerResponse.model_choice === FLASH_MODEL) {
+        // Currently, due to a model bug, using Flash as one of the first few requests causes empty token responses.
+        // Due to this, we will temporarily avoid routing for the first 5 parts in the history.
         return {
-          model: resolveModel(
-            GEMINI_MODEL_ALIAS_FLASH,
-            config.getPreviewFeatures(),
-          ),
-          metadata: {
-            source: 'Classifier',
-            latencyMs,
-            reasoning,
-          },
+          model:
+            context.history.length < 5
+              ? DEFAULT_GEMINI_FLASH_LITE_MODEL
+              : DEFAULT_GEMINI_FLASH_MODEL,
+          reason: `ClassifierStrategy: ${routerResponse.reasoning}`,
         };
       } else {
         return {
-          model: resolveModel(
-            GEMINI_MODEL_ALIAS_PRO,
-            config.getPreviewFeatures(),
-          ),
-          metadata: {
-            source: 'Classifier',
-            reasoning,
-            latencyMs,
-          },
+          model: DEFAULT_GEMINI_MODEL,
+          reason: `ClassifierStrategy: ${routerResponse.reasoning}`,
         };
       }
     } catch (error) {
-      // If the classifier fails for any reason (API error, parsing error, etc.),
-      // we log it and return null to allow the composite strategy to proceed.
-      debugLogger.warn(`[Routing] ClassifierStrategy failed:`, error);
-      return null;
+      console.log(
+        `ClassifierStrategy failed: ${getErrorMessage(
+          error,
+        )}. Defaulting to flash model.`,
+      );
+      return {
+        model: DEFAULT_GEMINI_FLASH_MODEL,
+        reason:
+          'ClassifierStrategy: Failed to classify, defaulting to flash model.',
+      };
     }
   }
 }

@@ -237,6 +237,7 @@ export class Turn {
     model: string,
     req: PartListUnion,
     signal: AbortSignal,
+    model?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
       // Note: This assumes `sendMessageStream` yields events like
@@ -250,6 +251,7 @@ export class Turn {
           },
         },
         this.prompt_id,
+        model ? model : undefined,
       );
 
       for await (const streamEvent of responseStream) {

@@ -43,11 +43,16 @@ export * from './code_assist/server.js';
 export * from './code_assist/types.js';
 export * from './core/apiKeyCredentialStorage.js';
 
+// Export Routing Logic
+export * from './routing/routingStrategy.js';
+export * from './routing/modelRouterService.js';
+
 // Export utilities
 export * from './utils/paths.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
 export * from './utils/getFolderStructure.js';
+export * from './utils/messageInspectors.js';
 export * from './utils/memoryDiscovery.js';
 export * from './utils/getPty.js';
 export * from './utils/gitIgnoreParser.js';
