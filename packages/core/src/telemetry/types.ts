@@ -392,15 +392,17 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
   }
 
   toSemanticLogRecord(config: Config): LogRecord {
+    const { 'gen_ai.response.model': _, ...requestConventionAttributes } =
+      getConventionAttributes({
+        model: this.model,
+        auth_type: config.getContentGeneratorConfig()?.authType,
+      });
     const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': EVENT_GEN_AI_OPERATION_DETAILS,
       'event.timestamp': this['event.timestamp'],
       ...toGenerateContentConfigAttributes(this.prompt.generate_content_config),
-      ...getConventionAttributes({
-        model: this.model,
-        auth_type: config.getContentGeneratorConfig()?.authType,
-      }),
+      ...requestConventionAttributes,
     };
 
     if (this.prompt.server) {
