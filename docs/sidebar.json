@@ -85,6 +85,10 @@
         "slug": "docs/cli/sandbox"
       },
       {
+        "label": "Session Management",
+        "slug": "docs/cli/session-management"
+      },
+      {
         "label": "Settings",
         "slug": "docs/cli/settings"
       },
