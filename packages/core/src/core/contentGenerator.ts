@@ -58,6 +58,7 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
+  baseUrl?: string;
 };
 
 export async function createContentGeneratorConfig(
@@ -76,6 +77,7 @@ export async function createContentGeneratorConfig(
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
     proxy: config?.getProxy(),
+    baseUrl: config?.getBaseUrl(),
   };
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
@@ -168,9 +170,9 @@ export async function createContentGenerator(
       const httpOptions: { headers: Record<string, string>; baseUrl?: string } =
         { headers };
 
-      // If proxy is set, use it as the base URL for API calls
-      if (config.proxy) {
-        httpOptions.baseUrl = config.proxy;
+      // Only set a base URL when explicitly provided via the CLI flag
+      if (config.baseUrl) {
+        httpOptions.baseUrl = config.baseUrl;
       }
 
       const googleGenAI = new GoogleGenAI({

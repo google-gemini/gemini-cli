@@ -82,7 +82,7 @@ import type { UserTierId } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
-// import { setGlobalProxy } from '../utils/fetch.js'; // Proxy now used as baseUrl in contentGenerator
+import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
@@ -252,6 +252,7 @@ export interface ConfigParameters {
   };
   checkpointing?: boolean;
   proxy?: string;
+  baseUrl?: string;
   cwd: string;
   fileDiscoveryService?: FileDiscoveryService;
   includeDirectories?: string[];
@@ -360,6 +361,7 @@ export class Config {
   private gitService: GitService | undefined = undefined;
   private readonly checkpointing: boolean;
   private readonly proxy: string | undefined;
+  private readonly baseUrl: string | undefined;
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
@@ -481,6 +483,7 @@ export class Config {
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
+    this.baseUrl = params.baseUrl;
     this.cwd = params.cwd ?? process.cwd();
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
@@ -577,20 +580,19 @@ export class Config {
       initializeTelemetry(this);
     }
 
-    // Note: proxy is now used as baseUrl in httpOptions for the Gemini API client
-    // rather than as a global HTTP tunnel proxy. See contentGenerator.ts
-    // const proxy = this.getProxy();
-    // if (proxy) {
-    //   try {
-    //     setGlobalProxy(proxy);
-    //   } catch (error) {
-    //     coreEvents.emitFeedback(
-    //       'error',
-    //       'Invalid proxy configuration detected. Check debug drawer for more details (F12)',
-    //       error,
-    //     );
-    //   }
-    // }
+    // Set up HTTP tunnel proxy from HTTPS_PROXY/HTTP_PROXY environment variables
+    const proxy = this.getProxy();
+    if (proxy) {
+      try {
+        setGlobalProxy(proxy);
+      } catch (error) {
+        coreEvents.emitFeedback(
+          'error',
+          'Invalid proxy configuration detected. Check debug drawer for more details (F12)',
+          error,
+        );
+      }
+    }
     this.geminiClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);
 
@@ -1100,6 +1102,10 @@ export class Config {
 
   getProxy(): string | undefined {
     return this.proxy;
+  }
+
+  getBaseUrl(): string | undefined {
+    return this.baseUrl;
   }
 
   getWorkingDir(): string {

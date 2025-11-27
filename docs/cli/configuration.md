@@ -569,6 +569,9 @@ for that specific session.
   - Sets the sandbox image URI.
 - **`--debug`** (**`-d`**):
   - Enables debug mode for this session, providing more verbose output.
+- **`--base-url <url>`**:
+  - Overrides the Gemini API base URL for this session (e.g.,
+    `http://localhost:8082`).
 - **`--all-files`** (**`-a`**):
   - If set, recursively includes all files within the current directory as
     context for the prompt.
