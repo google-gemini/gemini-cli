@@ -158,14 +158,23 @@ export async function startSimpleInteractive({
             const { processedQuery, shouldProceed } = await handleAtCommand({
               query: input,
               config,
-              addItem: (_item, _timestamp) => 0,
-              onDebugMessage: () => {},
+              addItem: (item, _timestamp) => {
+                if (item.type === 'error') {
+                  writeToStderr('[ERROR] ' + item.text + '\n');
+                }
+                return 0;
+              },
+              onDebugMessage: (message) => {
+                if (config.getDebugMode()) {
+                  writeToStderr('[DEBUG] @command: ' + message + '\n');
+                }
+              },
               messageId: Date.now(),
               signal: abortController.signal,
             });
 
             if (!shouldProceed || !processedQuery) {
-              writeToStderr('[ERROR] Failed to process @ command\n');
+              // The specific error is already logged by the custom `addItem` above.
               isProcessing = false;
               return;
             }
