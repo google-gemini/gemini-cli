@@ -1,0 +1,157 @@
+name: '🚫 Gemini Spam Detection'
+
+on:
+  issues:
+    types:
+      - 'opened'
+      - 'reopened'
+      - 'edited'
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to check'
+        required: true
+        type: 'number'
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.event.issue.number || github.event.inputs.issue_number }}'
+  cancel-in-progress: true
+
+permissions:
+  contents: 'read'
+  id-token: 'write'
+  issues: 'write'
+
+jobs:
+  detect-spam:
+    if: github.repository == 'google-gemini/gemini-cli'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+
+      - name: 'Get issue data'
+        id: 'get_issue_data'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea' # ratchet:actions/github-script@v6
+        with:
+          script: |
+            const issueNumber = context.eventName === 'workflow_dispatch' 
+              ? context.payload.inputs.issue_number 
+              : context.payload.issue.number;
+
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+            });
+
+            core.setOutput('title', issue.title);
+            core.setOutput('body', issue.body || '');
+            core.setOutput('number', issue.number);
+
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
+
+      - name: 'Run Gemini Spam Analysis'
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        id: 'spam_analysis'
+        env:
+          GITHUB_TOKEN: '' # No token needed for the model
+          ISSUE_TITLE: '${{ steps.get_issue_data.outputs.title }}'
+          ISSUE_BODY: '${{ steps.get_issue_data.outputs.body }}'
+        with:
+          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          settings: |-
+            {
+              "maxSessionTurns": 5,
+              "telemetry": {
+                "enabled": true,
+                "target": "gcp"
+              }
+            }
+          prompt: |-
+            ## Role
+            You are a GitHub repository moderator. Your task is to detect if a GitHub issue is spam.
+
+            ## Input
+            Title: ${{ env.ISSUE_TITLE }}
+            Body: ${{ env.ISSUE_BODY }}
+
+            ## Definition of Spam
+            - Unsolicited advertisements or promotions.
+            - Content that is completely unrelated to the project (software engineering, CLI, Gemini).
+            - Gibberish or nonsensical text.
+            - Malicious links or phishing attempts.
+            - Repeated identical posts (bot behavior).
+
+            ## Instructions
+            1. Analyze the title and body.
+            2. Determine if it matches the definition of spam.
+            3. Output a JSON object with "is_spam" (boolean) and "reason" (string).
+
+            Example:
+            {"is_spam": true, "reason": "The issue contains only an advertisement for a shoe store."}
+            {"is_spam": false, "reason": "This is a legitimate bug report about installation."}
+
+      - name: 'Handle Spam Issue'
+        if: steps.spam_analysis.outputs.summary != ''
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea' # ratchet:actions/github-script@v6
+        env:
+          ANALYSIS_RESULT: '${{ steps.spam_analysis.outputs.summary }}'
+          ISSUE_NUMBER: '${{ steps.get_issue_data.outputs.number }}'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |
+            const rawOutput = process.env.ANALYSIS_RESULT;
+            let result;
+            try {
+              result = JSON.parse(rawOutput);
+            } catch (e) {
+               const match = rawOutput.match(/```json\s*([\s\S]*?)\s*```/);
+               if (match) {
+                 result = JSON.parse(match[1]);
+               } else {
+                 core.setFailed('Failed to parse JSON output from Gemini');
+                 return;
+               }
+            }
+
+            if (result.is_spam) {
+              const issueNumber = parseInt(process.env.ISSUE_NUMBER);
+              
+              // Add 'spam' label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                labels: ['spam']
+              });
+              
+              // Close the issue
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                state: 'closed',
+                state_reason: 'not_planned'
+              });
+              
+              // Comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: `This issue has been automatically marked as spam and closed.\n\n**Reason:** ${result.reason}`
+              });
+            } else {
+              console.log('Issue is not spam.');
+            }
