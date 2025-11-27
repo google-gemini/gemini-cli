@@ -130,6 +130,32 @@ function extensionConsentString(extensionConfig: ExtensionConfig): string {
       `This extension will exclude the following core tools: ${sanitizedConfig.excludeTools}`,
     );
   }
+
+  if (sanitizedConfig.hooks) {
+    const hookEvents = Object.keys(sanitizedConfig.hooks);
+    if (hookEvents.length > 0) {
+      output.push(
+        '\nWARNING: This extension configures EVENT HOOKS. These hooks can execute arbitrary commands on your machine and intercept agent communications.',
+      );
+      for (const eventName of hookEvents) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const definitions = sanitizedConfig.hooks[eventName as any];
+        if (definitions && definitions.length > 0) {
+          output.push(`  * Event: ${eventName}`);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          definitions.forEach((def: any) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            def.hooks.forEach((hook: any) => {
+              if (hook.type === 'command') {
+                output.push(`    - Command: ${hook.command}`);
+              }
+            });
+          });
+        }
+      }
+    }
+  }
+
   return output.join('\n');
 }
 
