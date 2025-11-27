@@ -514,6 +514,7 @@ export class ExtensionManager extends ExtensionLoader {
           this.workspaceDir,
         ),
         id: getExtensionId(config, installMetadata),
+        hooks: config.hooks,
       };
       this.loadedExtensions = [...this.loadedExtensions, extension];
 

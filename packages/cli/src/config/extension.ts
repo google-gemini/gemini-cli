@@ -7,6 +7,8 @@
 import type {
   MCPServerConfig,
   ExtensionInstallMetadata,
+  HookDefinition,
+  HookEventName,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -27,6 +29,7 @@ export interface ExtensionConfig {
   contextFileName?: string | string[];
   excludeTools?: string[];
   settings?: ExtensionSetting[];
+  hooks?: { [K in HookEventName]?: HookDefinition[] };
 }
 
 export interface ExtensionUpdateInfo {
