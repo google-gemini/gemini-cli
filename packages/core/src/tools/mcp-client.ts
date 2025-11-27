@@ -51,6 +51,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
+export const MCP_CONNECTION_TIMEOUT_MSEC = 30 * 1000; // 30 seconds for initial connection
 
 export type DiscoveredMCPPrompt = Prompt & {
   serverName: string;
@@ -999,11 +1000,38 @@ export async function connectToMcpServer(
       mcpServerConfig,
       debugMode,
     );
+
+    const connectionTimeout =
+      mcpServerConfig.connectionTimeout ?? MCP_CONNECTION_TIMEOUT_MSEC;
+
     try {
-      await mcpClient.connect(transport, {
-        timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+      // Wrap connect with a timeout to prevent hanging on unresponsive or
+      // incompatible servers (e.g., SSE transport connecting to HTTP-only server)
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(
+            new Error(
+              `Connection to MCP server '${mcpServerName}' failed after ${connectionTimeout / 1000} seconds`,
+            ),
+          );
+        }, connectionTimeout);
       });
-      return mcpClient;
+
+      try {
+        await Promise.race([
+          mcpClient.connect(transport, {
+            timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+          }),
+          timeoutPromise,
+        ]);
+        return mcpClient;
+      } finally {
+        // Clean up the timeout to prevent unhandled promise rejections
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      }
     } catch (error) {
       await transport.close();
       throw error;
