@@ -24,6 +24,10 @@ exports[`<SessionSummaryDisplay /> > renders the summary display with a title 1`
 │                                                                                                  │
 │  Savings Highlight: 500 (50.0%) of input tokens were served from the cache, reducing costs.      │
 │                                                                                                  │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
+│                                                                                                  │
 │  » Tip: For a full token breakdown, run \`/stats model\`.                                          │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
