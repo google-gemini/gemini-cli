@@ -1,4 +1,4 @@
-name: '🚫 Gemini Spam Detection'
+name: 'Gemini Spam Detection'
 
 on:
   issues:
