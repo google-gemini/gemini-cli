@@ -287,6 +287,13 @@ export class ToolRegistry {
   }
 
   /**
+   * Removes a specific tool by name.
+   */
+  removeTool(name: string): void {
+    this.allKnownTools.delete(name);
+  }
+
+  /**
    * Discovers tools from project (if available and configured).
    * Can be called multiple times to update discovered tools.
    * This will discover tools from the command line and from MCP servers.

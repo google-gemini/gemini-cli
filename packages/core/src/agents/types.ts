@@ -56,6 +56,8 @@ export interface AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> {
   /** Unique identifier for the agent. */
   name: string;
   displayName?: string;
+  icon?: string;
+  filePath?: string;
   description: string;
   promptConfig: PromptConfig;
   modelConfig: ModelConfig;

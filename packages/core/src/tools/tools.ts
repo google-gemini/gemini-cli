@@ -310,6 +310,7 @@ export abstract class DeclarativeTool<
     readonly messageBus?: MessageBus,
     readonly extensionName?: string,
     readonly extensionId?: string,
+    readonly icon?: string,
   ) {}
 
   get schema(): FunctionDeclaration {

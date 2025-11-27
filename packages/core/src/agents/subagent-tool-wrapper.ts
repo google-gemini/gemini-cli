@@ -53,6 +53,9 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
       messageBus,
+      undefined, // extensionName
+      undefined, // extensionId
+      definition.icon,
     );
   }
 
