@@ -241,7 +241,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           },
           combinedController.signal,
           this.config.getEnableInteractiveShell(),
-          shellExecutionConfig ?? {},
+          { ...shellExecutionConfig, pager: 'cat' },
         );
 
       if (pid && setPidCallback) {

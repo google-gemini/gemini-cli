@@ -221,6 +221,7 @@ export class ShellExecutionService {
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: 'cat',
+          GIT_PAGER: 'cat',
         },
       });
 
@@ -434,6 +435,7 @@ export class ShellExecutionService {
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: shellExecutionConfig.pager ?? 'cat',
+          GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
         },
         handleFlowControl: true,
       });
