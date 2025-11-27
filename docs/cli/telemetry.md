@@ -361,6 +361,7 @@ Captures Gemini API requests, responses, and errors.
     - `response_text` (string, optional)
     - `prompt_id` (string)
     - `auth_type` (string)
+    - `finish_reasons` (array of strings)
 
 - `gemini_cli.api_error`: API request failed.
   - **Attributes**:

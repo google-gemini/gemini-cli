@@ -409,6 +409,7 @@ describe('loggers', () => {
         attributes: expect.objectContaining({
           'event.name': EVENT_API_RESPONSE,
           prompt_id: 'prompt-id-1',
+          finish_reasons: ['stop'],
         }),
       });
 
