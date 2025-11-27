@@ -5,6 +5,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import path from 'node:path';
 import type { HookConfig } from './types.js';
 import { HookEventName } from './types.js';
 import type {
@@ -33,8 +34,20 @@ const EXIT_CODE_NON_BLOCKING_ERROR = 1;
 /**
  * Hook runner that executes command hooks
  */
+type ShellFlavor = 'posix' | 'powershell';
+
+export interface HookRunnerOptions {
+  platformOverride?: NodeJS.Platform;
+}
+
 export class HookRunner {
-  constructor() {}
+  private readonly platform: NodeJS.Platform;
+  private readonly shellFlavor: ShellFlavor;
+
+  constructor(options: HookRunnerOptions = {}) {
+    this.platform = options.platformOverride ?? process.platform;
+    this.shellFlavor = this.platform === 'win32' ? 'powershell' : 'posix';
+  }
 
   /**
    * Execute a single hook
@@ -214,18 +227,26 @@ export class HookRunner {
         env,
         cwd: input.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
-        shell: true,
+        shell: this.shellFlavor === 'powershell' ? 'powershell.exe' : true,
       });
 
       // Set up timeout
       const timeoutHandle = setTimeout(() => {
         timedOut = true;
-        child.kill('SIGTERM');
+        try {
+          child.kill('SIGTERM');
+        } catch {
+          // Ignore
+        }
 
-        // Force kill after 5 seconds
+        // Force kill after 5 seconds if the process is still running
         setTimeout(() => {
-          if (!child.killed) {
-            child.kill('SIGKILL');
+          if (child.exitCode === null && child.signalCode === null) {
+            try {
+              child.kill('SIGKILL');
+            } catch {
+              // Ignore
+            }
           }
         }, 5000);
       }, timeout);
@@ -323,9 +344,71 @@ export class HookRunner {
    * Expand command with environment variables and input context
    */
   private expandCommand(command: string, input: HookInput): string {
+    if (this.shellFlavor === 'powershell') {
+      return this.expandCommandForPowerShell(command, input);
+    }
+
+    const escapedCwd = this.escapeShellArg(input.cwd);
+
     return command
-      .replace(/\$GEMINI_PROJECT_DIR/g, input.cwd)
-      .replace(/\$CLAUDE_PROJECT_DIR/g, input.cwd); // For compatibility
+      .replace(/\$GEMINI_PROJECT_DIR/g, escapedCwd)
+      .replace(/\$CLAUDE_PROJECT_DIR/g, escapedCwd); // For compatibility
+  }
+
+  private expandCommandForPowerShell(
+    command: string,
+    input: HookInput,
+  ): string {
+    const replacePlaceholder = (baseDir: string, rest?: string): string => {
+      const sanitizedRest = rest
+        ? rest
+            .replace(/^[\\/]/, '')
+            .replace(/\\/g, path.win32.sep)
+            .replace(/\//g, path.win32.sep)
+        : '';
+      const fullPath = sanitizedRest
+        ? path.win32.join(baseDir, sanitizedRest)
+        : baseDir;
+      return `'${fullPath.replace(/'/g, "''")}'`;
+    };
+
+    let expanded = command
+      .replace(/\$GEMINI_PROJECT_DIR([\\/][^\s'"&|;]*)?/g, (_match, rest) =>
+        replacePlaceholder(input.cwd, rest as string | undefined),
+      )
+      .replace(/\$CLAUDE_PROJECT_DIR([\\/][^\s'"&|;]*)?/g, (_match, rest) =>
+        replacePlaceholder(input.cwd, rest as string | undefined),
+      );
+
+    // If the command is just a path, prefix with the call operator so PowerShell executes it.
+    expanded = expanded.replace(
+      /^(\s*)('.*?')(\s|$)/,
+      (_full, leading, literal, trailing) => `${leading}& ${literal}${trailing}`,
+    );
+
+    return expanded;
+  }
+
+  /**
+   * Wrap a value so the shell treats it as a literal argument.
+   */
+  private escapeShellArg(value: string): string {
+    return this.shellFlavor === 'powershell'
+      ? this.escapePowerShellArg(value)
+      : this.escapePosixShellArg(value);
+  }
+
+  private escapePosixShellArg(value: string): string {
+    // Single quotes prevent the shell from interpreting metacharacters.
+    // Any embedded single quote is escaped by closing, inserting '\'',
+    // then reopening the quote (POSIX-compliant technique).
+    return `'${value.replace(/'/g, "'\\''")}'`;
+  }
+
+  private escapePowerShellArg(value: string): string {
+    // Single quotes in PowerShell behave like literal strings.
+    // Escape embedded single quotes by doubling them up.
+    return `'${value.replace(/'/g, "''")}'`;
   }
 
   /**
