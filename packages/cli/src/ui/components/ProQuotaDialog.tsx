@@ -12,7 +12,7 @@ import { theme } from '../semantic-colors.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
-  PREVIEW_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL,
   UserTierId,
 } from '@google/gemini-cli-core';
 
@@ -127,7 +127,7 @@ export function ProQuotaDialog({
         <RadioButtonSelect items={items} onSelect={handleSelect} />
       </Box>
       <Text color={theme.text.primary}>
-        {failedModel === PREVIEW_GEMINI_MODEL && !isModelNotFoundError
+        {fallbackModel === DEFAULT_GEMINI_MODEL && !isModelNotFoundError
           ? 'Note: We will periodically retry Preview Model to see if congestion has cleared.'
           : 'Note: You can always use /model to select a different option.'}
       </Text>

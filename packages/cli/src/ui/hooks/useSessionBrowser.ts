@@ -91,12 +91,16 @@ export const useSessionBrowser = (
      */
     handleDeleteSession: useCallback(
       (session: SessionInfo) => {
+        // Note: Chat sessions are stored on disk using a filename derived from
+        // the session, e.g. "session-<timestamp>-<sessionIdPrefix>.json".
+        // The ChatRecordingService.deleteSession API expects this file basename
+        // (without the ".json" extension), not the full session UUID.
         try {
           const chatRecordingService = config
             .getGeminiClient()
             ?.getChatRecordingService();
           if (chatRecordingService) {
-            chatRecordingService.deleteSession(session.id);
+            chatRecordingService.deleteSession(session.file);
           }
         } catch (error) {
           console.error('Error deleting session:', error);
