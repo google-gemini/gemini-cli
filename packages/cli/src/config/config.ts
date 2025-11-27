@@ -72,6 +72,7 @@ export interface CliArgs {
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
+  forceInteractive: boolean | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -235,6 +236,12 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
           hidden: true,
+        })
+        .option('force-interactive', {
+          type: 'boolean',
+          description:
+            'Force interactive mode even when stdin is not a TTY (for programmatic usage)',
+          default: false,
         })
         .deprecateOption(
           'prompt',
