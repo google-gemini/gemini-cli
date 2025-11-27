@@ -11,6 +11,7 @@ import { requestConsentNonInteractive } from '../../config/extensions/consent.js
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 interface UninstallArgs {
   names: string[]; // can be extension names or source URLs.
@@ -72,5 +73,6 @@ export const uninstallCommand: CommandModule = {
     await handleUninstall({
       names: argv['names'] as string[],
     });
+    await exitCli();
   },
 };

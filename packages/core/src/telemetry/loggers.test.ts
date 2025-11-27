@@ -409,6 +409,7 @@ describe('loggers', () => {
         attributes: expect.objectContaining({
           'event.name': EVENT_API_RESPONSE,
           prompt_id: 'prompt-id-1',
+          finish_reasons: ['stop'],
         }),
       });
 
@@ -1544,7 +1545,6 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       getUseSmartEdit: () => null,
-      getUseModelRouter: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 
@@ -1595,7 +1595,6 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       getUseSmartEdit: () => null,
-      getUseModelRouter: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 
@@ -1648,7 +1647,6 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       getUseSmartEdit: () => null,
-      getUseModelRouter: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 

@@ -51,6 +51,7 @@ export * from './routing/modelRouterService.js';
 export * from './utils/paths.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
+export * from './utils/exitCodes.js';
 export * from './utils/getFolderStructure.js';
 export * from './utils/messageInspectors.js';
 export * from './utils/memoryDiscovery.js';
@@ -59,6 +60,7 @@ export * from './utils/gitIgnoreParser.js';
 export * from './utils/gitUtils.js';
 export * from './utils/editor.js';
 export * from './utils/quotaErrorDetection.js';
+export * from './utils/userAccountManager.js';
 export * from './utils/googleQuotaErrors.js';
 export * from './utils/fileUtils.js';
 export * from './utils/retry.js';
@@ -143,8 +145,15 @@ export { sessionId } from './utils/session.js';
 export * from './utils/browser.js';
 export { Storage } from './config/storage.js';
 
+// Export hooks system
+export * from './hooks/index.js';
+
 // Export test utils
 export * from './test-utils/index.js';
 
 // Export hook types
 export * from './hooks/types.js';
+
+// Export stdio utils
+export * from './utils/stdio.js';
+export * from './utils/terminal.js';

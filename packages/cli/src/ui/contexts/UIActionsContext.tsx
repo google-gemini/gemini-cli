@@ -12,6 +12,7 @@ import { type AuthType, type EditorType } from '@google/gemini-cli-core';
 import { type LoadableSettingScope } from '../../config/settings.js';
 import type { AuthState } from '../types.js';
 import { type PermissionsDialogProps } from '../components/PermissionsModifyTrustDialog.js';
+import type { SessionInfo } from '../../utils/sessionUtils.js';
 
 export interface UIActions {
   handleThemeSelect: (themeName: string, scope: LoadableSettingScope) => void;
@@ -45,11 +46,16 @@ export interface UIActions {
   handleProQuotaChoice: (
     choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
   ) => void;
+  openSessionBrowser: () => void;
+  closeSessionBrowser: () => void;
+  handleResumeSession: (session: SessionInfo) => Promise<void>;
+  handleDeleteSession: (session: SessionInfo) => Promise<void>;
   setQueueErrorMessage: (message: string | null) => void;
   popAllMessages: (onPop: (messages: string | undefined) => void) => void;
   handleApiKeySubmit: (apiKey: string) => Promise<void>;
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
+  setEmbeddedShellFocused: (value: boolean) => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

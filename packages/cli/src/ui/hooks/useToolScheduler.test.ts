@@ -32,7 +32,9 @@ import {
   ToolConfirmationOutcome,
   ApprovalMode,
   MockTool,
+  HookSystem,
 } from '@google/gemini-cli-core';
+import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 import { ToolCallStatus } from '../types.js';
 
 // Mocks
@@ -74,14 +76,17 @@ const mockConfig = {
     authType: 'oauth-personal',
   }),
   getUseSmartEdit: () => false,
-  getUseModelRouter: () => false,
   getGeminiClient: () => null, // No client needed for these tests
   getShellExecutionConfig: () => ({ terminalWidth: 80, terminalHeight: 24 }),
   getEnableMessageBusIntegration: () => false,
   getMessageBus: () => null,
   getPolicyEngine: () => null,
   isInteractive: () => false,
+  getExperiments: () => {},
+  getEnableHooks: () => false,
 } as unknown as Config;
+mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
+mockConfig.getHookSystem = vi.fn().mockReturnValue(new HookSystem(mockConfig));
 
 const mockTool = new MockTool({
   name: 'mockTool',
@@ -135,7 +140,6 @@ describe('useReactToolScheduler in YOLO Mode', () => {
         onComplete,
         mockConfig as unknown as Config,
         () => undefined,
-        () => {},
       ),
     );
 
@@ -264,7 +268,6 @@ describe('useReactToolScheduler', () => {
         onComplete,
         mockConfig as unknown as Config,
         () => undefined,
-        () => {},
       ),
     );
 
