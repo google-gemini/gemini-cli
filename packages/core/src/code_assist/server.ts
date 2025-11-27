@@ -14,6 +14,8 @@ import type {
   OnboardUserRequest,
   SetCodeAssistGlobalUserSettingRequest,
   ClientMetadata,
+  RetrieveUserQuotaRequest,
+  RetrieveUserQuotaResponse,
 } from './types.js';
 import type {
   ListExperimentsRequest,
@@ -167,6 +169,15 @@ export class CodeAssistServer implements ContentGenerator {
     };
     return await this.requestPost<ListExperimentsResponse>(
       'listExperiments',
+      req,
+    );
+  }
+
+  async retrieveUserQuota(
+    req: RetrieveUserQuotaRequest,
+  ): Promise<RetrieveUserQuotaResponse> {
+    return await this.requestPost<RetrieveUserQuotaResponse>(
+      'retrieveUserQuota',
       req,
     );
   }

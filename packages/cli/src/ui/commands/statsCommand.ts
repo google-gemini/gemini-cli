@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { CodeAssistServer, getCodeAssistServer } from '@google/gemini-cli-core';
 import type { HistoryItemStats } from '../types.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
@@ -13,7 +14,7 @@ import {
   CommandKind,
 } from './types.js';
 
-function defaultSessionView(context: CommandContext) {
+async function defaultSessionView(context: CommandContext) {
   const now = new Date();
   const { sessionStartTime } = context.session.stats;
   if (!sessionStartTime) {
@@ -33,6 +34,16 @@ function defaultSessionView(context: CommandContext) {
     duration: formatDuration(wallDuration),
   };
 
+  if (context.services.config) {
+    const server = getCodeAssistServer(context.services.config);
+    if (server instanceof CodeAssistServer && server.projectId) {
+      const quota = await server.retrieveUserQuota({
+        project: server.projectId,
+      });
+      statsItem.quotas = quota;
+    }
+  }
+
   context.ui.addItem(statsItem, Date.now());
 }
 
@@ -41,16 +52,16 @@ export const statsCommand: SlashCommand = {
   altNames: ['usage'],
   description: 'Check session stats. Usage: /stats [session|model|tools]',
   kind: CommandKind.BUILT_IN,
-  action: (context: CommandContext) => {
-    defaultSessionView(context);
+  action: async (context: CommandContext) => {
+    await defaultSessionView(context);
   },
   subCommands: [
     {
       name: 'session',
       description: 'Show session-specific usage statistics',
       kind: CommandKind.BUILT_IN,
-      action: (context: CommandContext) => {
-        defaultSessionView(context);
+      action: async (context: CommandContext) => {
+        await defaultSessionView(context);
       },
     },
     {
