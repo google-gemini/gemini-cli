@@ -930,6 +930,16 @@ const SETTINGS_SCHEMA = {
             description: 'Show color in shell output.',
             showInDialog: true,
           },
+          inactivityTimeout: {
+            type: 'number',
+            label: 'Inactivity Timeout',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 300,
+            description:
+              'The maximum time in seconds allowed without output from the shell command. Defaults to 5 minutes.',
+            showInDialog: false,
+          },
         },
       },
       autoAccept: {
@@ -1515,6 +1525,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         type: 'string',
         description:
           'Service account email to impersonate (name@project.iam.gserviceaccount.com).',
+      },
+      useInstructions: {
+        type: 'boolean',
+        description:
+          'If true, instructions from this server will be included in the system prompt.',
       },
     },
   },
