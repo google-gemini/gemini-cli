@@ -222,7 +222,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        {},
+        { pager: 'cat' },
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
@@ -247,7 +247,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        {},
+        { pager: 'cat' },
       );
     });
 
@@ -268,7 +268,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        {},
+        { pager: 'cat' },
       );
     });
 
@@ -295,7 +295,7 @@ describe('ShellTool', () => {
           expect.any(Function),
           expect.any(AbortSignal),
           false,
-          {},
+          { pager: 'cat' },
         );
       },
       20000,
