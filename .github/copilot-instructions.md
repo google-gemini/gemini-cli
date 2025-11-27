@@ -199,6 +199,56 @@ export class YourTool extends BaseDeclarativeTool<YourToolParams, YourToolInvoca
 - **Recovery:** Fallback automatically downgrades model; manual recovery via `config.resetFallback()`
 - **Testing:** Use mock errors in unit tests, E2E tests verify fallback with real quota hits
 
+## Advanced Topics
+
+### Chat History Management & Compression
+- **Compression triggers:** When history exceeds 70% of token limit (DEFAULT_COMPRESSION_TOKEN_THRESHOLD)
+- **Compression strategy:** Keep last 30% of history (COMPRESSION_PRESERVE_THRESHOLD) to preserve context
+- **Service:** `ChatCompressionService` uses Gemini API to summarize old turns
+- **Splitting logic:** `findCompressSplitPoint()` only compresses at user message boundaries (safe split points)
+- **Validation:** History must alternate user↔model, start with user, no function calls in model boundaries
+
+### Service Patterns
+- **FileDiscoveryService** - Respects `.gitignore` and `.geminiignore` (configurable per operation)
+- **GitService** - Repo analysis for context
+- **ShellExecutionService** - Handles sandboxed shell execution with streaming output
+- **LoopDetectionService** - Detects and prevents infinite tool call loops
+- **ModelConfigService** - Manages model capabilities and token limits (cached from API)
+
+### Error Classification & Recovery
+- **Fatal vs Retryable:** 
+  - `FatalError` subclasses exit immediately (auth, config, sandbox, turn limit errors)
+  - Exit codes: 41 (auth), 42 (input), 44 (sandbox), 52 (config), 53 (turn limit)
+- **Quota errors:** Use `classifyGoogleError()` to distinguish terminal (daily limit) vs retryable (rate limit)
+- **Tool execution:** Tools return `{ toolError, message, details }` on failure; executor continues or stops based on error type
+- **Error reporting:** `reportError()` sends structured error data for monitoring
+
+### Agent Execution & Tool Calling Loop
+- **AgentExecutor** runs agents that call tools until `complete_task` is invoked
+- **Non-interactive tool execution:** `executeToolCall()` bypasses approval prompts (used by agents)
+- **Tool scheduling:** Core scheduler handles tool call resolution, output streaming, and error propagation
+- **Activity tracking:** Optional `ActivityCallback` receives agent turn events (thought, tool_call, tool_response, completion)
+- **Termination modes:** `completed`, `timeout` (grace period 60s), `tool_error`, `api_error`
+
+### Handling Multi-File Operations
+- **ReadManyFilesTool** preferred over sequential read calls (batches requests to Gemini API)
+- **EditTool with expected_replacements** - Set when replacing multiple occurrences in one file
+- **Tool locations** for IDE preview - Include operation type: `read`, `write`, `modify`, `create`
+- **Diff preview** - Uses `ModifiableDeclarativeTool.getModifyContext()` to open editor for manual edits
+
+### Context & Prompt Construction
+- **System prompt** - `getCoreSystemPrompt()` includes dynamic context (working directory, recent files)
+- **Directory structure** - `getDirectoryContextString()` provides tree view of project layout
+- **Compression prompt** - Special prompt for summarizing chat history while preserving key context
+- **Token limits** - Model-specific limits in `tokenLimits.ts`; consider compression when approaching 70%
+
+### Testing Strategies for Complex Features
+- **Mock tools:** Create lightweight tool implementations for testing scheduler/executor behavior
+- **Compression testing:** Verify split points respect safe boundaries (user messages)
+- **Loop detection:** Inject repeated tool calls, verify termination after threshold
+- **Fallback scenarios:** Mock `TerminalQuotaError` to test downgrade logic
+- **Agent testing:** Use `TestRig` with sandbox=false for fast local E2E validation
+
 ## Key Files to Review
 
 | File | Purpose |
@@ -212,6 +262,37 @@ export class YourTool extends BaseDeclarativeTool<YourToolParams, YourToolInvoca
 | `integration-tests/test-helper.ts` | Test utilities for E2E testing |
 | `esbuild.config.js` | Bundle configuration |
 | `Makefile` | Common dev tasks shorthand |
+| `packages/core/src/services/chatCompressionService.ts` | History compression logic |
+| `packages/core/src/agents/executor.ts` | Agent loop & tool calling |
+| `packages/core/src/core/turn.ts` | Turn data structures & validation |
+| `packages/core/src/utils/googleQuotaErrors.ts` | Quota error classification |
+
+## Code Organization Patterns
+
+### Directory Structure Conventions
+- **`src/tools/`** - Each tool is one file: `{toolname}.ts` + `{toolname}.test.ts`
+- **`src/core/`** - Core API interaction: `client.ts`, `geminiChat.ts`, `turn.ts`, prompts, compression
+- **`src/routing/`** - Model selection: `modelRouterService.ts` + `strategies/` subdirectory
+- **`src/services/`** - Shared business logic: file discovery, git, shell execution, loop detection
+- **`src/config/`** - Configuration: settings loading, model definitions, defaults
+- **`src/utils/`** - Helpers: error classification, environment context, retry logic, text utilities
+- **`src/__mocks__/`** - Vitest mocks with hoisting enabled
+
+### Type System Patterns
+- **Tool parameters:** Use interfaces extending object, map directly to JSON schema
+- **Tool results:** Extend `ToolResult` discriminated union for type safety
+- **Turn/Message types:** Use discriminated unions (`role: 'user' | 'model'`, `parts: Part[]`)
+- **Error types:** Extend `Error` with contextual properties (code, cause, retryDelayMs)
+- **Config types:** Use enums for modes (ApprovalMode, AuthType, TelemetryTarget)
+- **Avoid:** Generic `any` types; use `unknown` with type guards instead
+
+### Code Quality Standards
+- **License headers:** Apache 2.0 headers on all `.ts` files
+- **Exports:** Use `export class`, `export interface` at module level
+- **Constants:** UPPER_SNAKE_CASE for module-level constants
+- **Private fields:** Use `private readonly` in classes
+- **Error handling:** Never swallow errors; log, rethrow, or return structured error result
+- **Comments:** Doc comments on public methods/interfaces; inline comments for why, not what
 
 ## Release & Deployment
 
@@ -220,6 +301,86 @@ export class YourTool extends BaseDeclarativeTool<YourToolParams, YourToolInvoca
 - **Versioning:** Semver in `package.json` + git tags
 - **Build artifacts:** Published to npm registry + Docker images
 - **CI/CD:** GitHub Actions for tests, lint, build validation
+
+## Troubleshooting & Common Issues
+
+### Tool Execution Problems
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Tool not found in registry | Not registered or wrong class name | Check `BaseDeclarativeTool` inheritance; verify in tool-registry.ts auto-discovery |
+| User not prompted for edit | `shouldConfirmExecute()` returns false | Return confirmation details for modifiable tools; use messageBus |
+| Tool times out | Long-running operation | Use `updateOutput()` callback to send progress; increase timeout in test config |
+| MCP tool crashes silently | Server died; stdio broken | Check MCP config in ~/.gemini/config.json; verify server process spawns correctly |
+| File operation affects wrong files | Incorrect toolLocations() | Return exact paths that will be modified; relative paths from cwd |
+
+### Testing Failures
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| "Poll timed out" | Tool/API slower than expected | Increase timeout in test, or check for infinite loops with `LoopDetectionService` |
+| Mock fs not used in test | Hoisting not enabled | Check vitest config; ensure `vi.mock()` calls are at top level |
+| Tool approval prompt hangs | messageBus subscription missing | Verify `shouldConfirmExecute()` properly subscribes to TOOL_CONFIRMATION_RESPONSE |
+| E2E test flaky on CI | Sandbox/environment differences | Use `GEMINI_SANDBOX=false` for local testing; check 5-min timeout is sufficient |
+
+### Model Routing Issues
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Wrong model selected | Routing strategy not applied | Check if bypass conditions met (tool_response, next_speaker_request, forced override) |
+| Fallback stuck on | Quota recovery not triggered | Manual: check `config.resetFallback()`; auto: waits for next successful request |
+| Flash model returns empty response | Known API behavior on early requests | `ModelRouterService` has bypass for history < 5 (currently commented) |
+
+### Build & Bundle Issues
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Bundle fails with WASM | Missing wasm plugin | Check esbuild.config.js wasmLoader configuration; ensure .wasm files exist |
+| Build outputs empty dist/ | TypeScript errors not surfacing | Run `npm run typecheck` to see errors; check build script output |
+| Sandbox image not found | Build step skipped or failed | Run `npm run build:sandbox` explicitly; verify Docker/Podman available |
+
+### Quota & Fallback Edge Cases
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Daily quota exhausted but no fallback | TerminalQuotaError not detected | Check `classifyGoogleError()` logic; verify error message format matches |
+| Fallback loop infinite | Model selection broken | Verify flash model works; check `getEffectiveModel()` preserves lite requests |
+| Per-minute quota triggers fallback | Expected; soft limit | Use `RetryableQuotaError` for retry logic; fallback is intended behavior |
+
+### API & Communication
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| History validation fails | Role sequence broken | Must alternate user↔model; always start with user; no consecutive model turns |
+| Compression splits mid-turn | Safe split point not found | `findCompressSplitPoint()` only splits at user turn boundaries; check history structure |
+| Auth token expired | OAuth refresh failed | Check token storage in `packages/core/src/mcp/token-storage/`; re-auth if needed |
+
+## Debugging Tips
+
+### Enable Debug Logging
+```bash
+DEBUG=* npm run start
+GEMINI_DEV_TRACING=true npm run start
+```
+
+### Inspect Tool Calls
+```typescript
+// In integration tests
+const toolLogs = rig.readToolLogs();
+console.log(JSON.stringify(toolLogs, null, 2));
+```
+
+### Trace Model Routing
+- Check `ModelRouterService.route()` return value in logs
+- Verify `RoutingContext` has correct history, turnType, forcedModel
+- Test strategies independently in unit tests
+
+### Profile Tool Performance
+- Use `runInDevTraceSpan()` to wrap tool execution
+- View traces in Genkit UI at `http://localhost:4000`
+- Check for N+1 tool calls (use `ReadManyFilesTool` for batch reads)
+
+### Validate Configuration
+```typescript
+// Check config loading
+const config = new Config();
+console.log(config.getModel()); // Should return resolved model name
+console.log(config.isInFallbackMode()); // Check fallback state
+```
 
 ---
 
