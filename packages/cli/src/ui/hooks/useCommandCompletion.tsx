@@ -42,6 +42,16 @@ export interface UseCommandCompletionReturn {
   navigateDown: () => void;
   handleAutocomplete: (indexToUse: number) => void;
   promptCompletion: PromptCompletion;
+  getCommandFromSuggestion: (
+    suggestion: Suggestion,
+  ) => SlashCommand | undefined;
+  slashCompletionRange: {
+    completionStart: number;
+    completionEnd: number;
+    getCommandFromSuggestion: (
+      suggestion: Suggestion,
+    ) => SlashCommand | undefined;
+  };
 }
 
 export function useCommandCompletion(
@@ -270,5 +280,7 @@ export function useCommandCompletion(
     navigateDown,
     handleAutocomplete,
     promptCompletion,
+    getCommandFromSuggestion: slashCompletionRange.getCommandFromSuggestion,
+    slashCompletionRange,
   };
 }

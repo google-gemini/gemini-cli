@@ -191,6 +191,12 @@ describe('InputPrompt', () => {
         isActive: false,
         markSelected: vi.fn(),
       },
+      getCommandFromSuggestion: vi.fn().mockReturnValue(undefined),
+      slashCompletionRange: {
+        completionStart: -1,
+        completionEnd: -1,
+        getCommandFromSuggestion: vi.fn().mockReturnValue(undefined),
+      },
     };
     mockedUseCommandCompletion.mockReturnValue(mockCommandCompletion);
 
@@ -775,6 +781,52 @@ describe('InputPrompt', () => {
       stdin.write('\r');
     });
     await waitFor(() => expect(props.onSubmit).toHaveBeenCalledWith('/clear'));
+    unmount();
+  });
+
+  it('should auto-execute leaf commands on Enter when suggested', async () => {
+    const leafCommand: SlashCommand = {
+      name: 'leaf',
+      kind: CommandKind.BUILT_IN,
+      description: 'Leaf command',
+      action: vi.fn(),
+      // No subCommands, no completion -> isAutoExecutableCommand = true
+    };
+
+    const suggestion = { label: 'leaf', value: 'leaf' };
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [suggestion],
+      activeSuggestionIndex: 0,
+      getCommandFromSuggestion: vi.fn().mockReturnValue(leafCommand),
+      slashCompletionRange: {
+        completionStart: 1,
+        completionEnd: 5, // length of "/leaf" - 1 (since 'leaf' is 4 chars, / is 1) -> wait, range logic needs to be right relative to buffer.
+        getCommandFromSuggestion: vi.fn(),
+      },
+    });
+
+    // User typed partial command
+    props.buffer.setText('/le');
+    props.buffer.lines = ['/le'];
+    props.buffer.cursor = [0, 3];
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\r'); // Enter
+    });
+
+    await waitFor(() => {
+      // Should submit the full command constructed from buffer + suggestion
+      expect(props.onSubmit).toHaveBeenCalledWith('/leaf');
+      // Should NOT handle autocomplete (which just fills text)
+      expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
+    });
     unmount();
   });
 

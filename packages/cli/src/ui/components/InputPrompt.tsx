@@ -35,12 +35,15 @@ import {
   saveClipboardImage,
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
+import {
+  isAutoExecutableCommand,
+  isSlashCommand,
+} from '../utils/commandUtils.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { StreamingState } from '../types.js';
-import { isSlashCommand } from '../utils/commandUtils.js';
 import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
@@ -621,7 +624,40 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               completion.activeSuggestionIndex === -1
                 ? 0 // Default to the first if none is active
                 : completion.activeSuggestionIndex;
+
             if (targetIndex < completion.suggestions.length) {
+              const suggestion = completion.suggestions[targetIndex];
+
+              // Check if this is Enter key (not Tab) and command should auto-execute
+              const isEnterKey = key.name === 'return' && !key.ctrl;
+
+              if (isEnterKey && buffer.text.startsWith('/')) {
+                // Get the full command object
+                const command = completion.getCommandFromSuggestion(suggestion);
+
+                if (command && isAutoExecutableCommand(command)) {
+                  // Construct the full command text by simulating what autocomplete would produce
+                  // Use slashCompletionRange to know where to replace
+                  const cursorRow = buffer.cursor[0];
+                  const currentLine = buffer.lines[cursorRow] || '';
+                  const start = completion.slashCompletionRange.completionStart;
+                  const end = completion.slashCompletionRange.completionEnd;
+
+                  // Build the complete command:
+                  // everything before start + suggestion.value + everything after end
+                  const fullCommandText =
+                    currentLine.substring(0, start) +
+                    suggestion.value +
+                    currentLine.substring(end);
+
+                  // Auto-execute: submit the complete command text
+                  setExpandedSuggestionIndex(-1);
+                  handleSubmit(fullCommandText.trim());
+                  return;
+                }
+              }
+
+              // Default behavior: auto-complete to prompt box
               completion.handleAutocomplete(targetIndex);
               setExpandedSuggestionIndex(-1); // Reset expansion after selection
             }
