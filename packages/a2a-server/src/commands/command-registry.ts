@@ -5,6 +5,8 @@
  */
 
 import { ExtensionsCommand } from './extensions.js';
+import { InitCommand } from './init.js';
+import { RestoreCommand } from './restore.js';
 import type { Command } from './types.js';
 
 class CommandRegistry {
@@ -12,6 +14,8 @@ class CommandRegistry {
 
   constructor() {
     this.register(new ExtensionsCommand());
+    this.register(new RestoreCommand());
+    this.register(new InitCommand());
   }
 
   register(command: Command) {
@@ -28,6 +32,7 @@ class CommandRegistry {
   }
 
   get(commandName: string): Command | undefined {
+    console.log(`a2a-server: command-registry.get called for: ${commandName}`);
     return this.commands.get(commandName);
   }
 
