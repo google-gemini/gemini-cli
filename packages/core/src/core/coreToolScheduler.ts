@@ -1167,11 +1167,12 @@ export class CoreToolScheduler {
               spanMetadata.output = toolResult;
 
               const hasContent =
-                toolResult.llmContent !== undefined &&
-                toolResult.llmContent !== null &&
+                toolResult.llmContent != null &&
                 (typeof toolResult.llmContent === 'string'
                   ? toolResult.llmContent.length > 0
-                  : true);
+                  : Array.isArray(toolResult.llmContent)
+                    ? toolResult.llmContent.length > 0
+                    : true);
 
               if (signal.aborted && !hasContent) {
                 this.setStatusInternal(
