@@ -43,6 +43,7 @@ export class ModelRouterService {
         new FallbackStrategy(),
         new OverrideStrategy(),
         new ClassifierStrategy(),
+        new ScriptOutputSummarizationStrategy(), // Added new strategy here
         new DefaultStrategy(),
       ],
       'agent-router',
