@@ -24,6 +24,7 @@ import {
   CoreEvent,
   writeToStdout,
   writeToStderr,
+  ExitCodes,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -41,6 +42,7 @@ import {
 import { TextOutput } from './ui/utils/textOutput.js';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
+import { runExitCleanup } from './utils/cleanup.js';
 
 interface StartSimpleInteractiveParams {
   config: Config;
@@ -72,6 +74,19 @@ export async function startSimpleInteractive({
 
   const textOutput = new TextOutput();
   const abortController = new AbortController();
+  let requestedExitCode: number | null = null;
+  let resolveExit: (() => void) | null = null;
+  const exitRequested = new Promise<void>((resolve) => {
+    resolveExit = resolve;
+  });
+
+  const requestExit = (exitCode: number = ExitCodes.SUCCESS) => {
+    if (requestedExitCode !== null) {
+      return;
+    }
+    requestedExitCode = exitCode;
+    resolveExit?.();
+  };
 
   // Setup readline for line-based input
   const rl = readline.createInterface({
@@ -290,16 +305,11 @@ export async function startSimpleInteractive({
     });
 
     // Handle EOF (stdin closed)
-    rl.on('close', async () => {
+    rl.on('close', () => {
       if (config.getDebugMode()) {
         writeToStderr('[DEBUG] stdin closed, exiting\n');
       }
-      consolePatcher.cleanup();
-      coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
-      if (isTelemetrySdkInitialized()) {
-        await shutdownTelemetry(config);
-      }
-      process.exit(0);
+      requestExit(ExitCodes.SUCCESS);
     });
 
     // Handle SIGTERM and SIGINT
@@ -313,8 +323,8 @@ export async function startSimpleInteractive({
     process.on('SIGTERM', () => handleSignal('SIGTERM'));
     process.on('SIGINT', () => handleSignal('SIGINT'));
 
-    // Keep process alive (readline will handle it)
-    await new Promise(() => {}); // Never resolves, keeps event loop alive
+    // Keep process alive until exit is requested
+    await exitRequested;
   } catch (error) {
     errorToHandle = error;
   } finally {
@@ -322,6 +332,10 @@ export async function startSimpleInteractive({
     coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     if (isTelemetrySdkInitialized()) {
       await shutdownTelemetry(config);
+    }
+    if (requestedExitCode !== null) {
+      await runExitCleanup();
+      process.exit(requestedExitCode);
     }
   }
 
