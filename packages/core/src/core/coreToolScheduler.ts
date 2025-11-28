@@ -1165,7 +1165,16 @@ export class CoreToolScheduler {
             try {
               const toolResult: ToolResult = await promise;
               spanMetadata.output = toolResult;
-              if (signal.aborted) {
+              // If the tool invocation returned content (even if aborted), we prefer to show that content.
+              // This allows the agent to see partial outputs of cancelled commands (like shell commands).
+              const hasContent =
+                toolResult.llmContent !== undefined &&
+                toolResult.llmContent !== null &&
+                (typeof toolResult.llmContent === 'string'
+                  ? toolResult.llmContent.length > 0
+                  : true);
+
+              if (signal.aborted && !hasContent) {
                 this.setStatusInternal(
                   callId,
                   'cancelled',

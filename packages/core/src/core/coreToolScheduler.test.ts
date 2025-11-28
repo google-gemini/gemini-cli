@@ -1838,7 +1838,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const call3 = completedCalls.find((c) => c.request.callId === '3');
 
     expect(call1?.status).toBe('success');
-    expect(call2?.status).toBe('cancelled');
+    expect(call2?.status).toBe('success');
     expect(call3?.status).toBe('cancelled');
   });
 
