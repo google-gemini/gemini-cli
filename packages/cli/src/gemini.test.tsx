@@ -132,6 +132,7 @@ vi.mock('./config/config.js', () => ({
     getQuestion: vi.fn(() => ''),
     isInteractive: () => false,
     getHookRegistry: vi.fn(() => null),
+    getHookSystem: vi.fn(() => null),
     getDisabledHooks: vi.fn(() => []),
   } as unknown as Config),
   parseArguments: vi.fn().mockResolvedValue({}),
@@ -272,6 +273,7 @@ describe('gemini.tsx main function', () => {
         getExtensions: () => [],
         getUsageStatisticsEnabled: () => false,
         getHookRegistry: vi.fn(() => null),
+        getHookSystem: vi.fn(() => null),
         getDisabledHooks: vi.fn(() => []),
       } as unknown as Config;
     });
@@ -506,6 +508,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getExtensions: () => [],
       getUsageStatisticsEnabled: () => false,
       getHookRegistry: vi.fn(() => null),
+      getHookSystem: vi.fn(() => null),
       getDisabledHooks: vi.fn(() => []),
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue({
@@ -762,6 +765,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getFileFilteringRespectGitIgnore: () => true,
       getOutputFormat: () => 'text',
       getUsageStatisticsEnabled: () => false,
+      getHookSystem: () => null,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     vi.spyOn(themeManager, 'setActiveTheme').mockReturnValue(false);
@@ -990,6 +994,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getFileFilteringRespectGitIgnore: () => true,
       getOutputFormat: () => 'text',
       getUsageStatisticsEnabled: () => false,
+      getHookSystem: () => null,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     vi.mock('./utils/readStdin.js', () => ({
@@ -1148,6 +1153,7 @@ describe('gemini.tsx main function exit codes', () => {
       getOutputFormat: () => 'text',
       getExtensions: () => [],
       getUsageStatisticsEnabled: () => false,
+      getHookSystem: () => null,
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue({
       merged: { security: { auth: {} }, ui: {} },
@@ -1209,6 +1215,7 @@ describe('gemini.tsx main function exit codes', () => {
       getOutputFormat: () => 'text',
       getExtensions: () => [],
       getUsageStatisticsEnabled: () => false,
+      getHookSystem: () => null,
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue({
       merged: { security: { auth: {} }, ui: {} },
@@ -1273,6 +1280,7 @@ describe('startInteractiveUI', () => {
     getScreenReader: () => false,
     getDebugMode: () => false,
     getHookRegistry: vi.fn(() => null),
+    getHookSystem: vi.fn(() => null),
     getDisabledHooks: vi.fn(() => []),
   } as unknown as Config;
   const mockSettings = {

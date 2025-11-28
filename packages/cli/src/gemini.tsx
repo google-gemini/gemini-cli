@@ -10,7 +10,7 @@ import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
-import { basename, join } from 'node:path';
+import { basename } from 'node:path';
 import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
@@ -57,12 +57,8 @@ import {
   disableLineWrapping,
   shouldEnterAlternateScreen,
   ExitCodes,
-  HookEventName,
-  type SessionStartInput,
-  type SessionEndInput,
   SessionStartSource,
   SessionEndReason,
-  HookRunner,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -577,61 +573,29 @@ export async function main() {
 
     await config.initialize();
 
-    // Hook: SessionStart
-    const hookRegistry = config.getHookRegistry();
-    const hookRunner = new HookRunner();
-    if (hookRegistry) {
-      const hooks = hookRegistry.getHooksForEvent(HookEventName.SessionStart);
-      if (hooks.length > 0) {
-        try {
-          const hookConfigs = hooks.map((h) => h.config);
-          const input: SessionStartInput = {
-            session_id: config.getSessionId(),
-            transcript_path: join(
-              config.storage.getHistoryDir(),
-              config.getSessionId() + '.json',
-            ),
-            cwd: config.getWorkingDir(),
-            hook_event_name: HookEventName.SessionStart,
-            timestamp: new Date().toISOString(),
-            source: argv.resume
-              ? SessionStartSource.Resume
-              : SessionStartSource.Startup,
-          };
-          await hookRunner.executeHooksSequential(
-            hookConfigs,
-            HookEventName.SessionStart,
-            input,
-          );
-        } catch (error) {
-          // Log the error but don't block startup
-          debugLogger.error('Error executing SessionStart hooks:', error);
-        }
+    // Hook: SessionStart - use HookSystem if available
+    const hookSystem = config.getHookSystem();
+    if (hookSystem) {
+      try {
+        const source = argv.resume
+          ? SessionStartSource.Resume
+          : SessionStartSource.Startup;
+        await hookSystem.getEventHandler().fireSessionStartEvent(source);
+      } catch (error) {
+        // Log the error but don't block startup
+        debugLogger.error('Error executing SessionStart hooks:', error);
       }
     }
 
     // Register SessionEnd hook
     registerCleanup(async () => {
-      if (hookRegistry) {
-        const hooks = hookRegistry.getHooksForEvent(HookEventName.SessionEnd);
-        if (hooks.length > 0) {
-          const hookConfigs = hooks.map((h) => h.config);
-          const input: SessionEndInput = {
-            session_id: config.getSessionId(),
-            transcript_path: join(
-              config.storage.getHistoryDir(),
-              config.getSessionId() + '.json',
-            ),
-            cwd: config.getWorkingDir(),
-            hook_event_name: HookEventName.SessionEnd,
-            timestamp: new Date().toISOString(),
-            reason: SessionEndReason.Exit, // Simplified for now
-          };
-          await hookRunner.executeHooksSequential(
-            hookConfigs,
-            HookEventName.SessionEnd,
-            input,
-          );
+      if (hookSystem) {
+        try {
+          await hookSystem
+            .getEventHandler()
+            .fireSessionEndEvent(SessionEndReason.Exit);
+        } catch (error) {
+          debugLogger.error('Error executing SessionEnd hooks:', error);
         }
       }
     });
