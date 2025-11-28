@@ -1082,3 +1082,87 @@ export class TestRig {
     return logs;
   }
 }
+
+/**
+ * Creates a platform-appropriate hook command that outputs JSON
+ * @param jsonOutput - The JSON string to output
+ * @returns A shell command string that works on the current platform
+ */
+export function createHookCommand(jsonOutput: string): string {
+  const isWindows = os.platform() === 'win32';
+
+  if (isWindows) {
+    // Use PowerShell's Write-Output
+    // Escape single quotes by doubling them
+    const escapedJson = jsonOutput.replace(/'/g, "''");
+    return `powershell.exe -NoProfile -Command "Write-Output '${escapedJson}'"`;
+  } else {
+    // Use bash echo
+    // Escape single quotes by ending the string, adding escaped quote, and restarting
+    const escapedJson = jsonOutput.replace(/'/g, "'\\''");
+    return `echo '${escapedJson}'`;
+  }
+}
+
+/**
+ * Creates a platform-appropriate hook command that fails with an error
+ * @param errorMessage - The error message to output to stderr
+ * @returns A shell command string that outputs to stderr and exits with code 1
+ */
+export function createFailingHookCommand(errorMessage: string): string {
+  const isWindows = os.platform() === 'win32';
+
+  if (isWindows) {
+    // Use PowerShell's Write-Error
+    const escapedMessage = errorMessage.replace(/'/g, "''");
+    return `powershell.exe -NoProfile -Command "Write-Error '${escapedMessage}'; exit 1"`;
+  } else {
+    // Use bash with stderr redirection
+    const escapedMessage = errorMessage.replace(/'/g, "'\\''");
+    return `bash -c 'echo "${escapedMessage}" >&2; exit 1'`;
+  }
+}
+
+/**
+ * Creates a hook command that reads from stdin and validates input format
+ * @param requiredFields - Array of field names that must be present in the input
+ * @param outputOnSuccess - JSON to output if validation passes
+ * @param outputOnFailure - JSON to output if validation fails
+ * @returns A shell command string that works on the current platform
+ */
+export function createValidatingHookCommand(
+  requiredFields: string[],
+  outputOnSuccess: string,
+  outputOnFailure: string,
+): string {
+  const isWindows = os.platform() === 'win32';
+
+  if (isWindows) {
+    // PowerShell script that reads stdin and validates JSON
+    // Build the field check expressions
+    const fieldsCheck = requiredFields
+      .map((field) => `($obj.PSObject.Properties.Name -contains '${field}')`)
+      .join(' -and ');
+
+    const escapedSuccess = outputOnSuccess
+      .replace(/'/g, "''")
+      .replace(/"/g, '""');
+    const escapedFailure = outputOnFailure
+      .replace(/'/g, "''")
+      .replace(/"/g, '""');
+
+    // Use a simpler PowerShell approach with -replace for proper escaping
+    const script = `$inputJson = [Console]::In.ReadToEnd(); try { $obj = ConvertFrom-Json $inputJson; if (${fieldsCheck}) { Write-Output '${escapedSuccess}'; exit 0 } else { Write-Output '${escapedFailure}'; exit 0 } } catch { Write-Output '${escapedFailure}'; exit 0 }`;
+
+    return `powershell.exe -NoProfile -Command "${script}"`;
+  } else {
+    // Bash script that uses jq to validate JSON
+    const jqCheck = requiredFields.map((field) => `.${field}`).join(' and ');
+
+    // For simplicity, just echo the raw JSON - no single quotes to escape
+    // Use printf to avoid issues with special characters
+    const script = `input=$(cat); if echo "$input" | jq -e "${jqCheck}" > /dev/null 2>&1; then echo '${outputOnSuccess}'; else echo '${outputOnFailure}'; fi`;
+
+    return `bash -c "${script.replace(/"/g, '\\"')}"`;
+  }
+}

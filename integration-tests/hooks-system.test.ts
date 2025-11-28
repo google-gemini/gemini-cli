@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import {
+  TestRig,
+  createHookCommand,
+  createFailingHookCommand,
+} from './test-helper.js';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 
@@ -189,8 +193,7 @@ describe('Hooks System Integration', () => {
           'hooks-system.before-model.responses',
         ),
       });
-      const hookScript = `#!/bin/bash
-echo '{
+      const hookCommand = createHookCommand(`{
   "decision": "allow",
   "hookSpecificOutput": {
     "hookEventName": "BeforeModel",
@@ -203,13 +206,7 @@ echo '{
       ]
     }
   }
-}'`;
-
-      const scriptPath = join(rig.testDir!, 'before_model_hook.sh');
-      writeFileSync(scriptPath, hookScript);
-      // Make executable
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${scriptPath}"`);
+}`);
 
       await rig.setup('should modify LLM requests with BeforeModel hooks', {
         settings: {
@@ -222,7 +219,7 @@ echo '{
                 hooks: [
                   {
                     type: 'command',
-                    command: scriptPath,
+                    command: hookCommand,
                     timeout: 5000,
                   },
                 ],
@@ -243,14 +240,12 @@ echo '{
       expect(result.toLowerCase()).toContain('security hook modified');
 
       // Should generate hook telemetry
-
-      // Should generate hook telemetry
       const hookTelemetryFound = rig.readHookLogs();
       expect(hookTelemetryFound.length).toBeGreaterThan(0);
       expect(hookTelemetryFound[0].hookCall.hook_event_name).toBe(
         'BeforeModel',
       );
-      expect(hookTelemetryFound[0].hookCall.hook_name).toBe(scriptPath);
+      expect(hookTelemetryFound[0].hookCall.hook_name).toBe(hookCommand);
       expect(hookTelemetryFound[0].hookCall.hook_input).toBeDefined();
       expect(hookTelemetryFound[0].hookCall.hook_output).toBeDefined();
       expect(hookTelemetryFound[0].hookCall.exit_code).toBe(0);
@@ -267,9 +262,8 @@ echo '{
           'hooks-system.after-model.responses',
         ),
       });
-      // Create a hook script that modifies the LLM response
-      const hookScript = `#!/bin/bash
-echo '{
+      // Create a hook command that modifies the LLM response
+      const hookCommand = createHookCommand(`{
   "hookSpecificOutput": {
     "hookEventName": "AfterModel",
     "llm_response": {
@@ -286,12 +280,7 @@ echo '{
       ]
     }
   }
-}'`;
-
-      const scriptPath = join(rig.testDir!, 'after_model_hook.sh');
-      writeFileSync(scriptPath, hookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${scriptPath}"`);
+}`);
 
       await rig.setup('should modify LLM responses with AfterModel hooks', {
         settings: {
@@ -304,7 +293,7 @@ echo '{
                 hooks: [
                   {
                     type: 'command',
-                    command: scriptPath,
+                    command: hookCommand,
                     timeout: 5000,
                   },
                 ],
@@ -339,9 +328,8 @@ echo '{
           ),
         },
       );
-      // Create a hook script that restricts available tools
-      const hookScript = `#!/bin/bash
-echo '{
+      // Create a hook command that restricts available tools
+      const hookCommand = createHookCommand(`{
   "hookSpecificOutput": {
     "hookEventName": "BeforeToolSelection",
     "toolConfig": {
@@ -349,12 +337,7 @@ echo '{
       "allowedFunctionNames": ["read_file", "run_shell_command"]
     }
   }
-}'`;
-
-      const scriptPath = join(rig.testDir!, 'before_tool_selection_hook.sh');
-      writeFileSync(scriptPath, hookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${scriptPath}"`);
+}`);
 
       await rig.setup(
         'should modify tool selection with BeforeToolSelection hooks',
@@ -370,7 +353,7 @@ echo '{
                   hooks: [
                     {
                       type: 'command',
-                      command: scriptPath,
+                      command: hookCommand,
                       timeout: 5000,
                     },
                   ],
@@ -414,20 +397,14 @@ echo '{
           'hooks-system.before-agent.responses',
         ),
       });
-      // Create a hook script that adds context to the prompt
-      const hookScript = `#!/bin/bash
-echo '{
+      // Create a hook command that adds context to the prompt
+      const hookCommand = createHookCommand(`{
   "decision": "allow",
   "hookSpecificOutput": {
     "hookEventName": "BeforeAgent",
     "additionalContext": "SYSTEM INSTRUCTION: You are in a secure environment. Always mention security compliance in your responses."
   }
-}'`;
-
-      const scriptPath = join(rig.testDir!, 'before_agent_hook.sh');
-      writeFileSync(scriptPath, hookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${scriptPath}"`);
+}`);
 
       await rig.setup('should augment prompts with BeforeAgent hooks', {
         settings: {
@@ -440,7 +417,7 @@ echo '{
                 hooks: [
                   {
                     type: 'command',
-                    command: scriptPath,
+                    command: hookCommand,
                     timeout: 5000,
                   },
                 ],
@@ -525,33 +502,22 @@ echo '{
     // which behaves differently with mocked responses. Keeping real LLM calls.
     it('should execute hooks sequentially when configured', async () => {
       await rig.setup('should execute hooks sequentially when configured');
-      // Create two hooks that modify the input sequentially
-      const hook1Script = `#!/bin/bash
-echo '{
+      // Create two hook commands that modify the input sequentially
+      const hookCommand1 = createHookCommand(`{
   "decision": "allow",
   "hookSpecificOutput": {
     "hookEventName": "BeforeAgent",
     "additionalContext": "Step 1: Initial validation passed."
   }
-}'`;
+}`);
 
-      const hook2Script = `#!/bin/bash
-echo '{
+      const hookCommand2 = createHookCommand(`{
   "decision": "allow",
   "hookSpecificOutput": {
     "hookEventName": "BeforeAgent",
     "additionalContext": "Step 2: Security check completed."
   }
-}'`;
-
-      const script1Path = join(rig.testDir!, 'sequential_hook1.sh');
-      const script2Path = join(rig.testDir!, 'sequential_hook2.sh');
-
-      writeFileSync(script1Path, hook1Script);
-      writeFileSync(script2Path, hook2Script);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${script1Path}"`);
-      execSync(`chmod +x "${script2Path}"`);
+}`);
 
       await rig.setup('should execute hooks sequentially when configured', {
         settings: {
@@ -565,12 +531,12 @@ echo '{
                 hooks: [
                   {
                     type: 'command',
-                    command: script1Path,
+                    command: hookCommand1,
                     timeout: 5000,
                   },
                   {
                     type: 'command',
-                    command: script2Path,
+                    command: hookCommand2,
                     timeout: 5000,
                   },
                 ],
@@ -684,28 +650,18 @@ fi`;
     // which behaves differently with mocked responses. Keeping real LLM calls.
     it('should handle hooks for all major event types', async () => {
       await rig.setup('should handle hooks for all major event types');
-      // Create hook scripts for different events
-      const beforeToolScript = `#!/bin/bash
-echo '{"decision": "allow", "systemMessage": "BeforeTool: File operation logged"}'`;
+      // Create platform-agnostic hook commands
+      const beforeToolCommand = createHookCommand(
+        '{"decision": "allow", "systemMessage": "BeforeTool: File operation logged"}',
+      );
 
-      const afterToolScript = `#!/bin/bash
-echo '{"hookSpecificOutput": {"hookEventName": "AfterTool", "additionalContext": "AfterTool: Operation completed successfully"}}'`;
+      const afterToolCommand = createHookCommand(
+        '{"hookSpecificOutput": {"hookEventName": "AfterTool", "additionalContext": "AfterTool: Operation completed successfully"}}',
+      );
 
-      const beforeAgentScript = `#!/bin/bash
-echo '{"decision": "allow", "hookSpecificOutput": {"hookEventName": "BeforeAgent", "additionalContext": "BeforeAgent: User request processed"}}'`;
-
-      const beforeToolPath = join(rig.testDir!, 'before_tool.sh');
-      const afterToolPath = join(rig.testDir!, 'after_tool.sh');
-      const beforeAgentPath = join(rig.testDir!, 'before_agent.sh');
-
-      writeFileSync(beforeToolPath, beforeToolScript);
-      writeFileSync(afterToolPath, afterToolScript);
-      writeFileSync(beforeAgentPath, beforeAgentScript);
-
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${beforeToolPath}"`);
-      execSync(`chmod +x "${afterToolPath}"`);
-      execSync(`chmod +x "${beforeAgentPath}"`);
+      const beforeAgentCommand = createHookCommand(
+        '{"decision": "allow", "hookSpecificOutput": {"hookEventName": "BeforeAgent", "additionalContext": "BeforeAgent: User request processed"}}',
+      );
 
       await rig.setup('should handle hooks for all major event types', {
         settings: {
@@ -718,7 +674,7 @@ echo '{"decision": "allow", "hookSpecificOutput": {"hookEventName": "BeforeAgent
                 hooks: [
                   {
                     type: 'command',
-                    command: beforeAgentPath,
+                    command: beforeAgentCommand,
                     timeout: 5000,
                   },
                 ],
@@ -730,7 +686,7 @@ echo '{"decision": "allow", "hookSpecificOutput": {"hookEventName": "BeforeAgent
                 hooks: [
                   {
                     type: 'command',
-                    command: beforeToolPath,
+                    command: beforeToolCommand,
                     timeout: 5000,
                   },
                 ],
@@ -742,7 +698,7 @@ echo '{"decision": "allow", "hookSpecificOutput": {"hookEventName": "BeforeAgent
                 hooks: [
                   {
                     type: 'command',
-                    command: afterToolPath,
+                    command: afterToolCommand,
                     timeout: 5000,
                   },
                 ],
@@ -810,22 +766,14 @@ echo '{"decision": "allow", "hookSpecificOutput": {"hookEventName": "BeforeAgent
           'hooks-system.error-handling.responses',
         ),
       });
-      // Create a hook script that fails
-      const failingHookScript = `#!/bin/bash
-echo "Hook encountered an error" >&2
-exit 1`;
+      // Create hook commands - one that fails and one that succeeds
+      const failingHookCommand = createFailingHookCommand(
+        'Hook encountered an error',
+      );
 
-      const workingHookScript = `#!/bin/bash
-echo '{"decision": "allow", "reason": "Working hook succeeded"}'`;
-
-      const failingPath = join(rig.testDir!, 'failing_hook.sh');
-      const workingPath = join(rig.testDir!, 'working_hook.sh');
-
-      writeFileSync(failingPath, failingHookScript);
-      writeFileSync(workingPath, workingHookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${failingPath}"`);
-      execSync(`chmod +x "${workingPath}"`);
+      const workingHookCommand = createHookCommand(
+        '{"decision": "allow", "reason": "Working hook succeeded"}',
+      );
 
       await rig.setup('should handle hook failures gracefully', {
         settings: {
@@ -838,12 +786,12 @@ echo '{"decision": "allow", "reason": "Working hook succeeded"}'`;
                 hooks: [
                   {
                     type: 'command',
-                    command: failingPath,
+                    command: failingHookCommand,
                     timeout: 5000,
                   },
                   {
                     type: 'command',
-                    command: workingPath,
+                    command: workingHookCommand,
                     timeout: 5000,
                   },
                 ],
@@ -879,13 +827,9 @@ echo '{"decision": "allow", "reason": "Working hook succeeded"}'`;
           'hooks-system.telemetry.responses',
         ),
       });
-      const hookScript = `#!/bin/bash
-echo '{"decision": "allow", "reason": "Telemetry test hook"}'`;
-
-      const scriptPath = join(rig.testDir!, 'telemetry_hook.sh');
-      writeFileSync(scriptPath, hookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${scriptPath}"`);
+      const hookCommand = createHookCommand(
+        '{"decision": "allow", "reason": "Telemetry test hook"}',
+      );
 
       await rig.setup('should generate telemetry events for hook executions', {
         settings: {
@@ -898,7 +842,7 @@ echo '{"decision": "allow", "reason": "Telemetry test hook"}'`;
                 hooks: [
                   {
                     type: 'command',
-                    command: scriptPath,
+                    command: hookCommand,
                     timeout: 5000,
                   },
                 ],
