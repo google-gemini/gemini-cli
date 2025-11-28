@@ -48,121 +48,10 @@ import { ShellToolInvocation } from '../tools/shell.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { HookRunner } from '../hooks/hookRunner.js';
 import {
-  HookEventName,
-  type BeforeToolInput,
-  type AfterToolInput,
-} from '../hooks/types.js';
-import { debugLogger } from '../utils/debugLogger.js';
-import { Worker } from 'node:worker_threads';
-
-// Inline worker code for regex testing to avoid separate file dependency
-const workerCode = `
-import { parentPort } from 'node:worker_threads';
-
-if (!parentPort) {
-  throw new Error('This code must be run as a worker thread');
-}
-
-parentPort.on('message', ({ pattern, testString }) => {
-  try {
-    const regex = new RegExp(pattern);
-    const result = regex.test(testString);
-    parentPort.postMessage({ success: true, result });
-  } catch (error) {
-    parentPort.postMessage({
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-});
-`;
-
-/**
- * Safely tests a string against a user-provided regex pattern to prevent
- * ReDoS (Regular Expression Denial of Service) attacks.
- *
- * This function executes the regex test in an isolated worker thread with a hard
- * timeout. If the regex takes too long (catastrophic backtracking), the worker
- * is terminated and the pattern is rejected. This provides robust protection
- * against malicious or poorly-written regex patterns from untrusted hook sources.
- *
- * @param pattern - The regex pattern from user configuration
- * @param testString - The string to test against the pattern
- * @param timeoutMs - Maximum time to allow regex execution (default: 100ms)
- * @returns Promise resolving to true if pattern matches, false otherwise
- */
-async function safeRegexTest(
-  pattern: string,
-  testString: string,
-  timeoutMs = 100,
-): Promise<boolean> {
-  // Quick checks before spinning up a worker
-  if (pattern === '*') return true;
-  if (pattern === testString) return true;
-
-  return new Promise((resolve) => {
-    let worker: Worker;
-    let resolved = false;
-
-    try {
-      // Create worker from inline code
-      // Cast to any because @types/node might be missing 'type' in WorkerOptions
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      worker = new Worker(workerCode, { eval: true, type: 'module' } as any);
-    } catch (error) {
-      // If worker creation fails, fall back to exact match
-      debugLogger.warn(
-        `Failed to create worker for regex test: ${error}. Falling back to exact match.`,
-      );
-      resolve(pattern === testString);
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        worker.terminate();
-        debugLogger.warn(
-          `Regex pattern '${pattern}' timed out after ${timeoutMs}ms. Falling back to exact match.`,
-        );
-        resolve(pattern === testString);
-      }
-    }, timeoutMs);
-
-    worker.on('message', (msg) => {
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timeout);
-        worker.terminate();
-
-        if (msg.success) {
-          resolve(msg.result);
-        } else {
-          debugLogger.warn(
-            `Failed to compile regex pattern '${pattern}': ${msg.error}. Falling back to exact match.`,
-          );
-          resolve(pattern === testString);
-        }
-      }
-    });
-
-    worker.on('error', (error) => {
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timeout);
-        worker.terminate();
-        debugLogger.warn(
-          `Worker error testing regex pattern '${pattern}': ${error}. Falling back to exact match.`,
-        );
-        resolve(pattern === testString);
-      }
-    });
-
-    worker.postMessage({ pattern, testString });
-  });
-}
+  fireToolNotificationHook,
+  executeToolWithHooks,
+} from './coreToolHookTriggers.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -471,7 +360,6 @@ export class CoreToolScheduler {
   }> = [];
   private toolCallQueue: ToolCall[] = [];
   private completedToolCallsForBatch: CompletedToolCall[] = [];
-  private hookRunner = new HookRunner();
 
   constructor(options: CoreToolSchedulerOptions) {
     this.config = options.config;
@@ -954,64 +842,6 @@ export class CoreToolScheduler {
       const { request: reqInfo, invocation } = toolCall;
 
       try {
-        // Hook: BeforeTool
-        const registry = this.config.getHookRegistry();
-        if (registry) {
-          const hooks = registry.getHooksForEvent(HookEventName.BeforeTool);
-          if (hooks.length > 0) {
-            // Evaluate all matchers in parallel with worker thread protection
-            const matchResults = await Promise.all(
-              hooks.map(async (entry) => {
-                if (!entry.matcher || entry.matcher === '*') return true;
-                // Use safe regex test to prevent ReDoS attacks
-                return safeRegexTest(entry.matcher, reqInfo.name);
-              }),
-            );
-
-            const matchingHooks = hooks.filter(
-              (_, index) => matchResults[index],
-            );
-
-            if (matchingHooks.length > 0) {
-              const hookConfigs = matchingHooks.map((h) => h.config);
-              const input: BeforeToolInput = {
-                session_id: this.config.getSessionId(),
-                transcript_path: path.join(
-                  this.config.storage.getHistoryDir(),
-                  `${this.config.getSessionId()}.json`,
-                ),
-                cwd: this.config.getWorkingDir(),
-                hook_event_name: HookEventName.BeforeTool,
-                timestamp: new Date().toISOString(),
-                tool_name: reqInfo.name,
-                tool_input: reqInfo.args,
-              };
-
-              const results = await this.hookRunner.executeHooksSequential(
-                hookConfigs,
-                HookEventName.BeforeTool,
-                input,
-              );
-
-              for (const result of results) {
-                if (
-                  result.output?.decision === 'deny' ||
-                  result.output?.decision === 'block'
-                ) {
-                  this.setStatusInternal(
-                    reqInfo.callId,
-                    'cancelled',
-                    signal,
-                    `Blocked by BeforeTool hook: ${result.output.reason || 'No reason provided'}`,
-                  );
-                  await this.checkAndNotifyCompletion(signal);
-                  return;
-                }
-              }
-            }
-          }
-        }
-
         if (signal.aborted) {
           this.setStatusInternal(
             reqInfo.callId,
@@ -1041,6 +871,13 @@ export class CoreToolScheduler {
             );
             this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
           } else {
+            // Fire Notification hook before showing confirmation to user
+            const messageBus = this.config.getMessageBus();
+            const hooksEnabled = this.config.getEnableHooks();
+            if (hooksEnabled && messageBus) {
+              await fireToolNotificationHook(messageBus, confirmationDetails);
+            }
+
             // Allow IDE to resolve confirmation
             if (
               confirmationDetails.type === 'edit' &&
@@ -1277,6 +1114,8 @@ export class CoreToolScheduler {
             : undefined;
 
         const shellExecutionConfig = this.config.getShellExecutionConfig();
+        const hooksEnabled = this.config.getEnableHooks();
+        const messageBus = this.config.getMessageBus();
 
         await runInDevTraceSpan(
           {
@@ -1301,15 +1140,23 @@ export class CoreToolScheduler {
                 );
                 this.notifyToolCallsUpdate();
               };
-              promise = invocation.execute(
+              promise = executeToolWithHooks(
+                invocation,
+                toolName,
                 signal,
+                messageBus,
+                hooksEnabled,
                 liveOutputCallback,
                 shellExecutionConfig,
                 setPidCallback,
               );
             } else {
-              promise = invocation.execute(
+              promise = executeToolWithHooks(
+                invocation,
+                toolName,
                 signal,
+                messageBus,
+                hooksEnabled,
                 liveOutputCallback,
                 shellExecutionConfig,
               );
@@ -1397,66 +1244,6 @@ export class CoreToolScheduler {
                   toolResult.error.type,
                 );
                 this.setStatusInternal(callId, 'error', signal, errorResponse);
-              }
-
-              // Hook: AfterTool
-              const registry = this.config.getHookRegistry();
-              if (registry) {
-                const hooks = registry.getHooksForEvent(
-                  HookEventName.AfterTool,
-                );
-                if (hooks.length > 0) {
-                  // Evaluate all matchers in parallel with worker thread protection
-                  const matchResults = await Promise.all(
-                    hooks.map(async (entry) => {
-                      if (!entry.matcher || entry.matcher === '*') return true;
-                      // Use safe regex test to prevent ReDoS attacks
-                      return safeRegexTest(entry.matcher, toolName);
-                    }),
-                  );
-
-                  const matchingHooks = hooks.filter(
-                    (_, index) => matchResults[index],
-                  );
-
-                  if (matchingHooks.length > 0) {
-                    const hookConfigs = matchingHooks.map((h) => h.config);
-
-                    // Determine tool output for hook
-                    let toolResponse: Record<string, unknown> = {};
-                    if (toolResult.error) {
-                      toolResponse = { error: toolResult.error.message };
-                    } else if (typeof toolResult.llmContent === 'string') {
-                      toolResponse = { output: toolResult.llmContent };
-                    } else {
-                      // Complex content, approximate
-                      toolResponse = { output: 'Complex content' };
-                    }
-
-                    const input: AfterToolInput = {
-                      session_id: this.config.getSessionId(),
-                      transcript_path: path.join(
-                        this.config.storage.getHistoryDir(),
-                        `${this.config.getSessionId()}.json`,
-                      ),
-                      cwd: this.config.getWorkingDir(),
-                      hook_event_name: HookEventName.AfterTool,
-                      timestamp: new Date().toISOString(),
-                      tool_name: toolName,
-                      tool_input: scheduledCall.request.args,
-                      tool_response: toolResponse,
-                    };
-
-                    // Execute asynchronously, don't block completion (or should we?)
-                    // Claude docs say hooks are synchronous usually.
-                    // We'll await it to be safe and allow context injection.
-                    await this.hookRunner.executeHooksSequential(
-                      hookConfigs,
-                      HookEventName.AfterTool,
-                      input,
-                    );
-                  }
-                }
               }
             } catch (executionError: unknown) {
               spanMetadata.error = executionError;

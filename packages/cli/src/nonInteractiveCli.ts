@@ -4,12 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {
+  Config,
+  ToolCallRequestInfo,
+  ResumedSessionData,
+  CompletedToolCall,
+  UserFeedbackPayload,
+} from '@google/gemini-cli-core';
+import { isSlashCommand } from './ui/utils/commandUtils.js';
+import type { LoadedSettings } from './config/settings.js';
 import {
-  type Config,
-  type ToolCallRequestInfo,
-  type ResumedSessionData,
-  type CompletedToolCall,
-  type UserFeedbackPayload,
   executeToolCall,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
@@ -24,18 +28,10 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
-  HookRunner,
-  HookEventName,
-  type BeforeAgentInput,
-  type BeforeAgentOutput,
-  type AfterAgentInput,
 } from '@google/gemini-cli-core';
-import { isSlashCommand } from './ui/utils/commandUtils.js';
-import type { LoadedSettings } from './config/settings.js';
 
 import type { Content, Part } from '@google/genai';
 import readline from 'node:readline';
-import * as path from 'node:path';
 
 import { convertSessionToHistoryFormats } from './ui/hooks/useSessionBrowser.js';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
@@ -75,7 +71,6 @@ export async function runNonInteractive({
       },
     });
     const textOutput = new TextOutput();
-    const hookRunner = new HookRunner();
 
     const handleUserFeedback = (payload: UserFeedbackPayload) => {
       const prefix = payload.severity.toUpperCase();
@@ -194,73 +189,6 @@ export async function runNonInteractive({
           process.exit(0);
         }
       });
-
-      // Hook: BeforeAgent
-
-      let finalInput = input;
-
-      const registry = config.getHookRegistry();
-
-      if (registry) {
-        const hooks = registry.getHooksForEvent(HookEventName.BeforeAgent);
-
-        if (hooks.length > 0) {
-          const hookConfigs = hooks.map((h) => h.config);
-
-          const inputData: BeforeAgentInput = {
-            session_id: config.getSessionId(),
-
-            transcript_path: path.join(
-              config.storage.getHistoryDir(),
-              `${config.getSessionId()}.json`,
-            ),
-
-            cwd: config.getWorkingDir(),
-
-            hook_event_name: HookEventName.BeforeAgent,
-
-            timestamp: new Date().toISOString(),
-
-            prompt: input,
-          };
-
-          const results = await hookRunner.executeHooksSequential(
-            hookConfigs,
-
-            HookEventName.BeforeAgent,
-
-            inputData,
-          );
-
-          for (const result of results) {
-            if (
-              result.output?.decision === 'deny' ||
-              result.output?.decision === 'block'
-            ) {
-              console.error(`Request blocked by hook: ${result.output.reason}`);
-
-              process.exit(1);
-            }
-
-            const hookOutput = result.output as BeforeAgentOutput;
-
-            let additionalContext: string | undefined;
-
-            if (
-              hookOutput &&
-              hookOutput.hookSpecificOutput &&
-              'additionalContext' in hookOutput.hookSpecificOutput
-            ) {
-              additionalContext = hookOutput.hookSpecificOutput
-                .additionalContext as string;
-            }
-
-            if (additionalContext) {
-              finalInput += '\n\n' + additionalContext;
-            }
-          }
-        }
-      }
 
       const geminiClient = config.getGeminiClient();
 
@@ -504,33 +432,6 @@ export async function runNonInteractive({
           } else {
             textOutput.ensureTrailingNewline(); // Ensure a final newline
           }
-
-          // Hook: AfterAgent
-          if (registry) {
-            const hooks = registry.getHooksForEvent(HookEventName.AfterAgent);
-            if (hooks.length > 0) {
-              const hookConfigs = hooks.map((h) => h.config);
-              const inputData: AfterAgentInput = {
-                session_id: config.getSessionId(),
-                transcript_path: path.join(
-                  config.storage.getHistoryDir(),
-                  `${config.getSessionId()}.json`,
-                ),
-                cwd: config.getWorkingDir(),
-                hook_event_name: HookEventName.AfterAgent,
-                timestamp: new Date().toISOString(),
-                prompt: finalInput,
-                prompt_response: responseText,
-                stop_hook_active: false,
-              };
-              await hookRunner.executeHooksSequential(
-                hookConfigs,
-                HookEventName.AfterAgent,
-                inputData,
-              );
-            }
-          }
-
           return;
         }
       }

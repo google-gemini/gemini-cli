@@ -14,6 +14,7 @@ import type {
   Tool,
   PartListUnion,
   GenerateContentConfig,
+  GenerateContentParameters,
 } from '@google/genai';
 import { ThinkingLevel } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
@@ -46,15 +47,12 @@ import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import {
-  HookEventName,
-  type BeforeModelInput,
-  type BeforeModelOutput,
-} from '../hooks/types.js';
-import { HookRunner } from '../hooks/hookRunner.js';
-import { defaultHookTranslator } from '../hooks/hookTranslator.js';
-import * as path from 'node:path';
-import { debugLogger } from '../utils/debugLogger.js';
+  fireAfterModelHook,
+  fireBeforeModelHook,
+  fireBeforeToolSelectionHook,
+} from './geminiChatHookTriggers.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -222,8 +220,8 @@ export class GeminiChat {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(config);
     this.chatRecordingService.initialize(resumedSessionData);
-    this.lastPromptTokenCount = Math.ceil(
-      JSON.stringify(this.history).length / 4,
+    this.lastPromptTokenCount = estimateTokenCountSync(
+      this.history.flatMap((c) => c.parts || []),
     );
   }
 
@@ -293,153 +291,11 @@ export class GeminiChat {
 
     // Add user content to history ONCE before any attempts.
     this.history.push(userContent);
-    let requestContents = this.getHistory(true);
+    const requestContents = this.getHistory(true);
 
-    // Hook: BeforeModel (with full conversation history)
-    const registry = this.config.getHookRegistry();
-    const hookRunner = new HookRunner();
-    if (registry) {
-      const hooks = registry.getHooksForEvent(HookEventName.BeforeModel);
-      if (hooks.length > 0) {
-        const hookConfigs = hooks.map((h) => h.config);
-        const input: BeforeModelInput = {
-          session_id: this.config.getSessionId(),
-          transcript_path: path.join(
-            this.config.storage.getHistoryDir(),
-            this.config.getSessionId() + '.json',
-          ),
-          cwd: this.config.getWorkingDir(),
-          hook_event_name: HookEventName.BeforeModel,
-          timestamp: new Date().toISOString(),
-          llm_request: defaultHookTranslator.toHookLLMRequest({
-            model,
-            config: {},
-            contents: requestContents,
-          }),
-        };
-
-        try {
-          const results = await hookRunner.executeHooksSequential(
-            hookConfigs,
-            HookEventName.BeforeModel,
-            input,
-          );
-
-          // Check for blocking or modification
-          for (const result of results) {
-            if (
-              result.output?.decision === 'deny' ||
-              result.output?.decision === 'block'
-            ) {
-              debugLogger.log(
-                `Request blocked by BeforeModel hook: ${result.output.reason}`,
-              );
-              // Return empty generator - no API call made
-              return (async function* () {})();
-            }
-
-            const hookOutput = result.output as BeforeModelOutput;
-            if (
-              hookOutput &&
-              hookOutput.hookSpecificOutput &&
-              'llm_request' in hookOutput.hookSpecificOutput
-            ) {
-              // Apply modifications to the full request contents
-              const modifiedHookRequest =
-                hookOutput.hookSpecificOutput.llm_request;
-              if (
-                modifiedHookRequest &&
-                modifiedHookRequest.messages &&
-                modifiedHookRequest.messages.length > 0
-              ) {
-                // Convert hook LLM request back to Content[] format
-                const newRequestContents = modifiedHookRequest.messages.map(
-                  (msg) => ({
-                    role: msg.role === 'user' ? 'user' : 'model',
-                    parts:
-                      typeof msg.content === 'string'
-                        ? [{ text: msg.content }]
-                        : Array.isArray(msg.content)
-                          ? msg.content
-                              .map((p) => {
-                                // Validate that the Part has exactly one valid property
-                                if (
-                                  p &&
-                                  typeof p === 'object' &&
-                                  !Array.isArray(p)
-                                ) {
-                                  const validKeys = [
-                                    'text',
-                                    'inlineData',
-                                    'functionCall',
-                                    'functionResponse',
-                                    'fileData',
-                                  ];
-                                  const presentKeys = Object.keys(p).filter(
-                                    (key) => validKeys.includes(key),
-                                  );
-                                  if (presentKeys.length === 1) {
-                                    return p as Part;
-                                  }
-                                }
-                                debugLogger.warn(
-                                  'Received an invalid part from a BeforeModel hook, it will be ignored:',
-                                  p,
-                                );
-                                return null;
-                              })
-                              .filter((p): p is Part => p !== null)
-                          : [],
-                  }),
-                );
-
-                // Validate message role sequence - must alternate between user and model
-                let isValid = true;
-                for (let i = 0; i < newRequestContents.length - 1; i++) {
-                  if (
-                    newRequestContents[i].role ===
-                    newRequestContents[i + 1].role
-                  ) {
-                    isValid = false;
-                    debugLogger.error(
-                      `Invalid message sequence from BeforeModel hook: consecutive roles of '${newRequestContents[i].role}' detected at positions ${i} and ${i + 1}. Discarding modification.`,
-                    );
-                    break;
-                  }
-                }
-
-                if (
-                  isValid &&
-                  newRequestContents.length > 0 &&
-                  newRequestContents[newRequestContents.length - 1].role !==
-                    'user'
-                ) {
-                  isValid = false;
-                  debugLogger.error(
-                    `Invalid message sequence from BeforeModel hook: last message must have role 'user'. Discarding modification.`,
-                  );
-                }
-
-                if (isValid) {
-                  requestContents = newRequestContents;
-                } else {
-                  debugLogger.warn(
-                    'BeforeModel hook returned invalid conversation structure. Using original request.',
-                  );
-                }
-              }
-            }
-          }
-        } catch (error) {
-          debugLogger.error('Error executing BeforeModel hooks:', error);
-          // Continue with unmodified request if hook fails
-        }
-      }
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const self = this;
-    return (async function* () {
+    const streamWithRetries = async function* (
+      this: GeminiChat,
+    ): AsyncGenerator<StreamEvent, void, void> {
       try {
         let lastError: unknown = new Error('Request failed after all retries.');
 
@@ -447,7 +303,7 @@ export class GeminiChat {
         // If we are in Preview Model Fallback Mode, we want to fail fast (1 attempt)
         // when probing the Preview Model.
         if (
-          self.config.isPreviewModelFallbackMode() &&
+          this.config.isPreviewModelFallbackMode() &&
           model === PREVIEW_GEMINI_MODEL
         ) {
           maxAttempts = 1;
@@ -464,7 +320,7 @@ export class GeminiChat {
               generateContentConfig.temperature = 1;
             }
 
-            const stream = await self.makeApiCallAndProcessStream(
+            const stream = await this.makeApiCallAndProcessStream(
               model,
               generateContentConfig,
               requestContents,
@@ -485,7 +341,7 @@ export class GeminiChat {
               // Check if we have more attempts left.
               if (attempt < maxAttempts - 1) {
                 logContentRetry(
-                  self.config,
+                  this.config,
                   new ContentRetryEvent(
                     attempt,
                     (error as InvalidStreamError).type,
@@ -513,7 +369,7 @@ export class GeminiChat {
             isGemini2Model(model)
           ) {
             logContentRetryFailure(
-              self.config,
+              this.config,
               new ContentRetryFailureEvent(
                 maxAttempts,
                 (lastError as InvalidStreamError).type,
@@ -527,15 +383,17 @@ export class GeminiChat {
           // We only do this if we didn't bypass Preview Model (i.e. we actually used it).
           if (
             model === PREVIEW_GEMINI_MODEL &&
-            !self.config.isPreviewModelBypassMode()
+            !this.config.isPreviewModelBypassMode()
           ) {
-            self.config.setPreviewModelFallbackMode(false);
+            this.config.setPreviewModelFallbackMode(false);
           }
         }
       } finally {
         streamDoneResolver!();
       }
-    })();
+    };
+
+    return streamWithRetries.call(this);
   }
 
   private async makeApiCallAndProcessStream(
@@ -547,7 +405,13 @@ export class GeminiChat {
     let effectiveModel = model;
     const contentsForPreviewModel =
       this.ensureActiveLoopHasThoughtSignatures(requestContents);
-    const apiCall = () => {
+
+    // Track final request parameters for AfterModel hooks
+    let lastModelToUse = model;
+    let lastConfig: GenerateContentConfig = generateContentConfig;
+    let lastContentsToUse: Content[] = requestContents;
+
+    const apiCall = async () => {
       let modelToUse = getEffectiveModel(
         this.config.isInFallbackMode(),
         model,
@@ -589,14 +453,79 @@ export class GeminiChat {
         };
         delete config.thinkingConfig?.thinkingLevel;
       }
+      let contentsToUse =
+        modelToUse === PREVIEW_GEMINI_MODEL
+          ? contentsForPreviewModel
+          : requestContents;
+
+      // Fire BeforeModel and BeforeToolSelection hooks if enabled
+      const hooksEnabled = this.config.getEnableHooks();
+      const messageBus = this.config.getMessageBus();
+      if (hooksEnabled && messageBus) {
+        // Fire BeforeModel hook
+        const beforeModelResult = await fireBeforeModelHook(messageBus, {
+          model: modelToUse,
+          config,
+          contents: contentsToUse,
+        });
+
+        // Check if hook blocked the model call
+        if (beforeModelResult.blocked) {
+          // Return a synthetic response generator
+          const syntheticResponse = beforeModelResult.syntheticResponse;
+          if (syntheticResponse) {
+            return (async function* () {
+              yield syntheticResponse;
+            })();
+          }
+          // If blocked without synthetic response, return empty generator
+          return (async function* () {
+            // Empty generator - no response
+          })();
+        }
+
+        // Apply modifications from BeforeModel hook
+        if (beforeModelResult.modifiedConfig) {
+          Object.assign(config, beforeModelResult.modifiedConfig);
+        }
+        if (
+          beforeModelResult.modifiedContents &&
+          Array.isArray(beforeModelResult.modifiedContents)
+        ) {
+          contentsToUse = beforeModelResult.modifiedContents as Content[];
+        }
+
+        // Fire BeforeToolSelection hook
+        const toolSelectionResult = await fireBeforeToolSelectionHook(
+          messageBus,
+          {
+            model: modelToUse,
+            config,
+            contents: contentsToUse,
+          },
+        );
+
+        // Apply tool configuration modifications
+        if (toolSelectionResult.toolConfig) {
+          config.toolConfig = toolSelectionResult.toolConfig;
+        }
+        if (
+          toolSelectionResult.tools &&
+          Array.isArray(toolSelectionResult.tools)
+        ) {
+          config.tools = toolSelectionResult.tools as Tool[];
+        }
+      }
+
+      // Track final request parameters for AfterModel hooks
+      lastModelToUse = modelToUse;
+      lastConfig = config;
+      lastContentsToUse = contentsToUse;
 
       return this.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
-          contents:
-            modelToUse === PREVIEW_GEMINI_MODEL
-              ? contentsForPreviewModel
-              : requestContents,
+          contents: contentsToUse,
           config,
         },
         prompt_id,
@@ -620,7 +549,18 @@ export class GeminiChat {
           : undefined,
     });
 
-    return this.processStreamResponse(model, streamResponse);
+    // Store the original request for AfterModel hooks
+    const originalRequest: GenerateContentParameters = {
+      model: lastModelToUse,
+      config: lastConfig,
+      contents: lastContentsToUse,
+    };
+
+    return this.processStreamResponse(
+      effectiveModel,
+      streamResponse,
+      originalRequest,
+    );
   }
 
   /**
@@ -774,6 +714,7 @@ export class GeminiChat {
   private async *processStreamResponse(
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
+    originalRequest: GenerateContentParameters,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
 
@@ -813,7 +754,19 @@ export class GeminiChat {
         }
       }
 
-      yield chunk; // Yield every chunk to the UI immediately.
+      // Fire AfterModel hook through MessageBus (only if hooks are enabled)
+      const hooksEnabled = this.config.getEnableHooks();
+      const messageBus = this.config.getMessageBus();
+      if (hooksEnabled && messageBus && originalRequest && chunk) {
+        const hookResult = await fireAfterModelHook(
+          messageBus,
+          originalRequest,
+          chunk,
+        );
+        yield hookResult.response;
+      } else {
+        yield chunk; // Yield every chunk to the UI immediately.
+      }
     }
 
     // String thoughts and consolidate text parts.
