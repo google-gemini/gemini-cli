@@ -10,6 +10,7 @@ import type { TokenStorage, OAuthCredentials } from './types.js';
 import { TokenStorageType } from './types.js';
 
 const FORCE_FILE_STORAGE_ENV_VAR = 'GEMINI_FORCE_FILE_STORAGE';
+const ENABLE_KEYCHAIN_STORAGE_ENV_VAR = 'GEMINI_ENABLE_KEYCHAIN_STORAGE';
 
 export class HybridTokenStorage extends BaseTokenStorage {
   private storage: TokenStorage | null = null;
@@ -22,8 +23,10 @@ export class HybridTokenStorage extends BaseTokenStorage {
 
   private async initializeStorage(): Promise<TokenStorage> {
     const forceFileStorage = process.env[FORCE_FILE_STORAGE_ENV_VAR] === 'true';
+    const enableKeychainStorage =
+      process.env[ENABLE_KEYCHAIN_STORAGE_ENV_VAR] === 'true';
 
-    if (!forceFileStorage) {
+    if (!forceFileStorage && enableKeychainStorage) {
       try {
         const { KeychainTokenStorage } = await import(
           './keychain-token-storage.js'
