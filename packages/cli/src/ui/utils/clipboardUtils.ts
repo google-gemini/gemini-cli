@@ -13,6 +13,19 @@ import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
  * @returns true if clipboard contains an image
  */
 export async function clipboardHasImage(): Promise<boolean> {
+  if (process.platform === 'win32') {
+    try {
+      const { stdout } = await spawnAsync('powershell', [
+        '-NoProfile',
+        '-Command',
+        'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::ContainsImage()',
+      ]);
+      return stdout.trim() === 'True';
+    } catch {
+      return false;
+    }
+  }
+
   if (process.platform !== 'darwin') {
     return false;
   }
@@ -36,7 +49,7 @@ export async function clipboardHasImage(): Promise<boolean> {
 export async function saveClipboardImage(
   targetDir?: string,
 ): Promise<string | null> {
-  if (process.platform !== 'darwin') {
+  if (process.platform !== 'darwin' && process.platform !== 'win32') {
     return null;
   }
 
@@ -50,6 +63,41 @@ export async function saveClipboardImage(
     // Generate a unique filename with timestamp
     const timestamp = new Date().getTime();
 
+    if (process.platform === 'win32') {
+      const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
+      // Escape backslashes for PowerShell string
+      const psPath = tempFilePath.replace(/\\/g, '\\\\');
+
+      const script = `
+        Add-Type -AssemblyName System.Windows.Forms
+        Add-Type -AssemblyName System.Drawing
+        if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
+          $image = [System.Windows.Forms.Clipboard]::GetImage()
+          $image.Save('${psPath}', [System.Drawing.Imaging.ImageFormat]::Png)
+          Write-Output "success"
+        }
+      `;
+
+      const { stdout } = await spawnAsync('powershell', [
+        '-NoProfile',
+        '-Command',
+        script,
+      ]);
+
+      if (stdout.trim() === 'success') {
+        try {
+          const stats = await fs.stat(tempFilePath);
+          if (stats.size > 0) {
+            return tempFilePath;
+          }
+        } catch {
+          // File doesn't exist
+        }
+      }
+      return null;
+    }
+
+    // macOS implementation
     // Try different image formats in order of preference
     const formats = [
       { class: 'PNGf', extension: 'png' },
