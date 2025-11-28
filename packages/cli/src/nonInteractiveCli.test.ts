@@ -80,6 +80,7 @@ vi.mock('./services/CommandService.js', () => ({
 }));
 
 vi.mock('./services/FileCommandLoader.js');
+vi.mock('./services/BuiltinCommandLoader.js');
 vi.mock('./services/McpPromptLoader.js');
 
 describe('runNonInteractive', () => {
@@ -1166,6 +1167,9 @@ describe('runNonInteractive', () => {
     const { FileCommandLoader } = await import(
       './services/FileCommandLoader.js'
     );
+    const { BuiltinCommandLoader } = await import(
+      './services/BuiltinCommandLoader.js'
+    );
     const { McpPromptLoader } = await import('./services/McpPromptLoader.js');
 
     mockGetCommands.mockReturnValue([]); // No commands found, so it will fall through
@@ -1190,15 +1194,20 @@ describe('runNonInteractive', () => {
     // Check that loaders were instantiated with the config
     expect(FileCommandLoader).toHaveBeenCalledTimes(1);
     expect(FileCommandLoader).toHaveBeenCalledWith(mockConfig);
+    expect(BuiltinCommandLoader).toHaveBeenCalledTimes(1);
+    expect(BuiltinCommandLoader).toHaveBeenCalledWith(mockConfig);
     expect(McpPromptLoader).toHaveBeenCalledTimes(1);
     expect(McpPromptLoader).toHaveBeenCalledWith(mockConfig);
 
     // Check that instances were passed to CommandService.create
     expect(mockCommandServiceCreate).toHaveBeenCalledTimes(1);
     const loadersArg = mockCommandServiceCreate.mock.calls[0][0];
-    expect(loadersArg).toHaveLength(2);
+    expect(loadersArg).toHaveLength(3);
     expect(loadersArg[0]).toBe(vi.mocked(McpPromptLoader).mock.instances[0]);
-    expect(loadersArg[1]).toBe(vi.mocked(FileCommandLoader).mock.instances[0]);
+    expect(loadersArg[1]).toBe(
+      vi.mocked(BuiltinCommandLoader).mock.instances[0],
+    );
+    expect(loadersArg[2]).toBe(vi.mocked(FileCommandLoader).mock.instances[0]);
   });
 
   it('should allow a normally-excluded tool when --allowed-tools is set', async () => {
