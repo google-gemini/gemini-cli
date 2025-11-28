@@ -7,7 +7,10 @@
 import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPError,
+} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProviderType, type Config } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
@@ -490,16 +493,14 @@ describe('mcp-client', () => {
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toHaveProperty(
-          '_url',
-          new URL('http://test-server/'),
-        );
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: { headers: {} },
+        });
       });
 
       it('with headers', async () => {
-        // We need this to be an any type because we dig into its private state.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const transport: any = await createTransport(
+        const transport = await createTransport(
           'test-server',
           {
             httpUrl: 'http://test-server',
@@ -507,13 +508,14 @@ describe('mcp-client', () => {
           },
           false,
         );
+
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toHaveProperty(
-          '_url',
-          new URL('http://test-server/'),
-        );
-        const authHeader = transport._requestInit?.headers?.['Authorization'];
-        expect(authHeader).toBe('derp');
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: {
+            headers: { Authorization: 'derp' },
+          },
+        });
       });
     });
 
@@ -526,17 +528,15 @@ describe('mcp-client', () => {
           },
           false,
         );
-        expect(transport).toBeInstanceOf(SSEClientTransport);
-        expect(transport).toHaveProperty(
-          '_url',
-          new URL('http://test-server/'),
-        );
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: { headers: {} },
+        });
       });
 
       it('with headers', async () => {
-        // We need this to be an any type because we dig into its private state.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const transport: any = await createTransport(
+        const transport = await createTransport(
           'test-server',
           {
             url: 'http://test-server',
@@ -544,13 +544,122 @@ describe('mcp-client', () => {
           },
           false,
         );
-        expect(transport).toBeInstanceOf(SSEClientTransport);
-        expect(transport).toHaveProperty(
-          '_url',
-          new URL('http://test-server/'),
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: {
+            headers: { Authorization: 'derp' },
+          },
+        });
+      });
+
+      it('with type="http" creates StreamableHTTPClientTransport', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            type: 'http',
+          },
+          false,
         );
-        const authHeader = transport._requestInit?.headers?.['Authorization'];
-        expect(authHeader).toBe('derp');
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: { headers: {} },
+        });
+      });
+
+      it('with type="sse" creates SSEClientTransport', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            type: 'sse',
+          },
+          false,
+        );
+
+        expect(transport).toBeInstanceOf(SSEClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: { headers: {} },
+        });
+      });
+
+      it('without type defaults to StreamableHTTPClientTransport', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+          },
+          false,
+        );
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: { headers: {} },
+        });
+      });
+
+      it('with type="http" and headers applies headers correctly', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            type: 'http',
+            headers: { Authorization: 'Bearer token' },
+          },
+          false,
+        );
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: {
+            headers: { Authorization: 'Bearer token' },
+          },
+        });
+      });
+
+      it('with type="sse" and headers applies headers correctly', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            type: 'sse',
+            headers: { 'X-API-Key': 'key123' },
+          },
+          false,
+        );
+
+        expect(transport).toBeInstanceOf(SSEClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: {
+            headers: { 'X-API-Key': 'key123' },
+          },
+        });
+      });
+
+      it('httpUrl takes priority over url when both are present', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test-server-http',
+            url: 'http://test-server-url',
+          },
+          false,
+        );
+
+        // httpUrl should take priority and create HTTP transport
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server-http'),
+          _requestInit: { headers: {} },
+        });
       });
     });
 
@@ -680,6 +789,7 @@ describe('mcp-client', () => {
           'test-server',
           {
             url: 'http://test.googleapis.com',
+            type: 'sse',
             authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
             oauth: {
               scopes: ['scope1'],
@@ -839,7 +949,10 @@ describe('connectToMcpServer with OAuth', () => {
     const wwwAuthHeader = `Bearer realm="test", resource_metadata="http://test-server.com/.well-known/oauth-protected-resource"`;
 
     vi.mocked(mockedClient.connect).mockRejectedValueOnce(
-      new Error(`401 Unauthorized\nwww-authenticate: ${wwwAuthHeader}`),
+      new StreamableHTTPError(
+        401,
+        `Unauthorized\nwww-authenticate: ${wwwAuthHeader}`,
+      ),
     );
 
     vi.mocked(OAuthUtils.discoverOAuthConfig).mockResolvedValue({
@@ -860,7 +973,7 @@ describe('connectToMcpServer with OAuth', () => {
 
     const client = await connectToMcpServer(
       'test-server',
-      { httpUrl: serverUrl },
+      { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
       workspaceContext,
     );
@@ -880,7 +993,7 @@ describe('connectToMcpServer with OAuth', () => {
     const tokenUrl = 'http://auth.example.com/token';
 
     vi.mocked(mockedClient.connect).mockRejectedValueOnce(
-      new Error('401 Unauthorized'),
+      new StreamableHTTPError(401, 'Unauthorized'),
     );
 
     vi.mocked(OAuthUtils.discoverOAuthConfig).mockResolvedValue({
@@ -904,7 +1017,7 @@ describe('connectToMcpServer with OAuth', () => {
 
     const client = await connectToMcpServer(
       'test-server',
-      { httpUrl: serverUrl },
+      { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
       workspaceContext,
     );
@@ -917,5 +1030,195 @@ describe('connectToMcpServer with OAuth', () => {
     const authHeader =
       capturedTransport._requestInit?.headers?.['Authorization'];
     expect(authHeader).toBe('Bearer test-access-token-from-discovery');
+  });
+});
+
+describe('connectToMcpServer - HTTP→SSE fallback', () => {
+  let mockedClient: ClientLib.Client;
+  let workspaceContext: WorkspaceContext;
+  let testWorkspace: string;
+
+  beforeEach(() => {
+    mockedClient = {
+      connect: vi.fn(),
+      close: vi.fn(),
+      registerCapabilities: vi.fn(),
+      setRequestHandler: vi.fn(),
+      onclose: vi.fn(),
+      notification: vi.fn(),
+    } as unknown as ClientLib.Client;
+    vi.mocked(ClientLib.Client).mockImplementation(() => mockedClient);
+
+    testWorkspace = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-agent-test-'),
+    );
+    workspaceContext = new WorkspaceContext(testWorkspace);
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should NOT trigger fallback when type="http" is explicit', async () => {
+    vi.mocked(mockedClient.connect).mockRejectedValueOnce(
+      new Error('Connection failed'),
+    );
+
+    await expect(
+      connectToMcpServer(
+        'test-server',
+        { url: 'http://test-server', type: 'http' },
+        false,
+        workspaceContext,
+      ),
+    ).rejects.toThrow('Connection failed');
+
+    // Should only try once (no fallback)
+    expect(mockedClient.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('should NOT trigger fallback when type="sse" is explicit', async () => {
+    vi.mocked(mockedClient.connect).mockRejectedValueOnce(
+      new Error('Connection failed'),
+    );
+
+    await expect(
+      connectToMcpServer(
+        'test-server',
+        { url: 'http://test-server', type: 'sse' },
+        false,
+        workspaceContext,
+      ),
+    ).rejects.toThrow('Connection failed');
+
+    // Should only try once (no fallback)
+    expect(mockedClient.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('should trigger fallback when url provided without type and HTTP fails', async () => {
+    vi.mocked(mockedClient.connect)
+      .mockRejectedValueOnce(new StreamableHTTPError(500, 'Server error'))
+      .mockResolvedValueOnce(undefined);
+
+    const client = await connectToMcpServer(
+      'test-server',
+      { url: 'http://test-server' },
+      false,
+      workspaceContext,
+    );
+
+    expect(client).toBe(mockedClient);
+    // First HTTP attempt fails, second SSE attempt succeeds
+    expect(mockedClient.connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('should throw original HTTP error when both HTTP and SSE fail (non-401)', async () => {
+    const httpError = new StreamableHTTPError(500, 'Server error');
+    const sseError = new Error('SSE connection failed');
+
+    vi.mocked(mockedClient.connect)
+      .mockRejectedValueOnce(httpError)
+      .mockRejectedValueOnce(sseError);
+
+    await expect(
+      connectToMcpServer(
+        'test-server',
+        { url: 'http://test-server' },
+        false,
+        workspaceContext,
+      ),
+    ).rejects.toThrow('Server error');
+
+    expect(mockedClient.connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('should handle HTTP 404 followed by SSE success', async () => {
+    vi.mocked(mockedClient.connect)
+      .mockRejectedValueOnce(new StreamableHTTPError(404, 'Not Found'))
+      .mockResolvedValueOnce(undefined);
+
+    const client = await connectToMcpServer(
+      'test-server',
+      { url: 'http://test-server' },
+      false,
+      workspaceContext,
+    );
+
+    expect(client).toBe(mockedClient);
+    expect(mockedClient.connect).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('connectToMcpServer - OAuth with transport fallback', () => {
+  let mockedClient: ClientLib.Client;
+  let workspaceContext: WorkspaceContext;
+  let testWorkspace: string;
+  let mockAuthProvider: MCPOAuthProvider;
+  let mockTokenStorage: MCPOAuthTokenStorage;
+
+  beforeEach(() => {
+    mockedClient = {
+      connect: vi.fn(),
+      close: vi.fn(),
+      registerCapabilities: vi.fn(),
+      setRequestHandler: vi.fn(),
+      onclose: vi.fn(),
+      notification: vi.fn(),
+    } as unknown as ClientLib.Client;
+    vi.mocked(ClientLib.Client).mockImplementation(() => mockedClient);
+
+    testWorkspace = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-agent-test-'),
+    );
+    workspaceContext = new WorkspaceContext(testWorkspace);
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    mockTokenStorage = {
+      getCredentials: vi.fn().mockResolvedValue({ clientId: 'test-client' }),
+    } as unknown as MCPOAuthTokenStorage;
+    vi.mocked(MCPOAuthTokenStorage).mockReturnValue(mockTokenStorage);
+
+    mockAuthProvider = {
+      authenticate: vi.fn().mockResolvedValue(undefined),
+      getValidToken: vi.fn().mockResolvedValue('test-access-token'),
+      tokenStorage: mockTokenStorage,
+    } as unknown as MCPOAuthProvider;
+    vi.mocked(MCPOAuthProvider).mockReturnValue(mockAuthProvider);
+
+    vi.mocked(OAuthUtils.discoverOAuthConfig).mockResolvedValue({
+      authorizationUrl: 'http://auth.example.com/auth',
+      tokenUrl: 'http://auth.example.com/token',
+      scopes: ['test-scope'],
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should handle HTTP 404 → SSE 401 → OAuth → SSE+OAuth succeeds', async () => {
+    // Tests that OAuth flow works when SSE (not HTTP) requires auth
+    vi.mocked(mockedClient.connect)
+      .mockRejectedValueOnce(new StreamableHTTPError(404, 'Not Found'))
+      .mockRejectedValueOnce(new StreamableHTTPError(401, 'Unauthorized'))
+      .mockResolvedValueOnce(undefined);
+
+    const client = await connectToMcpServer(
+      'test-server',
+      { url: 'http://test-server', oauth: { enabled: true } },
+      false,
+      workspaceContext,
+    );
+
+    expect(client).toBe(mockedClient);
+    expect(mockedClient.connect).toHaveBeenCalledTimes(3);
+    expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
   });
 });
