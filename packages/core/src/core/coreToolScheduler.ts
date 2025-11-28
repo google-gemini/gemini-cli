@@ -1195,7 +1195,9 @@ export class CoreToolScheduler {
 
               if (timeoutController.signal.aborted) {
                 // Handle timeout
-                const message = `Command timed out after ${timeoutMs}ms. You can increase the timeout by passing a 'timeout' argument (in milliseconds).`;
+                const message = `Command timed out after ${
+                  timeoutMs / 1000
+                } seconds. The default timeout is 3 minutes. You can increase the timeout by passing a 'timeout' argument (in milliseconds).`;
 
                 // If we have content, append the message.
                 // Note: toolResult.llmContent is PartListUnion (string | Part | Part[])

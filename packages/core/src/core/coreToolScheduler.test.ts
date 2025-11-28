@@ -2204,7 +2204,7 @@ describe('CoreToolScheduler Timeout', () => {
     const response =
       completedCalls[0].response.responseParts[0].functionResponse.response
         .output;
-    expect(response).toContain('Command timed out after 100ms');
+    expect(response).toContain('Command timed out after 0.1 seconds');
     expect(response).toContain('Partial output before timeout');
     expect(response).toContain('Tool aborted');
   });
