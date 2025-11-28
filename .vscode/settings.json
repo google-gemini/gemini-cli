@@ -1,9 +1,7 @@
 {
   "typescript.tsserver.experimental.enableProjectDiagnostics": true,
   "editor.tabSize": 2,
-  "editor.rulers": [
-    80
-  ],
+  "editor.rulers": [80],
   "editor.detectIndentation": false,
   "editor.insertSpaces": true,
   "[typescript]": {
@@ -19,7 +17,5 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "vitest.disableWorkspaceWarning": true,
-  "githubPullRequests.ignoredPullRequestBranches": [
-    "main"
-  ]
+  "githubPullRequests.ignoredPullRequestBranches": ["main"]
 }
