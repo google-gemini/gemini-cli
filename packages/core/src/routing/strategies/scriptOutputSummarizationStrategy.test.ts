@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { ScriptOutputSummarizationStrategy } from './scriptOutputSummarizationStrategy';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../../config/models';
 import type { RoutingContext } from '../routingStrategy';
@@ -7,7 +7,11 @@ import type { BaseLlmClient } from '../../core/baseLlmClient';
 import type { ToolResult } from '../../tools/tools';
 
 describe('ScriptOutputSummarizationStrategy', () => {
-  const mockConfig = {} as Config;
+  const mockConfig = {
+    getModel: vi.fn(),
+    getPreviewFeatures: vi.fn(),
+    getSummarizeToolOutputConfig: vi.fn(),
+  } as unknown as Config;
   const mockBaseLlmClient = {
     generateContent: vi.fn(),
   } as unknown as BaseLlmClient;
@@ -54,6 +58,11 @@ describe('ScriptOutputSummarizationStrategy', () => {
     const mockSummaryResult = { text: 'Summary: This is a long output with a critical phrase: \'Important detail 1\'. And a second critical phrase: \'Crucial data point 2\'.' };
     const generateContentSpy = vi.spyOn(mockBaseLlmClient, 'generateContent').mockResolvedValue(mockSummaryResult);
 
+    // Mock config to return a summarizer for shell tool output
+    vi.spyOn(mockConfig, 'getSummarizeToolOutputConfig').mockReturnValue({
+        [ScriptOutputSummarizationStrategy.prototype.name]: { /* config */ },
+    });
+
     const decision = await strategy.route(context, mockConfig, mockBaseLlmClient);
 
     expect(decision).toEqual({
@@ -86,6 +95,8 @@ describe('ScriptOutputSummarizationStrategy', () => {
       },
     } as RoutingContext;
 
+    // Mock config to return null for summarizer, so it should return null decision
+    vi.spyOn(mockConfig, 'getSummarizeToolOutputConfig').mockReturnValue(null);
     const decision = await strategy.route(context, mockConfig, mockBaseLlmClient);
     expect(decision).toBeNull(); // Empty output is short, so no summarization
   });

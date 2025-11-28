@@ -16,6 +16,7 @@ export const GEMINI_MODEL_ALIAS_PRO = 'pro';
 export const GEMINI_MODEL_ALIAS_FLASH = 'flash';
 export const GEMINI_MODEL_ALIAS_FLASH_LITE = 'flash-lite';
 export const GEMINI_MODEL_ALIAS_IMAGE = 'image';
+export const GEMINI_MODEL_ALIAS_FLASH_LITE_IMAGE = 'flash-lite-image';
 
 export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 

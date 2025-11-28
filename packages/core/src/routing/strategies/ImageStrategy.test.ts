@@ -1,11 +1,17 @@
-import { describe, it, expect } from 'vitest';
+
+import { describe, it, expect, vi } from 'vitest';
 import { ImageStrategy } from './ImageStrategy';
-import { DEFAULT_GEMINI_MODEL } from '../../config/models';
+import { DEFAULT_GEMINI_MODEL, GEMINI_MODEL_ALIAS_FLASH_LITE_IMAGE } from '../../config/models';
 import { RoutingContext } from '../routingStrategy';
 import { Config } from '../../config/config';
 
 describe('ImageStrategy', () => {
-  it('should return an image model decision if the request contains an image and preview features are enabled', async () => {
+  const mockConfig = {
+    getModel: vi.fn(),
+    getPreviewFeatures: vi.fn(),
+  } as unknown as Config;
+
+  it('should return flash-lite image model if request has image and flash-lite is preferred general model', async () => {
     const strategy = new ImageStrategy();
     const context = {
       request: {
@@ -16,19 +22,23 @@ describe('ImageStrategy', () => {
       },
     } as RoutingContext;
 
-    const decision = await strategy.route(context, { getPreviewFeatures: () => true } as Config);
+    // Mock config to return flash-lite as preferred general model
+    vi.spyOn(mockConfig, 'getModel').mockReturnValue('flash-lite');
+    vi.spyOn(mockConfig, 'getPreviewFeatures').mockReturnValue(true);
+
+    const decision = await strategy.route(context, mockConfig, {} as any);
 
     expect(decision).toEqual({
-      model: 'gemini-2.5-pro-image-preview',
+      model: 'gemini-2.5-flash-lite-image-preview',
       metadata: {
-        source: 'ImageStrategy',
+        source: 'image',
         latencyMs: 0,
         reasoning: 'Request contains an image.',
       },
     });
   });
 
-  it('should return a pro model decision if the request contains an image and preview features are disabled', async () => {
+  it('should return pro image model if request has image and pro is preferred general model (preview enabled)', async () => {
     const strategy = new ImageStrategy();
     const context = {
       request: {
@@ -39,19 +49,50 @@ describe('ImageStrategy', () => {
       },
     } as RoutingContext;
 
-    const decision = await strategy.route(context, { getPreviewFeatures: () => false } as Config);
+    // Mock config to return pro as preferred general model
+    vi.spyOn(mockConfig, 'getModel').mockReturnValue('pro');
+    vi.spyOn(mockConfig, 'getPreviewFeatures').mockReturnValue(true);
+
+    const decision = await strategy.route(context, mockConfig, {} as any);
 
     expect(decision).toEqual({
-        model: DEFAULT_GEMINI_MODEL,
-        metadata: {
-            source: 'ImageStrategy',
-            latencyMs: 0,
-            reasoning: 'Request contains an image.',
-        },
+      model: 'gemini-2.5-pro-image-preview',
+      metadata: {
+        source: 'image',
+        latencyMs: 0,
+        reasoning: 'Request contains an image.',
+      },
     });
   });
 
-  it('should return an image model decision if the request asks to generate an image and preview features are enabled', async () => {
+  it('should return pro model if request has image and preview features are disabled', async () => {
+    const strategy = new ImageStrategy();
+    const context = {
+      request: {
+        parts: [
+          { text: 'Describe this image' },
+          { inlineData: { mimeType: 'image/png', data: 'base64...' } },
+        ],
+      },
+    } as RoutingContext;
+
+    // Mock config to disable preview features
+    vi.spy10('getPreviewFeatures').mockReturnValue(false);
+    vi.spyOn(mockConfig, 'getModel').mockReturnValue('pro');
+
+    const decision = await strategy.route(context, mockConfig, {} as any);
+
+    expect(decision).toEqual({
+      model: DEFAULT_GEMINI_MODEL,
+      metadata: {
+        source: 'image',
+        latencyMs: 0,
+        reasoning: 'Request contains an image.',
+      },
+    });
+  });
+
+  it('should return flash-lite image model if request asks to generate image and flash-lite is preferred general model', async () => {
     const strategy = new ImageStrategy();
     const context = {
       request: {
@@ -59,19 +100,23 @@ describe('ImageStrategy', () => {
       },
     } as RoutingContext;
 
-    const decision = await strategy.route(context, { getPreviewFeatures: () => true } as Config);
+    // Mock config to return flash-lite as preferred general model
+    vi.spyOn(mockConfig, 'getModel').mockReturnValue('flash-lite');
+    vi.spyOn(mockConfig, 'getPreviewFeatures').mockReturnValue(true);
+
+    const decision = await strategy.route(context, mockConfig, {} as any);
 
     expect(decision).toEqual({
-      model: 'gemini-2.5-pro-image-preview',
+      model: 'gemini-2.5-flash-lite-image-preview',
       metadata: {
-        source: 'ImageStrategy',
+        source: 'image',
         latencyMs: 0,
         reasoning: 'Request for image generation.',
       },
     });
   });
 
-  it('should return a pro model decision if the request asks to generate an image and preview features are disabled', async () => {
+  it('should return pro image model if request asks to generate image and pro is preferred general model (preview enabled)', async () => {
     const strategy = new ImageStrategy();
     const context = {
       request: {
@@ -79,19 +124,47 @@ describe('ImageStrategy', () => {
       },
     } as RoutingContext;
 
-    const decision = await strategy.route(context, { getPreviewFeatures: () => false } as Config);
+    // Mock config to return pro as preferred general model
+    vi.spyOn(mockConfig, 'getModel').mockReturnValue('pro');
+    vi.spyOn(mockConfig, 'getPreviewFeatures').mockReturnValue(true);
+
+    const decision = await strategy.route(context, mockConfig, {} as any);
 
     expect(decision).toEqual({
-        model: DEFAULT_GEMINI_MODEL,
-        metadata: {
-            source: 'ImageStrategy',
-            latencyMs: 0,
-            reasoning: 'Request for image generation.',
-        },
+      model: 'gemini-2.5-pro-image-preview',
+      metadata: {
+        source: 'image',
+        latencyMs: 0,
+        reasoning: 'Request for image generation.',
+      },
     });
   });
 
-  it('should return null if the request does not contain an image', async () => {
+  it('should return pro model if request asks to generate image and preview features are disabled', async () => {
+    const strategy = new ImageStrategy();
+    const context = {
+      request: {
+        parts: [{ text: 'draw a picture of a bird' }],
+      },
+    } as RoutingContext;
+
+    // Mock config to disable preview features
+    vi.spyOn(mockConfig, 'getPreviewFeatures').mockReturnValue(false);
+    vi.spyOn(mockConfig, 'getModel').mockReturnValue('pro');
+
+    const decision = await strategy.route(context, mockConfig, {} as any);
+
+    expect(decision).toEqual({
+      model: DEFAULT_GEMINI_MODEL,
+      metadata: {
+        source: 'image',
+        latencyMs: 0,
+        reasoning: 'Request for image generation.',
+      },
+    });
+  });
+
+  it('should return null if the request does not contain an image or image generation request', async () => {
     const strategy = new ImageStrategy();
     const context = {
       request: {

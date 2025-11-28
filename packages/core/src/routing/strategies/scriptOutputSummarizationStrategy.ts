@@ -52,11 +52,7 @@ export class ScriptOutputSummarizationStrategy implements RoutingStrategy {
     try {
       // Use a generic summarization prompt. This could be made more sophisticated.
       const summaryPrompt = `Summarize the following script output concisely:\n\n\n${actualOutput}\n\n\n\
-\
-\
-${actualOutput}\
-\
-\
+${actualOutput}
 `;
 
       const summaryResult = await baseLlmClient.generateContent({

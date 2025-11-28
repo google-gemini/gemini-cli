@@ -70,7 +70,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
   getDescription(): string {
     let description = `${this.params.command}`;
     // append optional [in directory]
-    // note description is needed even if validation fails duealute path
+    // note description is needed even if validation fails due to absolute path
     if (this.params.dir_path) {
       description += ` [in ${this.params.dir_path}]`;
     } else {
@@ -364,7 +364,7 @@ ${result.output}`;
       }
 
       return {
-        llmContent: `[SHELL_OUTPUT]\nCommand: ${this.params.command}\nDirectory: ${this.params.dir_path || '\'(root)\'}'}`, // Corrected llmContent with prefix
+        llmContent: `[SHELL_OUTPUT]\nCommand: ${this.params.command}\nDirectory: ${this.params.dir_path || '\'(root)\''}`, // Corrected llmContent with prefix
         returnDisplay: returnDisplayMessage,
         ...executionError,
         toolSpecificInfo: { isShellOutput: true },
@@ -397,23 +397,34 @@ function getShellToolDescription(): string {
 
       Command: Executed command.
       Directory: Directory where command was executed, or \`(root)\
-`.
-      Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Error: Error or \`(none)\` if no error was reported for the subprocess.
-      Exit Code: Exit code or \`(none)\` if terminated by signal.
-      Signal: Signal number or \`(none)\` if no signal was received.
-      Background PIDs: List of background processes started or \`(none)\
-`.
-      Process Group PGID: Process group started or \`(none)\\``;
+`. 
+      Stdout: Output on stdout stream. Can be `(empty)` or partial on error and for any unwaited background processes.
+      Stderr: Output on stderr stream. Can be `(empty)` or partial on error and for any unwaited background processes.
+      Error: Error or `(none)` if no error was reported for the subprocess.
+      Exit Code: Exit code or `(none)` if terminated by signal.
+      Signal: Signal number or `(none)` if no signal was received.
+      Background PIDs: List of background processes started or `(none)`.
+      Process Group PGID: Process group started or `(none)`
+`;
 
   if (os.platform() === 'win32') {
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\
-`.${returnedInfo}`;
+    return `This tool executes a given shell command as 
+	powershell.exe -NoProfile -Command <command>
+. Command can start background processes using PowerShell constructs such as 
+	Start-Process -NoNewWindow
+ or 
+	Start-Job
+.${returnedInfo}`;
   } else {
-    return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\
-`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\
-`.${returnedInfo}`;
+    return `This tool executes a given shell command as 
+	bash -c <command>
+. Command can start background processes using 
+	&
+. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as 
+	kill -- -PGID
+ or signaled as 
+	kill -s SIGNAL -- -PGID
+.${returnedInfo}`;
   }
 }
 
