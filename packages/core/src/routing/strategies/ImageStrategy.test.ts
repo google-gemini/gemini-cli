@@ -1,7 +1,6 @@
-
 import { describe, it, expect } from 'vitest';
 import { ImageStrategy } from './ImageStrategy';
-import { GEMINI_MODEL_ALIAS_PRO, DEFAULT_GEMINI_MODEL } from '../../config/models';
+import { DEFAULT_GEMINI_MODEL } from '../../config/models';
 import { RoutingContext } from '../routingStrategy';
 import { Config } from '../../config/config';
 
@@ -17,7 +16,9 @@ describe('ImageStrategy', () => {
       },
     } as RoutingContext;
 
-    const decision = await strategy.route(context, { getPreviewFeatures: () => true } as Config);
+    const decision = await strategy.route(context, {
+      getPreviewFeatures: () => true,
+    } as Config);
 
     expect(decision).toEqual({
       model: 'gemini-2.5-pro-image-preview',
@@ -40,15 +41,17 @@ describe('ImageStrategy', () => {
       },
     } as RoutingContext;
 
-    const decision = await strategy.route(context, { getPreviewFeatures: () => false } as Config);
+    const decision = await strategy.route(context, {
+      getPreviewFeatures: () => false,
+    } as Config);
 
     expect(decision).toEqual({
-        model: DEFAULT_GEMINI_MODEL,
-        metadata: {
-            source: 'ImageStrategy',
-            latencyMs: 0,
-            reasoning: 'Request contains an image.',
-        },
+      model: DEFAULT_GEMINI_MODEL,
+      metadata: {
+        source: 'ImageStrategy',
+        latencyMs: 0,
+        reasoning: 'Request contains an image.',
+      },
     });
   });
 
@@ -60,7 +63,9 @@ describe('ImageStrategy', () => {
       },
     } as RoutingContext;
 
-    const decision = await strategy.route(context, { getPreviewFeatures: () => true } as Config);
+    const decision = await strategy.route(context, {
+      getPreviewFeatures: () => true,
+    } as Config);
 
     expect(decision).toEqual({
       model: 'gemini-2.5-pro-image-preview',
@@ -80,15 +85,17 @@ describe('ImageStrategy', () => {
       },
     } as RoutingContext;
 
-    const decision = await strategy.route(context, { getPreviewFeatures: () => false } as Config);
+    const decision = await strategy.route(context, {
+      getPreviewFeatures: () => false,
+    } as Config);
 
     expect(decision).toEqual({
-        model: DEFAULT_GEMINI_MODEL,
-        metadata: {
-            source: 'ImageStrategy',
-            latencyMs: 0,
-            reasoning: 'Request for image generation.',
-        },
+      model: DEFAULT_GEMINI_MODEL,
+      metadata: {
+        source: 'ImageStrategy',
+        latencyMs: 0,
+        reasoning: 'Request for image generation.',
+      },
     });
   });
 
