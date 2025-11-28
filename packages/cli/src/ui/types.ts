@@ -73,6 +73,8 @@ export interface IndividualToolCallDisplay {
   renderOutputAsMarkdown?: boolean;
   ptyId?: number;
   outputFile?: string;
+  timeout?: number;
+  startTime?: number;
 }
 
 export interface CompressionProps {

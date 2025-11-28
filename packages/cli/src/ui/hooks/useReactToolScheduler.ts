@@ -276,6 +276,9 @@ export function mapToDisplay(
         name: displayName,
         description,
         renderOutputAsMarkdown,
+        timeout: trackedCall.request.timeout,
+        startTime:
+          'startTime' in trackedCall ? trackedCall.startTime : undefined,
       };
 
       switch (trackedCall.status) {
