@@ -36,7 +36,8 @@ export async function clipboardHasImage(): Promise<boolean> {
     const imageRegex =
       /«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»/;
     return imageRegex.test(stdout);
-  } catch {
+  } catch (error) {
+    debugLogger.warn('Error checking clipboard for image on Windows:', error);
     return false;
   }
 }
