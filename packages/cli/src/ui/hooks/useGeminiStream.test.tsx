@@ -150,6 +150,19 @@ vi.mock('./useAlternateBuffer.js', () => ({
   useAlternateBuffer: vi.fn(() => false),
 }));
 
+const mockUseVimMode = vi.hoisted(() =>
+  vi.fn().mockReturnValue({
+    vimEnabled: false,
+    vimMode: 'INSERT' as const,
+    toggleVimEnabled: vi.fn(),
+    setVimMode: vi.fn(),
+  }),
+);
+
+vi.mock('../contexts/VimModeContext.js', () => ({
+  useVimMode: mockUseVimMode,
+}));
+
 // --- END MOCKS ---
 
 // --- Tests for useGeminiStream Hook ---
@@ -1238,6 +1251,67 @@ describe('useGeminiStream', () => {
 
       // The final state should be idle
       expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
+    describe('with Vim Mode', () => {
+      it('should not cancel when vim is enabled and in INSERT mode', async () => {
+        mockUseVimMode.mockReturnValue({ vimEnabled: true, vimMode: 'INSERT' });
+        const mockStream = (async function* () {
+          yield { type: 'content', value: 'Part 1' };
+          await new Promise(() => {});
+        })();
+        mockSendMessageStream.mockReturnValue(mockStream);
+
+        const { result } = renderTestHook();
+
+        await act(async () => {
+          result.current.submitQuery('test query');
+        });
+
+        await waitFor(() => {
+          expect(result.current.streamingState).toBe(StreamingState.Responding);
+        });
+
+        simulateEscapeKeyPress();
+
+        expect(mockCancelAllToolCalls).not.toHaveBeenCalled();
+        expect(mockAddItem).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: 'Request cancelled.',
+          }),
+        );
+      });
+
+      it('should cancel when vim is enabled and in NORMAL mode', async () => {
+        mockUseVimMode.mockReturnValue({ vimEnabled: true, vimMode: 'NORMAL' });
+        const mockStream = (async function* () {
+          yield { type: 'content', value: 'Part 1' };
+          await new Promise(() => {});
+        })();
+        mockSendMessageStream.mockReturnValue(mockStream);
+
+        const { result } = renderTestHook();
+
+        await act(async () => {
+          result.current.submitQuery('test query');
+        });
+
+        await waitFor(() => {
+          expect(result.current.streamingState).toBe(StreamingState.Responding);
+        });
+
+        simulateEscapeKeyPress();
+
+        await waitFor(() => {
+          expect(mockAddItem).toHaveBeenCalledWith(
+            {
+              type: MessageType.INFO,
+              text: 'Request cancelled.',
+            },
+            expect.any(Number),
+          );
+        });
+      });
     });
   });
 
