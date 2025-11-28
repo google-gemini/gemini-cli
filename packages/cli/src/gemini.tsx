@@ -182,7 +182,10 @@ export async function startInteractiveUI(
     isAlternateBufferEnabled(settings),
     config.getScreenReader(),
   );
-  const mouseEventsEnabled = useAlternateBuffer;
+  // Mouse interaction is only enabled if explicitly requested AND alternate buffer is active
+  // Setting defaults to false to preserve native terminal text selection/copy/paste
+  const mouseEventsEnabled =
+    useAlternateBuffer && settings.merged.ui?.enableMouseInteraction === true;
   if (mouseEventsEnabled) {
     enableMouseEvents();
     registerCleanup(() => {
