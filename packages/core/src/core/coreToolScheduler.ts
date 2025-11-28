@@ -1120,22 +1120,40 @@ export class CoreToolScheduler {
         const messageBus = this.config.getMessageBus();
 
         // Setup timeout
-        const timeoutMs =
-          scheduledCall.request.timeout ?? DEFAULT_TOOL_TIMEOUT_MS;
-        const timeoutController = new AbortController();
-        const timeoutId = setTimeout(
-          () => timeoutController.abort(),
-          timeoutMs,
-        );
+        // Only apply timeout to specific tools that are prone to hanging:
+        // - Shell commands
+        // - Web fetch/search
+        // - MCP tools (which involve network/external processes)
+        const isMcpTool =
+          scheduledCall.tool.constructor.name === 'McpTool' ||
+          // Fallback check if constructor name is minified or different
+          'serverName' in scheduledCall.tool;
 
-        // Combine signals manually for backward compatibility with Node < 20
-        const combinedController = new AbortController();
-        const onAbort = () => combinedController.abort();
-        signal.addEventListener('abort', onAbort, { once: true });
-        timeoutController.signal.addEventListener('abort', onAbort, {
-          once: true,
-        });
-        const combinedSignal = combinedController.signal;
+        const shouldApplyTimeout =
+          toolName === SHELL_TOOL_NAME ||
+          toolName === 'web_fetch' || // Hardcoded for now as constant might not be exported
+          toolName === 'google_search' || // Hardcoded for now
+          isMcpTool;
+
+        let timeoutId: NodeJS.Timeout | undefined;
+        let combinedSignal = signal;
+        let timeoutController: AbortController | undefined;
+
+        if (shouldApplyTimeout) {
+          const timeoutMs =
+            scheduledCall.request.timeout ?? DEFAULT_TOOL_TIMEOUT_MS;
+          timeoutController = new AbortController();
+          timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+
+          // Combine signals manually for backward compatibility with Node < 20
+          const combinedController = new AbortController();
+          const onAbort = () => combinedController.abort();
+          signal.addEventListener('abort', onAbort, { once: true });
+          timeoutController.signal.addEventListener('abort', onAbort, {
+            once: true,
+          });
+          combinedSignal = combinedController.signal;
+        }
 
         await runInDevTraceSpan(
           {
@@ -1185,7 +1203,7 @@ export class CoreToolScheduler {
 
               try {
                 const toolResult: ToolResult = await promise;
-                clearTimeout(timeoutId); // Clear timeout on completion
+                if (timeoutId) clearTimeout(timeoutId); // Clear timeout on completion
 
                 spanMetadata.output = toolResult;
 
@@ -1197,8 +1215,10 @@ export class CoreToolScheduler {
                       ? toolResult.llmContent.length > 0
                       : true);
 
-                if (timeoutController.signal.aborted) {
+                if (timeoutController?.signal.aborted) {
                   // Handle timeout
+                  const timeoutMs =
+                    scheduledCall.request.timeout ?? DEFAULT_TOOL_TIMEOUT_MS;
                   const message = `Command timed out after ${
                     timeoutMs / 1000
                   } seconds. The default timeout is 3 minutes. You can increase the timeout by passing a 'timeout' argument (in milliseconds).`;
@@ -1314,7 +1334,7 @@ export class CoreToolScheduler {
                   );
                 }
               } catch (executionError: unknown) {
-                clearTimeout(timeoutId); // Clear timeout on error
+                if (timeoutId) clearTimeout(timeoutId); // Clear timeout on error
                 spanMetadata.error = executionError;
                 if (signal.aborted) {
                   this.setStatusInternal(
@@ -1340,8 +1360,10 @@ export class CoreToolScheduler {
               }
               await this.checkAndNotifyCompletion(signal);
             } finally {
-              signal.removeEventListener('abort', onAbort);
-              timeoutController.signal.removeEventListener('abort', onAbort);
+              if (timeoutController) {
+                signal.removeEventListener('abort', onAbort);
+                timeoutController.signal.removeEventListener('abort', onAbort);
+              }
             }
           },
         );
