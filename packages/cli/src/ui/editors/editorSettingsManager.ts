@@ -8,6 +8,7 @@ import {
   allowEditorTypeInSandbox,
   checkHasEditorType,
   type EditorType,
+  
   EDITOR_DISPLAY_NAMES,
 } from '@google/gemini-cli-core';
 
