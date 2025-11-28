@@ -15,6 +15,7 @@ export const DEFAULT_GEMINI_MODEL_AUTO = 'auto';
 export const GEMINI_MODEL_ALIAS_PRO = 'pro';
 export const GEMINI_MODEL_ALIAS_FLASH = 'flash';
 export const GEMINI_MODEL_ALIAS_FLASH_LITE = 'flash-lite';
+export const GEMINI_MODEL_ALIAS_IMAGE = 'image';
 
 export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 
@@ -45,6 +46,11 @@ export function resolveModel(
     }
     case GEMINI_MODEL_ALIAS_FLASH_LITE: {
       return DEFAULT_GEMINI_FLASH_LITE_MODEL;
+    }
+    case GEMINI_MODEL_ALIAS_IMAGE: {
+      return previewFeaturesEnabled
+        ? 'gemini-2.5-pro-image-preview'
+        : DEFAULT_GEMINI_MODEL;
     }
     default: {
       return requestedModel;

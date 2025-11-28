@@ -83,6 +83,18 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-2.5-flash-lite',
       },
     },
+    'gemini-2.5-image': {
+      extends: 'chat-base-2.5',
+      modelConfig: {
+        model: 'gemini-2.5-pro-image-preview',
+      },
+    },
+    'gemini-2.5-flash-lite-image': {
+      extends: 'chat-base-2.5',
+      modelConfig: {
+        model: 'gemini-2.5-flash-lite-image-preview',
+      },
+    },
     // Bases for the internal model configs.
     'gemini-2.5-flash-base': {
       extends: 'base',
