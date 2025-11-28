@@ -2192,14 +2192,14 @@ describe('CoreToolScheduler Timeout', () => {
       args: { someArg: 'value' },
       isClientInitiated: false,
       prompt_id: 'prompt-1',
-      timeout: 100, // 100ms timeout
+      timeout: 100,
     };
 
     await scheduler.schedule([request], abortController.signal);
 
     expect(onAllToolCallsComplete).toHaveBeenCalled();
     const completedCalls = onAllToolCallsComplete.mock.calls[0][0];
-    expect(completedCalls[0].status).toBe('success'); // We treat timeout as success with message
+    expect(completedCalls[0].status).toBe('success');
 
     const response =
       completedCalls[0].response.responseParts[0].functionResponse.response
