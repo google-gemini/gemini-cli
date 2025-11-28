@@ -1733,7 +1733,6 @@ describe('CoreToolScheduler Sequential Execution', () => {
           secondCallStarted = true;
           // This call will be cancelled while it's "running".
           await new Promise((resolve) => setTimeout(resolve, 100));
-          // It should not return a value because it will be cancelled.
           return { llmContent: 'Second call should not complete' };
         }
         if (args.call === 3) {
