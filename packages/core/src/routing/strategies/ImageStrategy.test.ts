@@ -1,4 +1,3 @@
-
 import { describe, it, expect, vi } from 'vitest';
 import { ImageStrategy } from './ImageStrategy';
 import { DEFAULT_GEMINI_MODEL, GEMINI_MODEL_ALIAS_FLASH_LITE_IMAGE } from '../../config/models';
@@ -29,7 +28,7 @@ describe('ImageStrategy', () => {
     const decision = await strategy.route(context, mockConfig, {} as any);
 
     expect(decision).toEqual({
-      model: 'gemini-2.5-flash-lite-image-preview',
+      model: GEMINI_MODEL_ALIAS_FLASH_LITE_IMAGE,
       metadata: {
         source: 'image',
         latencyMs: 0,
@@ -65,7 +64,7 @@ describe('ImageStrategy', () => {
     });
   });
 
-  it('should return pro model if request has image and preview features are disabled', async () => {
+  it('should return default pro model if request has image and preview features are disabled', async () => {
     const strategy = new ImageStrategy();
     const context = {
       request: {
@@ -77,7 +76,7 @@ describe('ImageStrategy', () => {
     } as RoutingContext;
 
     // Mock config to disable preview features
-    vi.spy10('getPreviewFeatures').mockReturnValue(false);
+    vi.spyOn(mockConfig, 'getPreviewFeatures').mockReturnValue(false);
     vi.spyOn(mockConfig, 'getModel').mockReturnValue('pro');
 
     const decision = await strategy.route(context, mockConfig, {} as any);
@@ -107,7 +106,7 @@ describe('ImageStrategy', () => {
     const decision = await strategy.route(context, mockConfig, {} as any);
 
     expect(decision).toEqual({
-      model: 'gemini-2.5-flash-lite-image-preview',
+      model: GEMINI_MODEL_ALIAS_FLASH_LITE_IMAGE,
       metadata: {
         source: 'image',
         latencyMs: 0,

@@ -20,8 +20,9 @@ This feature aims to enhance the Gemini CLI by incorporating support for the fla
     *   This strategy will detect if a user request includes image parts (e.g., via `inlineData`) or explicitly asks for image generation.
     *   It will route such requests to the appropriate image-capable model (using the new aliases).
     *   Ensure that the use of preview image models is controlled by the `--preview` flag.
+    *   **Refined Image Routing:** If the preferred general model is 'flash-lite', route image requests to the flash-lite image model; otherwise, use the pro image model (or default pro model based on preview flag).
 3.  **Testing:**
-    *   Add unit tests for the `ImageStrategy` to cover cases with and without images, and with/without preview features enabled.
+    *   Add unit tests for the `ImageStrategy` to cover cases with and without images, with/without preview features enabled, and with different preferred general models.
     *   Update golden files if necessary.
 
 ## Acceptance Criteria
@@ -30,3 +31,4 @@ This feature aims to enhance the Gemini CLI by incorporating support for the fla
 - Users can include image parts in their prompts, and the CLI correctly routes these to an image-capable model.
 - Users can request image generation (e.g., using prompts like "create an image..."), and the CLI routes these to an image-capable model.
 - Preview features flag correctly controls access to preview image models.
+- When 'flash-lite' is the preferred general model, image requests correctly route to the flash-lite image model.

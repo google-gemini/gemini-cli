@@ -22,21 +22,21 @@ This feature introduces a mechanism to summarize lengthy script outputs before t
     *   **Summarization Conditions:**
         *   Summarize if the script output is longer than a defined threshold (e.g., 500 characters).
         *   Skip summarization if the output is shorter than the threshold.
-        *   **(Optional/Future):** Implement a mechanism to respect explicit "no summarization" requests from the model or user (this might require further discussion on how such a signal would be passed).
-    *   Use the 'flash-lite' model (via `DEFAULT_GEMINI_FLASH_MODEL` alias) for summarization.
+        *   **Explicit "No Summarization" Request:** If the script output itself contains a specific marker (e.g., `[NO_SUMMARIZE]`), skip summarization. (This part requires careful implementation regarding how such markers would be generated).
 3.  **Model Router Integration:**
-    *   Add `ScriptOutputSummarizationStrategy` to the `CompositeStrategy` in `ModelRouterService.ts`, ensuring it is evaluated before other strategies that might process general text. 
+    *   Add `ScriptOutputSummarizationStrategy` to the `CompositeStrategy` in `ModelRouterService.ts`, ensuring it is evaluated before other strategies that might process general text.
 4.  **Testing:**
     *   Add unit tests for `ScriptOutputSummarizationStrategy` to cover:
-        *   Correct identification of shell output.
+        *   Correct identification of shell output via prefix.
         *   Correct skipping of summarization for short outputs.
         *   Correct summarization of long outputs using 'flash-lite'.
-        *   Proper handling of empty script outputs.
-    *   Ensure the summarization prompt includes instructions to preserve key excerpts.
+        *   Handling of explicit "no summarization" requests (if implemented).
+        *   Graceful handling of empty script outputs.
+    *   Ensure the summarization prompt instructs the LLM to preserve key phrases and sentences verbatim.
 
 ## Acceptance Criteria
 
-- Long script outputs are summarized using the 'flash-lite' model.
+- Long script outputs are summarized using the 'flash-lite' model, preserving key excerpts.
 - Short script outputs are passed through without summarization.
-- Summaries of script outputs retain critical information and key phrases from the original output.
+- Explicit requests to skip summarization (if implemented) are respected.
 - The system correctly identifies shell command outputs to apply this logic.

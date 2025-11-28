@@ -36,15 +36,9 @@ export class ImageStrategy implements RoutingStrategy {
       // Resolve the general model preference to its concrete name
       const resolvedGeneralModel = resolveModel(preferredGeneralModel, config.getPreviewFeatures());
 
-      let modelToUse: string;
-      // Check if the preferred general model is 'flash-lite' based on its name
-      if (resolvedGeneralModel.includes('flash-lite')) {
-        // Route to the flash-lite image model
-        modelToUse = GEMINI_MODEL_ALIAS_FLASH_LITE_IMAGE;
-      } else {
-        // Fallback to pro image model or default pro model based on preview flag
-        modelToUse = config.getPreviewFeatures() ? 'gemini-2.5-pro-image-preview' : DEFAULT_GEMINI_MODEL;
-      }
+      const modelToUse: string = resolvedGeneralModel.includes('flash-lite')
+        ? GEMINI_MODEL_ALIAS_FLASH_LITE_IMAGE
+        : config.getPreviewFeatures() ? 'gemini-2.5-pro-image-preview' : DEFAULT_GEMINI_MODEL;
 
       return {
         model: modelToUse,
