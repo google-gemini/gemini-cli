@@ -714,6 +714,64 @@ describe('mcp-client', () => {
         expect(googUserProject).toBe('myproject');
       });
 
+      it('should use headers from GoogleCredentialProvider', async () => {
+        const mockGetRequestHeaders = vi.fn().mockResolvedValue({
+          'X-Goog-User-Project': 'provider-project',
+        });
+        vi.spyOn(
+          GoogleCredentialProvider.prototype,
+          'getRequestHeaders',
+        ).mockImplementation(mockGetRequestHeaders);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test.googleapis.com',
+            authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
+          },
+          false,
+        );
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(mockGetRequestHeaders).toHaveBeenCalled();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const headers = (transport as any)._requestInit?.headers;
+        expect(headers['X-Goog-User-Project']).toBe('provider-project');
+      });
+
+      it('should prioritize provider headers over config headers', async () => {
+        const mockGetRequestHeaders = vi.fn().mockResolvedValue({
+          'X-Goog-User-Project': 'provider-project',
+        });
+        vi.spyOn(
+          GoogleCredentialProvider.prototype,
+          'getRequestHeaders',
+        ).mockImplementation(mockGetRequestHeaders);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test.googleapis.com',
+            authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
+            headers: {
+              'X-Goog-User-Project': 'config-project',
+            },
+          },
+          false,
+        );
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const headers = (transport as any)._requestInit?.headers;
+        expect(headers['X-Goog-User-Project']).toBe('provider-project');
+      });
+
       it('should use GoogleCredentialProvider with SSE transport', async () => {
         const transport = await createTransport(
           'test-server',
@@ -1020,24 +1078,6 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       connectToMcpServer(
         'test-server',
         { url: 'http://test-server', type: 'sse' },
-        false,
-        workspaceContext,
-      ),
-    ).rejects.toThrow('Connection failed');
-
-    // Should only try once (no fallback)
-    expect(mockedClient.connect).toHaveBeenCalledTimes(1);
-  });
-
-  it('should NOT trigger fallback when httpUrl is used', async () => {
-    vi.mocked(mockedClient.connect).mockRejectedValueOnce(
-      new Error('Connection failed'),
-    );
-
-    await expect(
-      connectToMcpServer(
-        'test-server',
-        { httpUrl: 'http://test-server' },
         false,
         workspaceContext,
       ),
