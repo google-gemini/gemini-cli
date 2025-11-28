@@ -125,6 +125,20 @@ export const migrateCommand: CommandModule = {
           continue;
         }
 
+        // Warn about semantic difference for Stop → AfterAgent mapping
+        if (claudeEvent === 'Stop') {
+          console.warn(`⚠️  Note: Stop → AfterAgent has different semantics:`);
+          console.warn(
+            `   - Claude's "Stop" was a notification when the agent finished`,
+          );
+          console.warn(
+            `   - Gemini's "AfterAgent" can force the agent to continue if it returns 'block'`,
+          );
+          console.warn(
+            `   If your hooks expect finality, ensure they return 'allow' or no decision.`,
+          );
+        }
+
         geminiHooks[geminiEvent] = definitions.map((def) => {
           const hooks = def.hooks.map((hook): HookConfig => {
             let command = hook.command;

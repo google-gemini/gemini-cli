@@ -101,7 +101,7 @@ describe('HookEventHandler', () => {
         totalDuration: 100,
       };
 
-      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockResolvedValue({
         eventName: HookEventName.BeforeTool,
         hookConfigs: mockPlan.map((p) => p.hookConfig),
         sequential: false,
@@ -138,7 +138,7 @@ describe('HookEventHandler', () => {
     });
 
     it('should return empty result when no hooks to execute', async () => {
-      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue(null);
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockResolvedValue(null);
 
       const result = await hookEventHandler.fireBeforeToolEvent('EditTool', {});
 
@@ -149,9 +149,9 @@ describe('HookEventHandler', () => {
     });
 
     it('should handle execution errors gracefully', async () => {
-      vi.mocked(mockHookPlanner.createExecutionPlan).mockImplementation(() => {
-        throw new Error('Planning failed');
-      });
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockRejectedValue(
+        new Error('Planning failed'),
+      );
 
       const result = await hookEventHandler.fireBeforeToolEvent('EditTool', {});
 
@@ -192,7 +192,7 @@ describe('HookEventHandler', () => {
         totalDuration: 100,
       };
 
-      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockResolvedValue({
         eventName: HookEventName.BeforeTool,
         hookConfigs: mockPlan.map((p) => p.hookConfig),
         sequential: false,
@@ -257,7 +257,7 @@ describe('HookEventHandler', () => {
         totalDuration: 100,
       };
 
-      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockResolvedValue({
         eventName: HookEventName.BeforeTool,
         hookConfigs: mockPlan.map((p) => p.hookConfig),
         sequential: false,
@@ -315,7 +315,7 @@ describe('HookEventHandler', () => {
         totalDuration: 50,
       };
 
-      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockResolvedValue({
         eventName: HookEventName.Notification,
         hookConfigs: mockPlan.map((p) => p.hookConfig),
         sequential: false,
@@ -378,7 +378,7 @@ describe('HookEventHandler', () => {
         totalDuration: 200,
       };
 
-      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockResolvedValue({
         eventName: HookEventName.SessionStart,
         hookConfigs: mockPlan.map((p) => p.hookConfig),
         sequential: false,
@@ -441,7 +441,7 @@ describe('HookEventHandler', () => {
         totalDuration: 150,
       };
 
-      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockResolvedValue({
         eventName: HookEventName.BeforeModel,
         hookConfigs: mockPlan.map((p) => p.hookConfig),
         sequential: false,
@@ -493,7 +493,7 @@ describe('HookEventHandler', () => {
         },
       ];
 
-      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockResolvedValue({
         eventName: HookEventName.BeforeTool,
         hookConfigs: mockPlan.map((p) => p.hookConfig),
         sequential: false,
