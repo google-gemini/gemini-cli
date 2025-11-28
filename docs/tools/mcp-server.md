@@ -65,6 +65,8 @@ The Gemini CLI uses the `mcpServers` configuration in your `settings.json` file
 to locate and connect to MCP servers. This configuration supports multiple
 servers with different transport mechanisms.
 
+Refer to [Gemini CLI Configuration](../get-started/configuration.md) for more details.
+
 ### Configure the MCP server in settings.json
 
 You can configure MCP servers in your `settings.json` file in two main ways:
