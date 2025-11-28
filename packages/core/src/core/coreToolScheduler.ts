@@ -1184,14 +1184,14 @@ export class CoreToolScheduler {
               clearTimeout(timeoutId); // Clear timeout on completion
 
               spanMetadata.output = toolResult;
-              // If the tool invocation returned content (even if aborted), we prefer to show that content.
-              // This allows the agent to see partial outputs of cancelled commands (like shell commands).
+
               let hasContent =
-                toolResult.llmContent !== undefined &&
-                toolResult.llmContent !== null &&
+                toolResult.llmContent != null &&
                 (typeof toolResult.llmContent === 'string'
                   ? toolResult.llmContent.length > 0
-                  : true);
+                  : Array.isArray(toolResult.llmContent)
+                    ? toolResult.llmContent.length > 0
+                    : true);
 
               if (timeoutController.signal.aborted) {
                 // Handle timeout
