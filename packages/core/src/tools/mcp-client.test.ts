@@ -39,6 +39,8 @@ vi.mock('@google/genai');
 vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
 vi.mock('../mcp/oauth-utils.js');
+vi.mock('google-auth-library');
+import { GoogleAuth } from 'google-auth-library';
 
 vi.mock('../utils/events.js', () => ({
   coreEvents: {
@@ -687,6 +689,16 @@ describe('mcp-client', () => {
     });
 
     describe('useGoogleCredentialProvider', () => {
+      beforeEach(() => {
+        // Mock GoogleAuth client
+        const mockClient = {
+          getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+          quotaProjectId: 'myproject',
+        };
+
+        GoogleAuth.prototype.getClient = vi.fn().mockResolvedValue(mockClient);
+      });
+
       it('should use GoogleCredentialProvider when specified', async () => {
         const transport = await createTransport(
           'test-server',
