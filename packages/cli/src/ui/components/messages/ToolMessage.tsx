@@ -59,6 +59,8 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   embeddedShellFocused,
   ptyId,
   config,
+  timeout,
+  startTime,
 }) => {
   const isThisShellFocused =
     (name === SHELL_COMMAND_NAME || name === 'Shell') &&
@@ -94,6 +96,32 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   const shouldShowFocusHint =
     isThisShellFocusable && (showFocusHint || userHasFocused);
 
+  const [remainingTime, setRemainingTime] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (
+      status === ToolCallStatus.Executing &&
+      typeof timeout === 'number' &&
+      typeof startTime === 'number'
+    ) {
+      const updateTimer = () => {
+        const elapsed = Date.now() - startTime!;
+        const remaining = Math.max(0, timeout! - elapsed);
+        const seconds = Math.ceil(remaining / 1000);
+        if (remaining <= 0) {
+          setRemainingTime('Timeout...');
+        } else {
+          setRemainingTime(`${seconds}s`);
+        }
+      };
+      updateTimer();
+      const intervalId = setInterval(updateTimer, 1000);
+      return () => clearInterval(intervalId);
+    } else {
+      setRemainingTime(null);
+    }
+  }, [status, timeout, startTime]);
+
   return (
     <Box flexDirection="column" width={terminalWidth}>
       <StickyHeader
@@ -109,6 +137,11 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           description={description}
           emphasis={emphasis}
         />
+        {remainingTime && (
+          <Box marginLeft={1} flexShrink={0}>
+            <Text color={theme.text.secondary}>({remainingTime})</Text>
+          </Box>
+        )}
         {shouldShowFocusHint && (
           <Box marginLeft={1} flexShrink={0}>
             <Text color={theme.text.accent}>
