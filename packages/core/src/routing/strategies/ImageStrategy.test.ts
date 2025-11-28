@@ -1,4 +1,3 @@
-
 import { describe, it, expect, vi } from 'vitest';
 import { ImageStrategy } from './ImageStrategy';
 import { DEFAULT_GEMINI_MODEL, GEMINI_MODEL_ALIAS_FLASH_LITE_IMAGE } from '../../config/models';
