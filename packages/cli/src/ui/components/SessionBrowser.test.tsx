@@ -138,6 +138,8 @@ const createSession = (overrides: Partial<SessionInfo>): SessionInfo => ({
 
 describe('SessionBrowser component', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-11-01T12:00:00Z'));
     keypressHandlers.length = 0;
     vi.clearAllMocks();
     // Freeze time so relative date formatting (e.g., "10mo ago") is stable
