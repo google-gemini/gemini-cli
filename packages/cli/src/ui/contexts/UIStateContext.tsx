@@ -32,6 +32,9 @@ import type { UpdateObject } from '../utils/updateCheck.js';
 export interface ProQuotaDialogRequest {
   failedModel: string;
   fallbackModel: string;
+  message: string;
+  isTerminalQuotaError: boolean;
+  isModelNotFoundError?: boolean;
   resolve: (intent: FallbackIntent) => void;
 }
 
@@ -56,6 +59,7 @@ export interface UIState {
   debugMessage: string;
   quittingMessages: HistoryItem[] | null;
   isSettingsDialogOpen: boolean;
+  isSessionBrowserOpen: boolean;
   isModelDialogOpen: boolean;
   isPermissionsDialogOpen: boolean;
   permissionsDialogProps: { targetDirectory?: string } | null;
@@ -126,6 +130,11 @@ export interface UIState {
   showFullTodos: boolean;
   copyModeEnabled: boolean;
   warningMessage: string | null;
+  bannerData: {
+    defaultText: string;
+    warningText: string;
+  };
+  bannerVisible: boolean;
   customDialog: React.ReactNode | null;
 }
 
