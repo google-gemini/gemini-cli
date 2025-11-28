@@ -260,9 +260,6 @@ export async function startInteractiveUI(
       },
       patchConsole: false,
       alternateBuffer: useAlternateBuffer,
-      incrementalRendering:
-        settings.merged.ui?.incrementalRendering !== false &&
-        useAlternateBuffer,
     },
   );
 
