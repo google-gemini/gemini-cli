@@ -1761,6 +1761,7 @@ describe('RipGrepTool', () => {
     });
   });
 });
+
 afterAll(() => {
   storageSpy.mockRestore();
 });
