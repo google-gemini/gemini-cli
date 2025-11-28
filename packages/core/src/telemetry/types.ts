@@ -31,6 +31,7 @@ import type { AgentTerminateMode } from '../agents/types.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import type { OTelFinishReason } from './semantic.js';
 import {
   toInputMessages,
   toOutputMessages,
@@ -38,6 +39,7 @@ import {
   toOutputType,
   toSystemInstruction,
 } from './semantic.js';
+import { sanitizeHookName } from './sanitize.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -544,6 +546,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
   prompt: GenAIPromptDetails;
   response: GenAIResponseDetails;
   usage: GenAIUsageDetails;
+  finish_reasons: OTelFinishReason[];
 
   constructor(
     model: string,
@@ -572,6 +575,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       tool_token_count: usage_data?.toolUsePromptTokenCount ?? 0,
       total_token_count: usage_data?.totalTokenCount ?? 0,
     };
+    this.finish_reasons = toFinishReasons(this.response.candidates);
   }
 
   toLogRecord(config: Config): LogRecord {
@@ -590,6 +594,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       prompt_id: this.prompt.prompt_id,
       auth_type: this.auth_type,
       status_code: this.status_code,
+      finish_reasons: this.finish_reasons,
     };
     if (this.response_text) {
       attributes['response_text'] = this.response_text;
@@ -612,9 +617,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       'event.name': EVENT_GEN_AI_OPERATION_DETAILS,
       'event.timestamp': this['event.timestamp'],
       'gen_ai.response.id': this.response.response_id,
-      'gen_ai.response.finish_reasons': toFinishReasons(
-        this.response.candidates,
-      ),
+      'gen_ai.response.finish_reasons': this.finish_reasons,
       'gen_ai.output.messages': JSON.stringify(
         toOutputMessages(this.response.candidates),
       ),
@@ -1735,5 +1738,88 @@ export class WebFetchFallbackAttemptEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Web fetch fallback attempt. Reason: ${this.reason}`;
+  }
+}
+
+export const EVENT_HOOK_CALL = 'gemini_cli.hook_call';
+export class HookCallEvent implements BaseTelemetryEvent {
+  'event.name': string;
+  'event.timestamp': string;
+  hook_event_name: string;
+  hook_type: 'command';
+  hook_name: string;
+  hook_input: Record<string, unknown>;
+  hook_output?: Record<string, unknown>;
+  exit_code?: number;
+  stdout?: string;
+  stderr?: string;
+  duration_ms: number;
+  success: boolean;
+  error?: string;
+
+  constructor(
+    hookEventName: string,
+    hookType: 'command',
+    hookName: string,
+    hookInput: Record<string, unknown>,
+    durationMs: number,
+    success: boolean,
+    hookOutput?: Record<string, unknown>,
+    exitCode?: number,
+    stdout?: string,
+    stderr?: string,
+    error?: string,
+  ) {
+    this['event.name'] = 'hook_call';
+    this['event.timestamp'] = new Date().toISOString();
+    this.hook_event_name = hookEventName;
+    this.hook_type = hookType;
+    this.hook_name = hookName;
+    this.hook_input = hookInput;
+    this.hook_output = hookOutput;
+    this.exit_code = exitCode;
+    this.stdout = stdout;
+    this.stderr = stderr;
+    this.duration_ms = durationMs;
+    this.success = success;
+    this.error = error;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_HOOK_CALL,
+      'event.timestamp': this['event.timestamp'],
+      hook_event_name: this.hook_event_name,
+      hook_type: this.hook_type,
+      // Sanitize hook_name unless full logging is enabled
+      hook_name: config.getTelemetryLogPromptsEnabled()
+        ? this.hook_name
+        : sanitizeHookName(this.hook_name),
+      duration_ms: this.duration_ms,
+      success: this.success,
+      exit_code: this.exit_code,
+    };
+
+    // Only include potentially sensitive data if telemetry logging of prompts is enabled
+    if (config.getTelemetryLogPromptsEnabled()) {
+      attributes['hook_input'] = safeJsonStringify(this.hook_input, 2);
+      attributes['hook_output'] = safeJsonStringify(this.hook_output, 2);
+      attributes['stdout'] = this.stdout;
+      attributes['stderr'] = this.stderr;
+    }
+
+    if (this.error) {
+      // Always log errors
+      attributes['error'] = this.error;
+    }
+
+    return attributes;
+  }
+
+  toLogBody(): string {
+    const hookId = `${this.hook_event_name}.${this.hook_name}`;
+    const status = `${this.success ? 'succeeded' : 'failed'}`;
+    return `Hook call ${hookId} ${status} in ${this.duration_ms}ms`;
   }
 }
