@@ -490,9 +490,11 @@ describe('mcp-client', () => {
           false,
         );
 
-        expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {}),
-        );
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: { headers: {} },
+        });
       });
 
       it('with headers', async () => {
@@ -505,13 +507,13 @@ describe('mcp-client', () => {
           false,
         );
 
-        expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {
-            requestInit: {
-              headers: { Authorization: 'derp' },
-            },
-          }),
-        );
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: {
+            headers: { Authorization: 'derp' },
+          },
+        });
       });
     });
 
@@ -524,9 +526,11 @@ describe('mcp-client', () => {
           },
           false,
         );
-        expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {}),
-        );
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: { headers: {} },
+        });
       });
 
       it('with headers', async () => {
@@ -539,13 +543,13 @@ describe('mcp-client', () => {
           false,
         );
 
-        expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {
-            requestInit: {
-              headers: { Authorization: 'derp' },
-            },
-          }),
-        );
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: {
+            headers: { Authorization: 'derp' },
+          },
+        });
       });
 
       it('with type="http" creates StreamableHTTPClientTransport', async () => {
@@ -558,9 +562,11 @@ describe('mcp-client', () => {
           false,
         );
 
-        expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {}),
-        );
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: { headers: {} },
+        });
       });
 
       it('with type="sse" creates SSEClientTransport', async () => {
@@ -573,9 +579,11 @@ describe('mcp-client', () => {
           false,
         );
 
-        expect(transport).toEqual(
-          new SSEClientTransport(new URL('http://test-server'), {}),
-        );
+        expect(transport).toBeInstanceOf(SSEClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: { headers: {} },
+        });
       });
 
       it('without type defaults to StreamableHTTPClientTransport', async () => {
@@ -587,9 +595,11 @@ describe('mcp-client', () => {
           false,
         );
 
-        expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {}),
-        );
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: { headers: {} },
+        });
       });
 
       it('with type="http" and headers applies headers correctly', async () => {
@@ -603,13 +613,13 @@ describe('mcp-client', () => {
           false,
         );
 
-        expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {
-            requestInit: {
-              headers: { Authorization: 'Bearer token' },
-            },
-          }),
-        );
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: {
+            headers: { Authorization: 'Bearer token' },
+          },
+        });
       });
 
       it('with type="sse" and headers applies headers correctly', async () => {
@@ -623,13 +633,13 @@ describe('mcp-client', () => {
           false,
         );
 
-        expect(transport).toEqual(
-          new SSEClientTransport(new URL('http://test-server'), {
-            requestInit: {
-              headers: { 'X-API-Key': 'key123' },
-            },
-          }),
-        );
+        expect(transport).toBeInstanceOf(SSEClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server'),
+          _requestInit: {
+            headers: { 'X-API-Key': 'key123' },
+          },
+        });
       });
 
       it('httpUrl takes priority over url when both are present', async () => {
@@ -643,12 +653,11 @@ describe('mcp-client', () => {
         );
 
         // httpUrl should take priority and create HTTP transport
-        expect(transport).toEqual(
-          new StreamableHTTPClientTransport(
-            new URL('http://test-server-http'),
-            {},
-          ),
-        );
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toMatchObject({
+          _url: new URL('http://test-server-http'),
+          _requestInit: { headers: {} },
+        });
       });
     });
 
