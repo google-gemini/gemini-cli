@@ -569,7 +569,12 @@ export async function refreshServerHierarchicalMemory(config: Config) {
     config.getFileFilteringOptions(),
     config.getDiscoveryMaxDirs(),
   );
-  config.setUserMemory(result.memoryContent);
+  const mcpInstructions =
+    config.getMcpClientManager()?.getMcpInstructions() || '';
+  const finalMemory = [result.memoryContent, mcpInstructions.trimStart()]
+    .filter(Boolean)
+    .join('\n\n');
+  config.setUserMemory(finalMemory);
   config.setGeminiMdFileCount(result.fileCount);
   config.setGeminiMdFilePaths(result.filePaths);
   coreEvents.emit(CoreEvent.MemoryChanged, result);

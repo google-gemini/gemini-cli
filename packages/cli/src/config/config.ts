@@ -262,11 +262,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       if (argv['prompt'] && argv['promptInteractive']) {
         return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
       }
-      if (argv['resume'] && !argv['prompt'] && !process.stdin.isTTY) {
-        throw new Error(
-          'When resuming a session, you must provide a message via --prompt (-p) or stdin',
-        );
-      }
       if (argv['yolo'] && argv['approvalMode']) {
         return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
       }
@@ -648,6 +643,7 @@ export async function loadCliConfig(
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell:
       settings.tools?.shell?.enableInteractiveShell ?? true,
+    shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
