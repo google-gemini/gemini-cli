@@ -70,7 +70,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
   getDescription(): string {
     let description = `${this.params.command}`;
     // append optional [in directory]
-    // note description is needed even if validation fails due to absolute path
+    // note description is needed even if validation fails duealute path
     if (this.params.dir_path) {
       description += ` [in ${this.params.dir_path}]`;
     } else {
@@ -103,7 +103,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       throw new Error(
-        `Command "${command}" is not in the list of allowed tools for non-interactive mode.`,
+        `Command "${command}" is not in the list of allowed tools for non-interactive mode.`, 
       );
     }
 
@@ -196,7 +196,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       // Start timeout
       resetTimeout();
 
-      const { result: resultPromise, pid } =
+      const { result: resultPromise, pid } = 
         await ShellExecutionService.execute(
           commandToExecute,
           cwd,
@@ -224,7 +224,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
                 isBinaryStream = true;
                 cumulativeOutput = `[Receiving binary output... ${formatMemoryUsage(
                   event.bytesReceived,
-                )} received]`;
+                )} received]`
                 if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
                   shouldUpdate = true;
                 }
@@ -277,16 +277,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
       let timeoutMessage = '';
       if (result.aborted) {
         if (timeoutController.signal.aborted) {
-          timeoutMessage = `Command was automatically cancelled because it exceeded the timeout of ${(
-            timeoutMs / 60000
-          ).toFixed(1)} minutes without output.`;
+          timeoutMessage = `Command was automatically cancelled because it exceeded the timeout of ${ 
+            (timeoutMs / 60000).toFixed(1)
+          } minutes without output.`;
           llmContent = timeoutMessage;
         } else {
           llmContent =
             'Command was cancelled by user before it could complete.';
         }
         if (result.output.trim()) {
-          llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
+          llmContent += ` Below is the output before it was cancelled:
+${result.output}`;
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
@@ -301,10 +302,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
           `Command: ${this.params.command}`,
           `Directory: ${this.params.dir_path || '(root)'}`,
           `Output: ${result.output || '(empty)'}`,
-          `Error: ${finalError}`, // Use the cleaned error string.
+          `Error: ${finalError}`,
           `Exit Code: ${result.exitCode ?? '(none)'}`,
           `Signal: ${result.signal ?? '(none)'}`,
-          `Background PIDs: ${
+          `Background PIDs: ${ 
             backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'
           }`,
           `Process Group PGID: ${result.pid ?? '(none)'}`,
@@ -363,9 +364,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       return {
-        llmContent,
+        llmContent: `[SHELL_OUTPUT]\nCommand: ${this.params.command}\nDirectory: ${this.params.dir_path || '\'(root)\'}'}`, // Corrected llmContent with prefix
         returnDisplay: returnDisplayMessage,
         ...executionError,
+        toolSpecificInfo: { isShellOutput: true },
       };
     } finally {
       if (timeoutTimer) clearTimeout(timeoutTimer);
@@ -394,19 +396,24 @@ function getShellToolDescription(): string {
       The following information is returned:
 
       Command: Executed command.
-      Directory: Directory where command was executed, or \`(root)\`.
+      Directory: Directory where command was executed, or \`(root)\
+`.
       Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
       Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
       Error: Error or \`(none)\` if no error was reported for the subprocess.
       Exit Code: Exit code or \`(none)\` if terminated by signal.
       Signal: Signal number or \`(none)\` if no signal was received.
-      Background PIDs: List of background processes started or \`(none)\`.
-      Process Group PGID: Process group started or \`(none)\``;
+      Background PIDs: List of background processes started or \`(none)\
+`.
+      Process Group PGID: Process group started or \`(none)\\``;
 
   if (os.platform() === 'win32') {
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${returnedInfo}`;
+    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\
+`.${returnedInfo}`;
   } else {
-    return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
+    return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\
+`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\
+`.${returnedInfo}`;
   }
 }
 

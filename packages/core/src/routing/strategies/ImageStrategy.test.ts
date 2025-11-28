@@ -16,9 +16,7 @@ describe('ImageStrategy', () => {
       },
     } as RoutingContext;
 
-    const decision = await strategy.route(context, {
-      getPreviewFeatures: () => true,
-    } as Config);
+    const decision = await strategy.route(context, { getPreviewFeatures: () => true } as Config);
 
     expect(decision).toEqual({
       model: 'gemini-2.5-pro-image-preview',
@@ -41,17 +39,15 @@ describe('ImageStrategy', () => {
       },
     } as RoutingContext;
 
-    const decision = await strategy.route(context, {
-      getPreviewFeatures: () => false,
-    } as Config);
+    const decision = await strategy.route(context, { getPreviewFeatures: () => false } as Config);
 
     expect(decision).toEqual({
-      model: DEFAULT_GEMINI_MODEL,
-      metadata: {
-        source: 'ImageStrategy',
-        latencyMs: 0,
-        reasoning: 'Request contains an image.',
-      },
+        model: DEFAULT_GEMINI_MODEL,
+        metadata: {
+            source: 'ImageStrategy',
+            latencyMs: 0,
+            reasoning: 'Request contains an image.',
+        },
     });
   });
 
@@ -63,9 +59,7 @@ describe('ImageStrategy', () => {
       },
     } as RoutingContext;
 
-    const decision = await strategy.route(context, {
-      getPreviewFeatures: () => true,
-    } as Config);
+    const decision = await strategy.route(context, { getPreviewFeatures: () => true } as Config);
 
     expect(decision).toEqual({
       model: 'gemini-2.5-pro-image-preview',
@@ -85,17 +79,15 @@ describe('ImageStrategy', () => {
       },
     } as RoutingContext;
 
-    const decision = await strategy.route(context, {
-      getPreviewFeatures: () => false,
-    } as Config);
+    const decision = await strategy.route(context, { getPreviewFeatures: () => false } as Config);
 
     expect(decision).toEqual({
-      model: DEFAULT_GEMINI_MODEL,
-      metadata: {
-        source: 'ImageStrategy',
-        latencyMs: 0,
-        reasoning: 'Request for image generation.',
-      },
+        model: DEFAULT_GEMINI_MODEL,
+        metadata: {
+            source: 'ImageStrategy',
+            latencyMs: 0,
+            reasoning: 'Request for image generation.',
+        },
     });
   });
 

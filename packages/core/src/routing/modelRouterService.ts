@@ -20,6 +20,7 @@ import { CompositeStrategy } from './strategies/compositeStrategy.js';
 import { FallbackStrategy } from './strategies/fallbackStrategy.js';
 import { OverrideStrategy } from './strategies/overrideStrategy.js';
 import { ImageStrategy } from './strategies/ImageStrategy.js';
+import { ScriptOutputSummarizationStrategy } from './strategies/scriptOutputSummarizationStrategy.js';
 
 import { logModelRouting } from '../telemetry/loggers.js';
 import { ModelRoutingEvent } from '../telemetry/types.js';
@@ -43,6 +44,8 @@ export class ModelRouterService {
       [
         new FallbackStrategy(),
         new OverrideStrategy(),
+        new ScriptOutputSummarizationStrategy(),
+        new ScriptOutputSummarizationStrategy(),
         new ImageStrategy(),
         new ClassifierStrategy(),
         new DefaultStrategy(),

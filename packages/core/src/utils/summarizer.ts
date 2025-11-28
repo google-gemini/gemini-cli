@@ -40,18 +40,32 @@ export const defaultSummarizer: Summarizer = (
   _abortSignal: AbortSignal,
 ) => Promise.resolve(JSON.stringify(result.llmContent));
 
-const SUMMARIZE_TOOL_OUTPUT_PROMPT = `Summarize the following tool output to be a maximum of {maxOutputTokens} tokens. The summary should be concise and capture the main points of the tool output.
+const SUMMARIZE_TOOL_OUTPUT_PROMPT = `Summarize the following tool output. The summary should be concise and capture the main points of the tool output.
 
-The summarization should be done based on the content that is provided. Here are the basic rules to follow:
-1. If the text is a directory listing or any output that is structural, use the history of the conversation to understand the context. Using this context try to understand what information we need from the tool output and return that as a response.
-2. If the text is text content and there is nothing structural that we need, summarize the text.
-3. If the text is the output of a shell command, use the history of the conversation to understand the context. Using this context try to understand what information we need from the tool output and return a summarization along with the stack trace of any error within the <error></error> tags. The stack trace should be complete and not truncated. If there are warnings, you should include them in the summary within <warning></warning> tags.
+
+
+Preserve key phrases and sentences that are critical to understanding the output verbatim. Present these excerpts clearly, perhaps by quoting them or using a specific marker like [EXCERPT]...[/EXCERPT]. Avoid paraphrasing or distorting the meaning of these excerpts.
+
+
+
+1.  If the text is a directory listing or any output that is structural, use the history of the conversation to understand the context. Using this context try to understand what information we need from the tool output and return that as a response.
+
+2.  If the text is text content and there is nothing structural that we need, summarize the text.
+
+3.  If the text is the output of a shell command, use the history of the conversation to understand the context. Using this context try to understand what information we need from the tool output and return a summarization along with the stack trace of any error within the <error></error> tags. The stack trace should be complete and not truncated. If there are warnings, you should include them in the summary within <warning></warning> tags.
+
+
+
 
 
 Text to summarize:
+
 "{textToSummarize}"
 
+
+
 Return the summary string which should first contain an overall summarization of text followed by the full stack trace of errors and warnings in the tool output.
+
 `;
 
 export const llmSummarizer: Summarizer = async (
