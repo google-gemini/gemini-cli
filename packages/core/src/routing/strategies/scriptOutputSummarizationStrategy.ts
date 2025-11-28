@@ -32,7 +32,7 @@ export class ScriptOutputSummarizationStrategy implements RoutingStrategy {
 
     const actualOutput = shellOutputPart.text.substring('[SHELL_OUTPUT]\n'.length);
 
-    // TODO: Implement logic for explicit "no summarization" request. 
+    // TODO: Implement logic for explicit "no summarization" request.
     // This is difficult without a clear signal in RoutingContext. 
     // For now, we only check for short output.
 

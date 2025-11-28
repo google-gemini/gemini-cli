@@ -1,4 +1,4 @@
-      return {
+return {
         llmContent: `[SHELL_OUTPUT]
 ${llmContent}`,
         returnDisplay: returnDisplayMessage,
@@ -14,4 +14,3 @@ ${llmContent}`,
       }
     }
   }
-
