@@ -20,6 +20,7 @@ import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { SessionBrowser } from './SessionBrowser.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
 import { theme } from '../semantic-colors.js';
@@ -207,6 +208,16 @@ export const DialogManager = ({
       <PrivacyNotice
         onExit={() => uiActions.exitPrivacyNotice()}
         config={config}
+      />
+    );
+  }
+  if (uiState.isSessionBrowserOpen) {
+    return (
+      <SessionBrowser
+        config={config}
+        onResumeSession={uiActions.handleResumeSession}
+        onDeleteSession={uiActions.handleDeleteSession}
+        onExit={uiActions.closeSessionBrowser}
       />
     );
   }
