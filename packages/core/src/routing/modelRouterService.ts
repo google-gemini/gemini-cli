@@ -44,6 +44,7 @@ export class ModelRouterService {
         new OverrideStrategy(),
         new ClassifierStrategy(),
         new ScriptOutputSummarizationStrategy(), // Added new strategy here
+        new ImageStrategy(), // Added ImageStrategy here
         new DefaultStrategy(),
       ],
       'agent-router',
