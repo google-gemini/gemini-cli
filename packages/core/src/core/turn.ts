@@ -107,6 +107,7 @@ export interface ToolCallRequestInfo {
   args: Record<string, unknown>;
   isClientInitiated: boolean;
   prompt_id: string;
+  timeout?: number;
 }
 
 export interface ToolCallResponseInfo {
@@ -375,12 +376,15 @@ export class Turn {
     const name = fnCall.name || 'undefined_tool_name';
     const args = (fnCall.args || {}) as Record<string, unknown>;
 
+    const { timeout, ...toolArgs } = args;
+
     const toolCallRequest: ToolCallRequestInfo = {
       callId,
       name,
-      args,
+      args: toolArgs,
       isClientInitiated: false,
       prompt_id: this.prompt_id,
+      timeout: typeof timeout === 'number' ? timeout : undefined,
     };
 
     this.pendingToolCalls.push(toolCallRequest);

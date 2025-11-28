@@ -1838,7 +1838,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const call3 = completedCalls.find((c) => c.request.callId === '3');
 
     expect(call1?.status).toBe('success');
-    expect(call2?.status).toBe('cancelled');
+    expect(call2?.status).toBe('success');
     expect(call3?.status).toBe('cancelled');
   });
 
@@ -2144,5 +2144,68 @@ describe('truncateAndSaveToFile', () => {
       expectedPath,
       expectedFileContent,
     );
+  });
+});
+
+describe('CoreToolScheduler Timeout', () => {
+  it('should timeout a tool call if it exceeds the specified timeout', async () => {
+    const abortController = new AbortController();
+
+    // Mock a slow tool
+    const executeFn = vi
+      .fn()
+      .mockImplementation(
+        async (_args, _signal, _output, _config, _setPidCallback) => {
+          // Wait longer than the timeout
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          return { llmContent: 'Tool aborted', returnDisplay: 'Tool aborted' };
+        },
+      );
+
+    const mockTool = new MockTool({ name: 'slowTool', execute: executeFn });
+
+    const mockToolRegistry = {
+      getTool: () => mockTool,
+      getToolByName: () => mockTool,
+      getAllToolNames: () => ['slowTool'],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+      getApprovalMode: () => ApprovalMode.YOLO,
+      isInteractive: () => false,
+    });
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const request = {
+      callId: '1',
+      name: 'slowTool',
+      args: { someArg: 'value' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-1',
+      timeout: 100, // 100ms timeout
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    const completedCalls = onAllToolCallsComplete.mock.calls[0][0];
+    expect(completedCalls[0].status).toBe('success'); // We treat timeout as success with message
+
+    const response =
+      completedCalls[0].response.responseParts[0].functionResponse.response
+        .output;
+    expect(response).toContain('Command timed out after 100ms');
+    expect(response).toContain('Partial output before timeout');
+    expect(response).toContain('Tool aborted');
   });
 });

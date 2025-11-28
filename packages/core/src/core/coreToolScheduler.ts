@@ -53,6 +53,8 @@ import {
   executeToolWithHooks,
 } from './coreToolHookTriggers.js';
 
+const DEFAULT_TOOL_TIMEOUT_MS = 180000; // 3 minutes
+
 export type ValidatingToolCall = {
   status: 'validating';
   request: ToolCallRequestInfo;
@@ -1117,6 +1119,21 @@ export class CoreToolScheduler {
         const hooksEnabled = this.config.getEnableHooks();
         const messageBus = this.config.getMessageBus();
 
+        // Setup timeout
+        const timeoutMs =
+          scheduledCall.request.timeout ?? DEFAULT_TOOL_TIMEOUT_MS;
+        const timeoutController = new AbortController();
+        const timeoutId = setTimeout(
+          () => timeoutController.abort(),
+          timeoutMs,
+        );
+
+        // Combine signals. AbortSignal.any is available in Node 20+.
+        const combinedSignal = AbortSignal.any([
+          signal,
+          timeoutController.signal,
+        ]);
+
         await runInDevTraceSpan(
           {
             name: toolCall.tool.name,
@@ -1143,7 +1160,7 @@ export class CoreToolScheduler {
               promise = executeToolWithHooks(
                 invocation,
                 toolName,
-                signal,
+                combinedSignal,
                 messageBus,
                 hooksEnabled,
                 liveOutputCallback,
@@ -1154,7 +1171,7 @@ export class CoreToolScheduler {
               promise = executeToolWithHooks(
                 invocation,
                 toolName,
-                signal,
+                combinedSignal,
                 messageBus,
                 hooksEnabled,
                 liveOutputCallback,
@@ -1164,8 +1181,48 @@ export class CoreToolScheduler {
 
             try {
               const toolResult: ToolResult = await promise;
+              clearTimeout(timeoutId); // Clear timeout on completion
+
               spanMetadata.output = toolResult;
-              if (signal.aborted) {
+              // If the tool invocation returned content (even if aborted), we prefer to show that content.
+              // This allows the agent to see partial outputs of cancelled commands (like shell commands).
+              let hasContent =
+                toolResult.llmContent !== undefined &&
+                toolResult.llmContent !== null &&
+                (typeof toolResult.llmContent === 'string'
+                  ? toolResult.llmContent.length > 0
+                  : true);
+
+              if (timeoutController.signal.aborted) {
+                // Handle timeout
+                const message = `Command timed out after ${timeoutMs}ms. You can increase the timeout by passing a 'timeout' argument (in milliseconds).`;
+
+                // If we have content, append the message.
+                // Note: toolResult.llmContent is PartListUnion (string | Part | Part[])
+                if (hasContent) {
+                  const partialContent = toolResult.llmContent;
+                  const partialStr =
+                    typeof partialContent === 'string'
+                      ? partialContent
+                      : JSON.stringify(partialContent); // Simple stringification for now
+
+                  toolResult.llmContent = `${message}\n\nPartial output before timeout:\n${partialStr}`;
+                } else {
+                  toolResult.llmContent = message;
+                  // Update returnDisplay as well if it was generic
+                  if (
+                    typeof toolResult.returnDisplay === 'string' &&
+                    toolResult.returnDisplay.includes('cancelled')
+                  ) {
+                    toolResult.returnDisplay = message;
+                  }
+                }
+
+                // Ensure we treat it as a success so the agent sees the output/message
+                hasContent = true;
+              }
+
+              if (signal.aborted && !hasContent) {
                 this.setStatusInternal(
                   callId,
                   'cancelled',
@@ -1246,6 +1303,7 @@ export class CoreToolScheduler {
                 this.setStatusInternal(callId, 'error', signal, errorResponse);
               }
             } catch (executionError: unknown) {
+              clearTimeout(timeoutId); // Clear timeout on error
               spanMetadata.error = executionError;
               if (signal.aborted) {
                 this.setStatusInternal(
