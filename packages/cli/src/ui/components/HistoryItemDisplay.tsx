@@ -30,6 +30,7 @@ import { getMCPServerStatus } from '@google/gemini-cli-core';
 import { ToolsList } from './views/ToolsList.js';
 import { McpStatus } from './views/McpStatus.js';
 import { ChatList } from './views/ChatList.js';
+import { ModelMessage } from './messages/ModelMessage.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
@@ -107,16 +108,23 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           selectedAuthType={itemForDisplay.selectedAuthType}
           gcpProject={itemForDisplay.gcpProject}
           ideClient={itemForDisplay.ideClient}
+          userEmail={itemForDisplay.userEmail}
         />
       )}
       {itemForDisplay.type === 'help' && commands && (
         <Help commands={commands} />
       )}
       {itemForDisplay.type === 'stats' && (
-        <StatsDisplay duration={itemForDisplay.duration} />
+        <StatsDisplay
+          duration={itemForDisplay.duration}
+          quotas={itemForDisplay.quotas}
+        />
       )}
       {itemForDisplay.type === 'model_stats' && <ModelStatsDisplay />}
       {itemForDisplay.type === 'tool_stats' && <ToolStatsDisplay />}
+      {itemForDisplay.type === 'model' && (
+        <ModelMessage model={itemForDisplay.model} />
+      )}
       {itemForDisplay.type === 'quit' && (
         <SessionSummaryDisplay duration={itemForDisplay.duration} />
       )}

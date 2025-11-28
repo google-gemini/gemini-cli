@@ -238,6 +238,15 @@ export function interpolateColor(
   color2: string,
   factor: number,
 ) {
+  if (factor <= 0 && color1) {
+    return color1;
+  }
+  if (factor >= 1 && color2) {
+    return color2;
+  }
+  if (!color1 || !color2) {
+    return '';
+  }
   const gradient = tinygradient(color1, color2);
   const color = gradient.rgbAt(factor);
   return color.toHexString();

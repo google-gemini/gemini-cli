@@ -72,6 +72,7 @@ export interface CommandContext {
     extensionsUpdateState: Map<string, ExtensionUpdateStatus>;
     dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
     addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
+    removeComponent: () => void;
   };
   // Session-specific data
   session: {
@@ -113,6 +114,7 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
+  props?: Record<string, unknown>;
 
   dialog:
     | 'help'
@@ -121,6 +123,7 @@ export interface OpenDialogActionReturn {
     | 'editor'
     | 'privacy'
     | 'settings'
+    | 'sessionBrowser'
     | 'model'
     | 'permissions';
 }
@@ -168,6 +171,11 @@ export interface ConfirmActionReturn {
   };
 }
 
+export interface OpenCustomDialogActionReturn {
+  type: 'custom_dialog';
+  component: ReactNode;
+}
+
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
@@ -176,7 +184,8 @@ export type SlashCommandActionReturn =
   | LoadHistoryActionReturn
   | SubmitPromptActionReturn
   | ConfirmShellCommandsActionReturn
-  | ConfirmActionReturn;
+  | ConfirmActionReturn
+  | OpenCustomDialogActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',

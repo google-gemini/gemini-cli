@@ -14,8 +14,10 @@ import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
 import { TrustLevel } from '../../config/trustedFolders.js';
 import * as trustedFolders from '../../config/trustedFolders.js';
+import { coreEvents, ExitCodes } from '@google/gemini-cli-core';
 
 const mockedCwd = vi.hoisted(() => vi.fn());
+const mockedExit = vi.hoisted(() => vi.fn());
 
 vi.mock('node:process', async () => {
   const actual =
@@ -23,6 +25,7 @@ vi.mock('node:process', async () => {
   return {
     ...actual,
     cwd: mockedCwd,
+    exit: mockedExit,
     platform: 'linux',
   };
 });
@@ -35,6 +38,7 @@ describe('useFolderTrust', () => {
   let addItem: Mock;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     mockSettings = {
       merged: {
         security: {
@@ -60,6 +64,7 @@ describe('useFolderTrust', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
@@ -259,5 +264,31 @@ describe('useFolderTrust', () => {
 
     expect(result.current.isRestarting).toBe(false);
     expect(result.current.isFolderTrustDialogOpen).toBe(false); // Dialog should close
+  });
+
+  it('should emit feedback on failure to set value', async () => {
+    isWorkspaceTrustedSpy.mockReturnValue({
+      isTrusted: undefined,
+      source: undefined,
+    });
+    (mockTrustedFolders.setValue as Mock).mockImplementation(() => {
+      throw new Error('test error');
+    });
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    const { result } = renderHook(() =>
+      useFolderTrust(mockSettings, onTrustChange, addItem),
+    );
+
+    act(() => {
+      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
+    });
+
+    await vi.runAllTimersAsync();
+
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
+      'Failed to save trust settings. Exiting Gemini CLI.',
+    );
+    expect(mockedExit).toHaveBeenCalledWith(ExitCodes.FATAL_CONFIG_ERROR);
   });
 });
