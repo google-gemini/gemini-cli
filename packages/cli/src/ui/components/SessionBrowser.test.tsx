@@ -142,9 +142,6 @@ describe('SessionBrowser component', () => {
     vi.setSystemTime(new Date('2025-11-01T12:00:00Z'));
     keypressHandlers.length = 0;
     vi.clearAllMocks();
-    // Freeze time so relative date formatting (e.g., "10mo ago") is stable
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2025-11-01T12:00:00Z'));
   });
 
   afterEach(() => {
