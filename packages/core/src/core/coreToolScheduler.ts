@@ -1128,11 +1128,14 @@ export class CoreToolScheduler {
           timeoutMs,
         );
 
-        // Combine signals. AbortSignal.any is available in Node 20+.
-        const combinedSignal = AbortSignal.any([
-          signal,
-          timeoutController.signal,
-        ]);
+        // Combine signals manually for backward compatibility with Node < 20
+        const combinedController = new AbortController();
+        const onAbort = () => combinedController.abort();
+        signal.addEventListener('abort', onAbort, { once: true });
+        timeoutController.signal.addEventListener('abort', onAbort, {
+          once: true,
+        });
+        const combinedSignal = combinedController.signal;
 
         await runInDevTraceSpan(
           {
@@ -1140,196 +1143,206 @@ export class CoreToolScheduler {
             attributes: { type: 'tool-call' },
           },
           async ({ metadata: spanMetadata }) => {
-            spanMetadata.input = {
-              request: toolCall.request,
-            };
-            // TODO: Refactor to remove special casing for ShellToolInvocation.
-            // Introduce a generic callbacks object for the execute method to handle
-            // things like `onPid` and `onLiveOutput`. This will make the scheduler
-            // agnostic to the invocation type.
-            let promise: Promise<ToolResult>;
-            if (invocation instanceof ShellToolInvocation) {
-              const setPidCallback = (pid: number) => {
-                this.toolCalls = this.toolCalls.map((tc) =>
-                  tc.request.callId === callId && tc.status === 'executing'
-                    ? { ...tc, pid }
-                    : tc,
-                );
-                this.notifyToolCallsUpdate();
-              };
-              promise = executeToolWithHooks(
-                invocation,
-                toolName,
-                combinedSignal,
-                messageBus,
-                hooksEnabled,
-                liveOutputCallback,
-                shellExecutionConfig,
-                setPidCallback,
-              );
-            } else {
-              promise = executeToolWithHooks(
-                invocation,
-                toolName,
-                combinedSignal,
-                messageBus,
-                hooksEnabled,
-                liveOutputCallback,
-                shellExecutionConfig,
-              );
-            }
-
             try {
-              const toolResult: ToolResult = await promise;
-              clearTimeout(timeoutId); // Clear timeout on completion
-
-              spanMetadata.output = toolResult;
-
-              let hasContent =
-                toolResult.llmContent != null &&
-                (typeof toolResult.llmContent === 'string'
-                  ? toolResult.llmContent.length > 0
-                  : Array.isArray(toolResult.llmContent)
-                    ? toolResult.llmContent.length > 0
-                    : true);
-
-              if (timeoutController.signal.aborted) {
-                // Handle timeout
-                const message = `Command timed out after ${
-                  timeoutMs / 1000
-                } seconds. The default timeout is 3 minutes. You can increase the timeout by passing a 'timeout' argument (in milliseconds).`;
-
-                // If we have content, append the message.
-                // Note: toolResult.llmContent is PartListUnion (string | Part | Part[])
-                if (hasContent) {
-                  const partialContent = toolResult.llmContent;
-                  const partialStr =
-                    typeof partialContent === 'string'
-                      ? partialContent
-                      : JSON.stringify(partialContent); // Simple stringification for now
-
-                  toolResult.llmContent = `${message}\n\nPartial output before timeout:\n${partialStr}`;
-                } else {
-                  toolResult.llmContent = message;
-                  // Update returnDisplay as well if it was generic
-                  if (
-                    typeof toolResult.returnDisplay === 'string' &&
-                    toolResult.returnDisplay.includes('cancelled')
-                  ) {
-                    toolResult.returnDisplay = message;
-                  }
-                }
-
-                // Ensure we treat it as a success so the agent sees the output/message
-                hasContent = true;
-              }
-
-              if (signal.aborted && !hasContent) {
-                this.setStatusInternal(
-                  callId,
-                  'cancelled',
-                  signal,
-                  'User cancelled tool execution.',
-                );
-              } else if (toolResult.error === undefined) {
-                let content = toolResult.llmContent;
-                let outputFile: string | undefined = undefined;
-                const contentLength =
-                  typeof content === 'string' ? content.length : undefined;
-                if (
-                  typeof content === 'string' &&
-                  toolName === SHELL_TOOL_NAME &&
-                  this.config.getEnableToolOutputTruncation() &&
-                  this.config.getTruncateToolOutputThreshold() > 0 &&
-                  this.config.getTruncateToolOutputLines() > 0
-                ) {
-                  const originalContentLength = content.length;
-                  const threshold =
-                    this.config.getTruncateToolOutputThreshold();
-                  const lines = this.config.getTruncateToolOutputLines();
-                  const truncatedResult = await truncateAndSaveToFile(
-                    content,
-                    callId,
-                    this.config.storage.getProjectTempDir(),
-                    threshold,
-                    lines,
+              spanMetadata.input = {
+                request: toolCall.request,
+              };
+              // TODO: Refactor to remove special casing for ShellToolInvocation.
+              // Introduce a generic callbacks object for the execute method to handle
+              // things like `onPid` and `onLiveOutput`. This will make the scheduler
+              // agnostic to the invocation type.
+              let promise: Promise<ToolResult>;
+              if (invocation instanceof ShellToolInvocation) {
+                const setPidCallback = (pid: number) => {
+                  this.toolCalls = this.toolCalls.map((tc) =>
+                    tc.request.callId === callId && tc.status === 'executing'
+                      ? { ...tc, pid }
+                      : tc,
                   );
-                  content = truncatedResult.content;
-                  outputFile = truncatedResult.outputFile;
+                  this.notifyToolCallsUpdate();
+                };
+                promise = executeToolWithHooks(
+                  invocation,
+                  toolName,
+                  combinedSignal,
+                  messageBus,
+                  hooksEnabled,
+                  liveOutputCallback,
+                  shellExecutionConfig,
+                  setPidCallback,
+                );
+              } else {
+                promise = executeToolWithHooks(
+                  invocation,
+                  toolName,
+                  combinedSignal,
+                  messageBus,
+                  hooksEnabled,
+                  liveOutputCallback,
+                  shellExecutionConfig,
+                );
+              }
 
-                  if (outputFile) {
-                    logToolOutputTruncated(
-                      this.config,
-                      new ToolOutputTruncatedEvent(
-                        scheduledCall.request.prompt_id,
-                        {
-                          toolName,
-                          originalContentLength,
-                          truncatedContentLength: content.length,
-                          threshold,
-                          lines,
-                        },
-                      ),
-                    );
+              try {
+                const toolResult: ToolResult = await promise;
+                clearTimeout(timeoutId); // Clear timeout on completion
+
+                spanMetadata.output = toolResult;
+
+                let hasContent =
+                  toolResult.llmContent != null &&
+                  (typeof toolResult.llmContent === 'string'
+                    ? toolResult.llmContent.length > 0
+                    : Array.isArray(toolResult.llmContent)
+                      ? toolResult.llmContent.length > 0
+                      : true);
+
+                if (timeoutController.signal.aborted) {
+                  // Handle timeout
+                  const message = `Command timed out after ${
+                    timeoutMs / 1000
+                  } seconds. The default timeout is 3 minutes. You can increase the timeout by passing a 'timeout' argument (in milliseconds).`;
+
+                  // If we have content, append the message.
+                  // Note: toolResult.llmContent is PartListUnion (string | Part | Part[])
+                  if (hasContent) {
+                    const partialContent = toolResult.llmContent;
+                    const partialStr =
+                      typeof partialContent === 'string'
+                        ? partialContent
+                        : JSON.stringify(partialContent); // Simple stringification for now
+
+                    toolResult.llmContent = `${message}\n\nPartial output before timeout:\n${partialStr}`;
+                  } else {
+                    toolResult.llmContent = message;
+                    // Update returnDisplay as well if it was generic
+                    if (
+                      typeof toolResult.returnDisplay === 'string' &&
+                      toolResult.returnDisplay.includes('cancelled')
+                    ) {
+                      toolResult.returnDisplay = message;
+                    }
                   }
+
+                  // Ensure we treat it as a success so the agent sees the output/message
+                  hasContent = true;
                 }
 
-                const response = convertToFunctionResponse(
-                  toolName,
-                  callId,
-                  content,
-                );
-                const successResponse: ToolCallResponseInfo = {
-                  callId,
-                  responseParts: response,
-                  resultDisplay: toolResult.returnDisplay,
-                  error: undefined,
-                  errorType: undefined,
-                  outputFile,
-                  contentLength,
-                };
-                this.setStatusInternal(
-                  callId,
-                  'success',
-                  signal,
-                  successResponse,
-                );
-              } else {
-                // It is a failure
-                const error = new Error(toolResult.error.message);
-                const errorResponse = createErrorResponse(
-                  scheduledCall.request,
-                  error,
-                  toolResult.error.type,
-                );
-                this.setStatusInternal(callId, 'error', signal, errorResponse);
-              }
-            } catch (executionError: unknown) {
-              clearTimeout(timeoutId); // Clear timeout on error
-              spanMetadata.error = executionError;
-              if (signal.aborted) {
-                this.setStatusInternal(
-                  callId,
-                  'cancelled',
-                  signal,
-                  'User cancelled tool execution.',
-                );
-              } else {
-                this.setStatusInternal(
-                  callId,
-                  'error',
-                  signal,
-                  createErrorResponse(
+                if (signal.aborted && !hasContent) {
+                  this.setStatusInternal(
+                    callId,
+                    'cancelled',
+                    signal,
+                    'User cancelled tool execution.',
+                  );
+                } else if (toolResult.error === undefined) {
+                  let content = toolResult.llmContent;
+                  let outputFile: string | undefined = undefined;
+                  const contentLength =
+                    typeof content === 'string' ? content.length : undefined;
+                  if (
+                    typeof content === 'string' &&
+                    toolName === SHELL_TOOL_NAME &&
+                    this.config.getEnableToolOutputTruncation() &&
+                    this.config.getTruncateToolOutputThreshold() > 0 &&
+                    this.config.getTruncateToolOutputLines() > 0
+                  ) {
+                    const originalContentLength = content.length;
+                    const threshold =
+                      this.config.getTruncateToolOutputThreshold();
+                    const lines = this.config.getTruncateToolOutputLines();
+                    const truncatedResult = await truncateAndSaveToFile(
+                      content,
+                      callId,
+                      this.config.storage.getProjectTempDir(),
+                      threshold,
+                      lines,
+                    );
+                    content = truncatedResult.content;
+                    outputFile = truncatedResult.outputFile;
+
+                    if (outputFile) {
+                      logToolOutputTruncated(
+                        this.config,
+                        new ToolOutputTruncatedEvent(
+                          scheduledCall.request.prompt_id,
+                          {
+                            toolName,
+                            originalContentLength,
+                            truncatedContentLength: content.length,
+                            threshold,
+                            lines,
+                          },
+                        ),
+                      );
+                    }
+                  }
+
+                  const response = convertToFunctionResponse(
+                    toolName,
+                    callId,
+                    content,
+                  );
+                  const successResponse: ToolCallResponseInfo = {
+                    callId,
+                    responseParts: response,
+                    resultDisplay: toolResult.returnDisplay,
+                    error: undefined,
+                    errorType: undefined,
+                    outputFile,
+                    contentLength,
+                  };
+                  this.setStatusInternal(
+                    callId,
+                    'success',
+                    signal,
+                    successResponse,
+                  );
+                } else {
+                  // It is a failure
+                  const error = new Error(toolResult.error.message);
+                  const errorResponse = createErrorResponse(
                     scheduledCall.request,
-                    executionError instanceof Error
-                      ? executionError
-                      : new Error(String(executionError)),
-                    ToolErrorType.UNHANDLED_EXCEPTION,
-                  ),
-                );
+                    error,
+                    toolResult.error.type,
+                  );
+                  this.setStatusInternal(
+                    callId,
+                    'error',
+                    signal,
+                    errorResponse,
+                  );
+                }
+              } catch (executionError: unknown) {
+                clearTimeout(timeoutId); // Clear timeout on error
+                spanMetadata.error = executionError;
+                if (signal.aborted) {
+                  this.setStatusInternal(
+                    callId,
+                    'cancelled',
+                    signal,
+                    'User cancelled tool execution.',
+                  );
+                } else {
+                  this.setStatusInternal(
+                    callId,
+                    'error',
+                    signal,
+                    createErrorResponse(
+                      scheduledCall.request,
+                      executionError instanceof Error
+                        ? executionError
+                        : new Error(String(executionError)),
+                      ToolErrorType.UNHANDLED_EXCEPTION,
+                    ),
+                  );
+                }
               }
+              await this.checkAndNotifyCompletion(signal);
+            } finally {
+              signal.removeEventListener('abort', onAbort);
+              timeoutController.signal.removeEventListener('abort', onAbort);
             }
-            await this.checkAndNotifyCompletion(signal);
           },
         );
       }
