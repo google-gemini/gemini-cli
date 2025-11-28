@@ -66,8 +66,8 @@ export async function saveClipboardImage(
 
     if (process.platform === 'win32') {
       const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
-      // Escape backslashes for PowerShell string
-      const psPath = tempFilePath.replace(/\\/g, '\\\\');
+      // The path is used directly in the PowerShell script.
+      const psPath = tempFilePath;
 
       const script = `
         Add-Type -AssemblyName System.Windows.Forms
