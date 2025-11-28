@@ -724,7 +724,7 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { output: 'Text from Part object' },
+          response: { content: [llmContent] },
         },
       },
     ]);
@@ -738,28 +738,22 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { output: 'Text from array' },
+          response: { content: llmContent },
         },
       },
     ]);
   });
-
-  it('should handle llmContent with inlineData', () => {
-    const llmContent: Part = {
-      inlineData: { mimeType: 'image/png', data: 'base64...' },
-    };
+  it('should handle llmContent as a PartListUnion array with multiple Parts', () => {
+    const llmContent: PartListUnion = [{ text: 'part1' }, { text: 'part2' }];
     const result = convertToFunctionResponse(toolName, callId, llmContent);
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: {
-            output: 'Binary content of type image/png was processed.',
-          },
+          response: { content: llmContent },
         },
       },
-      llmContent,
     ]);
   });
 
@@ -773,13 +767,31 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: {
-            output: 'Binary content of type application/pdf was processed.',
-          },
+          response: { content: [llmContent] },
         },
       },
-      llmContent,
     ]);
+  });
+
+  it('should preserve inner functionResponse id and name when flattening', () => {
+    const innerId = 'inner-call-id';
+    const innerName = 'inner-tool-name';
+    const input: Part = {
+      functionResponse: {
+        id: innerId,
+        name: innerName,
+        response: { content: [{ text: 'inner content' }] },
+      },
+    };
+
+    const result = convertToFunctionResponse(toolName, callId, input);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].functionResponse).toEqual({
+      id: innerId,
+      name: innerName,
+      response: { output: 'inner content' },
+    });
   });
 
   it('should handle llmContent as an array of multiple Parts (text and inlineData)', () => {
@@ -794,10 +806,9 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { output: 'Tool execution succeeded.' },
+          response: { content: llmContent },
         },
       },
-      ...llmContent,
     ]);
   });
 
@@ -811,12 +822,9 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: {
-            output: 'Binary content of type image/gif was processed.',
-          },
+          response: { content: llmContent },
         },
       },
-      ...llmContent,
     ]);
   });
 
@@ -828,7 +836,7 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { output: 'Tool execution succeeded.' },
+          response: { content: [llmContent] },
         },
       },
     ]);
@@ -856,7 +864,7 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { output: 'Tool execution succeeded.' },
+          response: { content: [] },
         },
       },
     ]);
@@ -870,7 +878,7 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { output: 'Tool execution succeeded.' },
+          response: { content: [llmContent] },
         },
       },
     ]);
