@@ -7,11 +7,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   TestRig,
-  createHookCommand,
-  createFailingHookCommand,
+  createPlatformHookScript,
+  createValidatingHookScript,
+  createFailingHookScript,
 } from './test-helper.js';
 import { join } from 'node:path';
-import { writeFileSync } from 'node:fs';
 
 describe('Hooks System Integration', () => {
   let rig: TestRig;
@@ -193,7 +193,8 @@ describe('Hooks System Integration', () => {
           'hooks-system.before-model.responses',
         ),
       });
-      const hookCommand = createHookCommand(`{
+      const hookCommand = createPlatformHookScript(
+        `{
   "decision": "allow",
   "hookSpecificOutput": {
     "hookEventName": "BeforeModel",
@@ -206,7 +207,10 @@ describe('Hooks System Integration', () => {
       ]
     }
   }
-}`);
+}`,
+        rig.testDir!,
+        'before_model_hook',
+      );
 
       await rig.setup('should modify LLM requests with BeforeModel hooks', {
         settings: {
@@ -240,6 +244,8 @@ describe('Hooks System Integration', () => {
       expect(result.toLowerCase()).toContain('security hook modified');
 
       // Should generate hook telemetry
+
+      // Should generate hook telemetry
       const hookTelemetryFound = rig.readHookLogs();
       expect(hookTelemetryFound.length).toBeGreaterThan(0);
       expect(hookTelemetryFound[0].hookCall.hook_event_name).toBe(
@@ -262,25 +268,29 @@ describe('Hooks System Integration', () => {
           'hooks-system.after-model.responses',
         ),
       });
-      // Create a hook command that modifies the LLM response
-      const hookCommand = createHookCommand(`{
-  "hookSpecificOutput": {
-    "hookEventName": "AfterModel",
-    "llm_response": {
-      "candidates": [
-        {
-          "content": {
-            "role": "model",
-            "parts": [
-              "[FILTERED] Response has been filtered for security compliance."
-            ]
+      // Create a platform-appropriate hook script that modifies the LLM response
+      const hookCommand = createPlatformHookScript(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'AfterModel',
+            llm_response: {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [
+                      '[FILTERED] Response has been filtered for security compliance.',
+                    ],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            },
           },
-          "finishReason": "STOP"
-        }
-      ]
-    }
-  }
-}`);
+        }),
+        rig.testDir!,
+        'after_model_hook',
+      );
 
       await rig.setup('should modify LLM responses with AfterModel hooks', {
         settings: {
@@ -328,16 +338,20 @@ describe('Hooks System Integration', () => {
           ),
         },
       );
-      // Create a hook command that restricts available tools
-      const hookCommand = createHookCommand(`{
-  "hookSpecificOutput": {
-    "hookEventName": "BeforeToolSelection",
-    "toolConfig": {
-      "mode": "ANY",
-      "allowedFunctionNames": ["read_file", "run_shell_command"]
-    }
-  }
-}`);
+      // Create a platform-appropriate hook script that restricts available tools
+      const hookCommand = createPlatformHookScript(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'BeforeToolSelection',
+            toolConfig: {
+              mode: 'ANY',
+              allowedFunctionNames: ['read_file', 'run_shell_command'],
+            },
+          },
+        }),
+        rig.testDir!,
+        'before_tool_selection_hook',
+      );
 
       await rig.setup(
         'should modify tool selection with BeforeToolSelection hooks',
@@ -397,14 +411,19 @@ describe('Hooks System Integration', () => {
           'hooks-system.before-agent.responses',
         ),
       });
-      // Create a hook command that adds context to the prompt
-      const hookCommand = createHookCommand(`{
-  "decision": "allow",
-  "hookSpecificOutput": {
-    "hookEventName": "BeforeAgent",
-    "additionalContext": "SYSTEM INSTRUCTION: You are in a secure environment. Always mention security compliance in your responses."
-  }
-}`);
+      // Create a platform-appropriate hook script that adds context to the prompt
+      const hookCommand = createPlatformHookScript(
+        JSON.stringify({
+          decision: 'allow',
+          hookSpecificOutput: {
+            hookEventName: 'BeforeAgent',
+            additionalContext:
+              'SYSTEM INSTRUCTION: You are in a secure environment. Always mention security compliance in your responses.',
+          },
+        }),
+        rig.testDir!,
+        'before_agent_hook',
+      );
 
       await rig.setup('should augment prompts with BeforeAgent hooks', {
         settings: {
@@ -442,17 +461,15 @@ describe('Hooks System Integration', () => {
   describe.skip('Notification Hooks - Permission Handling', () => {
     it('should handle notification hooks for tool permissions', async () => {
       await rig.setup('should handle notification hooks for tool permissions');
-      // Create a hook script that logs notification events
-      const hookScript = `#!/bin/bash
-echo '{
-  "suppressOutput": false,
-  "systemMessage": "Permission request logged by security hook"
-}'`;
-
-      const scriptPath = join(rig.testDir!, 'notification_hook.sh');
-      writeFileSync(scriptPath, hookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${scriptPath}"`);
+      // Create a platform-appropriate hook script that logs notification events
+      const hookCommand = createPlatformHookScript(
+        JSON.stringify({
+          suppressOutput: false,
+          systemMessage: 'Permission request logged by security hook',
+        }),
+        rig.testDir!,
+        'notification_hook',
+      );
 
       await rig.setup('should handle notification hooks for tool permissions', {
         settings: {
@@ -468,7 +485,7 @@ echo '{
                 hooks: [
                   {
                     type: 'command',
-                    command: scriptPath,
+                    command: hookCommand,
                     timeout: 5000,
                   },
                 ],
@@ -502,22 +519,30 @@ echo '{
     // which behaves differently with mocked responses. Keeping real LLM calls.
     it('should execute hooks sequentially when configured', async () => {
       await rig.setup('should execute hooks sequentially when configured');
-      // Create two hook commands that modify the input sequentially
-      const hookCommand1 = createHookCommand(`{
-  "decision": "allow",
-  "hookSpecificOutput": {
-    "hookEventName": "BeforeAgent",
-    "additionalContext": "Step 1: Initial validation passed."
-  }
-}`);
+      // Create two platform-appropriate hooks that modify the input sequentially
+      const hook1Command = createPlatformHookScript(
+        JSON.stringify({
+          decision: 'allow',
+          hookSpecificOutput: {
+            hookEventName: 'BeforeAgent',
+            additionalContext: 'Step 1: Initial validation passed.',
+          },
+        }),
+        rig.testDir!,
+        'sequential_hook1',
+      );
 
-      const hookCommand2 = createHookCommand(`{
-  "decision": "allow",
-  "hookSpecificOutput": {
-    "hookEventName": "BeforeAgent",
-    "additionalContext": "Step 2: Security check completed."
-  }
-}`);
+      const hook2Command = createPlatformHookScript(
+        JSON.stringify({
+          decision: 'allow',
+          hookSpecificOutput: {
+            hookEventName: 'BeforeAgent',
+            additionalContext: 'Step 2: Security check completed.',
+          },
+        }),
+        rig.testDir!,
+        'sequential_hook2',
+      );
 
       await rig.setup('should execute hooks sequentially when configured', {
         settings: {
@@ -531,12 +556,12 @@ echo '{
                 hooks: [
                   {
                     type: 'command',
-                    command: hookCommand1,
+                    command: hook1Command,
                     timeout: 5000,
                   },
                   {
                     type: 'command',
-                    command: hookCommand2,
+                    command: hook2Command,
                     timeout: 5000,
                   },
                 ],
@@ -588,24 +613,19 @@ echo '{
           'hooks-system.input-validation.responses',
         ),
       });
-      // Create a hook script that validates the input format
-      const hookScript = `#!/bin/bash
-# Read JSON input from stdin
-input=$(cat)
-
-# Check for required fields
-if echo "$input" | jq -e '.session_id and .cwd and .hook_event_name and .timestamp and .tool_name and .tool_input' > /dev/null 2>&1; then
-  echo '{"decision": "allow", "reason": "Input format is correct"}'
-  exit 0
-else
-  echo '{"decision": "block", "reason": "Input format is invalid"}'
-  exit 0
-fi`;
-
-      const scriptPath = join(rig.testDir!, 'input_validation_hook.sh');
-      writeFileSync(scriptPath, hookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${scriptPath}"`);
+      // Create a platform-appropriate hook script that validates the input format
+      const hookCommand = createValidatingHookScript(
+        [
+          'session_id',
+          'cwd',
+          'hook_event_name',
+          'timestamp',
+          'tool_name',
+          'tool_input',
+        ],
+        rig.testDir!,
+        'input_validation_hook',
+      );
 
       await rig.setup('should provide correct input format to hooks', {
         settings: {
@@ -618,7 +638,7 @@ fi`;
                 hooks: [
                   {
                     type: 'command',
-                    command: scriptPath,
+                    command: hookCommand,
                     timeout: 5000,
                   },
                 ],
@@ -650,17 +670,23 @@ fi`;
     // which behaves differently with mocked responses. Keeping real LLM calls.
     it('should handle hooks for all major event types', async () => {
       await rig.setup('should handle hooks for all major event types');
-      // Create platform-agnostic hook commands
-      const beforeToolCommand = createHookCommand(
+      // Create platform-appropriate hook scripts
+      const beforeToolCommand = createPlatformHookScript(
         '{"decision": "allow", "systemMessage": "BeforeTool: File operation logged"}',
+        rig.testDir!,
+        'before_tool',
       );
 
-      const afterToolCommand = createHookCommand(
+      const afterToolCommand = createPlatformHookScript(
         '{"hookSpecificOutput": {"hookEventName": "AfterTool", "additionalContext": "AfterTool: Operation completed successfully"}}',
+        rig.testDir!,
+        'after_tool',
       );
 
-      const beforeAgentCommand = createHookCommand(
+      const beforeAgentCommand = createPlatformHookScript(
         '{"decision": "allow", "hookSpecificOutput": {"hookEventName": "BeforeAgent", "additionalContext": "BeforeAgent: User request processed"}}',
+        rig.testDir!,
+        'before_agent',
       );
 
       await rig.setup('should handle hooks for all major event types', {
@@ -766,13 +792,20 @@ fi`;
           'hooks-system.error-handling.responses',
         ),
       });
-      // Create hook commands - one that fails and one that succeeds
-      const failingHookCommand = createFailingHookCommand(
+      // Create platform-appropriate hook scripts - one that fails and one that works
+      const failingHookCommand = createFailingHookScript(
         'Hook encountered an error',
+        rig.testDir!,
+        'failing_hook',
       );
 
-      const workingHookCommand = createHookCommand(
-        '{"decision": "allow", "reason": "Working hook succeeded"}',
+      const workingHookCommand = createPlatformHookScript(
+        JSON.stringify({
+          decision: 'allow',
+          reason: 'Working hook succeeded',
+        }),
+        rig.testDir!,
+        'working_hook',
       );
 
       await rig.setup('should handle hook failures gracefully', {
@@ -827,8 +860,14 @@ fi`;
           'hooks-system.telemetry.responses',
         ),
       });
-      const hookCommand = createHookCommand(
-        '{"decision": "allow", "reason": "Telemetry test hook"}',
+      // Create a platform-appropriate hook script for telemetry testing
+      const hookCommand = createPlatformHookScript(
+        JSON.stringify({
+          decision: 'allow',
+          reason: 'Telemetry test hook',
+        }),
+        rig.testDir!,
+        'telemetry_hook',
       );
 
       await rig.setup('should generate telemetry events for hook executions', {

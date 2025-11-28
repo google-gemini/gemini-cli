@@ -1084,85 +1084,135 @@ export class TestRig {
 }
 
 /**
- * Creates a platform-appropriate hook command that outputs JSON
+ * Creates a platform-appropriate hook script that outputs JSON.
+ * On Windows: Creates .ps1 file and returns powershell.exe -File command
+ * On Unix: Creates .sh file and returns bash command (no chmod needed)
  * @param jsonOutput - The JSON string to output
- * @returns A shell command string that works on the current platform
+ * @param testDir - The test directory to write the script to
+ * @param basename - Optional basename for the script file (default: 'hook_{timestamp}_{random}')
+ * @returns The command to execute the script
  */
-export function createHookCommand(jsonOutput: string): string {
-  const isWindows = os.platform() === 'win32';
-
-  if (isWindows) {
-    // Use PowerShell's Write-Output
-    // Escape single quotes by doubling them
-    const escapedJson = jsonOutput.replace(/'/g, "''");
-    return `powershell.exe -NoProfile -Command "Write-Output '${escapedJson}'"`;
-  } else {
-    // Use bash echo
-    // Escape single quotes by ending the string, adding escaped quote, and restarting
-    const escapedJson = jsonOutput.replace(/'/g, "'\\''");
-    return `echo '${escapedJson}'`;
-  }
-}
-
-/**
- * Creates a platform-appropriate hook command that fails with an error
- * @param errorMessage - The error message to output to stderr
- * @returns A shell command string that outputs to stderr and exits with code 1
- */
-export function createFailingHookCommand(errorMessage: string): string {
-  const isWindows = os.platform() === 'win32';
-
-  if (isWindows) {
-    // Use PowerShell's Write-Error
-    const escapedMessage = errorMessage.replace(/'/g, "''");
-    return `powershell.exe -NoProfile -Command "Write-Error '${escapedMessage}'; exit 1"`;
-  } else {
-    // Use bash with stderr redirection
-    const escapedMessage = errorMessage.replace(/'/g, "'\\''");
-    return `bash -c 'echo "${escapedMessage}" >&2; exit 1'`;
-  }
-}
-
-/**
- * Creates a hook command that reads from stdin and validates input format
- * @param requiredFields - Array of field names that must be present in the input
- * @param outputOnSuccess - JSON to output if validation passes
- * @param outputOnFailure - JSON to output if validation fails
- * @returns A shell command string that works on the current platform
- */
-export function createValidatingHookCommand(
-  requiredFields: string[],
-  outputOnSuccess: string,
-  outputOnFailure: string,
+export function createPlatformHookScript(
+  jsonOutput: string,
+  testDir: string,
+  basename?: string,
 ): string {
   const isWindows = os.platform() === 'win32';
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(7);
+  const defaultBasename = `hook_${timestamp}_${random}`;
 
   if (isWindows) {
-    // PowerShell script that reads stdin and validates JSON
-    // Build the field check expressions
-    const fieldsCheck = requiredFields
-      .map((field) => `($obj.PSObject.Properties.Name -contains '${field}')`)
-      .join(' -and ');
-
-    const escapedSuccess = outputOnSuccess
-      .replace(/'/g, "''")
-      .replace(/"/g, '""');
-    const escapedFailure = outputOnFailure
-      .replace(/'/g, "''")
-      .replace(/"/g, '""');
-
-    // Use a simpler PowerShell approach with -replace for proper escaping
-    const script = `$inputJson = [Console]::In.ReadToEnd(); try { $obj = ConvertFrom-Json $inputJson; if (${fieldsCheck}) { Write-Output '${escapedSuccess}'; exit 0 } else { Write-Output '${escapedFailure}'; exit 0 } } catch { Write-Output '${escapedFailure}'; exit 0 }`;
-
-    return `powershell.exe -NoProfile -Command "${script}"`;
+    // Write a PowerShell script
+    const scriptPath = join(testDir, `${basename || defaultBasename}.ps1`);
+    const scriptContent = `Write-Output '${jsonOutput.replace(/'/g, "''")}'`;
+    writeFileSync(scriptPath, scriptContent);
+    return `powershell.exe -NoProfile -File "${scriptPath}"`;
   } else {
-    // Bash script that uses jq to validate JSON
-    const jqCheck = requiredFields.map((field) => `.${field}`).join(' and ');
+    // Write a bash script
+    const scriptPath = join(testDir, `${basename || defaultBasename}.sh`);
+    const scriptContent = `#!/bin/bash
+echo '${jsonOutput.replace(/'/g, "'\\''")}'`;
+    writeFileSync(scriptPath, scriptContent);
+    // Execute with bash - no chmod needed!
+    return `bash "${scriptPath}"`;
+  }
+}
 
-    // For simplicity, just echo the raw JSON - no single quotes to escape
-    // Use printf to avoid issues with special characters
-    const script = `input=$(cat); if echo "$input" | jq -e "${jqCheck}" > /dev/null 2>&1; then echo '${outputOnSuccess}'; else echo '${outputOnFailure}'; fi`;
+/**
+ * Creates a platform-appropriate hook script that validates stdin input using jq.
+ * On Windows: Creates .ps1 file that validates JSON structure
+ * On Unix: Creates .sh file that uses jq to validate JSON structure
+ * @param requiredFields - Array of required field names to check in the input JSON
+ * @param testDir - The test directory to write the script to
+ * @param basename - Optional basename for the script file
+ * @returns The command to execute the script
+ */
+export function createValidatingHookScript(
+  requiredFields: string[],
+  testDir: string,
+  basename?: string,
+): string {
+  const isWindows = os.platform() === 'win32';
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(7);
+  const defaultBasename = `hook_${timestamp}_${random}`;
 
-    return `bash -c "${script.replace(/"/g, '\\"')}"`;
+  if (isWindows) {
+    // Write a PowerShell script that validates JSON
+    const scriptPath = join(testDir, `${basename || defaultBasename}.ps1`);
+    const fieldChecks = requiredFields
+      .map((field) => `$input.${field} -ne $null`)
+      .join(' -and ');
+    const scriptContent = `
+$stdin = $input | Out-String
+try {
+  $inputJson = $stdin | ConvertFrom-Json
+  if (${fieldChecks}) {
+    Write-Output '{"decision": "allow", "reason": "Input format is correct"}'
+  } else {
+    Write-Output '{"decision": "block", "reason": "Input format is invalid"}'
+  }
+} catch {
+  Write-Output '{"decision": "block", "reason": "Invalid JSON"}'
+}`;
+    writeFileSync(scriptPath, scriptContent);
+    return `powershell.exe -NoProfile -File "${scriptPath}"`;
+  } else {
+    // Write a bash script that uses jq
+    const scriptPath = join(testDir, `${basename || defaultBasename}.sh`);
+    const jqFilter = requiredFields.map((f) => `.${f}`).join(' and ');
+    const scriptContent = `#!/bin/bash
+# Read JSON input from stdin
+input=$(cat)
+
+# Check for required fields
+if echo "$input" | jq -e '${jqFilter}' > /dev/null 2>&1; then
+  echo '{"decision": "allow", "reason": "Input format is correct"}'
+  exit 0
+else
+  echo '{"decision": "block", "reason": "Input format is invalid"}'
+  exit 0
+fi`;
+    writeFileSync(scriptPath, scriptContent);
+    return `bash "${scriptPath}"`;
+  }
+}
+
+/**
+ * Creates a platform-appropriate hook script that fails with an error message.
+ * On Windows: Creates .ps1 file that writes to stderr and exits with code 1
+ * On Unix: Creates .sh file that writes to stderr and exits with code 1
+ * @param errorMessage - The error message to write to stderr
+ * @param testDir - The test directory to write the script to
+ * @param basename - Optional basename for the script file
+ * @returns The command to execute the script
+ */
+export function createFailingHookScript(
+  errorMessage: string,
+  testDir: string,
+  basename?: string,
+): string {
+  const isWindows = os.platform() === 'win32';
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(7);
+  const defaultBasename = `hook_${timestamp}_${random}`;
+
+  if (isWindows) {
+    // Write a PowerShell script that fails
+    const scriptPath = join(testDir, `${basename || defaultBasename}.ps1`);
+    const scriptContent = `
+[Console]::Error.WriteLine('${errorMessage.replace(/'/g, "''")}')
+exit 1`;
+    writeFileSync(scriptPath, scriptContent);
+    return `powershell.exe -NoProfile -File "${scriptPath}"`;
+  } else {
+    // Write a bash script that fails
+    const scriptPath = join(testDir, `${basename || defaultBasename}.sh`);
+    const scriptContent = `#!/bin/bash
+echo "${errorMessage}" >&2
+exit 1`;
+    writeFileSync(scriptPath, scriptContent);
+    return `bash "${scriptPath}"`;
   }
 }
