@@ -203,13 +203,14 @@ export interface SlashCommand {
   kind: CommandKind;
 
   /**
-   * Indicates whether this command accepts arguments.
-   * If true, the command will not auto-execute on Enter and will autocomplete instead,
-   * allowing users to provide arguments before executing.
+   * Controls whether this command auto-executes when selected with Enter.
    *
-   * When undefined or false, the command can auto-execute.
+   * If true, pressing Enter on the suggestion will execute the command immediately.
+   * If false, pressing Enter will autocomplete the command, allowing users to add arguments.
+   *
+   * When undefined, falls back to checking for completion function (backward compatibility).
    */
-  acceptsArguments?: boolean;
+  autoExecute?: boolean;
 
   // Optional metadata for extension commands
   extensionName?: string;
