@@ -21,6 +21,7 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_MODEL,
   type ExtensionLoader,
+  startupProfiler,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -88,6 +89,7 @@ export async function loadConfig(
   });
   // Needed to initialize ToolRegistry, and git checkpointing if enabled
   await config.initialize();
+  startupProfiler.flush(config);
 
   if (process.env['USE_CCPA']) {
     logger.info('[Config] Using CCPA Auth:');
