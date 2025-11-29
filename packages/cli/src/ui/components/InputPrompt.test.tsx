@@ -1035,6 +1035,86 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should autocomplete commands with autoExecute: false on Enter', async () => {
+    const shareCommand: SlashCommand = {
+      name: 'share',
+      kind: CommandKind.BUILT_IN,
+      description: 'Share conversation to file',
+      action: vi.fn(),
+      autoExecute: false, // Explicitly set to false
+    };
+
+    const suggestion = { label: 'share', value: 'share' };
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [suggestion],
+      activeSuggestionIndex: 0,
+      getCommandFromSuggestion: vi.fn().mockReturnValue(shareCommand),
+      getCompletedText: vi.fn().mockReturnValue('/chat share'),
+    });
+
+    props.buffer.setText('/chat sh');
+    props.buffer.lines = ['/chat sh'];
+    props.buffer.cursor = [0, 8];
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\r'); // Enter
+    });
+
+    await waitFor(() => {
+      // Should autocomplete to allow adding file argument
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+      expect(props.onSubmit).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
+  it('should auto-execute commands with autoExecute: true on Enter', async () => {
+    const quickCommand: SlashCommand = {
+      name: 'quick',
+      kind: CommandKind.BUILT_IN,
+      description: 'Quick command',
+      action: vi.fn(),
+      autoExecute: true, // Explicitly set to true
+    };
+
+    const suggestion = { label: 'quick', value: 'quick' };
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [suggestion],
+      activeSuggestionIndex: 0,
+      getCommandFromSuggestion: vi.fn().mockReturnValue(quickCommand),
+      getCompletedText: vi.fn().mockReturnValue('/quick'),
+    });
+
+    props.buffer.setText('/qui');
+    props.buffer.lines = ['/qui'];
+    props.buffer.cursor = [0, 4];
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\r'); // Enter
+    });
+
+    await waitFor(() => {
+      // Should auto-execute
+      expect(props.onSubmit).toHaveBeenCalledWith('/quick');
+      expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
   it('should autocomplete an @-path on Enter without submitting', async () => {
     mockedUseCommandCompletion.mockReturnValue({
       ...mockCommandCompletion,
