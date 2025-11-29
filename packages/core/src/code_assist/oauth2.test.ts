@@ -12,6 +12,7 @@ import {
   resetOauthClientForTesting,
   clearCachedCredentialFile,
   clearOauthClientCache,
+  authEvents,
 } from './oauth2.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import { OAuth2Client, Compute, GoogleAuth } from 'google-auth-library';
@@ -109,13 +110,18 @@ describe('oauth2', () => {
       const mockGetAccessToken = vi
         .fn()
         .mockResolvedValue({ token: 'mock-access-token' });
+      let tokensListener: ((tokens: Credentials) => void) | undefined;
       const mockOAuth2Client = {
         generateAuthUrl: mockGenerateAuthUrl,
         getToken: mockGetToken,
         setCredentials: mockSetCredentials,
         getAccessToken: mockGetAccessToken,
         credentials: mockTokens,
-        on: vi.fn(),
+        on: vi.fn((event, listener) => {
+          if (event === 'tokens') {
+            tokensListener = listener;
+          }
+        }),
       } as unknown as OAuth2Client;
       vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
 
@@ -195,6 +201,11 @@ describe('oauth2', () => {
       });
       expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
 
+      // Manually trigger the 'tokens' event listener
+      if (tokensListener) {
+        await tokensListener(mockTokens);
+      }
+
       // Verify Google Account was cached
       const googleAccountPath = path.join(
         tempHomeDir,
@@ -213,6 +224,45 @@ describe('oauth2', () => {
       expect(userAccountManager.getCachedGoogleAccount()).toBe(
         'test-google-account@gmail.com',
       );
+    });
+
+    it('should clear credentials file', async () => {
+      // Setup initial state with files
+      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+      await fs.promises.writeFile(credsPath, '{}');
+
+      await clearCachedCredentialFile();
+
+      expect(fs.existsSync(credsPath)).toBe(false);
+    });
+
+    it('should emit post_auth event when loading cached credentials', async () => {
+      const cachedCreds = { refresh_token: 'cached-token' };
+      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+      await fs.promises.writeFile(credsPath, JSON.stringify(cachedCreds));
+
+      const mockClient = {
+        setCredentials: vi.fn(),
+        getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+        getTokenInfo: vi.fn().mockResolvedValue({}),
+        on: vi.fn(),
+      };
+      vi.mocked(OAuth2Client).mockImplementation(
+        () => mockClient as unknown as OAuth2Client,
+      );
+
+      const eventPromise = new Promise<void>((resolve) => {
+        authEvents.once('post_auth', (creds) => {
+          expect(creds.refresh_token).toBe('cached-token');
+          resolve();
+        });
+      });
+
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+      await eventPromise;
     });
 
     it('should perform login with user code', async () => {
