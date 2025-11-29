@@ -94,7 +94,7 @@ import { startupProfiler } from '../telemetry/startupProfiler.js';
 import { ApprovalMode } from '../policy/types.js';
 
 export interface AccessibilitySettings {
-  disableLoadingPhrases?: boolean;
+  enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
 
@@ -256,7 +256,7 @@ export interface ConfigParameters {
     respectGitIgnore?: boolean;
     respectGeminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
-    disableFuzzySearch?: boolean;
+    enableFuzzySearch?: boolean;
   };
   checkpointing?: boolean;
   proxy?: string;
@@ -369,7 +369,7 @@ export class Config {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
     enableRecursiveFileSearch: boolean;
-    disableFuzzySearch: boolean;
+    enableFuzzySearch: boolean;
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
@@ -499,7 +499,7 @@ export class Config {
         DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
       enableRecursiveFileSearch:
         params.fileFiltering?.enableRecursiveFileSearch ?? true,
-      disableFuzzySearch: params.fileFiltering?.disableFuzzySearch ?? false,
+      enableFuzzySearch: params.fileFiltering?.enableFuzzySearch ?? true,
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
@@ -1151,8 +1151,8 @@ export class Config {
     return this.fileFiltering.enableRecursiveFileSearch;
   }
 
-  getFileFilteringDisableFuzzySearch(): boolean {
-    return this.fileFiltering.disableFuzzySearch;
+  getFileFilteringEnableFuzzySearch(): boolean {
+    return this.fileFiltering.enableFuzzySearch;
   }
 
   getFileFilteringRespectGitIgnore(): boolean {
