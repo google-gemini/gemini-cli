@@ -56,6 +56,7 @@ export interface UIActions {
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
   setEmbeddedShellFocused: (value: boolean) => void;
+  setCustomDialog: (dialog: React.ReactNode | null) => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

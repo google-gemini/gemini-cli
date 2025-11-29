@@ -859,6 +859,17 @@ export interface ChatCompressionEvent extends BaseTelemetryEvent {
   'event.timestamp': string;
   tokens_before: number;
   tokens_after: number;
+  goal_was_selected?: boolean;
+  messages_preserved?: number;
+  messages_compressed?: number;
+  trigger_reason?: string;
+  // Advanced opt-out tracking
+  user_selected_disable?: boolean;
+  user_selected_less_frequent?: boolean;
+  frequency_multiplier_applied?: number;
+  new_token_threshold?: number;
+  new_message_threshold?: number;
+  was_safety_valve?: boolean;
   toOpenTelemetryAttributes(config: Config): LogAttributes;
   toLogBody(): string;
 }
@@ -866,6 +877,16 @@ export interface ChatCompressionEvent extends BaseTelemetryEvent {
 export function makeChatCompressionEvent({
   tokens_before,
   tokens_after,
+  goal_was_selected,
+  messages_preserved,
+  messages_compressed,
+  trigger_reason,
+  user_selected_disable,
+  user_selected_less_frequent,
+  frequency_multiplier_applied,
+  new_token_threshold,
+  new_message_threshold,
+  was_safety_valve,
 }: Omit<
   ChatCompressionEvent,
   CommonFields | 'toOpenTelemetryAttributes' | 'toLogBody'
@@ -875,17 +896,63 @@ export function makeChatCompressionEvent({
     'event.timestamp': new Date().toISOString(),
     tokens_before,
     tokens_after,
+    goal_was_selected,
+    messages_preserved,
+    messages_compressed,
+    trigger_reason,
+    user_selected_disable,
+    user_selected_less_frequent,
+    frequency_multiplier_applied,
+    new_token_threshold,
+    new_message_threshold,
+    was_safety_valve,
     toOpenTelemetryAttributes(config: Config): LogAttributes {
-      return {
+      const attrs: LogAttributes = {
         ...getCommonAttributes(config),
         'event.name': EVENT_CHAT_COMPRESSION,
         'event.timestamp': this['event.timestamp'],
         tokens_before: this.tokens_before,
         tokens_after: this.tokens_after,
       };
+
+      if (this.goal_was_selected !== undefined) {
+        attrs['goal_was_selected'] = this.goal_was_selected;
+      }
+      if (this.messages_preserved !== undefined) {
+        attrs['messages_preserved'] = this.messages_preserved;
+      }
+      if (this.messages_compressed !== undefined) {
+        attrs['messages_compressed'] = this.messages_compressed;
+      }
+      if (this.trigger_reason) {
+        attrs['trigger_reason'] = this.trigger_reason;
+      }
+      if (this.user_selected_disable !== undefined) {
+        attrs['user_selected_disable'] = this.user_selected_disable;
+      }
+      if (this.user_selected_less_frequent !== undefined) {
+        attrs['user_selected_less_frequent'] = this.user_selected_less_frequent;
+      }
+      if (this.frequency_multiplier_applied !== undefined) {
+        attrs['frequency_multiplier_applied'] =
+          this.frequency_multiplier_applied;
+      }
+      if (this.new_token_threshold !== undefined) {
+        attrs['new_token_threshold'] = this.new_token_threshold;
+      }
+      if (this.new_message_threshold !== undefined) {
+        attrs['new_message_threshold'] = this.new_message_threshold;
+      }
+      if (this.was_safety_valve !== undefined) {
+        attrs['was_safety_valve'] = this.was_safety_valve;
+      }
+
+      return attrs;
     },
     toLogBody(): string {
-      return `Chat compression (Saved ${this.tokens_before - this.tokens_after} tokens)`;
+      const saved = this.tokens_before - this.tokens_after;
+      const goalInfo = this.goal_was_selected ? ' (goal-focused)' : '';
+      return `Chat compression${goalInfo} (Saved ${saved} tokens)`;
     },
   };
 }

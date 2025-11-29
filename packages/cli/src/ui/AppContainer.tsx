@@ -119,6 +119,8 @@ import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { enableSupportedProtocol } from './utils/kittyProtocolDetector.js';
 import { enableBracketedPaste } from './utils/bracketedPaste.js';
+import { GoalSelectionPrompt } from './components/GoalSelectionPrompt.js';
+import { CustomGoalInput } from './components/CustomGoalInput.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -723,6 +725,47 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
   }, [pendingRestorePrompt, userMessages, historyManager.history]);
 
+  const handleCompressionPrompt = useCallback(
+    async (goals: string[], isSafetyValve: boolean = false) =>
+      new Promise<string>((resolve) => {
+        const showCustomGoalInput = () => {
+          setCustomDialog(
+            <CustomGoalInput
+              terminalWidth={terminalWidth}
+              onSubmit={(customGoal) => {
+                setCustomDialog(null);
+                // If user submits empty string, fall back to auto
+                resolve(customGoal.trim() || 'auto');
+              }}
+              onCancel={() => {
+                setCustomDialog(null);
+                resolve('auto');
+              }}
+            />,
+          );
+        };
+
+        setCustomDialog(
+          <GoalSelectionPrompt
+            goals={goals}
+            terminalWidth={terminalWidth}
+            isSafetyValve={isSafetyValve}
+            timeoutSeconds={config.getCompressionPromptTimeout()}
+            onSelect={(goal) => {
+              if (goal === 'other') {
+                // User wants to enter a custom goal
+                showCustomGoalInput();
+              } else {
+                setCustomDialog(null);
+                resolve(goal === null ? 'auto' : goal);
+              }
+            }}
+          />,
+        );
+      }),
+    [setCustomDialog, terminalWidth, config],
+  );
+
   const {
     streamingState,
     submitQuery,
@@ -753,6 +796,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     terminalWidth,
     terminalHeight,
     embeddedShellFocused,
+    handleCompressionPrompt,
   );
 
   // Auto-accept indicator
@@ -1632,6 +1676,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       setEmbeddedShellFocused,
+      setCustomDialog,
     }),
     [
       handleThemeSelect,
@@ -1667,6 +1712,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       setEmbeddedShellFocused,
+      setCustomDialog,
     ],
   );
 

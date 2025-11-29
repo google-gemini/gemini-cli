@@ -75,6 +75,37 @@ export function createToolCallErrorMessage(
   );
 }
 
+/**
+ * Simulates building up a conversation history until a certain token utilization is reached.
+ * @param chat The chat object from makeTestClientWithResponses.
+ * @param client The client object from makeTestClientWithResponses.
+ * @param utilizationTarget The target utilization (e.g., 0.5 for 50%).
+ * @param messageCountIncrement How many messages to send in each batch.
+ */
+export async function buildUpTo50PercentUtilization(
+  chat: Record<string, unknown>, // Assuming chat has sendMessage method
+  client: Record<string, unknown>, // Assuming client has getCurrentTokenCount and getModelMaxTokens
+  utilizationTarget: number,
+  messageCountIncrement = 5,
+) {
+  const modelMaxTokens = client.getModelMaxTokens();
+  const targetTokens = modelMaxTokens * utilizationTarget;
+  let currentTokens = await client.getCurrentTokenCount();
+  let messageCounter = 0;
+
+  // Loop until target utilization is reached or exceeded
+  while (currentTokens < targetTokens) {
+    for (let i = 0; i < messageCountIncrement; i++) {
+      await chat.sendMessage(
+        `Test message to build history: ${messageCounter++}`,
+      );
+    }
+    currentTokens = await client.getCurrentTokenCount();
+    // Add a small delay to avoid overwhelming the mock server in rapid succession, if any
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
 // Helper to print debug information when tests fail
 export function printDebugInfo(
   rig: TestRig,

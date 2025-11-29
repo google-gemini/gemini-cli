@@ -310,6 +310,15 @@ export interface ConfigParameters {
   };
   previewFeatures?: boolean;
   enableModelAvailabilityService?: boolean;
+
+  // Deliberate Context Compaction
+  compressionInteractive?: boolean;
+  compressionPromptTimeout?: number;
+  compressionTriggerTokens?: number;
+  compressionTriggerUtilization?: number;
+  compressionMinMessages?: number;
+  compressionMinTimeBetweenPrompts?: number;
+  compressionFrequencyMultiplier?: number;
 }
 
 export class Config {
@@ -428,6 +437,15 @@ export class Config {
   private previewModelFallbackMode = false;
   private previewModelBypassMode = false;
   private readonly enableModelAvailabilityService: boolean;
+
+  // Deliberate Context Compaction
+  private compressionInteractive: boolean;
+  private compressionPromptTimeout: number;
+  private compressionTriggerTokens: number;
+  private compressionTriggerUtilization: number;
+  private compressionMinMessages: number;
+  private compressionMinTimeBetweenPrompts: number;
+  private compressionFrequencyMultiplier: number;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -568,6 +586,19 @@ export class Config {
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
     this.experiments = params.experiments;
+
+    // Deliberate Context Compaction
+    // TODO: TEMPORARY VALUES FOR TESTING - REVERT BEFORE MERGE
+    this.compressionInteractive = params.compressionInteractive ?? true;
+    this.compressionPromptTimeout = params.compressionPromptTimeout ?? 30;
+    this.compressionTriggerTokens = params.compressionTriggerTokens ?? 1000; // TEMP: was 40000
+    this.compressionTriggerUtilization =
+      params.compressionTriggerUtilization ?? 0.5;
+    this.compressionMinMessages = params.compressionMinMessages ?? 2; // TEMP: was 25
+    this.compressionMinTimeBetweenPrompts =
+      params.compressionMinTimeBetweenPrompts ?? 5; // TEMP: was 300
+    this.compressionFrequencyMultiplier =
+      params.compressionFrequencyMultiplier ?? 1.5;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -1241,6 +1272,122 @@ export class Config {
       return undefined;
     }
     return remoteThreshold;
+  }
+
+  /**
+   * Get absolute token threshold for triggering compression (default: 40000)
+   */
+  getCompressionTriggerTokens(): number {
+    return this.compressionTriggerTokens;
+  }
+
+  /**
+   * Set absolute token threshold for triggering compression.
+   */
+  setCompressionTriggerTokens(value: number): void {
+    this.compressionTriggerTokens = value;
+  }
+
+  /**
+   * Get utilization threshold for safety valve compression (default: 0.5 = 50%)
+   */
+  getCompressionTriggerUtilization(): number {
+    return this.compressionTriggerUtilization;
+  }
+
+  /**
+   * Set utilization threshold for safety valve compression.
+   */
+  setCompressionTriggerUtilization(value: number): void {
+    this.compressionTriggerUtilization = value;
+  }
+
+  /**
+   * Get minimum messages required between compressions (default: 25)
+   */
+  getCompressionMinMessages(): number {
+    return this.compressionMinMessages;
+  }
+
+  /**
+   * Set minimum messages required between compressions.
+   */
+  setCompressionMinMessages(value: number): void {
+    this.compressionMinMessages = value;
+  }
+
+  /**
+   * Get minimum time in seconds between compressions (default: 300 = 5 minutes)
+   */
+  getCompressionMinTimeBetweenPrompts(): number {
+    return this.compressionMinTimeBetweenPrompts;
+  }
+
+  /**
+   * Set minimum time in seconds between compressions.
+   */
+  setCompressionMinTimeBetweenPrompts(value: number): void {
+    this.compressionMinTimeBetweenPrompts = value;
+  }
+
+  /**
+   * Get multiplier for adjusting compression frequency (default: 1.5)
+   */
+  getCompressionFrequencyMultiplier(): number {
+    return this.compressionFrequencyMultiplier;
+  }
+
+  /**
+   * Set multiplier for adjusting compression frequency.
+   */
+  setCompressionFrequencyMultiplier(value: number): void {
+    this.compressionFrequencyMultiplier = value;
+  }
+
+  /**
+   * Check if deliberate compression is enabled (default: true)
+   */
+  isDeliberateCompressionEnabled(): boolean {
+    return this.compressionInteractive;
+  }
+
+  /**
+   * Check if interactive compression prompts are enabled (alias for isDeliberateCompressionEnabled)
+   */
+  isCompressionInteractive(): boolean {
+    return this.compressionInteractive;
+  }
+
+  /**
+   * Set if deliberate compression is enabled.
+   */
+  setCompressionInteractive(value: boolean): void {
+    this.compressionInteractive = value;
+  }
+
+  /**
+   * Get timeout for compression prompt in seconds (default: 30)
+   */
+  getCompressionPromptTimeout(): number {
+    return this.compressionPromptTimeout;
+  }
+
+  /**
+   * Set timeout for compression prompt in seconds.
+   */
+  setCompressionPromptTimeout(value: number): void {
+    this.compressionPromptTimeout = value;
+  }
+
+  /**
+   * Check if auto-skip is enabled for deliberate compression (default: false)
+   */
+  async getDeliberateCompressionAutoSkip(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+    return (
+      this.experiments?.flags[ExperimentFlags.DELIBERATE_COMPRESSION_AUTO_SKIP]
+        ?.boolValue ?? false
+    );
   }
 
   async getUserCaching(): Promise<boolean | undefined> {

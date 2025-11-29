@@ -211,4 +211,66 @@ describe('<CompressionMessage />', () => {
       }
     });
   });
+
+  describe('user goal display', () => {
+    it('should display user goal when provided with successful compression', () => {
+      const props = createCompressionProps({
+        isPending: false,
+        originalTokenCount: 50000,
+        newTokenCount: 20000,
+        compressionStatus: CompressionStatus.COMPRESSED,
+        userGoal: 'Implementing user authentication',
+      });
+      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
+      const output = lastFrame();
+
+      expect(output).toContain('Implementing user authentication');
+      expect(output).toContain('compressed from 50000 to 20000 tokens');
+      unmount();
+    });
+
+    it('should display goal-focused indicator when user goal is provided', () => {
+      const props = createCompressionProps({
+        isPending: false,
+        originalTokenCount: 50000,
+        newTokenCount: 20000,
+        compressionStatus: CompressionStatus.COMPRESSED,
+        userGoal: 'Adding API endpoints',
+      });
+      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
+      const output = lastFrame();
+
+      expect(output).toContain('optimized for');
+      expect(output).toContain('Adding API endpoints');
+      unmount();
+    });
+
+    it('should not display goal section when userGoal is not provided', () => {
+      const props = createCompressionProps({
+        isPending: false,
+        originalTokenCount: 50000,
+        newTokenCount: 20000,
+        compressionStatus: CompressionStatus.COMPRESSED,
+      });
+      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
+      const output = lastFrame();
+
+      expect(output).not.toContain('optimized for');
+      expect(output).toContain('compressed from 50000 to 20000 tokens');
+      unmount();
+    });
+
+    it('should not display goal section when compression is pending', () => {
+      const props = createCompressionProps({
+        isPending: true,
+        userGoal: 'Some goal',
+      });
+      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
+      const output = lastFrame();
+
+      expect(output).not.toContain('optimized for');
+      expect(output).toContain('Compressing chat history');
+      unmount();
+    });
+  });
 });

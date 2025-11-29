@@ -15,6 +15,7 @@ import { CompressionStatus } from '../core/turn.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import type { Config } from '../config/config.js';
+import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
 
 vi.mock('../core/tokenLimits.js');
@@ -99,6 +100,83 @@ describe('findCompressSplitPoint', () => {
     ];
     expect(findCompressSplitPoint(historyWithEmptyParts, 0.5)).toBe(2);
   });
+
+  describe('since-last-prompt strategy', () => {
+    it('should split at last user message', () => {
+      // GIVEN: History with 10 messages, last user message at index 8
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'msg 1' }] },
+        { role: 'model', parts: [{ text: 'response 1' }] },
+        { role: 'user', parts: [{ text: 'msg 2' }] },
+        { role: 'model', parts: [{ text: 'response 2' }] },
+        { role: 'user', parts: [{ text: 'msg 3' }] }, // Index 4
+        { role: 'model', parts: [{ text: 'response 3' }] },
+        { role: 'user', parts: [{ text: 'msg 4' }] },
+        { role: 'model', parts: [{ text: 'response 4' }] },
+        { role: 'user', parts: [{ text: 'msg 5' }] }, // Index 8 - last user
+        { role: 'model', parts: [{ text: 'response 5' }] },
+      ];
+
+      // WHEN: Find split point with since-last-prompt strategy
+      const result = findCompressSplitPoint(history, {
+        strategy: 'since-last-prompt',
+        minMessagesToCompress: 5,
+      });
+
+      // THEN: Should split at index 8
+      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      if (result && typeof result !== 'number') {
+        expect(result.splitIndex).toBe(8);
+        expect(result.historyToCompress).toHaveLength(8); // 0-7
+        expect(result.historyToKeep).toHaveLength(2); // 8-9
+      }
+    });
+
+    it('should return null if history too short', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'msg 1' }] },
+        { role: 'model', parts: [{ text: 'response 1' }] },
+      ];
+
+      const result = findCompressSplitPoint(history, {
+        strategy: 'since-last-prompt',
+        minMessagesToCompress: 5,
+      });
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null if not enough messages to compress', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'msg 1' }] },
+        { role: 'model', parts: [{ text: 'response 1' }] },
+        { role: 'user', parts: [{ text: 'msg 2' }] }, // Index 2 - last user
+        { role: 'model', parts: [{ text: 'response 2' }] },
+      ];
+
+      const result = findCompressSplitPoint(history, {
+        strategy: 'since-last-prompt',
+        minMessagesToCompress: 5, // Need at least 5, but only have 2
+      });
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null if no user messages found', () => {
+      const history: Content[] = [
+        { role: 'model', parts: [{ text: 'response 1' }] },
+        { role: 'model', parts: [{ text: 'response 2' }] },
+        { role: 'model', parts: [{ text: 'response 3' }] },
+      ];
+
+      const result = findCompressSplitPoint(history, {
+        strategy: 'since-last-prompt',
+      });
+
+      expect(result).toBeNull();
+    });
+  });
 });
 
 describe('modelStringToModelConfigAlias', () => {
@@ -152,7 +230,7 @@ describe('ChatCompressionService', () => {
       getCompressionThreshold: vi.fn(),
       getBaseLlmClient: vi.fn().mockReturnValue({
         generateContent: mockGenerateContent,
-      }),
+      } as unknown as BaseLlmClient),
       isInteractive: vi.fn().mockReturnValue(false),
       getContentGenerator: vi.fn().mockReturnValue({
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
@@ -307,5 +385,142 @@ describe('ChatCompressionService', () => {
       CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
     );
     expect(result.newHistory).toBeNull();
+  });
+
+  describe('compress with new options', () => {
+    it('should accept userGoal and preserveStrategy options', async () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'msg1' }] },
+        { role: 'model', parts: [{ text: 'msg2' }] },
+        { role: 'user', parts: [{ text: 'msg3' }] },
+        { role: 'model', parts: [{ text: 'msg4' }] },
+        { role: 'user', parts: [{ text: 'msg5' }] },
+        { role: 'model', parts: [{ text: 'msg6' }] },
+        { role: 'user', parts: [{ text: 'msg7' }] },
+        { role: 'model', parts: [{ text: 'msg8' }] },
+      ];
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(800);
+      vi.mocked(tokenLimit).mockReturnValue(1000);
+
+      const mockGenerateContent = vi.fn().mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'Summary with goal' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
+      vi.mocked(mockConfig.getBaseLlmClient).mockReturnValue({
+        generateContent: mockGenerateContent,
+      } as unknown as BaseLlmClient);
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        false,
+        mockModel,
+        mockConfig,
+        false,
+        {
+          userGoal: 'Implementing auth',
+          preserveStrategy: 'since-last-prompt',
+        },
+      );
+
+      expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
+      expect(result.newHistory).not.toBeNull();
+      expect(result.info.goalWasSelected).toBe(true);
+      expect(mockGenerateContent).toHaveBeenCalled();
+    });
+
+    it('should use since-last-prompt split when specified', async () => {
+      const history: Content[] = Array.from({ length: 50 }, (_, i) => ({
+        role: i % 2 === 0 ? ('user' as const) : ('model' as const),
+        parts: [{ text: `msg ${i + 1}` }],
+      }));
+
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(1000);
+      vi.mocked(tokenLimit).mockReturnValue(2000);
+
+      const mockGenerateContent = vi.fn().mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'Summary' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
+      vi.mocked(mockConfig.getBaseLlmClient).mockReturnValue({
+        generateContent: mockGenerateContent,
+      } as unknown as BaseLlmClient);
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        false,
+        mockModel,
+        mockConfig,
+        false,
+        {
+          preserveStrategy: 'since-last-prompt',
+        },
+      );
+
+      expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
+      // Should preserve fewer messages than percentage strategy (which would keep 30% = 15 messages)
+      expect(result.info.messagesPreserved).toBeLessThan(15);
+      expect(result.info.messagesPreserved).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should extract discarded context summary from XML', async () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'msg1' }] },
+        { role: 'model', parts: [{ text: 'msg2' }] },
+        { role: 'user', parts: [{ text: 'msg3' }] },
+        { role: 'model', parts: [{ text: 'msg4' }] },
+      ];
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(800);
+      vi.mocked(tokenLimit).mockReturnValue(1000);
+
+      const mockResponse = `
+        <state_snapshot>
+          <current_goal>Testing</current_goal>
+          <discarded_context_summary>
+            Omitted earlier discussion about database setup
+          </discarded_context_summary>
+        </state_snapshot>
+      `;
+      const mockGenerateContent = vi.fn().mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: mockResponse }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
+      vi.mocked(mockConfig.getBaseLlmClient).mockReturnValue({
+        generateContent: mockGenerateContent,
+      } as unknown as BaseLlmClient);
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        true,
+        mockModel,
+        mockConfig,
+        false,
+      );
+
+      expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
+      expect(result.info.discardedContextSummary).toContain(
+        'Omitted earlier discussion about database setup',
+      );
+    });
   });
 });

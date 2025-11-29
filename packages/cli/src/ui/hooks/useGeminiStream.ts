@@ -110,6 +110,7 @@ export const useGeminiStream = (
   terminalWidth: number,
   terminalHeight: number,
   isShellFocused?: boolean,
+  onShowCompressionPrompt?: (goals: string[]) => Promise<string>,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -954,6 +955,9 @@ export const useGeminiStream = (
                 queryToSend,
                 abortSignal,
                 prompt_id!,
+                undefined,
+                undefined,
+                onShowCompressionPrompt,
               );
               const processingStatus = await processGeminiStreamEvents(
                 stream,
@@ -1048,6 +1052,7 @@ export const useGeminiStream = (
       setInitError,
       geminiClient,
       onAuthError,
+      onShowCompressionPrompt,
       config,
       startNewPrompt,
       getPromptCount,
