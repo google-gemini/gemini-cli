@@ -856,4 +856,94 @@ describe('DiscoveredMCPTool', () => {
       expect(description).toBe('{"param":"testValue","param2":"anotherOne"}');
     });
   });
+
+  it('should publish UPDATE_POLICY message on ProceedAlwaysServer when messageBus is present', async () => {
+    const mockMessageBus = {
+      publish: vi.fn(),
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    } as any;
+
+    const toolWithBus = new DiscoveredMCPTool(
+      mockCallableToolInstance,
+      serverName,
+      serverToolName,
+      baseDescription,
+      inputSchema,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      mockMessageBus,
+    );
+
+    const invocation = toolWithBus.build({ param: 'mock' });
+    // Mock getMessageBusDecision to return ASK_USER immediately
+    vi.spyOn(invocation as any, 'getMessageBusDecision').mockResolvedValue(
+      'ASK_USER',
+    );
+
+    const confirmation = await invocation.shouldConfirmExecute(
+      new AbortController().signal,
+    );
+
+    expect(confirmation).not.toBe(false);
+    if (
+      confirmation &&
+      typeof confirmation === 'object' &&
+      'onConfirm' in confirmation
+    ) {
+      await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlwaysServer);
+      expect(mockMessageBus.publish).toHaveBeenCalledWith({
+        type: 'update-policy',
+        toolName: `${serverName}__*`,
+      });
+    }
+  });
+
+  it('should publish UPDATE_POLICY message on ProceedAlwaysTool when messageBus is present', async () => {
+    const mockMessageBus = {
+      publish: vi.fn(),
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    } as any;
+
+    const toolWithBus = new DiscoveredMCPTool(
+      mockCallableToolInstance,
+      serverName,
+      serverToolName,
+      baseDescription,
+      inputSchema,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      mockMessageBus,
+    );
+
+    const invocation = toolWithBus.build({ param: 'mock' });
+    // Mock getMessageBusDecision to return ASK_USER immediately
+    vi.spyOn(invocation as any, 'getMessageBusDecision').mockResolvedValue(
+      'ASK_USER',
+    );
+
+    const confirmation = await invocation.shouldConfirmExecute(
+      new AbortController().signal,
+    );
+
+    expect(confirmation).not.toBe(false);
+    if (
+      confirmation &&
+      typeof confirmation === 'object' &&
+      'onConfirm' in confirmation
+    ) {
+      await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlwaysTool);
+      expect(mockMessageBus.publish).toHaveBeenCalledWith({
+        type: 'update-policy',
+        toolName: `${serverName}__${serverToolName}`,
+      });
+    }
+  });
 });
