@@ -13,6 +13,15 @@ import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { act } from 'react';
 import { waitFor } from '../../test-utils/async.js';
 
+// Mock the editor availability so the test runs the same on every computer
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original = await importOriginal<object>();
+  return {
+    ...original,
+    isEditorAvailable: vi.fn().mockReturnValue(false), // Always pretend an editor exists
+  };
+});
+
 // Mock editorSettingsManager
 vi.mock('../editors/editorSettingsManager.js', () => ({
   editorSettingsManager: {

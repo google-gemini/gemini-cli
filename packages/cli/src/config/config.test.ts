@@ -702,7 +702,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   //    readability, and content based on paths derived from the mocked os.homedir().
   // 3. Spies on console functions (for logger output) are correctly set up if needed.
   // Example of a previously failing test structure:
-  it.skip('should correctly use mocked homedir for global path', async () => {
+  it('should correctly use mocked homedir for global path', async () => {
     // This test is skipped because mockFs and fsPromises are not properly imported/mocked
     // TODO: Fix this test by properly setting up mock-fs and fs/promises mocks
     /*
