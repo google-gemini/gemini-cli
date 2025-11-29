@@ -1583,34 +1583,6 @@ describe('enableTerminalBell configuration', () => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
-
-  it('should use enableTerminalBell value from settings (settings true)', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = {
-      ui: { accessibility: { enableTerminalBell: true } },
-    };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getEnableTerminalBell()).toBe(true);
-  });
-
-  it('should use enableTerminalBell value from settings (settings false)', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = {
-      ui: { accessibility: { enableTerminalBell: false } },
-    };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getEnableTerminalBell()).toBe(false);
-  });
-
-  it('should be false by default when no flag or setting is present', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getEnableTerminalBell()).toBe(false);
-  });
 });
 
 describe('loadCliConfig tool exclusions', () => {

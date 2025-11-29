@@ -576,7 +576,7 @@ const SETTINGS_SCHEMA = {
             type: 'boolean',
             label: 'Enable Terminal Bell',
             category: 'UI',
-            requiresRestart: true,
+            requiresRestart: false,
             default: false,
             description: 'Ring the terminal bell when user input is required.',
             showInDialog: true,
