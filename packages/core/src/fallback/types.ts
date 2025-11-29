@@ -4,6 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { ModelSelectionResult } from '../availability/modelAvailabilityService.js';
+import type {
+  FailureKind,
+  FallbackAction,
+  ModelPolicy,
+} from '../availability/modelPolicy.js';
+
 /**
  * Defines the intent returned by the UI layer during a fallback scenario.
  */
@@ -13,6 +20,13 @@ export type FallbackIntent =
   | 'stop' // Switch to fallback for future requests, but stop the current request.
   | 'retry_later' // Stop the current request and do not fallback. Intend to try again later with the same model.
   | 'upgrade'; // Give user an option to upgrade the tier.
+
+export interface FallbackRecommendation extends ModelSelectionResult {
+  action: FallbackAction;
+  failureKind: FailureKind;
+  failedPolicy?: ModelPolicy;
+  selectedPolicy: ModelPolicy;
+}
 
 /**
  * The interface for the handler provided by the UI layer (e.g., the CLI)

@@ -156,6 +156,8 @@ Each server configuration supports the following properties:
 - **`targetServiceAccount`** (string): The email address of the Google Cloud
   Service Account to impersonate. Used with
   `authProviderType: 'service_account_impersonation'`.
+- **`useInstructions`** (boolean): If true will include the MCP server's
+  initialization instructions in the system instructions.
 
 ### OAuth Support for Remote MCP Servers
 

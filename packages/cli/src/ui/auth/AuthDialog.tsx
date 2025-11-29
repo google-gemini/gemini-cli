@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
@@ -17,13 +17,13 @@ import { SettingScope } from '../../config/settings.js';
 import {
   AuthType,
   clearCachedCredentialFile,
-  debugLogger,
   type Config,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { AuthState } from '../types.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { validateAuthMethodWithSettings } from './useAuth.js';
+import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
 
 interface AuthDialogProps {
   config: Config;
@@ -40,6 +40,7 @@ export function AuthDialog({
   authError,
   onAuthError,
 }: AuthDialogProps): React.JSX.Element {
+  const [exiting, setExiting] = useState(false);
   let items = [
     {
       label: 'Login with Google',
@@ -111,7 +112,13 @@ export function AuthDialog({
 
   const onSelect = useCallback(
     async (authType: AuthType | undefined, scope: LoadableSettingScope) => {
+      if (exiting) {
+        return;
+      }
       if (authType) {
+        const isInitialAuthSelection =
+          !settings.merged.security?.auth?.selectedType;
+
         await clearCachedCredentialFile();
 
         settings.setValue(scope, 'security.auth.selectedType', authType);
@@ -119,24 +126,27 @@ export function AuthDialog({
           authType === AuthType.LOGIN_WITH_GOOGLE &&
           config.isBrowserLaunchSuppressed()
         ) {
-          runExitCleanup();
-          debugLogger.log(
-            `
-----------------------------------------------------------------
-Logging in with Google... Please restart Gemini CLI to continue.
-----------------------------------------------------------------
-            `,
-          );
-          process.exit(0);
+          setExiting(true);
+          setTimeout(async () => {
+            await runExitCleanup();
+            process.exit(RELAUNCH_EXIT_CODE);
+          }, 100);
+          return;
         }
-      }
-      if (authType === AuthType.USE_GEMINI) {
-        setAuthState(AuthState.AwaitingApiKeyInput);
-        return;
+
+        if (authType === AuthType.USE_GEMINI) {
+          if (isInitialAuthSelection && process.env['GEMINI_API_KEY']) {
+            setAuthState(AuthState.Unauthenticated);
+            return;
+          } else {
+            setAuthState(AuthState.AwaitingApiKeyInput);
+            return;
+          }
+        }
       }
       setAuthState(AuthState.Unauthenticated);
     },
-    [settings, config, setAuthState],
+    [settings, config, setAuthState, exiting],
   );
 
   const handleAuthSelect = (authMethod: AuthType) => {
@@ -168,6 +178,23 @@ Logging in with Google... Please restart Gemini CLI to continue.
     },
     { isActive: true },
   );
+
+  if (exiting) {
+    return (
+      <Box
+        borderStyle="round"
+        borderColor={theme.border.focused}
+        flexDirection="row"
+        padding={1}
+        width="100%"
+        alignItems="flex-start"
+      >
+        <Text color={theme.text.primary}>
+          Logging in with Google... Restarting Gemini CLI to continue.
+        </Text>
+      </Box>
+    );
+  }
 
   return (
     <Box

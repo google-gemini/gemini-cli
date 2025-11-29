@@ -19,6 +19,8 @@ import {
   AuthType,
   OutputFormat,
   makeFakeConfig,
+  debugLogger,
+  ExitCodes,
 } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import * as auth from './config/auth.js';
@@ -35,6 +37,7 @@ describe('validateNonInterActiveAuth', () => {
   let originalEnvVertexAi: string | undefined;
   let originalEnvGcp: string | undefined;
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let debugLoggerErrorSpy: ReturnType<typeof vi.spyOn>;
   let processExitSpy: MockInstance;
   let refreshAuthMock: Mock;
   let mockSettings: LoadedSettings;
@@ -47,6 +50,9 @@ describe('validateNonInterActiveAuth', () => {
     delete process.env['GOOGLE_GENAI_USE_VERTEXAI'];
     delete process.env['GOOGLE_GENAI_USE_GCA'];
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    debugLoggerErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
     processExitSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation((code?: string | number | null | undefined) => {
@@ -111,12 +117,16 @@ describe('validateNonInterActiveAuth', () => {
       );
       expect.fail('Should have exited');
     } catch (e) {
-      expect((e as Error).message).toContain('process.exit(1) called');
+      expect((e as Error).message).toContain(
+        `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
+      );
     }
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining('Please set an Auth method'),
     );
-    expect(processExitSpy).toHaveBeenCalledWith(1);
+    expect(processExitSpy).toHaveBeenCalledWith(
+      ExitCodes.FATAL_AUTHENTICATION_ERROR,
+    );
   });
 
   it('uses LOGIN_WITH_GOOGLE if GOOGLE_GENAI_USE_GCA is set', async () => {
@@ -263,10 +273,14 @@ describe('validateNonInterActiveAuth', () => {
       );
       expect.fail('Should have exited');
     } catch (e) {
-      expect((e as Error).message).toContain('process.exit(1) called');
+      expect((e as Error).message).toContain(
+        `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
+      );
     }
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Auth error!');
-    expect(processExitSpy).toHaveBeenCalledWith(1);
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith('Auth error!');
+    expect(processExitSpy).toHaveBeenCalledWith(
+      ExitCodes.FATAL_AUTHENTICATION_ERROR,
+    );
   });
 
   it('skips validation if useExternalAuth is true', async () => {
@@ -287,7 +301,7 @@ describe('validateNonInterActiveAuth', () => {
     );
 
     expect(validateAuthMethodSpy).not.toHaveBeenCalled();
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
     expect(processExitSpy).not.toHaveBeenCalled();
     // We still expect refreshAuth to be called with the (invalid) type
     expect(refreshAuthMock).toHaveBeenCalledWith('invalid-auth-type');
@@ -324,12 +338,16 @@ describe('validateNonInterActiveAuth', () => {
       );
       expect.fail('Should have exited');
     } catch (e) {
-      expect((e as Error).message).toContain('process.exit(1) called');
+      expect((e as Error).message).toContain(
+        `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
+      );
     }
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       "The enforced authentication type is 'oauth-personal', but the current type is 'gemini-api-key'. Please re-authenticate with the correct type.",
     );
-    expect(processExitSpy).toHaveBeenCalledWith(1);
+    expect(processExitSpy).toHaveBeenCalledWith(
+      ExitCodes.FATAL_AUTHENTICATION_ERROR,
+    );
   });
 
   it('exits if auth from env var does not match enforcedAuthType', async () => {
@@ -349,16 +367,20 @@ describe('validateNonInterActiveAuth', () => {
       );
       expect.fail('Should have exited');
     } catch (e) {
-      expect((e as Error).message).toContain('process.exit(1) called');
+      expect((e as Error).message).toContain(
+        `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
+      );
     }
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       "The enforced authentication type is 'oauth-personal', but the current type is 'gemini-api-key'. Please re-authenticate with the correct type.",
     );
-    expect(processExitSpy).toHaveBeenCalledWith(1);
+    expect(processExitSpy).toHaveBeenCalledWith(
+      ExitCodes.FATAL_AUTHENTICATION_ERROR,
+    );
   });
 
   describe('JSON output mode', () => {
-    it('prints JSON error when no auth is configured and exits with code 1', async () => {
+    it(`prints JSON error when no auth is configured and exits with code ${ExitCodes.FATAL_AUTHENTICATION_ERROR}`, async () => {
       const nonInteractiveConfig = createLocalMockConfig({
         refreshAuth: refreshAuthMock,
         getOutputFormat: vi.fn().mockReturnValue(OutputFormat.JSON),
@@ -379,17 +401,19 @@ describe('validateNonInterActiveAuth', () => {
         thrown = e as Error;
       }
 
-      expect(thrown?.message).toBe('process.exit(1) called');
+      expect(thrown?.message).toBe(
+        `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
+      );
       const errorArg = consoleErrorSpy.mock.calls[0]?.[0] as string;
       const payload = JSON.parse(errorArg);
       expect(payload.error.type).toBe('Error');
-      expect(payload.error.code).toBe(1);
+      expect(payload.error.code).toBe(ExitCodes.FATAL_AUTHENTICATION_ERROR);
       expect(payload.error.message).toContain(
         'Please set an Auth method in your',
       );
     });
 
-    it('prints JSON error when enforced auth mismatches current auth and exits with code 1', async () => {
+    it(`prints JSON error when enforced auth mismatches current auth and exits with code ${ExitCodes.FATAL_AUTHENTICATION_ERROR}`, async () => {
       mockSettings.merged.security!.auth!.enforcedType = AuthType.USE_GEMINI;
       const nonInteractiveConfig = createLocalMockConfig({
         refreshAuth: refreshAuthMock,
@@ -411,19 +435,21 @@ describe('validateNonInterActiveAuth', () => {
         thrown = e as Error;
       }
 
-      expect(thrown?.message).toBe('process.exit(1) called');
+      expect(thrown?.message).toBe(
+        `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
+      );
       {
         const errorArg = consoleErrorSpy.mock.calls[0]?.[0] as string;
         const payload = JSON.parse(errorArg);
         expect(payload.error.type).toBe('Error');
-        expect(payload.error.code).toBe(1);
+        expect(payload.error.code).toBe(ExitCodes.FATAL_AUTHENTICATION_ERROR);
         expect(payload.error.message).toContain(
           "The enforced authentication type is 'gemini-api-key', but the current type is 'oauth-personal'. Please re-authenticate with the correct type.",
         );
       }
     });
 
-    it('prints JSON error when validateAuthMethod fails and exits with code 1', async () => {
+    it(`prints JSON error when validateAuthMethod fails and exits with code ${ExitCodes.FATAL_AUTHENTICATION_ERROR}`, async () => {
       vi.spyOn(auth, 'validateAuthMethod').mockReturnValue('Auth error!');
       process.env['GEMINI_API_KEY'] = 'fake-key';
 
@@ -447,12 +473,14 @@ describe('validateNonInterActiveAuth', () => {
         thrown = e as Error;
       }
 
-      expect(thrown?.message).toBe('process.exit(1) called');
+      expect(thrown?.message).toBe(
+        `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
+      );
       {
         const errorArg = consoleErrorSpy.mock.calls[0]?.[0] as string;
         const payload = JSON.parse(errorArg);
         expect(payload.error.type).toBe('Error');
-        expect(payload.error.code).toBe(1);
+        expect(payload.error.code).toBe(ExitCodes.FATAL_AUTHENTICATION_ERROR);
         expect(payload.error.message).toBe('Auth error!');
       }
     });
