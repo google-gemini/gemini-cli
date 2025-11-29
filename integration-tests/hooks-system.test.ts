@@ -929,4 +929,136 @@ echo '{"decision": "allow", "reason": "Telemetry test hook"}'`;
       expect(hookTelemetryFound).toBeTruthy();
     });
   });
+
+  describe('Session Lifecycle Hooks', () => {
+    it('should fire SessionStart hook on app startup', async () => {
+      // Create inline hook command that outputs JSON
+      const sessionStartCommand =
+        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"Session starting on startup\\"}"';
+
+      await rig.setup('should fire SessionStart hook on app startup', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.session-startup.responses',
+        ),
+        settings: {
+          tools: {
+            enableHooks: true,
+          },
+          hooks: {
+            SessionStart: [
+              {
+                matcher: 'startup',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: sessionStartCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      // Run a simple query - the SessionStart hook will fire during app initialization
+      const prompt = 'Say hello';
+      await rig.run(prompt);
+
+      // Verify hook executed with correct parameters
+      const hookLogs = rig.readHookLogs();
+      const sessionStartLog = hookLogs.find(
+        (log) => log.hookCall.hook_event_name === 'SessionStart',
+      );
+
+      expect(sessionStartLog).toBeDefined();
+      if (sessionStartLog) {
+        expect(sessionStartLog.hookCall.hook_name).toBe(sessionStartCommand);
+        expect(sessionStartLog.hookCall.exit_code).toBe(0);
+        expect(sessionStartLog.hookCall.hook_input).toBeDefined();
+
+        // hook_input is a string that needs to be parsed
+        const hookInputStr =
+          typeof sessionStartLog.hookCall.hook_input === 'string'
+            ? sessionStartLog.hookCall.hook_input
+            : JSON.stringify(sessionStartLog.hookCall.hook_input);
+        const hookInput = JSON.parse(hookInputStr) as Record<string, unknown>;
+
+        expect(hookInput['source']).toBe('startup');
+        expect(sessionStartLog.hookCall.stdout).toContain(
+          'Session starting on startup',
+        );
+      }
+    });
+  });
+
+  describe('Compression Hooks', () => {
+    it('should fire PreCompress hook on automatic compression', async () => {
+      // Create inline hook command that outputs JSON
+      const preCompressCommand =
+        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"PreCompress hook executed for automatic compression\\"}"';
+
+      await rig.setup('should fire PreCompress hook on automatic compression', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.compress-auto.responses',
+        ),
+        settings: {
+          tools: {
+            enableHooks: true,
+          },
+          hooks: {
+            PreCompress: [
+              {
+                matcher: 'auto',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: preCompressCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+          },
+          // Configure automatic compression with a very low threshold
+          // This will trigger auto-compression after the first response
+          contextCompression: {
+            enabled: true,
+            targetTokenCount: 10, // Very low threshold to trigger compression
+          },
+        },
+      });
+
+      // Run a simple query that will trigger automatic compression
+      const prompt = 'Say hello in exactly 5 words';
+      await rig.run(prompt);
+
+      // Verify hook executed with correct parameters
+      const hookLogs = rig.readHookLogs();
+      const preCompressLog = hookLogs.find(
+        (log) => log.hookCall.hook_event_name === 'PreCompress',
+      );
+
+      expect(preCompressLog).toBeDefined();
+      if (preCompressLog) {
+        expect(preCompressLog.hookCall.hook_name).toBe(preCompressCommand);
+        expect(preCompressLog.hookCall.exit_code).toBe(0);
+        expect(preCompressLog.hookCall.hook_input).toBeDefined();
+
+        // hook_input is a string that needs to be parsed
+        const hookInputStr =
+          typeof preCompressLog.hookCall.hook_input === 'string'
+            ? preCompressLog.hookCall.hook_input
+            : JSON.stringify(preCompressLog.hookCall.hook_input);
+        const hookInput = JSON.parse(hookInputStr) as Record<string, unknown>;
+
+        expect(hookInput['trigger']).toBe('auto');
+        expect(preCompressLog.hookCall.stdout).toContain(
+          'PreCompress hook executed for automatic compression',
+        );
+      }
+    });
+  });
 });
