@@ -15,6 +15,7 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
+import { getEncodingForBuffer } from './systemEncoding.js';
 
 const requireModule = createModuleRequire(import.meta.url);
 
@@ -168,8 +169,13 @@ export async function readFileWithEncoding(filePath: string): Promise<string> {
 
   const bom = detectBOM(full);
   if (!bom) {
-    // No BOM → treat as UTF‑8
-    return full.toString('utf8');
+    // No BOM. Try to detect encoding using chardet (via systemEncoding utility)
+    // Node.js 'latin1' covers ISO-8859-1.
+    // We also map ISO-8859-2, windows-1252 etc. to latin1 as a best-effort fallback
+    // for single-byte encodings, since Node doesn't natively support them all
+    // and we want to preserve bytes as much as possible for simple text.
+    const encoding = getEncodingForBuffer(full);
+    return full.toString(encoding);
   }
 
   // Strip BOM and decode per encoding
