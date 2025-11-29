@@ -5,28 +5,28 @@
  */
 
 import type {
+  Candidate,
   Content,
   ContentListUnion,
   ContentUnion,
-  GenerateContentConfig,
-  GenerateContentParameters,
   CountTokensParameters,
   CountTokensResponse,
-  GenerationConfigRoutingConfig,
-  MediaResolution,
-  Candidate,
-  ModelSelectionConfig,
+  GenerateContentConfig,
+  GenerateContentParameters,
   GenerateContentResponsePromptFeedback,
   GenerateContentResponseUsageMetadata,
+  GenerationConfigRoutingConfig,
+  MediaResolution,
+  ModelSelectionConfig,
   Part,
-  SafetySetting,
   PartUnion,
+  SafetySetting,
   SpeechConfigUnion,
   ThinkingConfig,
-  ToolListUnion,
   ToolConfig,
+  ToolListUnion,
 } from '@google/genai';
-import { GenerateContentResponse } from '@google/genai';
+import {GenerateContentResponse} from '@google/genai';
 
 export interface CAGenerateContentRequest {
   model: string;
@@ -178,18 +178,23 @@ function maybeToContent(content?: ContentUnion): Content | undefined {
 }
 
 function toContent(content: ContentUnion): Content {
+  const originalRole =
+    typeof content === 'object' && content !== null && 'role' in content
+      ? content.role
+      : 'user';
+
   if (Array.isArray(content)) {
     // it's a PartsUnion[]
     return {
-      role: 'user',
+      role: originalRole,
       parts: toParts(content),
     };
   }
   if (typeof content === 'string') {
     // it's a string
     return {
-      role: 'user',
-      parts: [{ text: content }],
+      role: originalRole,
+      parts: [{text: content}],
     };
   }
   if ('parts' in content) {
@@ -203,7 +208,7 @@ function toContent(content: ContentUnion): Content {
   }
   // it's a Part
   return {
-    role: 'user',
+    role: originalRole,
     parts: [toPart(content as Part)],
   };
 }
@@ -215,7 +220,7 @@ export function toParts(parts: PartUnion[]): Part[] {
 function toPart(part: PartUnion): Part {
   if (typeof part === 'string') {
     // it's a string
-    return { text: part };
+    return {text: part};
   }
 
   // Handle thought parts for CountToken API compatibility
@@ -224,7 +229,7 @@ function toPart(part: PartUnion): Part {
   if ('thought' in part && part.thought) {
     const thoughtText = `[Thought: ${part.thought}]`;
 
-    const newPart = { ...part };
+    const newPart = {...part};
     delete (newPart as Record<string, unknown>)['thought'];
 
     const hasApiContent =
@@ -240,7 +245,7 @@ function toPart(part: PartUnion): Part {
 
     // If no other valid API content, this must be a text part.
     // Combine existing text (if any) with the thought, preserving other properties.
-    const text = (newPart as { text?: unknown }).text;
+    const text = (newPart as {text?: unknown}).text;
     const existingText = text ? String(text) : '';
     const combinedText = existingText
       ? `${existingText}\n${thoughtText}`
