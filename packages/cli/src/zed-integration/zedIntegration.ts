@@ -444,6 +444,7 @@ export class Session {
           case ToolConfirmationOutcome.ProceedAlways:
           case ToolConfirmationOutcome.ProceedAlwaysServer:
           case ToolConfirmationOutcome.ProceedAlwaysTool:
+          case ToolConfirmationOutcome.ProceedAndAddToAllowed:
           case ToolConfirmationOutcome.ModifyWithEditor:
             break;
           default: {
@@ -873,67 +874,63 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
   }
 }
 
-const basicPermissionOptions = [
-  {
-    optionId: ToolConfirmationOutcome.ProceedOnce,
-    name: 'Allow',
-    kind: 'allow_once',
-  },
-  {
-    optionId: ToolConfirmationOutcome.Cancel,
-    name: 'Reject',
-    kind: 'reject_once',
-  },
-] as const;
-
 function toPermissionOptions(
   confirmation: ToolCallConfirmationDetails,
 ): acp.PermissionOption[] {
+  const options: acp.PermissionOption[] = [
+    {
+      optionId: ToolConfirmationOutcome.ProceedOnce,
+      name: 'Allow',
+      kind: 'allow_once',
+    },
+    {
+      optionId: ToolConfirmationOutcome.Cancel,
+      name: 'Reject',
+      kind: 'reject_once',
+    },
+  ];
+
+  // Add the 'Allow and add to allowed tools' option only for trusted folders
+  // and specific confirmation types
+  const trustedOption: acp.PermissionOption | null =
+    confirmation.type !== 'mcp'
+      ? {
+          optionId: ToolConfirmationOutcome.ProceedAndAddToAllowed,
+          name: 'Allow and add to allowed tools',
+          kind: 'allow_and_add_to_allowed',
+        }
+      : null;
+
+  if (trustedOption) {
+    options.splice(1, 0, trustedOption); // Insert before 'Reject'
+  }
+
   switch (confirmation.type) {
     case 'edit':
-      return [
-        {
-          optionId: ToolConfirmationOutcome.ProceedAlways,
-          name: 'Allow All Edits',
-          kind: 'allow_always',
-        },
-        ...basicPermissionOptions,
-      ];
     case 'exec':
-      return [
-        {
-          optionId: ToolConfirmationOutcome.ProceedAlways,
-          name: `Always Allow ${confirmation.rootCommand}`,
-          kind: 'allow_always',
-        },
-        ...basicPermissionOptions,
-      ];
-    case 'mcp':
-      return [
-        {
-          optionId: ToolConfirmationOutcome.ProceedAlwaysServer,
-          name: `Always Allow ${confirmation.serverName}`,
-          kind: 'allow_always',
-        },
-        {
-          optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
-          name: `Always Allow ${confirmation.toolName}`,
-          kind: 'allow_always',
-        },
-        ...basicPermissionOptions,
-      ];
     case 'info':
-      return [
-        {
-          optionId: ToolConfirmationOutcome.ProceedAlways,
-          name: `Always Allow`,
-          kind: 'allow_always',
-        },
-        ...basicPermissionOptions,
-      ];
+      options.unshift({
+        optionId: ToolConfirmationOutcome.ProceedAlways,
+        name: `Always Allow`,
+        kind: 'allow_always',
+      });
+      break;
+    case 'mcp':
+      options.unshift({
+        optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
+        name: `Always Allow ${confirmation.toolName}`,
+        kind: 'allow_always',
+      });
+      options.unshift({
+        optionId: ToolConfirmationOutcome.ProceedAlwaysServer,
+        name: `Always Allow ${confirmation.serverName}`,
+        kind: 'allow_always',
+      });
+      break;
     default: {
       const unreachable: never = confirmation;
       throw new Error(`Unexpected: ${unreachable}`);
     }
   }
+  return options;
 }
