@@ -39,6 +39,67 @@ interface AtCommandPart {
 }
 
 /**
+ * Checks if an @-prefixed string is likely a false positive (not a file path).
+ * Returns true if it matches common patterns that should NOT be treated as file paths.
+ *
+ * This prevents triggering expensive glob searches for common non-file patterns.
+ */
+export function isLikelyFalsePositive(atPath: string): boolean {
+  // Remove leading @ for pattern matching
+  const pathWithoutAt = atPath.startsWith('@') ? atPath.substring(1) : atPath;
+
+  // Empty string (lone @) should not be treated as false positive
+  // It will be handled specially in handleAtCommand
+  if (!pathWithoutAt) {
+    return false;
+  }
+
+  // Dot-relative paths (./, ../) are valid file paths - allow them
+  if (pathWithoutAt.startsWith('.')) {
+    return false;
+  }
+
+  // NPM scoped packages: @scope/package or @scope/package/subpath
+  // Matches: @angular/core, @types/node/fs, @babel/plugin-transform-runtime
+  // Pattern: word chars (+ optional dots), slash, more word chars/slashes
+  // This is more robust than the previous simple pattern
+  if (/^["\w.-]+\/["\w.-]+(\/["\w.-]+)*$/.test(pathWithoutAt)) {
+    // If path contains uppercase letters, it's likely a file path (e.g. Dockerfile, README)
+    // NPM packages are conventionally lowercase.
+    if (/[A-Z]/.test(pathWithoutAt)) {
+      return false;
+    }
+
+    // Additional check: if last segment has a dot, it's likely a file extension
+    // e.g., @myorg/scripts/deploy.sh, @myorg/config/app.conf
+    // npm package names CAN have dots (e.g., @org/foo.bar) but this is extremely rare
+    // in practice, so we err on the side of allowing files through
+    const lastSegment = pathWithoutAt.split('/').pop() || '';
+
+    // If last segment contains a dot, treat as potential file
+    // This catches: .sh, .env, .gradle, .conf, .json, .ts, etc.
+    if (lastSegment.includes('.')) {
+      return false;
+    }
+
+    return true; // Treat as npm package
+  }
+
+  // Bazel targets: contain // (e.g., @rules_nodejs//nodejs:nodejs)
+  if (pathWithoutAt.includes('//')) {
+    return true;
+  }
+
+  // NOTE: We deliberately don't try to detect "user mentions" like @username
+  // because it's impossible to distinguish from legitimate files without extensions
+  // (e.g., @README, @LICENSE, @Makefile, @Dockerfile).
+  // If @username doesn't exist as a file, the glob search will simply find no matches,
+  // which is the correct behavior.
+
+  return false;
+}
+
+/**
  * Parses a query string to find all '@<path>' commands and text segments.
  * Handles \ escaped spaces within paths.
  */
@@ -86,8 +147,8 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
         inEscape = false;
       } else if (char === '\\') {
         inEscape = true;
-      } else if (/[,\s;!?()[\]{}]/.test(char)) {
-        // Path ends at first whitespace or punctuation not escaped
+      } else if (/[,\s;!?()[\]{}'"]/.test(char)) {
+        // Path ends at first whitespace, punctuation, or quotes not escaped
         break;
       } else if (char === '.') {
         // For . we need to be more careful - only terminate if followed by whitespace or end of string
@@ -258,7 +319,13 @@ export async function handleAtCommand({
         resolvedSuccessfully = true;
       } catch (error) {
         if (isNodeError(error) && error.code === 'ENOENT') {
-          if (config.getEnableRecursiveFileSearch() && globTool) {
+          // ENOENT handling with False Positive Check
+          if (isLikelyFalsePositive(pathName)) {
+            onDebugMessage(
+              `Path ${pathName} does not exist and looks like a false positive (package name or Bazel target). Skipping glob search.`,
+            );
+            // Do nothing (implicitly skips resolution, falls back to text)
+          } else if (config.getEnableRecursiveFileSearch() && globTool) {
             onDebugMessage(
               `Path ${pathName} not found directly, attempting glob search.`,
             );
@@ -279,6 +346,27 @@ export async function handleAtCommand({
                 const lines = globResult.llmContent.split('\n');
                 if (lines.length > 1 && lines[1]) {
                   const firstMatchAbsolute = lines[1].trim();
+
+                  // Safety Check: If glob resolves to a directory, do NOT auto-read it.
+                  // This prevents "fuzzy matching" a directory like node_modules/@angular/core
+                  // and recursively reading thousands of files.
+                  // Users must type directory names explicitly if they want to read them.
+                  try {
+                    const matchStats = await fs.stat(firstMatchAbsolute);
+                    if (matchStats.isDirectory()) {
+                      onDebugMessage(
+                        `Glob search found a directory: ${firstMatchAbsolute}. Implicit recursive read disabled for safety. Path ${pathName} will be skipped.`,
+                      );
+                      continue; // Skip this match, effectively treating it as text
+                    }
+                  } catch (statError) {
+                    // If we can't stat the result of glob, something is wrong. Skip.
+                    debugLogger.warn(
+                      `Error stating glob match ${firstMatchAbsolute}: ${getErrorMessage(statError)}`,
+                    );
+                    continue;
+                  }
+
                   currentPathSpec = path.relative(dir, firstMatchAbsolute);
                   absoluteToRelativePathMap.set(
                     firstMatchAbsolute,
@@ -346,10 +434,13 @@ export async function handleAtCommand({
       ) {
         // Add space if previous part was text and didn't end with space, or if previous was @path
         const prevPart = commandParts[i - 1];
+        // Don't add space if preceded by opening punctuation/quotes
+        const endsWithOpener = /["'({[]$/.test(initialQueryText);
         if (
-          prevPart.type === 'text' ||
-          (prevPart.type === 'atPath' &&
-            atPathToResolvedSpecMap.has(prevPart.content))
+          !endsWithOpener &&
+          (prevPart.type === 'text' ||
+            (prevPart.type === 'atPath' &&
+              atPathToResolvedSpecMap.has(prevPart.content)))
         ) {
           initialQueryText += ' ';
         }
@@ -359,11 +450,14 @@ export async function handleAtCommand({
       } else {
         // If not resolved for reading (e.g. lone @ or invalid path that was skipped),
         // add the original @-string back, ensuring spacing if it's not the first element.
+        // Avoid adding space if preceded by opening punctuation/quotes
+        const endsWithOpener = /["'({[]$/.test(initialQueryText);
         if (
           i > 0 &&
           initialQueryText.length > 0 &&
           !initialQueryText.endsWith(' ') &&
-          !part.content.startsWith(' ')
+          !part.content.startsWith(' ') &&
+          !endsWithOpener
         ) {
           initialQueryText += ' ';
         }
