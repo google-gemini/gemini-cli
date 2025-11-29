@@ -4,6 +4,9 @@ Select your Gemini CLI model. The `/model` command opens a dialog where you can
 configure the model used by Gemini CLI, giving you more control over your
 results.
 
+**Note:** The `/model` command is only available when you have
+[model routing](./model-routing) enabled.
+
 ## How to use the `/model` command
 
 Use the following command in Gemini CLI:
