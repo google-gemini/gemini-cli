@@ -194,7 +194,7 @@ export const useExtensionUpdates = (
       addItem(
         {
           type: MessageType.INFO,
-          text: `You have ${extensionsWithUpdatesCount} extension${s} with an update available, run "/extensions list" for more information.`,
+          text: `You have ${extensionsWithUpdatesCount} extension${s} with an update available. Run "/extensions list" to view details or "/extensions update <name>" to upgrade.`,
         },
         Date.now(),
       );
