@@ -91,6 +91,7 @@ they appear in the UI.
 | Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                     | `false` |
 | Auto Accept                      | `tools.autoAccept`                   | Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).              | `false` |
 | Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance. | `true`  |
+| Ripgrep Max Matches              | `tools.ripgrep.maxMatches`           | Maximum number of matches returned by the ripgrep tool. Increase for large repos or lower to conserve context.  | `20000` |
 | Enable Tool Output Truncation    | `tools.enableToolOutputTruncation`   | Enable truncation of large tool outputs.                                                                        | `true`  |
 | Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Truncate tool output if it is larger than this many characters. Set to -1 to disable.                           | `10000` |
 | Tool Output Truncation Lines     | `tools.truncateToolOutputLines`      | The number of lines to keep when truncating tool output.                                                        | `100`   |
