@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { uiTelemetryService } from '@google/gemini-cli-core';
+import {
+  uiTelemetryService,
+  fireSessionEndHook,
+  fireSessionStartHook,
+  SessionEndReason,
+  SessionStartSource,
+} from '@google/gemini-cli-core';
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
 import { randomUUID } from 'node:crypto';
@@ -20,6 +26,12 @@ export const clearCommand: SlashCommand = {
       ?.getGeminiClient()
       ?.getChat()
       .getChatRecordingService();
+    const messageBus = config?.getMessageBus();
+
+    // Fire SessionEnd hook before clearing
+    if (messageBus) {
+      await fireSessionEndHook(messageBus, SessionEndReason.Clear);
+    }
 
     if (geminiClient) {
       context.ui.setDebugMessage('Clearing terminal and resetting chat.');
@@ -35,6 +47,11 @@ export const clearCommand: SlashCommand = {
       const newSessionId = randomUUID();
       config.setSessionId(newSessionId);
       chatRecordingService.initialize();
+    }
+
+    // Fire SessionStart hook after clearing
+    if (messageBus) {
+      await fireSessionStartHook(messageBus, SessionStartSource.Clear);
     }
 
     uiTelemetryService.setLastPromptTokenCount(0);

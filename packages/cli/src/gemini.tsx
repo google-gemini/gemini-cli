@@ -57,6 +57,10 @@ import {
   disableLineWrapping,
   shouldEnterAlternateScreen,
   ExitCodes,
+  SessionStartSource,
+  SessionEndReason,
+  fireSessionStartHook,
+  fireSessionEndHook,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -570,6 +574,22 @@ export async function main() {
     }
 
     await config.initialize();
+
+    // Fire SessionStart hook through MessageBus (only if hooks are enabled)
+    // Must be called AFTER config.initialize() to ensure HookRegistry is loaded
+    const hooksEnabled = config.getEnableHooks();
+    const hookMessageBus = config.getMessageBus();
+    if (hooksEnabled && hookMessageBus) {
+      const sessionStartSource = resumedSessionData
+        ? SessionStartSource.Resume
+        : SessionStartSource.Startup;
+      await fireSessionStartHook(hookMessageBus, sessionStartSource);
+
+      // Register SessionEnd hook for graceful exit
+      registerCleanup(async () => {
+        await fireSessionEndHook(hookMessageBus, SessionEndReason.Exit);
+      });
+    }
 
     // If not a TTY, read from stdin
     // This is for cases where the user pipes input directly into the command
