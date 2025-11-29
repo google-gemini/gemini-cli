@@ -128,12 +128,12 @@ describe('errors', () => {
         ).mockReturnValue(OutputFormat.TEXT);
       });
 
-      it('should log error message and re-throw', () => {
+      it('should log error message and exit', () => {
         const testError = new Error('Test error');
 
         expect(() => {
           handleError(testError, mockConfig);
-        }).toThrow(testError);
+        }).toThrow('process.exit called with code: 1');
 
         expect(consoleErrorSpy).toHaveBeenCalledWith('API Error: Test error');
       });
@@ -143,9 +143,19 @@ describe('errors', () => {
 
         expect(() => {
           handleError(testError, mockConfig);
-        }).toThrow(testError);
+        }).toThrow('process.exit called with code: 1');
 
         expect(consoleErrorSpy).toHaveBeenCalledWith('API Error: String error');
+      });
+
+      it('should use extracted exit code when available', () => {
+        const fatalError = new FatalInputError('Fatal error');
+
+        expect(() => {
+          handleError(fatalError, mockConfig);
+        }).toThrow('process.exit called with code: 42');
+
+        expect(consoleErrorSpy).toHaveBeenCalledWith('API Error: Fatal error');
       });
     });
 
