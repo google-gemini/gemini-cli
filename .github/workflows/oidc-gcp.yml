@@ -1,0 +1,24 @@
+name: OIDC GCP (Template)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  gcp-auth:
+    name: Authenticate to GCP via WIF (OIDC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Auth via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/{{GCP_PROJECT_NUMBER}}/locations/global/workloadIdentityPools/{{POOL_NAME}}/providers/{{PROVIDER_NAME}}"
+          service_account: "{{SERVICE_ACCOUNT_EMAIL}}"
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Verify account
+        run: gcloud auth list --filter=status:ACTIVE

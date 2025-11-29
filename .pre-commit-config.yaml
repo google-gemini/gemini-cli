@@ -1,0 +1,27 @@
+repos:
+  - repo: local
+    hooks:
+      - id: secret-scan
+        name: secret-scan
+        entry: .githooks/secret_scan.sh
+        language: script
+        types: [file]
+        stages: [commit]
+        exclude: |
+          (?x)^(
+            \.git/
+            | \.githooks/
+            | \.env\.example$
+            | node_modules/
+            | vendor/
+            | dist/
+            | build/
+            | \.venv/
+            | venv/
+            | __pycache__/
+            | target/
+            | \.next/
+            | \.turbo/
+            | \.pnpm-store/
+          )
+
