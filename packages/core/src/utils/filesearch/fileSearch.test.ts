@@ -32,7 +32,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -58,7 +58,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -86,7 +86,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -115,7 +115,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -148,7 +148,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -172,7 +172,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -207,7 +207,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -237,7 +237,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -267,7 +267,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     // Expect no errors to be thrown during initialization
@@ -294,7 +294,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -320,7 +320,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -346,7 +346,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: true,
+      enableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -372,7 +372,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -396,7 +396,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -427,7 +427,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await expect(fileSearch.search('')).rejects.toThrow(
@@ -449,7 +449,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -472,7 +472,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -496,7 +496,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -533,7 +533,7 @@ describe('FileSearch', () => {
       cache: true, // Enable caching for this test
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -573,7 +573,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -617,7 +617,7 @@ describe('FileSearch', () => {
       cache: true, // Ensure caching is enabled
       cacheTtl: 10000,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -655,7 +655,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
@@ -685,7 +685,7 @@ describe('FileSearch', () => {
         cache: false,
         cacheTtl: 0,
         enableRecursiveFileSearch: false,
-        disableFuzzySearch: false,
+        enableFuzzySearch: true,
       });
 
       await fileSearch.initialize();
@@ -710,7 +710,7 @@ describe('FileSearch', () => {
         cache: false,
         cacheTtl: 0,
         enableRecursiveFileSearch: false,
-        disableFuzzySearch: false,
+        enableFuzzySearch: true,
       });
 
       await fileSearch.initialize();
@@ -735,7 +735,7 @@ describe('FileSearch', () => {
         cache: false,
         cacheTtl: 0,
         enableRecursiveFileSearch: false,
-        disableFuzzySearch: false,
+        enableFuzzySearch: true,
       });
 
       await fileSearch.initialize();
@@ -758,7 +758,7 @@ describe('FileSearch', () => {
         cache: false,
         cacheTtl: 0,
         enableRecursiveFileSearch: false,
-        disableFuzzySearch: false,
+        enableFuzzySearch: true,
       });
 
       await fileSearch.initialize();
