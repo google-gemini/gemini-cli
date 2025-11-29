@@ -313,3 +313,23 @@ to the context, and then invoke your command:
 ```
 
 Gemini CLI will then execute the multi-line prompt defined in your TOML file.
+
+## Limitations
+
+### Balanced Braces Requirement
+
+When using the `!{...}` or `@{...}` syntax, the content _inside_ the braces must
+contain a balanced number of opening (`{`) and closing (`}`) braces. The parser
+uses this to find the end of the block.
+
+If you need to execute a shell command that contains unbalanced braces (for
+example, in an `awk` or `JSON` string), it is recommended to wrap your command
+in an external shell script and call that script from within the tag.
+
+**Example (Incorrect):** `!{awk '{print $1' file.txt}` (This will fail due to
+the unbalanced brace).
+
+**Example (Correct):** Create a script `my-script.sh`: `#!/bin/bash`
+`awk '{print $1' file.txt`
+
+Then, in your `.toml` file: `!{./my-script.sh}`
