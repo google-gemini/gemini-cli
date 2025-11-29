@@ -817,42 +817,34 @@ export function migrateDeprecatedSettings(
       | (Record<string, unknown> & typeof settings.context)
       | undefined;
 
-    // Migrate general.disableAutoUpdate -> general.enableAutoUpdate
-    if (
-      generalSettings &&
-      typeof generalSettings['disableAutoUpdate'] === 'boolean'
-    ) {
-      const oldValue = generalSettings['disableAutoUpdate'] as boolean;
-      debugLogger.log(
-        `Migrating deprecated general.disableAutoUpdate to general.enableAutoUpdate from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
-      );
-      const newGeneral: Record<string, unknown> = {
-        ...generalSettings,
-        enableAutoUpdate: !oldValue,
-      };
-      delete newGeneral['disableAutoUpdate'];
-      loadedSettings.setValue(scope, 'general', newGeneral);
-    }
+    // Migrate general settings (disableAutoUpdate, disableUpdateNag)
+    if (generalSettings) {
+      const newGeneral: Record<string, unknown> = { ...generalSettings };
+      let modified = false;
 
-    // Migrate general.disableUpdateNag -> general.enableUpdatePrompts
-    if (
-      generalSettings &&
-      typeof generalSettings['disableUpdateNag'] === 'boolean'
-    ) {
-      const oldValue = generalSettings['disableUpdateNag'] as boolean;
-      debugLogger.log(
-        `Migrating deprecated general.disableUpdateNag to general.enableUpdatePrompts from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
-      );
-      // Re-read in case we just updated it above
-      const currentGeneral = loadedSettings.forScope(scope).settings.general as
-        | Record<string, unknown>
-        | undefined;
-      const newGeneral: Record<string, unknown> = {
-        ...currentGeneral,
-        enableUpdatePrompts: !oldValue,
-      };
-      delete newGeneral['disableUpdateNag'];
-      loadedSettings.setValue(scope, 'general', newGeneral);
+      if (typeof newGeneral['disableAutoUpdate'] === 'boolean') {
+        const oldValue = newGeneral['disableAutoUpdate'] as boolean;
+        debugLogger.log(
+          `Migrating deprecated general.disableAutoUpdate to general.enableAutoUpdate from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+        );
+        newGeneral['enableAutoUpdate'] = !oldValue;
+        delete newGeneral['disableAutoUpdate'];
+        modified = true;
+      }
+
+      if (typeof newGeneral['disableUpdateNag'] === 'boolean') {
+        const oldValue = newGeneral['disableUpdateNag'] as boolean;
+        debugLogger.log(
+          `Migrating deprecated general.disableUpdateNag to general.enableUpdatePrompts from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+        );
+        newGeneral['enableUpdatePrompts'] = !oldValue;
+        delete newGeneral['disableUpdateNag'];
+        modified = true;
+      }
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'general', newGeneral);
+      }
     }
 
     // Migrate ui.accessibility.disableLoadingPhrases -> ui.accessibility.enableLoadingPhrases
