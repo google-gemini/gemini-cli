@@ -326,10 +326,18 @@ If you need to execute a shell command that contains unbalanced braces (for
 example, in an `awk` or `JSON` string), it is recommended to wrap your command
 in an external shell script and call that script from within the tag.
 
-**Example (Incorrect):** `!{awk '{print $1' file.txt}` (This will fail due to
-the unbalanced brace).
+**Example (Incorrect):** `!{echo '{'}` (This will fail due to the unbalanced
+brace).
 
-**Example (Correct):** Create a script `my-script.sh`: `#!/bin/bash`
-`awk '{print $1' file.txt`
+**Example (Correct):** Create a script `my-script.sh` with the following
+content:
 
-Then, in your `.toml` file: `!{./my-script.sh}`
+```sh
+
+#!/bin/bash
+
+echo '{'
+
+```
+
+Then, in your .toml file, call the script: `!{./my-script.sh}`
