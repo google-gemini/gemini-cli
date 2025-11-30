@@ -40,6 +40,49 @@ export function tmpdir(): string {
 }
 
 /**
+ * Common generic directory names that are not distinguishing in monorepo structures.
+ * When shortening paths, we prefer to show distinguishing segments (like package names)
+ * over these generic parent directories.
+ */
+const GENERIC_DIRS = new Set([
+  'packages',
+  'apps',
+  'libs',
+  'src',
+  'lib',
+  'dist',
+  'build',
+  'node_modules',
+  '..',
+]);
+
+/**
+ * Finds the index of the first distinguishing (non-generic) segment in a path.
+ * In monorepo structures like ['packages', 'frontend', 'src', ...], this returns
+ * the index of 'frontend' (1) since 'packages' is generic.
+ * If the first segment is already distinguishing (non-generic), returns 0.
+ * @param segments - Array of path segments (directories and filename)
+ * @returns Index of the first distinguishing segment, or 0 if the first is already distinguishing
+ */
+function findDistinguishingSegmentIndex(segments: string[]): number {
+  // If the first segment is not generic, keep it (return 0)
+  if (segments.length === 0 || !GENERIC_DIRS.has(segments[0].toLowerCase())) {
+    return 0;
+  }
+
+  // First segment is generic, find the first non-generic one
+  for (let i = 0; i < segments.length - 1; i++) {
+    if (
+      GENERIC_DIRS.has(segments[i].toLowerCase()) &&
+      !GENERIC_DIRS.has(segments[i + 1].toLowerCase())
+    ) {
+      return i + 1;
+    }
+  }
+  return 0;
+}
+
+/**
  * Replaces the home directory with a tilde.
  * @param path - The path to tildeify.
  * @returns The tildeified path.
@@ -122,15 +165,22 @@ export function shortenPath(filePath: string, maxLen: number = 35): string {
     return simpleTruncate();
   }
 
-  const firstDir = segments[0];
+  // Find the most distinguishing segment (e.g., package name instead of generic 'packages')
+  const distinguishingIndex = findDistinguishingSegmentIndex(segments);
+  const distinguishingDir = segments[distinguishingIndex];
   const lastSegment = segments[segments.length - 1];
-  const startComponent = root + firstDir;
+
+  // If distinguishing segment is not the first, use ellipsis prefix instead of root
+  const useEllipsisPrefix = distinguishingIndex > 0;
+  const startComponent = useEllipsisPrefix
+    ? '...' + separator + distinguishingDir
+    : root + distinguishingDir;
 
   const endPartSegments = [lastSegment];
   let endPartLength = lastSegment.length;
 
-  // Iterate backwards through the middle segments
-  for (let i = segments.length - 2; i > 0; i--) {
+  // Iterate backwards through the middle segments (after the distinguishing segment)
+  for (let i = segments.length - 2; i > distinguishingIndex; i--) {
     const segment = segments[i];
     const newLength =
       startComponent.length +
@@ -149,7 +199,7 @@ export function shortenPath(filePath: string, maxLen: number = 35): string {
     }
   }
 
-  const components = [firstDir, ...endPartSegments];
+  const components = [distinguishingDir, ...endPartSegments];
   const componentModes: TruncateMode[] = components.map((_, index) => {
     if (index === 0) {
       return 'start';
@@ -161,7 +211,9 @@ export function shortenPath(filePath: string, maxLen: number = 35): string {
   });
 
   const separatorsCount = endPartSegments.length + 1;
-  const fixedLen = root.length + separatorsCount * separator.length + 3; // ellipsis length
+  // When using ellipsis prefix, we have ".../" instead of root at the start
+  const prefixLen = useEllipsisPrefix ? 3 + separator.length : root.length;
+  const fixedLen = prefixLen + separatorsCount * separator.length + 3; // ellipsis length
   const availableForComponents = maxLen - fixedLen;
 
   const trailingFallback = () => {
@@ -243,7 +295,9 @@ export function shortenPath(filePath: string, maxLen: number = 35): string {
 
   const truncatedFirst = truncatedComponents[0];
   const truncatedEnd = truncatedComponents.slice(1).join(separator);
-  const result = `${root}${truncatedFirst}${separator}...${separator}${truncatedEnd}`;
+  // Use ellipsis prefix when the first segment is generic (like 'packages')
+  const prefix = useEllipsisPrefix ? '...' + separator : root;
+  const result = `${prefix}${truncatedFirst}${separator}...${separator}${truncatedEnd}`;
 
   if (result.length > maxLen) {
     return trailingFallback();
