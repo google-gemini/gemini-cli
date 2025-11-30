@@ -17,5 +17,6 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "vitest.disableWorkspaceWarning": true,
-  "githubPullRequests.ignoredPullRequestBranches": ["main"]
+  "githubPullRequests.ignoredPullRequestBranches": ["main"],
+  "github.copilot.nextEditSuggestions.enabled": true
 }
