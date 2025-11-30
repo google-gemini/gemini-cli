@@ -13,6 +13,7 @@ import {
   afterEach,
   type Mock,
   type MockedObject,
+  type MockInstance,
 } from 'vitest';
 import { render } from '../test-utils/render.js';
 import { waitFor } from '../test-utils/async.js';
@@ -1652,6 +1653,209 @@ describe('AppContainer State Management', () => {
           unmount();
         });
       }
+    });
+  });
+
+  describe('Terminal Bell', () => {
+    let stdoutSpy: MockInstance;
+
+    beforeEach(() => {
+      stdoutSpy = vi
+        .spyOn(process.stdout, 'write')
+        .mockImplementation(() => true);
+      vi.spyOn(mockConfig, 'getEnableTerminalBell').mockReturnValue(true);
+    });
+
+    it('should not ring bell on initial render', () => {
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(stdoutSpy).not.toHaveBeenCalledWith('\u0007');
+    });
+
+    it('should ring bell when streaming state becomes idle', () => {
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'responding',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      const { rerender } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(stdoutSpy).not.toHaveBeenCalledWith('\u0007');
+
+      // Simulate state change to idle
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(stdoutSpy).toHaveBeenCalledWith('\u0007');
+    });
+
+    it('should ring bell when streaming state is waiting for confirmation', () => {
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'responding',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      const { rerender } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(stdoutSpy).not.toHaveBeenCalledWith('\u0007');
+
+      // Simulate state change to idle
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'waiting_for_confirmation',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(stdoutSpy).toHaveBeenCalledWith('\u0007');
+    });
+
+    it('should not ring bell if model has not been responding', () => {
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      const { rerender } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(stdoutSpy).not.toHaveBeenCalledWith('\u0007');
+
+      // Simulate state change to idle
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'waiting_for_confirmation',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(stdoutSpy).not.toHaveBeenCalledWith('\u0007');
+    });
+
+    it('should not ring bell if setting is disabled', () => {
+      vi.spyOn(mockConfig, 'getEnableTerminalBell').mockReturnValue(false);
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'responding',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      const { rerender } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(stdoutSpy).not.toHaveBeenCalledWith('\u0007');
     });
   });
 

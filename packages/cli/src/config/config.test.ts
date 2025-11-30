@@ -1569,6 +1569,50 @@ describe('screenReader configuration', () => {
   });
 });
 
+describe('enableTerminalBell configuration', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should use enableTerminalBell value from settings (settings true)', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ui: { accessibility: { enableTerminalBell: true } },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getEnableTerminalBell()).toBe(true);
+  });
+
+  it('should use enableTerminalBell value from settings (settings false)', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ui: { accessibility: { enableTerminalBell: false } },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getEnableTerminalBell()).toBe(false);
+  });
+
+  it('should be false by default when no flag or setting is present', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getEnableTerminalBell()).toBe(false);
+  });
+});
+
 describe('loadCliConfig tool exclusions', () => {
   const originalIsTTY = process.stdin.isTTY;
 

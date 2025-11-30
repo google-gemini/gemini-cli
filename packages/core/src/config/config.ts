@@ -93,6 +93,7 @@ import { ApprovalMode } from '../policy/types.js';
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
   screenReader?: boolean;
+  enableTerminalBell?: boolean;
 }
 
 export interface BugCommandSettings {
@@ -1332,6 +1333,10 @@ export class Config {
   }
   getScreenReader(): boolean {
     return this.accessibility.screenReader ?? false;
+  }
+
+  getEnableTerminalBell(): boolean {
+    return this.accessibility.enableTerminalBell ?? false;
   }
 
   getEnablePromptCompletion(): boolean {
