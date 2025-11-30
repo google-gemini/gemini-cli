@@ -23,11 +23,7 @@ import { Storage } from '../config/storage.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
-import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
-// Mock dependencies for canUseRipgrep
-vi.mock('@joshua.litt/get-ripgrep', () => ({
-  downloadRipGrep: vi.fn(),
-}));
+import { downloadRipGrep } from '../third_party/get-ripgrep/src/index.js';
 
 // Mock child_process for ripgrep calls
 vi.mock('child_process', () => ({
@@ -35,7 +31,15 @@ vi.mock('child_process', () => ({
 }));
 
 const mockSpawn = vi.mocked(spawn);
-const downloadRipGrepMock = vi.mocked(downloadRipGrep);
+
+const { downloadRipGrepMock } = vi.hoisted(() => ({
+  downloadRipGrepMock: vi.fn(),
+}));
+
+vi.mock('../third_party/get-ripgrep/src/index.js', () => ({
+  downloadRipGrep: downloadRipGrepMock,
+}));
+
 const originalGetGlobalBinDir = Storage.getGlobalBinDir.bind(Storage);
 const storageSpy = vi.spyOn(Storage, 'getGlobalBinDir');
 
