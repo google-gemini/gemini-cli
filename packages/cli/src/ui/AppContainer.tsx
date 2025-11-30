@@ -58,6 +58,10 @@ import {
   enableMouseEvents,
   disableLineWrapping,
   shouldEnterAlternateScreen,
+  SessionStartSource,
+  SessionEndReason,
+  fireSessionStartHook,
+  fireSessionEndHook,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -280,14 +284,32 @@ export const AppContainer = (props: AppContainerProps) => {
       // handled by the global catch.
       await config.initialize();
       setConfigInitialized(true);
+
+      // Fire SessionStart hook through MessageBus (only if hooks are enabled)
+      // Must be called AFTER config.initialize() to ensure HookRegistry is loaded
+      const hooksEnabled = config.getEnableHooks();
+      const hookMessageBus = config.getMessageBus();
+      if (hooksEnabled && hookMessageBus) {
+        const sessionStartSource = resumedSessionData
+          ? SessionStartSource.Resume
+          : SessionStartSource.Startup;
+        await fireSessionStartHook(hookMessageBus, sessionStartSource);
+      }
     })();
     registerCleanup(async () => {
       // Turn off mouse scroll.
       disableMouseEvents();
       const ideClient = await IdeClient.getInstance();
       await ideClient.disconnect();
+
+      // Fire SessionEnd hook on cleanup (only if hooks are enabled)
+      const hooksEnabled = config.getEnableHooks();
+      const hookMessageBus = config.getMessageBus();
+      if (hooksEnabled && hookMessageBus) {
+        await fireSessionEndHook(hookMessageBus, SessionEndReason.Exit);
+      }
     });
-  }, [config]);
+  }, [config, resumedSessionData]);
 
   useEffect(
     () => setUpdateHandler(historyManager.addItem, setUpdateInfo),

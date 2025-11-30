@@ -19,3 +19,10 @@ export { HookEventHandler } from './hookEventHandler.js';
 export type { HookRegistryEntry, ConfigSource } from './hookRegistry.js';
 export type { AggregatedHookResult } from './hookAggregator.js';
 export type { HookEventContext } from './hookPlanner.js';
+
+// Export hook trigger functions
+export {
+  fireSessionStartHook,
+  fireSessionEndHook,
+  firePreCompressHook,
+} from '../core/sessionHookTriggers.js';
