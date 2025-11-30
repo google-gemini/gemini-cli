@@ -23,6 +23,16 @@ vi.mock('../editors/editorSettingsManager.js', () => ({
   },
 }));
 
+// Mock isEditorAvailable to avoid environment-dependent behavior
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...original,
+    isEditorAvailable: () => true,
+  };
+});
+
 describe('EditorSettingsDialog', () => {
   const mockSettings = {
     forScope: (scope: string) => ({
