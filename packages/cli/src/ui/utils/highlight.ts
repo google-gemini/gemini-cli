@@ -11,7 +11,7 @@ export type HighlightToken = {
   type: 'default' | 'command' | 'file';
 };
 
-const HIGHLIGHT_REGEX = /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[a-zA-Z0-9_./-])+)/g;
+const HIGHLIGHT_REGEX = /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[^,\s;!?()[\]{}])+)/g;
 
 export function parseInputForHighlighting(
   text: string,

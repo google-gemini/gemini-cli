@@ -52,6 +52,10 @@ export class McpClientManager {
     return this.blockedMcpServers;
   }
 
+  getClient(serverName: string): McpClient | undefined {
+    return this.clients.get(serverName);
+  }
+
   /**
    * For all the MCP servers associated with this extension:
    *
@@ -173,6 +177,7 @@ export class McpClientManager {
               config,
               this.toolRegistry,
               this.cliConfig.getPromptRegistry(),
+              this.cliConfig.getResourceRegistry(),
               this.cliConfig.getWorkspaceContext(),
               this.cliConfig.getDebugMode(),
             );
