@@ -70,8 +70,9 @@ function findDistinguishingSegmentIndex(segments: string[]): number {
     return 0;
   }
 
-  // First segment is generic, find the first non-generic one
-  for (let i = 0; i < segments.length - 1; i++) {
+  // First segment is generic, find the first non-generic directory (not filename)
+  // Use segments.length - 2 to exclude the filename from consideration
+  for (let i = 0; i < segments.length - 2; i++) {
     if (
       GENERIC_DIRS.has(segments[i].toLowerCase()) &&
       !GENERIC_DIRS.has(segments[i + 1].toLowerCase())
