@@ -358,6 +358,63 @@ describe('shortenPath', () => {
       expect(result).toBe('.../verylongname.txt');
       expect(result.length).toBeLessThanOrEqual(20);
     });
+
+    // Monorepo path tests - prioritize distinguishing segments over generic dirs
+    it('should keep package name instead of generic "packages" dir', () => {
+      const p = '/packages/frontend/src/router/index.ts';
+      // Force truncation - original is 38 chars, so use 35 to force shortening
+      // Should show: .../frontend/.../router/index.ts (preferring frontend over packages)
+      const result = shortenPath(p, 35);
+      expect(result).toBe('.../frontend/.../router/index.ts');
+      expect(result.length).toBeLessThanOrEqual(35);
+    });
+
+    it('should keep app name instead of generic "apps" dir', () => {
+      const p = '/apps/web-client/src/components/Button.tsx';
+      // Force truncation by using a smaller maxLen
+      const result = shortenPath(p, 38);
+      expect(result).toBe('.../web-client/.../Button.tsx');
+      expect(result.length).toBeLessThanOrEqual(38);
+    });
+
+    it('should handle deeply nested monorepo paths', () => {
+      const p = '/packages/shared/libs/utils/src/helpers/format.ts';
+      const result = shortenPath(p, 35);
+      expect(result).toBe('.../shared/.../helpers/format.ts');
+      expect(result.length).toBeLessThanOrEqual(35);
+    });
+
+    it('should keep first segment if it is already distinguishing', () => {
+      const p = '/my-project/src/components/Header.tsx';
+      const result = shortenPath(p, 35);
+      expect(result).toBe('/my-project/.../Header.tsx');
+      expect(result.length).toBeLessThanOrEqual(35);
+    });
+
+    it('should handle multiple generic segments at start', () => {
+      const p = '/packages/apps/mobile/src/screens/Home.tsx';
+      // With 32 chars: .../mobile/.../screens/Home.tsx (31 chars)
+      const result = shortenPath(p, 32);
+      expect(result).toBe('.../mobile/.../screens/Home.tsx');
+      expect(result.length).toBeLessThanOrEqual(32);
+    });
+
+    it('should handle libs directory as generic', () => {
+      const p = '/libs/shared-utils/src/index.ts';
+      // With 30 chars: .../shared-utils/.../index.ts (29 chars)
+      const result = shortenPath(p, 30);
+      expect(result).toBe('.../shared-utils/.../index.ts');
+      expect(result.length).toBeLessThanOrEqual(30);
+    });
+
+    it('should handle node_modules as generic', () => {
+      const p = '/node_modules/lodash/dist/lodash.js';
+      // Force truncation, keeping 'lodash' instead of 'node_modules'
+      // .../lodash/.../lodash.js (24 chars)
+      const result = shortenPath(p, 25);
+      expect(result).toBe('.../lodash/.../lodash.js');
+      expect(result.length).toBeLessThanOrEqual(25);
+    });
   });
 
   describe.skipIf(process.platform !== 'win32')('on Windows', () => {
