@@ -1165,7 +1165,16 @@ export class CoreToolScheduler {
             try {
               const toolResult: ToolResult = await promise;
               spanMetadata.output = toolResult;
-              if (signal.aborted) {
+
+              const hasContent =
+                toolResult.llmContent != null &&
+                (typeof toolResult.llmContent === 'string'
+                  ? toolResult.llmContent.length > 0
+                  : Array.isArray(toolResult.llmContent)
+                    ? toolResult.llmContent.length > 0
+                    : true);
+
+              if (signal.aborted && !hasContent) {
                 this.setStatusInternal(
                   callId,
                   'cancelled',
