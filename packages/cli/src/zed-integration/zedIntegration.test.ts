@@ -129,11 +129,6 @@ describe('GeminiAgent', () => {
   it('should authenticate correctly', async () => {
     await agent.authenticate({
       methodId: AuthType.LOGIN_WITH_GOOGLE,
-      authMethod: {
-        id: AuthType.LOGIN_WITH_GOOGLE,
-        name: 'Log in with Google',
-        description: null,
-      },
     });
 
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
