@@ -1717,6 +1717,14 @@ describe('loadCliConfig interactive', () => {
     expect(config.isInteractive()).toBe(false);
   });
 
+  it('should be interactive if --force-interactive is set without a TTY', async () => {
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js', '--force-interactive'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.isInteractive()).toBe(true);
+  });
+
   it('should not be interactive if prompt is set', async () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js', '--prompt', 'test'];

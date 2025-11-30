@@ -102,6 +102,7 @@ export async function runNonInteractive({
 
     const setupStdinCancellation = () => {
       // Only setup if stdin is a TTY (user can interact)
+      // Note: In force-interactive mode without real TTY, cancellation via stdin won't work
       if (!process.stdin.isTTY) {
         return;
       }
