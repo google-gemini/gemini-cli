@@ -27,7 +27,11 @@ describe('generate-settings-schema', () => {
     expect(schema.properties).toHaveProperty('$schema');
     expect(schema.properties.$schema).toEqual({
       type: 'string',
-      description: 'JSON Schema reference for IDE autocomplete and validation.',
+      title: 'Schema',
+      description:
+        'The URL of the JSON schema for this settings file. Used by editors for validation and autocompletion.',
+      default:
+        'https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json',
     });
   });
 });
