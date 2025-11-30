@@ -577,17 +577,15 @@ export class Config {
       initializeTelemetry(this);
     }
 
-    const proxy = this.getProxy();
-    if (proxy) {
-      try {
-        setGlobalProxy(proxy);
-      } catch (error) {
-        coreEvents.emitFeedback(
-          'error',
-          'Invalid proxy configuration detected. Check debug drawer for more details (F12)',
-          error,
-        );
-      }
+            const proxy = this.getProxy();
+    try {
+      setGlobalProxy(proxy);
+    } catch (error) {
+      coreEvents.emitFeedback(
+        'error',
+        'Invalid proxy/network configuration detected. Check debug drawer for more details (F12)',
+        error,
+      );
     }
     this.geminiClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);

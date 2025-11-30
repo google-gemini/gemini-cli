@@ -6,7 +6,7 @@
 
 import { getErrorMessage, isNodeError } from './errors.js';
 import { URL } from 'node:url';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import { ProxyAgent, setGlobalDispatcher, Agent } from 'undici';
 
 const PRIVATE_IP_RANGES = [
   /^10\./,
@@ -57,6 +57,22 @@ export async function fetchWithTimeout(
   }
 }
 
-export function setGlobalProxy(proxy: string) {
-  setGlobalDispatcher(new ProxyAgent(proxy));
+export function setGlobalProxy(proxy?: string) {
+  if (proxy) {
+    setGlobalDispatcher(new ProxyAgent(proxy));
+  } else {
+    // Use a robust Agent configuration to prevent "fetch failed" errors
+    // frequently seen on Windows due to stale Keep-Alive connections.
+    const agent = new Agent({
+      connect: {
+        // Disabling keepAlive prevents the client from trying to reuse
+        // a socket that might have been silently closed by the OS/firewall.
+        keepAlive: false,
+        timeout: 30_000,
+      },
+      headersTimeout: 30_000,
+      bodyTimeout: 30_000,
+    });
+    setGlobalDispatcher(agent);
+  }
 }
