@@ -202,6 +202,16 @@ export interface SlashCommand {
 
   kind: CommandKind;
 
+  /**
+   * Controls whether this command auto-executes when selected with Enter.
+   *
+   * If true, pressing Enter on the suggestion will execute the command immediately.
+   * If false, pressing Enter will autocomplete the command, allowing users to add arguments.
+   *
+   * When undefined, falls back to checking for completion function (backward compatibility).
+   */
+  autoExecute?: boolean;
+
   // Optional metadata for extension commands
   extensionName?: string;
   extensionId?: string;

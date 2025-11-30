@@ -6,6 +6,8 @@
 
 import { debugLogger } from '@google/gemini-cli-core';
 import clipboardy from 'clipboardy';
+import type { SlashCommand } from '../commands/types.js';
+import { CommandKind } from '../commands/types.js';
 
 /**
  * Checks if a query string potentially represents an '@' command.
@@ -72,3 +74,49 @@ export const getUrlOpenCommand = (): string => {
   }
   return openCmd;
 };
+
+/**
+ * Determines if a slash command should auto-execute when selected.
+ *
+ * A command is auto-executable if it:
+ * - Has an action (is executable)
+ * - Has no subcommands (is not a parent command)
+ * - Has autoExecute explicitly set to true, OR
+ * - Has no completion function and autoExecute is not explicitly false
+ * - Is NOT a custom command from .toml files (they often accept arguments)
+ *
+ * @param command The slash command to check
+ * @returns true if the command should auto-execute on Enter
+ */
+export function isAutoExecutableCommand(
+  command: SlashCommand | undefined,
+): boolean {
+  if (!command) {
+    return false;
+  }
+
+  // Custom commands from .toml files should not auto-execute
+  // They often accept arguments but have no completion metadata
+  if (command.kind === CommandKind.FILE) {
+    return false;
+  }
+
+  // Must have an action to be executable
+  if (!command.action) {
+    return false;
+  }
+
+  // Parent commands (with subcommands) should not auto-execute
+  if (command.subCommands && command.subCommands.length > 0) {
+    return false;
+  }
+
+  // Check explicit autoExecute field first
+  if (command.autoExecute !== undefined) {
+    return command.autoExecute;
+  }
+
+  // Fall back to checking completion function (backward compatibility)
+  // Commands with completion functions need arguments, so don't auto-execute
+  return command.completion === undefined;
+}
