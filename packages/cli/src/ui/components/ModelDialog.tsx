@@ -120,7 +120,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         </ThemedGradient>
         <Text>{subheader}</Text>
       </Box>
-
       <Box marginTop={1}>
         <DescriptiveRadioButtonSelect
           items={options}
@@ -131,7 +130,12 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       </Box>
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.text.secondary}>
-          {'To use a specific Gemini model on startup, use the --model flag.'}
+          Applies to this session and future Gemini CLI sessions.
+        </Text>
+      </Box>
+      <Box marginTop={1} flexDirection="column">
+        <Text color={theme.text.secondary}>
+          {'> To use a specific Gemini model on startup, use the --model flag.'}
         </Text>
       </Box>
       <Box marginTop={1} flexDirection="column">

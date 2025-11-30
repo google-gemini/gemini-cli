@@ -31,6 +31,7 @@ import {
   loadServerHierarchicalMemory,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
+import { saveModelChange, loadSettings } from './settings.js';
 
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -379,6 +380,8 @@ export async function loadCliConfig(
 ): Promise<Config> {
   const debugMode = isDebugMode(argv);
 
+  const loadedSettings = loadSettings(cwd);
+
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
   }
@@ -562,10 +565,12 @@ export async function loadCliConfig(
   );
 
   const defaultModel = DEFAULT_GEMINI_MODEL_AUTO;
+
   const resolvedModel: string =
     argv.model ||
     process.env['GEMINI_MODEL'] ||
     settings.model?.name ||
+    settings.model?.preferredModel ||
     defaultModel;
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
@@ -666,6 +671,7 @@ export async function loadCliConfig(
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.tools?.enableHooks ?? false,
     hooks: settings.hooks || {},
+    onModelChange: (model: string) => saveModelChange(loadedSettings, model),
   });
 }
 
