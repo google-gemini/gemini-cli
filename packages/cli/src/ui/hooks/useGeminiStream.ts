@@ -424,9 +424,15 @@ export const useGeminiStream = (
 
         if (!shellModeActive) {
           // Handle UI-only commands first
-          const slashCommandResult = isSlashCommand(trimmedQuery)
-            ? await handleSlashCommand(trimmedQuery)
-            : false;
+          let slashCommandResult: SlashCommandProcessorResult | false = false;
+          if (
+            trimmedQuery.toLowerCase() === 'exit' ||
+            trimmedQuery.toLowerCase() === 'quit'
+          ) {
+            slashCommandResult = await handleSlashCommand('/exit');
+          } else if (isSlashCommand(trimmedQuery)) {
+            slashCommandResult = await handleSlashCommand(trimmedQuery);
+          }
 
           if (slashCommandResult) {
             switch (slashCommandResult.type) {

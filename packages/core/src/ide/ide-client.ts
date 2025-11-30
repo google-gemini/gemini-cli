@@ -399,7 +399,13 @@ export class IdeClient {
       return;
     }
     for (const filePath of this.diffResponses.keys()) {
-      await this.closeDiff(filePath);
+      // We want to try to close the diff, but we don't want to block the
+      // disconnect for too long if the IDE is unresponsive.
+      const closeDiffPromise = this.closeDiff(filePath);
+      const timeoutPromise = new Promise<void>((resolve) =>
+        setTimeout(resolve, 2000),
+      );
+      await Promise.race([closeDiffPromise, timeoutPromise]);
     }
     this.diffResponses.clear();
     this.setState(
