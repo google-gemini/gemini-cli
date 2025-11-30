@@ -78,6 +78,12 @@ describe('editor utils', () => {
         commands: ['agy'],
         win32Commands: ['agy.cmd'],
       },
+      { editor: 'idea', commands: ['idea'], win32Commands: ['idea64.exe'] },
+      {
+        editor: 'pycharm',
+        commands: ['pycharm'],
+        win32Commands: ['pycharm64.exe'],
+      },
     ];
 
     for (const { editor, commands, win32Commands } of testCases) {
@@ -274,6 +280,35 @@ describe('editor utils', () => {
       });
     }
 
+    const jetbrainsEditors: Array<{
+      editor: EditorType;
+      command: string;
+      win32Command: string;
+    }> = [
+      { editor: 'idea', command: 'idea', win32Command: 'idea64.exe' },
+      { editor: 'pycharm', command: 'pycharm', win32Command: 'pycharm64.exe' },
+    ];
+
+    for (const { editor, command, win32Command } of jetbrainsEditors) {
+      it(`should return the correct command for ${editor} on non-windows`, () => {
+        Object.defineProperty(process, 'platform', { value: 'linux' });
+        const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+        expect(diffCommand).toEqual({
+          command,
+          args: ['diff', '--wait', 'old.txt', 'new.txt'],
+        });
+      });
+
+      it(`should return the correct command for ${editor} on windows`, () => {
+        Object.defineProperty(process, 'platform', { value: 'win32' });
+        const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+        expect(diffCommand).toEqual({
+          command: win32Command,
+          args: ['diff', '--wait', 'old.txt', 'new.txt'],
+        });
+      });
+    }
+
     const terminalEditors: Array<{
       editor: EditorType;
       command: string;
@@ -332,6 +367,8 @@ describe('editor utils', () => {
       'windsurf',
       'cursor',
       'zed',
+      'idea',
+      'pycharm',
     ];
 
     for (const editor of guiEditors) {
@@ -447,6 +484,8 @@ describe('editor utils', () => {
       'windsurf',
       'cursor',
       'zed',
+      'idea',
+      'pycharm',
     ];
     for (const editor of guiEditors) {
       it(`should not allow ${editor} in sandbox mode`, () => {
@@ -507,6 +546,18 @@ describe('editor utils', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/nvim'));
       vi.stubEnv('SANDBOX', 'sandbox');
       expect(isEditorAvailable('neovim')).toBe(true);
+    });
+
+    it('should return false for idea when installed and in sandbox mode', () => {
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/idea'));
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(isEditorAvailable('idea')).toBe(false);
+    });
+
+    it('should return false for pycharm when installed and in sandbox mode', () => {
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/pycharm'));
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(isEditorAvailable('pycharm')).toBe(false);
     });
   });
 });

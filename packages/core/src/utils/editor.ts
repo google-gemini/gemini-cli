@@ -17,7 +17,9 @@ export type EditorType =
   | 'neovim'
   | 'zed'
   | 'emacs'
-  | 'antigravity';
+  | 'antigravity'
+  | 'idea'
+  | 'pycharm';
 
 export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   vscode: 'VS Code',
@@ -29,6 +31,8 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   zed: 'Zed',
   emacs: 'Emacs',
   antigravity: 'Antigravity',
+  idea: 'IntelliJ IDEA',
+  pycharm: 'PyCharm',
 };
 
 export function getEditorDisplayName(editor: EditorType): string {
@@ -46,6 +50,8 @@ function isValidEditorType(editor: string): editor is EditorType {
     'zed',
     'emacs',
     'antigravity',
+    'idea',
+    'pycharm',
   ].includes(editor);
 }
 
@@ -83,6 +89,8 @@ const editorCommands: Record<
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
   emacs: { win32: ['emacs.exe'], default: ['emacs'] },
   antigravity: { win32: ['agy.cmd'], default: ['agy'] },
+  idea: { win32: ['idea64.exe'], default: ['idea'] },
+  pycharm: { win32: ['pycharm64.exe'], default: ['pycharm'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
@@ -95,9 +103,16 @@ export function checkHasEditorType(editor: EditorType): boolean {
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   const notUsingSandbox = !process.env['SANDBOX'];
   if (
-    ['vscode', 'vscodium', 'windsurf', 'cursor', 'zed', 'antigravity'].includes(
-      editor,
-    )
+    [
+      'vscode',
+      'vscodium',
+      'windsurf',
+      'cursor',
+      'zed',
+      'antigravity',
+      'idea',
+      'pycharm',
+    ].includes(editor)
   ) {
     return notUsingSandbox;
   }
@@ -176,6 +191,9 @@ export function getDiffCommand(
         command: 'emacs',
         args: ['--eval', `(ediff "${oldPath}" "${newPath}")`],
       };
+    case 'idea':
+    case 'pycharm':
+      return { command, args: ['diff', '--wait', oldPath, newPath] };
     default:
       return null;
   }
