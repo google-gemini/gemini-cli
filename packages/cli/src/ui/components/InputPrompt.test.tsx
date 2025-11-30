@@ -785,34 +785,34 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should auto-execute leaf commands on Enter when suggested', async () => {
-    const leafCommand: SlashCommand = {
-      name: 'leaf',
+  it('should auto-execute commands with autoExecute: true on Enter', async () => {
+    const aboutCommand: SlashCommand = {
+      name: 'about',
       kind: CommandKind.BUILT_IN,
-      description: 'Leaf command',
+      description: 'About command',
       action: vi.fn(),
-      // No subCommands, no completion -> isAutoExecutableCommand = true
+      autoExecute: true,
     };
 
-    const suggestion = { label: 'leaf', value: 'leaf' };
+    const suggestion = { label: 'about', value: 'about' };
 
     mockedUseCommandCompletion.mockReturnValue({
       ...mockCommandCompletion,
       showSuggestions: true,
       suggestions: [suggestion],
       activeSuggestionIndex: 0,
-      getCommandFromSuggestion: vi.fn().mockReturnValue(leafCommand),
-      getCompletedText: vi.fn().mockReturnValue('/leaf'),
+      getCommandFromSuggestion: vi.fn().mockReturnValue(aboutCommand),
+      getCompletedText: vi.fn().mockReturnValue('/about'),
       slashCompletionRange: {
         completionStart: 1,
-        completionEnd: 3, // "/le" -> start at 1, end at 3
+        completionEnd: 3, // "/ab" -> start at 1, end at 3
         getCommandFromSuggestion: vi.fn(),
       },
     });
 
     // User typed partial command
-    props.buffer.setText('/le');
-    props.buffer.lines = ['/le'];
+    props.buffer.setText('/ab');
+    props.buffer.lines = ['/ab'];
     props.buffer.cursor = [0, 3];
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
@@ -825,81 +825,35 @@ describe('InputPrompt', () => {
 
     await waitFor(() => {
       // Should submit the full command constructed from buffer + suggestion
-      expect(props.onSubmit).toHaveBeenCalledWith('/leaf');
+      expect(props.onSubmit).toHaveBeenCalledWith('/about');
       // Should NOT handle autocomplete (which just fills text)
       expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
     });
     unmount();
   });
 
-  it('should autocomplete parent commands with subcommands on Enter', async () => {
-    const mcpCommand: SlashCommand = {
-      name: 'mcp',
+  it('should autocomplete commands with autoExecute: false on Enter', async () => {
+    const shareCommand: SlashCommand = {
+      name: 'share',
       kind: CommandKind.BUILT_IN,
-      description: 'MCP management',
-      subCommands: [
-        {
-          name: 'list',
-          kind: CommandKind.BUILT_IN,
-          description: 'List MCP servers',
-          action: vi.fn(),
-        },
-      ],
-    };
-
-    const suggestion = { label: 'mcp', value: 'mcp' };
-
-    mockedUseCommandCompletion.mockReturnValue({
-      ...mockCommandCompletion,
-      showSuggestions: true,
-      suggestions: [suggestion],
-      activeSuggestionIndex: 0,
-      getCommandFromSuggestion: vi.fn().mockReturnValue(mcpCommand),
-      getCompletedText: vi.fn().mockReturnValue('/mcp'),
-    });
-
-    props.buffer.setText('/mc');
-    props.buffer.lines = ['/mc'];
-    props.buffer.cursor = [0, 3];
-
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
-
-    await act(async () => {
-      stdin.write('\r'); // Enter
-    });
-
-    await waitFor(() => {
-      // Should autocomplete to allow subcommand selection
-      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
-      expect(props.onSubmit).not.toHaveBeenCalled();
-    });
-    unmount();
-  });
-
-  it('should autocomplete commands with completion function on Enter', async () => {
-    const commandWithCompletion: SlashCommand = {
-      name: 'load',
-      kind: CommandKind.BUILT_IN,
-      description: 'Load a file',
+      description: 'Share conversation to file',
       action: vi.fn(),
-      completion: vi.fn(),
+      autoExecute: false, // Explicitly set to false
     };
 
-    const suggestion = { label: 'load', value: 'load' };
+    const suggestion = { label: 'share', value: 'share' };
 
     mockedUseCommandCompletion.mockReturnValue({
       ...mockCommandCompletion,
       showSuggestions: true,
       suggestions: [suggestion],
       activeSuggestionIndex: 0,
-      getCommandFromSuggestion: vi.fn().mockReturnValue(commandWithCompletion),
-      getCompletedText: vi.fn().mockReturnValue('/load'),
+      getCommandFromSuggestion: vi.fn().mockReturnValue(shareCommand),
+      getCompletedText: vi.fn().mockReturnValue('/share'),
     });
 
-    props.buffer.setText('/lo');
-    props.buffer.lines = ['/lo'];
+    props.buffer.setText('/sh');
+    props.buffer.lines = ['/sh'];
     props.buffer.cursor = [0, 3];
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
@@ -911,7 +865,7 @@ describe('InputPrompt', () => {
     });
 
     await waitFor(() => {
-      // Should autocomplete to allow argument entry
+      // Should autocomplete to allow adding file argument
       expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
       expect(props.onSubmit).not.toHaveBeenCalled();
     });
@@ -924,6 +878,7 @@ describe('InputPrompt', () => {
       kind: CommandKind.BUILT_IN,
       description: 'About info',
       action: vi.fn(),
+      autoExecute: true,
     };
 
     const suggestion = { label: 'about', value: 'about' };
@@ -957,51 +912,13 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should auto-execute subcommands like /mcp list on Enter', async () => {
-    const listSubCommand: SlashCommand = {
-      name: 'list',
-      kind: CommandKind.BUILT_IN,
-      description: 'List MCP servers',
-      action: vi.fn(),
-    };
-
-    const suggestion = { label: 'list', value: 'list' };
-
-    mockedUseCommandCompletion.mockReturnValue({
-      ...mockCommandCompletion,
-      showSuggestions: true,
-      suggestions: [suggestion],
-      activeSuggestionIndex: 0,
-      getCommandFromSuggestion: vi.fn().mockReturnValue(listSubCommand),
-      getCompletedText: vi.fn().mockReturnValue('/mcp list'),
-    });
-
-    props.buffer.setText('/mcp li');
-    props.buffer.lines = ['/mcp li'];
-    props.buffer.cursor = [0, 7];
-
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
-
-    await act(async () => {
-      stdin.write('\r'); // Enter
-    });
-
-    await waitFor(() => {
-      // Should execute the full subcommand
-      expect(props.onSubmit).toHaveBeenCalledWith('/mcp list');
-      expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
-    });
-    unmount();
-  });
-
   it('should autocomplete custom commands from .toml files on Enter', async () => {
     const customCommand: SlashCommand = {
       name: 'find-capital',
       kind: CommandKind.FILE,
       description: 'Find capital of a country',
       action: vi.fn(),
+      // No autoExecute flag - custom commands default to undefined
     };
 
     const suggestion = { label: 'find-capital', value: 'find-capital' };
@@ -1028,89 +945,9 @@ describe('InputPrompt', () => {
     });
 
     await waitFor(() => {
-      // Should autocomplete to allow adding arguments
+      // Should autocomplete (not execute) since autoExecute is undefined
       expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
       expect(props.onSubmit).not.toHaveBeenCalled();
-    });
-    unmount();
-  });
-
-  it('should autocomplete commands with autoExecute: false on Enter', async () => {
-    const shareCommand: SlashCommand = {
-      name: 'share',
-      kind: CommandKind.BUILT_IN,
-      description: 'Share conversation to file',
-      action: vi.fn(),
-      autoExecute: false, // Explicitly set to false
-    };
-
-    const suggestion = { label: 'share', value: 'share' };
-
-    mockedUseCommandCompletion.mockReturnValue({
-      ...mockCommandCompletion,
-      showSuggestions: true,
-      suggestions: [suggestion],
-      activeSuggestionIndex: 0,
-      getCommandFromSuggestion: vi.fn().mockReturnValue(shareCommand),
-      getCompletedText: vi.fn().mockReturnValue('/chat share'),
-    });
-
-    props.buffer.setText('/chat sh');
-    props.buffer.lines = ['/chat sh'];
-    props.buffer.cursor = [0, 8];
-
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
-
-    await act(async () => {
-      stdin.write('\r'); // Enter
-    });
-
-    await waitFor(() => {
-      // Should autocomplete to allow adding file argument
-      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
-      expect(props.onSubmit).not.toHaveBeenCalled();
-    });
-    unmount();
-  });
-
-  it('should auto-execute commands with autoExecute: true on Enter', async () => {
-    const quickCommand: SlashCommand = {
-      name: 'quick',
-      kind: CommandKind.BUILT_IN,
-      description: 'Quick command',
-      action: vi.fn(),
-      autoExecute: true, // Explicitly set to true
-    };
-
-    const suggestion = { label: 'quick', value: 'quick' };
-
-    mockedUseCommandCompletion.mockReturnValue({
-      ...mockCommandCompletion,
-      showSuggestions: true,
-      suggestions: [suggestion],
-      activeSuggestionIndex: 0,
-      getCommandFromSuggestion: vi.fn().mockReturnValue(quickCommand),
-      getCompletedText: vi.fn().mockReturnValue('/quick'),
-    });
-
-    props.buffer.setText('/qui');
-    props.buffer.lines = ['/qui'];
-    props.buffer.cursor = [0, 4];
-
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
-
-    await act(async () => {
-      stdin.write('\r'); // Enter
-    });
-
-    await waitFor(() => {
-      // Should auto-execute
-      expect(props.onSubmit).toHaveBeenCalledWith('/quick');
-      expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
     });
     unmount();
   });
