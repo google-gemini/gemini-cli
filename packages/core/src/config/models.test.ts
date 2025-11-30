@@ -162,13 +162,13 @@ describe('getEffectiveModel', () => {
     });
 
     describe('with preview features', () => {
-      it('should downgrade the Pro alias to the Flash model', () => {
+      it('should downgrade the Pro alias to the DEFAULT_GEMINI_MODEL model', () => {
         const model = getEffectiveModel(
           isInFallbackMode,
           GEMINI_MODEL_ALIAS_PRO,
           true,
         );
-        expect(model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+        expect(model).toBe(DEFAULT_GEMINI_MODEL);
       });
 
       it('should return the Flash alias when requested', () => {

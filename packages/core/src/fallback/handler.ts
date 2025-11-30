@@ -10,6 +10,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
+  getFallbackModel,
 } from '../config/models.js';
 import { logFlashFallback, FlashFallbackEvent } from '../telemetry/index.js';
 import { coreEvents } from '../utils/events.js';
@@ -40,7 +41,65 @@ export async function handleFallback(
   if (config.isModelAvailabilityServiceEnabled()) {
     return handlePolicyDrivenFallback(config, failedModel, authType, error);
   }
+
+  // Specialized handler for Preview Model to ensure correct fallback logic (to Pro, not Flash)
+  // This uses the new configuration-based fallback chain.
+  if (failedModel === PREVIEW_GEMINI_MODEL) {
+    return handlePreviewModelFallback(config, failedModel, authType, error);
+  }
+
   return legacyHandleFallback(config, failedModel, authType, error);
+}
+
+/**
+ * Handler specifically for the Preview Model.
+ * Uses the fallback chain to determine the best fallback model (e.g. 2.5 Pro).
+ */
+async function handlePreviewModelFallback(
+  config: Config,
+  failedModel: string,
+  authType?: string,
+  error?: unknown,
+): Promise<string | boolean | null> {
+  if (authType !== AuthType.LOGIN_WITH_GOOGLE) return null;
+
+  // Preview Model Fallback Logic (Probing) for transient errors
+  if (!(error instanceof TerminalQuotaError)) {
+    // Always set bypass mode for the immediate retry for non-TerminalQuotaErrors.
+    config.setPreviewModelBypassMode(true);
+
+    // If we are already in Preview Model fallback mode (user previously said "Always"),
+    // we silently retry.
+    if (config.isPreviewModelFallbackMode()) {
+      return true;
+    }
+  }
+
+  // Determine fallback model using the chain (e.g. 3-pro -> 2.5-pro)
+  const fallbackModel = getFallbackModel(failedModel);
+
+  const fallbackModelHandler = config.fallbackModelHandler;
+  if (typeof fallbackModelHandler !== 'function') return null;
+
+  try {
+    const intent = await fallbackModelHandler(
+      failedModel,
+      fallbackModel,
+      error,
+    );
+
+    return await processIntent(
+      config,
+      intent,
+      failedModel,
+      fallbackModel,
+      authType,
+      error,
+    );
+  } catch (handlerError) {
+    console.error('Preview Fallback UI handler failed:', handlerError);
+    return null;
+  }
 }
 
 /**
@@ -254,6 +313,9 @@ async function processIntent(
 function activateFallbackMode(config: Config, authType: string | undefined) {
   if (!config.isInFallbackMode()) {
     config.setFallbackMode(true);
+    // If we are hard-falling back, disable the Preview Model probing mode to avoid confusion
+    // and ensure we don't stick to 1-attempt retries.
+    config.setPreviewModelFallbackMode(false);
     coreEvents.emitFallbackModeChanged(true);
     if (authType) {
       logFlashFallback(config, new FlashFallbackEvent(authType));

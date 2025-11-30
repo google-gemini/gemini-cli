@@ -21,6 +21,22 @@ export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 // Cap the thinking at 8192 to prevent run-away thinking loops.
 export const DEFAULT_THINKING_MODE = 8192;
 
+export const FALLBACK_CHAIN: Record<string, string> = {
+  [PREVIEW_GEMINI_MODEL]: DEFAULT_GEMINI_MODEL,
+  [DEFAULT_GEMINI_MODEL]: DEFAULT_GEMINI_FLASH_MODEL,
+};
+
+/**
+ * Returns the fallback model for a given model.
+ * If no specific fallback is defined, returns the default Flash model.
+ *
+ * @param model The model to find a fallback for.
+ * @returns The fallback model.
+ */
+export function getFallbackModel(model: string): string {
+  return FALLBACK_CHAIN[model] ?? DEFAULT_GEMINI_FLASH_MODEL;
+}
+
 /**
  * Resolves the requested model alias (e.g., 'auto', 'pro', 'flash', 'flash-lite')
  * to a concrete model name, considering preview features.
@@ -84,8 +100,8 @@ export function getEffectiveModel(
     return resolvedModel;
   }
 
-  // Default fallback for Gemini CLI.
-  return DEFAULT_GEMINI_FLASH_MODEL;
+  // Use the defined fallback chain.
+  return getFallbackModel(resolvedModel);
 }
 
 /**
