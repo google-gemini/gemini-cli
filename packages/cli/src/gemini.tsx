@@ -280,11 +280,26 @@ export async function startInteractiveUI(
   registerCleanup(() => instance.unmount());
 }
 
+/**
+ * Detects if ACP mode is enabled by checking process.argv early, before
+ * argument parsing. This is needed because patchStdio() must be skipped
+ * in ACP mode to allow raw stdout for JSON-RPC communication.
+ */
+export function isAcpModeFromArgs(): boolean {
+  return process.argv.includes('--experimental-acp');
+}
+
 export async function main() {
-  const cleanupStdio = patchStdio();
+  // Skip stdio patching in ACP mode - ACP needs raw stdout for JSON-RPC
+  // communication. patchStdio redirects stdout to internal event handlers
+  // which would break ACP's JSON-RPC protocol.
+  const isAcpMode = isAcpModeFromArgs();
+  const cleanupStdio = isAcpMode ? () => {} : patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
-    initializeOutputListenersAndFlush();
+    if (!isAcpMode) {
+      initializeOutputListenersAndFlush();
+    }
     cleanupStdio();
   });
 

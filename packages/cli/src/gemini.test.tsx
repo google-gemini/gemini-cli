@@ -19,6 +19,7 @@ import {
   validateDnsResolutionOrder,
   startInteractiveUI,
   getNodeMemoryArgs,
+  isAcpModeFromArgs,
 } from './gemini.js';
 import os from 'node:os';
 import v8 from 'node:v8';
@@ -1257,6 +1258,205 @@ describe('validateDnsResolutionOrder', () => {
     expect(debugLoggerWarnSpy).toHaveBeenCalledExactlyOnceWith(
       'Invalid value for dnsResolutionOrder in settings: "invalid-value". Using default "ipv4first".',
     );
+  });
+});
+
+describe('isAcpModeFromArgs', () => {
+  let originalArgv: string[];
+
+  beforeEach(() => {
+    originalArgv = process.argv;
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+  });
+
+  it('should return true when --experimental-acp is in process.argv', () => {
+    process.argv = ['node', 'gemini', '--experimental-acp'];
+    expect(isAcpModeFromArgs()).toBe(true);
+  });
+
+  it('should return true when --experimental-acp is among other args', () => {
+    process.argv = [
+      'node',
+      'gemini',
+      '--debug',
+      '--experimental-acp',
+      '--yolo',
+    ];
+    expect(isAcpModeFromArgs()).toBe(true);
+  });
+
+  it('should return false when --experimental-acp is not present', () => {
+    process.argv = ['node', 'gemini', '--debug'];
+    expect(isAcpModeFromArgs()).toBe(false);
+  });
+
+  it('should return false for empty args', () => {
+    process.argv = [];
+    expect(isAcpModeFromArgs()).toBe(false);
+  });
+});
+
+describe('ACP mode stdio patching', () => {
+  let originalArgv: string[];
+  let originalEnvSandbox: string | undefined;
+
+  beforeEach(() => {
+    originalArgv = process.argv;
+    originalEnvSandbox = process.env['SANDBOX'];
+    delete process.env['SANDBOX'];
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    if (originalEnvSandbox !== undefined) {
+      process.env['SANDBOX'] = originalEnvSandbox;
+    } else {
+      delete process.env['SANDBOX'];
+    }
+    vi.restoreAllMocks();
+  });
+
+  it('should not call patchStdio when --experimental-acp is present', async () => {
+    const { patchStdio } = await import('@google/gemini-cli-core');
+    const { loadCliConfig, parseArguments } = await import(
+      './config/config.js'
+    );
+    const { loadSettings } = await import('./config/settings.js');
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    // Set --experimental-acp in argv
+    process.argv = ['node', 'gemini', '--experimental-acp'];
+
+    vi.mocked(loadSettings).mockReturnValue({
+      merged: {
+        advanced: {},
+        security: { auth: {} },
+        ui: {},
+      },
+      setValue: vi.fn(),
+      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      errors: [],
+    } as never);
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      experimentalAcp: true,
+    } as unknown as CliArgs);
+
+    const mockConfig = {
+      isInteractive: () => false,
+      getQuestion: () => '',
+      getSandbox: () => false,
+      getDebugMode: () => false,
+      getListExtensions: () => false,
+      getListSessions: () => false,
+      getDeleteSession: () => undefined,
+      getMcpServers: () => ({}),
+      getMcpClientManager: vi.fn(),
+      initialize: vi.fn(),
+      getIdeMode: () => false,
+      getExperimentalZedIntegration: () => true, // ACP mode
+      getScreenReader: () => false,
+      getGeminiMdFileCount: () => 0,
+      getPolicyEngine: vi.fn(),
+      getMessageBus: () => ({
+        subscribe: vi.fn(),
+      }),
+      getToolRegistry: vi.fn(),
+      getContentGeneratorConfig: vi.fn(),
+      getModel: () => 'gemini-pro',
+      getEmbeddingModel: () => 'embedding-001',
+      getApprovalMode: () => 'default',
+      getCoreTools: () => [],
+      getTelemetryEnabled: () => false,
+      getTelemetryLogPromptsEnabled: () => false,
+      getFileFilteringRespectGitIgnore: () => true,
+      getOutputFormat: () => 'text',
+      getExtensions: () => [],
+      getUsageStatisticsEnabled: () => false,
+      refreshAuth: vi.fn(),
+    } as unknown as Config;
+
+    vi.mocked(loadCliConfig).mockResolvedValue(mockConfig);
+
+    // Mock runZedIntegration to prevent further execution
+    vi.mock('./zed-integration/zedIntegration.js', () => ({
+      runZedIntegration: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    // Clear the patchStdio mock call count before running main
+    vi.mocked(patchStdio).mockClear();
+
+    try {
+      await main();
+    } catch (e) {
+      // Expected - may exit or throw
+      if (!(e instanceof MockProcessExitError)) {
+        // runZedIntegration may complete normally
+      }
+    }
+
+    // patchStdio should NOT have been called in ACP mode
+    expect(patchStdio).not.toHaveBeenCalled();
+
+    processExitSpy.mockRestore();
+  });
+
+  it('should call patchStdio when --experimental-acp is NOT present', async () => {
+    const { patchStdio } = await import('@google/gemini-cli-core');
+    const { parseArguments } = await import('./config/config.js');
+    const { loadSettings } = await import('./config/settings.js');
+    const { relaunchAppInChildProcess } = await import('./utils/relaunch.js');
+    const { loadSandboxConfig } = await import('./config/sandboxConfig.js');
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    // No --experimental-acp in argv
+    process.argv = ['node', 'gemini', '--prompt', 'hello'];
+
+    vi.mocked(loadSettings).mockReturnValue({
+      merged: {
+        advanced: {},
+        security: { auth: {} },
+        ui: {},
+      },
+      setValue: vi.fn(),
+      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      errors: [],
+    } as never);
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      experimentalAcp: false,
+    } as unknown as CliArgs);
+
+    vi.mocked(loadSandboxConfig).mockResolvedValue(undefined);
+    vi.mocked(relaunchAppInChildProcess).mockResolvedValue();
+
+    // Clear the patchStdio mock call count before running main
+    vi.mocked(patchStdio).mockClear();
+
+    try {
+      await main();
+    } catch (e) {
+      // Expected - relaunch will stop execution
+      if (!(e instanceof MockProcessExitError)) {
+        // May complete normally
+      }
+    }
+
+    // patchStdio SHOULD have been called in non-ACP mode
+    expect(patchStdio).toHaveBeenCalled();
+
+    processExitSpy.mockRestore();
   });
 });
 
