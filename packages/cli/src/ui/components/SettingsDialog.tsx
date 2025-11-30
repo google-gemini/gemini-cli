@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
+import { AsyncFzf } from 'fzf';
 import { theme } from '../semantic-colors.js';
 import type {
   LoadableSettingScope,
@@ -45,6 +46,14 @@ import { debugLogger } from '@google/gemini-cli-core';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { Config } from '@google/gemini-cli-core';
 
+interface FzfResult {
+  item: string;
+  start: number;
+  end: number;
+  score: number;
+  positions?: number[];
+}
+
 interface SettingsDialogProps {
   settings: LoadedSettings;
   onSelect: (settingName: string | undefined, scope: SettingScope) => void;
@@ -78,6 +87,65 @@ export function SettingsDialog({
   // Scroll offset for settings
   const [scrollOffset, setScrollOffset] = useState(0);
   const [showRestartPrompt, setShowRestartPrompt] = useState(false);
+
+  // Search state
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
+  const [fzfInstance, setFzfInstance] = useState<AsyncFzf<string[]> | null>(
+    null,
+  );
+  // Map to get key from search result (which could be label or key)
+  const [searchMap, setSearchMap] = useState<Map<string, string>>(new Map());
+
+  // Initialize FZF
+  useEffect(() => {
+    const keys = getDialogSettingKeys();
+    const map = new Map<string, string>();
+    const searchItems: string[] = [];
+
+    keys.forEach((key) => {
+      const def = getSettingDefinition(key);
+      // Add key
+      searchItems.push(key);
+      map.set(key.toLowerCase(), key);
+      // Add label if exists
+      if (def?.label) {
+        searchItems.push(def.label);
+        map.set(def.label.toLowerCase(), key);
+      }
+    });
+
+    const fzf = new AsyncFzf(searchItems, {
+      fuzzy: 'v2',
+      casing: 'case-insensitive',
+    });
+    setFzfInstance(fzf);
+    setSearchMap(map);
+    setFilteredKeys(keys); // Default to all
+  }, []);
+
+  // Perform search
+  useEffect(() => {
+    if (!searchQuery.trim() || !fzfInstance) {
+      setFilteredKeys(getDialogSettingKeys());
+      return;
+    }
+
+    const doSearch = async () => {
+      const results = await fzfInstance.find(searchQuery);
+      const matchedKeys = new Set<string>();
+      results.forEach((res: FzfResult) => {
+        const key = searchMap.get(res.item.toLowerCase());
+        if (key) matchedKeys.add(key);
+      });
+      setFilteredKeys(Array.from(matchedKeys));
+      setActiveSettingIndex(0); // Reset cursor
+      setScrollOffset(0);
+    };
+
+    doSearch();
+  }, [searchQuery, fzfInstance, searchMap]);
 
   // Local pending settings state for the selected scope
   const [pendingSettings, setPendingSettings] = useState<Settings>(() =>
@@ -127,7 +195,8 @@ export function SettingsDialog({
   }, [selectedScope, settings, globalPendingChanges]);
 
   const generateSettingsItems = () => {
-    const settingKeys = getDialogSettingKeys();
+    const settingKeys =
+      isSearching || searchQuery ? filteredKeys : getDialogSettingKeys();
 
     return settingKeys.map((key: string) => {
       const definition = getSettingDefinition(key);
@@ -493,6 +562,38 @@ export function SettingsDialog({
   useKeypress(
     (key) => {
       const { name } = key;
+
+      if (isSearching) {
+        if (keyMatchers[Command.ESCAPE](key)) {
+          setIsSearching(false);
+          setSearchQuery('');
+          return;
+        }
+        if (keyMatchers[Command.RETURN](key)) {
+          setIsSearching(false);
+          return;
+        }
+        if (name === 'backspace') {
+          setSearchQuery((prev) => prev.slice(0, -1));
+          return;
+        }
+        if (
+          key.sequence &&
+          key.sequence.length === 1 &&
+          !key.ctrl &&
+          !key.meta &&
+          !keyMatchers[Command.DIALOG_NAVIGATION_UP](key) &&
+          !keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)
+        ) {
+          setSearchQuery((prev) => prev + key.sequence);
+          return;
+        }
+      } else if (!editingKey && key.sequence === '/') {
+        setIsSearching(true);
+        setSearchQuery('');
+        return;
+      }
+
       if (name === 'tab' && showScopeSelection) {
         setFocusSection((prev) => (prev === 'settings' ? 'scope' : 'settings'));
       }
@@ -768,9 +869,16 @@ export function SettingsDialog({
       height="100%"
     >
       <Box flexDirection="column" flexGrow={1}>
-        <Text bold={focusSection === 'settings'} wrap="truncate">
-          {focusSection === 'settings' ? '> ' : '  '}Settings
-        </Text>
+        {isSearching || searchQuery ? (
+          <Text bold color={theme.text.accent} wrap="truncate">
+            {isSearching ? '> ' : '  '}Search: {searchQuery}
+            {isSearching ? '_' : ''}
+          </Text>
+        ) : (
+          <Text bold={focusSection === 'settings'} wrap="truncate">
+            {focusSection === 'settings' ? '> ' : '  '}Settings
+          </Text>
+        )}
         <Box height={1} />
         {showScrollUp && <Text color={theme.text.secondary}>▲</Text>}
         {visibleItems.map((item, idx) => {
@@ -912,6 +1020,7 @@ export function SettingsDialog({
         )}
 
         <Box height={1} />
+        <Text color={theme.text.secondary}>Press / to trigger search mode</Text>
         <Text color={theme.text.secondary}>
           (Use Enter to select
           {showScopeSelection ? ', Tab to change focus' : ''}, Esc to close)
