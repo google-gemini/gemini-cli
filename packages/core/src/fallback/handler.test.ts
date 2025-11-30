@@ -384,7 +384,7 @@ describe('handleFallback', () => {
       expect(mockConfig.setPreviewModelFallbackMode).toHaveBeenCalledWith(true);
     });
 
-    it('should activate regular fallback when handler returns "retry_always" and is TerminalQuotaError', async () => {
+    it('should activate regular fallback to DEFAULT_GEMINI_MODEL when handler returns "retry_always" and is TerminalQuotaError on PREVIEW_GEMINI_MODEL', async () => {
       mockHandler.mockResolvedValue('retry_always');
       const mockGoogleApiError = {
         code: 503,
@@ -404,8 +404,15 @@ describe('handleFallback', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockConfig.setPreviewModelFallbackMode).not.toBeCalled();
+      expect(mockConfig.setPreviewModelFallbackMode).toHaveBeenCalledWith(
+        false,
+      );
       expect(mockConfig.setFallbackMode).toHaveBeenCalledWith(true);
+      expect(mockHandler).toHaveBeenCalledWith(
+        PREVIEW_GEMINI_MODEL,
+        DEFAULT_GEMINI_MODEL,
+        terminalError,
+      );
     });
 
     it('should NOT set fallback mode if user chooses "retry_once"', async () => {
@@ -478,7 +485,7 @@ describe('handleFallback', () => {
       );
     });
 
-    it('should pass DEFAULT_GEMINI_FLASH_MODEL as fallback when Preview Model fails with other error', async () => {
+    it('should pass DEFAULT_GEMINI_MODEL as fallback when Preview Model fails with TerminalQuotaError', async () => {
       const mockGoogleApiError = {
         code: 429,
         message: 'mock error',
@@ -498,7 +505,7 @@ describe('handleFallback', () => {
 
       expect(mockConfig.fallbackModelHandler).toHaveBeenCalledWith(
         PREVIEW_GEMINI_MODEL,
-        DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_MODEL,
         terminalQuotaError,
       );
     });
