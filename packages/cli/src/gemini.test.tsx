@@ -1302,6 +1302,21 @@ describe('isAcpModeFromArgs', () => {
     process.argv = ['node', 'gemini', '--experimental-acp=true'];
     expect(isAcpModeFromArgs()).toBe(true);
   });
+
+  it('should return false when --experimental-acp=false', () => {
+    process.argv = ['node', 'gemini', '--experimental-acp=false'];
+    expect(isAcpModeFromArgs()).toBe(false);
+  });
+
+  it('should return false when --experimental-acp=0', () => {
+    process.argv = ['node', 'gemini', '--experimental-acp=0'];
+    expect(isAcpModeFromArgs()).toBe(false);
+  });
+
+  it('should handle case-insensitive false values', () => {
+    process.argv = ['node', 'gemini', '--experimental-acp=FALSE'];
+    expect(isAcpModeFromArgs()).toBe(false);
+  });
 });
 
 describe('ACP mode stdio patching', () => {
