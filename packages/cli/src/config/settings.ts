@@ -202,7 +202,7 @@ export interface SummarizeToolOutputSettings {
 }
 
 export interface AccessibilitySettings {
-  disableLoadingPhrases?: boolean;
+  enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
 
@@ -788,6 +788,8 @@ export function migrateDeprecatedSettings(
 ): void {
   const processScope = (scope: LoadableSettingScope) => {
     const settings = loadedSettings.forScope(scope).settings;
+
+    // Migrate deprecated extensions.disabled
     if (settings.extensions?.disabled) {
       debugLogger.log(
         `Migrating deprecated extensions.disabled settings from ${scope} settings...`,
@@ -800,6 +802,96 @@ export function migrateDeprecatedSettings(
       newExtensionsValue.disabled = undefined;
 
       loadedSettings.setValue(scope, 'extensions', newExtensionsValue);
+    }
+
+    // Migrate inverted boolean settings (disableX -> enableX)
+    // These settings were renamed and their boolean logic inverted
+    // We use type casting since the old keys are no longer in the Settings type
+    const generalSettings = settings.general as
+      | (Record<string, unknown> & typeof settings.general)
+      | undefined;
+    const uiSettings = settings.ui as
+      | (Record<string, unknown> & typeof settings.ui)
+      | undefined;
+    const contextSettings = settings.context as
+      | (Record<string, unknown> & typeof settings.context)
+      | undefined;
+
+    // Migrate general settings (disableAutoUpdate, disableUpdateNag)
+    if (generalSettings) {
+      const newGeneral: Record<string, unknown> = { ...generalSettings };
+      let modified = false;
+
+      if (typeof newGeneral['disableAutoUpdate'] === 'boolean') {
+        const oldValue = newGeneral['disableAutoUpdate'] as boolean;
+        debugLogger.log(
+          `Migrating deprecated general.disableAutoUpdate to general.enableAutoUpdate from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+        );
+        newGeneral['enableAutoUpdate'] = !oldValue;
+        delete newGeneral['disableAutoUpdate'];
+        modified = true;
+      }
+
+      if (typeof newGeneral['disableUpdateNag'] === 'boolean') {
+        const oldValue = newGeneral['disableUpdateNag'] as boolean;
+        debugLogger.log(
+          `Migrating deprecated general.disableUpdateNag to general.enableUpdatePrompts from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+        );
+        newGeneral['enableUpdatePrompts'] = !oldValue;
+        delete newGeneral['disableUpdateNag'];
+        modified = true;
+      }
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'general', newGeneral);
+      }
+    }
+
+    // Migrate ui.accessibility.disableLoadingPhrases -> ui.accessibility.enableLoadingPhrases
+    const accessibilitySettings = uiSettings?.accessibility as
+      | Record<string, unknown>
+      | undefined;
+    if (
+      accessibilitySettings &&
+      typeof accessibilitySettings['disableLoadingPhrases'] === 'boolean'
+    ) {
+      const oldValue = accessibilitySettings[
+        'disableLoadingPhrases'
+      ] as boolean;
+      debugLogger.log(
+        `Migrating deprecated ui.accessibility.disableLoadingPhrases to ui.accessibility.enableLoadingPhrases from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+      );
+      const newAccessibility: Record<string, unknown> = {
+        ...accessibilitySettings,
+        enableLoadingPhrases: !oldValue,
+      };
+      delete newAccessibility['disableLoadingPhrases'];
+      const newUi = { ...uiSettings, accessibility: newAccessibility };
+      loadedSettings.setValue(scope, 'ui', newUi);
+    }
+
+    // Migrate context.fileFiltering.disableFuzzySearch -> context.fileFiltering.enableFuzzySearch
+    const fileFilteringSettings = contextSettings?.fileFiltering as
+      | Record<string, unknown>
+      | undefined;
+    if (
+      fileFilteringSettings &&
+      typeof fileFilteringSettings['disableFuzzySearch'] === 'boolean'
+    ) {
+      const oldValue = fileFilteringSettings['disableFuzzySearch'] as boolean;
+      debugLogger.log(
+        `Migrating deprecated context.fileFiltering.disableFuzzySearch to context.fileFiltering.enableFuzzySearch from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+      );
+      const newFileFiltering: Record<string, unknown> = {
+        ...fileFilteringSettings,
+        enableFuzzySearch: !oldValue,
+      };
+      delete newFileFiltering['disableFuzzySearch'];
+      const newContext = {
+        ...contextSettings,
+        fileFiltering: newFileFiltering,
+      };
+      loadedSettings.setValue(scope, 'context', newContext);
     }
   };
 

@@ -2358,6 +2358,110 @@ describe('Settings Loading and Merging', () => {
       expect(mockDisableExtension).not.toHaveBeenCalled();
       expect(setValueSpy).not.toHaveBeenCalled();
     });
+
+    it('should migrate general.disableAutoUpdate to general.enableAutoUpdate with inverted value', () => {
+      const userSettingsContent = {
+        general: {
+          disableAutoUpdate: true,
+        },
+      };
+
+      (mockFsReadFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+      const extensionManager = new ExtensionManager({
+        settings: loadedSettings.merged,
+        workspaceDir: MOCK_WORKSPACE_DIR,
+        requestConsent: vi.fn(),
+        requestSetting: vi.fn(),
+      });
+
+      migrateDeprecatedSettings(loadedSettings, extensionManager);
+
+      // Should set new value to false (inverted from true)
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        expect.objectContaining({ enableAutoUpdate: false }),
+      );
+    });
+
+    it('should migrate all 4 inverted boolean settings', () => {
+      const userSettingsContent = {
+        general: {
+          disableAutoUpdate: false,
+          disableUpdateNag: true,
+        },
+        context: {
+          fileFiltering: {
+            disableFuzzySearch: false,
+          },
+        },
+        ui: {
+          accessibility: {
+            disableLoadingPhrases: true,
+          },
+        },
+      };
+
+      (mockFsReadFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+      const extensionManager = new ExtensionManager({
+        settings: loadedSettings.merged,
+        workspaceDir: MOCK_WORKSPACE_DIR,
+        requestConsent: vi.fn(),
+        requestSetting: vi.fn(),
+      });
+
+      migrateDeprecatedSettings(loadedSettings, extensionManager);
+
+      // Check that general settings were migrated with inverted values
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        expect.objectContaining({ enableAutoUpdate: true }),
+      );
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        expect.objectContaining({ enableUpdatePrompts: false }),
+      );
+
+      // Check context.fileFiltering was migrated
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'context',
+        expect.objectContaining({
+          fileFiltering: expect.objectContaining({ enableFuzzySearch: true }),
+        }),
+      );
+
+      // Check ui.accessibility was migrated
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'ui',
+        expect.objectContaining({
+          accessibility: expect.objectContaining({
+            enableLoadingPhrases: false,
+          }),
+        }),
+      );
+    });
   });
 
   describe('saveSettings', () => {

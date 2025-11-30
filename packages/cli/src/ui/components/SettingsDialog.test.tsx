@@ -1125,7 +1125,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: true,
-            disableAutoUpdate: true,
+            enableAutoUpdate: false,
             debugKeystrokeLogging: true,
             enablePromptCompletion: true,
           },
@@ -1136,7 +1136,7 @@ describe('SettingsDialog', () => {
             showLineNumbers: true,
             showCitations: true,
             accessibility: {
-              disableLoadingPhrases: true,
+              enableLoadingPhrases: false,
               screenReader: true,
             },
           },
@@ -1149,7 +1149,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: true,
               respectGeminiIgnore: true,
               enableRecursiveFileSearch: true,
-              disableFuzzySearch: false,
+              enableFuzzySearch: true,
             },
           },
           tools: {
@@ -1172,7 +1172,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            disableAutoUpdate: true,
+            enableAutoUpdate: false,
           },
           ui: {
             showMemoryUsage: true,
@@ -1210,7 +1210,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           ui: {
             accessibility: {
-              disableLoadingPhrases: true,
+              enableLoadingPhrases: false,
               screenReader: true,
             },
             showMemoryUsage: true,
@@ -1232,7 +1232,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: false,
               respectGeminiIgnore: true,
               enableRecursiveFileSearch: false,
-              disableFuzzySearch: true,
+              enableFuzzySearch: false,
             },
             loadMemoryFromIncludeDirectories: true,
             discoveryMaxDirs: 100,
@@ -1271,7 +1271,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            disableAutoUpdate: false,
+            enableAutoUpdate: true,
             debugKeystrokeLogging: false,
             enablePromptCompletion: false,
           },
@@ -1282,7 +1282,7 @@ describe('SettingsDialog', () => {
             showLineNumbers: false,
             showCitations: false,
             accessibility: {
-              disableLoadingPhrases: false,
+              enableLoadingPhrases: true,
               screenReader: false,
             },
           },
@@ -1295,7 +1295,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: false,
               respectGeminiIgnore: false,
               enableRecursiveFileSearch: false,
-              disableFuzzySearch: false,
+              enableFuzzySearch: true,
             },
           },
           tools: {
