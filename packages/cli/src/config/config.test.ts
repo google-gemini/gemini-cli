@@ -435,37 +435,15 @@ describe('parseArguments', () => {
     debugErrorSpy.mockRestore();
   });
 
-  it('should throw an error when resuming a session without prompt in non-interactive mode', async () => {
+  it('should allow resuming a session without prompt argument in non-interactive mode (expecting stdin)', async () => {
     const originalIsTTY = process.stdin.isTTY;
     process.stdin.isTTY = false;
     process.argv = ['node', 'script.js', '--resume', 'session-id'];
 
-    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
-
-    const mockConsoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
-    const debugErrorSpy = vi
-      .spyOn(debugLogger, 'error')
-      .mockImplementation(() => {});
-
     try {
-      await expect(parseArguments({} as Settings)).rejects.toThrow(
-        'process.exit called',
-      );
-
-      expect(debugErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'When resuming a session, you must provide a message via --prompt (-p) or stdin',
-        ),
-      );
-      expect(mockConsoleError).toHaveBeenCalled();
+      const argv = await parseArguments({} as Settings);
+      expect(argv.resume).toBe('session-id');
     } finally {
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
-      debugErrorSpy.mockRestore();
       process.stdin.isTTY = originalIsTTY;
     }
   });

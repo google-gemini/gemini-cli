@@ -36,6 +36,8 @@ vi.mock('@google/genai');
 vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
 vi.mock('../mcp/oauth-utils.js');
+vi.mock('google-auth-library');
+import { GoogleAuth } from 'google-auth-library';
 
 vi.mock('../utils/events.js', () => ({
   coreEvents: {
@@ -487,15 +489,17 @@ describe('mcp-client', () => {
           false,
         );
 
-        expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {
-            requestInit: { headers: {} },
-          }),
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
         );
       });
 
       it('with headers', async () => {
-        const transport = await createTransport(
+        // We need this to be an any type because we dig into its private state.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const transport: any = await createTransport(
           'test-server',
           {
             httpUrl: 'http://test-server',
@@ -503,14 +507,13 @@ describe('mcp-client', () => {
           },
           false,
         );
-
-        expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {
-            requestInit: {
-              headers: { Authorization: 'derp' },
-            },
-          }),
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
         );
+        const authHeader = transport._requestInit?.headers?.['Authorization'];
+        expect(authHeader).toBe('derp');
       });
     });
 
@@ -523,15 +526,17 @@ describe('mcp-client', () => {
           },
           false,
         );
-        expect(transport).toEqual(
-          new SSEClientTransport(new URL('http://test-server'), {
-            requestInit: { headers: {} },
-          }),
+        expect(transport).toBeInstanceOf(SSEClientTransport);
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
         );
       });
 
       it('with headers', async () => {
-        const transport = await createTransport(
+        // We need this to be an any type because we dig into its private state.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const transport: any = await createTransport(
           'test-server',
           {
             url: 'http://test-server',
@@ -539,14 +544,13 @@ describe('mcp-client', () => {
           },
           false,
         );
-
-        expect(transport).toEqual(
-          new SSEClientTransport(new URL('http://test-server'), {
-            requestInit: {
-              headers: { Authorization: 'derp' },
-            },
-          }),
+        expect(transport).toBeInstanceOf(SSEClientTransport);
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
         );
+        const authHeader = transport._requestInit?.headers?.['Authorization'];
+        expect(authHeader).toBe('derp');
       });
     });
 
@@ -576,6 +580,16 @@ describe('mcp-client', () => {
     });
 
     describe('useGoogleCredentialProvider', () => {
+      beforeEach(() => {
+        // Mock GoogleAuth client
+        const mockClient = {
+          getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+          quotaProjectId: 'myproject',
+        };
+
+        GoogleAuth.prototype.getClient = vi.fn().mockResolvedValue(mockClient);
+      });
+
       it('should use GoogleCredentialProvider when specified', async () => {
         const transport = await createTransport(
           'test-server',
@@ -601,6 +615,64 @@ describe('mcp-client', () => {
           'X-Goog-User-Project'
         ];
         expect(googUserProject).toBe('myproject');
+      });
+
+      it('should use headers from GoogleCredentialProvider', async () => {
+        const mockGetRequestHeaders = vi.fn().mockResolvedValue({
+          'X-Goog-User-Project': 'provider-project',
+        });
+        vi.spyOn(
+          GoogleCredentialProvider.prototype,
+          'getRequestHeaders',
+        ).mockImplementation(mockGetRequestHeaders);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test.googleapis.com',
+            authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
+          },
+          false,
+        );
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(mockGetRequestHeaders).toHaveBeenCalled();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const headers = (transport as any)._requestInit?.headers;
+        expect(headers['X-Goog-User-Project']).toBe('provider-project');
+      });
+
+      it('should prioritize provider headers over config headers', async () => {
+        const mockGetRequestHeaders = vi.fn().mockResolvedValue({
+          'X-Goog-User-Project': 'provider-project',
+        });
+        vi.spyOn(
+          GoogleCredentialProvider.prototype,
+          'getRequestHeaders',
+        ).mockImplementation(mockGetRequestHeaders);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test.googleapis.com',
+            authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
+            headers: {
+              'X-Goog-User-Project': 'config-project',
+            },
+          },
+          false,
+        );
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const headers = (transport as any)._requestInit?.headers;
+        expect(headers['X-Goog-User-Project']).toBe('provider-project');
       });
 
       it('should use GoogleCredentialProvider with SSE transport', async () => {

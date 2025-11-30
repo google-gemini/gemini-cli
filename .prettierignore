@@ -18,3 +18,4 @@ eslint.config.js
 gha-creds-*.json
 junit.xml
 Thumbs.db
+.pytest_cache
