@@ -30,7 +30,7 @@ export const clearCommand: SlashCommand = {
     const messageBus = config?.getMessageBus();
 
     // Fire SessionEnd hook before clearing
-    if (messageBus) {
+    if (config?.getEnableHooks() && messageBus) {
       await fireSessionEndHook(messageBus, SessionEndReason.Clear);
     }
 
@@ -51,7 +51,7 @@ export const clearCommand: SlashCommand = {
     }
 
     // Fire SessionStart hook after clearing
-    if (messageBus) {
+    if (config?.getEnableHooks() && messageBus) {
       await fireSessionStartHook(messageBus, SessionStartSource.Clear);
     }
 

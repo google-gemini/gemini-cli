@@ -342,22 +342,9 @@ echo '{
           ),
         },
       );
-      // Create a hook script that restricts available tools
-      const hookScript = `#!/bin/bash
-echo '{
-  "hookSpecificOutput": {
-    "hookEventName": "BeforeToolSelection",
-    "toolConfig": {
-      "mode": "ANY",
-      "allowedFunctionNames": ["read_file", "run_shell_command"]
-    }
-  }
-}'`;
-
-      const scriptPath = join(rig.testDir!, 'before_tool_selection_hook.sh');
-      writeFileSync(scriptPath, hookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${scriptPath}"`);
+      // Create inline hook command (works on both Unix and Windows)
+      const hookCommand =
+        'echo "{\\"hookSpecificOutput\\": {\\"hookEventName\\": \\"BeforeToolSelection\\", \\"toolConfig\\": {\\"mode\\": \\"ANY\\", \\"allowedFunctionNames\\": [\\"read_file\\", \\"run_shell_command\\"]}}}"';
 
       await rig.setup(
         'should modify tool selection with BeforeToolSelection hooks',
@@ -373,7 +360,7 @@ echo '{
                   hooks: [
                     {
                       type: 'command',
-                      command: scriptPath,
+                      command: hookCommand,
                       timeout: 5000,
                     },
                   ],
@@ -465,26 +452,22 @@ echo '{
     });
   });
 
-  describe.skip('Notification Hooks - Permission Handling', () => {
+  describe('Notification Hooks - Permission Handling', () => {
     it('should handle notification hooks for tool permissions', async () => {
-      await rig.setup('should handle notification hooks for tool permissions');
-      // Create a hook script that logs notification events
-      const hookScript = `#!/bin/bash
-echo '{
-  "suppressOutput": false,
-  "systemMessage": "Permission request logged by security hook"
-}'`;
-
-      const scriptPath = join(rig.testDir!, 'notification_hook.sh');
-      writeFileSync(scriptPath, hookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${scriptPath}"`);
+      // Create inline hook command (works on both Unix and Windows)
+      const hookCommand =
+        'echo "{\\"suppressOutput\\": false, \\"systemMessage\\": \\"Permission request logged by security hook\\"}"';
 
       await rig.setup('should handle notification hooks for tool permissions', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.notification.responses',
+        ),
         settings: {
           // Configure tools to enable hooks and require confirmation to trigger notifications
           tools: {
             enableHooks: true,
+            approval: 'ASK', // Disable YOLO mode to show permission prompts
             confirmationRequired: ['run_shell_command'],
           },
           hooks: {
@@ -494,7 +477,7 @@ echo '{
                 hooks: [
                   {
                     type: 'command',
-                    command: scriptPath,
+                    command: hookCommand,
                     timeout: 5000,
                   },
                 ],
@@ -504,120 +487,132 @@ echo '{
         },
       });
 
-      const prompt =
-        'Run the command "echo test" (this should trigger a permission prompt)';
+      const run = await rig.runInteractive({ yolo: false });
 
-      // Use stdin to automatically approve the permission
-      await rig.run({
-        prompt,
-        stdin: 'y\n', // Approve the permission
-      });
+      // Send prompt that will trigger a permission request
+      await run.type('Run the command "echo test"');
+      await run.type('\r');
+
+      // Wait for permission prompt to appear
+      await run.expectText('Allow', 10000);
+
+      // Approve the permission
+      await run.type('y');
+      await run.type('\r');
+
+      // Wait for command to execute
+      await run.expectText('test', 10000);
 
       // Should find the shell command execution
       const foundShellCommand = await rig.waitForToolCall('run_shell_command');
       expect(foundShellCommand).toBeTruthy();
 
-      // Should generate hook telemetry
-      const hookTelemetryFound = await rig.waitForTelemetryEvent('hook_call');
-      expect(hookTelemetryFound).toBeTruthy();
+      // Verify Notification hook executed
+      const hookLogs = rig.readHookLogs();
+      const notificationLog = hookLogs.find(
+        (log) =>
+          log.hookCall.hook_event_name === 'Notification' &&
+          log.hookCall.hook_name === hookCommand,
+      );
+
+      expect(notificationLog).toBeDefined();
+      if (notificationLog) {
+        expect(notificationLog.hookCall.exit_code).toBe(0);
+        expect(notificationLog.hookCall.stdout).toContain(
+          'Permission request logged by security hook',
+        );
+
+        // Verify hook input contains notification details
+        const hookInputStr =
+          typeof notificationLog.hookCall.hook_input === 'string'
+            ? notificationLog.hookCall.hook_input
+            : JSON.stringify(notificationLog.hookCall.hook_input);
+        const hookInput = JSON.parse(hookInputStr) as Record<string, unknown>;
+
+        // Should have notification type (uses snake_case)
+        expect(hookInput['notification_type']).toBe('ToolPermission');
+
+        // Should have message
+        expect(hookInput['message']).toBeDefined();
+
+        // Should have details with tool info
+        expect(hookInput['details']).toBeDefined();
+        const details = hookInput['details'] as Record<string, unknown>;
+        // For 'exec' type confirmations, details contains: type, title, command, rootCommand
+        expect(details['type']).toBe('exec');
+        expect(details['command']).toBeDefined();
+        expect(details['title']).toBeDefined();
+      }
     });
   });
 
   describe('Sequential Hook Execution', () => {
-    // Note: This test checks telemetry for hook context in API requests,
-    // which behaves differently with mocked responses. Keeping real LLM calls.
-    it.skipIf(process.platform === 'win32')(
-      'should execute hooks sequentially when configured',
-      async () => {
-        await rig.setup('should execute hooks sequentially when configured');
-        // Create two hooks that modify the input sequentially
-        const hook1Script = `#!/bin/bash
-echo '{
-  "decision": "allow",
-  "hookSpecificOutput": {
-    "hookEventName": "BeforeAgent",
-    "additionalContext": "Step 1: Initial validation passed."
-  }
-}'`;
+    it('should execute hooks sequentially when configured', async () => {
+      // Create inline hook commands (works on both Unix and Windows)
+      const hook1Command =
+        'echo "{\\"decision\\": \\"allow\\", \\"hookSpecificOutput\\": {\\"hookEventName\\": \\"BeforeAgent\\", \\"additionalContext\\": \\"Step 1: Initial validation passed.\\"}}"';
+      const hook2Command =
+        'echo "{\\"decision\\": \\"allow\\", \\"hookSpecificOutput\\": {\\"hookEventName\\": \\"BeforeAgent\\", \\"additionalContext\\": \\"Step 2: Security check completed.\\"}}"';
 
-        const hook2Script = `#!/bin/bash
-echo '{
-  "decision": "allow",
-  "hookSpecificOutput": {
-    "hookEventName": "BeforeAgent",
-    "additionalContext": "Step 2: Security check completed."
-  }
-}'`;
-
-        const script1Path = join(rig.testDir!, 'sequential_hook1.sh');
-        const script2Path = join(rig.testDir!, 'sequential_hook2.sh');
-
-        writeFileSync(script1Path, hook1Script);
-        writeFileSync(script2Path, hook2Script);
-        const { execSync } = await import('node:child_process');
-        execSync(`chmod +x "${script1Path}"`);
-        execSync(`chmod +x "${script2Path}"`);
-
-        await rig.setup('should execute hooks sequentially when configured', {
-          settings: {
-            tools: {
-              enableHooks: true,
-            },
-            hooks: {
-              BeforeAgent: [
-                {
-                  sequential: true,
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: script1Path,
-                      timeout: 5000,
-                    },
-                    {
-                      type: 'command',
-                      command: script2Path,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+      await rig.setup('should execute hooks sequentially when configured', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.sequential-execution.responses',
+        ),
+        settings: {
+          tools: {
+            enableHooks: true,
           },
-        });
+          hooks: {
+            BeforeAgent: [
+              {
+                sequential: true,
+                hooks: [
+                  {
+                    type: 'command',
+                    command: hook1Command,
+                    timeout: 5000,
+                  },
+                  {
+                    type: 'command',
+                    command: hook2Command,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
 
-        const prompt = 'Hello, please help me with a task';
-        await rig.run(prompt);
+      const prompt = 'Hello, please help me with a task';
+      await rig.run(prompt);
 
-        // Should generate hook telemetry
-        let hookTelemetryFound = await rig.waitForTelemetryEvent('hook_call');
-        expect(hookTelemetryFound).toBeTruthy();
-        hookTelemetryFound = await rig.waitForTelemetryEvent('api_request');
-        const apiRequests = rig.readAllApiRequest();
-        const apiRequestsTexts = apiRequests
-          ?.filter(
-            (request) =>
-              'attributes' in request &&
-              typeof request['attributes'] === 'object' &&
-              request['attributes'] !== null &&
-              'request_text' in request['attributes'] &&
-              typeof request['attributes']['request_text'] === 'string',
-          )
-          .map((request) => request['attributes']['request_text']);
-        expect(apiRequestsTexts).toBeDefined();
-        let hasBeforeAgentHookContext = false;
-        let hasAfterToolHookContext = false;
-        for (const requestText of apiRequestsTexts) {
-          if (requestText.includes('Step 1: Initial validation passed')) {
-            hasBeforeAgentHookContext = true;
-          }
-          if (requestText.includes('Step 2: Security check completed')) {
-            hasAfterToolHookContext = true;
-          }
-        }
-        expect(hasBeforeAgentHookContext).toBeTruthy();
-        expect(hasAfterToolHookContext).toBeTruthy();
-      },
-    );
+      // Should generate hook telemetry
+      const hookTelemetryFound = await rig.waitForTelemetryEvent('hook_call');
+      expect(hookTelemetryFound).toBeTruthy();
+
+      // Verify both hooks executed
+      const hookLogs = rig.readHookLogs();
+      const hook1Log = hookLogs.find(
+        (log) => log.hookCall.hook_name === hook1Command,
+      );
+      const hook2Log = hookLogs.find(
+        (log) => log.hookCall.hook_name === hook2Command,
+      );
+
+      expect(hook1Log).toBeDefined();
+      expect(hook1Log?.hookCall.exit_code).toBe(0);
+      expect(hook1Log?.hookCall.stdout).toContain(
+        'Step 1: Initial validation passed',
+      );
+
+      expect(hook2Log).toBeDefined();
+      expect(hook2Log?.hookCall.exit_code).toBe(0);
+      expect(hook2Log?.hookCall.stdout).toContain(
+        'Step 2: Security check completed',
+      );
+    });
   });
 
   describe('Hook Input/Output Validation', () => {
@@ -686,129 +681,115 @@ fi`;
   });
 
   describe('Multiple Event Types', () => {
-    // Note: This test checks telemetry for hook context in API requests,
-    // which behaves differently with mocked responses. Keeping real LLM calls.
-    it.skipIf(process.platform === 'win32')(
-      'should handle hooks for all major event types',
-      async () => {
-        await rig.setup('should handle hooks for all major event types');
-        // Create hook scripts for different events
-        const beforeToolScript = `#!/bin/bash
-echo '{"decision": "allow", "systemMessage": "BeforeTool: File operation logged"}'`;
+    it('should handle hooks for all major event types', async () => {
+      // Create inline hook commands (works on both Unix and Windows)
+      const beforeToolCommand =
+        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"BeforeTool: File operation logged\\"}"';
+      const afterToolCommand =
+        'echo "{\\"hookSpecificOutput\\": {\\"hookEventName\\": \\"AfterTool\\", \\"additionalContext\\": \\"AfterTool: Operation completed successfully\\"}}"';
+      const beforeAgentCommand =
+        'echo "{\\"decision\\": \\"allow\\", \\"hookSpecificOutput\\": {\\"hookEventName\\": \\"BeforeAgent\\", \\"additionalContext\\": \\"BeforeAgent: User request processed\\"}}"';
 
-        const afterToolScript = `#!/bin/bash
-echo '{"hookSpecificOutput": {"hookEventName": "AfterTool", "additionalContext": "AfterTool: Operation completed successfully"}}'`;
-
-        const beforeAgentScript = `#!/bin/bash
-echo '{"decision": "allow", "hookSpecificOutput": {"hookEventName": "BeforeAgent", "additionalContext": "BeforeAgent: User request processed"}}'`;
-
-        const beforeToolPath = join(rig.testDir!, 'before_tool.sh');
-        const afterToolPath = join(rig.testDir!, 'after_tool.sh');
-        const beforeAgentPath = join(rig.testDir!, 'before_agent.sh');
-
-        writeFileSync(beforeToolPath, beforeToolScript);
-        writeFileSync(afterToolPath, afterToolScript);
-        writeFileSync(beforeAgentPath, beforeAgentScript);
-
-        const { execSync } = await import('node:child_process');
-        execSync(`chmod +x "${beforeToolPath}"`);
-        execSync(`chmod +x "${afterToolPath}"`);
-        execSync(`chmod +x "${beforeAgentPath}"`);
-
-        await rig.setup('should handle hooks for all major event types', {
-          settings: {
-            tools: {
-              enableHooks: true,
-            },
-            hooks: {
-              BeforeAgent: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: beforeAgentPath,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-              BeforeTool: [
-                {
-                  matcher: 'write_file',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: beforeToolPath,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-              AfterTool: [
-                {
-                  matcher: 'write_file',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: afterToolPath,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+      await rig.setup('should handle hooks for all major event types', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.multiple-events.responses',
+        ),
+        settings: {
+          tools: {
+            enableHooks: true,
           },
-        });
+          hooks: {
+            BeforeAgent: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: beforeAgentCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+            BeforeTool: [
+              {
+                matcher: 'write_file',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: beforeToolCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+            AfterTool: [
+              {
+                matcher: 'write_file',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: afterToolCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
 
-        const prompt =
-          'Create a file called multi-event-test.txt with content ' +
-          '"testing multiple events", and then please reply with ' +
-          'everything I say just after this:"';
-        const result = await rig.run(prompt);
+      const prompt =
+        'Create a file called multi-event-test.txt with content ' +
+        '"testing multiple events", and then please reply with ' +
+        'everything I say just after this:"';
+      const result = await rig.run(prompt);
 
-        // Should execute write_file tool
-        const foundWriteFile = await rig.waitForToolCall('write_file');
-        expect(foundWriteFile).toBeTruthy();
+      // Should execute write_file tool
+      const foundWriteFile = await rig.waitForToolCall('write_file');
+      expect(foundWriteFile).toBeTruthy();
 
-        // File should be created
-        const fileContent = rig.readFile('multi-event-test.txt');
-        expect(fileContent).toContain('testing multiple events');
+      // File should be created
+      const fileContent = rig.readFile('multi-event-test.txt');
+      expect(fileContent).toContain('testing multiple events');
 
-        // Result should contain context from all hooks
-        expect(result).toContain('BeforeTool: File operation logged');
+      // Result should contain context from all hooks
+      expect(result).toContain('BeforeTool: File operation logged');
 
-        // Should generate hook telemetry
-        let hookTelemetryFound = await rig.waitForTelemetryEvent('hook_call');
-        expect(hookTelemetryFound).toBeTruthy();
-        hookTelemetryFound = await rig.waitForTelemetryEvent('api_request');
-        const apiRequests = rig.readAllApiRequest();
-        const apiRequestsTexts = apiRequests
-          ?.filter(
-            (request) =>
-              'attributes' in request &&
-              typeof request['attributes'] === 'object' &&
-              request['attributes'] !== null &&
-              'request_text' in request['attributes'] &&
-              typeof request['attributes']['request_text'] === 'string',
-          )
-          .map((request) => request['attributes']['request_text']);
-        expect(apiRequestsTexts).toBeDefined();
-        let hasBeforeAgentHookContext = false;
-        let hasAfterToolHookContext = false;
-        for (const requestText of apiRequestsTexts) {
-          if (requestText.includes('BeforeAgent: User request processed')) {
-            hasBeforeAgentHookContext = true;
-          }
-          if (
-            requestText.includes('AfterTool: Operation completed successfully')
-          ) {
-            hasAfterToolHookContext = true;
-          }
-        }
-        expect(hasBeforeAgentHookContext).toBeTruthy();
-        expect(hasAfterToolHookContext).toBeTruthy();
-      },
-    );
+      // Should generate hook telemetry
+      const hookTelemetryFound = await rig.waitForTelemetryEvent('hook_call');
+      expect(hookTelemetryFound).toBeTruthy();
+
+      // Verify all three hooks executed
+      const hookLogs = rig.readHookLogs();
+      const beforeAgentLog = hookLogs.find(
+        (log) => log.hookCall.hook_name === beforeAgentCommand,
+      );
+      const beforeToolLog = hookLogs.find(
+        (log) => log.hookCall.hook_name === beforeToolCommand,
+      );
+      const afterToolLog = hookLogs.find(
+        (log) => log.hookCall.hook_name === afterToolCommand,
+      );
+
+      expect(beforeAgentLog).toBeDefined();
+      expect(beforeAgentLog?.hookCall.exit_code).toBe(0);
+      expect(beforeAgentLog?.hookCall.stdout).toContain(
+        'BeforeAgent: User request processed',
+      );
+
+      expect(beforeToolLog).toBeDefined();
+      expect(beforeToolLog?.hookCall.exit_code).toBe(0);
+      expect(beforeToolLog?.hookCall.stdout).toContain(
+        'BeforeTool: File operation logged',
+      );
+
+      expect(afterToolLog).toBeDefined();
+      expect(afterToolLog?.hookCall.exit_code).toBe(0);
+      expect(afterToolLog?.hookCall.stdout).toContain(
+        'AfterTool: Operation completed successfully',
+      );
+    });
   });
 
   describe('Hook Error Handling', () => {
@@ -820,21 +801,12 @@ echo '{"decision": "allow", "hookSpecificOutput": {"hookEventName": "BeforeAgent
         ),
       });
       // Create a hook script that fails
-      const failingHookScript = `#!/bin/bash
-echo "Hook encountered an error" >&2
-exit 1`;
-
-      const workingHookScript = `#!/bin/bash
-echo '{"decision": "allow", "reason": "Working hook succeeded"}'`;
-
-      const failingPath = join(rig.testDir!, 'failing_hook.sh');
-      const workingPath = join(rig.testDir!, 'working_hook.sh');
-
-      writeFileSync(failingPath, failingHookScript);
-      writeFileSync(workingPath, workingHookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${failingPath}"`);
-      execSync(`chmod +x "${workingPath}"`);
+      // Create inline hook commands (works on both Unix and Windows)
+      // Failing hook: exits with non-zero code
+      const failingCommand = 'exit 1';
+      // Working hook: returns success with JSON
+      const workingCommand =
+        'echo "{\\"decision\\": \\"allow\\", \\"reason\\": \\"Working hook succeeded\\"}"';
 
       await rig.setup('should handle hook failures gracefully', {
         settings: {
@@ -847,12 +819,12 @@ echo '{"decision": "allow", "reason": "Working hook succeeded"}'`;
                 hooks: [
                   {
                     type: 'command',
-                    command: failingPath,
+                    command: failingCommand,
                     timeout: 5000,
                   },
                   {
                     type: 'command',
-                    command: workingPath,
+                    command: workingCommand,
                     timeout: 5000,
                   },
                 ],
@@ -882,21 +854,15 @@ echo '{"decision": "allow", "reason": "Working hook succeeded"}'`;
 
   describe('Hook Telemetry and Observability', () => {
     it('should generate telemetry events for hook executions', async () => {
+      // Create inline hook command (works on both Unix and Windows)
+      const hookCommand =
+        'echo "{\\"decision\\": \\"allow\\", \\"reason\\": \\"Telemetry test hook\\"}"';
+
       await rig.setup('should generate telemetry events for hook executions', {
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.telemetry.responses',
         ),
-      });
-      const hookScript = `#!/bin/bash
-echo '{"decision": "allow", "reason": "Telemetry test hook"}'`;
-
-      const scriptPath = join(rig.testDir!, 'telemetry_hook.sh');
-      writeFileSync(scriptPath, hookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${scriptPath}"`);
-
-      await rig.setup('should generate telemetry events for hook executions', {
         settings: {
           tools: {
             enableHooks: true,
@@ -907,7 +873,7 @@ echo '{"decision": "allow", "reason": "Telemetry test hook"}'`;
                 hooks: [
                   {
                     type: 'command',
-                    command: scriptPath,
+                    command: hookCommand,
                     timeout: 5000,
                   },
                 ],
@@ -988,6 +954,127 @@ echo '{"decision": "allow", "reason": "Telemetry test hook"}'`;
         expect(hookInput['source']).toBe('startup');
         expect(sessionStartLog.hookCall.stdout).toContain(
           'Session starting on startup',
+        );
+      }
+    });
+
+    it('should fire SessionEnd and SessionStart hooks on /clear command', async () => {
+      // Create inline hook commands for both SessionEnd and SessionStart
+      const sessionEndCommand =
+        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"Session ending due to clear\\"}"';
+      const sessionStartCommand =
+        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"Session starting after clear\\"}"';
+
+      await rig.setup(
+        'should fire SessionEnd and SessionStart hooks on /clear command',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.session-clear.responses',
+          ),
+          settings: {
+            tools: {
+              enableHooks: true,
+            },
+            hooks: {
+              SessionEnd: [
+                {
+                  matcher: '*',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: sessionEndCommand,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+              SessionStart: [
+                {
+                  matcher: '*',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: sessionStartCommand,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      );
+
+      const run = await rig.runInteractive();
+
+      // Send an initial prompt to establish a session
+      await run.sendKeys('Say hello');
+      await run.sendKeys('\r');
+
+      // Wait for the response
+      await run.expectText('Hello', 10000);
+
+      // Execute /clear command - use sendKeys for faster typing
+      await run.sendKeys('/clear');
+      await run.sendKeys('\r');
+
+      // Wait for clear to complete - the screen clears and shows the prompt again
+      // We can't check for the debug message because it gets cleared
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // Give time for hooks to execute
+
+      // Wait for telemetry to be written to disk
+      await rig.waitForTelemetryReady();
+
+      // Verify hooks executed
+      const hookLogs = rig.readHookLogs();
+      expect(hookLogs.length).toBeGreaterThanOrEqual(3); // SessionStart (startup), SessionEnd (clear), SessionStart (clear)
+
+      // Find SessionEnd hook log
+      const sessionEndLog = hookLogs.find(
+        (log) =>
+          log.hookCall.hook_event_name === 'SessionEnd' &&
+          log.hookCall.hook_name === sessionEndCommand,
+      );
+      expect(sessionEndLog).toBeDefined();
+      if (sessionEndLog) {
+        expect(sessionEndLog.hookCall.exit_code).toBe(0);
+        expect(sessionEndLog.hookCall.stdout).toContain(
+          'Session ending due to clear',
+        );
+
+        // Verify hook input contains reason
+        const hookInputStr =
+          typeof sessionEndLog.hookCall.hook_input === 'string'
+            ? sessionEndLog.hookCall.hook_input
+            : JSON.stringify(sessionEndLog.hookCall.hook_input);
+        const hookInput = JSON.parse(hookInputStr) as Record<string, unknown>;
+        expect(hookInput['reason']).toBe('clear');
+      }
+
+      // Find SessionStart hook log after clear
+      const sessionStartAfterClearLogs = hookLogs.filter(
+        (log) =>
+          log.hookCall.hook_event_name === 'SessionStart' &&
+          log.hookCall.hook_name === sessionStartCommand,
+      );
+      // Should have at least one SessionStart from after clear
+      expect(sessionStartAfterClearLogs.length).toBeGreaterThanOrEqual(1);
+
+      const sessionStartLog = sessionStartAfterClearLogs.find((log) => {
+        const hookInputStr =
+          typeof log.hookCall.hook_input === 'string'
+            ? log.hookCall.hook_input
+            : JSON.stringify(log.hookCall.hook_input);
+        const hookInput = JSON.parse(hookInputStr) as Record<string, unknown>;
+        return hookInput['source'] === 'clear';
+      });
+
+      expect(sessionStartLog).toBeDefined();
+      if (sessionStartLog) {
+        expect(sessionStartLog.hookCall.exit_code).toBe(0);
+        expect(sessionStartLog.hookCall.stdout).toContain(
+          'Session starting after clear',
         );
       }
     });
