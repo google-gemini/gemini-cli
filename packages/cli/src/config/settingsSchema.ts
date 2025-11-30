@@ -455,6 +455,15 @@ const SETTINGS_SCHEMA = {
             description: 'Hides the context window remaining percentage.',
             showInDialog: true,
           },
+          showTokenUsage: {
+            type: 'boolean',
+            label: 'Show Token Usage',
+            category: 'UI',
+            requiresRestart: false,
+            default: false,
+            description: 'Show token usage and estimated cost in the footer.',
+            showInDialog: true,
+          },
         },
       },
       hideFooter: {
