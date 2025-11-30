@@ -125,12 +125,6 @@ runs:
         npm run build:packages
         npm run prepare:package
 
-    - name: '🎁 Bundle'
-      working-directory: '${{ inputs.working-directory }}'
-      shell: 'bash'
-      run: |
-        npm run bundle
-
     # TODO: Refactor this github specific publishing script to be generalized based upon inputs.
     - name: '📦 Prepare for GitHub release'
       if: "inputs.npm-registry-url == 'https://npm.pkg.github.com/'"
