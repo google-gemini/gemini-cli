@@ -1546,6 +1546,22 @@ describe('screenReader configuration', () => {
   });
 });
 
+describe('enableTerminalBell configuration', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+});
+
 describe('loadCliConfig tool exclusions', () => {
   const originalIsTTY = process.stdin.isTTY;
 
