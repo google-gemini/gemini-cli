@@ -25,7 +25,7 @@ import os from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import dotenv from 'dotenv';
-import { GEMINI_DIR } from '@google/gemini-cli-core';
+import { GEMINI_DIR, Storage } from '@google/gemini-cli-core';
 
 const argv = yargs(hideBin(process.argv)).option('q', {
   alias: 'quiet',
@@ -36,7 +36,7 @@ const argv = yargs(hideBin(process.argv)).option('q', {
 let geminiSandbox = process.env.GEMINI_SANDBOX;
 
 if (!geminiSandbox) {
-  const userSettingsFile = join(os.homedir(), GEMINI_DIR, 'settings.json');
+  const userSettingsFile = join(Storage.getConfigDir(), 'settings.json');
   if (existsSync(userSettingsFile)) {
     const settings = JSON.parse(
       stripJsonComments(readFileSync(userSettingsFile, 'utf-8')),

@@ -10,7 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { createExtension } from '../../test-utils/createExtension.js';
 import { useExtensionUpdates } from './useExtensionUpdates.js';
-import { GEMINI_DIR } from '@google/gemini-cli-core';
+import { Storage } from '@google/gemini-cli-core';
 import { render } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { MessageType } from '../types.js';
@@ -21,6 +21,17 @@ import {
 import { ExtensionUpdateState } from '../state/extensions.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings } from '../../config/settings.js';
+
+beforeEach(() => {
+  vi.stubEnv('XDG_CONFIG_HOME', '');
+  vi.stubEnv('XDG_CACHE_HOME', '');
+  vi.stubEnv('XDG_DATA_HOME', '');
+  vi.stubEnv('XDG_STATE_HOME', '');
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 vi.mock('os', async (importOriginal) => {
   const mockedOs = await importOriginal<typeof os>();
@@ -50,7 +61,7 @@ describe('useExtensionUpdates', () => {
       path.join(tempHomeDir, 'gemini-cli-test-workspace-'),
     );
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
-    userExtensionsDir = path.join(tempHomeDir, GEMINI_DIR, 'extensions');
+    userExtensionsDir = path.join(Storage.getConfigDir(), 'extensions');
     fs.mkdirSync(userExtensionsDir, { recursive: true });
     vi.mocked(checkForAllExtensionUpdates).mockReset();
     vi.mocked(updateExtension).mockReset();

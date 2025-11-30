@@ -35,8 +35,23 @@ vi.mock('node:child_process', async (importOriginal) => {
 vi.mock('../utils/textUtils.js', () => ({
   isBinary: mockIsBinary,
 }));
-vi.mock('os', () => ({
-  default: {
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>();
+  return {
+    ...actual,
+    default: {
+      platform: mockPlatform,
+      homedir: () => '/home/user',
+      tmpdir: () => '/tmp',
+      constants: {
+        signals: {
+          SIGTERM: 15,
+          SIGKILL: 9,
+        },
+      },
+    },
+    homedir: () => '/home/user',
+    tmpdir: () => '/tmp',
     platform: mockPlatform,
     constants: {
       signals: {
@@ -44,15 +59,8 @@ vi.mock('os', () => ({
         SIGKILL: 9,
       },
     },
-  },
-  platform: mockPlatform,
-  constants: {
-    signals: {
-      SIGTERM: 15,
-      SIGKILL: 9,
-    },
-  },
-}));
+  };
+});
 vi.mock('../utils/getPty.js', () => ({
   getPty: mockGetPty,
 }));

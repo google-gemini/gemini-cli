@@ -9,15 +9,11 @@
 import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
-import { GEMINI_DIR } from '@google/gemini-cli-core';
+import { GEMINI_DIR, Storage } from '@google/gemini-cli-core';
 
 const projectRoot = join(import.meta.dirname, '..');
 
-const USER_SETTINGS_DIR = join(
-  process.env.HOME || process.env.USERPROFILE || process.env.HOMEPATH || '',
-  GEMINI_DIR,
-);
-const USER_SETTINGS_PATH = join(USER_SETTINGS_DIR, 'settings.json');
+const USER_SETTINGS_PATH = join(Storage.getConfigDir(), 'settings.json');
 const WORKSPACE_SETTINGS_PATH = join(projectRoot, GEMINI_DIR, 'settings.json');
 
 let settingsTarget = undefined;

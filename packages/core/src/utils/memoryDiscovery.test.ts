@@ -20,12 +20,22 @@ import {
   DEFAULT_CONTEXT_FILENAME,
 } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { GEMINI_DIR } from './paths.js';
 import { Config, type GeminiCLIExtension } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { SimpleExtensionLoader } from './extensionLoader.js';
 import { CoreEvent, coreEvents } from './events.js';
 import { debugLogger } from './debugLogger.js';
+
+beforeEach(() => {
+  vi.stubEnv('XDG_CONFIG_HOME', '');
+  vi.stubEnv('XDG_CACHE_HOME', '');
+  vi.stubEnv('XDG_DATA_HOME', '');
+  vi.stubEnv('XDG_STATE_HOME', '');
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -119,7 +129,10 @@ describe('memoryDiscovery', () => {
         'Src directory memory', // Untrusted
       );
 
-      const filepath = path.join(homedir, GEMINI_DIR, DEFAULT_CONTEXT_FILENAME);
+      const filepath = path.join(
+        Storage.getConfigDir(),
+        DEFAULT_CONTEXT_FILENAME,
+      );
       await createTestFile(filepath, 'default context content'); // In user home dir (outside untrusted space).
       const { fileCount, memoryContent, filePaths } =
         await loadServerHierarchicalMemory(
@@ -156,7 +169,7 @@ describe('memoryDiscovery', () => {
 
   it('should load only the global context file if present and others are not (default filename)', async () => {
     const defaultContextFile = await createTestFile(
-      path.join(homedir, GEMINI_DIR, DEFAULT_CONTEXT_FILENAME),
+      path.join(Storage.getConfigDir(), DEFAULT_CONTEXT_FILENAME),
       'default context content',
     );
 
@@ -183,7 +196,7 @@ default context content
     setGeminiMdFilename(customFilename);
 
     const customContextFile = await createTestFile(
-      path.join(homedir, GEMINI_DIR, customFilename),
+      path.join(Storage.getConfigDir(), customFilename),
       'custom context content',
     );
 
@@ -341,7 +354,7 @@ Subdir memory
 
   it('should load and correctly order global, upward, and downward ORIGINAL_GEMINI_MD_FILENAME files', async () => {
     const defaultContextFile = await createTestFile(
-      path.join(homedir, GEMINI_DIR, DEFAULT_CONTEXT_FILENAME),
+      path.join(Storage.getConfigDir(), DEFAULT_CONTEXT_FILENAME),
       'default context content',
     );
     const rootGeminiFile = await createTestFile(
@@ -625,7 +638,7 @@ included directory memory
   describe('loadGlobalMemory', () => {
     it('should load global memory file if it exists', async () => {
       const globalMemoryFile = await createTestFile(
-        path.join(homedir, GEMINI_DIR, DEFAULT_CONTEXT_FILENAME),
+        path.join(Storage.getConfigDir(), DEFAULT_CONTEXT_FILENAME),
         'Global memory content',
       );
 

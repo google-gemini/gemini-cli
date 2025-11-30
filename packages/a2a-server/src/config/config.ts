@@ -6,7 +6,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { homedir } from 'node:os';
 import * as dotenv from 'dotenv';
 
 import type { TelemetryTarget } from '@google/gemini-cli-core';
@@ -17,9 +16,9 @@ import {
   FileDiscoveryService,
   ApprovalMode,
   loadServerHierarchicalMemory,
-  GEMINI_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_MODEL,
+  Storage,
   type ExtensionLoader,
 } from '@google/gemini-cli-core';
 
@@ -156,7 +155,7 @@ function findEnvFile(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
   while (true) {
     // prefer gemini-specific .env under GEMINI_DIR
-    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
+    const geminiEnvPath = path.join(currentDir, '.env');
     if (fs.existsSync(geminiEnvPath)) {
       return geminiEnvPath;
     }
@@ -167,11 +166,11 @@ function findEnvFile(startDir: string): string | null {
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
       // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(process.cwd(), GEMINI_DIR, '.env');
+      const homeGeminiEnvPath = path.join(Storage.getConfigDir(), '.env');
       if (fs.existsSync(homeGeminiEnvPath)) {
         return homeGeminiEnvPath;
       }
-      const homeEnvPath = path.join(homedir(), '.env');
+      const homeEnvPath = path.join(Storage.getConfigDir(), '.env');
       if (fs.existsSync(homeEnvPath)) {
         return homeEnvPath;
       }
