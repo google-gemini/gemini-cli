@@ -600,7 +600,33 @@ export interface TodoList {
   todos: Todo[];
 }
 
-export type ToolResultDisplay = string | FileDiff | AnsiOutput | TodoList;
+/**
+ * Represents image data that can be displayed in the terminal.
+ */
+export interface ImageData {
+  /** Base64 encoded image data */
+  base64?: string;
+  /** File path to the image */
+  filePath?: string;
+  /** MIME type of the image (e.g., 'image/png', 'image/jpeg') */
+  mimeType?: string;
+  /** Alt text for the image */
+  alt?: string;
+}
+
+/**
+ * Represents an image result from a tool execution.
+ */
+export interface ImageResult {
+  image: ImageData;
+}
+
+export type ToolResultDisplay =
+  | string
+  | FileDiff
+  | AnsiOutput
+  | TodoList
+  | ImageResult;
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
