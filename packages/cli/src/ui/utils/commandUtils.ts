@@ -81,9 +81,12 @@ export const getUrlOpenCommand = (): string => {
  * A command is auto-executable if it:
  * - Has an action (is executable)
  * - Has no subcommands (is not a parent command)
- * - Has autoExecute explicitly set to true, OR
- * - Has no completion function and autoExecute is not explicitly false
+ * - Has autoExecute explicitly set to true
  * - Is NOT a custom command from .toml files (they often accept arguments)
+ *
+ * All built-in commands now have autoExecute explicitly set.
+ * For backward compatibility with extensions and custom commands,
+ * we keep safety checks and fall back to checking the completion function.
  *
  * @param command The slash command to check
  * @returns true if the command should auto-execute on Enter
@@ -111,12 +114,13 @@ export function isAutoExecutableCommand(
     return false;
   }
 
-  // Check explicit autoExecute field first
+  // For built-in commands, autoExecute should now always be explicitly set
+  // For backward compatibility with extension commands, fall back to checking completion
   if (command.autoExecute !== undefined) {
     return command.autoExecute;
   }
 
-  // Fall back to checking completion function (backward compatibility)
+  // Fallback for commands without explicit autoExecute (extensions/custom commands)
   // Commands with completion functions need arguments, so don't auto-execute
   return command.completion === undefined;
 }

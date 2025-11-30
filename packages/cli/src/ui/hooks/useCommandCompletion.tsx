@@ -233,10 +233,19 @@ export function useCommandCompletion(
         return null;
       }
 
-      // Build the completed text without spaces
+      // Apply space padding for slash commands (needed for subcommands like "/chat list")
+      let suggestionText = suggestion.value;
+      if (completionMode === CompletionMode.SLASH) {
+        // Add leading space if completing a subcommand (cursor is after parent command with no space)
+        if (start === end && start > 1 && currentLine[start - 1] !== ' ') {
+          suggestionText = ' ' + suggestionText;
+        }
+      }
+
+      // Build the completed text with proper spacing
       return (
         currentLine.substring(0, start) +
-        suggestion.value +
+        suggestionText +
         currentLine.substring(end)
       );
     },
@@ -269,7 +278,7 @@ export function useCommandCompletion(
         end = slashCompletionRange.completionEnd;
       }
 
-      // Add space padding for autocomplete (not needed for auto-execute)
+      // Add space padding for Tab completion (auto-execute gets padding from getCompletedText)
       let suggestionText = suggestion.value;
       if (completionMode === CompletionMode.SLASH) {
         if (
