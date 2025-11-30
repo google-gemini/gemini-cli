@@ -415,6 +415,17 @@ describe('shortenPath', () => {
       expect(result).toBe('.../lodash/.../lodash.js');
       expect(result.length).toBeLessThanOrEqual(25);
     });
+
+    it('should not select filename as distinguishing segment when all dirs are generic', () => {
+      // Edge case: /src/lib/dist/index.ts - all directories are generic
+      // Should fall back to first segment (src), not select 'index.ts' as distinguishing
+      const p = '/src/lib/dist/index.ts';
+      const result = shortenPath(p, 20);
+      expect(result).toBe('/src/.../index.ts');
+      expect(result.length).toBeLessThanOrEqual(20);
+      // Ensure we don't get something like '.../index.ts/.../index.ts'
+      expect(result).not.toContain('index.ts/');
+    });
   });
 
   describe.skipIf(process.platform !== 'win32')('on Windows', () => {
