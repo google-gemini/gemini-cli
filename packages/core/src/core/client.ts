@@ -36,7 +36,11 @@ import {
   getEffectiveModel,
 } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import {
+  ChatCompressionService,
+  type CompressionOptions,
+} from '../services/chatCompressionService.js';
+import { DeliberateCompressionOrchestrator } from '../services/deliberateCompressionOrchestrator.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -55,6 +59,8 @@ import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js'; // Import coreEvents
+
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
 
@@ -66,6 +72,7 @@ export class GeminiClient {
 
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
+  private readonly deliberateCompressionOrchestrator: DeliberateCompressionOrchestrator;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
@@ -77,9 +84,18 @@ export class GeminiClient {
    */
   private hasFailedCompressionAttempt = false;
 
+  /**
+   * Track state for hybrid trigger system
+   */
+  private messagesSinceLastCompress = 0;
+  private lastCompressionTime = 0;
+  private isCompressing = false;
+
   constructor(private readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
     this.compressionService = new ChatCompressionService();
+    this.deliberateCompressionOrchestrator =
+      new DeliberateCompressionOrchestrator();
     this.lastPromptId = this.config.getSessionId();
   }
 
@@ -404,6 +420,11 @@ export class GeminiClient {
     prompt_id: string,
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
+    onShowCompressionPrompt: (
+      goals: string[],
+      isSafetyValve: boolean,
+    ) => Promise<string> = async () => 'auto',
+    isTopLevelCall: boolean = true,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Fire BeforeAgent hook through MessageBus (only if hooks are enabled)
     const hooksEnabled = this.config.getEnableHooks();
@@ -440,6 +461,11 @@ export class GeminiClient {
       this.currentSequenceModel = null;
     }
     this.sessionTurnCount++;
+
+    // Track messages for compression guard (only count top-level user messages)
+    if (isTopLevelCall) {
+      this.messagesSinceLastCompress++;
+    }
     if (
       this.config.getMaxSessionTurns() > 0 &&
       this.sessionTurnCount > this.config.getMaxSessionTurns()
@@ -473,12 +499,6 @@ export class GeminiClient {
         value: { estimatedRequestTokenCount, remainingTokenCount },
       };
       return new Turn(this.getChat(), prompt_id);
-    }
-
-    const compressed = await this.tryCompressChat(prompt_id, false);
-
-    if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
-      yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
 
     // Prevent context updates from being sent while a tool call is
@@ -571,6 +591,8 @@ export class GeminiClient {
             prompt_id,
             boundedTurns - 1,
             true, // Set isInvalidStreamRetry to true
+            onShowCompressionPrompt, // Pass the callback to recursive calls
+            false, // Not a top-level call - skip compression
           );
           return turn;
         }
@@ -579,6 +601,17 @@ export class GeminiClient {
         return turn;
       }
     }
+    // Post-response compression check - run BEFORE any early returns
+    if (isTopLevelCall && !turn.pendingToolCalls.length) {
+      const compressionResult = await this.handlePostResponseCompression(
+        prompt_id,
+        onShowCompressionPrompt,
+      );
+      if (compressionResult) {
+        yield compressionResult;
+      }
+    }
+
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
       // Check if next speaker check is needed
       if (this.config.getQuotaErrorOccurred()) {
@@ -612,7 +645,9 @@ export class GeminiClient {
           signal,
           prompt_id,
           boundedTurns - 1,
-          // isInvalidStreamRetry is false here, as this is a next speaker check
+          false, // isInvalidStreamRetry is false here, as this is a next speaker check
+          onShowCompressionPrompt, // Pass the callback to recursive calls
+          false, // Not a top-level call - skip compression
         );
       }
     }
@@ -638,6 +673,9 @@ export class GeminiClient {
           signal,
           prompt_id,
           boundedTurns - 1,
+          false,
+          onShowCompressionPrompt,
+          false, // Not a top-level call - skip compression
         );
       }
     }
@@ -720,37 +758,287 @@ export class GeminiClient {
     }
   }
 
+  /**
+   * Determines if compression should be triggered based on hybrid criteria
+   */
+  async shouldTriggerCompression(): Promise<{
+    shouldCompress: boolean;
+    reason: string;
+    isSafetyValve: boolean;
+  }> {
+    // Concurrency guard: prevent concurrent compressions
+    if (this.isCompressing) {
+      return {
+        shouldCompress: false,
+        reason: 'compression_in_progress',
+        isSafetyValve: false,
+      };
+    }
+
+    // Concurrency guard: don't compress during streaming
+    // Note: Removed isStreaming() check as Turn doesn't have this method yet
+
+    const chat = this.getChat();
+    const currentTokens = chat.getLastPromptTokenCount();
+    const model = this._getEffectiveModelForCurrentTurn();
+    const modelLimit = tokenLimit(model);
+
+    // Debug: Show compression evaluation
+    const tokenThreshold = await this.config.getCompressionTriggerTokens();
+    const minMessages = await this.config.getCompressionMinMessages();
+    const debugMsg =
+      `[Compress] tokens=${currentTokens}/${tokenThreshold}, ` +
+      `msgs=${this.messagesSinceLastCompress}/${minMessages}`;
+    debugLogger.log(debugMsg);
+
+    // Check safety valve first (50% utilization threshold)
+    const utilizationThreshold =
+      await this.config.getCompressionTriggerUtilization();
+    const utilization = currentTokens / modelLimit;
+
+    if (utilization >= utilizationThreshold) {
+      // Safety valve - bypass all guards
+      return {
+        shouldCompress: true,
+        reason: 'utilization_threshold',
+        isSafetyValve: true,
+      };
+    }
+
+    if (currentTokens < tokenThreshold) {
+      return {
+        shouldCompress: false,
+        reason: 'below_token_threshold',
+        isSafetyValve: false,
+      };
+    }
+
+    // Apply guards
+    if (this.messagesSinceLastCompress < minMessages) {
+      return {
+        shouldCompress: false,
+        reason: 'message_guard_failed',
+        isSafetyValve: false,
+      };
+    }
+
+    const minTimeBetween =
+      await this.config.getCompressionMinTimeBetweenPrompts(); // seconds
+    const timeSinceLastCompress =
+      (Date.now() - this.lastCompressionTime) / 1000;
+    if (
+      this.lastCompressionTime > 0 &&
+      timeSinceLastCompress < minTimeBetween
+    ) {
+      return {
+        shouldCompress: false,
+        reason: 'time_guard_failed',
+        isSafetyValve: false,
+      };
+    }
+
+    // All checks passed
+    return {
+      shouldCompress: true,
+      reason: 'absolute_tokens',
+      isSafetyValve: false,
+    };
+  }
+
+  /**
+   * Prepares for deliberate compression by extracting goals
+   * Returns info about whether to prompt user and what goals were found
+   */
+  async prepareDeliberateCompression(
+    prompt_id: string,
+    isSafetyValve: boolean,
+  ) {
+    const model = this._getEffectiveModelForCurrentTurn();
+
+    return await this.deliberateCompressionOrchestrator.prepareDeliberateCompression(
+      this.getChat(),
+      this.config,
+      model,
+      prompt_id,
+      isSafetyValve,
+    );
+  }
+
+  /**
+   * Creates compression options from user's goal selection
+   */
+  createCompressionOptions(selectedGoal: string | null): CompressionOptions {
+    return this.deliberateCompressionOrchestrator.createCompressionOptions(
+      selectedGoal,
+    );
+  }
+
+  /**
+   * Handles post-response compression check and prompt flow
+   * Returns a ChatCompressed event if compression occurred, undefined otherwise
+   */
+  private async handlePostResponseCompression(
+    promptId: string,
+    onShowCompressionPrompt: (
+      goals: string[],
+      isSafetyValve: boolean,
+    ) => Promise<string>,
+  ): Promise<ServerGeminiStreamEvent | undefined> {
+    const { shouldCompress, isSafetyValve } =
+      await this.shouldTriggerCompression();
+
+    if (!shouldCompress) {
+      return undefined;
+    }
+
+    let compressionOptions: CompressionOptions;
+
+    if (this.config.isCompressionInteractive()) {
+      const { extractedGoals, shouldPromptUser, skipReason, selectedGoal } =
+        await this.prepareDeliberateCompression(promptId, isSafetyValve);
+
+      if (shouldPromptUser && extractedGoals) {
+        const selection = await onShowCompressionPrompt(
+          extractedGoals,
+          isSafetyValve,
+        );
+        compressionOptions = this.handleCompressionSelection(selection);
+      } else {
+        this.emitCompressionSkipFeedback(skipReason);
+        compressionOptions = this.createCompressionOptions(
+          selectedGoal || 'auto',
+        );
+      }
+    } else {
+      compressionOptions = this.createCompressionOptions('auto');
+    }
+
+    // Pass force=true since shouldTriggerCompression already determined we should compress
+    // This bypasses the old percentage-based threshold check in compress()
+    const compressed = await this.tryCompressChat(
+      promptId,
+      true,
+      compressionOptions,
+    );
+
+    if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
+      return { type: GeminiEventType.ChatCompressed, value: compressed };
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Handles user selection from the compression prompt and returns compression options
+   */
+  private handleCompressionSelection(
+    selection: string | null,
+  ): CompressionOptions {
+    switch (selection) {
+      case 'disable':
+        this.config.setCompressionInteractive(false);
+        coreEvents.emitFeedback(
+          'info',
+          'Interactive compression disabled. Future compressions will be automatic.',
+        );
+        return this.createCompressionOptions('auto');
+
+      case 'less_frequent': {
+        const currentTokens = this.config.getCompressionTriggerTokens();
+        const currentMessages = this.config.getCompressionMinMessages();
+        const multiplier = this.config.getCompressionFrequencyMultiplier();
+
+        const cappedTokens = Math.min(
+          Math.round(currentTokens * multiplier),
+          200000,
+        );
+        const cappedMessages = Math.min(
+          Math.round(currentMessages * multiplier),
+          100,
+        );
+
+        this.config.setCompressionTriggerTokens(cappedTokens);
+        this.config.setCompressionMinMessages(cappedMessages);
+
+        coreEvents.emitFeedback(
+          'info',
+          `Check-ins ${multiplier}x less frequent: ${currentTokens / 1000}k → ${cappedTokens / 1000}k tokens, ${currentMessages} → ${cappedMessages} messages`,
+        );
+        return this.createCompressionOptions('auto');
+      }
+
+      case 'auto':
+      case null:
+        return this.createCompressionOptions('auto');
+
+      default:
+        // User selected a specific goal
+        return this.createCompressionOptions(selection);
+    }
+  }
+
+  /**
+   * Emits user-visible feedback explaining why the compression prompt was skipped
+   */
+  private emitCompressionSkipFeedback(skipReason: string | undefined): void {
+    if (skipReason === 'safety_valve') {
+      coreEvents.emitFeedback(
+        'info',
+        'Context limit reached - compressing automatically.',
+      );
+    } else if (
+      skipReason === 'no_goals' ||
+      skipReason === 'extraction_failed'
+    ) {
+      coreEvents.emitFeedback('info', `Compressing context (${skipReason}).`);
+    }
+  }
+
   async tryCompressChat(
     prompt_id: string,
     force: boolean = false,
+    options?: CompressionOptions,
   ): Promise<ChatCompressionInfo> {
-    // If the model is 'auto', we will use a placeholder model to check.
-    // Compression occurs before we choose a model, so calling `count_tokens`
-    // before the model is chosen would result in an error.
-    const model = this._getEffectiveModelForCurrentTurn();
+    // Set compression lock
+    this.isCompressing = true;
 
-    const { newHistory, info } = await this.compressionService.compress(
-      this.getChat(),
-      prompt_id,
-      force,
-      model,
-      this.config,
-      this.hasFailedCompressionAttempt,
-    );
+    try {
+      // If the model is 'auto', we will use a placeholder model to check.
+      // Compression occurs before we choose a model, so calling `count_tokens`
+      // before the model is chosen would result in an error.
+      const model = this._getEffectiveModelForCurrentTurn();
 
-    if (
-      info.compressionStatus ===
-      CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT
-    ) {
-      this.hasFailedCompressionAttempt = !force && true;
-    } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
-      if (newHistory) {
-        this.chat = await this.startChat(newHistory);
-        this.updateTelemetryTokenCount();
-        this.forceFullIdeContext = true;
+      const { newHistory, info } = await this.compressionService.compress(
+        this.getChat(),
+        prompt_id,
+        force,
+        model,
+        this.config,
+        this.hasFailedCompressionAttempt,
+        options,
+      );
+
+      if (
+        info.compressionStatus ===
+        CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT
+      ) {
+        this.hasFailedCompressionAttempt = !force && true;
+      } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
+        if (newHistory) {
+          this.chat = await this.startChat(newHistory);
+          this.updateTelemetryTokenCount();
+          this.forceFullIdeContext = true;
+
+          // Update tracking state
+          this.messagesSinceLastCompress = 0;
+          this.lastCompressionTime = Date.now();
+        }
       }
-    }
 
-    return info;
+      return info;
+    } finally {
+      // Always clear compression lock
+      this.isCompressing = false;
+    }
   }
 }

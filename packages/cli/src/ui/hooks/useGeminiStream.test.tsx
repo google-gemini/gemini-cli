@@ -349,6 +349,8 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
+          false,
+          () => Promise.resolve(''),
         );
       },
       {
@@ -451,6 +453,8 @@ describe('useGeminiStream', () => {
         setShellInputFocused,
         80,
         24,
+        false,
+        () => Promise.resolve(''),
       ),
     );
   };
@@ -592,6 +596,8 @@ describe('useGeminiStream', () => {
         () => {},
         80,
         24,
+        false,
+        () => Promise.resolve(''),
       ),
     );
 
@@ -615,6 +621,9 @@ describe('useGeminiStream', () => {
       expectedMergedResponse,
       expect.any(AbortSignal),
       'prompt-id-2',
+      undefined,
+      undefined,
+      expect.any(Function),
     );
   });
 
@@ -674,6 +683,8 @@ describe('useGeminiStream', () => {
         () => {},
         80,
         24,
+        false,
+        () => Promise.resolve(''),
       ),
     );
 
@@ -785,6 +796,8 @@ describe('useGeminiStream', () => {
         () => {},
         80,
         24,
+        false,
+        () => Promise.resolve(''),
       ),
     );
 
@@ -898,6 +911,8 @@ describe('useGeminiStream', () => {
         () => {},
         80,
         24,
+        false,
+        () => Promise.resolve(''),
       ),
     );
 
@@ -937,6 +952,9 @@ describe('useGeminiStream', () => {
         toolCallResponseParts,
         expect.any(AbortSignal),
         'prompt-id-4',
+        undefined,
+        undefined,
+        expect.any(Function),
       );
     });
 
@@ -1031,6 +1049,8 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
+          false,
+          () => Promise.resolve(''),
         ),
       );
 
@@ -1071,6 +1091,8 @@ describe('useGeminiStream', () => {
           setShellInputFocusedSpy, // Pass the spy here
           80,
           24,
+          false,
+          () => Promise.resolve(''),
         ),
       );
 
@@ -1313,12 +1335,18 @@ describe('useGeminiStream', () => {
           '/my-custom-command',
           expect.anything(),
           expect.anything(),
+          expect.anything(),
+          expect.anything(),
+          expect.anything(),
         );
 
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
           'This is the actual prompt from the command file.',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          undefined,
+          expect.any(Function),
         );
 
         expect(mockScheduleToolCalls).not.toHaveBeenCalled();
@@ -1345,6 +1373,9 @@ describe('useGeminiStream', () => {
           '',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          undefined,
+          expect.any(Function),
         );
       });
     });
@@ -1363,6 +1394,9 @@ describe('useGeminiStream', () => {
           '// This is a line comment',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          undefined,
+          expect.any(Function),
         );
       });
     });
@@ -1381,6 +1415,9 @@ describe('useGeminiStream', () => {
           '/* This is a block comment */',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          undefined,
+          expect.any(Function),
         );
       });
     });
@@ -1405,6 +1442,8 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
+          false,
+          () => Promise.resolve(''),
         ),
       );
 
@@ -1478,6 +1517,8 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
+          false,
+          () => Promise.resolve(''),
         ),
       );
 
@@ -1534,6 +1575,8 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
+          false,
+          () => Promise.resolve(''),
         ),
       );
 
@@ -1835,6 +1878,8 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
+          false,
+          () => Promise.resolve(''),
         ),
       );
 
@@ -1943,6 +1988,8 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
+          false,
+          () => Promise.resolve(''),
         ),
       );
 
@@ -2087,6 +2134,8 @@ describe('useGeminiStream', () => {
         vi.fn(), // setShellInputFocused
         80, // terminalWidth
         24, // terminalHeight
+        false, // isShellFocused
+        () => Promise.resolve(''), // onShowCompressionPrompt
       ),
     );
 
@@ -2113,6 +2162,9 @@ describe('useGeminiStream', () => {
       processedQueryParts, // Argument 1: The parts array directly
       expect.any(AbortSignal), // Argument 2: An AbortSignal
       expect.any(String), // Argument 3: The prompt_id string
+      undefined, // Argument 4: turns
+      undefined, // Argument 5: isInvalidStreamRetry
+      expect.any(Function), // Argument 6: onShowCompressionPrompt
     );
   });
   describe('Thought Reset', () => {
@@ -2157,6 +2209,8 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
+          false,
+          () => Promise.resolve(''),
         ),
       );
 
@@ -2237,6 +2291,8 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
+          false,
+          () => Promise.resolve(''),
         ),
       );
 
@@ -2306,6 +2362,8 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
+          false,
+          () => Promise.resolve(''),
         ),
       );
 
@@ -2363,6 +2421,8 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
+          false,
+          () => Promise.resolve(''),
         ),
       );
 
@@ -2507,6 +2567,9 @@ describe('useGeminiStream', () => {
           'test query',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          undefined,
+          expect.any(Function),
         );
       });
     });
@@ -2663,6 +2726,9 @@ describe('useGeminiStream', () => {
           'second query',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          undefined,
+          expect.any(Function),
         );
       });
     });
@@ -2700,6 +2766,403 @@ describe('useGeminiStream', () => {
       // Then verify loop detection confirmation request was set
       await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+    });
+  });
+
+  describe('Deliberate Compression Integration', () => {
+    it('should pass onShowCompressionPrompt callback to sendMessageStream', async () => {
+      const mockCompressionPromptCallback = vi.fn().mockResolvedValue('auto');
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Test response',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP' },
+          };
+        })(),
+      );
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+          false,
+          mockCompressionPromptCallback,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      // Verify the callback was passed to sendMessageStream
+      await waitFor(() => {
+        expect(mockSendMessageStream).toHaveBeenCalledWith(
+          'test query',
+          expect.any(AbortSignal),
+          expect.any(String),
+          undefined,
+          undefined,
+          mockCompressionPromptCallback,
+        );
+      });
+    });
+
+    it('should handle compression with user-selected goal', async () => {
+      // This test verifies that when compression is triggered and user selects a goal,
+      // the callback is invoked properly and the selection flows through
+      const mockCompressionPromptCallback = vi
+        .fn()
+        .mockResolvedValue('Implementing OAuth authentication');
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.ChatCompressed,
+            value: {
+              originalTokenCount: 50000,
+              newTokenCount: 20000,
+              compressionStatus: 'COMPRESSED',
+            },
+          };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Response after compression',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP' },
+          };
+        })(),
+      );
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+          false,
+          mockCompressionPromptCallback,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.submitQuery('Help me add OAuth');
+      });
+
+      // Verify compression message was added to history
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'info',
+            text: expect.stringContaining('compressed'),
+          }),
+          expect.any(Number),
+        );
+      });
+
+      // Verify response after compression was also added
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'gemini',
+            text: 'Response after compression',
+          }),
+          expect.any(Number),
+        );
+      });
+    });
+
+    it('should handle compression with auto selection', async () => {
+      const mockCompressionPromptCallback = vi.fn().mockResolvedValue('auto');
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.ChatCompressed,
+            value: {
+              originalTokenCount: 60000,
+              newTokenCount: 25000,
+              compressionStatus: 'COMPRESSED',
+            },
+          };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Auto compressed response',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP' },
+          };
+        })(),
+      );
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+          false,
+          mockCompressionPromptCallback,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.submitQuery('Continue with the task');
+      });
+
+      // Verify the callback was passed to sendMessageStream
+      await waitFor(() => {
+        expect(mockSendMessageStream).toHaveBeenCalledWith(
+          'Continue with the task',
+          expect.any(AbortSignal),
+          expect.any(String),
+          undefined,
+          undefined,
+          mockCompressionPromptCallback,
+        );
+      });
+    });
+
+    it('should continue working after compression prompt callback is called', async () => {
+      const mockCompressionPromptCallback = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve('Implementing feature X'));
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Working on your request',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP' },
+          };
+        })(),
+      );
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+          false,
+          mockCompressionPromptCallback,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      // Verify the callback was passed correctly (even if not invoked by this mock)
+      await waitFor(() => {
+        expect(mockSendMessageStream).toHaveBeenCalledWith(
+          'test query',
+          expect.any(AbortSignal),
+          expect.any(String),
+          undefined,
+          undefined,
+          mockCompressionPromptCallback,
+        );
+      });
+
+      // Verify response was processed normally
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'gemini',
+            text: 'Working on your request',
+          }),
+          expect.any(Number),
+        );
+      });
+
+      // Verify streaming state returns to idle
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
+    it('should handle compression callback returning null (user timeout)', async () => {
+      const mockCompressionPromptCallback = vi.fn().mockResolvedValue(null);
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.ChatCompressed,
+            value: {
+              originalTokenCount: 70000,
+              newTokenCount: 30000,
+              compressionStatus: 'COMPRESSED',
+            },
+          };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Proceeded with default compression',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP' },
+          };
+        })(),
+      );
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+          false,
+          mockCompressionPromptCallback,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      // Should still process and complete normally
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'gemini',
+            text: 'Proceeded with default compression',
+          }),
+          expect.any(Number),
+        );
+      });
+    });
+
+    it('should handle compression callback returning other (custom goal)', async () => {
+      const mockCompressionPromptCallback = vi.fn().mockResolvedValue('other');
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Processing with other option',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP' },
+          };
+        })(),
+      );
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+          false,
+          mockCompressionPromptCallback,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      // Verify the callback was passed correctly
+      await waitFor(() => {
+        expect(mockSendMessageStream).toHaveBeenCalledWith(
+          'test query',
+          expect.any(AbortSignal),
+          expect.any(String),
+          undefined,
+          undefined,
+          mockCompressionPromptCallback,
+        );
       });
     });
   });

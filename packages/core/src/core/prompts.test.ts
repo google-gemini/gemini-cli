@@ -393,4 +393,43 @@ describe('resolvePathFromEnv helper function', () => {
       consoleSpy.mockRestore();
     });
   });
+
+  describe('getChatCompressionPrompt', () => {
+    it('should return base prompt without user goal', async () => {
+      const { getChatCompressionPrompt } = await import('./prompts.js');
+      const prompt = getChatCompressionPrompt();
+
+      expect(prompt).toContain('<state_snapshot>');
+      expect(prompt).toContain('<goal>');
+      expect(prompt).not.toContain('CURRENT FOCUS');
+    });
+
+    it('should prepend user goal section when provided', async () => {
+      const { getChatCompressionPrompt } = await import('./prompts.js');
+      const userGoal = 'Implementing user authentication';
+      const prompt = getChatCompressionPrompt(userGoal);
+
+      expect(prompt).toContain('CURRENT FOCUS');
+      expect(prompt).toContain(userGoal);
+      expect(prompt).toContain('Aggressively prioritize');
+    });
+
+    it('should include omitted section in XML structure', async () => {
+      const { getChatCompressionPrompt } = await import('./prompts.js');
+      const prompt = getChatCompressionPrompt('Test goal');
+
+      expect(prompt).toContain('<omitted>');
+      expect(prompt).toContain('what was dropped and why');
+    });
+
+    it('should include priority order and blockers section', async () => {
+      const { getChatCompressionPrompt } = await import('./prompts.js');
+      const prompt = getChatCompressionPrompt();
+
+      expect(prompt).toContain('PRIORITY ORDER');
+      expect(prompt).toContain('<blockers>');
+      expect(prompt).toContain('<decisions>');
+      expect(prompt).toContain('<next_steps>');
+    });
+  });
 });

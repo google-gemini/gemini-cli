@@ -120,6 +120,14 @@ export interface SettingDefinition {
    * Optional reference identifier for generators that emit a `$ref`.
    */
   ref?: string;
+  /**
+   * Minimum value for number settings.
+   */
+  min?: number;
+  /**
+   * Maximum value for number settings.
+   */
+  max?: number;
 }
 
 export interface SettingsSchema {
@@ -697,6 +705,84 @@ const SETTINGS_SCHEMA = {
         description:
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
+      },
+      compressionInteractive: {
+        type: 'boolean',
+        label: 'Interactive Compression',
+        category: 'Model',
+        requiresRestart: false,
+        default: true,
+        description: "Ask what you're working on before compressing.",
+        showInDialog: true,
+      },
+      compressionPromptTimeout: {
+        type: 'number',
+        label: 'Compression Prompt Timeout',
+        category: 'Model',
+        requiresRestart: false,
+        default: 30,
+        description:
+          'Seconds to wait for goal selection before auto-compressing.',
+        showInDialog: true,
+        min: 10,
+        max: 300,
+      },
+      compressionTriggerTokens: {
+        type: 'number',
+        label: 'Compression Trigger Tokens',
+        category: 'Model',
+        requiresRestart: false,
+        default: 40000,
+        description:
+          'Trigger compression at this token count (cost optimization).',
+        showInDialog: true,
+        min: 10000,
+        max: 200000,
+      },
+      compressionTriggerUtilization: {
+        type: 'number',
+        label: 'Compression Trigger Utilization',
+        category: 'Model',
+        requiresRestart: false,
+        default: 0.5,
+        description:
+          'Maximum utilization before forcing compression (safety valve).',
+        showInDialog: true,
+        min: 0.3,
+        max: 0.95,
+      },
+      compressionMinMessages: {
+        type: 'number',
+        label: 'Compression Minimum Messages',
+        category: 'Model',
+        requiresRestart: false,
+        default: 25,
+        description: 'Minimum messages required between compressions.',
+        showInDialog: true,
+        min: 5,
+        max: 100,
+      },
+      compressionMinTimeBetweenPrompts: {
+        type: 'number',
+        label: 'Compression Minimum Time Between Prompts',
+        category: 'Model',
+        requiresRestart: false,
+        default: 300,
+        description: 'Minimum time in seconds between compression prompts.',
+        showInDialog: false,
+        min: 60,
+        max: 1800,
+      },
+      compressionFrequencyMultiplier: {
+        type: 'number',
+        label: 'Compression Frequency Multiplier',
+        category: 'Model',
+        requiresRestart: false,
+        default: 1.5,
+        description: 'Multiplier when user requests less frequent check-ins.',
+        showInDialog: false,
+        min: 1.2,
+        max: 3.0,
       },
       skipNextSpeakerCheck: {
         type: 'boolean',
