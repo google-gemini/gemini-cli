@@ -184,7 +184,7 @@ context around the `old_string` to ensure it modifies the correct location.
   - If `old_string` is provided, it reads the `file_path` and attempts to find
     exactly one occurrence of `old_string`.
   - If one occurrence is found, it replaces it with `new_string`.
-  - **Enhanced Reliability (Multi-Stage Edit Correction):** To significantly
+  - **Enhanced reliability (multi-stage edit correction):** To significantly
     improve the success rate of edits, especially when the model-provided
     `old_string` might not be perfectly precise, the tool incorporates a
     multi-stage edit correction mechanism.

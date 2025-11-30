@@ -90,7 +90,7 @@ topics on:
     `advanced.excludedEnvVars` setting in your `settings.json` to exclude fewer
     variables.
 
-## Exit Codes
+## Exit codes
 
 The Gemini CLI uses specific exit codes to indicate the reason for termination.
 This is especially useful for scripting and automation.
@@ -103,7 +103,7 @@ This is especially useful for scripting and automation.
 | 52        | `FatalConfigError`         | A configuration file (`settings.json`) is invalid or contains errors.                               |
 | 53        | `FatalTurnLimitedError`    | The maximum number of conversational turns for the session was reached. (non-interactive mode only) |
 
-## Debugging Tips
+## Debugging tips
 
 - **CLI debugging:**
   - Use the `--verbose` flag (if available) with CLI commands for more detailed
@@ -129,7 +129,7 @@ This is especially useful for scripting and automation.
   - Always run `npm run preflight` before committing code. This can catch many
     common issues related to formatting, linting, and type errors.
 
-## Existing GitHub Issues similar to yours or creating new Issues
+## Existing GitHub issues similar to yours or creating new issues
 
 If you encounter an issue that was not covered here in this _Troubleshooting
 guide_, consider searching the Gemini CLI

@@ -1,4 +1,4 @@
-# Gemini CLI Model Selection (`/model` Command)
+# Gemini CLI model selection (`/model` command)
 
 Select your Gemini CLI model. The `/model` command opens a dialog where you can
 configure the model used by Gemini CLI, giving you more control over your
@@ -21,7 +21,7 @@ Running this command will open a dialog with your model options:
 | Flash              | For tasks that need a balance of speed and reasoning.         | gemini-2.5-flash                                                                           |
 | Flash-Lite         | For simple tasks that need to be done quickly.                | gemini-2.5-flash-lite                                                                      |
 
-### Gemini 3 Pro and Preview Features
+### Gemini 3 Pro and preview features
 
 Note: Gemini 3 is not currently available on all account types. To learn more
 about Gemini 3 access, refer to
