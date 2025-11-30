@@ -1297,6 +1297,11 @@ describe('isAcpModeFromArgs', () => {
     process.argv = [];
     expect(isAcpModeFromArgs()).toBe(false);
   });
+
+  it('should return true when --experimental-acp is passed with a value', () => {
+    process.argv = ['node', 'gemini', '--experimental-acp=true'];
+    expect(isAcpModeFromArgs()).toBe(true);
+  });
 });
 
 describe('ACP mode stdio patching', () => {

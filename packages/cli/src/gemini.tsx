@@ -286,7 +286,7 @@ export async function startInteractiveUI(
  * in ACP mode to allow raw stdout for JSON-RPC communication.
  */
 export function isAcpModeFromArgs(): boolean {
-  return process.argv.includes('--experimental-acp');
+  return process.argv.some((arg) => arg.startsWith('--experimental-acp'));
 }
 
 export async function main() {
