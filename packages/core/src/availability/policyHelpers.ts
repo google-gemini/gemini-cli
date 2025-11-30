@@ -34,7 +34,9 @@ export function resolvePolicyChain(config: Config): ModelPolicyChain {
     return chain;
   }
 
-  return [createDefaultPolicy(activeModel), ...chain];
+  // If the user specified a model not in the default chain, we assume they want
+  // *only* that model. We do not fallback to the default chain.
+  return [createDefaultPolicy(activeModel, { isLastResort: true })];
 }
 
 /**
@@ -52,9 +54,11 @@ export function buildFallbackPolicyContext(
   if (index === -1) {
     return { failedPolicy: undefined, candidates: chain };
   }
+  // Return [candidates_after, candidates_before] to prioritize downgrades
+  // (continuing the chain) before wrapping around to upgrades.
   return {
     failedPolicy: chain[index],
-    candidates: chain.slice(index + 1),
+    candidates: [...chain.slice(index + 1), ...chain.slice(0, index)],
   };
 }
 

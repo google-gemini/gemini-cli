@@ -22,6 +22,7 @@ describe('policyHelpers', () => {
         isInFallbackMode: () => false,
       } as unknown as Config;
       const chain = resolvePolicyChain(config);
+      expect(chain).toHaveLength(1);
       expect(chain[0]?.model).toBe('custom-model');
     });
 
@@ -46,7 +47,7 @@ describe('policyHelpers', () => {
       ];
       const context = buildFallbackPolicyContext(chain, 'b');
       expect(context.failedPolicy?.model).toBe('b');
-      expect(context.candidates.map((p) => p.model)).toEqual(['c']);
+      expect(context.candidates.map((p) => p.model)).toEqual(['c', 'a']);
     });
 
     it('returns full chain when model is not in policy list', () => {
