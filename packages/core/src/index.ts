@@ -148,6 +148,9 @@ export * from './test-utils/index.js';
 
 // Export hook types
 export * from './hooks/types.js';
+export * from './hooks/hookRunner.js';
+export * from './hooks/hookRegistry.js';
+export * from './hooks/hookTranslator.js';
 
 // Export stdio utils
 export * from './utils/stdio.js';

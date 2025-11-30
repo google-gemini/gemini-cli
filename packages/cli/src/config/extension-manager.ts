@@ -508,6 +508,7 @@ export class ExtensionManager extends ExtensionLoader {
         contextFiles,
         installMetadata,
         mcpServers: config.mcpServers,
+        hooks: config.hooks,
         excludeTools: config.excludeTools,
         isActive: this.extensionEnablementManager.isEnabled(
           config.name,

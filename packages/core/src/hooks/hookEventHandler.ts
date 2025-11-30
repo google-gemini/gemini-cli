@@ -444,7 +444,10 @@ export class HookEventHandler {
   ): Promise<AggregatedHookResult> {
     try {
       // Create execution plan
-      const plan = this.hookPlanner.createExecutionPlan(eventName, context);
+      const plan = await this.hookPlanner.createExecutionPlan(
+        eventName,
+        context,
+      );
 
       if (!plan || plan.hookConfigs.length === 0) {
         return {

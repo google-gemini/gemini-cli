@@ -37,15 +37,17 @@ describe('HookPlanner', () => {
   });
 
   describe('createExecutionPlan', () => {
-    it('should return empty plan when no hooks registered', () => {
+    it('should return empty plan when no hooks registered', async () => {
       vi.mocked(mockHookRegistry.getHooksForEvent).mockReturnValue([]);
 
-      const plan = hookPlanner.createExecutionPlan(HookEventName.BeforeTool);
+      const plan = await hookPlanner.createExecutionPlan(
+        HookEventName.BeforeTool,
+      );
 
       expect(plan).toBeNull();
     });
 
-    it('should create plan for hooks without matchers', () => {
+    it('should create plan for hooks without matchers', async () => {
       const mockEntries: HookRegistryEntry[] = [
         {
           config: { type: HookType.Command, command: './hook1.sh' },
@@ -66,7 +68,9 @@ describe('HookPlanner', () => {
 
       vi.mocked(mockHookRegistry.getHooksForEvent).mockReturnValue(mockEntries);
 
-      const plan = hookPlanner.createExecutionPlan(HookEventName.BeforeTool);
+      const plan = await hookPlanner.createExecutionPlan(
+        HookEventName.BeforeTool,
+      );
 
       expect(plan).not.toBeNull();
       expect(plan!.hookConfigs).toHaveLength(2);
@@ -74,7 +78,7 @@ describe('HookPlanner', () => {
       expect(plan!.hookConfigs[1].command).toBe('./test-hook.sh');
     });
 
-    it('should filter hooks by tool name matcher', () => {
+    it('should filter hooks by tool name matcher', async () => {
       const mockEntries: HookRegistryEntry[] = [
         {
           config: { type: HookType.Command, command: './edit_hook.sh' },
@@ -94,15 +98,18 @@ describe('HookPlanner', () => {
       vi.mocked(mockHookRegistry.getHooksForEvent).mockReturnValue(mockEntries);
 
       // Test with EditTool context
-      const plan = hookPlanner.createExecutionPlan(HookEventName.BeforeTool, {
-        toolName: 'EditTool',
-      });
+      const plan = await hookPlanner.createExecutionPlan(
+        HookEventName.BeforeTool,
+        {
+          toolName: 'EditTool',
+        },
+      );
 
       expect(plan).not.toBeNull();
       expect(plan!.hookConfigs).toHaveLength(2); // Both should match (one specific, one general)
     });
 
-    it('should filter hooks by regex matcher', () => {
+    it('should filter hooks by regex matcher', async () => {
       const mockEntries: HookRegistryEntry[] = [
         {
           config: { type: HookType.Command, command: './edit_hook.sh' },
@@ -123,7 +130,7 @@ describe('HookPlanner', () => {
       vi.mocked(mockHookRegistry.getHooksForEvent).mockReturnValue(mockEntries);
 
       // Test with EditTool - should match first hook
-      const editPlan = hookPlanner.createExecutionPlan(
+      const editPlan = await hookPlanner.createExecutionPlan(
         HookEventName.BeforeTool,
         { toolName: 'EditTool' },
       );
@@ -132,7 +139,7 @@ describe('HookPlanner', () => {
       expect(editPlan!.hookConfigs[0].command).toBe('./edit_hook.sh');
 
       // Test with WriteTool - should match first hook
-      const writePlan = hookPlanner.createExecutionPlan(
+      const writePlan = await hookPlanner.createExecutionPlan(
         HookEventName.BeforeTool,
         { toolName: 'WriteTool' },
       );
@@ -141,7 +148,7 @@ describe('HookPlanner', () => {
       expect(writePlan!.hookConfigs[0].command).toBe('./edit_hook.sh');
 
       // Test with ReadTool - should match second hook
-      const readPlan = hookPlanner.createExecutionPlan(
+      const readPlan = await hookPlanner.createExecutionPlan(
         HookEventName.BeforeTool,
         { toolName: 'ReadTool' },
       );
@@ -150,14 +157,14 @@ describe('HookPlanner', () => {
       expect(readPlan!.hookConfigs[0].command).toBe('./read_hook.sh');
 
       // Test with unmatched tool - should match no hooks
-      const otherPlan = hookPlanner.createExecutionPlan(
+      const otherPlan = await hookPlanner.createExecutionPlan(
         HookEventName.BeforeTool,
         { toolName: 'OtherTool' },
       );
       expect(otherPlan).toBeNull();
     });
 
-    it('should handle wildcard matcher', () => {
+    it('should handle wildcard matcher', async () => {
       const mockEntries: HookRegistryEntry[] = [
         {
           config: { type: HookType.Command, command: './wildcard_hook.sh' },
@@ -170,15 +177,18 @@ describe('HookPlanner', () => {
 
       vi.mocked(mockHookRegistry.getHooksForEvent).mockReturnValue(mockEntries);
 
-      const plan = hookPlanner.createExecutionPlan(HookEventName.BeforeTool, {
-        toolName: 'AnyTool',
-      });
+      const plan = await hookPlanner.createExecutionPlan(
+        HookEventName.BeforeTool,
+        {
+          toolName: 'AnyTool',
+        },
+      );
 
       expect(plan).not.toBeNull();
       expect(plan!.hookConfigs).toHaveLength(1);
     });
 
-    it('should handle empty string matcher', () => {
+    it('should handle empty string matcher', async () => {
       const mockEntries: HookRegistryEntry[] = [
         {
           config: {
@@ -194,15 +204,18 @@ describe('HookPlanner', () => {
 
       vi.mocked(mockHookRegistry.getHooksForEvent).mockReturnValue(mockEntries);
 
-      const plan = hookPlanner.createExecutionPlan(HookEventName.BeforeTool, {
-        toolName: 'AnyTool',
-      });
+      const plan = await hookPlanner.createExecutionPlan(
+        HookEventName.BeforeTool,
+        {
+          toolName: 'AnyTool',
+        },
+      );
 
       expect(plan).not.toBeNull();
       expect(plan!.hookConfigs).toHaveLength(1);
     });
 
-    it('should handle invalid regex matcher gracefully', () => {
+    it('should handle invalid regex matcher gracefully', async () => {
       const mockEntries: HookRegistryEntry[] = [
         {
           config: {
@@ -219,15 +232,18 @@ describe('HookPlanner', () => {
       vi.mocked(mockHookRegistry.getHooksForEvent).mockReturnValue(mockEntries);
 
       // Should match when toolName exactly equals the invalid regex pattern
-      const plan = hookPlanner.createExecutionPlan(HookEventName.BeforeTool, {
-        toolName: '[invalid-regex',
-      });
+      const plan = await hookPlanner.createExecutionPlan(
+        HookEventName.BeforeTool,
+        {
+          toolName: '[invalid-regex',
+        },
+      );
 
       expect(plan).not.toBeNull();
       expect(plan!.hookConfigs).toHaveLength(1); // Should fall back to exact match
 
       // Should not match when toolName doesn't exactly equal the pattern
-      const planNoMatch = hookPlanner.createExecutionPlan(
+      const planNoMatch = await hookPlanner.createExecutionPlan(
         HookEventName.BeforeTool,
         {
           toolName: 'other-tool',
@@ -237,7 +253,7 @@ describe('HookPlanner', () => {
       expect(planNoMatch).toBeNull();
     });
 
-    it('should deduplicate identical hooks', () => {
+    it('should deduplicate identical hooks', async () => {
       const mockEntries: HookRegistryEntry[] = [
         {
           config: { type: HookType.Command, command: './same_hook.sh' },
@@ -273,7 +289,9 @@ describe('HookPlanner', () => {
 
       vi.mocked(mockHookRegistry.getHooksForEvent).mockReturnValue(mockEntries);
 
-      const plan = hookPlanner.createExecutionPlan(HookEventName.BeforeTool);
+      const plan = await hookPlanner.createExecutionPlan(
+        HookEventName.BeforeTool,
+      );
 
       expect(plan).not.toBeNull();
       expect(plan!.hookConfigs).toHaveLength(2); // Should be deduplicated to 2 unique hooks
@@ -282,7 +300,7 @@ describe('HookPlanner', () => {
       );
     });
 
-    it('should match trigger for session events', () => {
+    it('should match trigger for session events', async () => {
       const mockEntries: HookRegistryEntry[] = [
         {
           config: { type: HookType.Command, command: './startup_hook.sh' },
@@ -303,7 +321,7 @@ describe('HookPlanner', () => {
       vi.mocked(mockHookRegistry.getHooksForEvent).mockReturnValue(mockEntries);
 
       // Test startup trigger
-      const startupPlan = hookPlanner.createExecutionPlan(
+      const startupPlan = await hookPlanner.createExecutionPlan(
         HookEventName.SessionStart,
         { trigger: 'startup' },
       );
@@ -312,7 +330,7 @@ describe('HookPlanner', () => {
       expect(startupPlan!.hookConfigs[0].command).toBe('./startup_hook.sh');
 
       // Test resume trigger
-      const resumePlan = hookPlanner.createExecutionPlan(
+      const resumePlan = await hookPlanner.createExecutionPlan(
         HookEventName.SessionStart,
         { trigger: 'resume' },
       );

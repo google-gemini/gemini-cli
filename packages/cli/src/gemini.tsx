@@ -57,6 +57,8 @@ import {
   disableLineWrapping,
   shouldEnterAlternateScreen,
   ExitCodes,
+  SessionStartSource,
+  SessionEndReason,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -570,6 +572,33 @@ export async function main() {
     }
 
     await config.initialize();
+
+    // Hook: SessionStart - use HookSystem if available
+    const hookSystem = config.getHookSystem();
+    if (hookSystem) {
+      try {
+        const source = argv.resume
+          ? SessionStartSource.Resume
+          : SessionStartSource.Startup;
+        await hookSystem.getEventHandler().fireSessionStartEvent(source);
+      } catch (error) {
+        // Log the error but don't block startup
+        debugLogger.error('Error executing SessionStart hooks:', error);
+      }
+    }
+
+    // Register SessionEnd hook
+    registerCleanup(async () => {
+      if (hookSystem) {
+        try {
+          await hookSystem
+            .getEventHandler()
+            .fireSessionEndEvent(SessionEndReason.Exit);
+        } catch (error) {
+          debugLogger.error('Error executing SessionEnd hooks:', error);
+        }
+      }
+    });
 
     // If not a TTY, read from stdin
     // This is for cases where the user pipes input directly into the command

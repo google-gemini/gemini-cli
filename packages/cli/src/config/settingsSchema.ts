@@ -1419,6 +1419,16 @@ const SETTINGS_SCHEMA = {
     showInDialog: false,
     mergeStrategy: MergeStrategy.SHALLOW_MERGE,
   },
+  disabledHooks: {
+    type: 'array',
+    label: 'Disabled Hooks',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: [] as string[],
+    description:
+      'List of hook command names that are disabled. This persists across sessions for all hook sources (user config, extensions, etc.).',
+    showInDialog: false,
+  },
 } as const satisfies SettingsSchema;
 
 export type SettingsSchemaType = typeof SETTINGS_SCHEMA;

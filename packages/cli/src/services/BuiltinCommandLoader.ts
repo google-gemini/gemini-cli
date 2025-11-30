@@ -21,6 +21,7 @@ import { directoryCommand } from '../ui/commands/directoryCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
+import { hooksCommand } from '../ui/commands/hooksCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
 import { initCommand } from '../ui/commands/initCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
@@ -56,6 +57,16 @@ export class BuiltinCommandLoader implements ICommandLoader {
    * @returns A promise that resolves to an array of `SlashCommand` objects.
    */
   async loadCommands(_signal: AbortSignal): Promise<SlashCommand[]> {
+    let ideCmd: SlashCommand | null = null;
+    try {
+      ideCmd = await ideCommand();
+    } catch (_e) {
+      // This can happen if the IDE client fails to initialize.
+      // We don't want to crash the whole CLI if this happens.
+      // The error is likely already logged by the IDE client or will be logged here.
+      // debugLogger.warn('Failed to load ideCommand:', _e);
+    }
+
     const allDefinitions: Array<SlashCommand | null> = [
       aboutCommand,
       authCommand,
@@ -70,7 +81,8 @@ export class BuiltinCommandLoader implements ICommandLoader {
       editorCommand,
       extensionsCommand(this.config?.getEnableExtensionReloading()),
       helpCommand,
-      await ideCommand(),
+      hooksCommand,
+      ideCmd,
       initCommand,
       mcpCommand,
       memoryCommand,
