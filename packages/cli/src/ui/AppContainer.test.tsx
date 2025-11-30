@@ -1817,7 +1817,7 @@ describe('AppContainer State Management', () => {
     // Helper to extract arguments from the useGeminiStream hook call
     // This isolates the positional argument dependency to a single location
     const extractUseGeminiStreamArgs = (args: unknown[]) => ({
-      onCancelSubmit: args[13] as (shouldRestorePrompt?: boolean) => void,
+      onCancelSubmit: args[14] as (shouldRestorePrompt?: boolean) => void,
     });
 
     beforeEach(() => {

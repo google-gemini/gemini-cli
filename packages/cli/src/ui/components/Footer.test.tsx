@@ -38,6 +38,8 @@ const mockSessionStats: SessionStatsState = {
   sessionId: 'test-session',
   sessionStartTime: new Date(),
   lastPromptTokenCount: 0,
+  lastCandidatesTokenCount: 0,
+  lastTotalTokenCount: 0,
   promptCount: 0,
   metrics: {
     models: {},

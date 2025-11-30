@@ -23,6 +23,7 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     toggleCorgiMode: () => {},
     toggleDebugProfiler: () => {},
     toggleVimEnabled: async () => false,
+    setIsPlanMode: () => {},
     reloadCommands: () => {},
     extensionsUpdateState: new Map(),
     dispatchExtensionStateUpdate: (_action: ExtensionUpdateAction) => {},

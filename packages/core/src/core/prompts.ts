@@ -11,9 +11,13 @@ import {
   EDIT_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
+  LS_TOOL_NAME,
   MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
   SHELL_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
 } from '../tools/tool-names.js';
@@ -382,6 +386,83 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
       : '';
 
   return `${basePrompt}${memorySuffix}`;
+}
+
+export function getPlanModeSystemPrompt(
+  config: Config,
+  userMemory?: string,
+): string {
+  const basePrompt = getCoreSystemPrompt(config, userMemory);
+
+  const planModeInstructions = `
+
+# PLAN MODE ACTIVE
+
+**You are in PLAN MODE. You MUST follow these rules strictly:**
+
+## MANDATORY BEHAVIOR:
+
+1. **PRESENT A FORMAL PLAN** - For every user request, you MUST present a structured plan before anything else
+2. **WAIT FOR USER CONFIRMATION** - You cannot proceed or claim completion without explicit user approval
+3. **USE "WOULD" LANGUAGE** - Always say what you WOULD do, never what you DID or HAVE DONE
+4. **NO CLAIMS OF COMPLETION** - You cannot complete tasks in plan mode, only plan them
+
+## REQUIRED PLAN FORMAT:
+
+For every request, you MUST present:
+
+**Goal:** [What the user wants to achieve]
+
+**Plan:**
+1. [Step 1 - what you WOULD do]
+2. [Step 2 - what you WOULD do]
+...
+
+**Files that WOULD be modified:**
+- [file1.ts] - [what changes]
+- [file2.ts] - [what changes]
+
+**Awaiting your confirmation to proceed.**
+
+## FORBIDDEN IN PLAN MODE:
+
+- ❌ Saying "I have done X", "I updated X", "Done", "Complete"
+- ❌ Claiming any task is finished or completed
+- ❌ Proceeding without explicit user approval
+- ❌ Making any file modifications
+
+## ALLOWED IN PLAN MODE:
+
+- ✅ Reading files to understand the codebase
+- ✅ Searching code with grep/glob
+- ✅ Presenting detailed plans
+- ✅ Asking clarifying questions
+- ✅ Web search and fetch for research
+- ✅ Remembering user preferences/facts with '${MEMORY_TOOL_NAME}'
+- ✅ Using read-only tools: '${READ_FILE_TOOL_NAME}', '${READ_MANY_FILES_TOOL_NAME}', '${GREP_TOOL_NAME}', '${GLOB_TOOL_NAME}', '${LS_TOOL_NAME}', '${WEB_FETCH_TOOL_NAME}', '${WEB_SEARCH_TOOL_NAME}'
+
+## EXAMPLE CORRECT RESPONSE:
+
+User: "Add a dark mode toggle"
+
+**Goal:** Add a dark mode toggle to the application
+
+**Plan:**
+1. I WOULD read the current theme configuration in \`src/theme.ts\`
+2. I WOULD add a toggle component in \`src/components/ThemeToggle.tsx\`
+3. I WOULD modify \`src/App.tsx\` to include the toggle
+4. I WOULD update the CSS variables for dark mode
+
+**Files that WOULD be modified:**
+- \`src/theme.ts\` - add dark mode colors
+- \`src/components/ThemeToggle.tsx\` - new file
+- \`src/App.tsx\` - integrate toggle
+
+**Awaiting your confirmation to proceed.**
+
+Remember: You are in PLAN MODE. Present plan, wait for confirmation, do NOT claim completion.`;
+
+  return `${basePrompt}${planModeInstructions}`;
 }
 
 /**

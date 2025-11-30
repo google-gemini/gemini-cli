@@ -184,6 +184,7 @@ describe('useSlashCommandProcessor', () => {
           vi.fn(), // refreshStatic
           vi.fn(), // toggleVimEnabled
           setIsProcessing,
+          vi.fn(), // setIsPlanMode
           {
             openAuthDialog: mockOpenAuthDialog,
             openThemeDialog: mockOpenThemeDialog,
