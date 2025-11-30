@@ -8,7 +8,6 @@ import type { Config } from '../config/config.js';
 import { AuthType } from '../core/contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
   getFallbackModel,
 } from '../config/models.js';
@@ -120,25 +119,8 @@ async function legacyHandleFallback(
   ) {
     return null;
   }
-  const shouldActivatePreviewFallback =
-    failedModel === PREVIEW_GEMINI_MODEL &&
-    !(error instanceof TerminalQuotaError);
-  // Preview Model Specific Logic
-  if (shouldActivatePreviewFallback) {
-    // Always set bypass mode for the immediate retry, for non-TerminalQuotaErrors.
-    // This ensures the next attempt uses 2.5 Pro.
-    config.setPreviewModelBypassMode(true);
 
-    // If we are already in Preview Model fallback mode (user previously said "Always"),
-    // we silently retry (which will use 2.5 Pro due to bypass mode).
-    if (config.isPreviewModelFallbackMode()) {
-      return true;
-    }
-  }
-
-  const fallbackModel = shouldActivatePreviewFallback
-    ? DEFAULT_GEMINI_MODEL
-    : DEFAULT_GEMINI_FLASH_MODEL;
+  const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
 
   // Consult UI Handler for Intent
   const fallbackModelHandler = config.fallbackModelHandler;
