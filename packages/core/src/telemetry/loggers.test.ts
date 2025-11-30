@@ -637,50 +637,249 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      getContentGeneratorConfig: () => ({
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      }),
     } as Config;
 
     it('should log an API request with request_text', () => {
       const event = new ApiRequestEvent(
         'test-model',
-        'prompt-id-7',
+        {
+          prompt_id: 'prompt-id-7',
+          contents: [],
+        },
         'This is a test request',
       );
 
       logApiRequest(mockConfig, event);
 
-      expect(mockLogger.emit).toHaveBeenCalledWith({
+      expect(mockLogger.emit).toHaveBeenNthCalledWith(1, {
         body: 'API request to test-model.',
-        attributes: {
-          'session.id': 'test-session-id',
-          'user.email': 'test-user@example.com',
-          'installation.id': 'test-installation-id',
+        attributes: expect.objectContaining({
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           interactive: false,
           model: 'test-model',
           request_text: 'This is a test request',
           prompt_id: 'prompt-id-7',
-        },
+        }),
+      });
+
+      expect(mockLogger.emit).toHaveBeenNthCalledWith(2, {
+        body: 'GenAI operation request details from test-model.',
+        attributes: expect.objectContaining({
+          'event.name': 'gen_ai.client.inference.operation.details',
+          'gen_ai.request.model': 'test-model',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+        }),
       });
     });
 
     it('should log an API request without request_text', () => {
-      const event = new ApiRequestEvent('test-model', 'prompt-id-6');
+      const event = new ApiRequestEvent('test-model', {
+        prompt_id: 'prompt-id-6',
+        contents: [],
+      });
 
       logApiRequest(mockConfig, event);
 
-      expect(mockLogger.emit).toHaveBeenCalledWith({
+      expect(mockLogger.emit).toHaveBeenNthCalledWith(1, {
         body: 'API request to test-model.',
-        attributes: {
-          'session.id': 'test-session-id',
-          'user.email': 'test-user@example.com',
-          'installation.id': 'test-installation-id',
+        attributes: expect.objectContaining({
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           interactive: false,
           model: 'test-model',
           prompt_id: 'prompt-id-6',
+        }),
+      });
+
+      expect(mockLogger.emit).toHaveBeenNthCalledWith(2, {
+        body: 'GenAI operation request details from test-model.',
+        attributes: expect.objectContaining({
+          'event.name': 'gen_ai.client.inference.operation.details',
+          'gen_ai.request.model': 'test-model',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+        }),
+      });
+    });
+
+    it('should log an API request with full semantic details when logPrompts is enabled', () => {
+      const mockConfigWithPrompts = {
+        getSessionId: () => 'test-session-id',
+        getTargetDir: () => 'target-dir',
+        getUsageStatisticsEnabled: () => true,
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => true, // Enabled
+        isInteractive: () => false,
+        getContentGeneratorConfig: () => ({
+          authType: AuthType.USE_GEMINI,
+        }),
+      } as Config;
+
+      const promptDetails = {
+        prompt_id: 'prompt-id-semantic-1',
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: 'Semantic request test' }],
+          },
+        ],
+        generate_content_config: {
+          temperature: 0.5,
+          topP: 0.8,
+          topK: 10,
+          responseMimeType: 'application/json',
+          candidateCount: 1,
+          stopSequences: ['end'],
+          systemInstruction: {
+            role: 'model',
+            parts: [{ text: 'be helpful' }],
+          },
         },
+        server: {
+          address: 'semantic-api.example.com',
+          port: 8080,
+        },
+      };
+
+      const event = new ApiRequestEvent(
+        'test-model',
+        promptDetails,
+        'Full semantic request',
+      );
+
+      logApiRequest(mockConfigWithPrompts, event);
+
+      // Expect two calls to emit: one for the regular log, one for the semantic log
+      expect(mockLogger.emit).toHaveBeenCalledTimes(2);
+
+      // Verify the first (original) log record
+      expect(mockLogger.emit).toHaveBeenNthCalledWith(1, {
+        body: 'API request to test-model.',
+        attributes: expect.objectContaining({
+          'event.name': EVENT_API_REQUEST,
+          prompt_id: 'prompt-id-semantic-1',
+        }),
+      });
+
+      // Verify the second (semantic) log record
+      expect(mockLogger.emit).toHaveBeenNthCalledWith(2, {
+        body: 'GenAI operation request details from test-model.',
+        attributes: expect.objectContaining({
+          'event.name': 'gen_ai.client.inference.operation.details',
+          'gen_ai.request.model': 'test-model',
+          'gen_ai.request.temperature': 0.5,
+          'gen_ai.request.top_p': 0.8,
+          'gen_ai.request.top_k': 10,
+          'gen_ai.input.messages': JSON.stringify([
+            {
+              role: 'user',
+              parts: [{ type: 'text', content: 'Semantic request test' }],
+            },
+          ]),
+          'server.address': 'semantic-api.example.com',
+          'server.port': 8080,
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+          'gen_ai.output.type': 'json',
+          'gen_ai.request.stop_sequences': ['end'],
+          'gen_ai.system_instructions': JSON.stringify([
+            { type: 'text', content: 'be helpful' },
+          ]),
+        }),
+      });
+    });
+
+    it('should log an API request with semantic details, but without prompts when logPrompts is disabled', () => {
+      const mockConfigWithoutPrompts = {
+        getSessionId: () => 'test-session-id',
+        getTargetDir: () => 'target-dir',
+        getUsageStatisticsEnabled: () => true,
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => false, // Disabled
+        isInteractive: () => false,
+        getContentGeneratorConfig: () => ({
+          authType: AuthType.USE_VERTEX_AI,
+        }),
+      } as Config;
+
+      const promptDetails = {
+        prompt_id: 'prompt-id-semantic-2',
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: 'This prompt should be hidden' }],
+          },
+        ],
+        generate_content_config: {},
+        model: 'gemini-1.0-pro',
+      };
+
+      const event = new ApiRequestEvent(
+        'gemini-1.0-pro',
+        promptDetails,
+        'Request with hidden prompt',
+      );
+
+      logApiRequest(mockConfigWithoutPrompts, event);
+
+      // Expect two calls to emit
+      expect(mockLogger.emit).toHaveBeenCalledTimes(2);
+
+      // Get the arguments of the second (semantic) log call
+      const semanticLogCall = mockLogger.emit.mock.calls[1][0];
+
+      // Assert on the body
+      expect(semanticLogCall.body).toBe(
+        'GenAI operation request details from gemini-1.0-pro.',
+      );
+
+      // Assert on specific attributes
+      const attributes = semanticLogCall.attributes;
+      expect(attributes['event.name']).toBe(
+        'gen_ai.client.inference.operation.details',
+      );
+      expect(attributes['gen_ai.request.model']).toBe('gemini-1.0-pro');
+      expect(attributes['gen_ai.provider.name']).toBe('gcp.vertex_ai');
+      // Ensure prompt messages are NOT included
+      expect(attributes['gen_ai.input.messages']).toBeUndefined();
+    });
+
+    it('should correctly derive model from prompt details if available in semantic log', () => {
+      const mockConfig = {
+        getSessionId: () => 'test-session-id',
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => true,
+        isInteractive: () => false,
+        getUsageStatisticsEnabled: () => true,
+        getContentGeneratorConfig: () => ({
+          authType: AuthType.USE_GEMINI,
+        }),
+      } as Config;
+
+      const promptDetails = {
+        prompt_id: 'prompt-id-semantic-3',
+        contents: [],
+        model: 'my-custom-model',
+      };
+
+      const event = new ApiRequestEvent(
+        'my-custom-model',
+        promptDetails,
+        'Request with custom model',
+      );
+
+      logApiRequest(mockConfig, event);
+
+      // Verify the second (semantic) log record
+      expect(mockLogger.emit).toHaveBeenNthCalledWith(2, {
+        body: 'GenAI operation request details from my-custom-model.',
+        attributes: expect.objectContaining({
+          'event.name': 'gen_ai.client.inference.operation.details',
+          'gen_ai.request.model': 'my-custom-model',
+        }),
       });
     });
   });
