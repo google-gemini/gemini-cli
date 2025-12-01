@@ -10,7 +10,15 @@ For the full changelog, refer to
 [Releases - google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli/releases)
 on GitHub.
 
-## Release v0.20.0-nightly.20251127.5bed97064
+## Current Releases
+
+| Release channel | Release                            | Notes                                           |
+| :-------------- | :--------------------------------- | :---------------------------------------------- |
+| Nightly         | v0.19.0-nightly.20251126.03845198c | Nightly release with the most recent changes.   |
+| Preview         | v0.19.0-preview.0                  | Experimental features ready for early feedback. |
+| Stable          | v0.18.0                            | Stable, recommended for general use.            |
+
+## Release v0.20.0-nightly.20251127.5bed97064 (Nightly)
 
 ### What's Changed
 
@@ -49,7 +57,7 @@ on GitHub.
 **Full Changelog**:
 https://github.com/google-gemini/gemini-cli/compare/v0.19.0-nightly.20251126.03845198c...v0.20.0-nightly.20251127.5bed97064
 
-## Release v0.19.0-preview.0
+## Release v0.19.0-preview.0 (Preview)
 
 ### What's Changed
 
@@ -210,7 +218,7 @@ https://github.com/google-gemini/gemini-cli/compare/v0.18.0-preview.4...v0.19.0-
 **Full Changelog**:
 https://github.com/google-gemini/gemini-cli/compare/v0.19.0-nightly.20251125.f6d97d448...v0.19.0-nightly.20251126.03845198c
 
-## Release v0.18.4
+## Release v0.18.4 (Latest)
 
 ## What's Changed
 
