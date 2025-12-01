@@ -24,12 +24,12 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │ ●  4. Default Dark                           │ 3     a, b = 0, 1                               │ │
 │    5. Dracula Dark                           │ 4     for _ in range(n):                        │ │
 │    6. GitHub Dark                            │ 5         a, b = b, a + b                       │ │
-│    7. Shades Of Purple Dark                  │ 6     return a                                  │ │
-│    8. ANSI Light Light                       │                                                 │ │
-│    9. Ayu Light Light                        │ 1 - print("Hello, " + name)                     │ │
-│   10. Default Light Light                    │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. GitHub Light Light                     │                                                 │ │
-│   12. Google Code Light                      └─────────────────────────────────────────────────┘ │
+│    7. Holiday Dark                           │ 6     return a                                  │ │
+│    8. Shades Of Purple Dark                  │                                                 │ │
+│    9. ANSI Light Light                       │ 1 - print("Hello, " + name)                     │ │
+│   10. Ayu Light Light                        │ 1 + print(f"Hello, {name}!")                    │ │
+│   11. Default Light Light                    │                                                 │ │
+│   12. GitHub Light Light                     └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
