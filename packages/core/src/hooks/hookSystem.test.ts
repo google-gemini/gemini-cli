@@ -96,6 +96,7 @@ describe('HookSystem Integration', () => {
       stdin: {
         write: vi.fn(),
         end: vi.fn(),
+        on: vi.fn(),
       } as unknown as Writable,
       stdout: {
         on: mockStdoutOn,
