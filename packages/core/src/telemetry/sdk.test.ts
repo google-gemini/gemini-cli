@@ -21,6 +21,9 @@ import {
 } from './gcp-exporters.js';
 import { TelemetryTarget } from './index.js';
 
+import * as os from 'node:os';
+import * as path from 'node:path';
+
 vi.mock('@opentelemetry/exporter-trace-otlp-grpc');
 vi.mock('@opentelemetry/exporter-logs-otlp-grpc');
 vi.mock('@opentelemetry/exporter-metrics-otlp-grpc');
@@ -217,5 +220,20 @@ describe('Telemetry SDK', () => {
         delete process.env['GOOGLE_CLOUD_PROJECT'];
       }
     }
+  });
+
+  it('should not use OTLP exporters when telemetryOutfile is set', () => {
+    vi.spyOn(mockConfig, 'getTelemetryOutfile').mockReturnValue(
+      path.join(os.tmpdir(), 'test.log'),
+    );
+    initializeTelemetry(mockConfig);
+
+    expect(OTLPTraceExporter).not.toHaveBeenCalled();
+    expect(OTLPLogExporter).not.toHaveBeenCalled();
+    expect(OTLPMetricExporter).not.toHaveBeenCalled();
+    expect(OTLPTraceExporterHttp).not.toHaveBeenCalled();
+    expect(OTLPLogExporterHttp).not.toHaveBeenCalled();
+    expect(OTLPMetricExporterHttp).not.toHaveBeenCalled();
+    expect(NodeSDK.prototype.start).toHaveBeenCalled();
   });
 });

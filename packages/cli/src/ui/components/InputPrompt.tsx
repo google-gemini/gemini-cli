@@ -5,8 +5,9 @@
  */
 
 import type React from 'react';
+import clipboardy from 'clipboardy';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
@@ -24,14 +25,43 @@ import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode } from '@google/gemini-cli-core';
-import { parseInputForHighlighting } from '../utils/highlight.js';
+import {
+  parseInputForHighlighting,
+  buildSegmentsForVisualSlice,
+} from '../utils/highlight.js';
+import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import {
   clipboardHasImage,
   saveClipboardImage,
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
+import {
+  isAutoExecutableCommand,
+  isSlashCommand,
+} from '../utils/commandUtils.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
+import { useShellFocusState } from '../contexts/ShellFocusContext.js';
+import { useUIState } from '../contexts/UIStateContext.js';
+import { StreamingState } from '../types.js';
+import { useMouseClick } from '../hooks/useMouseClick.js';
+import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
+
+/**
+ * Returns if the terminal can be trusted to handle paste events atomically
+ * rather than potentially sending multiple paste events separated by line
+ * breaks which could trigger unintended command execution.
+ */
+export function isTerminalPasteTrusted(
+  kittyProtocolSupported: boolean,
+): boolean {
+  // Ideally we could trust all VSCode family terminals as well but it appears
+  // we cannot as Cursor users on windows reported being impacted by this
+  // issue (https://github.com/google-gemini/gemini-cli/issues/3763).
+  return kittyProtocolSupported;
+}
+
 export interface InputPromptProps {
   buffer: TextBuffer;
   onSubmit: (value: string) => void;
@@ -48,9 +78,31 @@ export interface InputPromptProps {
   setShellModeActive: (value: boolean) => void;
   approvalMode: ApprovalMode;
   onEscapePromptChange?: (showPrompt: boolean) => void;
+  onSuggestionsVisibilityChange?: (visible: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
-  isShellFocused?: boolean;
+  isEmbeddedShellFocused?: boolean;
+  setQueueErrorMessage: (message: string | null) => void;
+  streamingState: StreamingState;
+  popAllMessages?: (onPop: (messages: string | undefined) => void) => void;
+  suggestionsPosition?: 'above' | 'below';
+  setBannerVisible: (visible: boolean) => void;
 }
+
+// The input content, input container, and input suggestions list may have different widths
+export const calculatePromptWidths = (mainContentWidth: number) => {
+  const FRAME_PADDING_AND_BORDER = 4; // Border (2) + padding (2)
+  const PROMPT_PREFIX_WIDTH = 2; // '> ' or '! '
+
+  const FRAME_OVERHEAD = FRAME_PADDING_AND_BORDER + PROMPT_PREFIX_WIDTH;
+  const suggestionsWidth = Math.max(20, mainContentWidth);
+
+  return {
+    inputWidth: Math.max(mainContentWidth - FRAME_OVERHEAD, 1),
+    containerWidth: mainContentWidth,
+    suggestionsWidth,
+    frameOverhead: FRAME_OVERHEAD,
+  } as const;
+};
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
   buffer,
@@ -68,15 +120,28 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
   approvalMode,
   onEscapePromptChange,
+  onSuggestionsVisibilityChange,
   vimHandleInput,
-  isShellFocused,
+  isEmbeddedShellFocused,
+  setQueueErrorMessage,
+  streamingState,
+  popAllMessages,
+  suggestionsPosition = 'below',
+  setBannerVisible,
 }) => {
+  const kittyProtocol = useKittyKeyboardProtocol();
+  const isShellFocused = useShellFocusState();
+  const { setEmbeddedShellFocused } = useUIActions();
+  const { mainAreaWidth } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
-  const [escPressCount, setEscPressCount] = useState(0);
+  const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [recentPasteTime, setRecentPasteTime] = useState<number | null>(null);
+  const [recentUnsafePasteTime, setRecentUnsafePasteTime] = useState<
+    number | null
+  >(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const innerBoxRef = useRef<DOMElement>(null);
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -105,6 +170,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     slashCommands,
     commandContext,
     reverseSearchActive,
+    shellModeActive,
     config,
   );
 
@@ -126,12 +192,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const resetCommandSearchCompletionState =
     commandSearchCompletion.resetCompletionState;
 
+  const showCursor = focus && isShellFocused && !isEmbeddedShellFocused;
+
   const resetEscapeState = useCallback(() => {
     if (escapeTimerRef.current) {
       clearTimeout(escapeTimerRef.current);
       escapeTimerRef.current = null;
     }
-    setEscPressCount(0);
+    escPressCount.current = 0;
     setShowEscapePrompt(false);
   }, []);
 
@@ -177,6 +245,31 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ],
   );
 
+  const handleSubmit = useCallback(
+    (submittedValue: string) => {
+      const trimmedMessage = submittedValue.trim();
+      const isSlash = isSlashCommand(trimmedMessage);
+
+      const isShell = shellModeActive;
+      if (
+        (isSlash || isShell) &&
+        streamingState === StreamingState.Responding
+      ) {
+        setQueueErrorMessage(
+          `${isShell ? 'Shell' : 'Slash'} commands cannot be queued`,
+        );
+        return;
+      }
+      handleSubmitAndClear(trimmedMessage);
+    },
+    [
+      handleSubmitAndClear,
+      shellModeActive,
+      streamingState,
+      setQueueErrorMessage,
+    ],
+  );
+
   const customSetTextAndResetCompletionSignal = useCallback(
     (newText: string) => {
       buffer.setText(newText);
@@ -213,8 +306,25 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     resetCommandSearchCompletionState,
   ]);
 
+  // Helper function to handle loading queued messages into input
+  // Returns true if we should continue with input history navigation
+  const tryLoadQueuedMessages = useCallback(() => {
+    if (buffer.text.trim() === '' && popAllMessages) {
+      popAllMessages((allMessages) => {
+        if (allMessages) {
+          buffer.setText(allMessages);
+        } else {
+          // No queued messages, proceed with input history
+          inputHistory.navigateUp();
+        }
+      });
+      return true; // We handled the up arrow key
+    }
+    return false;
+  }, [buffer, popAllMessages, inputHistory]);
+
   // Handle clipboard image pasting with Ctrl+V
-  const handleClipboardImage = useCallback(async () => {
+  const handleClipboardPaste = useCallback(async () => {
     try {
       if (await clipboardHasImage()) {
         const imagePath = await saveClipboardImage(config.getTargetDir());
@@ -230,14 +340,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           // Insert @path reference at cursor position
           const insertText = `@${relativePath}`;
           const currentText = buffer.text;
-          const [row, col] = buffer.cursor;
-
-          // Calculate offset from row/col
-          let offset = 0;
-          for (let i = 0; i < row; i++) {
-            offset += buffer.lines[i].length + 1; // +1 for newline
-          }
-          offset += col;
+          const offset = buffer.getOffset();
 
           // Add spaces around the path if needed
           let textToInsert = insertText;
@@ -254,15 +357,44 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
           // Insert at cursor position
           buffer.replaceRangeByOffset(offset, offset, textToInsert);
+          return;
         }
       }
+
+      const textToInsert = await clipboardy.read();
+      const offset = buffer.getOffset();
+      buffer.replaceRangeByOffset(offset, offset, textToInsert);
     } catch (error) {
       console.error('Error handling clipboard image:', error);
     }
   }, [buffer, config]);
 
+  useMouseClick(
+    innerBoxRef,
+    (_event, relX, relY) => {
+      if (isEmbeddedShellFocused) {
+        setEmbeddedShellFocused(false);
+      }
+      const visualRow = buffer.visualScrollRow + relY;
+      buffer.moveToVisualPosition(visualRow, relX);
+    },
+    { isActive: focus },
+  );
+
+  useMouse(
+    (event: MouseEvent) => {
+      if (event.name === 'right-release') {
+        handleClipboardPaste();
+      }
+    },
+    { isActive: focus },
+  );
+
   const handleInput = useCallback(
     (key: Key) => {
+      // TODO(jacobr): this special case is likely not needed anymore.
+      // We should probably stop supporting paste if the InputPrompt is not
+      // focused.
       /// We want to handle paste even when not focused to support drag and drop.
       if (!focus && !key.paste) {
         return;
@@ -270,19 +402,28 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (key.paste) {
         // Record paste time to prevent accidental auto-submission
-        setRecentPasteTime(Date.now());
+        if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
+          setRecentUnsafePasteTime(Date.now());
 
-        // Clear any existing paste timeout
-        if (pasteTimeoutRef.current) {
-          clearTimeout(pasteTimeoutRef.current);
+          // Clear any existing paste timeout
+          if (pasteTimeoutRef.current) {
+            clearTimeout(pasteTimeoutRef.current);
+          }
+
+          // Clear the paste protection after a very short delay to prevent
+          // false positives.
+          // Due to how we use a reducer for text buffer state updates, it is
+          // reasonable to expect that key events that are really part of the
+          // same paste will be processed in the same event loop tick. 40ms
+          // is chosen arbitrarily as it is faster than a typical human
+          // could go from pressing paste to pressing enter. The fastest typists
+          // can type at 200 words per minute which roughly translates to 50ms
+          // per letter.
+          pasteTimeoutRef.current = setTimeout(() => {
+            setRecentUnsafePasteTime(null);
+            pasteTimeoutRef.current = null;
+          }, 40);
         }
-
-        // Clear the paste protection after a safe delay
-        pasteTimeoutRef.current = setTimeout(() => {
-          setRecentPasteTime(null);
-          pasteTimeoutRef.current = null;
-        }, 500);
-
         // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
         return;
@@ -294,7 +435,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Reset ESC count and hide prompt on any non-ESC key
       if (key.name !== 'escape') {
-        if (escPressCount > 0 || showEscapePrompt) {
+        if (escPressCount.current > 0 || showEscapePrompt) {
           resetEscapeState();
         }
       }
@@ -355,11 +496,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
 
         // Handle double ESC for clearing input
-        if (escPressCount === 0) {
+        if (escPressCount.current === 0) {
           if (buffer.text === '') {
             return;
           }
-          setEscPressCount(1);
+          escPressCount.current = 1;
           setShowEscapePrompt(true);
           if (escapeTimerRef.current) {
             clearTimeout(escapeTimerRef.current);
@@ -384,6 +525,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (keyMatchers[Command.CLEAR_SCREEN](key)) {
+        setBannerVisible(false);
         onClearScreen();
         return;
       }
@@ -458,7 +600,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // If the command is a perfect match, pressing enter should execute it.
       if (completion.isPerfectMatch && keyMatchers[Command.RETURN](key)) {
-        handleSubmitAndClear(buffer.text);
+        handleSubmit(buffer.text);
         return;
       }
 
@@ -482,7 +624,27 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               completion.activeSuggestionIndex === -1
                 ? 0 // Default to the first if none is active
                 : completion.activeSuggestionIndex;
+
             if (targetIndex < completion.suggestions.length) {
+              const suggestion = completion.suggestions[targetIndex];
+
+              const isEnterKey = key.name === 'return' && !key.ctrl;
+
+              if (isEnterKey && buffer.text.startsWith('/')) {
+                const command = completion.getCommandFromSuggestion(suggestion);
+
+                if (command && isAutoExecutableCommand(command)) {
+                  const completedText = completion.getCompletedText(suggestion);
+
+                  if (completedText) {
+                    setExpandedSuggestionIndex(-1);
+                    handleSubmit(completedText.trim());
+                    return;
+                  }
+                }
+              }
+
+              // Default behavior: auto-complete to prompt box
               completion.handleAutocomplete(targetIndex);
               setExpandedSuggestionIndex(-1); // Reset expansion after selection
             }
@@ -510,6 +672,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
 
         if (keyMatchers[Command.HISTORY_UP](key)) {
+          // Check for queued messages first when input is empty
+          // If no queued messages, inputHistory.navigateUp() is called inside tryLoadQueuedMessages
+          if (tryLoadQueuedMessages()) {
+            return;
+          }
+          // Only navigate history if popAllMessages doesn't exist
           inputHistory.navigateUp();
           return;
         }
@@ -523,6 +691,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           (buffer.allVisualLines.length === 1 ||
             (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
         ) {
+          // Check for queued messages first when input is empty
+          // If no queued messages, inputHistory.navigateUp() is called inside tryLoadQueuedMessages
+          if (tryLoadQueuedMessages()) {
+            return;
+          }
+          // Only navigate history if popAllMessages doesn't exist
           inputHistory.navigateUp();
           return;
         }
@@ -551,8 +725,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (keyMatchers[Command.SUBMIT](key)) {
         if (buffer.text.trim()) {
           // Check if a paste operation occurred recently to prevent accidental auto-submission
-          if (recentPasteTime !== null) {
-            // Paste occurred recently, ignore this submit to prevent auto-execution
+          if (recentUnsafePasteTime !== null) {
+            // Paste occurred recently in a terminal where we don't trust pastes
+            // to be reported correctly so assume this paste was really a
+            // newline that was part of the paste.
+            // This has the added benefit that in the worst case at least users
+            // get some feedback that their keypress was handled rather than
+            // wondering why it was completely ignored.
+            buffer.newline();
             return;
           }
 
@@ -563,7 +743,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.backspace();
             buffer.newline();
           } else {
-            handleSubmitAndClear(buffer.text);
+            handleSubmit(buffer.text);
           }
         }
         return;
@@ -614,9 +794,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Ctrl+V for clipboard image paste
-      if (keyMatchers[Command.PASTE_CLIPBOARD_IMAGE](key)) {
-        handleClipboardImage();
+      // Ctrl+V for clipboard paste
+      if (keyMatchers[Command.PASTE_CLIPBOARD](key)) {
+        handleClipboardPaste();
         return;
       }
 
@@ -644,26 +824,27 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       onClearScreen,
       inputHistory,
       handleSubmitAndClear,
+      handleSubmit,
       shellHistory,
       reverseSearchCompletion,
-      handleClipboardImage,
+      handleClipboardPaste,
       resetCompletionState,
-      escPressCount,
       showEscapePrompt,
       resetEscapeState,
       vimHandleInput,
       reverseSearchActive,
       textBeforeReverseSearch,
       cursorPosition,
-      recentPasteTime,
+      recentUnsafePasteTime,
       commandSearchActive,
       commandSearchCompletion,
+      kittyProtocol.enabled,
+      tryLoadQueuedMessages,
+      setBannerVisible,
     ],
   );
 
-  useKeypress(handleInput, {
-    isActive: !isShellFocused,
-  });
+  useKeypress(handleInput, { isActive: !isEmbeddedShellFocused });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
@@ -791,6 +972,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const activeCompletion = getActiveCompletion();
   const shouldShowSuggestions = activeCompletion.showSuggestions;
 
+  useEffect(() => {
+    if (onSuggestionsVisibilityChange) {
+      onSuggestionsVisibilityChange(shouldShowSuggestions);
+    }
+  }, [shouldShowSuggestions, onSuggestionsVisibilityChange]);
+
   const showAutoAcceptStyling =
     !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
   const showYoloStyling =
@@ -809,14 +996,42 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     statusText = 'Accepting edits';
   }
 
+  const suggestionsNode = shouldShowSuggestions ? (
+    <Box paddingRight={2}>
+      <SuggestionsDisplay
+        suggestions={activeCompletion.suggestions}
+        activeIndex={activeCompletion.activeSuggestionIndex}
+        isLoading={activeCompletion.isLoadingSuggestions}
+        width={suggestionsWidth}
+        scrollOffset={activeCompletion.visibleStartIndex}
+        userInput={buffer.text}
+        mode={
+          buffer.text.startsWith('/') &&
+          !reverseSearchActive &&
+          !commandSearchActive
+            ? 'slash'
+            : 'reverse'
+        }
+        expandedIndex={expandedSuggestionIndex}
+      />
+    </Box>
+  ) : null;
+
   return (
     <>
+      {suggestionsPosition === 'above' && suggestionsNode}
       <Box
         borderStyle="round"
         borderColor={
-          statusColor ?? (focus ? theme.border.focused : theme.border.default)
+          isShellFocused && !isEmbeddedShellFocused
+            ? (statusColor ?? theme.border.focused)
+            : theme.border.default
         }
         paddingX={1}
+        width={mainAreaWidth}
+        flexDirection="row"
+        alignItems="flex-start"
+        minHeight={3}
       >
         <Text
           color={statusColor ?? theme.text.accent}
@@ -841,9 +1056,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             '>'
           )}{' '}
         </Text>
-        <Box flexGrow={1} flexDirection="column">
+        <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
           {buffer.text.length === 0 && placeholder ? (
-            focus ? (
+            showCursor ? (
               <Text>
                 {chalk.inverse(placeholder.slice(0, 1))}
                 <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
@@ -854,64 +1069,81 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           ) : (
             linesToRender
               .map((lineText, visualIdxInRenderedSet) => {
-                const tokens = parseInputForHighlighting(
-                  lineText,
-                  visualIdxInRenderedSet,
-                );
+                const absoluteVisualIdx =
+                  scrollVisualRow + visualIdxInRenderedSet;
+                const mapEntry = buffer.visualToLogicalMap[absoluteVisualIdx];
                 const cursorVisualRow =
                   cursorVisualRowAbsolute - scrollVisualRow;
                 const isOnCursorLine =
                   focus && visualIdxInRenderedSet === cursorVisualRow;
 
                 const renderedLine: React.ReactNode[] = [];
-                let charCount = 0;
 
-                tokens.forEach((token, tokenIdx) => {
-                  let display = token.text;
+                const [logicalLineIdx, logicalStartCol] = mapEntry;
+                const logicalLine = buffer.lines[logicalLineIdx] || '';
+                const tokens = parseInputForHighlighting(
+                  logicalLine,
+                  logicalLineIdx,
+                );
+
+                const visualStart = logicalStartCol;
+                const visualEnd = logicalStartCol + cpLen(lineText);
+                const segments = buildSegmentsForVisualSlice(
+                  tokens,
+                  visualStart,
+                  visualEnd,
+                );
+
+                let charCount = 0;
+                segments.forEach((seg, segIdx) => {
+                  const segLen = cpLen(seg.text);
+                  let display = seg.text;
+
                   if (isOnCursorLine) {
                     const relativeVisualColForHighlight =
                       cursorVisualColAbsolute;
-                    const tokenStart = charCount;
-                    const tokenEnd = tokenStart + cpLen(token.text);
-
+                    const segStart = charCount;
+                    const segEnd = segStart + segLen;
                     if (
-                      relativeVisualColForHighlight >= tokenStart &&
-                      relativeVisualColForHighlight < tokenEnd
+                      relativeVisualColForHighlight >= segStart &&
+                      relativeVisualColForHighlight < segEnd
                     ) {
                       const charToHighlight = cpSlice(
-                        token.text,
-                        relativeVisualColForHighlight - tokenStart,
-                        relativeVisualColForHighlight - tokenStart + 1,
+                        seg.text,
+                        relativeVisualColForHighlight - segStart,
+                        relativeVisualColForHighlight - segStart + 1,
                       );
-                      const highlighted = chalk.inverse(charToHighlight);
+                      const highlighted = showCursor
+                        ? chalk.inverse(charToHighlight)
+                        : charToHighlight;
                       display =
                         cpSlice(
-                          token.text,
+                          seg.text,
                           0,
-                          relativeVisualColForHighlight - tokenStart,
+                          relativeVisualColForHighlight - segStart,
                         ) +
                         highlighted +
                         cpSlice(
-                          token.text,
-                          relativeVisualColForHighlight - tokenStart + 1,
+                          seg.text,
+                          relativeVisualColForHighlight - segStart + 1,
                         );
                     }
-                    charCount = tokenEnd;
+                    charCount = segEnd;
                   }
 
                   const color =
-                    token.type === 'command' || token.type === 'file'
+                    seg.type === 'command' || seg.type === 'file'
                       ? theme.text.accent
                       : theme.text.primary;
 
                   renderedLine.push(
-                    <Text key={`token-${tokenIdx}`} color={color}>
+                    <Text key={`token-${segIdx}`} color={color}>
                       {display}
                     </Text>,
                   );
                 });
-                const currentLineGhost = isOnCursorLine ? inlineGhost : '';
 
+                const currentLineGhost = isOnCursorLine ? inlineGhost : '';
                 if (
                   isOnCursorLine &&
                   cursorVisualColAbsolute === cpLen(lineText)
@@ -919,7 +1151,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   if (!currentLineGhost) {
                     renderedLine.push(
                       <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
-                        {chalk.inverse(' ')}
+                        {showCursor ? chalk.inverse(' ') : ' '}
                       </Text>,
                     );
                   }
@@ -935,7 +1167,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
                     <Text>
                       {renderedLine}
-                      {showCursorBeforeGhost && chalk.inverse(' ')}
+                      {showCursorBeforeGhost &&
+                        (showCursor ? chalk.inverse(' ') : ' ')}
                       {currentLineGhost && (
                         <Text color={theme.text.secondary}>
                           {currentLineGhost}
@@ -965,26 +1198,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           )}
         </Box>
       </Box>
-      {shouldShowSuggestions && (
-        <Box paddingRight={2}>
-          <SuggestionsDisplay
-            suggestions={activeCompletion.suggestions}
-            activeIndex={activeCompletion.activeSuggestionIndex}
-            isLoading={activeCompletion.isLoadingSuggestions}
-            width={suggestionsWidth}
-            scrollOffset={activeCompletion.visibleStartIndex}
-            userInput={buffer.text}
-            mode={
-              buffer.text.startsWith('/') &&
-              !reverseSearchActive &&
-              !commandSearchActive
-                ? 'slash'
-                : 'reverse'
-            }
-            expandedIndex={expandedSuggestionIndex}
-          />
-        </Box>
-      )}
+      {suggestionsPosition === 'below' && suggestionsNode}
     </>
   );
 };

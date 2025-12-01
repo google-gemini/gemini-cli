@@ -9,17 +9,20 @@ inputs:
     description: 'The npm tag to publish with (e.g., latest, preview, nightly).'
     required: true
   wombat-token-core:
-    description: 'The npm token for the @google/gemini-cli-core package.'
+    description: 'The npm token for the cli-core package.'
     required: true
   wombat-token-cli:
-    description: 'The npm token for the @google/gemini-cli package.'
+    description: 'The npm token for the cli package.'
+    required: true
+  wombat-token-a2a-server:
+    description: 'The npm token for the a2a package.'
     required: true
   github-token:
     description: 'The GitHub token for creating the release.'
     required: true
   dry-run:
     description: 'Whether to run in dry-run mode.'
-    type: 'boolean'
+    type: 'string'
     required: true
   release-tag:
     description: 'The release tag for the release (e.g., v0.1.11).'
@@ -27,22 +30,62 @@ inputs:
   previous-tag:
     description: 'The previous tag to use for generating release notes.'
     required: true
+  skip-github-release:
+    description: 'Whether to skip creating a GitHub release.'
+    type: 'boolean'
+    required: false
+    default: false
   working-directory:
     description: 'The working directory to run the steps in.'
     required: false
     default: '.'
-
+  force-skip-tests:
+    description: 'Skip tests and validation'
+    required: false
+    default: false
+  skip-branch-cleanup:
+    description: 'Whether to skip cleaning up the release branch.'
+    type: 'boolean'
+    required: false
+    default: false
+  gemini_api_key:
+    description: 'The API key for running integration tests.'
+    required: true
+  npm-registry-publish-url:
+    description: 'npm registry publish url'
+    required: true
+  npm-registry-url:
+    description: 'npm registry url'
+    required: true
+  npm-registry-scope:
+    description: 'npm registry scope'
+    required: true
+  cli-package-name:
+    description: 'The name of the cli package.'
+    required: true
+  core-package-name:
+    description: 'The name of the core package.'
+    required: true
+  a2a-package-name:
+    description: 'The name of the a2a package.'
+    required: true
 runs:
   using: 'composite'
   steps:
-    - name: 'Configure Git User'
+    - name: '📝 Print Inputs'
+      shell: 'bash'
+      env:
+        JSON_INPUTS: '${{ toJSON(inputs) }}'
+      run: 'echo "$JSON_INPUTS"'
+
+    - name: '👤 Configure Git User'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
-      run: |-
+      run: |
         git config user.name "gemini-cli-robot"
         git config user.email "gemini-cli-robot@google.com"
 
-    - name: 'Create and switch to a release branch'
+    - name: '🌿 Create and switch to a release branch'
       working-directory: '${{ inputs.working-directory }}'
       id: 'release_branch'
       shell: 'bash'
@@ -51,12 +94,13 @@ runs:
         git switch -c "${BRANCH_NAME}"
         echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
 
-    - name: 'Update package versions'
+    - name: '⬆️ Update package versions'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
-      run: 'npm run release:version "${{ inputs.release-version }}"'
+      run: |
+        npm run release:version "${{ inputs.release-version }}"
 
-    - name: 'Commit and Conditionally Push package versions'
+    - name: '💾 Commit and Conditionally Push package versions'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
       env:
@@ -64,7 +108,8 @@ runs:
         DRY_RUN: '${{ inputs.dry-run }}'
         RELEASE_TAG: '${{ inputs.release-tag }}'
       run: |-
-        git add package.json npm-shrinkwrap.json packages/*/package.json
+        set -e
+        git add package.json package-lock.json packages/*/package.json
         git commit -m "chore(release): ${RELEASE_TAG}"
         if [[ "${DRY_RUN}" == "false" ]]; then
           echo "Pushing release branch to remote..."
@@ -73,80 +118,157 @@ runs:
           echo "Dry run enabled. Skipping push."
         fi
 
-    - name: 'Build and Prepare Packages'
+    - name: '🛠️ Build and Prepare Packages'
       working-directory: '${{ inputs.working-directory }}'
-      run: |-
+      shell: 'bash'
+      run: |
         npm run build:packages
         npm run prepare:package
-      shell: 'bash'
 
-    - name: 'Configure npm for publishing'
+    - name: '🎁 Bundle'
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        npm run bundle
+
+    # TODO: Refactor this github specific publishing script to be generalized based upon inputs.
+    - name: '📦 Prepare for GitHub release'
+      if: "inputs.npm-registry-url == 'https://npm.pkg.github.com/'"
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        node ${{ github.workspace }}/scripts/prepare-github-release.js
+
+    - name: 'Configure npm for publishing to npm'
       uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       with:
         node-version-file: '${{ inputs.working-directory }}/.nvmrc'
-        registry-url: 'https://wombat-dressing-room.appspot.com'
-        scope: '@google'
+        registry-url: '${{inputs.npm-registry-publish-url}}'
+        scope: '${{inputs.npm-registry-scope}}'
 
-    - name: 'Publish @google/gemini-cli-core'
+    - name: 'Get core Token'
+      uses: './.github/actions/npm-auth-token'
+      id: 'core-token'
+      with:
+        package-name: '${{ inputs.core-package-name }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
+
+    - name: '📦 Publish CORE to NPM'
       working-directory: '${{ inputs.working-directory }}'
       env:
-        NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
-      run: |-
+        NODE_AUTH_TOKEN: '${{ steps.core-token.outputs.auth-token }}'
+      shell: 'bash'
+      run: |
         npm publish \
           --dry-run="${{ inputs.dry-run }}" \
-          --workspace="@google/gemini-cli-core" \
-          --tag="${{ inputs.npm-tag }}"
-      shell: 'bash'
+          --workspace="${{ inputs.core-package-name }}" \
+          --no-tag
+        npm dist-tag rm ${{ inputs.core-package-name }} false --silent
 
-    - name: 'Install latest core package'
+    - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
-      if: '${{ inputs.dry-run == false }}'
-      run: |-
-        npm install "@google/gemini-cli-core@${{ inputs.release-version }}" \
-        --workspace="@google/gemini-cli" \
+      if: "${{ inputs.dry-run != 'true' }}"
+      shell: 'bash'
+      run: |
+        npm install "${{ inputs.core-package-name }}@${{ inputs.release-version }}" \
+        --workspace="${{ inputs.cli-package-name }}" \
+        --workspace="${{ inputs.a2a-package-name }}" \
         --save-exact
-      shell: 'bash'
 
-    - name: 'Publish @google/gemini-cli'
+    - name: 'Get CLI Token'
+      uses: './.github/actions/npm-auth-token'
+      id: 'cli-token'
+      with:
+        package-name: '${{ inputs.cli-package-name }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
+
+    - name: '📦 Publish CLI'
       working-directory: '${{ inputs.working-directory }}'
       env:
-        NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
-      run: |-
+        NODE_AUTH_TOKEN: '${{ steps.cli-token.outputs.auth-token }}'
+      shell: 'bash'
+      run: |
         npm publish \
           --dry-run="${{ inputs.dry-run }}" \
-          --workspace="@google/gemini-cli" \
-          --tag="${{ inputs.npm-tag }}"
-      shell: 'bash'
+          --workspace="${{ inputs.cli-package-name }}" \
+          --no-tag
+        npm dist-tag rm ${{ inputs.cli-package-name }} false --silent
 
-    - name: 'Bundle'
-      working-directory: '${{ inputs.working-directory }}'
-      run: 'npm run bundle'
-      shell: 'bash'
+    - name: 'Get a2a-server Token'
+      uses: './.github/actions/npm-auth-token'
+      id: 'a2a-token'
+      with:
+        package-name: '${{ inputs.a2a-package-name }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
 
-    - name: 'Create GitHub Release'
+    - name: '📦 Publish a2a'
       working-directory: '${{ inputs.working-directory }}'
-      if: '${{ inputs.dry-run == false }}'
+      env:
+        NODE_AUTH_TOKEN: '${{ steps.a2a-token.outputs.auth-token }}'
+      shell: 'bash'
+      # Tag staging for initial release
+      run: |
+        npm publish \
+          --dry-run="${{ inputs.dry-run }}" \
+          --workspace="${{ inputs.a2a-package-name }}" \
+          --no-tag
+        npm dist-tag rm ${{ inputs.a2a-package-name }} false --silent
+
+    - name: '🔬 Verify NPM release by version'
+      uses: './.github/actions/verify-release'
+      if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' }}"
+      with:
+        npm-package: '${{ inputs.cli-package-name }}@${{ inputs.release-version }}'
+        expected-version: '${{ inputs.release-version }}'
+        working-directory: '${{ inputs.working-directory }}'
+        gemini_api_key: '${{ inputs.gemini_api_key }}'
+        github-token: '${{ inputs.github-token }}'
+        npm-registry-url: '${{ inputs.npm-registry-url }}'
+        npm-registry-scope: '${{ inputs.npm-registry-scope }}'
+
+    - name: '🏷️ Tag release'
+      uses: './.github/actions/tag-npm-release'
+      with:
+        channel: '${{ inputs.npm-tag }}'
+        version: '${{ inputs.release-version }}'
+        dry-run: '${{ inputs.dry-run }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
+        cli-package-name: '${{ inputs.cli-package-name }}'
+        core-package-name: '${{ inputs.core-package-name }}'
+        a2a-package-name: '${{ inputs.a2a-package-name }}'
+        working-directory: '${{ inputs.working-directory }}'
+
+    - name: '🎉 Create GitHub Release'
+      working-directory: '${{ inputs.working-directory }}'
+      if: "${{ inputs.dry-run != 'true' && inputs.skip-github-release != 'true' && inputs.npm-tag != 'dev' && inputs.npm-registry-url != 'https://npm.pkg.github.com/' }}"
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
-      run: |-
+      shell: 'bash'
+      run: |
         gh release create "${{ inputs.release-tag }}" \
           bundle/gemini.js \
           --target "${{ steps.release_branch.outputs.BRANCH_NAME }}" \
           --title "Release ${{ inputs.release-tag }}" \
           --notes-start-tag "${{ inputs.previous-tag }}" \
           --generate-notes
-      shell: 'bash'
 
-    - name: 'Create Issue on Failure'
-      if: |-
-        ${{ failure() }}
-      env:
-        GITHUB_TOKEN: '${{ inputs.github-token }}'
-        RELEASE_TAG: '${{ inputs.release-tag }} || "N/A"'
-        DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-      run: |-
-        gh issue create \
-          --title "Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')" \
-          --body "The release workflow failed. See the full run for details: ${DETAILS_URL}" \
-          --label "kind/bug,release-failure,priority/p0"
+    - name: '🧹 Clean up release branch'
+      working-directory: '${{ inputs.working-directory }}'
+      if: "${{ inputs.dry-run != 'true' && inputs.skip-branch-cleanup != 'true' }}"
+      continue-on-error: true
       shell: 'bash'
+      run: |
+        echo "Cleaning up release branch ${{ steps.release_branch.outputs.BRANCH_NAME }}..."
+        git push origin --delete "${{ steps.release_branch.outputs.BRANCH_NAME }}"

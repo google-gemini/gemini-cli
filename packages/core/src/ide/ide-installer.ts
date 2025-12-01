@@ -9,12 +9,8 @@ import * as process from 'node:process';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { DetectedIde, getIdeInfo, type IdeInfo } from './detect-ide.js';
+import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
 import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
-
-function getVsCodeCommand(platform: NodeJS.Platform = process.platform) {
-  return platform === 'win32' ? 'code.cmd' : 'code';
-}
 
 export interface IdeInstaller {
   install(): Promise<InstallResult>;
@@ -25,15 +21,15 @@ export interface InstallResult {
   message: string;
 }
 
-async function findVsCodeCommand(
+async function findCommand(
+  command: string,
   platform: NodeJS.Platform = process.platform,
 ): Promise<string | null> {
   // 1. Check PATH first.
-  const vscodeCommand = getVsCodeCommand(platform);
   try {
     if (platform === 'win32') {
       const result = child_process
-        .execSync(`where.exe ${vscodeCommand}`)
+        .execSync(`where.exe ${command}`)
         .toString()
         .trim();
       // `where.exe` can return multiple paths. Return the first one.
@@ -42,10 +38,10 @@ async function findVsCodeCommand(
         return firstPath;
       }
     } else {
-      child_process.execSync(`command -v ${vscodeCommand}`, {
+      child_process.execSync(`command -v ${command}`, {
         stdio: 'ignore',
       });
-      return vscodeCommand;
+      return command;
     }
   } catch {
     // Not in PATH, continue to check common locations.
@@ -55,38 +51,40 @@ async function findVsCodeCommand(
   const locations: string[] = [];
   const homeDir = os.homedir();
 
-  if (platform === 'darwin') {
-    // macOS
-    locations.push(
-      '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
-      path.join(homeDir, 'Library/Application Support/Code/bin/code'),
-    );
-  } else if (platform === 'linux') {
-    // Linux
-    locations.push(
-      '/usr/share/code/bin/code',
-      '/snap/bin/code',
-      path.join(homeDir, '.local/share/code/bin/code'),
-    );
-  } else if (platform === 'win32') {
-    // Windows
-    locations.push(
-      path.join(
-        process.env['ProgramFiles'] || 'C:\\Program Files',
-        'Microsoft VS Code',
-        'bin',
-        'code.cmd',
-      ),
-      path.join(
-        homeDir,
-        'AppData',
-        'Local',
-        'Programs',
-        'Microsoft VS Code',
-        'bin',
-        'code.cmd',
-      ),
-    );
+  if (command === 'code' || command === 'code.cmd') {
+    if (platform === 'darwin') {
+      // macOS
+      locations.push(
+        '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
+        path.join(homeDir, 'Library/Application Support/Code/bin/code'),
+      );
+    } else if (platform === 'linux') {
+      // Linux
+      locations.push(
+        '/usr/share/code/bin/code',
+        '/snap/bin/code',
+        path.join(homeDir, '.local/share/code/bin/code'),
+      );
+    } else if (platform === 'win32') {
+      // Windows
+      locations.push(
+        path.join(
+          process.env['ProgramFiles'] || 'C:\\Program Files',
+          'Microsoft VS Code',
+          'bin',
+          'code.cmd',
+        ),
+        path.join(
+          homeDir,
+          'AppData',
+          'Local',
+          'Programs',
+          'Microsoft VS Code',
+          'bin',
+          'code.cmd',
+        ),
+      );
+    }
   }
 
   for (const location of locations) {
@@ -100,14 +98,13 @@ async function findVsCodeCommand(
 
 class VsCodeInstaller implements IdeInstaller {
   private vsCodeCommand: Promise<string | null>;
-  private readonly ideInfo: IdeInfo;
 
   constructor(
-    readonly ide: DetectedIde,
+    readonly ideInfo: IdeInfo,
     readonly platform = process.platform,
   ) {
-    this.vsCodeCommand = findVsCodeCommand(platform);
-    this.ideInfo = getIdeInfo(ide);
+    const command = platform === 'win32' ? 'code.cmd' : 'code';
+    this.vsCodeCommand = findCommand(command, platform);
   }
 
   async install(): Promise<InstallResult> {
@@ -127,7 +124,60 @@ class VsCodeInstaller implements IdeInstaller {
           'google.gemini-cli-vscode-ide-companion',
           '--force',
         ],
-        { stdio: 'pipe' },
+        { stdio: 'pipe', shell: this.platform === 'win32' },
+      );
+
+      if (result.status !== 0) {
+        throw new Error(
+          `Failed to install extension: ${result.stderr?.toString()}`,
+        );
+      }
+
+      return {
+        success: true,
+        message: `${this.ideInfo.displayName} companion extension was installed successfully.`,
+      };
+    } catch (_error) {
+      return {
+        success: false,
+        message: `Failed to install ${this.ideInfo.displayName} companion extension. Please try installing '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' manually from the ${this.ideInfo.displayName} extension marketplace.`,
+      };
+    }
+  }
+}
+
+class AntigravityInstaller implements IdeInstaller {
+  constructor(
+    readonly ideInfo: IdeInfo,
+    readonly platform = process.platform,
+  ) {}
+
+  async install(): Promise<InstallResult> {
+    const command = process.env['ANTIGRAVITY_CLI_ALIAS'];
+    if (!command) {
+      return {
+        success: false,
+        message: 'ANTIGRAVITY_CLI_ALIAS environment variable not set.',
+      };
+    }
+
+    const commandPath = await findCommand(command, this.platform);
+    if (!commandPath) {
+      return {
+        success: false,
+        message: `${command} not found. Please ensure it is in your system's PATH.`,
+      };
+    }
+
+    try {
+      const result = child_process.spawnSync(
+        commandPath,
+        [
+          '--install-extension',
+          'google.gemini-cli-vscode-ide-companion',
+          '--force',
+        ],
+        { stdio: 'pipe', shell: this.platform === 'win32' },
       );
 
       if (result.status !== 0) {
@@ -150,13 +200,15 @@ class VsCodeInstaller implements IdeInstaller {
 }
 
 export function getIdeInstaller(
-  ide: DetectedIde,
+  ide: IdeInfo,
   platform = process.platform,
 ): IdeInstaller | null {
-  switch (ide) {
-    case DetectedIde.VSCode:
-    case DetectedIde.FirebaseStudio:
+  switch (ide.name) {
+    case IDE_DEFINITIONS.vscode.name:
+    case IDE_DEFINITIONS.firebasestudio.name:
       return new VsCodeInstaller(ide, platform);
+    case IDE_DEFINITIONS.antigravity.name:
+      return new AntigravityInstaller(ide, platform);
     default:
       return null;
   }

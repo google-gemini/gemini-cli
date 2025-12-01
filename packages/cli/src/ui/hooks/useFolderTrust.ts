@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import {
@@ -13,30 +13,39 @@ import {
   isWorkspaceTrusted,
 } from '../../config/trustedFolders.js';
 import * as process from 'node:process';
+import { type HistoryItemWithoutId, MessageType } from '../types.js';
+import { coreEvents, ExitCodes } from '@google/gemini-cli-core';
+import { runExitCleanup } from '../../utils/cleanup.js';
 
 export const useFolderTrust = (
   settings: LoadedSettings,
   onTrustChange: (isTrusted: boolean | undefined) => void,
-  refreshStatic: () => void,
+  addItem: (item: HistoryItemWithoutId, timestamp: number) => number,
 ) => {
   const [isTrusted, setIsTrusted] = useState<boolean | undefined>(undefined);
   const [isFolderTrustDialogOpen, setIsFolderTrustDialogOpen] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
+  const startupMessageSent = useRef(false);
 
   const folderTrust = settings.merged.security?.folderTrust?.enabled;
 
   useEffect(() => {
-    const trusted = isWorkspaceTrusted(settings.merged);
+    const { isTrusted: trusted } = isWorkspaceTrusted(settings.merged);
     setIsTrusted(trusted);
     setIsFolderTrustDialogOpen(trusted === undefined);
     onTrustChange(trusted);
-  }, [folderTrust, onTrustChange, settings.merged]);
 
-  useEffect(() => {
-    // When the folder trust dialog is about to open/close, we need to force a refresh
-    // of the static content to ensure the Tips are hidden/shown correctly.
-    refreshStatic();
-  }, [isFolderTrustDialogOpen, refreshStatic]);
+    if (trusted === false && !startupMessageSent.current) {
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: 'This folder is not trusted. Some features may be disabled. Use the `/permissions` command to change the trust level.',
+        },
+        Date.now(),
+      );
+      startupMessageSent.current = true;
+    }
+  }, [folderTrust, onTrustChange, settings.merged, addItem]);
 
   const handleFolderTrustSelect = useCallback(
     (choice: FolderTrustChoice) => {
@@ -60,7 +69,20 @@ export const useFolderTrust = (
           return;
       }
 
-      trustedFolders.setValue(cwd, trustLevel);
+      try {
+        trustedFolders.setValue(cwd, trustLevel);
+      } catch (_e) {
+        coreEvents.emitFeedback(
+          'error',
+          'Failed to save trust settings. Exiting Gemini CLI.',
+        );
+        setTimeout(async () => {
+          await runExitCleanup();
+          process.exit(ExitCodes.FATAL_CONFIG_ERROR);
+        }, 100);
+        return;
+      }
+
       const currentIsTrusted =
         trustLevel === TrustLevel.TRUST_FOLDER ||
         trustLevel === TrustLevel.TRUST_PARENT;

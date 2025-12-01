@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { PrepareLabel, MAX_WIDTH } from './PrepareLabel.js';
 
 describe('PrepareLabel', () => {
@@ -13,7 +13,7 @@ describe('PrepareLabel', () => {
   const flat = (s: string | undefined) => (s ?? '').replace(/\n/g, '');
 
   it('renders plain label when no match (short label)', () => {
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <PrepareLabel
         label="simple command"
         userInput=""
@@ -23,11 +23,12 @@ describe('PrepareLabel', () => {
       />,
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('truncates long label when collapsed and no match', () => {
     const long = 'x'.repeat(MAX_WIDTH + 25);
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <PrepareLabel
         label={long}
         userInput=""
@@ -40,11 +41,12 @@ describe('PrepareLabel', () => {
     expect(f.endsWith('...')).toBe(true);
     expect(f.length).toBe(MAX_WIDTH + 3);
     expect(out).toMatchSnapshot();
+    unmount();
   });
 
   it('shows full long label when expanded and no match', () => {
     const long = 'y'.repeat(MAX_WIDTH + 25);
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <PrepareLabel
         label={long}
         userInput=""
@@ -56,13 +58,14 @@ describe('PrepareLabel', () => {
     const f = flat(out);
     expect(f.length).toBe(long.length);
     expect(out).toMatchSnapshot();
+    unmount();
   });
 
   it('highlights matched substring when expanded (text only visible)', () => {
     const label = 'run: git commit -m "feat: add search"';
     const userInput = 'commit';
     const matchedIndex = label.indexOf(userInput);
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <PrepareLabel
         label={label}
         userInput={userInput}
@@ -70,17 +73,19 @@ describe('PrepareLabel', () => {
         textColor={color}
         isExpanded={true}
       />,
+      100,
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('creates centered window around match when collapsed', () => {
-    const prefix = 'cd /very/long/path/that/keeps/going/'.repeat(3);
+    const prefix = 'cd_/very/long/path/that/keeps/going/'.repeat(3);
     const core = 'search-here';
     const suffix = '/and/then/some/more/components/'.repeat(3);
     const label = prefix + core + suffix;
     const matchedIndex = prefix.length;
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <PrepareLabel
         label={label}
         userInput={core}
@@ -88,6 +93,7 @@ describe('PrepareLabel', () => {
         textColor={color}
         isExpanded={false}
       />,
+      100,
     );
     const out = lastFrame();
     const f = flat(out);
@@ -95,6 +101,7 @@ describe('PrepareLabel', () => {
     expect(f.startsWith('...')).toBe(true);
     expect(f.endsWith('...')).toBe(true);
     expect(out).toMatchSnapshot();
+    unmount();
   });
 
   it('truncates match itself when match is very long', () => {
@@ -103,7 +110,7 @@ describe('PrepareLabel', () => {
     const suffix = ' in this text';
     const label = prefix + core + suffix;
     const matchedIndex = prefix.length;
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <PrepareLabel
         label={label}
         userInput={core}
@@ -119,5 +126,6 @@ describe('PrepareLabel', () => {
     expect(f.endsWith('...')).toBe(true);
     expect(f.length).toBe(MAX_WIDTH + 2);
     expect(out).toMatchSnapshot();
+    unmount();
   });
 });

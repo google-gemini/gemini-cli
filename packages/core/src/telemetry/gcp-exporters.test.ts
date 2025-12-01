@@ -131,7 +131,7 @@ describe('GCP Exporters', () => {
           }),
           expect.objectContaining({
             message: 'Test log message',
-            session_id: 'test-session',
+            'session.id': 'test-session',
             'custom.attribute': 'value',
             'service.name': 'test-service',
           }),
