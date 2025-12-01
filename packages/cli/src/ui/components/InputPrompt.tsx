@@ -628,19 +628,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             if (targetIndex < completion.suggestions.length) {
               const suggestion = completion.suggestions[targetIndex];
 
-              // Check if this is Enter key (not Tab) and command should auto-execute
               const isEnterKey = key.name === 'return' && !key.ctrl;
 
               if (isEnterKey && buffer.text.startsWith('/')) {
-                // Get the full command object
                 const command = completion.getCommandFromSuggestion(suggestion);
 
                 if (command && isAutoExecutableCommand(command)) {
-                  // Use centralized logic to get the completed text
                   const completedText = completion.getCompletedText(suggestion);
 
                   if (completedText) {
-                    // Auto-execute: submit the complete command text
                     setExpandedSuggestionIndex(-1);
                     handleSubmit(completedText.trim());
                     return;
