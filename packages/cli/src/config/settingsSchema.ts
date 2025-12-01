@@ -22,6 +22,7 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_MODEL_CONFIGS,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -1113,6 +1114,46 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         items: { type: 'string' },
       },
+      autoRestart: {
+        type: 'object',
+        label: 'MCP Auto Restart',
+        category: 'MCP',
+        requiresRestart: true,
+        default: {},
+        description: 'Settings for auto-restarting MCP servers.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Auto Restart',
+            category: 'MCP',
+            requiresRestart: true,
+            default: true,
+            description: 'Enable auto-restarting of MCP servers.',
+            showInDialog: true,
+          },
+          healthCheckIntervalMs: {
+            type: 'number',
+            label: 'Health Check Interval (ms)',
+            category: 'MCP',
+            requiresRestart: true,
+            default: 15000,
+            description:
+              'The interval in milliseconds to check the health of MCP servers.',
+            showInDialog: true,
+          },
+          unhealthyTimeoutMs: {
+            type: 'number',
+            label: 'Unhealthy Timeout (ms)',
+            category: 'MCP',
+            requiresRestart: true,
+            default: 30000,
+            description:
+              'The timeout in milliseconds to consider an MCP server unhealthy.',
+            showInDialog: true,
+          },
+        },
+      },
     },
   },
   useSmartEdit: {
@@ -1367,6 +1408,47 @@ const SETTINGS_SCHEMA = {
             description:
               'The model to use for the Codebase Investigator agent.',
             showInDialog: false,
+          },
+        },
+      },
+      modelRouter: {
+        type: 'object',
+        label: 'Model Router',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: {},
+        description: 'Settings for configuring the model router.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Model Router',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: true,
+            description:
+              'Enable model routing to route requests to the best model based on complexity.',
+            showInDialog: true,
+          },
+          simpleTaskModel: {
+            type: 'string',
+            label: 'Simple Task Model',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: DEFAULT_GEMINI_FLASH_MODEL,
+            description:
+              'The model to use for simple, well-defined tasks when the model router is enabled.',
+            showInDialog: true,
+          },
+          complexTaskModel: {
+            type: 'string',
+            label: 'Complex Task Model',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: DEFAULT_GEMINI_MODEL,
+            description:
+              'The model to use for complex, multi-step, or ambiguous tasks when the model router is enabled.',
+            showInDialog: true,
           },
         },
       },

@@ -696,6 +696,23 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`mcp.autoRestart.enabled`** (boolean):
+  - **Description:** Enable auto-restarting of MCP servers.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`mcp.autoRestart.healthCheckIntervalMs`** (number):
+  - **Description:** The interval in milliseconds to check the health of MCP
+    servers.
+  - **Default:** `15000`
+  - **Requires restart:** Yes
+
+- **`mcp.autoRestart.unhealthyTimeoutMs`** (number):
+  - **Description:** The timeout in milliseconds to consider an MCP server
+    unhealthy.
+  - **Default:** `30000`
+  - **Requires restart:** Yes
+
 #### `useSmartEdit`
 
 - **`useSmartEdit`** (boolean):
@@ -806,6 +823,24 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.codebaseInvestigatorSettings.model`** (string):
   - **Description:** The model to use for the Codebase Investigator agent.
+  - **Default:** `"gemini-2.5-pro"`
+  - **Requires restart:** Yes
+
+- **`experimental.modelRouter.enabled`** (boolean):
+  - **Description:** Enable model routing to route requests to the best model
+    based on complexity.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.modelRouter.simpleTaskModel`** (string):
+  - **Description:** The model to use for simple, well-defined tasks when the
+    model router is enabled.
+  - **Default:** `"gemini-2.5-flash"`
+  - **Requires restart:** Yes
+
+- **`experimental.modelRouter.complexTaskModel`** (string):
+  - **Description:** The model to use for complex, multi-step, or ambiguous
+    tasks when the model router is enabled.
   - **Default:** `"gemini-2.5-pro"`
   - **Requires restart:** Yes
 

@@ -1125,6 +1125,37 @@
           "items": {
             "type": "string"
           }
+        },
+        "autoRestart": {
+          "title": "MCP Auto Restart",
+          "description": "Settings for auto-restarting MCP servers.",
+          "markdownDescription": "Settings for auto-restarting MCP servers.\n\n- Category: `MCP`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Auto Restart",
+              "description": "Enable auto-restarting of MCP servers.",
+              "markdownDescription": "Enable auto-restarting of MCP servers.\n\n- Category: `MCP`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "healthCheckIntervalMs": {
+              "title": "Health Check Interval (ms)",
+              "description": "The interval in milliseconds to check the health of MCP servers.",
+              "markdownDescription": "The interval in milliseconds to check the health of MCP servers.\n\n- Category: `MCP`\n- Requires restart: `yes`\n- Default: `15000`",
+              "default": 15000,
+              "type": "number"
+            },
+            "unhealthyTimeoutMs": {
+              "title": "Unhealthy Timeout (ms)",
+              "description": "The timeout in milliseconds to consider an MCP server unhealthy.",
+              "markdownDescription": "The timeout in milliseconds to consider an MCP server unhealthy.\n\n- Category: `MCP`\n- Requires restart: `yes`\n- Default: `30000`",
+              "default": 30000,
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -1318,6 +1349,37 @@
               "title": "Model",
               "description": "The model to use for the Codebase Investigator agent.",
               "markdownDescription": "The model to use for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemini-2.5-pro`",
+              "default": "gemini-2.5-pro",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "modelRouter": {
+          "title": "Model Router",
+          "description": "Settings for configuring the model router.",
+          "markdownDescription": "Settings for configuring the model router.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Model Router",
+              "description": "Enable model routing to route requests to the best model based on complexity.",
+              "markdownDescription": "Enable model routing to route requests to the best model based on complexity.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "simpleTaskModel": {
+              "title": "Simple Task Model",
+              "description": "The model to use for simple, well-defined tasks when the model router is enabled.",
+              "markdownDescription": "The model to use for simple, well-defined tasks when the model router is enabled.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemini-2.5-flash`",
+              "default": "gemini-2.5-flash",
+              "type": "string"
+            },
+            "complexTaskModel": {
+              "title": "Complex Task Model",
+              "description": "The model to use for complex, multi-step, or ambiguous tasks when the model router is enabled.",
+              "markdownDescription": "The model to use for complex, multi-step, or ambiguous tasks when the model router is enabled.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemini-2.5-pro`",
               "default": "gemini-2.5-pro",
               "type": "string"
             }

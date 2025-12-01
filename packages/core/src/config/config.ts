@@ -309,6 +309,11 @@ export interface ConfigParameters {
   };
   previewFeatures?: boolean;
   enableModelAvailabilityService?: boolean;
+  mcpAutoRestart?: {
+    enabled?: boolean;
+    healthCheckIntervalMs?: number;
+    unhealthyTimeoutMs?: number;
+  };
 }
 
 export class Config {
@@ -427,6 +432,11 @@ export class Config {
   private previewModelFallbackMode = false;
   private previewModelBypassMode = false;
   private readonly enableModelAvailabilityService: boolean;
+  private readonly mcpAutoRestart: {
+    enabled: boolean;
+    healthCheckIntervalMs: number;
+    unhealthyTimeoutMs: number;
+  };
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -486,6 +496,12 @@ export class Config {
     this.model = params.model;
     this.enableModelAvailabilityService =
       params.enableModelAvailabilityService ?? false;
+    this.mcpAutoRestart = {
+      enabled: params.mcpAutoRestart?.enabled ?? true,
+      healthCheckIntervalMs:
+        params.mcpAutoRestart?.healthCheckIntervalMs ?? 15000,
+      unhealthyTimeoutMs: params.mcpAutoRestart?.unhealthyTimeoutMs ?? 30000,
+    };
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
@@ -1162,6 +1178,10 @@ export class Config {
 
   isModelAvailabilityServiceEnabled(): boolean {
     return this.enableModelAvailabilityService;
+  }
+
+  getMcpAutoRestartConfig() {
+    return this.mcpAutoRestart;
   }
 
   getNoBrowser(): boolean {
