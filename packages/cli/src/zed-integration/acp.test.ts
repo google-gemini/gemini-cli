@@ -172,11 +172,6 @@ describe('acp', () => {
     it('should call agent.authenticate when Connection handler receives authenticate method', async () => {
       const authenticateParams = {
         methodId: 'test-auth-method',
-        authMethod: {
-          id: 'test-auth',
-          name: 'Test Auth Method',
-          description: 'A test authentication method',
-        },
       };
       const handler = mockConnectionConstructor.mock
         .calls[0][0]! as MethodHandler;
