@@ -52,5 +52,5 @@ export async function getClientMetadata(): Promise<ClientMetadata> {
       updateChannel: await getReleaseChannel(__dirname),
     }))();
   }
-  return await clientMetadataPromise;
+  return clientMetadataPromise;
 }

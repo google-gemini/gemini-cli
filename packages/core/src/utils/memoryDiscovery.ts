@@ -436,7 +436,7 @@ export async function loadEnvironmentMemory(
         `Loading environment memory for trusted root: ${resolvedRoot} (Stopping exactly here)`,
       );
     }
-    return await findUpwardGeminiFiles(resolvedRoot, resolvedRoot, debugMode);
+    return findUpwardGeminiFiles(resolvedRoot, resolvedRoot, debugMode);
   });
 
   const pathArrays = await Promise.all(traversalPromises);
