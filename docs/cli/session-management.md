@@ -31,7 +31,7 @@ When starting the CLI, you can use the `--resume` (or `-r`) flag:
 - **Resume latest:**
 
   ```bash
-  gemini --resume
+  gemini --resume latest
   ```
 
   This immediately loads the most recent session.
