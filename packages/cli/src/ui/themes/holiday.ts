@@ -9,7 +9,7 @@ import { interpolateColor } from './color-utils.js';
 
 const holidayColors: ColorsTheme = {
   type: 'dark',
-  Background: '#151B18',
+  Background: '#00210e',
   Foreground: '#F0F8FF',
   LightBlue: '#B0E0E6',
   AccentBlue: '#3CB371',
