@@ -9,7 +9,11 @@ import { Box, Text, type DOMElement } from 'ink';
 import { ToolCallStatus } from '../../types.js';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { StickyHeader } from '../StickyHeader.js';
-import { SHELL_COMMAND_NAME, SHELL_NAME } from '../../constants.js';
+import {
+  SHELL_COMMAND_NAME,
+  SHELL_NAME,
+  SHELL_FOCUS_HINT_DELAY_MS,
+} from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
 import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
 import { useUIActions } from '../../contexts/UIActionsContext.js';
@@ -104,7 +108,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 
     const timer = setTimeout(() => {
       setShowFocusHint(true);
-    }, 5000);
+    }, SHELL_FOCUS_HINT_DELAY_MS);
 
     return () => clearTimeout(timer);
   }, [lastUpdateTime]);
