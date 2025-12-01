@@ -18,8 +18,13 @@ import { reportError } from '../utils/errorReporting.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { MalformedJsonResponseEvent } from '../telemetry/types.js';
-import { retryWithBackoff } from '../utils/retry.js';
+import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import {
+  retryWithBackoff,
+  type RetryAvailabilityContext,
+} from '../utils/retry.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { resolvePolicyChain } from '../availability/policyHelpers.js';
 
 const DEFAULT_MAX_ATTEMPTS = 5;
 
@@ -232,14 +237,75 @@ export class BaseLlmClient {
   ): Promise<GenerateContentResponse> {
     const abortSignal = requestParams.config?.abortSignal;
 
-    try {
-      const apiCall = () =>
-        this.contentGenerator.generateContent(requestParams, promptId);
+    // Define callback to fetch context dynamically since active model may get updated during retry loop
+    const getAvailabilityContext = (): RetryAvailabilityContext | undefined => {
+      if (!this.config.isModelAvailabilityServiceEnabled()) {
+        return undefined;
+      }
+      const service = this.config.getModelAvailabilityService();
+      // We want the policy for the model that was *just attempted* (and failed).
+      // Since apiCall updates requestParams.model before calling, requestParams.model
+      // holds the model we just tried.
+      const currentModel = requestParams.model;
+      const chain = resolvePolicyChain(this.config, currentModel);
+      const policy = chain.find((p) => p.model === currentModel);
+      return policy ? { service, policy } : undefined;
+    };
 
-      return await retryWithBackoff(apiCall, {
+    if (this.config.isModelAvailabilityServiceEnabled()) {
+      const chain = resolvePolicyChain(this.config);
+      const service = this.config.getModelAvailabilityService();
+      const selection = service.selectFirstAvailable(chain.map((p) => p.model));
+
+      // Default to last resort if nothing selected (shouldn't happen with correct chain)
+      const lastResort = chain.find((p) => p.isLastResort);
+      const selectedModel =
+        selection.selectedModel ?? lastResort?.model ?? DEFAULT_GEMINI_MODEL;
+
+      if (selectedModel) {
+        if (selectedModel !== requestParams.model) {
+          requestParams.model = selectedModel;
+          const { generateContentConfig } =
+            this.config.modelConfigService.getResolvedConfig({
+              model: selectedModel,
+            });
+          requestParams.config = {
+            ...requestParams.config,
+            ...generateContentConfig,
+          };
+        }
+        this.config.setActiveModel(selectedModel);
+
+        if (selection.attempts) {
+          service.consumeStickyAttempt(selectedModel);
+        }
+      }
+    }
+
+    try {
+      const apiCall = () => {
+        // If availability is enabled, ensure we use the current active model
+        // in case a fallback occurred in a previous attempt.
+        if (this.config.isModelAvailabilityServiceEnabled()) {
+          requestParams.model = this.config.getActiveModel();
+        }
+        return this.contentGenerator.generateContent(requestParams, promptId);
+      };
+
+      const result = await retryWithBackoff(apiCall, {
         shouldRetryOnContent,
         maxAttempts: maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+        getAvailabilityContext,
       });
+
+      if (this.config.isModelAvailabilityServiceEnabled()) {
+        const modelUsed = requestParams.model;
+        if (modelUsed) {
+          this.config.getModelAvailabilityService().markHealthy(modelUsed);
+        }
+      }
+
+      return result;
     } catch (error) {
       if (abortSignal?.aborted) {
         throw error;

@@ -56,46 +56,11 @@ import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
+import { resolvePolicyChain } from '../availability/policyHelpers.js';
+import type { RetryAvailabilityContext } from '../utils/retry.js';
 
 const MAX_TURNS = 100;
-
-/**
- * Estimates the character length of text-only parts in a request.
- * Binary data (inline_data, fileData) is excluded from the estimation
- * because Gemini counts these as fixed token values, not based on their size.
- * @param request The request to estimate tokens for
- * @returns Estimated character length of text content
- */
-function estimateTextOnlyLength(request: PartListUnion): number {
-  if (typeof request === 'string') {
-    return request.length;
-  }
-
-  // Ensure request is an array before iterating
-  if (!Array.isArray(request)) {
-    return 0;
-  }
-
-  let textLength = 0;
-  for (const part of request) {
-    // Handle string elements in the array
-    if (typeof part === 'string') {
-      textLength += part.length;
-    }
-    // Handle object elements with text property
-    else if (
-      typeof part === 'object' &&
-      part !== null &&
-      'text' in part &&
-      part.text
-    ) {
-      textLength += part.text.length;
-    }
-    // inlineData, fileData, and other binary parts are ignored
-    // as they are counted as fixed tokens by Gemini
-  }
-  return textLength;
-}
 
 export class GeminiClient {
   private chat?: GeminiChat;
@@ -442,6 +407,11 @@ export class GeminiClient {
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    if (!isInvalidStreamRetry) {
+      // resets modelAvailabilityService turn
+      this.config.resetTurn();
+    }
+
     // Fire BeforeAgent hook through MessageBus (only if hooks are enabled)
     const hooksEnabled = this.config.getEnableHooks();
     const messageBus = this.config.getMessageBus();
@@ -493,11 +463,12 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getEffectiveModelForCurrentTurn();
 
-    // Estimate tokens based on text content only.
-    // Binary data (PDFs, images) are counted as fixed tokens by Gemini,
-    // not based on their base64-encoded size.
-    const estimatedRequestTokenCount = Math.floor(
-      estimateTextOnlyLength(request) / 4,
+    // Estimate tokens. For text-only requests, we estimate based on character length.
+    // For requests with non-text parts (like images, tools), we use the countTokens API.
+    const estimatedRequestTokenCount = await calculateRequestTokenCount(
+      request,
+      this.getContentGeneratorOrFail(),
+      modelForLimitCheck,
     );
 
     const remainingTokenCount =
@@ -570,10 +541,30 @@ export class GeminiClient {
       const router = await this.config.getModelRouterService();
       const decision = await router.route(routingContext);
       modelToUse = decision.model;
-      // Lock the model for the rest of the sequence
-      this.currentSequenceModel = modelToUse;
-      yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
+
+    // --- Availability Logic Integration ---
+    if (this.config.isModelAvailabilityServiceEnabled()) {
+      const chain = resolvePolicyChain(this.config, modelToUse);
+      const service = this.config.getModelAvailabilityService();
+      const selection = service.selectFirstAvailable(chain.map((p) => p.model));
+      const finalModel =
+        selection.selectedModel ?? chain.find((p) => p.isLastResort)?.model;
+
+      if (finalModel) {
+        modelToUse = finalModel;
+        this.config.setActiveModel(modelToUse);
+        if (selection.attempts) {
+          service.consumeStickyAttempt(modelToUse);
+        }
+      }
+    }
+    // --------------------------------------
+
+    // Lock the model for the rest of the sequence
+    // If availability changed it, we lock to the *available* model.
+    this.currentSequenceModel = modelToUse;
+    yield { type: GeminiEventType.ModelInfo, value: modelToUse };
 
     const resultStream = turn.run({ model: modelToUse }, request, linkedSignal);
     for await (const event of resultStream) {
@@ -702,13 +693,78 @@ export class GeminiClient {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
 
+      // --- Availability Logic Integration ---
+      let availabilityContextFn:
+        | (() => RetryAvailabilityContext | undefined)
+        | undefined;
+      if (this.config.isModelAvailabilityServiceEnabled()) {
+        // ... (logic to select initial model and set context) ...
+        const chain = resolvePolicyChain(this.config, currentAttemptModel);
+        const service = this.config.getModelAvailabilityService();
+        const selection = service.selectFirstAvailable(
+          chain.map((p) => p.model),
+        );
+        const finalModel =
+          selection.selectedModel ?? chain.find((p) => p.isLastResort)?.model;
+
+        if (finalModel) {
+          currentAttemptModel = finalModel;
+          this.config.setActiveModel(currentAttemptModel);
+          if (selection.attempts) {
+            service.consumeStickyAttempt(currentAttemptModel);
+          }
+          // We also need to update currentAttemptGenerateContentConfig if the model changed?
+          // ... (existing comments) ...
+          if (currentAttemptModel !== desiredModelConfig.model) {
+            const newConfig = this.config.modelConfigService.getResolvedConfig({
+              ...modelConfigKey,
+              model: currentAttemptModel,
+            });
+            currentAttemptGenerateContentConfig =
+              newConfig.generateContentConfig;
+          }
+        }
+
+        // Define callback to refresh context based on currentAttemptModel which might be updated by fallback handler
+        availabilityContextFn = () => {
+          const chain = resolvePolicyChain(this.config, currentAttemptModel);
+          const policy = chain.find((p) => p.model === currentAttemptModel);
+          return policy ? { service, policy } : undefined;
+        };
+      }
+      // --------------------------------------
+
       const apiCall = () => {
-        const modelConfigToUse = this.config.isInFallbackMode()
-          ? fallbackModelConfig
-          : desiredModelConfig;
-        currentAttemptModel = modelConfigToUse.model;
-        currentAttemptGenerateContentConfig =
-          modelConfigToUse.generateContentConfig;
+        // If availability service is enabled, currentAttemptModel is already set correctly above.
+        // If NOT enabled, we use the legacy logic:
+        let modelConfigToUse = desiredModelConfig;
+        if (!this.config.isModelAvailabilityServiceEnabled()) {
+          modelConfigToUse = this.config.isInFallbackMode()
+            ? fallbackModelConfig
+            : desiredModelConfig;
+          currentAttemptModel = modelConfigToUse.model;
+          currentAttemptGenerateContentConfig =
+            modelConfigToUse.generateContentConfig;
+        } else {
+          // In enabled mode, ensure we use the ACTIVE model if it changed.
+          // But wait, apiCall closure captures `currentAttemptModel`.
+          // If fallback handler changes active model, we need to pick it up here.
+          // `handleFallback` updates `activeModel`.
+          // `currentAttemptModel` is a local variable.
+          // We MUST update `currentAttemptModel` from `config.getActiveModel()` here.
+          const active = this.config.getActiveModel();
+          if (active !== currentAttemptModel) {
+            currentAttemptModel = active;
+            // Re-resolve config if model changed
+            const newConfig = this.config.modelConfigService.getResolvedConfig({
+              ...modelConfigKey,
+              model: currentAttemptModel,
+            });
+            currentAttemptGenerateContentConfig =
+              newConfig.generateContentConfig;
+          }
+        }
+
         const requestConfig: GenerateContentConfig = {
           ...currentAttemptGenerateContentConfig,
           abortSignal,
@@ -734,7 +790,19 @@ export class GeminiClient {
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: onPersistent429Callback,
         authType: this.config.getContentGeneratorConfig()?.authType,
+        getAvailabilityContext: availabilityContextFn,
       });
+      // On success... (rest is fine)
+
+      // On success, mark the model as healthy (if enabled)
+      if (this.config.isModelAvailabilityServiceEnabled()) {
+        // Use the model from the LAST successful apiCall attempt.
+        // apiCall updates currentAttemptModel if enabled.
+        this.config
+          .getModelAvailabilityService()
+          .markHealthy(currentAttemptModel);
+      }
+
       return result;
     } catch (error: unknown) {
       if (abortSignal.aborted) {

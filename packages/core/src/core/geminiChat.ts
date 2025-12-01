@@ -46,6 +46,9 @@ import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
+import { resolvePolicyChain } from '../availability/policyHelpers.js';
+import type { RetryAvailabilityContext } from '../utils/retry.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -213,8 +216,8 @@ export class GeminiChat {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(config);
     this.chatRecordingService.initialize(resumedSessionData);
-    this.lastPromptTokenCount = Math.ceil(
-      JSON.stringify(this.history).length / 4,
+    this.lastPromptTokenCount = estimateTokenCountSync(
+      this.history.flatMap((c) => c.parts || []),
     );
   }
 
@@ -396,16 +399,38 @@ export class GeminiChat {
     let effectiveModel = model;
     const contentsForPreviewModel =
       this.ensureActiveLoopHasThoughtSignatures(requestContents);
+
+    // --- Availability Logic Integration ---
+    const getAvailabilityContext = (): RetryAvailabilityContext | undefined => {
+      if (!this.config.isModelAvailabilityServiceEnabled()) {
+        return undefined;
+      }
+      const service = this.config.getModelAvailabilityService();
+      // Use effectiveModel which tracks the last attempted model in apiCall
+      const chain = resolvePolicyChain(this.config, effectiveModel);
+      const policy = chain.find((p) => p.model === effectiveModel);
+      return policy ? { service, policy } : undefined;
+    };
+    // --------------------------------------
+
     const apiCall = () => {
-      let modelToUse = getEffectiveModel(
-        this.config.isInFallbackMode(),
-        model,
-        this.config.getPreviewFeatures(),
-      );
+      let modelToUse: string;
+
+      if (this.config.isModelAvailabilityServiceEnabled()) {
+        modelToUse = this.config.getActiveModel();
+      } else {
+        modelToUse = getEffectiveModel(
+          this.config.isInFallbackMode(),
+          model,
+          this.config.getPreviewFeatures(),
+        );
+      }
 
       // Preview Model Bypass Logic:
       // If we are in "Preview Model Bypass Mode" (transient failure), we force downgrade to 2.5 Pro
       // IF the effective model is currently Preview Model.
+      // Note: In availability mode, this should ideally be handled by policy, but preserving
+      // bypass logic for now as it handles specific transient behavior.
       if (
         this.config.isPreviewModelBypassMode() &&
         modelToUse === PREVIEW_GEMINI_MODEL
@@ -467,7 +492,13 @@ export class GeminiChat {
         model === PREVIEW_GEMINI_MODEL
           ? 1
           : undefined,
+      getAvailabilityContext,
     });
+
+    // On success, mark the model as healthy (if enabled)
+    if (this.config.isModelAvailabilityServiceEnabled()) {
+      this.config.getModelAvailabilityService().markHealthy(effectiveModel);
+    }
 
     return this.processStreamResponse(effectiveModel, streamResponse);
   }

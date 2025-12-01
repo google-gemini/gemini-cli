@@ -18,6 +18,9 @@ import {
 import type { GenerateContentResponse } from '@google/genai';
 import { BaseLlmClient, type GenerateJsonOptions } from './baseLlmClient.js';
 import type { ContentGenerator } from './contentGenerator.js';
+import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
+import { createAvailabilityServiceMock } from '../availability/availabilityTestingUtils.js';
+import type { GenerateContentOptions } from './baseLlmClient.js';
 import type { Config } from '../config/config.js';
 import { AuthType } from './contentGenerator.js';
 import { reportError } from '../utils/errorReporting.js';
@@ -105,6 +108,14 @@ describe('BaseLlmClient', () => {
           },
         })),
       },
+      isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(false),
+      getModelAvailabilityService: vi.fn(),
+      setActiveModel: vi.fn(),
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getUserTier: vi.fn().mockReturnValue(undefined),
+      isInFallbackMode: vi.fn().mockReturnValue(false),
+      getModel: vi.fn().mockReturnValue('test-model'),
+      getActiveModel: vi.fn().mockReturnValue('test-model'),
     } as unknown as Mocked<Config>;
 
     client = new BaseLlmClient(mockContentGenerator, mockConfig);
@@ -590,6 +601,169 @@ describe('BaseLlmClient', () => {
         'API returned invalid content after all retries.',
         options.contents,
         'generateContent-invalid-content',
+      );
+    });
+  });
+
+  describe('Availability Service Integration', () => {
+    let mockAvailabilityService: ModelAvailabilityService;
+    let contentOptions: GenerateContentOptions;
+    let jsonOptions: GenerateJsonOptions;
+
+    beforeEach(() => {
+      mockConfig.isModelAvailabilityServiceEnabled = vi
+        .fn()
+        .mockReturnValue(true);
+
+      mockAvailabilityService = createAvailabilityServiceMock({
+        selectedModel: 'test-model',
+        skipped: [],
+      });
+
+      // Reflect setActiveModel into getActiveModel so availability-driven updates
+      // are visible to the client under test.
+      mockConfig.getActiveModel = vi.fn().mockReturnValue('test-model');
+      mockConfig.setActiveModel = vi.fn((model: string) => {
+        vi.mocked(mockConfig.getActiveModel).mockReturnValue(model);
+      });
+
+      vi.spyOn(mockConfig, 'getModelAvailabilityService').mockReturnValue(
+        mockAvailabilityService,
+      );
+
+      contentOptions = {
+        modelConfigKey: { model: 'test-model' },
+        contents: [{ role: 'user', parts: [{ text: 'Give me a color.' }] }],
+        abortSignal: abortController.signal,
+        promptId: 'content-prompt-id',
+      };
+
+      jsonOptions = {
+        ...defaultOptions,
+        promptId: 'json-prompt-id',
+      };
+    });
+
+    it('should preserve legacy behavior when availability is disabled', async () => {
+      mockConfig.isModelAvailabilityServiceEnabled = vi
+        .fn()
+        .mockReturnValue(false);
+      mockGenerateContent.mockResolvedValue(
+        createMockResponse('Some text response'),
+      );
+
+      await client.generateContent(contentOptions);
+
+      expect(
+        mockAvailabilityService.selectFirstAvailable,
+      ).not.toHaveBeenCalled();
+      expect(mockConfig.setActiveModel).not.toHaveBeenCalled();
+      expect(mockAvailabilityService.markHealthy).not.toHaveBeenCalled();
+    });
+
+    it('should mark model as healthy on success', async () => {
+      const successfulModel = 'gemini-pro';
+      vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
+        selectedModel: successfulModel,
+        skipped: [],
+      });
+      mockGenerateContent.mockResolvedValue(
+        createMockResponse('Some text response'),
+      );
+
+      await client.generateContent({
+        ...contentOptions,
+        modelConfigKey: { model: successfulModel },
+      });
+
+      expect(mockAvailabilityService.markHealthy).toHaveBeenCalledWith(
+        successfulModel,
+      );
+    });
+
+    it('marks the final attempted model healthy after a retry with availability enabled', async () => {
+      const firstModel = 'gemini-pro';
+      const fallbackModel = 'gemini-flash';
+      vi.mocked(mockAvailabilityService.selectFirstAvailable)
+        .mockReturnValueOnce({ selectedModel: firstModel, skipped: [] })
+        .mockReturnValueOnce({ selectedModel: fallbackModel, skipped: [] });
+
+      mockGenerateContent
+        .mockResolvedValueOnce(createMockResponse('retry-me'))
+        .mockResolvedValueOnce(createMockResponse('final-response'));
+
+      // Run the real retryWithBackoff (with fake timers) to exercise the retry path
+      vi.useFakeTimers();
+
+      const retryPromise = client.generateContent({
+        ...contentOptions,
+        modelConfigKey: { model: firstModel },
+        maxAttempts: 2,
+      });
+
+      await vi.runAllTimersAsync();
+      await retryPromise;
+
+      await client.generateContent({
+        ...contentOptions,
+        modelConfigKey: { model: firstModel },
+        maxAttempts: 2,
+      });
+
+      expect(mockConfig.setActiveModel).toHaveBeenCalledWith(firstModel);
+      expect(mockConfig.setActiveModel).toHaveBeenCalledWith(fallbackModel);
+      expect(mockAvailabilityService.markHealthy).toHaveBeenCalledWith(
+        fallbackModel,
+      );
+      expect(mockGenerateContent).toHaveBeenLastCalledWith(
+        expect.objectContaining({ model: fallbackModel }),
+        expect.any(String),
+      );
+    });
+
+    it('should consume sticky attempt if selection has attempts', async () => {
+      const stickyModel = 'gemini-pro-sticky';
+      vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
+        selectedModel: stickyModel,
+        attempts: 1,
+        skipped: [],
+      });
+      mockGenerateContent.mockResolvedValue(
+        createMockResponse('Some text response'),
+      );
+      vi.mocked(retryWithBackoff).mockImplementation(async (fn) => fn());
+
+      await client.generateContent({
+        ...contentOptions,
+        modelConfigKey: { model: stickyModel },
+      });
+
+      expect(mockAvailabilityService.consumeStickyAttempt).toHaveBeenCalledWith(
+        stickyModel,
+      );
+    });
+
+    it('should mark healthy and honor availability selection when using generateJson', async () => {
+      const availableModel = 'gemini-json-pro';
+      vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
+        selectedModel: availableModel,
+        skipped: [],
+      });
+      mockGenerateContent.mockResolvedValue(
+        createMockResponse('{"color":"violet"}'),
+      );
+      vi.mocked(retryWithBackoff).mockImplementation(async (fn) => fn());
+
+      const result = await client.generateJson(jsonOptions);
+
+      expect(result).toEqual({ color: 'violet' });
+      expect(mockConfig.setActiveModel).toHaveBeenCalledWith(availableModel);
+      expect(mockAvailabilityService.markHealthy).toHaveBeenCalledWith(
+        availableModel,
+      );
+      expect(mockGenerateContent).toHaveBeenLastCalledWith(
+        expect.objectContaining({ model: availableModel }),
+        jsonOptions.promptId,
       );
     });
   });
