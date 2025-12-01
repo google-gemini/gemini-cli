@@ -13,6 +13,7 @@ import {
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
   type ExtensionLoader,
   debugLogger,
 } from '@google/gemini-cli-core';
@@ -767,6 +768,7 @@ describe('mergeExcludeTools', () => {
     SHELL_TOOL_NAME,
     EDIT_TOOL_NAME,
     WRITE_FILE_TOOL_NAME,
+    WEB_FETCH_TOOL_NAME,
   ]);
   const originalIsTTY = process.stdin.isTTY;
 
@@ -1643,6 +1645,29 @@ describe('loadCliConfig tool exclusions', () => {
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getExcludeTools()).not.toContain(SHELL_TOOL_NAME);
+  });
+
+  it('should exclude web-fetch in non-interactive mode when not allowed', async () => {
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js', '-p', 'test'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.getExcludeTools()).toContain(WEB_FETCH_TOOL_NAME);
+  });
+
+  it('should not exclude web-fetch in non-interactive mode when allowed', async () => {
+    process.stdin.isTTY = false;
+    process.argv = [
+      'node',
+      'script.js',
+      '-p',
+      'test',
+      '--allowed-tools',
+      WEB_FETCH_TOOL_NAME,
+    ];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.getExcludeTools()).not.toContain(WEB_FETCH_TOOL_NAME);
   });
 
   it('should not exclude shell tool in non-interactive mode when --allowed-tools="run_shell_command" is set', async () => {
