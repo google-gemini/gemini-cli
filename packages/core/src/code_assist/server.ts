@@ -170,7 +170,7 @@ export class CodeAssistServer implements ContentGenerator {
   async retrieveUserQuota(
     req: RetrieveUserQuotaRequest,
   ): Promise<RetrieveUserQuotaResponse> {
-    return await this.requestPost<RetrieveUserQuotaResponse>(
+    return this.requestPost<RetrieveUserQuotaResponse>(
       'retrieveUserQuota',
       req,
     );
