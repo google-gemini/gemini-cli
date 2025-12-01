@@ -1317,7 +1317,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable Just-In-Time (JIT) context loading.',
-        showInDialog: true,
+        showInDialog: false,
       },
       codebaseInvestigatorSettings: {
         type: 'object',
