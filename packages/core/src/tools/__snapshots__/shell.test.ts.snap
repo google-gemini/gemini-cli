@@ -17,7 +17,7 @@ exports[`ShellTool > getDescription > should return the non-windows description 
 `;
 
 exports[`ShellTool > getDescription > should return the windows description when on windows 1`] = `
-"This tool executes a given shell command as \`cmd.exe /c <command>\`. Command can start background processes using \`start /b\`.
+"This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.
 
       The following information is returned:
 

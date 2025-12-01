@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as glob from 'glob';
 import * as path from 'node:path';
 import type { Config } from '@google/gemini-cli-core';
-import { Storage } from '@google/gemini-cli-core';
+import { GEMINI_DIR, Storage } from '@google/gemini-cli-core';
 import mock from 'mock-fs';
 import { FileCommandLoader } from './FileCommandLoader.js';
 import { assert, vi } from 'vitest';
@@ -70,11 +71,18 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
+vi.mock('glob', () => ({
+  glob: vi.fn(),
+}));
+
 describe('FileCommandLoader', () => {
   const signal: AbortSignal = new AbortController().signal;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { glob: actualGlob } =
+      await vi.importActual<typeof import('glob')>('glob');
+    vi.mocked(glob.glob).mockImplementation(actualGlob);
     mockShellProcess.mockImplementation(
       (prompt: PromptPipelineContent, context: CommandContext) => {
         const userArgsRaw = context?.invocation?.args || '';
@@ -224,8 +232,8 @@ describe('FileCommandLoader', () => {
     const mockConfig = {
       getProjectRoot: vi.fn(() => '/path/to/project'),
       getExtensions: vi.fn(() => []),
-      getFolderTrustFeature: vi.fn(() => false),
       getFolderTrust: vi.fn(() => false),
+      isTrustedFolder: vi.fn(() => false),
     } as unknown as Config;
     const loader = new FileCommandLoader(mockConfig);
     const commands = await loader.loadCommands(signal);
@@ -269,8 +277,8 @@ describe('FileCommandLoader', () => {
     const mockConfig = {
       getProjectRoot: vi.fn(() => process.cwd()),
       getExtensions: vi.fn(() => []),
-      getFolderTrustFeature: vi.fn(() => false),
       getFolderTrust: vi.fn(() => false),
+      isTrustedFolder: vi.fn(() => false),
     } as unknown as Config;
     const loader = new FileCommandLoader(mockConfig);
     const commands = await loader.loadCommands(signal);
@@ -529,7 +537,9 @@ describe('FileCommandLoader', () => {
       ).getProjectCommandsDir();
       const extensionDir = path.join(
         process.cwd(),
-        '.gemini/extensions/test-ext',
+        GEMINI_DIR,
+        'extensions',
+        'test-ext',
       );
 
       mock({
@@ -560,8 +570,8 @@ describe('FileCommandLoader', () => {
             path: extensionDir,
           },
         ]),
-        getFolderTrustFeature: vi.fn(() => false),
         getFolderTrust: vi.fn(() => false),
+        isTrustedFolder: vi.fn(() => false),
       } as unknown as Config;
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
@@ -582,7 +592,9 @@ describe('FileCommandLoader', () => {
       ).getProjectCommandsDir();
       const extensionDir = path.join(
         process.cwd(),
-        '.gemini/extensions/test-ext',
+        GEMINI_DIR,
+        'extensions',
+        'test-ext',
       );
 
       mock({
@@ -613,8 +625,8 @@ describe('FileCommandLoader', () => {
             path: extensionDir,
           },
         ]),
-        getFolderTrustFeature: vi.fn(() => false),
         getFolderTrust: vi.fn(() => false),
+        isTrustedFolder: vi.fn(() => false),
       } as unknown as Config;
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
@@ -678,11 +690,15 @@ describe('FileCommandLoader', () => {
     it('only loads commands from active extensions', async () => {
       const extensionDir1 = path.join(
         process.cwd(),
-        '.gemini/extensions/active-ext',
+        GEMINI_DIR,
+        'extensions',
+        'active-ext',
       );
       const extensionDir2 = path.join(
         process.cwd(),
-        '.gemini/extensions/inactive-ext',
+        GEMINI_DIR,
+        'extensions',
+        'inactive-ext',
       );
 
       mock({
@@ -722,8 +738,8 @@ describe('FileCommandLoader', () => {
             path: extensionDir2,
           },
         ]),
-        getFolderTrustFeature: vi.fn(() => false),
         getFolderTrust: vi.fn(() => false),
+        isTrustedFolder: vi.fn(() => false),
       } as unknown as Config;
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
@@ -737,7 +753,9 @@ describe('FileCommandLoader', () => {
     it('handles missing extension commands directory gracefully', async () => {
       const extensionDir = path.join(
         process.cwd(),
-        '.gemini/extensions/no-commands',
+        GEMINI_DIR,
+        'extensions',
+        'no-commands',
       );
 
       mock({
@@ -760,8 +778,8 @@ describe('FileCommandLoader', () => {
             path: extensionDir,
           },
         ]),
-        getFolderTrustFeature: vi.fn(() => false),
         getFolderTrust: vi.fn(() => false),
+        isTrustedFolder: vi.fn(() => false),
       } as unknown as Config;
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
@@ -769,7 +787,12 @@ describe('FileCommandLoader', () => {
     });
 
     it('handles nested command structure in extensions', async () => {
-      const extensionDir = path.join(process.cwd(), '.gemini/extensions/a');
+      const extensionDir = path.join(
+        process.cwd(),
+        GEMINI_DIR,
+        'extensions',
+        'a',
+      );
 
       mock({
         [extensionDir]: {
@@ -794,8 +817,8 @@ describe('FileCommandLoader', () => {
         getExtensions: vi.fn(() => [
           { name: 'a', version: '1.0.0', isActive: true, path: extensionDir },
         ]),
-        getFolderTrustFeature: vi.fn(() => false),
         getFolderTrust: vi.fn(() => false),
+        isTrustedFolder: vi.fn(() => false),
       } as unknown as Config;
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
@@ -826,6 +849,52 @@ describe('FileCommandLoader', () => {
       } else {
         assert.fail('Incorrect action type');
       }
+    });
+
+    it('correctly loads extensionId for extension commands', async () => {
+      const extensionId = 'my-test-ext-id-123';
+      const extensionDir = path.join(
+        process.cwd(),
+        GEMINI_DIR,
+        'extensions',
+        'my-test-ext',
+      );
+
+      mock({
+        [extensionDir]: {
+          'gemini-extension.json': JSON.stringify({
+            name: 'my-test-ext',
+            id: extensionId,
+            version: '1.0.0',
+          }),
+          commands: {
+            'my-cmd.toml': 'prompt = "My test command"',
+          },
+        },
+      });
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => process.cwd()),
+        getExtensions: vi.fn(() => [
+          {
+            name: 'my-test-ext',
+            id: extensionId,
+            version: '1.0.0',
+            isActive: true,
+            path: extensionDir,
+          },
+        ]),
+        getFolderTrust: vi.fn(() => false),
+        isTrustedFolder: vi.fn(() => false),
+      } as unknown as Config;
+      const loader = new FileCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(1);
+      const command = commands[0];
+      expect(command.name).toBe('my-cmd');
+      expect(command.extensionName).toBe('my-test-ext');
+      expect(command.extensionId).toBe(extensionId);
     });
   });
 
@@ -1189,8 +1258,8 @@ describe('FileCommandLoader', () => {
       const mockConfig = {
         getProjectRoot: vi.fn(() => '/path/to/project'),
         getExtensions: vi.fn(() => []),
-        getFolderTrustFeature: vi.fn(() => true),
         getFolderTrust: vi.fn(() => true),
+        isTrustedFolder: vi.fn(() => true),
       } as unknown as Config;
       const userCommandsDir = Storage.getUserCommandsDir();
       mock({
@@ -1210,8 +1279,8 @@ describe('FileCommandLoader', () => {
       const mockConfig = {
         getProjectRoot: vi.fn(() => '/path/to/project'),
         getExtensions: vi.fn(() => []),
-        getFolderTrustFeature: vi.fn(() => true),
-        getFolderTrust: vi.fn(() => false),
+        getFolderTrust: vi.fn(() => true),
+        isTrustedFolder: vi.fn(() => false),
       } as unknown as Config;
       const userCommandsDir = Storage.getUserCommandsDir();
       mock({
@@ -1225,6 +1294,47 @@ describe('FileCommandLoader', () => {
       const commands = await loader.loadCommands(signal);
 
       expect(commands).toHaveLength(0);
+    });
+  });
+
+  describe('Aborted signal', () => {
+    it('does not log errors if the signal is aborted', async () => {
+      const controller = new AbortController();
+      const abortSignal = controller.signal;
+
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => '/path/to/project'),
+        getExtensions: vi.fn(() => []),
+        getFolderTrust: vi.fn(() => false),
+        isTrustedFolder: vi.fn(() => false),
+      } as unknown as Config;
+
+      // Set up mock-fs so that the loader attempts to read a directory.
+      const userCommandsDir = Storage.getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'test1.toml': 'prompt = "Prompt 1"',
+        },
+      });
+
+      const loader = new FileCommandLoader(mockConfig);
+
+      // Mock glob to throw an AbortError
+      const abortError = new DOMException('Aborted', 'AbortError');
+      vi.mocked(glob.glob).mockImplementation(async () => {
+        controller.abort(); // Ensure the signal is aborted when the service checks
+        throw abortError;
+      });
+
+      await loader.loadCommands(abortSignal);
+
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+      consoleErrorSpy.mockRestore();
     });
   });
 });

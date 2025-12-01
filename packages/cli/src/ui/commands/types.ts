@@ -4,14 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Dispatch, ReactNode, SetStateAction } from 'react';
+import type { ReactNode } from 'react';
 import type { Content, PartListUnion } from '@google/genai';
-import type { HistoryItemWithoutId, HistoryItem } from '../types.js';
+import type {
+  HistoryItemWithoutId,
+  HistoryItem,
+  ConfirmationRequest,
+} from '../types.js';
 import type { Config, GitService, Logger } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
-import type { ExtensionUpdateState } from '../state/extensions.js';
+import type {
+  ExtensionUpdateAction,
+  ExtensionUpdateStatus,
+} from '../state/extensions.js';
 
 // Grouped dependencies for clarity and easier mocking
 export interface CommandContext {
@@ -59,13 +66,13 @@ export interface CommandContext {
     loadHistory: UseHistoryManagerReturn['loadHistory'];
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
+    toggleDebugProfiler: () => void;
     toggleVimEnabled: () => Promise<boolean>;
-    setGeminiMdFileCount: (count: number) => void;
     reloadCommands: () => void;
-    extensionsUpdateState: Map<string, ExtensionUpdateState>;
-    setExtensionsUpdateState: Dispatch<
-      SetStateAction<Map<string, ExtensionUpdateState>>
-    >;
+    extensionsUpdateState: Map<string, ExtensionUpdateStatus>;
+    dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
+    addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
+    removeComponent: () => void;
   };
   // Session-specific data
   session: {
@@ -107,8 +114,18 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
+  props?: Record<string, unknown>;
 
-  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy' | 'settings';
+  dialog:
+    | 'help'
+    | 'auth'
+    | 'theme'
+    | 'editor'
+    | 'privacy'
+    | 'settings'
+    | 'sessionBrowser'
+    | 'model'
+    | 'permissions';
 }
 
 /**
@@ -154,6 +171,11 @@ export interface ConfirmActionReturn {
   };
 }
 
+export interface OpenCustomDialogActionReturn {
+  type: 'custom_dialog';
+  component: ReactNode;
+}
+
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
@@ -162,7 +184,8 @@ export type SlashCommandActionReturn =
   | LoadHistoryActionReturn
   | SubmitPromptActionReturn
   | ConfirmShellCommandsActionReturn
-  | ConfirmActionReturn;
+  | ConfirmActionReturn
+  | OpenCustomDialogActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
@@ -179,8 +202,17 @@ export interface SlashCommand {
 
   kind: CommandKind;
 
+  /**
+   * Controls whether the command auto-executes when selected with Enter.
+   *
+   * If true, pressing Enter on the suggestion will execute the command immediately.
+   * If false or undefined, pressing Enter will autocomplete the command into the prompt window.
+   */
+  autoExecute?: boolean;
+
   // Optional metadata for extension commands
   extensionName?: string;
+  extensionId?: string;
 
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (
@@ -195,7 +227,7 @@ export interface SlashCommand {
   completion?: (
     context: CommandContext,
     partialArg: string,
-  ) => Promise<string[]>;
+  ) => Promise<string[]> | string[];
 
   subCommands?: SlashCommand[];
 }

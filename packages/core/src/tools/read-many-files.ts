@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -27,24 +28,17 @@ import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { ToolErrorType } from './tool-error.js';
+import { READ_MANY_FILES_TOOL_NAME } from './tool-names.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
  */
 export interface ReadManyFilesParams {
   /**
-   * An array of file paths or directory paths to search within.
-   * Paths are relative to the tool's configured target directory.
-   * Glob patterns can be used directly in these paths.
-   */
-  paths: string[];
-
-  /**
-   * Optional. Glob patterns for files to include.
-   * These are effectively combined with the `paths`.
+   * Glob patterns for files to include.
    * Example: ["*.ts", "src/** /*.md"]
    */
-  include?: string[];
+  include: string[];
 
   /**
    * Optional. Glob patterns for files/directories to exclude.
@@ -113,14 +107,16 @@ class ReadManyFilesToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: ReadManyFilesParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
-    const allPatterns = [...this.params.paths, ...(this.params.include || [])];
     const pathDesc = `using patterns: 
-${allPatterns.join('`, `')}
+${this.params.include.join('`, `')}
  (within target directory: 
 ${this.config.getTargetDir()}
 ) `;
@@ -128,19 +124,12 @@ ${this.config.getTargetDir()}
     // Determine the final list of exclusion patterns exactly as in execute method
     const paramExcludes = this.params.exclude || [];
     const paramUseDefaultExcludes = this.params.useDefaultExcludes !== false;
-    const geminiIgnorePatterns = this.config
-      .getFileService()
-      .getGeminiIgnorePatterns();
     const finalExclusionPatternsForDescription: string[] =
       paramUseDefaultExcludes
-        ? [
-            ...getDefaultExcludes(this.config),
-            ...paramExcludes,
-            ...geminiIgnorePatterns,
-          ]
-        : [...paramExcludes, ...geminiIgnorePatterns];
+        ? [...getDefaultExcludes(this.config), ...paramExcludes]
+        : [...paramExcludes];
 
-    let excludeDesc = `Excluding: ${
+    const excludeDesc = `Excluding: ${
       finalExclusionPatternsForDescription.length > 0
         ? `patterns like 
 ${finalExclusionPatternsForDescription
@@ -151,16 +140,6 @@ ${finalExclusionPatternsForDescription
         : 'none specified'
     }`;
 
-    // Add a note if .geminiignore patterns contributed to the final list of exclusions
-    if (geminiIgnorePatterns.length > 0) {
-      const geminiPatternsInEffect = geminiIgnorePatterns.filter((p) =>
-        finalExclusionPatternsForDescription.includes(p),
-      ).length;
-      if (geminiPatternsInEffect > 0) {
-        excludeDesc += ` (includes ${geminiPatternsInEffect} from .geminiignore)`;
-      }
-    }
-
     return `Will attempt to read and concatenate files ${pathDesc}. ${excludeDesc}. File encoding: ${DEFAULT_ENCODING}. Separator: "${DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
       '{filePath}',
       'path/to/file.ext',
@@ -168,12 +147,7 @@ ${finalExclusionPatternsForDescription
   }
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
-    const {
-      paths: inputPatterns,
-      include = [],
-      exclude = [],
-      useDefaultExcludes = true,
-    } = this.params;
+    const { include, exclude = [], useDefaultExcludes = true } = this.params;
 
     const filesToConsider = new Set<string>();
     const skippedFiles: Array<{ path: string; reason: string }> = [];
@@ -184,14 +158,13 @@ ${finalExclusionPatternsForDescription
       ? [...getDefaultExcludes(this.config), ...exclude]
       : [...exclude];
 
-    const searchPatterns = [...inputPatterns, ...include];
     try {
       const allEntries = new Set<string>();
       const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
 
       for (const dir of workspaceDirs) {
         const processedPatterns = [];
-        for (const p of searchPatterns) {
+        for (const p of include) {
           const normalizedP = p.replace(/\\/g, '/');
           const fullPath = path.join(dir, normalizedP);
           if (fs.existsSync(fullPath)) {
@@ -220,7 +193,7 @@ ${finalExclusionPatternsForDescription
       );
 
       const fileDiscovery = this.config.getFileService();
-      const { filteredPaths, gitIgnoredCount, geminiIgnoredCount } =
+      const { filteredPaths, ignoredCount } =
         fileDiscovery.filterFilesWithReport(relativeEntries, {
           respectGitIgnore:
             this.params.file_filtering_options?.respect_git_ignore ??
@@ -248,19 +221,11 @@ ${finalExclusionPatternsForDescription
         filesToConsider.add(fullPath);
       }
 
-      // Add info about git-ignored files if any were filtered
-      if (gitIgnoredCount > 0) {
+      // Add info about ignored files if any were filtered
+      if (ignoredCount > 0) {
         skippedFiles.push({
-          path: `${gitIgnoredCount} file(s)`,
-          reason: 'git ignored',
-        });
-      }
-
-      // Add info about gemini-ignored files if any were filtered
-      if (geminiIgnoredCount > 0) {
-        skippedFiles.push({
-          path: `${geminiIgnoredCount} file(s)`,
-          reason: 'gemini ignored',
+          path: `${ignoredCount} file(s)`,
+          reason: 'ignored by project ignore files',
         });
       }
     } catch (error) {
@@ -292,7 +257,7 @@ ${finalExclusionPatternsForDescription
               filePath,
               fileExtension,
             );
-            const requestedExplicitly = inputPatterns.some(
+            const requestedExplicitly = include.some(
               (pattern: string) =>
                 pattern.toLowerCase().includes(fileExtension) ||
                 pattern.includes(fileNameWithoutExtension),
@@ -387,12 +352,12 @@ ${finalExclusionPatternsForDescription
               : undefined;
           const mimetype = getSpecificMimeType(filePath);
           const programming_language = getProgrammingLanguage({
-            absolute_path: filePath,
+            file_path: filePath,
           });
           logFileOperation(
             this.config,
             new FileOperationEvent(
-              ReadManyFilesTool.Name,
+              READ_MANY_FILES_TOOL_NAME,
               FileOperation.READ,
               lines,
               mimetype,
@@ -474,13 +439,16 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
   ReadManyFilesParams,
   ToolResult
 > {
-  static readonly Name: string = 'read_many_files';
+  static readonly Name = READ_MANY_FILES_TOOL_NAME;
 
-  constructor(private config: Config) {
+  constructor(
+    private config: Config,
+    messageBus?: MessageBus,
+  ) {
     const parameterSchema = {
       type: 'object',
       properties: {
-        paths: {
+        include: {
           type: 'array',
           items: {
             type: 'string',
@@ -488,17 +456,7 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
           },
           minItems: 1,
           description:
-            "Required. An array of glob patterns or paths relative to the tool's target directory. Examples: ['src/**/*.ts'], ['README.md', 'docs/']",
-        },
-        include: {
-          type: 'array',
-          items: {
-            type: 'string',
-            minLength: 1,
-          },
-          description:
-            'Optional. Additional glob patterns to include. These are merged with `paths`. Example: "*.test.ts" to specifically add test files if they were broadly excluded.',
-          default: [],
+            'An array of glob patterns or paths. Examples: ["src/**/*.ts"], ["README.md", "docs/"]',
         },
         exclude: {
           type: 'array',
@@ -540,13 +498,13 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
           },
         },
       },
-      required: ['paths'],
+      required: ['include'],
     };
 
     super(
       ReadManyFilesTool.Name,
       'ReadManyFiles',
-      `Reads content from multiple files specified by paths or glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg) and PDF (.pdf) files if their file names or extensions are explicitly included in the 'paths' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded).
+      `Reads content from multiple files specified by glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg) and PDF (.pdf) files if their file names or extensions are explicitly included in the 'include' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded).
 
 This tool is useful when you need to understand or analyze a collection of files, such as:
 - Getting an overview of a codebase or parts of it (e.g., all TypeScript files in the 'src' directory).
@@ -555,15 +513,27 @@ This tool is useful when you need to understand or analyze a collection of files
 - Gathering context from multiple configuration files.
 - When the user asks to "read all files in X directory" or "show me the content of all Y files".
 
-Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. The tool inserts a '--- End of content ---' after the last file. Ensure paths are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
+Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. The tool inserts a '--- End of content ---' after the last file. Ensure glob patterns are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
       Kind.Read,
       parameterSchema,
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+      messageBus,
     );
   }
 
   protected createInvocation(
     params: ReadManyFilesParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<ReadManyFilesParams, ToolResult> {
-    return new ReadManyFilesToolInvocation(this.config, params);
+    return new ReadManyFilesToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }

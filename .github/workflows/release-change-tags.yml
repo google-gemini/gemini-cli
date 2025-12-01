@@ -8,48 +8,58 @@ on:
         required: true
         type: 'string'
       channel:
-        description: 'The npm dist-tag to apply (e.g., preview, stable).'
+        description: 'The npm dist-tag to apply (e.g., latest, preview, nightly).'
         required: true
         type: 'choice'
         options:
-          - 'stable'
+          - 'dev'
+          - 'latest'
           - 'preview'
           - 'nightly'
-      dry_run:
+      dry-run:
         description: 'Whether to run in dry-run mode.'
         required: false
         type: 'boolean'
         default: true
+      environment:
+        description: 'Environment'
+        required: false
+        type: 'choice'
+        options:
+          - 'prod'
+          - 'dev'
+        default: 'prod'
 
 jobs:
   change-tags:
     runs-on: 'ubuntu-latest'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
       packages: 'write'
       issues: 'write'
     steps:
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@v4'
+        with:
+          ref: '${{ github.ref }}'
+          fetch-depth: 0
+
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
         with:
           node-version-file: '.nvmrc'
-          registry-url: 'https://wombat-dressing-room.appspot.com'
-          scope: '@google'
 
-      - name: 'Change tag for @google/gemini-cli-core'
-        if: 'github.event.inputs.dry_run == false'
-        env:
-          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CORE }}'
-        run: |
-          npm dist-tag add @google/gemini-cli-core@${{ github.event.inputs.version }} ${{ github.event.inputs.channel }}
-
-      - name: 'Change tag for @google/gemini-cli'
-        if: 'github.event.inputs.dry_run == false'
-        env:
-          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
-        run: |
-          npm dist-tag add @google/gemini-cli@${{ github.event.inputs.version }} ${{ github.event.inputs.channel }}
-
-      - name: 'Log dry run'
-        if: 'github.event.inputs.dry_run == true'
-        run: |
-          echo "Dry run: Would have added tag '${{ github.event.inputs.channel }}' to version '${{ github.event.inputs.version }}' for @google/gemini-cli and @google/gemini-cli-core."
+      - name: 'Change tag'
+        uses: './.github/actions/tag-npm-release'
+        with:
+          channel: '${{ github.event.inputs.channel }}'
+          version: '${{ github.event.inputs.version }}'
+          dry-run: '${{ github.event.inputs.dry-run }}'
+          wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+          wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          cli-package-name: '${{ vars.CLI_PACKAGE_NAME }}'
+          core-package-name: '${{ vars.CORE_PACKAGE_NAME }}'
+          a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
+          working-directory: '.'
