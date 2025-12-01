@@ -422,7 +422,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           );
         });
 
-        child.on('close', (code) => {
+        child.on('close', (code, signal) => {
           options.signal.removeEventListener('abort', cleanup);
           const stdoutData = Buffer.concat(stdoutChunks).toString('utf8');
           const stderrData = Buffer.concat(stderrChunks).toString('utf8');
@@ -432,9 +432,13 @@ class GrepToolInvocation extends BaseToolInvocation<
           } else if (code === 1) {
             resolve(''); // No matches found
           } else {
-            reject(
-              new Error(`ripgrep exited with code ${code}: ${stderrData}`),
-            );
+            if (signal) {
+              reject(new Error(`ripgrep was terminated by signal: ${signal}`));
+            } else {
+              reject(
+                new Error(`ripgrep exited with code ${code}: ${stderrData}`),
+              );
+            }
           }
         });
       });
