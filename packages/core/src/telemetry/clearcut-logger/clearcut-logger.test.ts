@@ -295,11 +295,7 @@ describe('ClearcutLogger', () => {
 
     it('logs all user settings', () => {
       const { logger } = setup({
-<<<<<<< HEAD
-        config: { useSmartEdit: true },
-=======
         config: { useSmartEdit: true, modelRouter: { enabled: true } },
->>>>>>> cce2f06a (refactor(settings): consolidate model router settings)
       });
 
       vi.stubEnv('TERM_PROGRAM', 'vscode');

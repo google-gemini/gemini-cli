@@ -138,7 +138,9 @@ vi.mock('../agents/registry.js', () => {
   return { AgentRegistry: AgentRegistryMock };
 });
 
-vi.mock('../agents/subagent-tool-wrapper.js', () => ({ SubagentToolWrapper: vi.fn() }));
+vi.mock('../agents/subagent-tool-wrapper.js', () => ({
+  SubagentToolWrapper: vi.fn(),
+}));
 
 const mockCoreEvents = vi.hoisted(() => ({
   emitFeedback: vi.fn(),
@@ -751,7 +753,7 @@ describe('Server Config (config.ts)', () => {
     it('should set useModelRouter to true when enabled is true', () => {
       const params: ConfigParameters = {
         ...baseParams,
-        useModelRouter: true,
+        modelRouter: { enabled: true },
       };
       const config = new Config(params);
       expect(config.getUseModelRouter()).toBe(true);
@@ -760,7 +762,7 @@ describe('Server Config (config.ts)', () => {
     it('should set useModelRouter to false when enabled is false', () => {
       const params: ConfigParameters = {
         ...baseParams,
-        useModelRouter: false,
+        modelRouter: { enabled: false },
       };
       const config = new Config(params);
       expect(config.getUseModelRouter()).toBe(false);
@@ -780,7 +782,7 @@ describe('Server Config (config.ts)', () => {
       const customModel = 'my-custom-flash';
       const params: ConfigParameters = {
         ...baseParams,
-        simpleTaskModel: customModel,
+        modelRouter: { simpleTaskModel: customModel },
       };
       const config = new Config(params);
       expect(config.getSimpleTaskModel()).toBe(customModel);
@@ -790,7 +792,7 @@ describe('Server Config (config.ts)', () => {
       const customModel = 'my-custom-pro';
       const params: ConfigParameters = {
         ...baseParams,
-        complexTaskModel: customModel,
+        modelRouter: { complexTaskModel: customModel },
       };
       const config = new Config(params);
       expect(config.getComplexTaskModel()).toBe(customModel);
@@ -801,7 +803,7 @@ describe('Server Config (config.ts)', () => {
     it('should register a tool if coreTools contains an argument-specific pattern', async () => {
       const params: ConfigParameters = {
         ...baseParams,
-        coreTools: ['ShellTool(git status)']
+        coreTools: ['ShellTool(git status)'],
       };
       const config = new Config(params);
       await config.initialize();
@@ -939,7 +941,7 @@ describe('Server Config (config.ts)', () => {
       it('should register a tool if coreTools contains an argument-specific pattern with the non-minified class name', async () => {
         const params: ConfigParameters = {
           ...baseParams,
-          coreTools: ['ShellTool(git status)']
+          coreTools: ['ShellTool(git status)'],
         };
         const config = new Config(params);
         await config.initialize();

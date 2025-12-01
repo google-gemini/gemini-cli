@@ -295,7 +295,6 @@ export interface ConfigParameters {
     complexTaskModel?: string;
   };
   enableMessageBusIntegration?: boolean;
-<<<<<<< HEAD
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   continueOnFailedApiCall?: boolean;
@@ -313,10 +312,6 @@ export interface ConfigParameters {
   };
   previewFeatures?: boolean;
   enableModelAvailabilityService?: boolean;
-  simpleTaskModel?: string;
-  complexTaskModel?: string;
-=======
->>>>>>> cce2f06a (refactor(settings): consolidate model router settings)
 }
 
 export class Config {
@@ -414,8 +409,8 @@ export class Config {
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
   private useModelRouter: boolean;
-  private readonly initialUseModelRouter: boolean;
   private readonly enableMessageBusIntegration: boolean;
+  private readonly disableModelRouterForAuth: AuthType[];
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
@@ -534,12 +529,10 @@ export class Config {
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
-<<<<<<< HEAD
-    this.useWriteTodos = params.useWriteTodos ?? true;
-    this.initialUseModelRouter = params.useModelRouter ?? false;
-    this.useModelRouter = this.initialUseModelRouter;
-<<<<<<< HEAD
-=======
+    this.useWriteTodos = params.useWriteTodos ?? false;
+
+    // Model Router
+    this.useModelRouter = params.modelRouter?.enabled ?? false;
     this.simpleTaskModel =
       params.modelRouter?.simpleTaskModel ?? DEFAULT_GEMINI_FLASH_MODEL;
     this.complexTaskModel =
@@ -547,7 +540,7 @@ export class Config {
     this.validateModel('simpleTaskModel', this.simpleTaskModel);
     this.validateModel('complexTaskModel', this.complexTaskModel);
     this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
->>>>>>> 446e448d (refactor(config): improve router and path configuration)
+
     this.enableHooks = params.enableHooks ?? false;
 
     // Enable MessageBus integration if:
@@ -558,6 +551,7 @@ export class Config {
     this.enableMessageBusIntegration =
       params.enableMessageBusIntegration ??
       (hooksNeedMessageBus ? true : false);
+
     this.codebaseInvestigatorSettings = {
       enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
       maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 10,
@@ -570,16 +564,6 @@ export class Config {
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
-=======
-    this.useWriteTodos = params.useWriteTodos ?? false;
-    this.useModelRouter = params.modelRouter?.enabled ?? false;
-    this.enableMessageBusIntegration =
-      params.enableMessageBusIntegration ?? false;
-    this.simpleTaskModel =
-      params.modelRouter?.simpleTaskModel ?? DEFAULT_GEMINI_FLASH_MODEL;
-    this.complexTaskModel =
-      params.modelRouter?.complexTaskModel ?? DEFAULT_GEMINI_MODEL;
->>>>>>> cce2f06a (refactor(settings): consolidate model router settings)
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir);
@@ -597,8 +581,6 @@ export class Config {
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
     this.experiments = params.experiments;
-    this.simpleTaskModel = params.simpleTaskModel ?? DEFAULT_GEMINI_FLASH_MODEL;
-    this.complexTaskModel = params.complexTaskModel ?? DEFAULT_GEMINI_MODEL;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -1402,6 +1384,10 @@ export class Config {
 
   getComplexTaskModel(): string {
     return this.complexTaskModel;
+  }
+
+  getDisableModelRouterForAuth(): AuthType[] {
+    return this.disableModelRouterForAuth;
   }
 
   async getGitService(): Promise<GitService> {
