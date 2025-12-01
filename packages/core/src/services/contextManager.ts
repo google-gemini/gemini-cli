@@ -16,6 +16,8 @@ import type { Config } from '../config/config.js';
 export class ContextManager {
   private loadedPaths: Set<string> = new Set();
   private config: Config;
+  private globalMemory: string = '';
+  private environmentMemory: string = '';
 
   constructor(config: Config) {
     this.config = config;
@@ -27,7 +29,8 @@ export class ContextManager {
   async loadGlobalMemory(): Promise<string> {
     const result = await loadGlobalMemory(this.config.getDebugMode());
     this.markAsLoaded(result.files.map((f) => f.path));
-    return this.formatMemory(result.files);
+    this.globalMemory = this.formatMemory(result.files);
+    return this.globalMemory;
   }
 
   /**
@@ -43,7 +46,8 @@ export class ContextManager {
       this.config.getDebugMode(),
     );
     this.markAsLoaded(result.files.map((f) => f.path));
-    return this.formatMemory(result.files);
+    this.environmentMemory = this.formatMemory(result.files);
+    return this.environmentMemory;
   }
 
   /**
@@ -67,6 +71,14 @@ export class ContextManager {
 
     this.markAsLoaded(result.files.map((f) => f.path));
     return this.formatMemory(result.files);
+  }
+
+  getGlobalMemory(): string {
+    return this.globalMemory;
+  }
+
+  getEnvironmentMemory(): string {
+    return this.environmentMemory;
   }
 
   private markAsLoaded(paths: string[]): void {

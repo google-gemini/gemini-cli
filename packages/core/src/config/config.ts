@@ -432,8 +432,6 @@ export class Config {
 
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
-  private globalMemory: string = '';
-  private environmentMemory: string = '';
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -971,19 +969,11 @@ export class Config {
   }
 
   getGlobalMemory(): string {
-    return this.globalMemory;
-  }
-
-  setGlobalMemory(memory: string): void {
-    this.globalMemory = memory;
+    return this.contextManager?.getGlobalMemory() ?? '';
   }
 
   getEnvironmentMemory(): string {
-    return this.environmentMemory;
-  }
-
-  setEnvironmentMemory(memory: string): void {
-    this.environmentMemory = memory;
+    return this.contextManager?.getEnvironmentMemory() ?? '';
   }
 
   getContextManager(): ContextManager | undefined {

@@ -45,6 +45,7 @@ describe('ContextManager', () => {
       expect(contextManager.getLoadedPaths()).toContain(
         '/home/user/.gemini/GEMINI.md',
       );
+      expect(contextManager.getGlobalMemory()).toBe(result);
     });
   });
 
@@ -71,6 +72,7 @@ describe('ContextManager', () => {
       expect(result).toContain('--- Context from: GEMINI.md ---');
       expect(result).toContain('Env Content');
       expect(contextManager.getLoadedPaths()).toContain('/app/GEMINI.md');
+      expect(contextManager.getEnvironmentMemory()).toBe(result);
     });
   });
 
