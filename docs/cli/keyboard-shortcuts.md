@@ -6,14 +6,14 @@ available combinations.
 
 <!-- KEYBINDINGS-AUTOGEN:START -->
 
-#### Basic controls
+#### Basic Controls
 
 | Action                                       | Keys    |
 | -------------------------------------------- | ------- |
 | Confirm the current selection or choice.     | `Enter` |
 | Dismiss dialogs or cancel the current focus. | `Esc`   |
 
-#### Cursor movement
+#### Cursor Movement
 
 | Action                                    | Keys                   |
 | ----------------------------------------- | ---------------------- |
@@ -29,7 +29,7 @@ available combinations.
 | Clear all text in the input field.               | `Ctrl + C`                                |
 | Delete the previous word.                        | `Ctrl + Backspace`<br />`Cmd + Backspace` |
 
-#### Screen control
+#### Screen Control
 
 | Action                                       | Keys       |
 | -------------------------------------------- | ---------- |
@@ -46,7 +46,7 @@ available combinations.
 | Scroll up by one page.   | `Page Up`            |
 | Scroll down by one page. | `Page Down`          |
 
-#### History and search
+#### History & Search
 
 | Action                                       | Keys                  |
 | -------------------------------------------- | --------------------- |
@@ -65,7 +65,7 @@ available combinations.
 | Move up within dialog options.   | `Up Arrow (no Shift)`<br />`K (no Shift)`   |
 | Move down within dialog options. | `Down Arrow (no Shift)`<br />`J (no Shift)` |
 
-#### Suggestions and completions
+#### Suggestions & Completions
 
 | Action                                  | Keys                                               |
 | --------------------------------------- | -------------------------------------------------- |
@@ -75,21 +75,21 @@ available combinations.
 | Expand an inline suggestion.            | `Right Arrow`                                      |
 | Collapse an inline suggestion.          | `Left Arrow`                                       |
 
-#### Text input
+#### Text Input
 
 | Action                               | Keys                                                                                        |
 | ------------------------------------ | ------------------------------------------------------------------------------------------- |
 | Submit the current prompt.           | `Enter (no Ctrl, no Shift, no Cmd, not Paste)`                                              |
 | Insert a newline without submitting. | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Paste + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
 
-#### External tools
+#### External Tools
 
 | Action                                         | Keys       |
 | ---------------------------------------------- | ---------- |
 | Open the current prompt in an external editor. | `Ctrl + X` |
 | Paste from the clipboard.                      | `Ctrl + V` |
 
-#### App controls
+#### App Controls
 
 | Action                                                            | Keys       |
 | ----------------------------------------------------------------- | ---------- |
@@ -101,7 +101,7 @@ available combinations.
 | Expand a height-constrained response to show additional lines.    | `Ctrl + S` |
 | Toggle focus between the shell and Gemini input.                  | `Ctrl + F` |
 
-#### Session control
+#### Session Control
 
 | Action                                       | Keys       |
 | -------------------------------------------- | ---------- |
