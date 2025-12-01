@@ -106,10 +106,8 @@ export function SettingsDialog({
 
     keys.forEach((key) => {
       const def = getSettingDefinition(key);
-      // Add key
       searchItems.push(key);
       map.set(key.toLowerCase(), key);
-      // Add label if exists
       if (def?.label) {
         searchItems.push(def.label);
         map.set(def.label.toLowerCase(), key);
@@ -876,7 +874,8 @@ export function SettingsDialog({
           </Text>
         ) : (
           <Text bold={focusSection === 'settings'} wrap="truncate">
-            {focusSection === 'settings' ? '> ' : '  '}Settings
+            {focusSection === 'settings' ? '> ' : '  '}Settings{' '}
+            <Text color={theme.text.secondary}>(press / to search)</Text>
           </Text>
         )}
         <Box height={1} />
@@ -1020,7 +1019,6 @@ export function SettingsDialog({
         )}
 
         <Box height={1} />
-        <Text color={theme.text.secondary}>Press / to trigger search mode</Text>
         <Text color={theme.text.secondary}>
           (Use Enter to select
           {showScopeSelection ? ', Tab to change focus' : ''}, Esc to close)
