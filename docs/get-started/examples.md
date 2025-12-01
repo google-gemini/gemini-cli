@@ -1,4 +1,4 @@
-# Gemini CLI Examples
+# Gemini CLI examples
 
 Not sure where to get started with Gemini CLI? This document covers examples on
 how to use Gemini CLI for a variety of tasks.
@@ -57,7 +57,7 @@ Gemini CLI will return an explanation based on the actual source code:
 The `chalk` library is a popular npm package for styling terminal output with
 colors. After analyzing the source code, here's how it works:
 
-- **Core Functionality:** The main file sets up a chainable API. Each color or
+- **Core functionality:** The main file sets up a chainable API. Each color or
   modifier (like `bold` or `italic`) is a getter that appends the corresponding
   ANSI escape code to an internal stack.
 
@@ -65,7 +65,7 @@ colors. After analyzing the source code, here's how it works:
   getters. The `red` getter adds the red color code, and the `bold` getter adds
   the bold code.
 
-- **Output Generation:** When the chain is treated as a string (e.g., in
+- **Output generation:** When the chain is treated as a string (e.g., in
   `console.log`), a final `toString()` method is called. This method joins all
   the stored ANSI codes, wraps them around the input string ('Hello'), and adds
   a reset code at the end. This produces the final, styled string that the

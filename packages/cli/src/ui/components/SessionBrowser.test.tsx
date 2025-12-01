@@ -57,7 +57,10 @@ vi.mock('./SessionBrowser.js', async (importOriginal) => {
       moveSelection,
       cycleSortOrder,
       props.onResumeSession,
-      props.onDeleteSession,
+      props.onDeleteSession ??
+        (async () => {
+          // no-op delete handler for tests that don't care about deletion
+        }),
       props.onExit,
     );
 
@@ -135,23 +138,28 @@ const createSession = (overrides: Partial<SessionInfo>): SessionInfo => ({
 
 describe('SessionBrowser component', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-11-01T12:00:00Z'));
     keypressHandlers.length = 0;
     vi.clearAllMocks();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
   it('shows empty state when no sessions exist', () => {
     const config = createMockConfig();
     const onResumeSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
     const { lastFrame } = render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
+        onDeleteSession={onDeleteSession}
         onExit={onExit}
         testSessions={[]}
       />,
@@ -181,12 +189,14 @@ describe('SessionBrowser component', () => {
 
     const config = createMockConfig();
     const onResumeSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
     const { lastFrame } = render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
+        onDeleteSession={onDeleteSession}
         onExit={onExit}
         testSessions={[session1, session2]}
       />,
@@ -230,12 +240,14 @@ describe('SessionBrowser component', () => {
 
     const config = createMockConfig();
     const onResumeSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
     const { lastFrame } = render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
+        onDeleteSession={onDeleteSession}
         onExit={onExit}
         testSessions={[searchSession, otherSession]}
       />,
@@ -279,12 +291,14 @@ describe('SessionBrowser component', () => {
 
     const config = createMockConfig();
     const onResumeSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
     const { lastFrame } = render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
+        onDeleteSession={onDeleteSession}
         onExit={onExit}
         testSessions={[session1, session2]}
       />,
@@ -323,7 +337,7 @@ describe('SessionBrowser component', () => {
 
     const config = createMockConfig();
     const onResumeSession = vi.fn();
-    const onDeleteSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
     render(
@@ -348,12 +362,14 @@ describe('SessionBrowser component', () => {
   it('shows an error state when loading sessions fails', () => {
     const config = createMockConfig();
     const onResumeSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
     const { lastFrame } = render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
+        onDeleteSession={onDeleteSession}
         onExit={onExit}
         testError="storage failure"
       />,
