@@ -78,7 +78,7 @@ export class AgentRegistry {
    * it will be overwritten, respecting the precedence established by the
    * initialization order.
    */
-  protected registerAgent<TOutput extends z.ZodTypeAny>(
+  registerAgent<TOutput extends z.ZodTypeAny>(
     definition: AgentDefinition<TOutput>,
   ): void {
     // Basic validation
@@ -117,6 +117,17 @@ export class AgentRegistry {
       getModelConfigAlias(definition),
       runtimeAlias,
     );
+  }
+
+  /**
+   * Unregisters an agent definition.
+   */
+  unregisterAgent(name: string): void {
+    if (this.agents.has(name)) {
+      // We don't currently have a way to unregister the model config, but that's okay
+      // as it will be overwritten if the agent is re-registered.
+      this.agents.delete(name);
+    }
   }
 
   /**

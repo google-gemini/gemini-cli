@@ -198,11 +198,18 @@ export interface ToolDefinition {
   name: string;
   displayName: string;
   description?: string;
+  icon?: string;
 }
 
 export type HistoryItemToolsList = HistoryItemBase & {
   type: 'tools_list';
   tools: ToolDefinition[];
+  showDescriptions: boolean;
+};
+
+export type HistoryItemAgentsList = HistoryItemBase & {
+  type: 'agents_list';
+  agents: ToolDefinition[]; // Reusing ToolDefinition as it has name, displayName, description
   showDescriptions: boolean;
 };
 
@@ -263,6 +270,7 @@ export type HistoryItemWithoutId =
   | HistoryItemCompression
   | HistoryItemExtensionsList
   | HistoryItemToolsList
+  | HistoryItemAgentsList
   | HistoryItemMcpStatus
   | HistoryItemChatList;
 
@@ -284,6 +292,7 @@ export enum MessageType {
   COMPRESSION = 'compression',
   EXTENSIONS_LIST = 'extensions_list',
   TOOLS_LIST = 'tools_list',
+  AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
 }

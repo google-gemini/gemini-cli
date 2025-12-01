@@ -14,7 +14,7 @@ import {
   TOOL_STATUS,
 } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
-import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
+import { SHELL_TOOL_NAME, Kind, type Config } from '@google/gemini-cli-core';
 
 export const STATUS_INDICATOR_WIDTH = 3;
 
@@ -23,17 +23,31 @@ export type TextEmphasis = 'high' | 'medium' | 'low';
 type ToolStatusIndicatorProps = {
   status: ToolCallStatus;
   name: string;
+  config?: Config;
 };
 
 export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
   status,
   name,
+  config,
 }) => {
   const isShell =
     name === SHELL_COMMAND_NAME ||
     name === SHELL_NAME ||
     name === SHELL_TOOL_NAME;
   const statusColor = isShell ? theme.ui.symbol : theme.status.warning;
+
+  const tool = config?.getToolRegistry().getTool(name);
+  const isAgent = tool?.kind === Kind.Think;
+  const agentIcon = tool?.icon ?? '🤖';
+
+  if (isAgent) {
+    return (
+      <Box minWidth={STATUS_INDICATOR_WIDTH}>
+        <Text>{agentIcon}</Text>
+      </Box>
+    );
+  }
 
   return (
     <Box minWidth={STATUS_INDICATOR_WIDTH}>
