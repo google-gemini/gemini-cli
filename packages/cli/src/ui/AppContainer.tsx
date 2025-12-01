@@ -842,15 +842,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
     terminalHeight - controlsHeight - staticExtraHeight - 2,
   );
 
-  config.setShellExecutionConfig({
-    terminalWidth: Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
-    terminalHeight: Math.max(
-      Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
-      1,
-    ),
-    pager: settings.merged.tools?.shell?.pager,
-    showColor: settings.merged.tools?.shell?.showColor,
-  });
+  useEffect(() => {
+    config.setShellExecutionConfig({
+      terminalWidth: Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
+      terminalHeight: Math.max(
+        Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
+        1,
+      ),
+      pager: settings.merged.tools?.shell?.pager,
+      showColor: settings.merged.tools?.shell?.showColor,
+    });
+  }, [config, terminalWidth, availableTerminalHeight, settings]);
 
   const isFocused = useFocus();
   useBracketedPaste();
