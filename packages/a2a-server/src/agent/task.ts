@@ -662,7 +662,7 @@ export class Task {
           errorMessage,
         );
 
-        let errMessage = 'Unknown error from LLM stream';
+        let errMessage = `Unknown error from LLM stream: ${JSON.stringify(event)}`;
         if (errorEvent.value) {
           errMessage = parseAndFormatApiError(errorEvent.value);
         }
