@@ -1,4 +1,4 @@
-# Memory Tool (`save_memory`)
+# Memory tool (`save_memory`)
 
 This document describes the `save_memory` tool for the Gemini CLI.
 
