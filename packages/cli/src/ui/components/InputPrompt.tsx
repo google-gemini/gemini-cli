@@ -35,12 +35,15 @@ import {
   saveClipboardImage,
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
+import {
+  isAutoExecutableCommand,
+  isSlashCommand,
+} from '../utils/commandUtils.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { StreamingState } from '../types.js';
-import { isSlashCommand } from '../utils/commandUtils.js';
 import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
@@ -621,7 +624,27 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               completion.activeSuggestionIndex === -1
                 ? 0 // Default to the first if none is active
                 : completion.activeSuggestionIndex;
+
             if (targetIndex < completion.suggestions.length) {
+              const suggestion = completion.suggestions[targetIndex];
+
+              const isEnterKey = key.name === 'return' && !key.ctrl;
+
+              if (isEnterKey && buffer.text.startsWith('/')) {
+                const command = completion.getCommandFromSuggestion(suggestion);
+
+                if (command && isAutoExecutableCommand(command)) {
+                  const completedText = completion.getCompletedText(suggestion);
+
+                  if (completedText) {
+                    setExpandedSuggestionIndex(-1);
+                    handleSubmit(completedText.trim());
+                    return;
+                  }
+                }
+              }
+
+              // Default behavior: auto-complete to prompt box
               completion.handleAutocomplete(targetIndex);
               setExpandedSuggestionIndex(-1); // Reset expansion after selection
             }

@@ -31,6 +31,7 @@ import {
   ReadManyFilesTool,
   getEffectiveModel,
   createWorkingStdio,
+  startupProfiler,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -187,6 +188,7 @@ export class GeminiAgent {
     const config = await loadCliConfig(settings, sessionId, this.argv, cwd);
 
     await config.initialize();
+    startupProfiler.flush(config);
     return config;
   }
 
