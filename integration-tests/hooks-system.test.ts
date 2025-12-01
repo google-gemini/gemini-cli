@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import { TestRig, poll } from './test-helper.js';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 
@@ -1025,6 +1025,18 @@ fi`;
 
       // Wait for telemetry to be written to disk
       await rig.waitForTelemetryReady();
+
+      // Wait for hook telemetry events to be flushed to disk
+      // In interactive mode, telemetry may be buffered, so we need to poll for the events
+      await poll(
+        () => {
+          const hookLogs = rig.readHookLogs();
+          // We expect at least 3 hook calls: SessionStart (startup), SessionEnd (clear), SessionStart (clear)
+          return hookLogs.length >= 3;
+        },
+        10000, // 10 second timeout
+        200, // check every 200ms
+      );
 
       // Verify hooks executed
       const hookLogs = rig.readHookLogs();
