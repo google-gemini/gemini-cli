@@ -13,6 +13,7 @@ import {
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
   type ExtensionLoader,
   debugLogger,
 } from '@google/gemini-cli-core';
@@ -435,37 +436,15 @@ describe('parseArguments', () => {
     debugErrorSpy.mockRestore();
   });
 
-  it('should throw an error when resuming a session without prompt in non-interactive mode', async () => {
+  it('should allow resuming a session without prompt argument in non-interactive mode (expecting stdin)', async () => {
     const originalIsTTY = process.stdin.isTTY;
     process.stdin.isTTY = false;
     process.argv = ['node', 'script.js', '--resume', 'session-id'];
 
-    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
-
-    const mockConsoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
-    const debugErrorSpy = vi
-      .spyOn(debugLogger, 'error')
-      .mockImplementation(() => {});
-
     try {
-      await expect(parseArguments({} as Settings)).rejects.toThrow(
-        'process.exit called',
-      );
-
-      expect(debugErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'When resuming a session, you must provide a message via --prompt (-p) or stdin',
-        ),
-      );
-      expect(mockConsoleError).toHaveBeenCalled();
+      const argv = await parseArguments({} as Settings);
+      expect(argv.resume).toBe('session-id');
     } finally {
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
-      debugErrorSpy.mockRestore();
       process.stdin.isTTY = originalIsTTY;
     }
   });
@@ -789,6 +768,7 @@ describe('mergeExcludeTools', () => {
     SHELL_TOOL_NAME,
     EDIT_TOOL_NAME,
     WRITE_FILE_TOOL_NAME,
+    WEB_FETCH_TOOL_NAME,
   ]);
   const originalIsTTY = process.stdin.isTTY;
 
@@ -1665,6 +1645,29 @@ describe('loadCliConfig tool exclusions', () => {
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getExcludeTools()).not.toContain(SHELL_TOOL_NAME);
+  });
+
+  it('should exclude web-fetch in non-interactive mode when not allowed', async () => {
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js', '-p', 'test'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.getExcludeTools()).toContain(WEB_FETCH_TOOL_NAME);
+  });
+
+  it('should not exclude web-fetch in non-interactive mode when allowed', async () => {
+    process.stdin.isTTY = false;
+    process.argv = [
+      'node',
+      'script.js',
+      '-p',
+      'test',
+      '--allowed-tools',
+      WEB_FETCH_TOOL_NAME,
+    ];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.getExcludeTools()).not.toContain(WEB_FETCH_TOOL_NAME);
   });
 
   it('should not exclude shell tool in non-interactive mode when --allowed-tools="run_shell_command" is set', async () => {

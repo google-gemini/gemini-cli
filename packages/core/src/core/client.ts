@@ -43,6 +43,10 @@ import {
   logNextSpeakerCheck,
 } from '../telemetry/loggers.js';
 import {
+  fireBeforeAgentHook,
+  fireAfterAgentHook,
+} from './clientHookTriggers.js';
+import {
   ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
@@ -52,46 +56,9 @@ import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
 
 const MAX_TURNS = 100;
-
-/**
- * Estimates the character length of text-only parts in a request.
- * Binary data (inline_data, fileData) is excluded from the estimation
- * because Gemini counts these as fixed token values, not based on their size.
- * @param request The request to estimate tokens for
- * @returns Estimated character length of text content
- */
-function estimateTextOnlyLength(request: PartListUnion): number {
-  if (typeof request === 'string') {
-    return request.length;
-  }
-
-  // Ensure request is an array before iterating
-  if (!Array.isArray(request)) {
-    return 0;
-  }
-
-  let textLength = 0;
-  for (const part of request) {
-    // Handle string elements in the array
-    if (typeof part === 'string') {
-      textLength += part.length;
-    }
-    // Handle object elements with text property
-    else if (
-      typeof part === 'object' &&
-      part !== null &&
-      'text' in part &&
-      part.text
-    ) {
-      textLength += part.text.length;
-    }
-    // inlineData, fileData, and other binary parts are ignored
-    // as they are counted as fixed tokens by Gemini
-  }
-  return textLength;
-}
 
 export class GeminiClient {
   private chat?: GeminiChat;
@@ -438,6 +405,35 @@ export class GeminiClient {
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    // Fire BeforeAgent hook through MessageBus (only if hooks are enabled)
+    const hooksEnabled = this.config.getEnableHooks();
+    const messageBus = this.config.getMessageBus();
+    if (hooksEnabled && messageBus) {
+      const hookOutput = await fireBeforeAgentHook(messageBus, request);
+
+      if (
+        hookOutput?.isBlockingDecision() ||
+        hookOutput?.shouldStopExecution()
+      ) {
+        yield {
+          type: GeminiEventType.Error,
+          value: {
+            error: new Error(
+              `BeforeAgent hook blocked processing: ${hookOutput.getEffectiveReason()}`,
+            ),
+          },
+        };
+        return new Turn(this.getChat(), prompt_id);
+      }
+
+      // Add additional context from hooks to the request
+      const additionalContext = hookOutput?.getAdditionalContext();
+      if (additionalContext) {
+        const requestArray = Array.isArray(request) ? request : [request];
+        request = [...requestArray, { text: additionalContext }];
+      }
+    }
+
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id);
       this.lastPromptId = prompt_id;
@@ -460,11 +456,12 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getEffectiveModelForCurrentTurn();
 
-    // Estimate tokens based on text content only.
-    // Binary data (PDFs, images) are counted as fixed tokens by Gemini,
-    // not based on their base64-encoded size.
-    const estimatedRequestTokenCount = Math.floor(
-      estimateTextOnlyLength(request) / 4,
+    // Estimate tokens. For text-only requests, we estimate based on character length.
+    // For requests with non-text parts (like images, tools), we use the countTokens API.
+    const estimatedRequestTokenCount = await calculateRequestTokenCount(
+      request,
+      this.getContentGeneratorOrFail(),
+      modelForLimitCheck,
     );
 
     const remainingTokenCount =
@@ -608,9 +605,9 @@ export class GeminiClient {
       );
       if (nextSpeakerCheck?.next_speaker === 'model') {
         const nextRequest = [{ text: 'Please continue.' }];
-        // This recursive call's events will be yielded out, but the final
-        // turn object will be from the top-level call.
-        yield* this.sendMessageStream(
+        // This recursive call's events will be yielded out, and the final
+        // turn object from the recursive call will be returned.
+        return yield* this.sendMessageStream(
           nextRequest,
           signal,
           prompt_id,
@@ -619,6 +616,32 @@ export class GeminiClient {
         );
       }
     }
+
+    // Fire AfterAgent hook through MessageBus (only if hooks are enabled)
+    if (hooksEnabled && messageBus) {
+      const responseText = turn.getResponseText() || '[no response text]';
+      const hookOutput = await fireAfterAgentHook(
+        messageBus,
+        request,
+        responseText,
+      );
+
+      // For AfterAgent hooks, blocking/stop execution should force continuation
+      if (
+        hookOutput?.isBlockingDecision() ||
+        hookOutput?.shouldStopExecution()
+      ) {
+        const continueReason = hookOutput.getEffectiveReason();
+        const continueRequest = [{ text: continueReason }];
+        yield* this.sendMessageStream(
+          continueRequest,
+          signal,
+          prompt_id,
+          boundedTurns - 1,
+        );
+      }
+    }
+
     return turn;
   }
 
