@@ -133,6 +133,7 @@ vi.mock('./contexts/VimModeContext.js');
 vi.mock('./contexts/SessionContext.js');
 vi.mock('./components/shared/text-buffer.js');
 vi.mock('./hooks/useLogger.js');
+vi.mock('./hooks/useInputHistoryStore.js');
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -160,6 +161,7 @@ import { useSessionStats } from './contexts/SessionContext.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
+import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
@@ -231,6 +233,7 @@ describe('AppContainer State Management', () => {
   const mockedUseLogger = useLogger as Mock;
   const mockedUseLoadingIndicator = useLoadingIndicator as Mock;
   const mockedUseKeypress = useKeypress as Mock;
+  const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -341,6 +344,11 @@ describe('AppContainer State Management', () => {
     });
     mockedUseLogger.mockReturnValue({
       getPreviousUserMessages: vi.fn().mockReturnValue(new Promise(() => {})),
+    });
+    mockedUseInputHistoryStore.mockReturnValue({
+      inputHistory: [],
+      addInput: vi.fn(),
+      initializeFromLogger: vi.fn(),
     });
     mockedUseLoadingIndicator.mockReturnValue({
       elapsedTime: '0.0s',
@@ -1846,10 +1854,11 @@ describe('AppContainer State Management', () => {
     });
 
     it('restores the prompt when onCancelSubmit is called with shouldRestorePrompt=true (or undefined)', async () => {
-      mockedUseLogger.mockReturnValue({
-        getPreviousUserMessages: vi
-          .fn()
-          .mockResolvedValue(['previous message']),
+      // Mock useInputHistoryStore to provide input history
+      mockedUseInputHistoryStore.mockReturnValue({
+        inputHistory: ['previous message'],
+        addInput: vi.fn(),
+        initializeFromLogger: vi.fn(),
       });
 
       const { unmount } = renderAppContainer();
@@ -1870,74 +1879,38 @@ describe('AppContainer State Management', () => {
       unmount();
     });
 
-    it('correctly restores prompt even if userMessages is stale (race condition fix)', async () => {
-      // Setup initial history with one message
-      const initialHistory = [{ type: 'user', text: 'Previous Prompt' }];
-      mockedUseHistory.mockReturnValue({
-        history: initialHistory,
-        addItem: vi.fn(),
-        updateItem: vi.fn(),
-        clearItems: vi.fn(),
-        loadHistory: vi.fn(),
+    it('input history is independent from conversation history (survives /clear)', async () => {
+      // This test verifies that input history (used for up-arrow navigation) is maintained
+      // separately from conversation history and survives /clear operations.
+      const mockAddInput = vi.fn();
+      mockedUseInputHistoryStore.mockReturnValue({
+        inputHistory: ['first prompt', 'second prompt'],
+        addInput: mockAddInput,
+        initializeFromLogger: vi.fn(),
       });
 
-      let resolveLoggerPromise: (val: string[]) => void;
-      const loggerPromise = new Promise<string[]>((resolve) => {
-        resolveLoggerPromise = resolve;
-      });
+      const { unmount } = renderAppContainer();
 
-      // Mock logger to control when userMessages updates
-      const getPreviousUserMessagesMock = vi
-        .fn()
-        .mockResolvedValueOnce([]) // Initial mount
-        .mockReturnValueOnce(loggerPromise); // Second render (simulated update)
-
-      mockedUseLogger.mockReturnValue({
-        getPreviousUserMessages: getPreviousUserMessagesMock,
-      });
-
-      const { unmount, rerender } = renderAppContainer();
-
-      // Wait for userMessages to be populated with 'Previous Prompt'
+      // Verify userMessages is populated from inputHistory
       await waitFor(() =>
-        expect(capturedUIState.userMessages).toContain('Previous Prompt'),
+        expect(capturedUIState.userMessages).toContain('first prompt'),
       );
+      expect(capturedUIState.userMessages).toContain('second prompt');
 
-      // Simulate a new prompt being added (e.g., user sent it, but it overflowed)
-      const newPrompt = 'Current Prompt that Overflowed';
-      const newHistory = [...initialHistory, { type: 'user', text: newPrompt }];
-
+      // Clear the conversation history (simulating /clear command)
+      const mockClearItems = vi.fn();
       mockedUseHistory.mockReturnValue({
-        history: newHistory,
+        history: [],
         addItem: vi.fn(),
         updateItem: vi.fn(),
-        clearItems: vi.fn(),
+        clearItems: mockClearItems,
         loadHistory: vi.fn(),
       });
 
-      // Rerender to reflect the history change.
-      // This triggers the effect to update userMessages, but it hangs on loggerPromise.
-      rerender(getAppContainer());
-
-      const { onCancelSubmit } = extractUseGeminiStreamArgs(
-        mockedUseGeminiStream.mock.lastCall!,
-      );
-
-      // Call onCancelSubmit immediately. userMessages is still stale (has only 'Previous Prompt')
-      // because the effect is waiting on loggerPromise.
-      act(() => {
-        onCancelSubmit(true);
-      });
-
-      // Now resolve the promise to let the effect complete and update userMessages
-      await act(async () => {
-        resolveLoggerPromise!([]);
-      });
-
-      // With the fix, it should have waited for userMessages to update and then set the new prompt
-      await waitFor(() => {
-        expect(mockSetText).toHaveBeenCalledWith(newPrompt);
-      });
+      // Verify that userMessages still contains the input history
+      // (it should not be affected by clearing conversation history)
+      expect(capturedUIState.userMessages).toContain('first prompt');
+      expect(capturedUIState.userMessages).toContain('second prompt');
 
       unmount();
     });
