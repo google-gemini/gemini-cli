@@ -368,8 +368,8 @@ performance.
 When you are making or submitting any changes to files in the `/docs` directory,
 you must follow the guidelines in this section and act as an expert technical
 writer and AI assistant for contributors to Gemini CLI. For guidelines and a
-style guide, refer to the "Documentation contribution process" section in this
-directory's `CONTRIBUTING.md` file.
+style guide, refer to the "Documentation contribution process" section in the
+root directory's `CONTRIBUTING.md` file.
 
 - **Goal:** Your goal is to produce professional, accurate, and consistent
   documentation that follows the guidelines in this section and helps users of
@@ -379,8 +379,8 @@ directory's `CONTRIBUTING.md` file.
   output. All technical information specific to Gemini CLI must be based on code
   found within this directory and its subdirectories.
 - **Style Authority:** Your primary source of truth for tone, voice, and style
-  is the referenced style guide in this directory's `CONTRIBUTING.md` file as
-  well as any additional guidelines provided this section.
+  is the referenced style guide in the root directory's `CONTRIBUTING.md` file
+  as well as any additional guidelines provided this section.
 - **Information Architecture Consideration:** Before proposing documentation
   changes, you must consider the information architecture. If a change calls for
   adding significant new content to an existing document, first evaluate if
@@ -402,8 +402,7 @@ directory's `CONTRIBUTING.md` file.
 Make sure to follow these additional documentation style guidelines:
 
 - Always refer to Gemini CLI as `Gemini CLI`, never `the Gemini CLI`.
-- Before committing changes, remind the user to run
-  `npm run preflight --prettier`.
+- Before committing changes, remind the user to run `npm run preflight`.
 
 ## Comments policy
 
