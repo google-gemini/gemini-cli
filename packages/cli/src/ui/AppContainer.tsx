@@ -58,6 +58,7 @@ import {
   enableMouseEvents,
   disableLineWrapping,
   shouldEnterAlternateScreen,
+  startupProfiler,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -118,6 +119,7 @@ import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { enableSupportedProtocol } from './utils/kittyProtocolDetector.js';
+import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { enableBracketedPaste } from './utils/bracketedPaste.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
@@ -253,7 +255,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const [isConfigInitialized, setConfigInitialized] = useState(false);
 
   const logger = useLogger(config.storage);
-  const [userMessages, setUserMessages] = useState<string[]>([]);
+  const { inputHistory, addInput, initializeFromLogger } =
+    useInputHistoryStore();
 
   // Terminal and layout hooks
   const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
@@ -281,6 +284,7 @@ export const AppContainer = (props: AppContainerProps) => {
       // handled by the global catch.
       await config.initialize();
       setConfigInitialized(true);
+      startupProfiler.flush(config);
     })();
     registerCleanup(async () => {
       // Turn off mouse scroll.
@@ -344,35 +348,10 @@ export const AppContainer = (props: AppContainerProps) => {
     shellModeActive,
   });
 
+  // Initialize input history from logger (past sessions)
   useEffect(() => {
-    const fetchUserMessages = async () => {
-      const pastMessagesRaw = (await logger?.getPreviousUserMessages()) || [];
-      const currentSessionUserMessages = historyManager.history
-        .filter(
-          (item): item is HistoryItem & { type: 'user'; text: string } =>
-            item.type === 'user' &&
-            typeof item.text === 'string' &&
-            item.text.trim() !== '',
-        )
-        .map((item) => item.text)
-        .reverse();
-      const combinedMessages = [
-        ...currentSessionUserMessages,
-        ...pastMessagesRaw,
-      ];
-      const deduplicatedMessages: string[] = [];
-      if (combinedMessages.length > 0) {
-        deduplicatedMessages.push(combinedMessages[0]);
-        for (let i = 1; i < combinedMessages.length; i++) {
-          if (combinedMessages[i] !== combinedMessages[i - 1]) {
-            deduplicatedMessages.push(combinedMessages[i]);
-          }
-        }
-      }
-      setUserMessages(deduplicatedMessages.reverse());
-    };
-    fetchUserMessages();
-  }, [historyManager.history, logger]);
+    initializeFromLogger(logger);
+  }, [logger, initializeFromLogger]);
 
   const refreshStatic = useCallback(() => {
     if (!isAlternateBuffer) {
@@ -712,7 +691,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       const lastHistoryUserMsg = historyManager.history.findLast(
         (h) => h.type === 'user',
       );
-      const lastUserMsg = userMessages.at(-1);
+      const lastUserMsg = inputHistory.at(-1);
 
       if (
         !lastHistoryUserMsg ||
@@ -723,7 +702,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setPendingRestorePrompt(false);
       }
     }
-  }, [pendingRestorePrompt, userMessages, historyManager.history]);
+  }, [pendingRestorePrompt, inputHistory, historyManager.history]);
 
   const {
     streamingState,
@@ -788,7 +767,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
-      const lastUserMessage = userMessages.at(-1);
+      const lastUserMessage = inputHistory.at(-1);
       let textToSet = shouldRestorePrompt ? lastUserMessage || '' : '';
 
       const queuedText = getQueuedMessagesText();
@@ -803,7 +782,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     },
     [
       buffer,
-      userMessages,
+      inputHistory,
       getQueuedMessagesText,
       clearQueue,
       pendingSlashCommandHistoryItems,
@@ -814,8 +793,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
       addMessage(submittedValue);
+      addInput(submittedValue); // Track input for up-arrow history
     },
-    [addMessage],
+    [addMessage, addInput],
   );
 
   const handleClearScreen = useCallback(() => {
@@ -1441,7 +1421,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingGeminiHistoryItems,
       thought,
       shellModeActive,
-      userMessages,
+      userMessages: inputHistory,
       buffer,
       inputWidth,
       suggestionsWidth,
@@ -1533,7 +1513,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingGeminiHistoryItems,
       thought,
       shellModeActive,
-      userMessages,
+      inputHistory,
       buffer,
       inputWidth,
       suggestionsWidth,
