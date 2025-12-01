@@ -133,6 +133,7 @@ vi.mock('./contexts/VimModeContext.js');
 vi.mock('./contexts/SessionContext.js');
 vi.mock('./components/shared/text-buffer.js');
 vi.mock('./hooks/useLogger.js');
+vi.mock('./hooks/useInputHistoryStore.js');
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -160,6 +161,7 @@ import { useSessionStats } from './contexts/SessionContext.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
+import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
