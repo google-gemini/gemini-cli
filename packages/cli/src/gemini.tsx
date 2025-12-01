@@ -56,6 +56,7 @@ import {
   enterAlternateScreen,
   disableLineWrapping,
   shouldEnterAlternateScreen,
+  startupProfiler,
   ExitCodes,
 } from '@google/gemini-cli-core';
 import {
@@ -281,6 +282,7 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
+  const cliStartupHandle = startupProfiler.start('cli_startup');
   const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
@@ -289,7 +291,11 @@ export async function main() {
   });
 
   setupUnhandledRejectionHandler();
+  const loadSettingsHandle = startupProfiler.start('load_settings');
   const settings = loadSettings();
+  loadSettingsHandle?.end();
+
+  const migrateHandle = startupProfiler.start('migrate_settings');
   migrateDeprecatedSettings(
     settings,
     // Temporary extension manager only used during this non-interactive UI phase.
@@ -301,9 +307,12 @@ export async function main() {
       requestSetting: null,
     }),
   );
+  migrateHandle?.end();
   await cleanupCheckpoints();
 
+  const parseArgsHandle = startupProfiler.start('parse_arguments');
   const argv = await parseArguments(settings.merged);
+  parseArgsHandle?.end();
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
@@ -446,7 +455,9 @@ export async function main() {
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
   {
+    const loadConfigHandle = startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv);
+    loadConfigHandle?.end();
 
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
@@ -514,7 +525,9 @@ export async function main() {
     }
 
     setMaxSizedBoxDebugging(isDebugMode);
+    const initAppHandle = startupProfiler.start('initialize_app');
     const initializationResult = await initializeApp(config, settings);
+    initAppHandle?.end();
 
     if (
       settings.merged.security?.auth?.selectedType ===
@@ -556,6 +569,7 @@ export async function main() {
       }
     }
 
+    cliStartupHandle?.end();
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
       await startInteractiveUI(
@@ -570,6 +584,7 @@ export async function main() {
     }
 
     await config.initialize();
+    startupProfiler.flush(config);
 
     // If not a TTY, read from stdin
     // This is for cases where the user pipes input directly into the command
