@@ -430,10 +430,10 @@ export class Config {
   private previewModelBypassMode = false;
   private readonly enableModelAvailabilityService: boolean;
 
-  readonly experimentalJitContext: boolean;
-  contextManager?: ContextManager;
-  globalMemory: string = '';
-  environmentMemory: string = '';
+  private readonly experimentalJitContext: boolean;
+  private contextManager?: ContextManager;
+  private globalMemory: string = '';
+  private environmentMemory: string = '';
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -968,6 +968,30 @@ export class Config {
 
   setUserMemory(newUserMemory: string): void {
     this.userMemory = newUserMemory;
+  }
+
+  getGlobalMemory(): string {
+    return this.globalMemory;
+  }
+
+  setGlobalMemory(memory: string): void {
+    this.globalMemory = memory;
+  }
+
+  getEnvironmentMemory(): string {
+    return this.environmentMemory;
+  }
+
+  setEnvironmentMemory(memory: string): void {
+    this.environmentMemory = memory;
+  }
+
+  getContextManager(): ContextManager | undefined {
+    return this.contextManager;
+  }
+
+  isJitContextEnabled(): boolean {
+    return this.experimentalJitContext;
   }
 
   getGeminiMdFileCount(): number {
