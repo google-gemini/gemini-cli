@@ -1,4 +1,4 @@
-# Headless Mode
+# Headless mode
 
 Headless mode allows you to run Gemini CLI programmatically from command line
 scripts and automation tools without any interactive UI. This is ideal for
@@ -45,9 +45,9 @@ The headless mode provides a headless interface to Gemini CLI that:
 - Enables automation and scripting workflows
 - Provides consistent exit codes for error handling
 
-## Basic Usage
+## Basic usage
 
-### Direct Prompts
+### Direct prompts
 
 Use the `--prompt` (or `-p`) flag to run in headless mode:
 
@@ -55,7 +55,7 @@ Use the `--prompt` (or `-p`) flag to run in headless mode:
 gemini --prompt "What is machine learning?"
 ```
 
-### Stdin Input
+### Stdin input
 
 Pipe input to Gemini CLI from your terminal:
 
@@ -63,7 +63,7 @@ Pipe input to Gemini CLI from your terminal:
 echo "Explain this code" | gemini
 ```
 
-### Combining with File Input
+### Combining with file input
 
 Read from files and process with Gemini:
 
@@ -71,9 +71,9 @@ Read from files and process with Gemini:
 cat README.md | gemini --prompt "Summarize this documentation"
 ```
 
-## Output Formats
+## Output formats
 
-### Text Output (Default)
+### Text output (default)
 
 Standard human-readable output:
 
@@ -87,12 +87,12 @@ Response format:
 The capital of France is Paris.
 ```
 
-### JSON Output
+### JSON output
 
 Returns structured data including response, statistics, and metadata. This
 format is ideal for programmatic processing and automation scripts.
 
-#### Response Schema
+#### Response schema
 
 The JSON output follows this high-level structure:
 
@@ -140,7 +140,7 @@ The JSON output follows this high-level structure:
 }
 ```
 
-#### Example Usage
+#### Example usage
 
 ```bash
 gemini -p "What is the capital of France?" --output-format json
@@ -218,14 +218,14 @@ Response:
 }
 ```
 
-### Streaming JSON Output
+### Streaming JSON output
 
 Returns real-time events as newline-delimited JSON (JSONL). Each significant
 action (initialization, messages, tool calls, results) emits immediately as it
 occurs. This format is ideal for monitoring long-running operations, building
 UIs with live progress, and creating automation pipelines that react to events.
 
-#### When to Use Streaming JSON
+#### When to use streaming JSON
 
 Use `--output-format stream-json` when you need:
 
@@ -237,7 +237,7 @@ Use `--output-format stream-json` when you need:
   timestamps
 - **Pipeline integration** - Stream events to logging/monitoring systems
 
-#### Event Types
+#### Event types
 
 The streaming format emits 6 event types:
 
@@ -248,7 +248,7 @@ The streaming format emits 6 event types:
 5. **`error`** - Non-fatal errors and warnings
 6. **`result`** - Final session outcome with aggregated stats
 
-#### Basic Usage
+#### Basic usage
 
 ```bash
 # Stream events to console
@@ -261,7 +261,7 @@ gemini --output-format stream-json --prompt "Analyze this code" > events.jsonl
 gemini --output-format stream-json --prompt "List files" | jq -r '.type'
 ```
 
-#### Example Output
+#### Example output
 
 Each line is a complete JSON event:
 
@@ -274,7 +274,7 @@ Each line is a complete JSON event:
 {"type":"result","status":"success","stats":{"total_tokens":250,"input_tokens":50,"output_tokens":200,"duration_ms":3000,"tool_calls":1},"timestamp":"2025-10-10T12:00:05.000Z"}
 ```
 
-### File Redirection
+### File redirection
 
 Save output to files or pipe to other commands:
 
@@ -292,7 +292,7 @@ gemini -p "Explain microservices" | wc -w
 gemini -p "List programming languages" | grep -i "python"
 ```
 
-## Configuration Options
+## Configuration options
 
 Key command-line options for headless usage:
 

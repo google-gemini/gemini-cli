@@ -1,4 +1,4 @@
-# Gemini CLI Settings (`/settings` Command)
+# Gemini CLI settings (`/settings` command)
 
 Control your Gemini CLI experience with the `/settings` command. The `/settings`
 command opens a dialog to view and edit all your Gemini CLI settings, including

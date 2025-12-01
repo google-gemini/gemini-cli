@@ -1,4 +1,4 @@
-# Gemini 3 Pro on Gemini CLI (Join the Waitlist)
+# Gemini 3 Pro on Gemini CLI (join the waitlist)
 
 We’re excited to bring Gemini 3 Pro to Gemini CLI. For Google AI Ultra users
 (Google AI Ultra for Business is not currently supported) and paid Gemini and
@@ -8,7 +8,7 @@ For everyone else, we're gradually expanding access
 waitlist now to access Gemini 3 Pro once approved.
 
 **Note:** Please wait until you have been approved to use Gemini 3 Pro to enable
-**Preview Features**. If enabled early, the CLI will fallback to Gemini 2.5 Pro.
+**preview features**. If enabled early, the CLI will fallback to Gemini 2.5 Pro.
 
 ## Do I need to join the waitlist?
 
@@ -81,7 +81,7 @@ CLI waits longer between each retry, when the system is busy. If the retry
 doesn't happen immediately, please wait a few minutes for the request to
 process.
 
-## Model selection & routing types
+## Model selection and routing types
 
 When using Gemini CLI, you may want to control how your requests are routed
 between models. By default, Gemini CLI uses **Auto** routing.

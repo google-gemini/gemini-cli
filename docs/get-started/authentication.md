@@ -1,4 +1,4 @@
-# Gemini CLI Authentication Setup
+# Gemini CLI authentication setup
 
 Gemini CLI requires authentication using Google's services. Before using Gemini
 CLI, configure **one** of the following authentication methods:
@@ -10,12 +10,12 @@ CLI, configure **one** of the following authentication methods:
 - Headless (non-interactive) mode
 - Google Cloud Environments (Cloud Shell, Compute Engine, etc.)
 
-## Quick Check: Running in Google Cloud Shell?
+## Quick check: Running in Google Cloud Shell?
 
 If you are running the Gemini CLI within a Google Cloud Shell environment,
 authentication is typically automatic using your Cloud Shell credentials.
 
-### Other Google Cloud Environments (e.g., Compute Engine)
+### Other Google Cloud environments (e.g., Compute Engine)
 
 Some other Google Cloud environments, such as Compute Engine VMs, might also
 support automatic authentication. In these environments, Gemini CLI can
@@ -25,7 +25,7 @@ environment's metadata server.
 If automatic authentication does not occur in your environment, you will need to
 use one of the interactive methods described below.
 
-## Authenticate in Interactive mode
+## Authenticate in interactive mode
 
 When you run Gemini CLI through the command-line, Gemini CLI will provide the
 following options:
@@ -61,7 +61,7 @@ logging in with your Google account.
    > The browser will be redirected to a `localhost` URL that the CLI listens on
    > during setup.
 
-#### (Optional) Set your Google Cloud Project
+#### (Optional) Set your Google Cloud project
 
 When you log in using a Google account, you may be prompted to select a
 `GOOGLE_CLOUD_PROJECT`.
@@ -98,7 +98,7 @@ export GOOGLE_CLOUD_PROJECT_ID="YOUR_PROJECT_ID"
 To make this setting persistent, see
 [Persisting Environment Variables](#persisting-environment-variables).
 
-### Use Gemini API Key
+### Use Gemini API key
 
 If you don't want to authenticate using your Google account, you can use an API
 key from Google AI Studio.
@@ -143,7 +143,7 @@ export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 ```
 
-#### A. Vertex AI - Application Default Credentials (ADC) using `gcloud`
+#### A. Vertex AI - application default credentials (ADC) using `gcloud`
 
 Consider this method of authentication if you have Google Cloud CLI installed.
 
@@ -168,7 +168,7 @@ unset GOOGLE_API_KEY GEMINI_API_KEY
 3.  Ensure `GOOGLE_CLOUD_PROJECT` (or `GOOGLE_CLOUD_PROJECT_ID`) and
     `GOOGLE_CLOUD_LOCATION` are set.
 
-#### B. Vertex AI - Service Account JSON key
+#### B. Vertex AI - service account JSON key
 
 Consider this method of authentication in non-interactive environments, CI/CD,
 or if your organization restricts user-based ADC or API key creation.
@@ -218,7 +218,7 @@ unset GOOGLE_API_KEY GEMINI_API_KEY
 To make any of these Vertex AI environment variable settings persistent, see
 [Persisting Environment Variables](#persisting-environment-variables).
 
-## Persisting Environment Variables
+## Persisting environment variables
 
 To avoid setting environment variables in every terminal session, you can:
 
@@ -263,7 +263,7 @@ If you have not already logged in with an authentication credential (such as a
 Google account), you **must** configure authentication using environment
 variables:
 
-1.  **Gemini API Key:** Set `GEMINI_API_KEY`.
+1.  **Gemini API key:** Set `GEMINI_API_KEY`.
 2.  **Vertex AI:**
     - Set `GOOGLE_GENAI_USE_VERTEXAI=true`.
     - **With Google Cloud API Key:** Set `GOOGLE_API_KEY`.

@@ -1,4 +1,4 @@
-# Custom Commands
+# Custom commands
 
 Custom commands let you save and reuse your favorite or most frequently used
 prompts as personal shortcuts within Gemini CLI. You can create commands that
@@ -9,9 +9,9 @@ all your projects, streamlining your workflow and ensuring consistency.
 
 Gemini CLI discovers commands from two locations, loaded in a specific order:
 
-1.  **User Commands (Global):** Located in `~/.gemini/commands/`. These commands
+1.  **User commands (global):** Located in `~/.gemini/commands/`. These commands
     are available in any project you are working on.
-2.  **Project Commands (Local):** Located in
+2.  **Project commands (local):** Located in
     `<your-project-root>/.gemini/commands/`. These commands are specific to the
     current project and can be checked into version control to be shared with
     your team.
@@ -30,7 +30,7 @@ separator (`/` or `\`) being converted to a colon (`:`).
 - A file at `<project>/.gemini/commands/git/commit.toml` becomes the namespaced
   command `/git:commit`.
 
-## TOML File Format (v1)
+## TOML file format (v1)
 
 Your command definition files must be written in the TOML format and use the
 `.toml` file extension.
@@ -60,7 +60,7 @@ replace that placeholder with the text the user typed after the command name.
 
 The behavior of this injection depends on where it is used:
 
-**A. Raw injection (outside Shell commands)**
+**A. Raw injection (outside shell commands)**
 
 When used in the main body of the prompt, the arguments are injected exactly as
 the user typed them.
@@ -77,7 +77,7 @@ prompt = "Please provide a code fix for the issue described here: {{args}}."
 The model receives:
 `Please provide a code fix for the issue described here: "Button is misaligned".`
 
-**B. Using arguments in Shell commands (inside `!{...}` blocks)**
+**B. Using arguments in shell commands (inside `!{...}` blocks)**
 
 When you use `{{args}}` inside a shell injection block (`!{...}`), the arguments
 are automatically **shell-escaped** before replacement. This allows you to
@@ -156,7 +156,7 @@ When you run `/changelog 1.2.0 added "New feature"`, the final text sent to the
 model will be the original prompt followed by two newlines and the command you
 typed.
 
-### 3. Executing Shell commands with `!{...}`
+### 3. Executing shell commands with `!{...}`
 
 You can make your commands dynamic by executing shell commands directly within
 your `prompt` and injecting their output. This is ideal for gathering context
@@ -302,7 +302,7 @@ Your response should include:
 """
 ```
 
-**3. Run the Command:**
+**3. Run the command:**
 
 That's it! You can now run your command in the CLI. First, you might add a file
 to the context, and then invoke your command:

@@ -1,4 +1,4 @@
-# Example Proxy Script
+# Example proxy script
 
 The following is an example of a proxy script that can be used with the
 `GEMINI_SANDBOX_PROXY_COMMAND` environment variable. This script only allows

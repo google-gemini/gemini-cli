@@ -35,7 +35,7 @@ _PowerShell_
 Remove-Item -Path (Join-Path $env:LocalAppData "npm-cache\_npx") -Recurse -Force
 ```
 
-## Method 2: Using npm (Global Install)
+## Method 2: Using npm (global install)
 
 If you installed the CLI globally (e.g., `npm install -g @google/gemini-cli`),
 use the `npm uninstall` command with the `-g` flag to remove it.
