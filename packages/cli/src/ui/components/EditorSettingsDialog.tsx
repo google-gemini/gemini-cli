@@ -9,19 +9,27 @@ import { useState } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
-  EDITOR_DISPLAY_NAMES,
   editorSettingsManager,
   type EditorDisplay,
 } from '../editors/editorSettingsManager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
-import type { LoadedSettings } from '../../config/settings.js';
+import type {
+  LoadableSettingScope,
+  LoadedSettings,
+} from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
-import type { EditorType } from '@google/gemini-cli-core';
-import { isEditorAvailable } from '@google/gemini-cli-core';
+import {
+  type EditorType,
+  isEditorAvailable,
+  EDITOR_DISPLAY_NAMES,
+} from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 
 interface EditorDialogProps {
-  onSelect: (editorType: EditorType | undefined, scope: SettingScope) => void;
+  onSelect: (
+    editorType: EditorType | undefined,
+    scope: LoadableSettingScope,
+  ) => void;
   settings: LoadedSettings;
   onExit: () => void;
 }
@@ -31,7 +39,7 @@ export function EditorSettingsDialog({
   settings,
   onExit,
 }: EditorDialogProps): React.JSX.Element {
-  const [selectedScope, setSelectedScope] = useState<SettingScope>(
+  const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
   );
   const [focusedSection, setFocusedSection] = useState<'editor' | 'scope'>(
@@ -64,9 +72,21 @@ export function EditorSettingsDialog({
     editorIndex = 0;
   }
 
-  const scopeItems = [
-    { label: 'User Settings', value: SettingScope.User },
-    { label: 'Workspace Settings', value: SettingScope.Workspace },
+  const scopeItems: Array<{
+    label: string;
+    value: LoadableSettingScope;
+    key: string;
+  }> = [
+    {
+      label: 'User Settings',
+      value: SettingScope.User,
+      key: SettingScope.User,
+    },
+    {
+      label: 'Workspace Settings',
+      value: SettingScope.Workspace,
+      key: SettingScope.Workspace,
+    },
   ];
 
   const handleEditorSelect = (editorType: EditorType | 'not_set') => {
@@ -77,7 +97,7 @@ export function EditorSettingsDialog({
     onSelect(editorType, selectedScope);
   };
 
-  const handleScopeSelect = (scope: SettingScope) => {
+  const handleScopeSelect = (scope: LoadableSettingScope) => {
     setSelectedScope(scope);
     setFocusedSection('editor');
   };
@@ -127,6 +147,7 @@ export function EditorSettingsDialog({
             label: item.name,
             value: item.type,
             disabled: item.disabled,
+            key: item.type,
           }))}
           initialIndex={editorIndex}
           onSelect={handleEditorSelect}
@@ -148,7 +169,7 @@ export function EditorSettingsDialog({
 
         <Box marginTop={1}>
           <Text color={theme.text.secondary}>
-            (Use Enter to select, Tab to change focus)
+            (Use Enter to select, Tab to change focus, Esc to close)
           </Text>
         </Box>
       </Box>

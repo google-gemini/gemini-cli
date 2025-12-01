@@ -9,7 +9,7 @@ import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
-} from './constants.js';
+} from './types.js';
 
 import { ToolCallDecision } from './tool-call-decision.js';
 import type {
@@ -144,8 +144,8 @@ export class UiTelemetryService extends EventEmitter {
     return this.#lastPromptTokenCount;
   }
 
-  resetLastPromptTokenCount(): void {
-    this.#lastPromptTokenCount = 0;
+  setLastPromptTokenCount(lastPromptTokenCount: number): void {
+    this.#lastPromptTokenCount = lastPromptTokenCount;
     this.emit('update', {
       metrics: this.#metrics,
       lastPromptTokenCount: this.#lastPromptTokenCount,
@@ -165,14 +165,12 @@ export class UiTelemetryService extends EventEmitter {
     modelMetrics.api.totalRequests++;
     modelMetrics.api.totalLatencyMs += event.duration_ms;
 
-    modelMetrics.tokens.prompt += event.input_token_count;
-    modelMetrics.tokens.candidates += event.output_token_count;
-    modelMetrics.tokens.total += event.total_token_count;
-    modelMetrics.tokens.cached += event.cached_content_token_count;
-    modelMetrics.tokens.thoughts += event.thoughts_token_count;
-    modelMetrics.tokens.tool += event.tool_token_count;
-
-    this.#lastPromptTokenCount = event.input_token_count;
+    modelMetrics.tokens.prompt += event.usage.input_token_count;
+    modelMetrics.tokens.candidates += event.usage.output_token_count;
+    modelMetrics.tokens.total += event.usage.total_token_count;
+    modelMetrics.tokens.cached += event.usage.cached_content_token_count;
+    modelMetrics.tokens.thoughts += event.usage.thoughts_token_count;
+    modelMetrics.tokens.tool += event.usage.tool_token_count;
   }
 
   private processApiError(event: ApiErrorEvent) {

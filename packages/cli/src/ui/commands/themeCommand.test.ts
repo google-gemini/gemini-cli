@@ -33,6 +33,6 @@ describe('themeCommand', () => {
 
   it('should have the correct name and description', () => {
     expect(themeCommand.name).toBe('theme');
-    expect(themeCommand.description).toBe('change the theme');
+    expect(themeCommand.description).toBe('Change the theme');
   });
 });

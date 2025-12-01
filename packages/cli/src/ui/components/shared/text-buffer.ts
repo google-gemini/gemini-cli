@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import pathMod from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
-import { unescapePath } from '@google/gemini-cli-core';
+import { unescapePath, coreEvents, CoreEvent } from '@google/gemini-cli-core';
 import {
   toCodePoints,
   cpLen,
@@ -17,8 +17,10 @@ import {
   stripUnsafeCharacters,
   getCachedStringWidth,
 } from '../../utils/textUtils.js';
+import type { Key } from '../../contexts/KeypressContext.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
+import { enableSupportedProtocol } from '../../utils/kittyProtocolDetector.js';
 
 export type Direction =
   | 'left'
@@ -518,6 +520,8 @@ interface UseTextBufferProps {
   onChange?: (text: string) => void; // Callback for when text changes
   isValidPath: (path: string) => boolean;
   shellModeActive?: boolean; // Whether the text buffer is in shell mode
+  inputFilter?: (text: string) => string; // Optional filter for input text
+  singleLine?: boolean;
 }
 
 interface UndoHistoryEntry {
@@ -849,7 +853,7 @@ export interface TextBufferState {
   lines: string[];
   cursorRow: number;
   cursorCol: number;
-  preferredCol: number | null; // This is visual preferred col
+  preferredCol: number | null; // This is the logical character offset in the visual line
   undoStack: UndoHistoryEntry[];
   redoStack: UndoHistoryEntry[];
   clipboard: string | null;
@@ -949,9 +953,15 @@ export type TextBufferAction =
   | { type: 'vim_move_to_line'; payload: { lineNumber: number } }
   | { type: 'vim_escape_insert_mode' };
 
+export interface TextBufferOptions {
+  inputFilter?: (text: string) => string;
+  singleLine?: boolean;
+}
+
 function textBufferReducerLogic(
   state: TextBufferState,
   action: TextBufferAction,
+  options: TextBufferOptions = {},
 ): TextBufferState {
   const pushUndoLocal = pushUndo;
 
@@ -986,8 +996,20 @@ function textBufferReducerLogic(
 
       const currentLine = (r: number) => newLines[r] ?? '';
 
+      let payload = action.payload;
+      if (options.singleLine) {
+        payload = payload.replace(/[\r\n]/g, '');
+      }
+      if (options.inputFilter) {
+        payload = options.inputFilter(payload);
+      }
+
+      if (payload.length === 0) {
+        return state;
+      }
+
       const str = stripUnsafeCharacters(
-        action.payload.replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
+        payload.replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
       );
       const parts = str.split('\n');
       const lineContent = currentLine(newCursorRow);
@@ -1498,8 +1520,9 @@ function textBufferReducerLogic(
 export function textBufferReducer(
   state: TextBufferState,
   action: TextBufferAction,
+  options: TextBufferOptions = {},
 ): TextBufferState {
-  const newState = textBufferReducerLogic(state, action);
+  const newState = textBufferReducerLogic(state, action, options);
 
   if (
     newState.lines !== state.lines ||
@@ -1525,6 +1548,8 @@ export function useTextBuffer({
   onChange,
   isValidPath,
   shellModeActive = false,
+  inputFilter,
+  singleLine = false,
 }: UseTextBufferProps): TextBuffer {
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
@@ -1551,7 +1576,11 @@ export function useTextBuffer({
     };
   }, [initialText, initialCursorOffset, viewport.width, viewport.height]);
 
-  const [state, dispatch] = useReducer(textBufferReducer, initialState);
+  const [state, dispatch] = useReducer(
+    (s: TextBufferState, a: TextBufferAction) =>
+      textBufferReducer(s, a, { inputFilter, singleLine }),
+    initialState,
+  );
   const {
     lines,
     cursorRow,
@@ -1568,7 +1597,7 @@ export function useTextBuffer({
     [visualLayout, cursorRow, cursorCol],
   );
 
-  const { visualLines } = visualLayout;
+  const { visualLines, visualToLogicalMap } = visualLayout;
 
   const [visualScrollRow, setVisualScrollRow] = useState<number>(0);
 
@@ -1588,6 +1617,8 @@ export function useTextBuffer({
   // Update visual scroll (vertical)
   useEffect(() => {
     const { height } = viewport;
+    const totalVisualLines = visualLines.length;
+    const maxScrollStart = Math.max(0, totalVisualLines - height);
     let newVisualScrollRow = visualScrollRow;
 
     if (visualCursor[0] < visualScrollRow) {
@@ -1595,14 +1626,19 @@ export function useTextBuffer({
     } else if (visualCursor[0] >= visualScrollRow + height) {
       newVisualScrollRow = visualCursor[0] - height + 1;
     }
+
+    // When the number of visual lines shrinks (e.g., after widening the viewport),
+    // ensure scroll never starts beyond the last valid start so we can render a full window.
+    newVisualScrollRow = clamp(newVisualScrollRow, 0, maxScrollStart);
+
     if (newVisualScrollRow !== visualScrollRow) {
       setVisualScrollRow(newVisualScrollRow);
     }
-  }, [visualCursor, visualScrollRow, viewport]);
+  }, [visualCursor, visualScrollRow, viewport, visualLines.length]);
 
   const insert = useCallback(
     (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
-      if (/[\n\r]/.test(ch)) {
+      if (!singleLine && /[\n\r]/.test(ch)) {
         dispatch({ type: 'insert', payload: ch });
         return;
       }
@@ -1641,12 +1677,15 @@ export function useTextBuffer({
         dispatch({ type: 'insert', payload: currentText });
       }
     },
-    [isValidPath, shellModeActive],
+    [isValidPath, shellModeActive, singleLine],
   );
 
   const newline = useCallback((): void => {
+    if (singleLine) {
+      return;
+    }
     dispatch({ type: 'insert', payload: '\n' });
-  }, []);
+  }, [singleLine]);
 
   const backspace = useCallback((): void => {
     dispatch({ type: 'backspace' });
@@ -1853,6 +1892,8 @@ export function useTextBuffer({
       } catch (err) {
         console.error('[useTextBuffer] external editor error', err);
       } finally {
+        enableSupportedProtocol();
+        coreEvents.emit(CoreEvent.ExternalEditorClosed);
         if (wasRaw) setRawMode?.(true);
         try {
           fs.unlinkSync(filePath);
@@ -1870,14 +1911,7 @@ export function useTextBuffer({
   );
 
   const handleInput = useCallback(
-    (key: {
-      name: string;
-      ctrl: boolean;
-      meta: boolean;
-      shift: boolean;
-      paste: boolean;
-      sequence: string;
-    }): void => {
+    (key: Key): void => {
       const { sequence: input } = key;
 
       if (key.paste) {
@@ -1888,10 +1922,11 @@ export function useTextBuffer({
       }
 
       if (
-        key.name === 'return' ||
-        input === '\r' ||
-        input === '\n' ||
-        input === '\\\r' // VSCode terminal represents shift + enter this way
+        !singleLine &&
+        (key.name === 'return' ||
+          input === '\r' ||
+          input === '\n' ||
+          input === '\\r') // VSCode terminal represents shift + enter this way
       )
         newline();
       else if (key.name === 'left' && !key.meta && !key.ctrl) move('left');
@@ -1926,7 +1961,7 @@ export function useTextBuffer({
       else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
       else if (key.ctrl && !key.shift && key.name === 'z') undo();
       else if (key.ctrl && key.shift && key.name === 'z') redo();
-      else if (input && !key.ctrl && !key.meta) {
+      else if (key.insertable) {
         insert(input, { paste: key.paste });
       }
     },
@@ -1940,6 +1975,7 @@ export function useTextBuffer({
       insert,
       undo,
       redo,
+      singleLine,
     ],
   );
 
@@ -1977,70 +2013,194 @@ export function useTextBuffer({
     dispatch({ type: 'move_to_offset', payload: { offset } });
   }, []);
 
-  const returnValue: TextBuffer = {
-    lines,
-    text,
-    cursor: [cursorRow, cursorCol],
-    preferredCol,
-    selectionAnchor,
+  const moveToVisualPosition = useCallback(
+    (visRow: number, visCol: number): void => {
+      const { visualLines, visualToLogicalMap } = visualLayout;
+      // Clamp visRow to valid range
+      const clampedVisRow = Math.max(
+        0,
+        Math.min(visRow, visualLines.length - 1),
+      );
+      const visualLine = visualLines[clampedVisRow] || '';
 
-    allVisualLines: visualLines,
-    viewportVisualLines: renderedVisualLines,
-    visualCursor,
-    visualScrollRow,
+      if (visualToLogicalMap[clampedVisRow]) {
+        const [logRow, logStartCol] = visualToLogicalMap[clampedVisRow];
 
-    setText,
-    insert,
-    newline,
-    backspace,
-    del,
-    move,
-    undo,
-    redo,
-    replaceRange,
-    replaceRangeByOffset,
-    moveToOffset,
-    deleteWordLeft,
-    deleteWordRight,
+        const codePoints = toCodePoints(visualLine);
+        let currentVisX = 0;
+        let charOffset = 0;
 
-    killLineRight,
-    killLineLeft,
-    handleInput,
-    openInExternalEditor,
-    // Vim-specific operations
-    vimDeleteWordForward,
-    vimDeleteWordBackward,
-    vimDeleteWordEnd,
-    vimChangeWordForward,
-    vimChangeWordBackward,
-    vimChangeWordEnd,
-    vimDeleteLine,
-    vimChangeLine,
-    vimDeleteToEndOfLine,
-    vimChangeToEndOfLine,
-    vimChangeMovement,
-    vimMoveLeft,
-    vimMoveRight,
-    vimMoveUp,
-    vimMoveDown,
-    vimMoveWordForward,
-    vimMoveWordBackward,
-    vimMoveWordEnd,
-    vimDeleteChar,
-    vimInsertAtCursor,
-    vimAppendAtCursor,
-    vimOpenLineBelow,
-    vimOpenLineAbove,
-    vimAppendAtLineEnd,
-    vimInsertAtLineStart,
-    vimMoveToLineStart,
-    vimMoveToLineEnd,
-    vimMoveToFirstNonWhitespace,
-    vimMoveToFirstLine,
-    vimMoveToLastLine,
-    vimMoveToLine,
-    vimEscapeInsertMode,
-  };
+        for (const char of codePoints) {
+          const charWidth = getCachedStringWidth(char);
+          // If the click is within this character
+          if (visCol < currentVisX + charWidth) {
+            // Check if we clicked the second half of a wide character
+            if (charWidth > 1 && visCol >= currentVisX + charWidth / 2) {
+              charOffset++;
+            }
+            break;
+          }
+          currentVisX += charWidth;
+          charOffset++;
+        }
+
+        // Clamp charOffset to length
+        charOffset = Math.min(charOffset, codePoints.length);
+
+        const newCursorRow = logRow;
+        const newCursorCol = logStartCol + charOffset;
+
+        dispatch({
+          type: 'set_cursor',
+          payload: {
+            cursorRow: newCursorRow,
+            cursorCol: newCursorCol,
+            preferredCol: charOffset,
+          },
+        });
+      }
+    },
+    [visualLayout],
+  );
+
+  const getOffset = useCallback(
+    (): number => logicalPosToOffset(lines, cursorRow, cursorCol),
+    [lines, cursorRow, cursorCol],
+  );
+
+  const returnValue: TextBuffer = useMemo(
+    () => ({
+      lines,
+      text,
+      cursor: [cursorRow, cursorCol],
+      preferredCol,
+      selectionAnchor,
+
+      allVisualLines: visualLines,
+      viewportVisualLines: renderedVisualLines,
+      visualCursor,
+      visualScrollRow,
+      visualToLogicalMap,
+
+      setText,
+      insert,
+      newline,
+      backspace,
+      del,
+      move,
+      undo,
+      redo,
+      replaceRange,
+      replaceRangeByOffset,
+      moveToOffset,
+      getOffset,
+      moveToVisualPosition,
+      deleteWordLeft,
+      deleteWordRight,
+
+      killLineRight,
+      killLineLeft,
+      handleInput,
+      openInExternalEditor,
+      // Vim-specific operations
+      vimDeleteWordForward,
+      vimDeleteWordBackward,
+      vimDeleteWordEnd,
+      vimChangeWordForward,
+      vimChangeWordBackward,
+      vimChangeWordEnd,
+      vimDeleteLine,
+      vimChangeLine,
+      vimDeleteToEndOfLine,
+      vimChangeToEndOfLine,
+      vimChangeMovement,
+      vimMoveLeft,
+      vimMoveRight,
+      vimMoveUp,
+      vimMoveDown,
+      vimMoveWordForward,
+      vimMoveWordBackward,
+      vimMoveWordEnd,
+      vimDeleteChar,
+      vimInsertAtCursor,
+      vimAppendAtCursor,
+      vimOpenLineBelow,
+      vimOpenLineAbove,
+      vimAppendAtLineEnd,
+      vimInsertAtLineStart,
+      vimMoveToLineStart,
+      vimMoveToLineEnd,
+      vimMoveToFirstNonWhitespace,
+      vimMoveToFirstLine,
+      vimMoveToLastLine,
+      vimMoveToLine,
+      vimEscapeInsertMode,
+    }),
+    [
+      lines,
+      text,
+      cursorRow,
+      cursorCol,
+      preferredCol,
+      selectionAnchor,
+      visualLines,
+      renderedVisualLines,
+      visualCursor,
+      visualScrollRow,
+      setText,
+      insert,
+      newline,
+      backspace,
+      del,
+      move,
+      undo,
+      redo,
+      replaceRange,
+      replaceRangeByOffset,
+      moveToOffset,
+      getOffset,
+      moveToVisualPosition,
+      deleteWordLeft,
+      deleteWordRight,
+      killLineRight,
+      killLineLeft,
+      handleInput,
+      openInExternalEditor,
+      vimDeleteWordForward,
+      vimDeleteWordBackward,
+      vimDeleteWordEnd,
+      vimChangeWordForward,
+      vimChangeWordBackward,
+      vimChangeWordEnd,
+      vimDeleteLine,
+      vimChangeLine,
+      vimDeleteToEndOfLine,
+      vimChangeToEndOfLine,
+      vimChangeMovement,
+      vimMoveLeft,
+      vimMoveRight,
+      vimMoveUp,
+      vimMoveDown,
+      vimMoveWordForward,
+      vimMoveWordBackward,
+      vimMoveWordEnd,
+      vimDeleteChar,
+      vimInsertAtCursor,
+      vimAppendAtCursor,
+      vimOpenLineBelow,
+      vimOpenLineAbove,
+      vimAppendAtLineEnd,
+      vimInsertAtLineStart,
+      vimMoveToLineStart,
+      vimMoveToLineEnd,
+      vimMoveToFirstNonWhitespace,
+      vimMoveToFirstLine,
+      vimMoveToLastLine,
+      vimMoveToLine,
+      vimEscapeInsertMode,
+      visualToLogicalMap,
+    ],
+  );
   return returnValue;
 }
 
@@ -2063,6 +2223,12 @@ export interface TextBuffer {
   viewportVisualLines: string[]; // The subset of visual lines to be rendered based on visualScrollRow and viewport.height
   visualCursor: [number, number]; // Visual cursor [row, col] relative to the start of all visualLines
   visualScrollRow: number; // Scroll position for visual lines (index of the first visible visual line)
+  /**
+   * For each visual line (by absolute index in allVisualLines) provides a tuple
+   * [logicalLineIndex, startColInLogical] that maps where that visual line
+   * begins within the logical buffer. Indices are code-point based.
+   */
+  visualToLogicalMap: Array<[number, number]>;
 
   // Actions
 
@@ -2124,14 +2290,7 @@ export interface TextBuffer {
   /**
    * High level "handleInput" – receives what Ink gives us.
    */
-  handleInput: (key: {
-    name: string;
-    ctrl: boolean;
-    meta: boolean;
-    shift: boolean;
-    paste: boolean;
-    sequence: string;
-  }) => void;
+  handleInput: (key: Key) => void;
   /**
    * Opens the current buffer contents in the user's preferred terminal text
    * editor ($VISUAL or $EDITOR, falling back to "vi").  The method blocks
@@ -2154,7 +2313,9 @@ export interface TextBuffer {
     endOffset: number,
     replacementText: string,
   ) => void;
+  getOffset: () => number;
   moveToOffset(offset: number): void;
+  moveToVisualPosition(visualRow: number, visualCol: number): void;
 
   // Vim-specific operations
   /**

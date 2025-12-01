@@ -43,5 +43,6 @@ describe('read_many_files', () => {
 
     // Validate model output - will throw if no output
     validateModelOutput(result, null, 'Read many files test');
+    await rig.cleanup();
   });
 });

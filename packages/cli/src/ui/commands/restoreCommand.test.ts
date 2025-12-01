@@ -11,7 +11,11 @@ import * as path from 'node:path';
 import { restoreCommand } from './restoreCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import type { Config, GitService } from '@google/gemini-cli-core';
+import {
+  GEMINI_DIR,
+  type Config,
+  type GitService,
+} from '@google/gemini-cli-core';
 
 describe('restoreCommand', () => {
   let mockContext: CommandContext;
@@ -26,7 +30,7 @@ describe('restoreCommand', () => {
     testRootDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'restore-command-test-'),
     );
-    geminiTempDir = path.join(testRootDir, '.gemini');
+    geminiTempDir = path.join(testRootDir, GEMINI_DIR);
     checkpointsDir = path.join(geminiTempDir, 'checkpoints');
     // The command itself creates this, but for tests it's easier to have it ready.
     // Some tests might remove it to test error paths.

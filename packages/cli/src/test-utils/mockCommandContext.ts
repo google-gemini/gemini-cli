@@ -54,6 +54,8 @@ export const createMockCommandContext = (
       loadHistory: vi.fn(),
       toggleCorgiMode: vi.fn(),
       toggleVimEnabled: vi.fn(),
+      extensionsUpdateState: new Map(),
+      setExtensionsUpdateState: vi.fn(),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any,
     session: {
@@ -86,7 +88,7 @@ export const createMockCommandContext = (
         const targetValue = output[key];
 
         if (
-          // We only want to recursivlty merge plain objects
+          // We only want to recursively merge plain objects
           Object.prototype.toString.call(sourceValue) === '[object Object]' &&
           Object.prototype.toString.call(targetValue) === '[object Object]'
         ) {

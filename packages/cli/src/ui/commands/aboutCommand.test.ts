@@ -22,6 +22,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getDetectedIdeDisplayName: vi.fn().mockReturnValue('test-ide'),
       }),
     },
+    UserAccountManager: vi.fn().mockImplementation(() => ({
+      getCachedGoogleAccount: vi.fn().mockReturnValue('test-email@example.com'),
+    })),
   };
 });
 
@@ -77,7 +80,7 @@ describe('aboutCommand', () => {
 
   it('should have the correct name and description', () => {
     expect(aboutCommand.name).toBe('about');
-    expect(aboutCommand.description).toBe('show version info');
+    expect(aboutCommand.description).toBe('Show version info');
   });
 
   it('should call addItem with all version info', async () => {
@@ -98,6 +101,7 @@ describe('aboutCommand', () => {
         selectedAuthType: 'test-auth',
         gcpProject: 'test-gcp-project',
         ideClient: 'test-ide',
+        userEmail: 'test-email@example.com',
       },
       expect.any(Number),
     );

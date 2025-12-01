@@ -10,11 +10,17 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['scripts/tests/**/*.test.js'],
+    include: ['scripts/tests/**/*.test.{js,ts}'],
     setupFiles: ['scripts/tests/test-setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
+    },
+    poolOptions: {
+      threads: {
+        minThreads: 8,
+        maxThreads: 16,
+      },
     },
   },
 });
