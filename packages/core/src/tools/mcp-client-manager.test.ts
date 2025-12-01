@@ -195,8 +195,7 @@ describe('McpClientManager', () => {
   });
 
   describe('getMcpInstructions', () => {
-    it('should only return instructions from servers with useInstructions: true', async () => {
-      // Override McpClient mock for this test to return distinct objects based on config
+    it('should not return instructions for servers that do not have instructions', async () => {
       vi.mocked(McpClient).mockImplementation(
         (name, config) =>
           ({
@@ -206,42 +205,34 @@ describe('McpClientManager', () => {
             getServerConfig: vi.fn().mockReturnValue(config),
             getInstructions: vi
               .fn()
-              .mockReturnValue(`Instructions for ${name}`),
+              .mockReturnValue(
+                name === 'server-with-instructions'
+                  ? `Instructions for ${name}`
+                  : '',
+              ),
           }) as unknown as McpClient,
       );
 
       const manager = new McpClientManager({} as ToolRegistry, mockConfig);
 
-      // 1. Configured server with useInstructions: true
       mockConfig.getMcpServers.mockReturnValue({
-        'enabled-server': {
-          useInstructions: true,
-        },
-        'disabled-server': {
-          useInstructions: false,
-        },
-        'default-server': {
-          // undefined should be treated as false
-        },
+        'server-with-instructions': {},
+        'server-without-instructions': {},
       });
       await manager.startConfiguredMcpServers();
 
       const instructions = manager.getMcpInstructions();
 
       expect(instructions).toContain(
-        "# Instructions for MCP Server 'enabled-server'",
+        "# Instructions for MCP Server 'server-with-instructions'",
       );
-      expect(instructions).toContain('Instructions for enabled-server');
+      expect(instructions).toContain(
+        'Instructions for server-with-instructions',
+      );
 
       expect(instructions).not.toContain(
-        "# Instructions for MCP Server 'disabled-server'",
+        "# Instructions for MCP Server 'server-without-instructions'",
       );
-      expect(instructions).not.toContain('Instructions for disabled-server');
-
-      expect(instructions).not.toContain(
-        "# Instructions for MCP Server 'default-server'",
-      );
-      expect(instructions).not.toContain('Instructions for default-server');
     });
   });
 });

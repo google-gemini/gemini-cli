@@ -204,8 +204,6 @@ export class MCPServerConfig {
     readonly targetAudience?: string,
     /* targetServiceAccount format: <service-account-name>@<project-num>.iam.gserviceaccount.com */
     readonly targetServiceAccount?: string,
-    // Include the MCP server initialization instructions in the system instructions
-    readonly useInstructions?: boolean,
   ) {}
 }
 

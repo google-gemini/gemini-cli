@@ -156,8 +156,6 @@ Each server configuration supports the following properties:
 - **`targetServiceAccount`** (string): The email address of the Google Cloud
   Service Account to impersonate. Used with
   `authProviderType: 'service_account_impersonation'`.
-- **`useInstructions`** (boolean): If true will include the MCP server's
-  initialization instructions in the system instructions.
 
 ### OAuth Support for Remote MCP Servers
 
@@ -1011,3 +1009,9 @@ gemini mcp remove my-server
 
 This will find and delete the "my-server" entry from the `mcpServers` object in
 the appropriate `settings.json` file based on the scope (`-s, --scope`).
+
+## Instructions
+
+Gemini CLI supports
+[MCP server instructions](https://modelcontextprotocol.io/specification/2025-06-18/schema#initializeresult),
+which will be appended to the system instructions.
