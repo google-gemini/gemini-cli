@@ -35,10 +35,11 @@ export interface ThemeDisplay {
 
 export const DEFAULT_THEME: Theme = DefaultDark;
 
-class ThemeManager {
+export class ThemeManager {
   private readonly availableThemes: Theme[];
   private activeTheme: Theme;
   private customThemes: Map<string, Theme> = new Map();
+  private themeFilePaths: Map<string, string> = new Map();
 
   constructor() {
     this.availableThemes = [
@@ -65,6 +66,7 @@ class ThemeManager {
    */
   loadCustomThemes(customThemesSettings?: Record<string, CustomTheme>): void {
     this.customThemes.clear();
+    this.themeFilePaths.clear();
 
     if (!customThemesSettings) {
       return;
@@ -103,6 +105,111 @@ class ThemeManager {
     ) {
       this.activeTheme = this.customThemes.get(this.activeTheme.name)!;
     }
+  }
+
+  /**
+   * Loads custom themes from a list of files.
+   * @param files List of custom theme files with names and paths.
+   */
+  loadCustomThemeFiles(files?: Array<{ name?: string; path: string }>): void {
+    if (!files) {
+      return;
+    }
+
+    for (const file of files) {
+      try {
+        const resolvedPath = path.resolve(file.path);
+        // Check if file exists before trying to read
+        if (!fs.existsSync(resolvedPath)) {
+          debugLogger.warn(
+            `Custom theme file not found: "${file.path}" (resolved: "${resolvedPath}")`,
+          );
+          continue;
+        }
+
+        const canonicalPath = fs.realpathSync(resolvedPath);
+
+        // Security check
+        const homeDir = path.resolve(os.homedir());
+        if (!canonicalPath.startsWith(homeDir)) {
+          debugLogger.warn(
+            `Theme file at "${file.path}" is outside your home directory. ` +
+              `Only load themes from trusted sources.`,
+          );
+          continue;
+        }
+
+        const themeContent = fs.readFileSync(canonicalPath, 'utf-8');
+        let customThemeConfig: CustomTheme;
+        try {
+          customThemeConfig = JSON.parse(themeContent) as CustomTheme;
+        } catch (e) {
+          debugLogger.warn(
+            `Failed to parse JSON from theme file "${file.path}":`,
+            e,
+          );
+          continue;
+        }
+
+        const validation = validateCustomTheme(customThemeConfig);
+        if (!validation.isValid) {
+          debugLogger.warn(
+            `Invalid custom theme from file "${file.path}": ${validation.error}`,
+          );
+          continue;
+        }
+
+        if (validation.warning) {
+          debugLogger.warn(`Theme from "${file.path}": ${validation.warning}`);
+        }
+
+        const themeName =
+          file.name ||
+          customThemeConfig.name ||
+          path.basename(file.path, '.json');
+
+        const themeWithDefaults: CustomTheme = {
+          ...DEFAULT_THEME.colors,
+          ...customThemeConfig,
+          name: themeName,
+          type: 'custom',
+        };
+
+        try {
+          const theme = createCustomTheme(themeWithDefaults);
+          this.customThemes.set(themeName, theme);
+          this.themeFilePaths.set(canonicalPath, themeName);
+        } catch (error) {
+          debugLogger.warn(
+            `Failed to create custom theme "${themeName}":`,
+            error,
+          );
+        }
+      } catch (error) {
+        debugLogger.warn(
+          `Error loading custom theme file "${file.path}":`,
+          error,
+        );
+      }
+    }
+  }
+
+  /**
+   * Gets a theme name by its file path.
+   * @param themePath The path to the theme file.
+   * @returns The theme name if found, undefined otherwise.
+   */
+  getThemeNameByPath(themePath: string): string | undefined {
+    try {
+      const resolvedPath = path.resolve(themePath);
+      if (fs.existsSync(resolvedPath)) {
+        const canonicalPath = fs.realpathSync(resolvedPath);
+        return this.themeFilePaths.get(canonicalPath);
+      }
+    } catch (_e) {
+      return undefined;
+    }
+    return undefined;
   }
 
   /**

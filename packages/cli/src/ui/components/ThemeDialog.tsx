@@ -60,10 +60,23 @@ export function ThemeDialog({
     selectedScope === SettingScope.User
       ? settings.user.settings.ui?.customThemes || {}
       : settings.merged.ui?.customThemes || {};
+
+  const customThemeFiles =
+    selectedScope === SettingScope.User
+      ? settings.user.settings.ui?.customThemeFiles || []
+      : settings.merged.ui?.customThemeFiles || [];
+
   const builtInThemes = themeManager
     .getAvailableThemes()
     .filter((theme) => theme.type !== 'custom');
-  const customThemeNames = Object.keys(customThemes);
+  const customThemeNames = Array.from(
+    new Set([
+      ...Object.keys(customThemes),
+      ...customThemeFiles
+        .map((f) => f.name || themeManager.getThemeNameByPath(f.path))
+        .filter((name): name is string => !!name),
+    ]),
+  );
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   // Generate theme items
   const themeItems = [

@@ -180,6 +180,28 @@
             "$ref": "#/$defs/CustomTheme"
           }
         },
+        "customThemeFiles": {
+          "title": "Custom Theme Files",
+          "description": "List of custom theme files to load.",
+          "markdownDescription": "List of custom theme files to load. Each entry specifies a theme name and the file path.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the theme."
+              },
+              "path": {
+                "type": "string",
+                "description": "Path to the theme JSON file."
+              }
+            },
+            "required": ["path"],
+            "additionalProperties": false
+          }
+        },
         "hideWindowTitle": {
           "title": "Hide Window Title",
           "description": "Hide the window title bar",

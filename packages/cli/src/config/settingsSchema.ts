@@ -362,6 +362,39 @@ const SETTINGS_SCHEMA = {
           ref: 'CustomTheme',
         },
       },
+      customThemeFiles: {
+        type: 'array',
+        label: 'Custom Theme Files',
+        category: 'UI',
+        requiresRestart: false,
+        default: [] as Array<{ name?: string; path: string }>,
+        description:
+          'List of custom theme files to load. Each entry specifies a theme name and the file path.',
+        showInDialog: false,
+        items: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+              label: 'Name',
+              category: 'UI',
+              requiresRestart: false,
+              default: undefined as string | undefined,
+              description: 'Name of the theme.',
+              showInDialog: false,
+            },
+            path: {
+              type: 'string',
+              label: 'Path',
+              category: 'UI',
+              requiresRestart: false,
+              default: undefined as string | undefined,
+              description: 'Path to the theme JSON file.',
+              showInDialog: false,
+            },
+          },
+        },
+      },
       hideWindowTitle: {
         type: 'boolean',
         label: 'Hide Window Title',
