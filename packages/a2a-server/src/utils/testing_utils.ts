@@ -27,6 +27,8 @@ export function createMockConfig(
     getToolRegistry: vi.fn().mockReturnValue({
       getTool: vi.fn(),
       getAllToolNames: vi.fn().mockReturnValue([]),
+      getAllTools: vi.fn().mockReturnValue([]),
+      getToolsByServer: vi.fn().mockReturnValue([]),
     }),
     getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     getIdeMode: vi.fn().mockReturnValue(false),
@@ -57,6 +59,9 @@ export function createMockConfig(
     getPolicyEngine: vi.fn(),
     getEnableExtensionReloading: vi.fn().mockReturnValue(false),
     getEnableHooks: vi.fn().mockReturnValue(false),
+    getMcpClientManager: vi.fn().mockReturnValue({
+      getMcpServers: vi.fn().mockReturnValue({}),
+    }),
     ...overrides,
   } as unknown as Config;
   mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
