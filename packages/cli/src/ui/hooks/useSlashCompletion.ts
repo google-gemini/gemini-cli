@@ -376,6 +376,32 @@ function usePerfectMatch(
   }, [parserResult]);
 }
 
+/**
+ * Gets the SlashCommand object for a given suggestion by navigating the command hierarchy
+ * based on the current parser state.
+ * @param suggestion The suggestion object
+ * @param parserResult The current parser result with hierarchy information
+ * @returns The matching SlashCommand or undefined
+ */
+function getCommandFromSuggestion(
+  suggestion: Suggestion,
+  parserResult: CommandParserResult,
+): SlashCommand | undefined {
+  const { currentLevel } = parserResult;
+
+  if (!currentLevel) {
+    return undefined;
+  }
+
+  // suggestion.value is just the command name at the current level (e.g., "list")
+  // Find it in the current level's commands
+  const command = currentLevel.find((cmd) =>
+    matchesCommand(cmd, suggestion.value),
+  );
+
+  return command;
+}
+
 export interface UseSlashCompletionProps {
   enabled: boolean;
   query: string | null;
@@ -389,6 +415,9 @@ export interface UseSlashCompletionProps {
 export function useSlashCompletion(props: UseSlashCompletionProps): {
   completionStart: number;
   completionEnd: number;
+  getCommandFromSuggestion: (
+    suggestion: Suggestion,
+  ) => SlashCommand | undefined;
 } {
   const {
     enabled,
@@ -536,5 +565,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
   return {
     completionStart,
     completionEnd,
+    getCommandFromSuggestion: (suggestion: Suggestion) =>
+      getCommandFromSuggestion(suggestion, parserResult),
   };
 }
