@@ -184,11 +184,8 @@ export function logApiRequest(config: Config, event: ApiRequestEvent): void {
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
-  const logRecord: LogRecord = {
-    body: event.toLogBody(),
-    attributes: event.toOpenTelemetryAttributes(config),
-  };
-  logger.emit(logRecord);
+  logger.emit(event.toLogRecord(config));
+  logger.emit(event.toSemanticLogRecord(config));
 }
 
 export function logFlashFallback(
