@@ -28,6 +28,7 @@ const authCommand: SlashCommand = {
   name: 'auth',
   description: 'Authenticate with an OAuth-enabled MCP server',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: async (
     context: CommandContext,
     args: string,
@@ -265,6 +266,7 @@ const listCommand: SlashCommand = {
   altNames: ['ls', 'nodesc', 'nodescription'],
   description: 'List configured MCP servers and tools',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: (context) => listAction(context),
 };
 
@@ -273,6 +275,7 @@ const descCommand: SlashCommand = {
   altNames: ['description'],
   description: 'List configured MCP servers and tools with descriptions',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: (context) => listAction(context, true),
 };
 
@@ -281,6 +284,7 @@ const schemaCommand: SlashCommand = {
   description:
     'List configured MCP servers and tools with descriptions and schemas',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: (context) => listAction(context, true, true),
 };
 
@@ -288,6 +292,7 @@ const refreshCommand: SlashCommand = {
   name: 'refresh',
   description: 'Restarts MCP servers',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async (
     context: CommandContext,
   ): Promise<void | SlashCommandActionReturn> => {
@@ -336,6 +341,7 @@ export const mcpCommand: SlashCommand = {
   name: 'mcp',
   description: 'Manage configured Model Context Protocol (MCP) servers',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   subCommands: [
     listCommand,
     descCommand,
