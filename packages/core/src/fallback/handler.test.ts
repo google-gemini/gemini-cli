@@ -539,7 +539,7 @@ describe('handleFallback', () => {
     beforeEach(() => {
       vi.clearAllMocks();
       availability = createAvailabilityMock({
-        selectedModel: 'gemini-1.5-flash',
+        selectedModel: DEFAULT_GEMINI_FLASH_MODEL,
         skipped: [],
       });
       policyHandler = vi.fn().mockResolvedValue('retry_once');
@@ -556,9 +556,16 @@ describe('handleFallback', () => {
       );
     });
 
-    it('uses availability selection when enabled', async () => {
-      await handleFallback(policyConfig, MOCK_PRO_MODEL, AUTH_OAUTH);
-      expect(availability.selectFirstAvailable).toHaveBeenCalled();
+    it('uses availability selection with correct candidates when enabled', async () => {
+      vi.spyOn(policyConfig, 'getPreviewFeatures').mockReturnValue(true);
+      vi.spyOn(policyConfig, 'getModel').mockReturnValue(DEFAULT_GEMINI_MODEL);
+
+      await handleFallback(policyConfig, DEFAULT_GEMINI_MODEL, AUTH_OAUTH);
+
+      expect(availability.selectFirstAvailable).toHaveBeenCalledWith([
+        DEFAULT_GEMINI_FLASH_MODEL,
+        PREVIEW_GEMINI_MODEL,
+      ]);
     });
 
     it('falls back to last resort when availability returns null', async () => {
@@ -611,6 +618,33 @@ describe('handleFallback', () => {
       }
     });
 
+    it('wraps around to upgrade candidates if the current model was selected mid-chain (e.g. by router)', async () => {
+      // Last-resort failure (Flash) in [Preview, Pro, Flash] checks Preview then Pro (all upstream).
+      vi.spyOn(policyConfig, 'getPreviewFeatures').mockReturnValue(true);
+
+      availability.selectFirstAvailable = vi.fn().mockReturnValue({
+        selectedModel: MOCK_PRO_MODEL,
+        skipped: [],
+      });
+      policyHandler.mockResolvedValue('retry_once');
+
+      await handleFallback(
+        policyConfig,
+        DEFAULT_GEMINI_FLASH_MODEL,
+        AUTH_OAUTH,
+      );
+
+      expect(availability.selectFirstAvailable).toHaveBeenCalledWith([
+        PREVIEW_GEMINI_MODEL,
+        MOCK_PRO_MODEL,
+      ]);
+      expect(policyHandler).toHaveBeenCalledWith(
+        DEFAULT_GEMINI_FLASH_MODEL,
+        MOCK_PRO_MODEL,
+        undefined,
+      );
+    });
+
     it('logs and returns null when handler resolves to null', async () => {
       policyHandler.mockResolvedValue(null);
       const debugLoggerErrorSpy = vi.spyOn(debugLogger, 'error');
@@ -656,7 +690,12 @@ describe('handleFallback', () => {
       );
     });
 
-    it('short-circuits when the failed model is already the last-resort policy', async () => {
+    it('short-circuits when the failed model is the last-resort policy AND candidates are unavailable', async () => {
+      // Ensure short-circuit when wrapping to an unavailable upstream model.
+      availability.selectFirstAvailable = vi
+        .fn()
+        .mockReturnValue({ selectedModel: null, skipped: [] });
+
       const result = await handleFallback(
         policyConfig,
         DEFAULT_GEMINI_FLASH_MODEL,
@@ -664,7 +703,8 @@ describe('handleFallback', () => {
       );
 
       expect(result).toBeNull();
-      expect(policyConfig.getModelAvailabilityService).not.toHaveBeenCalled();
+      // Service called to check upstream; no UI handler since nothing selected.
+      expect(policyConfig.getModelAvailabilityService).toHaveBeenCalled();
       expect(policyConfig.getFallbackModelHandler).not.toHaveBeenCalled();
     });
   });
