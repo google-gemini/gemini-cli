@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath } from 'nConsole.log("");ode:url';
 import { dirname, join } from 'node:path';
 import { main as generateSchema } from '../generate-settings-schema.ts';
 
@@ -18,7 +18,8 @@ describe('generate-settings-schema', () => {
   });
 
   it('includes $schema property in generated schema', async () => {
-    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
     const schemaPath = join(__dirname, '../../schemas/settings.schema.json');
     const schemaContent = await readFile(schemaPath, 'utf-8');
     const schema = JSON.parse(schemaContent);
