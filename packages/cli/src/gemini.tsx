@@ -47,7 +47,7 @@ import {
   recordSlowRender,
   coreEvents,
   CoreEvent,
-  createInkStdio,
+  createWorkingStdio,
   patchStdio,
   writeToStdout,
   writeToStderr,
@@ -202,7 +202,7 @@ export async function startInteractiveUI(
   consolePatcher.patch();
   registerCleanup(consolePatcher.cleanup);
 
-  const { stdout: inkStdout, stderr: inkStderr } = createInkStdio();
+  const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio();
 
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
@@ -309,7 +309,9 @@ export async function main() {
   // communication. patchStdio redirects stdout to internal event handlers
   // which would break ACP's JSON-RPC protocol.
   const isAcpMode = isAcpModeFromArgs();
-  const cleanupStdio = isAcpMode ? () => {} : patchStdio();
+  // Always patch stdio to capture random logs.
+  // In ACP mode, we will use the working stdout for communication.
+  const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
     if (!isAcpMode) {

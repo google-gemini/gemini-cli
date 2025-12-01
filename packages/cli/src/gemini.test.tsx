@@ -51,7 +51,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       ),
     ),
     patchStdio: vi.fn(() => () => {}),
-    createInkStdio: vi.fn(() => ({
+    createWorkingStdio: vi.fn(() => ({
       stdout: {
         write: vi.fn((...args) =>
           process.stdout.write(
@@ -1339,7 +1339,7 @@ describe('ACP mode stdio patching', () => {
     vi.restoreAllMocks();
   });
 
-  it('should not call patchStdio when --experimental-acp is present', async () => {
+  it('should call patchStdio even when --experimental-acp is present', async () => {
     const { patchStdio } = await import('@google/gemini-cli-core');
     const { loadCliConfig, parseArguments } = await import(
       './config/config.js'
@@ -1422,8 +1422,8 @@ describe('ACP mode stdio patching', () => {
       }
     }
 
-    // patchStdio should NOT have been called in ACP mode
-    expect(patchStdio).not.toHaveBeenCalled();
+    // patchStdio SHOULD be called in ACP mode (design change: always patch stdout)
+    expect(patchStdio).toHaveBeenCalled();
 
     processExitSpy.mockRestore();
   });

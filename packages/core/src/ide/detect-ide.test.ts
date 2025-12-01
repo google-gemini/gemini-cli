@@ -4,17 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { detectIde, IDE_DEFINITIONS } from './detect-ide.js';
 
 describe('detectIde', () => {
   const ideProcessInfo = { pid: 123, command: 'some/path/to/code' };
   const ideProcessInfoNoCode = { pid: 123, command: 'some/path/to/fork' };
 
+  beforeEach(() => {
+    // Clear environment variables that might be set in the test environment
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
     // Clear Cursor-specific environment variables that might interfere with tests
     delete process.env['CURSOR_TRACE_ID'];
+    delete process.env['ANTIGRAVITY_CLI_ALIAS'];
   });
 
   it('should return undefined if TERM_PROGRAM is not vscode', () => {
@@ -98,6 +104,11 @@ describe('detectIde', () => {
 
 describe('detectIde with ideInfoFromFile', () => {
   const ideProcessInfo = { pid: 123, command: 'some/path/to/code' };
+
+  beforeEach(() => {
+    // Clear environment variables that might be set in the test environment
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+  });
 
   afterEach(() => {
     vi.unstubAllEnvs();
