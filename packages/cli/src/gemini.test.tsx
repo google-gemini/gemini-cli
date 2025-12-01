@@ -19,7 +19,6 @@ import {
   validateDnsResolutionOrder,
   startInteractiveUI,
   getNodeMemoryArgs,
-  isAcpModeFromArgs,
 } from './gemini.js';
 import os from 'node:os';
 import v8 from 'node:v8';
@@ -1258,64 +1257,6 @@ describe('validateDnsResolutionOrder', () => {
     expect(debugLoggerWarnSpy).toHaveBeenCalledExactlyOnceWith(
       'Invalid value for dnsResolutionOrder in settings: "invalid-value". Using default "ipv4first".',
     );
-  });
-});
-
-describe('isAcpModeFromArgs', () => {
-  let originalArgv: string[];
-
-  beforeEach(() => {
-    originalArgv = process.argv;
-  });
-
-  afterEach(() => {
-    process.argv = originalArgv;
-  });
-
-  it('should return true when --experimental-acp is in process.argv', () => {
-    process.argv = ['node', 'gemini', '--experimental-acp'];
-    expect(isAcpModeFromArgs()).toBe(true);
-  });
-
-  it('should return true when --experimental-acp is among other args', () => {
-    process.argv = [
-      'node',
-      'gemini',
-      '--debug',
-      '--experimental-acp',
-      '--yolo',
-    ];
-    expect(isAcpModeFromArgs()).toBe(true);
-  });
-
-  it('should return false when --experimental-acp is not present', () => {
-    process.argv = ['node', 'gemini', '--debug'];
-    expect(isAcpModeFromArgs()).toBe(false);
-  });
-
-  it('should return false for empty args', () => {
-    process.argv = [];
-    expect(isAcpModeFromArgs()).toBe(false);
-  });
-
-  it('should return true when --experimental-acp is passed with a value', () => {
-    process.argv = ['node', 'gemini', '--experimental-acp=true'];
-    expect(isAcpModeFromArgs()).toBe(true);
-  });
-
-  it('should return false when --experimental-acp=false', () => {
-    process.argv = ['node', 'gemini', '--experimental-acp=false'];
-    expect(isAcpModeFromArgs()).toBe(false);
-  });
-
-  it('should return false when --experimental-acp=0', () => {
-    process.argv = ['node', 'gemini', '--experimental-acp=0'];
-    expect(isAcpModeFromArgs()).toBe(false);
-  });
-
-  it('should handle case-insensitive false values', () => {
-    process.argv = ['node', 'gemini', '--experimental-acp=FALSE'];
-    expect(isAcpModeFromArgs()).toBe(false);
   });
 });
 
