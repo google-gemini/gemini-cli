@@ -70,6 +70,7 @@ const listCommand: SlashCommand = {
   name: 'list',
   description: 'List saved conversation checkpoints',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async (context): Promise<void> => {
     const chatDetails = await getSavedChatTags(context, false);
 
@@ -87,6 +88,7 @@ const saveCommand: SlashCommand = {
   description:
     'Save the current conversation as a checkpoint. Usage: /chat save <tag>',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: async (context, args): Promise<SlashCommandActionReturn | void> => {
     const tag = args.trim();
     if (!tag) {
@@ -155,6 +157,7 @@ const resumeCommand: SlashCommand = {
   description:
     'Resume a conversation from a checkpoint. Usage: /chat resume <tag>',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: async (context, args) => {
     const tag = args.trim();
     if (!tag) {
@@ -238,6 +241,7 @@ const deleteCommand: SlashCommand = {
   name: 'delete',
   description: 'Delete a conversation checkpoint. Usage: /chat delete <tag>',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: async (context, args): Promise<MessageActionReturn> => {
     const tag = args.trim();
     if (!tag) {
@@ -311,6 +315,7 @@ const shareCommand: SlashCommand = {
   description:
     'Share the current conversation to a markdown or json file. Usage: /chat share <file>',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: async (context, args): Promise<MessageActionReturn> => {
     let filePathArg = args.trim();
     if (!filePathArg) {
@@ -378,6 +383,7 @@ export const chatCommand: SlashCommand = {
   name: 'chat',
   description: 'Manage conversation history',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   subCommands: [
     listCommand,
     saveCommand,

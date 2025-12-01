@@ -99,6 +99,7 @@ import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
+import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
@@ -108,14 +109,16 @@ import {
   useExtensionUpdates,
 } from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
-import { useSessionResume } from './hooks/useSessionResume.js';
 import { type ExtensionManager } from '../config/extension-manager.js';
 import { requestConsentInteractive } from '../config/extensions/consent.js';
+import { useSessionBrowser } from './hooks/useSessionBrowser.js';
+import { useSessionResume } from './hooks/useSessionResume.js';
 import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { enableSupportedProtocol } from './utils/kittyProtocolDetector.js';
+import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { enableBracketedPaste } from './utils/bracketedPaste.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
@@ -250,7 +253,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const [isConfigInitialized, setConfigInitialized] = useState(false);
 
   const logger = useLogger(config.storage);
-  const [userMessages, setUserMessages] = useState<string[]>([]);
+  const { inputHistory, addInput, initializeFromLogger } =
+    useInputHistoryStore();
 
   // Terminal and layout hooks
   const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
@@ -341,35 +345,10 @@ export const AppContainer = (props: AppContainerProps) => {
     shellModeActive,
   });
 
+  // Initialize input history from logger (past sessions)
   useEffect(() => {
-    const fetchUserMessages = async () => {
-      const pastMessagesRaw = (await logger?.getPreviousUserMessages()) || [];
-      const currentSessionUserMessages = historyManager.history
-        .filter(
-          (item): item is HistoryItem & { type: 'user'; text: string } =>
-            item.type === 'user' &&
-            typeof item.text === 'string' &&
-            item.text.trim() !== '',
-        )
-        .map((item) => item.text)
-        .reverse();
-      const combinedMessages = [
-        ...currentSessionUserMessages,
-        ...pastMessagesRaw,
-      ];
-      const deduplicatedMessages: string[] = [];
-      if (combinedMessages.length > 0) {
-        deduplicatedMessages.push(combinedMessages[0]);
-        for (let i = 1; i < combinedMessages.length; i++) {
-          if (combinedMessages[i] !== combinedMessages[i - 1]) {
-            deduplicatedMessages.push(combinedMessages[i]);
-          }
-        }
-      }
-      setUserMessages(deduplicatedMessages.reverse());
-    };
-    fetchUserMessages();
-  }, [historyManager.history, logger]);
+    initializeFromLogger(logger);
+  }, [logger, initializeFromLogger]);
 
   const refreshStatic = useCallback(() => {
     if (!isAlternateBuffer) {
@@ -436,7 +415,7 @@ export const AppContainer = (props: AppContainerProps) => {
   // Session browser and resume functionality
   const isGeminiClientInitialized = config.getGeminiClient()?.isInitialized();
 
-  useSessionResume({
+  const { loadHistoryForResume } = useSessionResume({
     config,
     historyManager,
     refreshStatic,
@@ -445,6 +424,20 @@ export const AppContainer = (props: AppContainerProps) => {
     resumedSessionData,
     isAuthenticating,
   });
+  const {
+    isSessionBrowserOpen,
+    openSessionBrowser,
+    closeSessionBrowser,
+    handleResumeSession,
+    handleDeleteSession: handleDeleteSessionSync,
+  } = useSessionBrowser(config, loadHistoryForResume);
+  // Wrap handleDeleteSession to return a Promise for UIActions interface
+  const handleDeleteSession = useCallback(
+    async (session: SessionInfo): Promise<void> => {
+      handleDeleteSessionSync(session);
+    },
+    [handleDeleteSessionSync],
+  );
 
   // Create handleAuthSelect wrapper for backward compatibility
   const handleAuthSelect = useCallback(
@@ -570,6 +563,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openEditorDialog,
       openPrivacyNotice: () => setShowPrivacyNotice(true),
       openSettingsDialog,
+      openSessionBrowser,
       openModelDialog,
       openPermissionsDialog,
       quit: (messages: HistoryItem[]) => {
@@ -590,6 +584,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openThemeDialog,
       openEditorDialog,
       openSettingsDialog,
+      openSessionBrowser,
       openModelDialog,
       setQuittingMessages,
       setDebugMessage,
@@ -692,7 +687,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       const lastHistoryUserMsg = historyManager.history.findLast(
         (h) => h.type === 'user',
       );
-      const lastUserMsg = userMessages.at(-1);
+      const lastUserMsg = inputHistory.at(-1);
 
       if (
         !lastHistoryUserMsg ||
@@ -703,7 +698,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setPendingRestorePrompt(false);
       }
     }
-  }, [pendingRestorePrompt, userMessages, historyManager.history]);
+  }, [pendingRestorePrompt, inputHistory, historyManager.history]);
 
   const {
     streamingState,
@@ -767,7 +762,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
-      const lastUserMessage = userMessages.at(-1);
+      const lastUserMessage = inputHistory.at(-1);
       let textToSet = shouldRestorePrompt ? lastUserMessage || '' : '';
 
       const queuedText = getQueuedMessagesText();
@@ -782,7 +777,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     },
     [
       buffer,
-      userMessages,
+      inputHistory,
       getQueuedMessagesText,
       clearQueue,
       pendingSlashCommandHistoryItems,
@@ -793,8 +788,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
       addMessage(submittedValue);
+      addInput(submittedValue); // Track input for up-arrow history
     },
-    [addMessage],
+    [addMessage, addInput],
   );
 
   const handleClearScreen = useCallback(() => {
@@ -1330,6 +1326,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     showPrivacyNotice ||
     showIdeRestartPrompt ||
     !!proQuotaRequest ||
+    isSessionBrowserOpen ||
     isAuthDialogOpen ||
     authState === AuthState.AwaitingApiKeyInput;
 
@@ -1402,6 +1399,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       debugMessage,
       quittingMessages,
       isSettingsDialogOpen,
+      isSessionBrowserOpen,
       isModelDialogOpen,
       isPermissionsDialogOpen,
       permissionsDialogProps,
@@ -1418,7 +1416,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingGeminiHistoryItems,
       thought,
       shellModeActive,
-      userMessages,
+      userMessages: inputHistory,
       buffer,
       inputWidth,
       suggestionsWidth,
@@ -1492,6 +1490,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       debugMessage,
       quittingMessages,
       isSettingsDialogOpen,
+      isSessionBrowserOpen,
       isModelDialogOpen,
       isPermissionsDialogOpen,
       permissionsDialogProps,
@@ -1508,7 +1507,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingGeminiHistoryItems,
       thought,
       shellModeActive,
-      userMessages,
+      inputHistory,
       buffer,
       inputWidth,
       suggestionsWidth,
@@ -1601,6 +1600,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleFinalSubmit,
       handleClearScreen,
       handleProQuotaChoice,
+      openSessionBrowser,
+      closeSessionBrowser,
+      handleResumeSession,
+      handleDeleteSession,
       setQueueErrorMessage,
       popAllMessages,
       handleApiKeySubmit,
@@ -1632,6 +1635,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleFinalSubmit,
       handleClearScreen,
       handleProQuotaChoice,
+      openSessionBrowser,
+      closeSessionBrowser,
+      handleResumeSession,
+      handleDeleteSession,
       setQueueErrorMessage,
       popAllMessages,
       handleApiKeySubmit,
