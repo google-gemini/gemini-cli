@@ -1,4 +1,4 @@
-# Gemini CLI Authentication Setup
+# Gemini CLI authentication setup
 
 To use Gemini CLI, you'll need to authenticate with Google. This guide helps you
 quickly find the best way to sign in based on your account type and how you're
@@ -66,7 +66,7 @@ when you meet at least one of the following conditions:
 
 For instructions, see [Set your Google Cloud Project](#set-gcp).
 
-## Use Gemini API Key <a id="gemini-api"></a>
+## Use Gemini API key <a id="gemini-api"></a>
 
 If you don't want to authenticate using your Google account, you can use an API
 key from Google AI Studio.
@@ -123,7 +123,7 @@ export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 To make any Vertex AI environment variable settings persistent, see
 [Persisting Environment Variables](#persisting-vars).
 
-#### A. Vertex AI - Application Default Credentials (ADC) using `gcloud`
+#### A. Vertex AI - application default credentials (ADC) using `gcloud`
 
 Consider this authentication method if you have Google Cloud CLI installed.
 
@@ -152,7 +152,7 @@ Consider this authentication method if you have Google Cloud CLI installed.
 
 5. Select **Vertex AI**.
 
-#### B. Vertex AI - Service Account JSON key
+#### B. Vertex AI - service account JSON key
 
 Consider this method of authentication in non-interactive environments, CI/CD
 pipelines, or if your organization restricts user-based ADC or API key creation.
@@ -251,7 +251,7 @@ To configure Gemini CLI to use a Google Cloud project, do the following:
     To make this setting persistent, see
     [Persisting Environment Variables](#persisting-vars).
 
-## Persisting Environment Variables <a id="persisting-vars"></a>
+## Persisting environment variables <a id="persisting-vars"></a>
 
 To avoid setting environment variables for every terminal session, you can
 persist them with the following methods:
