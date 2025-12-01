@@ -190,6 +190,8 @@ export class MCPServerConfig {
     readonly tcp?: string,
     // Common
     readonly timeout?: number,
+    // Timeout for initial connection handshake (default: 30 seconds)
+    readonly connectionTimeout?: number,
     readonly trust?: boolean,
     // Metadata
     readonly description?: string,

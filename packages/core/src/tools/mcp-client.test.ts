@@ -919,3 +919,137 @@ describe('connectToMcpServer with OAuth', () => {
     expect(authHeader).toBe('Bearer test-access-token-from-discovery');
   });
 });
+
+describe('connectToMcpServer connection timeout', () => {
+  let mockedClient: ClientLib.Client;
+  let workspaceContext: WorkspaceContext;
+  let testWorkspace: string;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+
+    mockedClient = {
+      connect: vi.fn(),
+      close: vi.fn(),
+      registerCapabilities: vi.fn(),
+      setRequestHandler: vi.fn(),
+      onclose: vi.fn(),
+      notification: vi.fn(),
+    } as unknown as ClientLib.Client;
+    vi.mocked(ClientLib.Client).mockImplementation(() => mockedClient);
+
+    testWorkspace = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-agent-test-'),
+    );
+    workspaceContext = new WorkspaceContext(testWorkspace);
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  // Helper to run a promise with fake timers and catch errors
+  async function runWithTimeout<T>(
+    promise: Promise<T>,
+    advanceMs: number,
+  ): Promise<{ result?: T; error?: Error }> {
+    let result: T | undefined;
+    let error: Error | undefined;
+
+    // Attach error handler immediately to prevent unhandled rejection
+    const handledPromise = promise.then(
+      (r) => {
+        result = r;
+      },
+      (e) => {
+        error = e as Error;
+      },
+    );
+
+    // Advance time
+    await vi.advanceTimersByTimeAsync(advanceMs);
+
+    // Wait for the promise to settle
+    await handledPromise;
+
+    return { result, error };
+  }
+
+  it('should timeout if connection hangs', async () => {
+    // Mock connect to never resolve (simulating a hanging connection)
+    vi.mocked(mockedClient.connect).mockImplementation(
+      () => new Promise(() => {}), // Never resolves
+    );
+
+    vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue({
+      close: vi.fn(),
+    } as unknown as SdkClientStdioLib.StdioClientTransport);
+
+    const connectPromise = connectToMcpServer(
+      'hanging-server',
+      { command: 'test-command', connectionTimeout: 1000 }, // 1 second timeout
+      false,
+      workspaceContext,
+    );
+
+    const { error } = await runWithTimeout(connectPromise, 1500);
+
+    expect(error).toBeDefined();
+    expect(error!.message).toContain(
+      "Connection to MCP server 'hanging-server' failed after 1 seconds",
+    );
+  });
+
+  it('should use default connection timeout when not specified', async () => {
+    // Mock connect to never resolve
+    vi.mocked(mockedClient.connect).mockImplementation(
+      () => new Promise(() => {}),
+    );
+
+    vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue({
+      close: vi.fn(),
+    } as unknown as SdkClientStdioLib.StdioClientTransport);
+
+    const connectPromise = connectToMcpServer(
+      'hanging-server',
+      { command: 'test-command' }, // No connectionTimeout specified
+      false,
+      workspaceContext,
+    );
+
+    const { error } = await runWithTimeout(connectPromise, 31000);
+
+    expect(error).toBeDefined();
+    expect(error!.message).toContain(
+      "Connection to MCP server 'hanging-server' failed after 30 seconds",
+    );
+  });
+
+  it('should succeed if connection completes before timeout', async () => {
+    // Mock connect to resolve after a short delay
+    vi.mocked(mockedClient.connect).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+
+    vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue({
+      close: vi.fn(),
+    } as unknown as SdkClientStdioLib.StdioClientTransport);
+
+    const connectPromise = connectToMcpServer(
+      'fast-server',
+      { command: 'test-command', connectionTimeout: 5000 },
+      false,
+      workspaceContext,
+    );
+
+    const { result, error } = await runWithTimeout(connectPromise, 200);
+
+    expect(error).toBeUndefined();
+    expect(result).toBe(mockedClient);
+  });
+});
