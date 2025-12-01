@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+import type { McpAuthProvider } from './auth-provider.js';
 import type {
   OAuthClientInformation,
   OAuthClientInformationFull,
@@ -18,7 +18,7 @@ import { coreEvents } from '../utils/events.js';
 
 const ALLOWED_HOSTS = [/^.+\.googleapis\.com$/, /^(.*\.)?luci\.app$/];
 
-export class GoogleCredentialProvider implements OAuthClientProvider {
+export class GoogleCredentialProvider implements McpAuthProvider {
   private readonly auth: GoogleAuth;
   private cachedToken?: OAuthTokens;
   private tokenExpiryTime?: number;
@@ -122,5 +122,36 @@ export class GoogleCredentialProvider implements OAuthClientProvider {
   codeVerifier(): string {
     // No-op
     return '';
+  }
+  /**
+   * Returns the project ID used for quota.
+   */
+  async getQuotaProjectId(): Promise<string | undefined> {
+    const client = await this.auth.getClient();
+    return client.quotaProjectId;
+  }
+
+  /**
+   * Returns custom headers to be added to the request.
+   */
+  async getRequestHeaders(): Promise<Record<string, string>> {
+    const headers: Record<string, string> = {};
+    const configHeaders = this.config?.headers ?? {};
+    const userProjectHeaderKey = Object.keys(configHeaders).find(
+      (key) => key.toLowerCase() === 'x-goog-user-project',
+    );
+
+    // If the header is present in the config (case-insensitive check), use the
+    // config's key and value. This prevents duplicate headers (e.g.
+    // 'x-goog-user-project' and 'X-Goog-User-Project') which can cause errors.
+    if (userProjectHeaderKey) {
+      headers[userProjectHeaderKey] = configHeaders[userProjectHeaderKey];
+    } else {
+      const quotaProjectId = await this.getQuotaProjectId();
+      if (quotaProjectId) {
+        headers['X-Goog-User-Project'] = quotaProjectId;
+      }
+    }
+    return headers;
   }
 }

@@ -36,6 +36,8 @@ vi.mock('@google/genai');
 vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
 vi.mock('../mcp/oauth-utils.js');
+vi.mock('google-auth-library');
+import { GoogleAuth } from 'google-auth-library';
 
 vi.mock('../utils/events.js', () => ({
   coreEvents: {
@@ -578,6 +580,16 @@ describe('mcp-client', () => {
     });
 
     describe('useGoogleCredentialProvider', () => {
+      beforeEach(() => {
+        // Mock GoogleAuth client
+        const mockClient = {
+          getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+          quotaProjectId: 'myproject',
+        };
+
+        GoogleAuth.prototype.getClient = vi.fn().mockResolvedValue(mockClient);
+      });
+
       it('should use GoogleCredentialProvider when specified', async () => {
         const transport = await createTransport(
           'test-server',
@@ -603,6 +615,64 @@ describe('mcp-client', () => {
           'X-Goog-User-Project'
         ];
         expect(googUserProject).toBe('myproject');
+      });
+
+      it('should use headers from GoogleCredentialProvider', async () => {
+        const mockGetRequestHeaders = vi.fn().mockResolvedValue({
+          'X-Goog-User-Project': 'provider-project',
+        });
+        vi.spyOn(
+          GoogleCredentialProvider.prototype,
+          'getRequestHeaders',
+        ).mockImplementation(mockGetRequestHeaders);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test.googleapis.com',
+            authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
+          },
+          false,
+        );
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(mockGetRequestHeaders).toHaveBeenCalled();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const headers = (transport as any)._requestInit?.headers;
+        expect(headers['X-Goog-User-Project']).toBe('provider-project');
+      });
+
+      it('should prioritize provider headers over config headers', async () => {
+        const mockGetRequestHeaders = vi.fn().mockResolvedValue({
+          'X-Goog-User-Project': 'provider-project',
+        });
+        vi.spyOn(
+          GoogleCredentialProvider.prototype,
+          'getRequestHeaders',
+        ).mockImplementation(mockGetRequestHeaders);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test.googleapis.com',
+            authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
+            headers: {
+              'X-Goog-User-Project': 'config-project',
+            },
+          },
+          false,
+        );
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const headers = (transport as any)._requestInit?.headers;
+        expect(headers['X-Goog-User-Project']).toBe('provider-project');
       });
 
       it('should use GoogleCredentialProvider with SSE transport', async () => {

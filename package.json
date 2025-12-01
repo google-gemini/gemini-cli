@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.20.0-nightly.20251126.d2a6cff4d",
+  "version": "0.20.0-nightly.20251127.5bed97064",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.20.0-nightly.20251126.d2a6cff4d"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.20.0-nightly.20251127.5bed97064"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
