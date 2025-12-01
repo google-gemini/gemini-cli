@@ -38,8 +38,9 @@ export const DEFAULT_THEME: Theme = DefaultDark;
 export class ThemeManager {
   private readonly availableThemes: Theme[];
   private activeTheme: Theme;
-  private customThemes: Map<string, Theme> = new Map();
-  private themeFilePaths: Map<string, string> = new Map();
+  private customThemes: Map<string, Theme> = new Map(); // Key: settings.json key, Value: Theme object
+  private resolvedNameToTheme: Map<string, Theme> = new Map(); // Key: resolved theme name, Value: Theme object
+  readonly themeFilePaths: Map<string, string> = new Map(); // Key: canonicalPath, Value: settings.json key
 
   constructor() {
     this.availableThemes = [
@@ -66,131 +67,134 @@ export class ThemeManager {
    */
   loadCustomThemes(customThemesSettings?: Record<string, CustomTheme>): void {
     this.customThemes.clear();
+    this.resolvedNameToTheme.clear(); // Clear this map as well
     this.themeFilePaths.clear();
 
     if (!customThemesSettings) {
       return;
     }
 
-    for (const [name, customThemeConfig] of Object.entries(
+    for (const [key, customThemeConfig] of Object.entries(
       customThemesSettings,
     )) {
+      // Check if it's a file-based theme
+      if (customThemeConfig.path) {
+        this.loadThemeFromFileWithKey(
+          key,
+          customThemeConfig.path,
+          customThemeConfig,
+        );
+        continue;
+      }
+
+      // It's an inline theme
       const validation = validateCustomTheme(customThemeConfig);
       if (validation.isValid) {
         if (validation.warning) {
-          debugLogger.warn(`Theme "${name}": ${validation.warning}`);
+          debugLogger.warn(`Theme "${key}": ${validation.warning}`);
         }
         const themeWithDefaults: CustomTheme = {
           ...DEFAULT_THEME.colors,
           ...customThemeConfig,
-          name: customThemeConfig.name || name,
+          name: customThemeConfig.name || key,
           type: 'custom',
         };
 
         try {
           const theme = createCustomTheme(themeWithDefaults);
-          this.customThemes.set(name, theme);
+          this.customThemes.set(key, theme);
+          this.resolvedNameToTheme.set(theme.name, theme); // Register by resolved name
         } catch (error) {
-          debugLogger.warn(`Failed to load custom theme "${name}":`, error);
+          debugLogger.warn(`Failed to load custom theme "${key}":`, error);
         }
       } else {
-        debugLogger.warn(`Invalid custom theme "${name}": ${validation.error}`);
+        debugLogger.warn(`Invalid custom theme "${key}": ${validation.error}`);
       }
     }
     // If the current active theme is a custom theme, keep it if still valid
     if (
       this.activeTheme &&
       this.activeTheme.type === 'custom' &&
-      this.customThemes.has(this.activeTheme.name)
+      this.resolvedNameToTheme.has(this.activeTheme.name) // Check resolved name map
     ) {
-      this.activeTheme = this.customThemes.get(this.activeTheme.name)!;
+      this.activeTheme = this.resolvedNameToTheme.get(this.activeTheme.name)!; // Retrieve from resolved name map
     }
   }
 
-  /**
-   * Loads custom themes from a list of files.
-   * @param files List of custom theme files with names and paths.
-   */
-  loadCustomThemeFiles(files?: Array<{ name?: string; path: string }>): void {
-    if (!files) {
-      return;
-    }
-
-    for (const file of files) {
-      try {
-        const resolvedPath = path.resolve(file.path);
-        // Check if file exists before trying to read
-        if (!fs.existsSync(resolvedPath)) {
-          debugLogger.warn(
-            `Custom theme file not found: "${file.path}" (resolved: "${resolvedPath}")`,
-          );
-          continue;
-        }
-
-        const canonicalPath = fs.realpathSync(resolvedPath);
-
-        // Security check
-        const homeDir = path.resolve(os.homedir());
-        if (!canonicalPath.startsWith(homeDir)) {
-          debugLogger.warn(
-            `Theme file at "${file.path}" is outside your home directory. ` +
-              `Only load themes from trusted sources.`,
-          );
-          continue;
-        }
-
-        const themeContent = fs.readFileSync(canonicalPath, 'utf-8');
-        let customThemeConfig: CustomTheme;
-        try {
-          customThemeConfig = JSON.parse(themeContent) as CustomTheme;
-        } catch (e) {
-          debugLogger.warn(
-            `Failed to parse JSON from theme file "${file.path}":`,
-            e,
-          );
-          continue;
-        }
-
-        const validation = validateCustomTheme(customThemeConfig);
-        if (!validation.isValid) {
-          debugLogger.warn(
-            `Invalid custom theme from file "${file.path}": ${validation.error}`,
-          );
-          continue;
-        }
-
-        if (validation.warning) {
-          debugLogger.warn(`Theme from "${file.path}": ${validation.warning}`);
-        }
-
-        const themeName =
-          file.name ||
-          customThemeConfig.name ||
-          path.basename(file.path, '.json');
-
-        const themeWithDefaults: CustomTheme = {
-          ...DEFAULT_THEME.colors,
-          ...customThemeConfig,
-          name: themeName,
-          type: 'custom',
-        };
-
-        try {
-          const theme = createCustomTheme(themeWithDefaults);
-          this.customThemes.set(themeName, theme);
-          this.themeFilePaths.set(canonicalPath, themeName);
-        } catch (error) {
-          debugLogger.warn(
-            `Failed to create custom theme "${themeName}":`,
-            error,
-          );
-        }
-      } catch (error) {
+  private loadThemeFromFileWithKey(
+    key: string,
+    themePath: string,
+    config: CustomTheme,
+  ): void {
+    try {
+      const resolvedPath = path.resolve(themePath);
+      // Check if file exists before trying to read
+      if (!fs.existsSync(resolvedPath)) {
         debugLogger.warn(
-          `Error loading custom theme file "${file.path}":`,
-          error,
+          `Custom theme file not found for "${key}": "${themePath}" (resolved: "${resolvedPath}")`,
         );
+        return;
       }
+
+      const canonicalPath = fs.realpathSync(resolvedPath);
+
+      // Security check
+      const homeDir = path.resolve(os.homedir());
+      if (!canonicalPath.startsWith(homeDir)) {
+        debugLogger.warn(
+          `Theme file at "${themePath}" is outside your home directory. ` +
+            `Only load themes from trusted sources.`,
+        );
+        return;
+      }
+
+      const themeContent = fs.readFileSync(canonicalPath, 'utf-8');
+      let fileThemeConfig: CustomTheme;
+      try {
+        fileThemeConfig = JSON.parse(themeContent) as CustomTheme;
+      } catch (e) {
+        debugLogger.warn(
+          `Failed to parse JSON from theme file "${themePath}":`,
+          e,
+        );
+        return;
+      }
+
+      const validation = validateCustomTheme(fileThemeConfig);
+      if (!validation.isValid) {
+        debugLogger.warn(
+          `Invalid custom theme from file "${themePath}": ${validation.error}`,
+        );
+        return;
+      }
+
+      if (validation.warning) {
+        debugLogger.warn(`Theme from "${themePath}": ${validation.warning}`);
+      }
+
+      // Use the name from settings (if provided), otherwise use the name from file, otherwise use key
+      const themeName = config.name || fileThemeConfig.name || key;
+
+      const themeWithDefaults: CustomTheme = {
+        ...DEFAULT_THEME.colors,
+        ...fileThemeConfig,
+        name: themeName,
+        type: 'custom',
+      };
+
+      try {
+        const theme = createCustomTheme(themeWithDefaults);
+        this.customThemes.set(key, theme); // Register under the key from settings
+        this.resolvedNameToTheme.set(theme.name, theme); // Register by resolved name
+        this.themeFilePaths.set(canonicalPath, key);
+      } catch (error) {
+        debugLogger.warn(`Failed to create custom theme "${key}":`, error);
+      }
+    } catch (error) {
+      debugLogger.warn(
+        `Error loading custom theme file "${themePath}":`,
+        error,
+      );
     }
   }
 
@@ -204,7 +208,10 @@ export class ThemeManager {
       const resolvedPath = path.resolve(themePath);
       if (fs.existsSync(resolvedPath)) {
         const canonicalPath = fs.realpathSync(resolvedPath);
-        return this.themeFilePaths.get(canonicalPath);
+        const key = this.themeFilePaths.get(canonicalPath);
+        if (key) {
+          return this.customThemes.get(key)?.name; // Return the resolved name
+        }
       }
     } catch (_e) {
       return undefined;
@@ -239,9 +246,8 @@ export class ThemeManager {
       const isBuiltIn = this.availableThemes.some(
         (t) => t.name === this.activeTheme.name,
       );
-      const isCustom = [...this.customThemes.values()].includes(
-        this.activeTheme,
-      );
+      // Check the resolvedNameToTheme for custom themes
+      const isCustom = this.resolvedNameToTheme.has(this.activeTheme.name);
 
       if (isBuiltIn || isCustom) {
         return this.activeTheme;
@@ -333,76 +339,6 @@ export class ThemeManager {
     return this.findThemeByName(themeName);
   }
 
-  private isPath(themeName: string): boolean {
-    return (
-      themeName.endsWith('.json') ||
-      themeName.startsWith('.') ||
-      path.isAbsolute(themeName)
-    );
-  }
-
-  private loadThemeFromFile(themePath: string): Theme | undefined {
-    try {
-      // realpathSync resolves the path and throws if it doesn't exist.
-      const canonicalPath = fs.realpathSync(path.resolve(themePath));
-
-      // 1. Check cache using the canonical path.
-      if (this.customThemes.has(canonicalPath)) {
-        return this.customThemes.get(canonicalPath);
-      }
-
-      // 2. Perform security check.
-      const homeDir = path.resolve(os.homedir());
-      if (!canonicalPath.startsWith(homeDir)) {
-        debugLogger.warn(
-          `Theme file at "${themePath}" is outside your home directory. ` +
-            `Only load themes from trusted sources.`,
-        );
-        return undefined;
-      }
-
-      // 3. Read, parse, and validate the theme file.
-      const themeContent = fs.readFileSync(canonicalPath, 'utf-8');
-      const customThemeConfig = JSON.parse(themeContent) as CustomTheme;
-
-      const validation = validateCustomTheme(customThemeConfig);
-      if (!validation.isValid) {
-        debugLogger.warn(
-          `Invalid custom theme from file "${themePath}": ${validation.error}`,
-        );
-        return undefined;
-      }
-
-      if (validation.warning) {
-        debugLogger.warn(`Theme from "${themePath}": ${validation.warning}`);
-      }
-
-      // 4. Create and cache the theme.
-      const themeWithDefaults: CustomTheme = {
-        ...DEFAULT_THEME.colors,
-        ...customThemeConfig,
-        name: customThemeConfig.name || canonicalPath,
-        type: 'custom',
-      };
-
-      const theme = createCustomTheme(themeWithDefaults);
-      this.customThemes.set(canonicalPath, theme); // Cache by canonical path
-      return theme;
-    } catch (error) {
-      // Any error in the process (file not found, bad JSON, etc.) is caught here.
-      // We can return undefined silently for file-not-found, and warn for others.
-      if (
-        !(error instanceof Error && 'code' in error && error.code === 'ENOENT')
-      ) {
-        debugLogger.warn(
-          `Could not load theme from file "${themePath}":`,
-          error,
-        );
-      }
-      return undefined;
-    }
-  }
-
   findThemeByName(themeName: string | undefined): Theme | undefined {
     if (!themeName) {
       return DEFAULT_THEME;
@@ -416,16 +352,19 @@ export class ThemeManager {
       return builtInTheme;
     }
 
-    // Then check custom themes that have been loaded from settings, or file paths
-    if (this.isPath(themeName)) {
-      return this.loadThemeFromFile(themeName);
+    // Then check custom themes by their resolved name
+    const resolvedCustomTheme = this.resolvedNameToTheme.get(themeName);
+    if (resolvedCustomTheme) {
+      return resolvedCustomTheme;
     }
 
+    // Finally, check custom themes by their key from settings.json
+    // This is primarily for backward compatibility or direct lookup by key if needed
     if (this.customThemes.has(themeName)) {
       return this.customThemes.get(themeName);
     }
 
-    // If it's not a built-in, not in cache, and not a valid file path,
+    // If it's not a built-in, not a resolved custom theme name, and not a settings key,
     // it's not a valid theme.
     return undefined;
   }

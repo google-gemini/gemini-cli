@@ -173,33 +173,11 @@
         "customThemes": {
           "title": "Custom Themes",
           "description": "Custom theme definitions.",
-          "markdownDescription": "Custom theme definitions.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `{}`",
+          "markdownDescription": "Custom theme definitions. Can be an inline theme definition or a path to a theme file.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `{}`",
           "default": {},
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/CustomTheme"
-          }
-        },
-        "customThemeFiles": {
-          "title": "Custom Theme Files",
-          "description": "List of custom theme files to load.",
-          "markdownDescription": "List of custom theme files to load. Each entry specifies a theme name and the file path.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `[]`",
-          "default": [],
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "description": "Name of the theme."
-              },
-              "path": {
-                "type": "string",
-                "description": "Path to the theme JSON file."
-              }
-            },
-            "required": ["path"],
-            "additionalProperties": false
           }
         },
         "hideWindowTitle": {
@@ -1564,6 +1542,10 @@
           "type": "string",
           "enum": ["custom"],
           "default": "custom"
+        },
+        "path": {
+          "type": "string",
+          "description": "Path to the theme JSON file."
         },
         "name": {
           "type": "string",
