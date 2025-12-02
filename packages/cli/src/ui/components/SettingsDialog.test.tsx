@@ -1264,6 +1264,35 @@ describe('SettingsDialog', () => {
 
       unmount();
     });
+
+    it('should display "No matches found." when search yields no results', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      // Enter search mode
+      act(() => {
+        stdin.write('/');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Search:');
+      });
+
+      // Type a search query that won't match any settings
+      act(() => {
+        stdin.write('nonexistentsetting');
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Search: nonexistentsetting');
+        expect(lastFrame()).toContain('No matches found.');
+        expect(lastFrame()).not.toContain('Vim Mode'); // Should not contain any settings
+        expect(lastFrame()).not.toContain('Disable Auto Update'); // Should not contain any settings
+      });
+
+      unmount();
+    });
   });
 
   describe('Snapshot Tests', () => {
