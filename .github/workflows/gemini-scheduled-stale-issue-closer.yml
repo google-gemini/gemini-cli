@@ -109,15 +109,62 @@ jobs:
 
               // 3. Evaluate Conditions
               const isOld = createdAt < threeMonthsAgo;
-              const isStale = updatedAt < tenDaysAgo;
               const isUnpopular = reactionCount < 5;
+              
+              // Determine staleness (considering Bot updates)
+              let isStale = updatedAt < tenDaysAgo;
+
+              if (!isStale && isOld && isUnpopular) {
+                // If it looks active, check if the last update was just a bot
+                // We only do this API call if the issue is OLD and UNPOPULAR, to save rate limits
+                try {
+                  const comments = await github.rest.issues.listComments({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    per_page: 10, // Check last 10 comments
+                    sort: 'created',
+                    direction: 'desc'
+                  });
+                  
+                  let lastHumanDate = null;
+                  
+                  // Iterate comments to find last human
+                  for (const comment of comments.data) {
+                    if (comment.user.type !== 'Bot') {
+                      lastHumanDate = new Date(comment.created_at);
+                      break; // Found the latest human comment
+                    }
+                  }
+                  
+                  // If we found a human comment, check its date
+                  if (lastHumanDate) {
+                    isStale = lastHumanDate < tenDaysAgo;
+                  } else {
+                    // No human comments in the last 10 (or at all if few), 
+                    // check the issue creator. If creator is human, use createdAt.
+                    // If creator is Bot, and no human comments, it's stale.
+                    if (issue.user.type !== 'Bot') {
+                       isStale = createdAt < tenDaysAgo;
+                    } else {
+                       isStale = true; // Bot created, no human comments
+                    }
+                  }
+                  
+                  if (isStale) {
+                     core.info(`Issue #${issue.number} is seemingly active (updated ${updatedAt.toISOString()}) but last human interaction was stale.`);
+                  }
+
+                } catch (error) {
+                  core.warning(`Failed to fetch comments for check #${issue.number}: ${error.message}`);
+                }
+              }
 
               // 4. Check Issue Type (Must be 'Bug' or 'No Type')
               const typeName = issue.type ? issue.type.name : null;
-              const isBug = typeName === 'Bug';
-              const isNoType = !typeName || typeName === 'No Type';
+              const isBugOrUntyped = typeName === 'Bug' || typeName === 'No Type' || !typeName;
 
-              if (isOld && isStale && isUnpopular && (isBug || isNoType)) {
+              if (isOld && isStale && isUnpopular && isBugOrUntyped) {
                 const message = `Closing stale issue #${issue.number}: "${issue.title}" (${issue.html_url}) (Created: ${createdAt.toISOString()}, Reactions: ${reactionCount})`;
 
                 processedCount++;
