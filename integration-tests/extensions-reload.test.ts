@@ -77,7 +77,7 @@ describe('extension reloading', () => {
         'test-extension (v0.0.1) - active (update available)',
       );
       // Wait a bit for the UI to settle
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
       await run.sendKeys('\u0015/mcp list\r');
       await run.expectText(
         'test-server (from test-extension) - Ready (1 tool)',
@@ -101,7 +101,7 @@ describe('extension reloading', () => {
       await run.sendKeys('\u0015/extensions list\r');
       await run.expectText('test-extension (v0.0.2) - active (updated)');
       // Wait a bit for the UI to settle
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
       await run.sendKeys('\u0015/mcp list\r');
       await run.expectText(
         'test-server (from test-extension) - Ready (1 tool)',
