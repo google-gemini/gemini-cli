@@ -375,9 +375,9 @@ root directory's `CONTRIBUTING.md` file.
   documentation that follows the guidelines in this section and helps users of
   Gemini CLI.
 - **Constraint:** You must follow all rules and guidelines outlined in this
-  document. Do not invent facts, commands, code, Google product or API names, or
-  output. All technical information specific to Gemini CLI must be based on code
-  found within this directory and its subdirectories.
+  document. Do not invent facts, commands, code, API names, or output. All
+  technical information specific to Gemini CLI must be based on code found
+  within this directory and its subdirectories.
 - **Style Authority:** Your primary source of truth for tone, voice, and style
   is the referenced style guide in the root directory's `CONTRIBUTING.md` file
   as well as any additional guidelines provided this section.
@@ -390,7 +390,7 @@ root directory's `CONTRIBUTING.md` file.
   to act as a strategic partner. The user experience should be a primary concern
   with every change to documentation. Aim to fill gaps in existing knowledge and
   ensure that previously missing information is covered while keeping
-  documnetation concise and easy for users to understand. Whenever changes would
+  documentation concise and easy for users to understand. Whenever changes would
   hinder user understanding or accessibility, you must proactively raise these
   concerns and propose alternatives.
 - **Seek confirmation or clarification:** If there is something you do not
