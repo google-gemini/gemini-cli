@@ -54,11 +54,11 @@ jobs:
             const threeMonthsAgo = new Date();
             threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
-            const tenDaysAgo = new Date();
-            tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+            const fourteenDaysAgo = new Date();
+            fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
             core.info(`Cutoff date for creation (3 months ago): ${threeMonthsAgo.toISOString()}`);
-            core.info(`Cutoff date for updates (10 days ago): ${tenDaysAgo.toISOString()}`);
+            core.info(`Cutoff date for updates (14 days ago): ${fourteenDaysAgo.toISOString()}`);
 
             // 2. Fetch all open issues (Limited to 100 for debugging)
             const opts = github.rest.issues.listForRepo.endpoint.merge({
@@ -88,8 +88,16 @@ jobs:
               const isStale = updatedAt < tenDaysAgo;
               const isUnpopular = reactionCount < 5;
 
-              if (isOld && isStale && isUnpopular) {
+              // 4. Check Issue Type (Must be 'Bug' or 'No Type')
+              // Note: The REST API might return 'type' as null if not set.
+              // We check if type is 'Bug', explicitly 'No Type', or null/undefined.
+              const typeName = issue.type ? issue.type.name : null;
+              const isBugOrUntyped = typeName === 'Bug' || typeName === 'No Type' || !typeName;
+
+              if (isOld && isStale && isUnpopular && isBugOrUntyped) {
                 const message = `Closing stale issue #${issue.number}: "${issue.title}" (Created: ${createdAt.toISOString()}, Reactions: ${reactionCount})`;
+                
+                processedCount++;
 
                 if (dryRun) {
                   core.info(`[DRY RUN] ${message}`);
