@@ -323,4 +323,17 @@ export class McpClientManager {
     }
     return mcpServers;
   }
+
+  getMcpInstructions(): string {
+    const instructions: string[] = [];
+    for (const [name, client] of this.clients) {
+      const clientInstructions = client.getInstructions();
+      if (clientInstructions) {
+        instructions.push(
+          `# Instructions for MCP Server '${name}'\n${clientInstructions}`,
+        );
+      }
+    }
+    return instructions.join('\n\n');
+  }
 }

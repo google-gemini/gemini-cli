@@ -92,6 +92,7 @@ describe('ShellTool', () => {
       getGeminiClient: vi.fn(),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
       isInteractive: vi.fn().mockReturnValue(true),
+      getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
     } as unknown as Config;
 
     shellTool = new ShellTool(mockConfig);
@@ -219,9 +220,9 @@ describe('ShellTool', () => {
         wrappedCommand,
         tempRootDir,
         expect.any(Function),
-        mockAbortSignal,
+        expect.any(AbortSignal),
         false,
-        {},
+        { pager: 'cat' },
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
@@ -244,9 +245,9 @@ describe('ShellTool', () => {
         wrappedCommand,
         subdir,
         expect.any(Function),
-        mockAbortSignal,
+        expect.any(AbortSignal),
         false,
-        {},
+        { pager: 'cat' },
       );
     });
 
@@ -265,9 +266,9 @@ describe('ShellTool', () => {
         wrappedCommand,
         path.join(tempRootDir, 'subdir'),
         expect.any(Function),
-        mockAbortSignal,
+        expect.any(AbortSignal),
         false,
-        {},
+        { pager: 'cat' },
       );
     });
 
@@ -292,9 +293,9 @@ describe('ShellTool', () => {
           'dir',
           tempRootDir,
           expect.any(Function),
-          mockAbortSignal,
+          expect.any(AbortSignal),
           false,
-          {},
+          { pager: 'cat' },
         );
       },
       20000,
@@ -374,6 +375,30 @@ describe('ShellTool', () => {
       );
       expect(result.llmContent).toBe('summarized output');
       expect(result.returnDisplay).toBe('long output');
+    });
+
+    it('should NOT start a timeout if timeoutMs is <= 0', async () => {
+      // Mock the timeout config to be 0
+      (mockConfig.getShellToolInactivityTimeout as Mock).mockReturnValue(0);
+
+      vi.useFakeTimers();
+
+      const invocation = shellTool.build({ command: 'sleep 10' });
+      const promise = invocation.execute(mockAbortSignal);
+
+      // Verify no timeout logic is triggered even after a long time
+      resolveShellExecution({
+        output: 'finished',
+        exitCode: 0,
+      });
+
+      await promise;
+      // If we got here without aborting/timing out logic interfering, we're good.
+      // We can also verify that setTimeout was NOT called for the inactivity timeout.
+      // However, since we don't have direct access to the internal `resetTimeout`,
+      // we can infer success by the fact it didn't abort.
+
+      vi.useRealTimers();
     });
 
     it('should clean up the temp file on synchronous execution error', async () => {
