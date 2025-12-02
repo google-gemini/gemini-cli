@@ -112,6 +112,15 @@ export function useCommandCompletion(
             break;
           }
         } else if (char === '@') {
+          let backslashCount = 0;
+          for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
+            backslashCount++;
+          }
+
+          if (backslashCount % 2 !== 0) {
+            continue; // escaped '@'
+          }
+
           let end = codePoints.length;
           for (let i = cursorCol; i < codePoints.length; i++) {
             if (codePoints[i] === ' ') {
