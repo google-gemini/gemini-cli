@@ -1,4 +1,4 @@
-# Latest stable release: v0.18.0
+# Latest stable release: v0.18.4
 
 Released: November 26, 2026
 
@@ -9,7 +9,42 @@ the latest stable version with:
 npm install -g @google/gemini-cli
 ```
 
-## What's changed
+## Highlights
+
+- **Experimental permission improvements**: We're experimenting with a new
+  policy engine in Gemini CLI, letting users and administrators create
+  fine-grained policies for tool calls. This setting is currently behind a flag.
+  See our [policy engine documentation](../core/policy-engine.md) to learn how
+  to use this feature.
+- **Gemini 3 support rolled out for some users**: Some users can now enable
+  Gemini 3 by using the `/settings` flag and toggling **Preview Features**. See
+  our [Gemini 3 on Gemini CLI documentation](../get-started/gemini-3.md) to find
+  out more about using Gemini 3.
+- **Updated UI rollback:** We've temporarily rolled back a previous UI update,
+  which enabled embedded scrolling and mouse support. This can be re-enabled by
+  using the `/settings` command and setting **Use Alternate Screen Buffer** to
+  `true`.
+- **Display your model in your chat history**: You can now go use `/settings`
+  and turn on **Show Model in Chat** to display the model in your chat history.
+- **Uninstall multiple extensions**: You can uninstall multiple extensions with
+  a single command: `gemini extensions uninstall`.
+
+![Uninstalling Gemini extensions with a single command](https://i.imgur.com/pi7nEBI.png)
+
+And a huge shout out to our new contributors:
+
+- @aswinashok44 made their first contribution in
+  https://github.com/google-gemini/gemini-cli/pull/13291
+- @gmackall made their first contribution in
+  https://github.com/google-gemini/gemini-cli/pull/13312
+- @avilladsen made their first contribution in
+  https://github.com/google-gemini/gemini-cli/pull/13352
+- @holtskinner made their first contribution in
+  https://github.com/google-gemini/gemini-cli/pull/13289
+- @kevin-ramdass made their first contribution in
+  https://github.com/google-gemini/gemini-cli/pull/13454
+
+## What's Changed
 
 - Remove obsolete reference to "help wanted" label in CONTRIBUTING.md by
   @aswinashok44 in https://github.com/google-gemini/gemini-cli/pull/13291
@@ -114,3 +149,6 @@ npm install -g @google/gemini-cli
 - fix(patch): cherry-pick d8a3d08 to release/v0.18.0-preview.3-pr-13791 to patch
   version v0.18.0-preview.3 and create version 0.18.0-preview.4 by
   @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/13826
+
+  **Full Changelog**:
+  https://github.com/google-gemini/gemini-cli/compare/v0.17.1...v0.18.0
