@@ -308,6 +308,7 @@ export interface ConfigParameters {
     [K in HookEventName]?: HookDefinition[];
   };
   previewFeatures?: boolean;
+  enableAgents?: boolean;
   enableModelAvailabilityService?: boolean;
 }
 
@@ -427,6 +428,7 @@ export class Config {
   private previewModelFallbackMode = false;
   private previewModelBypassMode = false;
   private readonly enableModelAvailabilityService: boolean;
+  private readonly enableAgents: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -486,6 +488,7 @@ export class Config {
     this.model = params.model;
     this.enableModelAvailabilityService =
       params.enableModelAvailabilityService ?? false;
+    this.enableAgents = params.enableAgents ?? false;
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
@@ -1162,6 +1165,10 @@ export class Config {
 
   isModelAvailabilityServiceEnabled(): boolean {
     return this.enableModelAvailabilityService;
+  }
+
+  isAgentsEnabled(): boolean {
+    return this.enableAgents;
   }
 
   getNoBrowser(): boolean {

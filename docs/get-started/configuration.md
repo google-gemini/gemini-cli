@@ -767,6 +767,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `experimental`
 
+- **`experimental.enableAgents`** (boolean):
+  - **Description:** Enable local and remote subagents.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.extensionManagement`** (boolean):
   - **Description:** Enable extension management features.
   - **Default:** `true`

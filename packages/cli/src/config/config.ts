@@ -633,6 +633,7 @@ export async function loadCliConfig(
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,
+    enableAgents: settings.experimental?.enableAgents,
     enableModelAvailabilityService:
       settings.experimental?.isModelAvailabilityServiceEnabled,
     noBrowser: !!process.env['NO_BROWSER'],
