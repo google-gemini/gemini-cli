@@ -50,7 +50,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       ),
     ),
     patchStdio: vi.fn(() => () => {}),
-    createInkStdio: vi.fn(() => ({
+    createWorkingStdio: vi.fn(() => ({
       stdout: {
         write: vi.fn((...args) =>
           process.stdout.write(

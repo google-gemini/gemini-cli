@@ -33,7 +33,7 @@ import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   writeToStdout,
-  createInkStdio,
+  createWorkingStdio,
   writeToStderr,
 } from '../utils/stdio.js';
 import {
@@ -334,7 +334,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
     const code = await new Promise<string>((resolve, _) => {
       const rl = readline.createInterface({
         input: process.stdin,
-        output: createInkStdio().stdout,
+        output: createWorkingStdio().stdout,
         terminal: true,
       });
 
