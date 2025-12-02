@@ -34,6 +34,7 @@ import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
+import { GEMINI_MODEL_ALIAS_PRO } from './models.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -886,6 +887,13 @@ describe('Server Config (config.ts)', () => {
       await config.initialize();
 
       expect(SubagentToolWrapperMock).not.toHaveBeenCalled();
+    });
+
+    it('should default codebase investigator model to PRO alias', () => {
+      const config = new Config(baseParams);
+      expect(config.getCodebaseInvestigatorSettings()?.model).toBe(
+        GEMINI_MODEL_ALIAS_PRO,
+      );
     });
 
     describe('with minified tool class names', () => {
