@@ -9,7 +9,7 @@ on:
         description: 'Run in dry-run mode (no changes applied)'
         required: false
         default: false
-        type: boolean
+        type: 'boolean'
 
 concurrency:
   group: '${{ github.workflow }}'
@@ -21,26 +21,26 @@ defaults:
 
 jobs:
   close-stale-issues:
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
     permissions:
-      issues: write
+      issues: 'write'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: 'Checkout'
+        uses: 'actions/checkout@v4'
 
-      - name: Generate GitHub App Token
-        id: generate_token
-        uses: actions/create-github-app-token@v1
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@v1'
         with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
 
-      - name: Process Stale Issues
-        uses: actions/github-script@v7
+      - name: 'Process Stale Issues'
+        uses: 'actions/github-script@v7'
         env:
-          DRY_RUN: ${{ inputs.dry_run }}
+          DRY_RUN: '${{ inputs.dry_run }}'
         with:
-          github-token: ${{ steps.generate_token.outputs.token }}
+          github-token: '${{ steps.generate_token.outputs.token }}''
           script: |
             const dryRun = process.env.DRY_RUN === 'true';
             if (dryRun) {
@@ -50,7 +50,7 @@ jobs:
             // 1. Setup Date Thresholds
             const threeMonthsAgo = new Date();
             threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-            
+
             const tenDaysAgo = new Date();
             tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
 
@@ -66,7 +66,7 @@ jobs:
               direction: 'asc',
               per_page: 100
             });
-            
+
             // Using listForRepo directly instead of paginate to limit to first 100 results
             const response = await github.rest.issues.listForRepo(opts);
             const issues = response.data;
@@ -87,14 +87,14 @@ jobs:
 
               if (isOld && isStale && isUnpopular) {
                 const message = `Closing stale issue #${issue.number}: "${issue.title}" (Created: ${createdAt.toISOString()}, Reactions: ${reactionCount})`;
-                
+
                 if (dryRun) {
                   core.info(`[DRY RUN] ${message}`);
                   continue;
                 }
 
                 core.info(message);
-                
+
                 // 4. Comment
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
