@@ -98,7 +98,7 @@ jobs:
 
               if (isOld && isStale && isUnpopular && isBugOrUntyped) {
                 const message = `Closing stale issue #${issue.number}: "${issue.title}" (Created: ${createdAt.toISOString()}, Reactions: ${reactionCount})`;
-                
+
                 processedCount++;
 
                 if (dryRun) {
@@ -125,7 +125,7 @@ jobs:
                 // });
               }
             }
-            
+
             if (dryRun) {
               core.info(`[DRY RUN] Total issues that would be closed: ${processedCount}`);
             } else {
