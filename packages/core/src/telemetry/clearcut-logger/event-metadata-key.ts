@@ -7,6 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
+  // Next ID: 131
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -79,14 +80,27 @@ export enum EventMetadataKey {
   // Logs the tool call duration in milliseconds.
   GEMINI_CLI_TOOL_CALL_DURATION_MS = 17,
 
-  // Logs the tool call error message, if any.
-  GEMINI_CLI_TOOL_ERROR_MESSAGE = 18,
+  // Do not use.
+  DEPRECATED_GEMINI_CLI_TOOL_ERROR_MESSAGE = 18,
 
   // Logs the tool call error type, if any.
   GEMINI_CLI_TOOL_CALL_ERROR_TYPE = 19,
 
   // Logs the length of tool output
   GEMINI_CLI_TOOL_CALL_CONTENT_LENGTH = 93,
+
+  // ==========================================================================
+  // Replace Tool Call Event Keys
+  // ===========================================================================
+
+  // Logs a smart edit tool strategy choice.
+  GEMINI_CLI_SMART_EDIT_STRATEGY = 109,
+
+  // Logs a smart edit correction event.
+  GEMINI_CLI_SMART_EDIT_CORRECTION = 110,
+
+  // Logs the reason for web fetch fallback.
+  GEMINI_CLI_WEB_FETCH_FALLBACK_REASON = 116,
 
   // ==========================================================================
   // GenAI API Request Event Keys
@@ -177,6 +191,12 @@ export enum EventMetadataKey {
   // Logs active user settings
   GEMINI_CLI_USER_SETTINGS = 84,
 
+  // Logs the name of the GitHub Action workflow that triggered the session.
+  GEMINI_CLI_GH_WORKFLOW_NAME = 130,
+
+  // Logs the active experiment IDs for the session.
+  GEMINI_CLI_EXPERIMENT_IDS = 131,
+
   // ==========================================================================
   // Loop Detected Event Keys
   // ===========================================================================
@@ -249,8 +269,8 @@ export enum EventMetadataKey {
   // Kitty Sequence Overflow Event Keys
   // ===========================================================================
 
-  // Logs the truncated kitty sequence.
-  GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
+  // Do not use.
+  DEPRECATED_GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
 
   // Logs the length of the kitty sequence that overflowed.
   GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 53,
@@ -353,14 +373,20 @@ export enum EventMetadataKey {
   GEMINI_CLI_NODE_VERSION = 83,
 
   // ==========================================================================
-  // Extension Install Event Keys
+  // Extension Event Keys
   // ===========================================================================
 
   // Logs the name of the extension.
   GEMINI_CLI_EXTENSION_NAME = 85,
 
+  // Logs the name of the extension.
+  GEMINI_CLI_EXTENSION_ID = 121,
+
   // Logs the version of the extension.
   GEMINI_CLI_EXTENSION_VERSION = 86,
+
+  // Logs the previous version of the extension.
+  GEMINI_CLI_EXTENSION_PREVIOUS_VERSION = 117,
 
   // Logs the source of the extension.
   GEMINI_CLI_EXTENSION_SOURCE = 87,
@@ -370,6 +396,15 @@ export enum EventMetadataKey {
 
   // Logs the status of the extension uninstall
   GEMINI_CLI_EXTENSION_UNINSTALL_STATUS = 96,
+
+  // Logs the status of the extension uninstall
+  GEMINI_CLI_EXTENSION_UPDATE_STATUS = 118,
+
+  // Logs the count of extensions in Start Session Event
+  GEMINI_CLI_START_SESSION_EXTENSIONS_COUNT = 119,
+
+  // Logs the name of extensions as a comma-separated string
+  GEMINI_CLI_START_SESSION_EXTENSION_IDS = 120,
 
   // Logs the setting scope for an extension enablement.
   GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE = 102,
@@ -416,4 +451,51 @@ export enum EventMetadataKey {
 
   // Logs an event when the user uses the /model command.
   GEMINI_CLI_MODEL_SLASH_COMMAND = 108,
+
+  // ==========================================================================
+  // Agent Event Keys
+  // ==========================================================================
+
+  // Logs the name of the agent.
+  GEMINI_CLI_AGENT_NAME = 111,
+
+  // Logs the unique ID of the agent instance.
+  GEMINI_CLI_AGENT_ID = 112,
+
+  // Logs the duration of the agent execution in milliseconds.
+  GEMINI_CLI_AGENT_DURATION_MS = 113,
+
+  // Logs the number of turns the agent took.
+  GEMINI_CLI_AGENT_TURN_COUNT = 114,
+
+  // Logs the reason for agent termination.
+  GEMINI_CLI_AGENT_TERMINATE_REASON = 115,
+
+  // Logs the reason for an agent recovery attempt.
+  GEMINI_CLI_AGENT_RECOVERY_REASON = 122,
+
+  // Logs the duration of an agent recovery attempt in milliseconds.
+  GEMINI_CLI_AGENT_RECOVERY_DURATION_MS = 123,
+
+  // Logs whether the agent recovery attempt was successful.
+  GEMINI_CLI_AGENT_RECOVERY_SUCCESS = 124,
+
+  // Logs whether the session is interactive.
+  GEMINI_CLI_INTERACTIVE = 125,
+
+  // ==========================================================================
+  // LLM Loop Check Event Keys
+  // ==========================================================================
+
+  // Logs the confidence score from the flash model loop check.
+  GEMINI_CLI_LLM_LOOP_CHECK_FLASH_CONFIDENCE = 126,
+
+  // Logs the name of the main model used for the secondary loop check.
+  GEMINI_CLI_LLM_LOOP_CHECK_MAIN_MODEL = 127,
+
+  // Logs the confidence score from the main model loop check.
+  GEMINI_CLI_LLM_LOOP_CHECK_MAIN_MODEL_CONFIDENCE = 128,
+
+  // Logs the model that confirmed the loop.
+  GEMINI_CLI_LOOP_DETECTED_CONFIRMED_BY_MODEL = 129,
 }

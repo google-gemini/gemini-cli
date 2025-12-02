@@ -9,15 +9,18 @@ import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
 import { ShellConfirmationDialog } from './ShellConfirmationDialog.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import { ConsentPrompt } from './ConsentPrompt.js';
 import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
 import { AuthInProgress } from '../auth/AuthInProgress.js';
 import { AuthDialog } from '../auth/AuthDialog.js';
+import { ApiAuthDialog } from '../auth/ApiAuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
-import { WorkspaceMigrationDialog } from './WorkspaceMigrationDialog.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
+import { runExitCleanup } from '../../utils/cleanup.js';
+import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { SessionBrowser } from './SessionBrowser.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
 import { theme } from '../semantic-colors.js';
@@ -27,13 +30,18 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
+  terminalWidth: number;
 }
 
 // Props for DialogManager
-export const DialogManager = ({ addItem }: DialogManagerProps) => {
+export const DialogManager = ({
+  addItem,
+  terminalWidth,
+}: DialogManagerProps) => {
   const config = useConfig();
   const settings = useSettings();
 
@@ -43,30 +51,18 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
     uiState;
 
   if (uiState.showIdeRestartPrompt) {
-    return (
-      <Box borderStyle="round" borderColor={theme.status.warning} paddingX={1}>
-        <Text color={theme.status.warning}>
-          Workspace trust has changed. Press &apos;r&apos; to restart Gemini to
-          apply the changes.
-        </Text>
-      </Box>
-    );
-  }
-  if (uiState.showWorkspaceMigrationDialog) {
-    return (
-      <WorkspaceMigrationDialog
-        workspaceExtensions={uiState.workspaceExtensions}
-        onOpen={uiActions.onWorkspaceMigrationDialogOpen}
-        onClose={uiActions.onWorkspaceMigrationDialogClose}
-      />
-    );
+    return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
   }
   if (uiState.proQuotaRequest) {
     return (
       <ProQuotaDialog
         failedModel={uiState.proQuotaRequest.failedModel}
         fallbackModel={uiState.proQuotaRequest.fallbackModel}
+        message={uiState.proQuotaRequest.message}
+        isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
+        isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
         onChoice={uiActions.handleProQuotaChoice}
+        userTier={uiState.userTier}
       />
     );
   }
@@ -100,20 +96,21 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
   }
   if (uiState.confirmationRequest) {
     return (
-      <Box flexDirection="column">
-        {uiState.confirmationRequest.prompt}
-        <Box paddingY={1}>
-          <RadioButtonSelect
-            items={[
-              { label: 'Yes', value: true, key: 'Yes' },
-              { label: 'No', value: false, key: 'No' },
-            ]}
-            onSelect={(value: boolean) => {
-              uiState.confirmationRequest!.onConfirm(value);
-            }}
-          />
-        </Box>
-      </Box>
+      <ConsentPrompt
+        prompt={uiState.confirmationRequest.prompt}
+        onConfirm={uiState.confirmationRequest.onConfirm}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
+  if (uiState.confirmUpdateExtensionRequests.length > 0) {
+    const request = uiState.confirmUpdateExtensionRequests[0];
+    return (
+      <ConsentPrompt
+        prompt={request.prompt}
+        onConfirm={request.onConfirm}
+        terminalWidth={terminalWidth}
+      />
     );
   }
   if (uiState.isThemeDialogOpen) {
@@ -126,6 +123,7 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
         )}
         <ThemeDialog
           onSelect={uiActions.handleThemeSelect}
+          onCancel={uiActions.closeThemeDialog}
           onHighlight={uiActions.handleThemeHighlight}
           settings={settings}
           availableTerminalHeight={
@@ -142,8 +140,12 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
         <SettingsDialog
           settings={settings}
           onSelect={() => uiActions.closeSettingsDialog()}
-          onRestartRequest={() => process.exit(0)}
+          onRestartRequest={async () => {
+            await runExitCleanup();
+            process.exit(RELAUNCH_EXIT_CODE);
+          }}
           availableTerminalHeight={terminalHeight - staticExtraHeight}
+          config={config}
         />
       </Box>
     );
@@ -158,6 +160,18 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
           uiActions.onAuthError('Authentication cancelled.');
         }}
       />
+    );
+  }
+  if (uiState.isAwaitingApiKeyInput) {
+    return (
+      <Box flexDirection="column">
+        <ApiAuthDialog
+          onSubmit={uiActions.handleApiKeySubmit}
+          onCancel={uiActions.handleApiKeyCancel}
+          error={uiState.authError}
+          defaultValue={uiState.apiKeyDefaultValue}
+        />
+      </Box>
     );
   }
   if (uiState.isAuthDialogOpen) {
@@ -197,12 +211,23 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
       />
     );
   }
+  if (uiState.isSessionBrowserOpen) {
+    return (
+      <SessionBrowser
+        config={config}
+        onResumeSession={uiActions.handleResumeSession}
+        onDeleteSession={uiActions.handleDeleteSession}
+        onExit={uiActions.closeSessionBrowser}
+      />
+    );
+  }
 
   if (uiState.isPermissionsDialogOpen) {
     return (
       <PermissionsModifyTrustDialog
         onExit={uiActions.closePermissionsDialog}
         addItem={addItem}
+        targetDirectory={uiState.permissionsDialogProps?.targetDirectory}
       />
     );
   }

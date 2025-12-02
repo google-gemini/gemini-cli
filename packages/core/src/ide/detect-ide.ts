@@ -14,6 +14,7 @@ export const IDE_DEFINITIONS = {
   trae: { name: 'trae', displayName: 'Trae' },
   vscode: { name: 'vscode', displayName: 'VS Code' },
   vscodefork: { name: 'vscodefork', displayName: 'IDE' },
+  antigravity: { name: 'antigravity', displayName: 'Antigravity' },
 } as const;
 
 export interface IdeInfo {
@@ -21,7 +22,14 @@ export interface IdeInfo {
   displayName: string;
 }
 
+export function isCloudShell(): boolean {
+  return !!(process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']);
+}
+
 export function detectIdeFromEnv(): IdeInfo {
+  if (process.env['ANTIGRAVITY_CLI_ALIAS']) {
+    return IDE_DEFINITIONS.antigravity;
+  }
   if (process.env['__COG_BASHRC_SOURCED']) {
     return IDE_DEFINITIONS.devin;
   }
@@ -34,7 +42,7 @@ export function detectIdeFromEnv(): IdeInfo {
   if (process.env['CODESPACES']) {
     return IDE_DEFINITIONS.codespaces;
   }
-  if (process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']) {
+  if (isCloudShell()) {
     return IDE_DEFINITIONS.cloudshell;
   }
   if (process.env['TERM_PRODUCT'] === 'Trae') {
@@ -56,7 +64,10 @@ function verifyVSCode(
   if (ide.name !== IDE_DEFINITIONS.vscode.name) {
     return ide;
   }
-  if (ideProcessInfo.command.toLowerCase().includes('code')) {
+  if (
+    !ideProcessInfo.command ||
+    ideProcessInfo.command.toLowerCase().includes('code')
+  ) {
     return IDE_DEFINITIONS.vscode;
   }
   return IDE_DEFINITIONS.vscodefork;

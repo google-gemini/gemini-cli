@@ -104,7 +104,7 @@ const untarGz = async (inFile, outDir) => {
   }
 }
 
-export const downloadRipGrep = async () => {
+export const downloadRipGrep = async (binPath = BIN_PATH) => {
   const target = getTarget()
   const url = `https://github.com/${REPOSITORY}/releases/download/${VERSION}/ripgrep-${VERSION}-${target}`
   const downloadPath = `${xdgCache}/vscode-ripgrep/ripgrep-${VERSION}-${target}`
@@ -114,9 +114,9 @@ export const downloadRipGrep = async () => {
     console.info(`File ${downloadPath} has been cached`)
   }
   if (downloadPath.endsWith('.tar.gz')) {
-    await untarGz(downloadPath, BIN_PATH)
+    await untarGz(downloadPath, binPath)
   } else if (downloadPath.endsWith('.zip')) {
-    await unzip(downloadPath, BIN_PATH)
+    await unzip(downloadPath, binPath)
   } else {
     throw new VError(`Invalid downloadPath ${downloadPath}`)
   }

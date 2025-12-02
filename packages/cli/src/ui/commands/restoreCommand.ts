@@ -147,6 +147,7 @@ export const restoreCommand = (config: Config | null): SlashCommand | null => {
     description:
       'Restore a tool call. This will reset the conversation and file history to the state it was in when the tool call was suggested',
     kind: CommandKind.BUILT_IN,
+    autoExecute: false,
     action: restoreAction,
     completion,
   };
