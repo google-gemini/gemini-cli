@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Text } from 'ink';
+import { AsyncFzf } from 'fzf';
 import { theme } from '../semantic-colors.js';
 import type {
   LoadableSettingScope,
@@ -45,6 +46,14 @@ import { debugLogger } from '@google/gemini-cli-core';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { Config } from '@google/gemini-cli-core';
 
+interface FzfResult {
+  item: string;
+  start: number;
+  end: number;
+  score: number;
+  positions?: number[];
+}
+
 interface SettingsDialogProps {
   settings: LoadedSettings;
   onSelect: (settingName: string | undefined, scope: SettingScope) => void;
@@ -78,6 +87,62 @@ export function SettingsDialog({
   // Scroll offset for settings
   const [scrollOffset, setScrollOffset] = useState(0);
   const [showRestartPrompt, setShowRestartPrompt] = useState(false);
+
+  // Search state
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredKeys, setFilteredKeys] = useState<string[]>(() =>
+    getDialogSettingKeys(),
+  );
+  const { fzfInstance, searchMap } = useMemo(() => {
+    const keys = getDialogSettingKeys();
+    const map = new Map<string, string>();
+    const searchItems: string[] = [];
+
+    keys.forEach((key) => {
+      const def = getSettingDefinition(key);
+      if (def?.label) {
+        searchItems.push(def.label);
+        map.set(def.label.toLowerCase(), key);
+      }
+    });
+
+    const fzf = new AsyncFzf(searchItems, {
+      fuzzy: 'v2',
+      casing: 'case-insensitive',
+    });
+    return { fzfInstance: fzf, searchMap: map };
+  }, []);
+
+  // Perform search
+  useEffect(() => {
+    let active = true;
+    if (!searchQuery.trim() || !fzfInstance) {
+      setFilteredKeys(getDialogSettingKeys());
+      return;
+    }
+
+    const doSearch = async () => {
+      const results = await fzfInstance.find(searchQuery);
+
+      if (!active) return;
+
+      const matchedKeys = new Set<string>();
+      results.forEach((res: FzfResult) => {
+        const key = searchMap.get(res.item.toLowerCase());
+        if (key) matchedKeys.add(key);
+      });
+      setFilteredKeys(Array.from(matchedKeys));
+      setActiveSettingIndex(0); // Reset cursor
+      setScrollOffset(0);
+    };
+
+    doSearch();
+
+    return () => {
+      active = false;
+    };
+  }, [searchQuery, fzfInstance, searchMap]);
 
   // Local pending settings state for the selected scope
   const [pendingSettings, setPendingSettings] = useState<Settings>(() =>
@@ -127,7 +192,8 @@ export function SettingsDialog({
   }, [selectedScope, settings, globalPendingChanges]);
 
   const generateSettingsItems = () => {
-    const settingKeys = getDialogSettingKeys();
+    const settingKeys =
+      isSearching || searchQuery ? filteredKeys : getDialogSettingKeys();
 
     return settingKeys.map((key: string) => {
       const definition = getSettingDefinition(key);
@@ -493,6 +559,38 @@ export function SettingsDialog({
   useKeypress(
     (key) => {
       const { name } = key;
+
+      if (isSearching) {
+        if (keyMatchers[Command.ESCAPE](key)) {
+          setIsSearching(false);
+          setSearchQuery('');
+          return;
+        }
+        if (keyMatchers[Command.RETURN](key)) {
+          setIsSearching(false);
+          return;
+        }
+        if (name === 'backspace') {
+          setSearchQuery((prev) => prev.slice(0, -1));
+          return;
+        }
+        if (
+          key.sequence &&
+          key.sequence.length === 1 &&
+          !key.ctrl &&
+          !key.meta &&
+          !keyMatchers[Command.DIALOG_NAVIGATION_UP](key) &&
+          !keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)
+        ) {
+          setSearchQuery((prev) => prev + key.sequence);
+          return;
+        }
+      } else if (!editingKey && key.sequence === '/') {
+        setIsSearching(true);
+        setSearchQuery('');
+        return;
+      }
+
       if (name === 'tab' && showScopeSelection) {
         setFocusSection((prev) => (prev === 'settings' ? 'scope' : 'settings'));
       }
@@ -768,127 +866,154 @@ export function SettingsDialog({
       height="100%"
     >
       <Box flexDirection="column" flexGrow={1}>
-        <Text bold={focusSection === 'settings'} wrap="truncate">
-          {focusSection === 'settings' ? '> ' : '  '}Settings
-        </Text>
+        {isSearching || searchQuery ? (
+          <Text bold color={theme.text.accent} wrap="truncate">
+            {isSearching ? '> ' : '  '}Search: {searchQuery}
+            {isSearching ? '_' : ''}
+          </Text>
+        ) : (
+          <Text bold={focusSection === 'settings'} wrap="truncate">
+            {focusSection === 'settings' ? '> ' : '  '}Settings{' '}
+            <Text color={theme.text.secondary}>(press / to search)</Text>
+          </Text>
+        )}
         <Box height={1} />
-        {showScrollUp && <Text color={theme.text.secondary}>▲</Text>}
-        {visibleItems.map((item, idx) => {
-          const isActive =
-            focusSection === 'settings' &&
-            activeSettingIndex === idx + scrollOffset;
+        {isSearching && visibleItems.length === 0 ? (
+          <Box height={1} flexDirection="column">
+            <Text color={theme.text.secondary}>No matches found.</Text>
+          </Box>
+        ) : (
+          <>
+            {showScrollUp && <Text color={theme.text.secondary}>▲</Text>}
+            {visibleItems.map((item, idx) => {
+              const isActive =
+                focusSection === 'settings' &&
+                activeSettingIndex === idx + scrollOffset;
 
-          const scopeSettings = settings.forScope(selectedScope).settings;
-          const mergedSettings = settings.merged;
+              const scopeSettings = settings.forScope(selectedScope).settings;
+              const mergedSettings = settings.merged;
 
-          let displayValue: string;
-          if (editingKey === item.value) {
-            // Show edit buffer with advanced cursor highlighting
-            if (cursorVisible && editCursorPos < cpLen(editBuffer)) {
-              // Cursor is in the middle or at start of text
-              const beforeCursor = cpSlice(editBuffer, 0, editCursorPos);
-              const atCursor = cpSlice(
-                editBuffer,
-                editCursorPos,
-                editCursorPos + 1,
+              let displayValue: string;
+              if (editingKey === item.value) {
+                // Show edit buffer with advanced cursor highlighting
+                if (cursorVisible && editCursorPos < cpLen(editBuffer)) {
+                  // Cursor is in the middle or at start of text
+                  const beforeCursor = cpSlice(editBuffer, 0, editCursorPos);
+                  const atCursor = cpSlice(
+                    editBuffer,
+                    editCursorPos,
+                    editCursorPos + 1,
+                  );
+                  const afterCursor = cpSlice(editBuffer, editCursorPos + 1);
+                  displayValue =
+                    beforeCursor + chalk.inverse(atCursor) + afterCursor;
+                } else if (
+                  cursorVisible &&
+                  editCursorPos >= cpLen(editBuffer)
+                ) {
+                  // Cursor is at the end - show inverted space
+                  displayValue = editBuffer + chalk.inverse(' ');
+                } else {
+                  // Cursor not visible
+                  displayValue = editBuffer;
+                }
+              } else if (item.type === 'number' || item.type === 'string') {
+                // For numbers/strings, get the actual current value from pending settings
+                const path = item.value.split('.');
+                const currentValue = getNestedValue(pendingSettings, path);
+
+                const defaultValue = getDefaultValue(item.value);
+
+                if (currentValue !== undefined && currentValue !== null) {
+                  displayValue = String(currentValue);
+                } else {
+                  displayValue =
+                    defaultValue !== undefined && defaultValue !== null
+                      ? String(defaultValue)
+                      : '';
+                }
+
+                // Add * if value differs from default OR if currently being modified
+                const isModified = modifiedSettings.has(item.value);
+                const effectiveCurrentValue =
+                  currentValue !== undefined && currentValue !== null
+                    ? currentValue
+                    : defaultValue;
+                const isDifferentFromDefault =
+                  effectiveCurrentValue !== defaultValue;
+
+                if (isDifferentFromDefault || isModified) {
+                  displayValue += '*';
+                }
+              } else {
+                // For booleans and other types, use existing logic
+                displayValue = getDisplayValue(
+                  item.value,
+                  scopeSettings,
+                  mergedSettings,
+                  modifiedSettings,
+                  pendingSettings,
+                );
+              }
+              const shouldBeGreyedOut = isDefaultValue(
+                item.value,
+                scopeSettings,
               );
-              const afterCursor = cpSlice(editBuffer, editCursorPos + 1);
-              displayValue =
-                beforeCursor + chalk.inverse(atCursor) + afterCursor;
-            } else if (cursorVisible && editCursorPos >= cpLen(editBuffer)) {
-              // Cursor is at the end - show inverted space
-              displayValue = editBuffer + chalk.inverse(' ');
-            } else {
-              // Cursor not visible
-              displayValue = editBuffer;
-            }
-          } else if (item.type === 'number' || item.type === 'string') {
-            // For numbers/strings, get the actual current value from pending settings
-            const path = item.value.split('.');
-            const currentValue = getNestedValue(pendingSettings, path);
 
-            const defaultValue = getDefaultValue(item.value);
+              // Generate scope message for this setting
+              const scopeMessage = getScopeMessageForSetting(
+                item.value,
+                selectedScope,
+                settings,
+              );
 
-            if (currentValue !== undefined && currentValue !== null) {
-              displayValue = String(currentValue);
-            } else {
-              displayValue =
-                defaultValue !== undefined && defaultValue !== null
-                  ? String(defaultValue)
-                  : '';
-            }
-
-            // Add * if value differs from default OR if currently being modified
-            const isModified = modifiedSettings.has(item.value);
-            const effectiveCurrentValue =
-              currentValue !== undefined && currentValue !== null
-                ? currentValue
-                : defaultValue;
-            const isDifferentFromDefault =
-              effectiveCurrentValue !== defaultValue;
-
-            if (isDifferentFromDefault || isModified) {
-              displayValue += '*';
-            }
-          } else {
-            // For booleans and other types, use existing logic
-            displayValue = getDisplayValue(
-              item.value,
-              scopeSettings,
-              mergedSettings,
-              modifiedSettings,
-              pendingSettings,
-            );
-          }
-          const shouldBeGreyedOut = isDefaultValue(item.value, scopeSettings);
-
-          // Generate scope message for this setting
-          const scopeMessage = getScopeMessageForSetting(
-            item.value,
-            selectedScope,
-            settings,
-          );
-
-          return (
-            <React.Fragment key={item.value}>
-              <Box flexDirection="row" alignItems="center">
-                <Box minWidth={2} flexShrink={0}>
-                  <Text
-                    color={
-                      isActive ? theme.status.success : theme.text.secondary
-                    }
-                  >
-                    {isActive ? '●' : ''}
-                  </Text>
-                </Box>
-                <Box minWidth={50}>
-                  <Text
-                    color={isActive ? theme.status.success : theme.text.primary}
-                  >
-                    {item.label}
-                    {scopeMessage && (
-                      <Text color={theme.text.secondary}> {scopeMessage}</Text>
-                    )}
-                  </Text>
-                </Box>
-                <Box minWidth={3} />
-                <Text
-                  color={
-                    isActive
-                      ? theme.status.success
-                      : shouldBeGreyedOut
-                        ? theme.text.secondary
-                        : theme.text.primary
-                  }
-                >
-                  {displayValue}
-                </Text>
-              </Box>
-              <Box height={1} />
-            </React.Fragment>
-          );
-        })}
-        {showScrollDown && <Text color={theme.text.secondary}>▼</Text>}
+              return (
+                <React.Fragment key={item.value}>
+                  <Box flexDirection="row" alignItems="center">
+                    <Box minWidth={2} flexShrink={0}>
+                      <Text
+                        color={
+                          isActive ? theme.status.success : theme.text.secondary
+                        }
+                      >
+                        {isActive ? '●' : ''}
+                      </Text>
+                    </Box>
+                    <Box minWidth={50}>
+                      <Text
+                        color={
+                          isActive ? theme.status.success : theme.text.primary
+                        }
+                      >
+                        {item.label}
+                        {scopeMessage && (
+                          <Text color={theme.text.secondary}>
+                            {' '}
+                            {scopeMessage}
+                          </Text>
+                        )}
+                      </Text>
+                    </Box>
+                    <Box minWidth={3} />
+                    <Text
+                      color={
+                        isActive
+                          ? theme.status.success
+                          : shouldBeGreyedOut
+                            ? theme.text.secondary
+                            : theme.text.primary
+                      }
+                    >
+                      {displayValue}
+                    </Text>
+                  </Box>
+                  <Box height={1} />
+                </React.Fragment>
+              );
+            })}
+            {showScrollDown && <Text color={theme.text.secondary}>▼</Text>}
+          </>
+        )}
 
         <Box height={1} />
 
