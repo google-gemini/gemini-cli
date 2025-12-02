@@ -310,6 +310,19 @@ describe('extension tests', () => {
       expect(extensions[0].mcpServers?.['test-server'].cwd).toBe(expectedCwd);
     });
 
+    it('should load includeDirectories from extension config', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'test-extension',
+        version: '1.0.0',
+        includeDirectories: ['/extension/dir'],
+      });
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].includeDirectories).toEqual(['/extension/dir']);
+    });
+
     it('should load a linked extension correctly', async () => {
       const sourceExtDir = createExtension({
         extensionsDir: tempWorkspaceDir,

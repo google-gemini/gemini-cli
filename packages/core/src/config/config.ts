@@ -143,6 +143,7 @@ export interface GeminiCLIExtension {
   excludeTools?: string[];
   id: string;
   hooks?: { [K in HookEventName]?: HookDefinition[] };
+  includeDirectories?: string[];
 }
 
 export interface ExtensionInstallMetadata {

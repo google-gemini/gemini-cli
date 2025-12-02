@@ -14,6 +14,7 @@ import {
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
+  type GeminiCLIExtension,
   type ExtensionLoader,
   debugLogger,
 } from '@google/gemini-cli-core';
@@ -88,8 +89,12 @@ vi.mock('@google/gemini-cli-core', async () => {
   const actualServer = await vi.importActual<typeof ServerConfig>(
     '@google/gemini-cli-core',
   );
+  const actualConfig = await vi.importActual<
+    typeof import('../../../core/src/config/config.js')
+  >('../../../core/src/config/config.js');
   return {
     ...actualServer,
+    Config: actualConfig.Config,
     IdeClient: {
       getInstance: vi.fn().mockResolvedValue({
         getConnectionStatus: vi.fn(),
@@ -97,6 +102,13 @@ vi.mock('@google/gemini-cli-core', async () => {
         shutdown: vi.fn(),
       }),
     },
+    EDITOR_DISPLAY_NAMES: {
+      vim: 'Vim',
+      nano: 'Nano',
+    },
+    checkHasEditorType: vi.fn().mockReturnValue(true),
+    allowEditorTypeInSandbox: vi.fn().mockReturnValue(true),
+    logExtensionEnable: vi.fn(),
     loadEnvironment: vi.fn(),
     loadServerHierarchicalMemory: vi.fn(
       (
@@ -1444,6 +1456,30 @@ describe('loadCliConfig with includeDirectories', () => {
     expect(config.getPendingIncludeDirectories()).toHaveLength(
       expected.length - 1,
     );
+  });
+
+  it('should include directories from active extensions', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+
+    const mockExtension = {
+      name: 'test-extension',
+      version: '1.0.0',
+      isActive: true,
+      path: '/path/to/extension',
+      id: 'test-extension-id',
+      contextFiles: [],
+      includeDirectories: ['/extension/dir'],
+    } as unknown as GeminiCLIExtension;
+
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
+      mockExtension,
+    ]);
+
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    const pendingDirs = config.getPendingIncludeDirectories();
+    expect(pendingDirs).toContain(path.resolve('/extension/dir'));
   });
 });
 

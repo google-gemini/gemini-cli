@@ -152,7 +152,9 @@ The file has the following structure:
     }
   },
   "contextFileName": "GEMINI.md",
-  "excludeTools": ["run_shell_command"]
+  "contextFileName": "GEMINI.md",
+  "excludeTools": ["run_shell_command"],
+  "includeDirectories": ["/path/to/include"]
 }
 ```
 
@@ -181,6 +183,9 @@ The file has the following structure:
   `"excludeTools": ["run_shell_command(rm -rf)"]` will block the `rm -rf`
   command. Note that this differs from the MCP server `excludeTools`
   functionality, which can be listed in the MCP server config.
+- `includeDirectories`: An array of directories to include in the context. These
+  directories will be added to the CLI's `includeDirectories` setting when the
+  extension is active.
 
 When Gemini CLI starts, it loads all the extensions and merges their
 configurations. If there are any conflicts, the workspace configuration takes
