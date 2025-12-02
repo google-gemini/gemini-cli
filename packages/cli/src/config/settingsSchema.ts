@@ -1310,6 +1310,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable model routing using new availability service.',
         showInDialog: false,
       },
+      jitContext: {
+        type: 'boolean',
+        label: 'JIT Context Loading',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable Just-In-Time (JIT) context loading.',
+        showInDialog: false,
+      },
       codebaseInvestigatorSettings: {
         type: 'object',
         label: 'Codebase Investigator Settings',
