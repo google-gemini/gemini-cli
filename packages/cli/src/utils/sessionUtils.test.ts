@@ -9,6 +9,7 @@ import {
   SessionSelector,
   extractFirstUserMessage,
   formatRelativeTime,
+  hasUserOrAssistantMessage,
 } from './sessionUtils.js';
 import type { Config, MessageRecord } from '@google/gemini-cli-core';
 import { SESSION_FILE_PREFIX } from '@google/gemini-cli-core';
@@ -338,6 +339,114 @@ describe('SessionSelector', () => {
       'Invalid session identifier "999"',
     );
   });
+
+  it('should not list sessions with only system messages', async () => {
+    const sessionIdWithUser = randomUUID();
+    const sessionIdSystemOnly = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    // Session with user message - should be listed
+    const sessionWithUser = {
+      sessionId: sessionIdWithUser,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Hello world',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    // Session with only system messages - should NOT be listed
+    const sessionSystemOnly = {
+      sessionId: sessionIdSystemOnly,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T11:00:00.000Z',
+      lastUpdated: '2024-01-01T11:30:00.000Z',
+      messages: [
+        {
+          type: 'info',
+          content: 'Session started',
+          id: 'msg1',
+          timestamp: '2024-01-01T11:00:00.000Z',
+        },
+        {
+          type: 'error',
+          content: 'An error occurred',
+          id: 'msg2',
+          timestamp: '2024-01-01T11:01:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionIdWithUser.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionWithUser, null, 2),
+    );
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionIdSystemOnly.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionSystemOnly, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+    const sessions = await sessionSelector.listSessions();
+
+    // Should only list the session with user message
+    expect(sessions.length).toBe(1);
+    expect(sessions[0].id).toBe(sessionIdWithUser);
+  });
+
+  it('should list session with gemini message even without user message', async () => {
+    const sessionIdGeminiOnly = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    // Session with only gemini message - should be listed
+    const sessionGeminiOnly = {
+      sessionId: sessionIdGeminiOnly,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'gemini',
+          content: 'Hello, how can I help?',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionIdGeminiOnly.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionGeminiOnly, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+    const sessions = await sessionSelector.listSessions();
+
+    expect(sessions.length).toBe(1);
+    expect(sessions[0].id).toBe(sessionIdGeminiOnly);
+  });
 });
 
 describe('extractFirstUserMessage', () => {
@@ -386,6 +495,147 @@ describe('extractFirstUserMessage', () => {
     ] as MessageRecord[];
 
     expect(extractFirstUserMessage(messages)).toBe('Empty conversation');
+  });
+});
+
+describe('hasUserOrAssistantMessage', () => {
+  it('should return true when session has user message', () => {
+    const messages = [
+      {
+        type: 'user',
+        content: 'Hello',
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      },
+    ] as MessageRecord[];
+
+    expect(hasUserOrAssistantMessage(messages)).toBe(true);
+  });
+
+  it('should return true when session has gemini message', () => {
+    const messages = [
+      {
+        type: 'gemini',
+        content: 'Hello, how can I help?',
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      },
+    ] as MessageRecord[];
+
+    expect(hasUserOrAssistantMessage(messages)).toBe(true);
+  });
+
+  it('should return true when session has both user and gemini messages', () => {
+    const messages = [
+      {
+        type: 'user',
+        content: 'Hello',
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      },
+      {
+        type: 'gemini',
+        content: 'Hi there!',
+        id: 'msg2',
+        timestamp: '2024-01-01T10:01:00.000Z',
+      },
+    ] as MessageRecord[];
+
+    expect(hasUserOrAssistantMessage(messages)).toBe(true);
+  });
+
+  it('should return false when session only has info messages', () => {
+    const messages = [
+      {
+        type: 'info',
+        content: 'Session started',
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      },
+    ] as MessageRecord[];
+
+    expect(hasUserOrAssistantMessage(messages)).toBe(false);
+  });
+
+  it('should return false when session only has error messages', () => {
+    const messages = [
+      {
+        type: 'error',
+        content: 'An error occurred',
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      },
+    ] as MessageRecord[];
+
+    expect(hasUserOrAssistantMessage(messages)).toBe(false);
+  });
+
+  it('should return false when session only has warning messages', () => {
+    const messages = [
+      {
+        type: 'warning',
+        content: 'Warning message',
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      },
+    ] as MessageRecord[];
+
+    expect(hasUserOrAssistantMessage(messages)).toBe(false);
+  });
+
+  it('should return false when session only has system messages (mixed)', () => {
+    const messages = [
+      {
+        type: 'info',
+        content: 'Session started',
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      },
+      {
+        type: 'error',
+        content: 'An error occurred',
+        id: 'msg2',
+        timestamp: '2024-01-01T10:01:00.000Z',
+      },
+      {
+        type: 'warning',
+        content: 'Warning message',
+        id: 'msg3',
+        timestamp: '2024-01-01T10:02:00.000Z',
+      },
+    ] as MessageRecord[];
+
+    expect(hasUserOrAssistantMessage(messages)).toBe(false);
+  });
+
+  it('should return true when session has user message among system messages', () => {
+    const messages = [
+      {
+        type: 'info',
+        content: 'Session started',
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      },
+      {
+        type: 'user',
+        content: 'Hello',
+        id: 'msg2',
+        timestamp: '2024-01-01T10:01:00.000Z',
+      },
+      {
+        type: 'error',
+        content: 'An error occurred',
+        id: 'msg3',
+        timestamp: '2024-01-01T10:02:00.000Z',
+      },
+    ] as MessageRecord[];
+
+    expect(hasUserOrAssistantMessage(messages)).toBe(true);
+  });
+
+  it('should return false for empty messages array', () => {
+    const messages: MessageRecord[] = [];
+    expect(hasUserOrAssistantMessage(messages)).toBe(false);
   });
 });
 
