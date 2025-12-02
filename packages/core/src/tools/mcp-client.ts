@@ -23,6 +23,7 @@ import type {
 } from '@modelcontextprotocol/sdk/types.js';
 import {
   ListRootsRequestSchema,
+  ToolListChangedNotificationSchema,
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
@@ -100,7 +101,9 @@ export class McpClient {
     private readonly toolRegistry: ToolRegistry,
     private readonly promptRegistry: PromptRegistry,
     private readonly workspaceContext: WorkspaceContext,
+    private readonly cliConfig: Config,
     private readonly debugMode: boolean,
+    private readonly onToolsUpdated?: () => Promise<void>,
   ) {}
 
   /**
@@ -120,6 +123,25 @@ export class McpClient {
         this.debugMode,
         this.workspaceContext,
       );
+
+      // setup dynamic tool listener
+      const capabilities = this.client.getServerCapabilities();
+
+      if (capabilities?.tools?.listChanged) {
+        debugLogger.log(
+          `Server '${this.serverName}' supports tool updates. Listening for changes...`,
+        );
+
+        this.client.setNotificationHandler(
+          ToolListChangedNotificationSchema,
+          async () => {
+            debugLogger.log(
+              `🔔 Received tool update notification from '${this.serverName}'`,
+            );
+            await this.refreshTools();
+          },
+        );
+      }
       const originalOnError = this.client.onerror;
       this.client.onerror = (error) => {
         if (this.status !== MCPServerStatus.CONNECTED) {
@@ -222,6 +244,37 @@ export class McpClient {
 
   getInstructions(): string | undefined {
     return this.client?.getInstructions();
+  }
+
+  // Logic to purge and re-add tools
+  private async refreshTools(): Promise<void> {
+    try {
+      if (this.status !== MCPServerStatus.CONNECTED || !this.client) return;
+
+      this.toolRegistry.removeMcpToolsByServer(this.serverName);
+
+      // Re-fetch tools using existing discovery logic
+      const tools = await this.discoverTools(this.cliConfig);
+
+      for (const tool of tools) {
+        this.toolRegistry.registerTool(tool);
+      }
+      this.toolRegistry.sortTools();
+
+      // Notify the Manager (to update Gemini Context)
+      if (this.onToolsUpdated) {
+        await this.onToolsUpdated();
+      }
+
+      coreEvents.emitFeedback(
+        'info',
+        `Tools updated for server: ${this.serverName}`,
+      );
+    } catch (error) {
+      debugLogger.error(
+        `Failed to refresh tools for ${this.serverName}: ${getErrorMessage(error)}`,
+      );
+    }
   }
 }
 
