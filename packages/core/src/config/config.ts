@@ -48,8 +48,8 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
   DEFAULT_THINKING_MODE,
+  GEMINI_MODEL_ALIAS_PRO,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -573,7 +573,8 @@ export class Config {
       thinkingBudget:
         params.codebaseInvestigatorSettings?.thinkingBudget ??
         DEFAULT_THINKING_MODE,
-      model: params.codebaseInvestigatorSettings?.model ?? DEFAULT_GEMINI_MODEL,
+      model:
+        params.codebaseInvestigatorSettings?.model ?? GEMINI_MODEL_ALIAS_PRO,
     };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
