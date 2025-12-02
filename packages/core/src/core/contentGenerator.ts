@@ -184,6 +184,17 @@ export async function createContentGenerator(
         },
       };
 
+      // Debug logging
+      console.error('[DEBUG] Creating GoogleGenAI with:');
+      console.error('[DEBUG] vertexai:', config.vertexai);
+      console.error('[DEBUG] project:', config.project);
+      console.error('[DEBUG] location:', config.location);
+      console.error('[DEBUG] httpOptions.baseUrl:', httpOptions.baseUrl);
+      console.error(
+        '[DEBUG] httpOptions.headers:',
+        JSON.stringify(httpOptions.headers, null, 2),
+      );
+
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
         vertexai: config.vertexai,

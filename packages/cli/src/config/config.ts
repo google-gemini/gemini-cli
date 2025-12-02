@@ -323,10 +323,12 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     } else {
       result['prompt'] = q;
     }
+    // Clear query since it's been moved to prompt/promptInteractive
+    (result as Record<string, unknown>)['query'] = undefined;
+  } else {
+    // Keep CliArgs.query as a string for downstream typing
+    (result as Record<string, unknown>)['query'] = q || undefined;
   }
-
-  // Keep CliArgs.query as a string for downstream typing
-  (result as Record<string, unknown>)['query'] = q || undefined;
 
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument
