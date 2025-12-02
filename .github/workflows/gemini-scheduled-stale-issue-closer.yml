@@ -54,11 +54,11 @@ jobs:
             const threeMonthsAgo = new Date();
             threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
-            const fourteenDaysAgo = new Date();
-            fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+            const tenDaysAgo = new Date();
+            tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
 
             core.info(`Cutoff date for creation (3 months ago): ${threeMonthsAgo.toISOString()}`);
-            core.info(`Cutoff date for updates (14 days ago): ${fourteenDaysAgo.toISOString()}`);
+            core.info(`Cutoff date for updates (10 days ago): ${tenDaysAgo.toISOString()}`);
 
             // 2. Fetch all open issues (Limited to 100 for debugging)
             const opts = github.rest.issues.listForRepo.endpoint.merge({
