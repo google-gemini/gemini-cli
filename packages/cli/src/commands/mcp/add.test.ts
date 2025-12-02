@@ -4,10 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, type Mock } from 'vitest';
+import { describe, it, expect, vi, type Mock, type MockInstance } from 'vitest';
 import yargs, { type Argv } from 'yargs';
 import { addCommand } from './add.js';
 import { loadSettings, SettingScope } from '../../config/settings.js';
+import { debugLogger } from '@google/gemini-cli-core';
+
+vi.mock('../utils.js', () => ({
+  exitCli: vi.fn(),
+}));
 
 vi.mock('fs/promises', () => ({
   readFile: vi.fn(),
@@ -38,6 +43,7 @@ describe('mcp add command', () => {
   let parser: Argv;
   let mockSetValue: Mock;
   let mockConsoleError: Mock;
+  let debugLoggerErrorSpy: MockInstance;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -45,6 +51,9 @@ describe('mcp add command', () => {
     parser = yargsInstance;
     mockSetValue = vi.fn();
     mockConsoleError = vi.fn();
+    debugLoggerErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(mockConsoleError);
     mockedLoadSettings.mockReturnValue({
       forScope: () => ({ settings: {} }),
@@ -232,7 +241,7 @@ describe('mcp add command', () => {
           parser.parseAsync(`add ${serverName} ${command}`),
         ).rejects.toThrow('process.exit called');
 
-        expect(mockConsoleError).toHaveBeenCalledWith(
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
           'Error: Please use --scope user to edit settings in the home directory.',
         );
         expect(mockProcessExit).toHaveBeenCalledWith(1);
@@ -250,7 +259,7 @@ describe('mcp add command', () => {
           parser.parseAsync(`add --scope project ${serverName} ${command}`),
         ).rejects.toThrow('process.exit called');
 
-        expect(mockConsoleError).toHaveBeenCalledWith(
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
           'Error: Please use --scope user to edit settings in the home directory.',
         );
         expect(mockProcessExit).toHaveBeenCalledWith(1);
@@ -264,7 +273,7 @@ describe('mcp add command', () => {
           'mcpServers',
           expect.any(Object),
         );
-        expect(mockConsoleError).not.toHaveBeenCalled();
+        expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
       });
     });
 

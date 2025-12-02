@@ -29,8 +29,10 @@ import * as path from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { isKittyProtocolEnabled } from './kittyProtocolDetector.js';
-import { VSCODE_SHIFT_ENTER_SEQUENCE } from './platformConstants.js';
+
 import { debugLogger } from '@google/gemini-cli-core';
+
+export const VSCODE_SHIFT_ENTER_SEQUENCE = '\\\r\n';
 
 const execAsync = promisify(exec);
 
@@ -51,8 +53,7 @@ export interface TerminalSetupResult {
 
 type SupportedTerminal = 'vscode' | 'cursor' | 'windsurf';
 
-// Terminal detection
-async function detectTerminal(): Promise<SupportedTerminal | null> {
+export function getTerminalProgram(): SupportedTerminal | null {
   const termProgram = process.env['TERM_PROGRAM'];
 
   // Check VS Code and its forks - check forks first to avoid false positives
@@ -72,6 +73,15 @@ async function detectTerminal(): Promise<SupportedTerminal | null> {
   // Check VS Code last since forks may also set VSCODE env vars
   if (termProgram === 'vscode' || process.env['VSCODE_GIT_IPC_HANDLE']) {
     return 'vscode';
+  }
+  return null;
+}
+
+// Terminal detection
+async function detectTerminal(): Promise<SupportedTerminal | null> {
+  const envTerminal = getTerminalProgram();
+  if (envTerminal) {
+    return envTerminal;
   }
 
   // Check parent process name
@@ -194,35 +204,6 @@ async function configureVSCodeStyle(
       args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
     };
 
-    // Check if ANY shift+enter or ctrl+enter bindings already exist
-    const existingShiftEnter = keybindings.find((kb) => {
-      const binding = kb as { key?: string };
-      return binding.key === 'shift+enter';
-    });
-
-    const existingCtrlEnter = keybindings.find((kb) => {
-      const binding = kb as { key?: string };
-      return binding.key === 'ctrl+enter';
-    });
-
-    if (existingShiftEnter || existingCtrlEnter) {
-      const messages: string[] = [];
-      if (existingShiftEnter) {
-        messages.push(`- Shift+Enter binding already exists`);
-      }
-      if (existingCtrlEnter) {
-        messages.push(`- Ctrl+Enter binding already exists`);
-      }
-      return {
-        success: false,
-        message:
-          `Existing keybindings detected. Will not modify to avoid conflicts.\n` +
-          messages.join('\n') +
-          '\n' +
-          `Please check and modify manually if needed: ${keybindingsFile}`,
-      };
-    }
-
     // Check if our specific bindings already exist
     const hasOurShiftEnter = keybindings.some((kb) => {
       const binding = kb as {
@@ -250,22 +231,55 @@ async function configureVSCodeStyle(
       );
     });
 
-    if (!hasOurShiftEnter || !hasOurCtrlEnter) {
-      if (!hasOurShiftEnter) keybindings.unshift(shiftEnterBinding);
-      if (!hasOurCtrlEnter) keybindings.unshift(ctrlEnterBinding);
-
-      await fs.writeFile(keybindingsFile, JSON.stringify(keybindings, null, 4));
-      return {
-        success: true,
-        message: `Added Shift+Enter and Ctrl+Enter keybindings to ${terminalName}.\nModified: ${keybindingsFile}`,
-        requiresRestart: true,
-      };
-    } else {
+    if (hasOurShiftEnter && hasOurCtrlEnter) {
       return {
         success: true,
         message: `${terminalName} keybindings already configured.`,
       };
     }
+
+    // Check if ANY shift+enter or ctrl+enter bindings already exist (that are NOT ours)
+    const existingShiftEnter = keybindings.find((kb) => {
+      const binding = kb as { key?: string };
+      return binding.key === 'shift+enter';
+    });
+
+    const existingCtrlEnter = keybindings.find((kb) => {
+      const binding = kb as { key?: string };
+      return binding.key === 'ctrl+enter';
+    });
+
+    if (existingShiftEnter || existingCtrlEnter) {
+      const messages: string[] = [];
+      // Only report conflict if it's not our binding (though we checked above, partial matches might exist)
+      if (existingShiftEnter && !hasOurShiftEnter) {
+        messages.push(`- Shift+Enter binding already exists`);
+      }
+      if (existingCtrlEnter && !hasOurCtrlEnter) {
+        messages.push(`- Ctrl+Enter binding already exists`);
+      }
+
+      if (messages.length > 0) {
+        return {
+          success: false,
+          message:
+            `Existing keybindings detected. Will not modify to avoid conflicts.\n` +
+            messages.join('\n') +
+            '\n' +
+            `Please check and modify manually if needed: ${keybindingsFile}`,
+        };
+      }
+    }
+
+    if (!hasOurShiftEnter) keybindings.unshift(shiftEnterBinding);
+    if (!hasOurCtrlEnter) keybindings.unshift(ctrlEnterBinding);
+
+    await fs.writeFile(keybindingsFile, JSON.stringify(keybindings, null, 4));
+    return {
+      success: true,
+      message: `Added Shift+Enter and Ctrl+Enter keybindings to ${terminalName}.\nModified: ${keybindingsFile}`,
+      requiresRestart: true,
+    };
   } catch (error) {
     return {
       success: false,

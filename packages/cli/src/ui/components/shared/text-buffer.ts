@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import pathMod from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
-import { unescapePath } from '@google/gemini-cli-core';
+import { unescapePath, coreEvents, CoreEvent } from '@google/gemini-cli-core';
 import {
   toCodePoints,
   cpLen,
@@ -17,12 +17,14 @@ import {
   stripUnsafeCharacters,
   getCachedStringWidth,
 } from '../../utils/textUtils.js';
+import type { Key } from '../../contexts/KeypressContext.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { findPlaceholderCandidates } from '../../utils/parse.js';
 
 // When the pasted content is larger than this threshold, it will be inserted as a placeholder
 const LARGE_PASTE_CHAR_THRESHOLD = 1000;
+import { enableSupportedProtocol } from '../../utils/kittyProtocolDetector.js';
 
 export type Direction =
   | 'left'
@@ -860,7 +862,7 @@ export interface TextBufferState {
   lines: string[];
   cursorRow: number;
   cursorCol: number;
-  preferredCol: number | null; // This is visual preferred col
+  preferredCol: number | null; // This is the logical character offset in the visual line
   undoStack: UndoHistoryEntry[];
   redoStack: UndoHistoryEntry[];
   clipboard: string | null;
@@ -2011,6 +2013,8 @@ export function useTextBuffer({
       } catch (err) {
         console.error('[useTextBuffer] external editor error', err);
       } finally {
+        enableSupportedProtocol();
+        coreEvents.emit(CoreEvent.ExternalEditorClosed);
         if (wasRaw) setRawMode?.(true);
         try {
           fs.unlinkSync(filePath);
@@ -2028,14 +2032,7 @@ export function useTextBuffer({
   );
 
   const handleInput = useCallback(
-    (key: {
-      name: string;
-      ctrl: boolean;
-      meta: boolean;
-      shift: boolean;
-      paste: boolean;
-      sequence: string;
-    }): void => {
+    (key: Key): void => {
       const { sequence: input } = key;
 
       if (key.paste) {
@@ -2093,7 +2090,7 @@ export function useTextBuffer({
       } else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
       else if (key.ctrl && !key.shift && key.name === 'z') undo();
       else if (key.ctrl && key.shift && key.name === 'z') redo();
-      else if (input && !key.ctrl && !key.meta && key.name !== 'tab') {
+      else if (key.insertable) {
         insert(input, { paste: key.paste });
       }
     },
@@ -2188,6 +2185,61 @@ export function useTextBuffer({
     [state.pendingPastes],
   );
 
+  const moveToVisualPosition = useCallback(
+    (visRow: number, visCol: number): void => {
+      const { visualLines, visualToLogicalMap } = visualLayout;
+      // Clamp visRow to valid range
+      const clampedVisRow = Math.max(
+        0,
+        Math.min(visRow, visualLines.length - 1),
+      );
+      const visualLine = visualLines[clampedVisRow] || '';
+
+      if (visualToLogicalMap[clampedVisRow]) {
+        const [logRow, logStartCol] = visualToLogicalMap[clampedVisRow];
+
+        const codePoints = toCodePoints(visualLine);
+        let currentVisX = 0;
+        let charOffset = 0;
+
+        for (const char of codePoints) {
+          const charWidth = getCachedStringWidth(char);
+          // If the click is within this character
+          if (visCol < currentVisX + charWidth) {
+            // Check if we clicked the second half of a wide character
+            if (charWidth > 1 && visCol >= currentVisX + charWidth / 2) {
+              charOffset++;
+            }
+            break;
+          }
+          currentVisX += charWidth;
+          charOffset++;
+        }
+
+        // Clamp charOffset to length
+        charOffset = Math.min(charOffset, codePoints.length);
+
+        const newCursorRow = logRow;
+        const newCursorCol = logStartCol + charOffset;
+
+        dispatch({
+          type: 'set_cursor',
+          payload: {
+            cursorRow: newCursorRow,
+            cursorCol: newCursorCol,
+            preferredCol: charOffset,
+          },
+        });
+      }
+    },
+    [visualLayout],
+  );
+
+  const getOffset = useCallback(
+    (): number => logicalPosToOffset(lines, cursorRow, cursorCol),
+    [lines, cursorRow, cursorCol],
+  );
+
   const returnValue: TextBuffer = useMemo(
     () => ({
       lines,
@@ -2216,6 +2268,8 @@ export function useTextBuffer({
       replaceRange,
       replaceRangeByOffset,
       moveToOffset,
+      getOffset,
+      moveToVisualPosition,
       deleteWordLeft,
       deleteWordRight,
 
@@ -2279,6 +2333,8 @@ export function useTextBuffer({
       replaceRange,
       replaceRangeByOffset,
       moveToOffset,
+      getOffset,
+      moveToVisualPosition,
       deleteWordLeft,
       deleteWordRight,
       killLineRight,
@@ -2421,14 +2477,7 @@ export interface TextBuffer {
   /**
    * High level "handleInput" – receives what Ink gives us.
    */
-  handleInput: (key: {
-    name: string;
-    ctrl: boolean;
-    meta: boolean;
-    shift: boolean;
-    paste: boolean;
-    sequence: string;
-  }) => void;
+  handleInput: (key: Key) => void;
   /**
    * Opens the current buffer contents in the user's preferred terminal text
    * editor ($VISUAL or $EDITOR, falling back to "vi").  The method blocks
@@ -2451,7 +2500,9 @@ export interface TextBuffer {
     endOffset: number,
     replacementText: string,
   ) => void;
+  getOffset: () => number;
   moveToOffset(offset: number): void;
+  moveToVisualPosition(visualRow: number, visualCol: number): void;
 
   // Vim-specific operations
   /**

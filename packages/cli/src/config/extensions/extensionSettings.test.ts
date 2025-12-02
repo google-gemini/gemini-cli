@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import {
+  getEnvContents,
   maybePromptForSettings,
   promptForSetting,
   type ExtensionSetting,
@@ -188,6 +189,83 @@ describe('extensionSettings', () => {
       expect(actualContent).toBe(expectedContent);
     });
 
+    it('should clear settings if new config has no settings', async () => {
+      const previousConfig: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [
+          { name: 's1', description: 'd1', envVar: 'VAR1' },
+          {
+            name: 's2',
+            description: 'd2',
+            envVar: 'SENSITIVE_VAR',
+            sensitive: true,
+          },
+        ],
+      };
+      const newConfig: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [],
+      };
+      const previousSettings = {
+        VAR1: 'previous-VAR1',
+        SENSITIVE_VAR: 'secret',
+      };
+      keychainData['SENSITIVE_VAR'] = 'secret';
+      const envPath = path.join(extensionDir, '.env');
+      await fsPromises.writeFile(envPath, 'VAR1=previous-VAR1');
+
+      await maybePromptForSettings(
+        newConfig,
+        '12345',
+        mockRequestSetting,
+        previousConfig,
+        previousSettings,
+      );
+
+      expect(mockRequestSetting).not.toHaveBeenCalled();
+      const actualContent = await fsPromises.readFile(envPath, 'utf-8');
+      expect(actualContent).toBe('');
+      expect(mockKeychainStorage.deleteSecret).toHaveBeenCalledWith(
+        'SENSITIVE_VAR',
+      );
+    });
+
+    it('should remove sensitive settings from keychain', async () => {
+      const previousConfig: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [
+          {
+            name: 's1',
+            description: 'd1',
+            envVar: 'SENSITIVE_VAR',
+            sensitive: true,
+          },
+        ],
+      };
+      const newConfig: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [],
+      };
+      const previousSettings = { SENSITIVE_VAR: 'secret' };
+      keychainData['SENSITIVE_VAR'] = 'secret';
+
+      await maybePromptForSettings(
+        newConfig,
+        '12345',
+        mockRequestSetting,
+        previousConfig,
+        previousSettings,
+      );
+
+      expect(mockKeychainStorage.deleteSecret).toHaveBeenCalledWith(
+        'SENSITIVE_VAR',
+      );
+    });
+
     it('should remove settings that are no longer in the config', async () => {
       const previousConfig: ExtensionConfig = {
         name: 'test-ext',
@@ -296,60 +374,112 @@ describe('extensionSettings', () => {
   });
 
   describe('promptForSetting', () => {
-    it('should use prompts with type "password" for sensitive settings', async () => {
-      const setting: ExtensionSetting = {
-        name: 'API Key',
-        description: 'Your secret key',
-        envVar: 'API_KEY',
-        sensitive: true,
-      };
-      vi.mocked(prompts).mockResolvedValue({ value: 'secret-key' });
+    it.each([
+      {
+        description:
+          'should use prompts with type "password" for sensitive settings',
+        setting: {
+          name: 'API Key',
+          description: 'Your secret key',
+          envVar: 'API_KEY',
+          sensitive: true,
+        },
+        expectedType: 'password',
+        promptValue: 'secret-key',
+      },
+      {
+        description:
+          'should use prompts with type "text" for non-sensitive settings',
+        setting: {
+          name: 'Username',
+          description: 'Your public username',
+          envVar: 'USERNAME',
+          sensitive: false,
+        },
+        expectedType: 'text',
+        promptValue: 'test-user',
+      },
+      {
+        description: 'should default to "text" if sensitive is undefined',
+        setting: {
+          name: 'Username',
+          description: 'Your public username',
+          envVar: 'USERNAME',
+        },
+        expectedType: 'text',
+        promptValue: 'test-user',
+      },
+    ])('$description', async ({ setting, expectedType, promptValue }) => {
+      vi.mocked(prompts).mockResolvedValue({ value: promptValue });
 
-      const result = await promptForSetting(setting);
+      const result = await promptForSetting(setting as ExtensionSetting);
 
       expect(prompts).toHaveBeenCalledWith({
-        type: 'password',
+        type: expectedType,
         name: 'value',
-        message: 'API Key\nYour secret key',
+        message: `${setting.name}\n${setting.description}`,
       });
-      expect(result).toBe('secret-key');
+      expect(result).toBe(promptValue);
     });
 
-    it('should use prompts with type "text" for non-sensitive settings', async () => {
-      const setting: ExtensionSetting = {
-        name: 'Username',
-        description: 'Your public username',
-        envVar: 'USERNAME',
-        // sensitive: false,
-      };
-      vi.mocked(prompts).mockResolvedValue({ value: 'test-user' });
-
-      const result = await promptForSetting(setting);
-
-      expect(prompts).toHaveBeenCalledWith({
-        type: 'text',
-        name: 'value',
-        message: 'Username\nYour public username',
+    it('should return undefined if the user cancels the prompt', async () => {
+      vi.mocked(prompts).mockResolvedValue({ value: undefined });
+      const result = await promptForSetting({
+        name: 'Test',
+        description: 'Test desc',
+        envVar: 'TEST_VAR',
       });
-      expect(result).toBe('test-user');
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('getEnvContents', () => {
+    const config: ExtensionConfig = {
+      name: 'test-ext',
+      version: '1.0.0',
+      settings: [
+        { name: 's1', description: 'd1', envVar: 'VAR1' },
+        {
+          name: 's2',
+          description: 'd2',
+          envVar: 'SENSITIVE_VAR',
+          sensitive: true,
+        },
+      ],
+    };
+
+    it('should return combined contents from .env and keychain', async () => {
+      const envPath = path.join(extensionDir, '.env');
+      await fsPromises.writeFile(envPath, 'VAR1=value1');
+      keychainData['SENSITIVE_VAR'] = 'secret';
+
+      const contents = await getEnvContents(config, '12345');
+
+      expect(contents).toEqual({
+        VAR1: 'value1',
+        SENSITIVE_VAR: 'secret',
+      });
     });
 
-    it('should default to "text" if sensitive is undefined', async () => {
-      const setting: ExtensionSetting = {
-        name: 'Username',
-        description: 'Your public username',
-        envVar: 'USERNAME',
-      };
-      vi.mocked(prompts).mockResolvedValue({ value: 'test-user' });
+    it('should return an empty object if no settings are defined', async () => {
+      const contents = await getEnvContents(
+        { name: 'test-ext', version: '1.0.0' },
+        '12345',
+      );
+      expect(contents).toEqual({});
+    });
 
-      const result = await promptForSetting(setting);
+    it('should return only keychain contents if .env file does not exist', async () => {
+      keychainData['SENSITIVE_VAR'] = 'secret';
+      const contents = await getEnvContents(config, '12345');
+      expect(contents).toEqual({ SENSITIVE_VAR: 'secret' });
+    });
 
-      expect(prompts).toHaveBeenCalledWith({
-        type: 'text',
-        name: 'value',
-        message: 'Username\nYour public username',
-      });
-      expect(result).toBe('test-user');
+    it('should return only .env contents if keychain is empty', async () => {
+      const envPath = path.join(extensionDir, '.env');
+      await fsPromises.writeFile(envPath, 'VAR1=value1');
+      const contents = await getEnvContents(config, '12345');
+      expect(contents).toEqual({ VAR1: 'value1' });
     });
   });
 });

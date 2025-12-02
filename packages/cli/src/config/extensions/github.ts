@@ -84,12 +84,27 @@ export interface GithubRepoInfo {
 }
 
 export function tryParseGithubUrl(source: string): GithubRepoInfo | null {
-  // First step in normalizing a github ssh URI to the https form.
-  if (source.startsWith('git@github.com:')) {
-    source = source.replace('git@github.com:', '');
+  // Handle SCP-style SSH URLs.
+  if (source.startsWith('git@')) {
+    if (source.startsWith('git@github.com:')) {
+      // It's a GitHub SSH URL, so normalize it for the URL parser.
+      source = source.replace('git@github.com:', '');
+    } else {
+      // It's another provider's SSH URL (e.g., gitlab), so not a GitHub repo.
+      return null;
+    }
   }
   // Default to a github repo path, so `source` can be just an org/repo
-  const parsedUrl = URL.parse(source, 'https://github.com');
+  let parsedUrl: URL;
+  try {
+    // Use the standard URL constructor for backward compatibility.
+    parsedUrl = new URL(source, 'https://github.com');
+  } catch (e) {
+    // Throw a TypeError to maintain a consistent error contract for invalid URLs.
+    // This avoids a breaking change for consumers who might expect a TypeError.
+    throw new TypeError(`Invalid repo URL: ${source}`, { cause: e });
+  }
+
   if (!parsedUrl) {
     throw new Error(`Invalid repo URL: ${source}`);
   }
@@ -123,7 +138,7 @@ export async function fetchReleaseFromGithub(
   allowPreRelease?: boolean,
 ): Promise<GithubReleaseData | null> {
   if (ref) {
-    return await fetchJson(
+    return fetchJson(
       `https://api.github.com/repos/${owner}/${repo}/releases/tags/${ref}`,
     );
   }
@@ -306,8 +321,11 @@ export async function downloadFromGitHubRelease(
     let archiveUrl: string | undefined;
     let isTar = false;
     let isZip = false;
+    let fileName: string | undefined;
+
     if (asset) {
-      archiveUrl = asset.browser_download_url;
+      archiveUrl = asset.url;
+      fileName = asset.name;
     } else {
       if (releaseData.tarball_url) {
         archiveUrl = releaseData.tarball_url;
@@ -326,10 +344,10 @@ export async function downloadFromGitHubRelease(
         errorMessage: `No assets found for release with tag ${releaseData.tag_name}`,
       };
     }
-    let downloadedAssetPath = path.join(
-      destination,
-      path.basename(new URL(archiveUrl).pathname),
-    );
+    if (!fileName) {
+      fileName = path.basename(new URL(archiveUrl).pathname);
+    }
+    let downloadedAssetPath = path.join(destination, fileName);
     if (isTar && !downloadedAssetPath.endsWith('.tar.gz')) {
       downloadedAssetPath += '.tar.gz';
     } else if (isZip && !downloadedAssetPath.endsWith('.zip')) {
@@ -414,7 +432,7 @@ interface GithubReleaseData {
 
 interface Asset {
   name: string;
-  browser_download_url: string;
+  url: string;
 }
 
 export function findReleaseAsset(assets: Asset[]): Asset | undefined {
@@ -454,9 +472,14 @@ export function findReleaseAsset(assets: Asset[]): Asset | undefined {
   return undefined;
 }
 
-async function downloadFile(url: string, dest: string): Promise<void> {
-  const headers: { 'User-agent': string; Authorization?: string } = {
+export async function downloadFile(url: string, dest: string): Promise<void> {
+  const headers: {
+    'User-agent': string;
+    Accept: string;
+    Authorization?: string;
+  } = {
     'User-agent': 'gemini-cli',
+    Accept: 'application/octet-stream',
   };
   const token = getGitHubToken();
   if (token) {

@@ -38,7 +38,6 @@ export {
   logFlashFallback,
   logSlashCommand,
   logConversationFinishedEvent,
-  logKittySequenceOverflow,
   logChatCompression,
   logToolOutputTruncated,
   logExtensionEnable,
@@ -59,7 +58,6 @@ export {
   StartSessionEvent,
   ToolCallEvent,
   ConversationFinishedEvent,
-  KittySequenceOverflowEvent,
   ToolOutputTruncatedEvent,
   WebFetchFallbackAttemptEvent,
   ToolCallDecision,
@@ -139,3 +137,4 @@ export {
   GenAiTokenType,
 } from './metrics.js';
 export { runInDevTraceSpan, type SpanMetadata } from './trace.js';
+export { startupProfiler, StartupProfiler } from './startupProfiler.js';

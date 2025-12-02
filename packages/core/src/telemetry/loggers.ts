@@ -28,7 +28,6 @@ import type {
   LoopDetectionDisabledEvent,
   SlashCommandEvent,
   ConversationFinishedEvent,
-  KittySequenceOverflowEvent,
   ChatCompressionEvent,
   MalformedJsonResponseEvent,
   InvalidChunkEvent,
@@ -46,8 +45,11 @@ import type {
   SmartEditCorrectionEvent,
   AgentStartEvent,
   AgentFinishEvent,
+  RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
+  LlmLoopCheckEvent,
+  HookCallEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -63,7 +65,9 @@ import {
   recordTokenUsageMetrics,
   recordApiResponseMetrics,
   recordAgentRunMetrics,
+  recordRecoveryAttemptMetrics,
   recordLinesChanged,
+  recordHookCallMetrics,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -180,11 +184,8 @@ export function logApiRequest(config: Config, event: ApiRequestEvent): void {
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
-  const logRecord: LogRecord = {
-    body: event.toLogBody(),
-    attributes: event.toOpenTelemetryAttributes(config),
-  };
-  logger.emit(logRecord);
+  logger.emit(event.toLogRecord(config));
+  logger.emit(event.toSemanticLogRecord(config));
 }
 
 export function logFlashFallback(
@@ -396,20 +397,6 @@ export function logChatCompression(
   });
 }
 
-export function logKittySequenceOverflow(
-  config: Config,
-  event: KittySequenceOverflowEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logKittySequenceOverflowEvent(event);
-  if (!isTelemetrySdkInitialized()) return;
-  const logger = logs.getLogger(SERVICE_NAME);
-  const logRecord: LogRecord = {
-    body: event.toLogBody(),
-    attributes: event.toOpenTelemetryAttributes(config),
-  };
-  logger.emit(logRecord);
-}
-
 export function logMalformedJsonResponse(
   config: Config,
   event: MalformedJsonResponseEvent,
@@ -505,11 +492,11 @@ export function logModelSlashCommand(
   recordModelSlashCommand(config, event);
 }
 
-export function logExtensionInstallEvent(
+export async function logExtensionInstallEvent(
   config: Config,
   event: ExtensionInstallEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionInstallEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionInstallEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -520,11 +507,11 @@ export function logExtensionInstallEvent(
   logger.emit(logRecord);
 }
 
-export function logExtensionUninstall(
+export async function logExtensionUninstall(
   config: Config,
   event: ExtensionUninstallEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionUninstallEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionUninstallEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -535,11 +522,11 @@ export function logExtensionUninstall(
   logger.emit(logRecord);
 }
 
-export function logExtensionUpdateEvent(
+export async function logExtensionUpdateEvent(
   config: Config,
   event: ExtensionUpdateEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionUpdateEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionUpdateEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -550,11 +537,11 @@ export function logExtensionUpdateEvent(
   logger.emit(logRecord);
 }
 
-export function logExtensionEnable(
+export async function logExtensionEnable(
   config: Config,
   event: ExtensionEnableEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionEnableEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionEnableEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -565,11 +552,11 @@ export function logExtensionEnable(
   logger.emit(logRecord);
 }
 
-export function logExtensionDisable(
+export async function logExtensionDisable(
   config: Config,
   event: ExtensionDisableEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionDisableEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionDisableEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -636,6 +623,23 @@ export function logAgentFinish(config: Config, event: AgentFinishEvent): void {
   recordAgentRunMetrics(config, event);
 }
 
+export function logRecoveryAttempt(
+  config: Config,
+  event: RecoveryAttemptEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logRecoveryAttemptEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
+  };
+  logger.emit(logRecord);
+
+  recordRecoveryAttemptMetrics(config, event);
+}
+
 export function logWebFetchFallbackAttempt(
   config: Config,
   event: WebFetchFallbackAttemptEvent,
@@ -649,4 +653,38 @@ export function logWebFetchFallbackAttempt(
     attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
+}
+
+export function logLlmLoopCheck(
+  config: Config,
+  event: LlmLoopCheckEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logLlmLoopCheckEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
+  };
+  logger.emit(logRecord);
+}
+
+export function logHookCall(config: Config, event: HookCallEvent): void {
+  if (!isTelemetrySdkInitialized()) return;
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
+  };
+  logger.emit(logRecord);
+
+  recordHookCallMetrics(
+    config,
+    event.hook_event_name,
+    event.hook_name,
+    event.duration_ms,
+    event.success,
+  );
 }

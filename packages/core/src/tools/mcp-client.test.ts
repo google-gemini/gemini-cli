@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as GenAiLib from '@google/genai';
 import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -37,10 +36,13 @@ vi.mock('@google/genai');
 vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
 vi.mock('../mcp/oauth-utils.js');
+vi.mock('google-auth-library');
+import { GoogleAuth } from 'google-auth-library';
 
 vi.mock('../utils/events.js', () => ({
   coreEvents: {
     emitFeedback: vi.fn(),
+    emitConsoleLog: vi.fn(),
   },
 }));
 
@@ -71,6 +73,21 @@ describe('mcp-client', () => {
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'testFunction',
+              inputSchema: {
+                type: 'object',
+                properties: {},
+              },
+            },
+          ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({
+          prompts: [],
+        }),
+        request: vi.fn().mockResolvedValue({}),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
@@ -78,17 +95,9 @@ describe('mcp-client', () => {
       vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
         {} as SdkClientStdioLib.StdioClientTransport,
       );
-      const mockedMcpToTool = vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
-        tool: () => ({
-          functionDeclarations: [
-            {
-              name: 'testFunction',
-            },
-          ],
-        }),
-      } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -103,7 +112,7 @@ describe('mcp-client', () => {
       );
       await client.connect();
       await client.discover({} as Config);
-      expect(mockedMcpToTool).toHaveBeenCalledOnce();
+      expect(mockedClient.listTools).toHaveBeenCalledWith({});
     });
 
     it('should not skip tools even if a parameter is missing a type', async () => {
@@ -118,7 +127,33 @@ describe('mcp-client', () => {
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
-        tool: vi.fn(),
+
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'validTool',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  param1: { type: 'string' },
+                },
+              },
+            },
+            {
+              name: 'invalidTool',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  param1: { description: 'a param with no type' },
+                },
+              },
+            },
+          ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({
+          prompts: [],
+        }),
+        request: vi.fn().mockResolvedValue({}),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
@@ -126,33 +161,9 @@ describe('mcp-client', () => {
       vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
         {} as SdkClientStdioLib.StdioClientTransport,
       );
-      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
-        tool: () =>
-          Promise.resolve({
-            functionDeclarations: [
-              {
-                name: 'validTool',
-                parametersJsonSchema: {
-                  type: 'object',
-                  properties: {
-                    param1: { type: 'string' },
-                  },
-                },
-              },
-              {
-                name: 'invalidTool',
-                parametersJsonSchema: {
-                  type: 'object',
-                  properties: {
-                    param1: { description: 'a param with no type' },
-                  },
-                },
-              },
-            ],
-          }),
-      } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -181,7 +192,9 @@ describe('mcp-client', () => {
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
-        request: vi.fn().mockRejectedValue(new Error('Test error')),
+        listTools: vi.fn().mockResolvedValue({ tools: [] }),
+        listPrompts: vi.fn().mockRejectedValue(new Error('Test error')),
+        request: vi.fn().mockResolvedValue({}),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
@@ -189,9 +202,6 @@ describe('mcp-client', () => {
       vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
         {} as SdkClientStdioLib.StdioClientTransport,
       );
-      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
-        tool: () => Promise.resolve({ functionDeclarations: [] }),
-      } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
@@ -226,7 +236,8 @@ describe('mcp-client', () => {
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
-        request: vi.fn().mockResolvedValue({ prompts: [] }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
@@ -234,9 +245,9 @@ describe('mcp-client', () => {
       vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
         {} as SdkClientStdioLib.StdioClientTransport,
       );
-      const mockedMcpToTool = vi.mocked(GenAiLib.mcpToTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -253,7 +264,6 @@ describe('mcp-client', () => {
       await expect(client.discover({} as Config)).rejects.toThrow(
         'No prompts or tools found on the server.',
       );
-      expect(mockedMcpToTool).not.toHaveBeenCalled();
     });
 
     it('should discover tools if server supports them', async () => {
@@ -265,7 +275,17 @@ describe('mcp-client', () => {
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
-        request: vi.fn().mockResolvedValue({ prompts: [] }),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'testTool',
+              description: 'A test tool',
+              inputSchema: { type: 'object', properties: {} },
+            },
+          ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
@@ -273,19 +293,9 @@ describe('mcp-client', () => {
       vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
         {} as SdkClientStdioLib.StdioClientTransport,
       );
-      const mockedMcpToTool = vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
-        tool: () =>
-          Promise.resolve({
-            functionDeclarations: [
-              {
-                name: 'testTool',
-                description: 'A test tool',
-              },
-            ],
-          }),
-      } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -300,8 +310,150 @@ describe('mcp-client', () => {
       );
       await client.connect();
       await client.discover({} as Config);
-      expect(mockedMcpToTool).toHaveBeenCalledOnce();
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
+    });
+
+    it('should discover tools with $defs and $ref in schema', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'toolWithDefs',
+              description: 'A tool using $defs',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  param1: {
+                    $ref: '#/$defs/MyType',
+                  },
+                },
+                $defs: {
+                  MyType: {
+                    type: 'string',
+                    description: 'A defined type',
+                  },
+                },
+              },
+            },
+          ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({
+          prompts: [],
+        }),
+        request: vi.fn().mockResolvedValue({}),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+      } as unknown as ToolRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        mockedToolRegistry,
+        {} as PromptRegistry,
+        workspaceContext,
+        false,
+      );
+      await client.connect();
+      await client.discover({} as Config);
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
+      const registeredTool = vi.mocked(mockedToolRegistry.registerTool).mock
+        .calls[0][0];
+      expect(registeredTool.schema.parametersJsonSchema).toEqual({
+        type: 'object',
+        properties: {
+          param1: {
+            $ref: '#/$defs/MyType',
+          },
+        },
+        $defs: {
+          MyType: {
+            type: 'string',
+            description: 'A defined type',
+          },
+        },
+      });
+    });
+
+    it('should remove tools and prompts on disconnect', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        close: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        getServerCapabilities: vi
+          .fn()
+          .mockReturnValue({ tools: {}, prompts: {} }),
+        listPrompts: vi.fn().mockResolvedValue({
+          prompts: [{ id: 'prompt1', text: 'a prompt' }],
+        }),
+        request: vi.fn().mockResolvedValue({}),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'testTool',
+              description: 'A test tool',
+              inputSchema: { type: 'object', properties: {} },
+            },
+          ],
+        }),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        unregisterTool: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+        removeMcpToolsByServer: vi.fn(),
+        sortTools: vi.fn(),
+      } as unknown as ToolRegistry;
+      const mockedPromptRegistry = {
+        registerPrompt: vi.fn(),
+        unregisterPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        mockedToolRegistry,
+        mockedPromptRegistry,
+        workspaceContext,
+        false,
+      );
+      await client.connect();
+      await client.discover({} as Config);
+
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
+      expect(mockedPromptRegistry.registerPrompt).toHaveBeenCalledOnce();
+
+      await client.disconnect();
+
+      expect(mockedClient.close).toHaveBeenCalledOnce();
+      expect(mockedToolRegistry.removeMcpToolsByServer).toHaveBeenCalledOnce();
+      expect(mockedPromptRegistry.removePromptsByServer).toHaveBeenCalledOnce();
     });
   });
   describe('appendMcpServerCommand', () => {
@@ -337,13 +489,17 @@ describe('mcp-client', () => {
           false,
         );
 
-        expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {}),
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
         );
       });
 
       it('with headers', async () => {
-        const transport = await createTransport(
+        // We need this to be an any type because we dig into its private state.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const transport: any = await createTransport(
           'test-server',
           {
             httpUrl: 'http://test-server',
@@ -351,14 +507,13 @@ describe('mcp-client', () => {
           },
           false,
         );
-
-        expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {
-            requestInit: {
-              headers: { Authorization: 'derp' },
-            },
-          }),
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
         );
+        const authHeader = transport._requestInit?.headers?.['Authorization'];
+        expect(authHeader).toBe('derp');
       });
     });
 
@@ -371,13 +526,17 @@ describe('mcp-client', () => {
           },
           false,
         );
-        expect(transport).toEqual(
-          new SSEClientTransport(new URL('http://test-server'), {}),
+        expect(transport).toBeInstanceOf(SSEClientTransport);
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
         );
       });
 
       it('with headers', async () => {
-        const transport = await createTransport(
+        // We need this to be an any type because we dig into its private state.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const transport: any = await createTransport(
           'test-server',
           {
             url: 'http://test-server',
@@ -385,14 +544,13 @@ describe('mcp-client', () => {
           },
           false,
         );
-
-        expect(transport).toEqual(
-          new SSEClientTransport(new URL('http://test-server'), {
-            requestInit: {
-              headers: { Authorization: 'derp' },
-            },
-          }),
+        expect(transport).toBeInstanceOf(SSEClientTransport);
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
         );
+        const authHeader = transport._requestInit?.headers?.['Authorization'];
+        expect(authHeader).toBe('derp');
       });
     });
 
@@ -422,7 +580,52 @@ describe('mcp-client', () => {
     });
 
     describe('useGoogleCredentialProvider', () => {
+      beforeEach(() => {
+        // Mock GoogleAuth client
+        const mockClient = {
+          getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+          quotaProjectId: 'myproject',
+        };
+
+        GoogleAuth.prototype.getClient = vi.fn().mockResolvedValue(mockClient);
+      });
+
       it('should use GoogleCredentialProvider when specified', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test.googleapis.com',
+            authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
+            headers: {
+              'X-Goog-User-Project': 'myproject',
+            },
+          },
+          false,
+        );
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const authProvider = (transport as any)._authProvider;
+        expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const googUserProject = (transport as any)._requestInit?.headers?.[
+          'X-Goog-User-Project'
+        ];
+        expect(googUserProject).toBe('myproject');
+      });
+
+      it('should use headers from GoogleCredentialProvider', async () => {
+        const mockGetRequestHeaders = vi.fn().mockResolvedValue({
+          'X-Goog-User-Project': 'provider-project',
+        });
+        vi.spyOn(
+          GoogleCredentialProvider.prototype,
+          'getRequestHeaders',
+        ).mockImplementation(mockGetRequestHeaders);
+
         const transport = await createTransport(
           'test-server',
           {
@@ -436,9 +639,40 @@ describe('mcp-client', () => {
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(mockGetRequestHeaders).toHaveBeenCalled();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const authProvider = (transport as any)._authProvider;
-        expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
+        const headers = (transport as any)._requestInit?.headers;
+        expect(headers['X-Goog-User-Project']).toBe('provider-project');
+      });
+
+      it('should prioritize provider headers over config headers', async () => {
+        const mockGetRequestHeaders = vi.fn().mockResolvedValue({
+          'X-Goog-User-Project': 'provider-project',
+        });
+        vi.spyOn(
+          GoogleCredentialProvider.prototype,
+          'getRequestHeaders',
+        ).mockImplementation(mockGetRequestHeaders);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test.googleapis.com',
+            authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
+            headers: {
+              'X-Goog-User-Project': 'config-project',
+            },
+          },
+          false,
+        );
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const headers = (transport as any)._requestInit?.headers;
+        expect(headers['X-Goog-User-Project']).toBe('provider-project');
       });
 
       it('should use GoogleCredentialProvider with SSE transport', async () => {

@@ -1,8 +1,7 @@
 name: 'Website issue'
 description: 'Report an issue with the Gemini CLI Website and Gemini CLI Extensions Gallery'
 labels:
-  - 'area/website'
-  - 'status/need-triage'
+  - 'area/extensions'
 body:
   - type: 'markdown'
     attributes:

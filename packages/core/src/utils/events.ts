@@ -5,6 +5,7 @@
  */
 
 import { EventEmitter } from 'node:events';
+import type { LoadServerHierarchicalMemoryResponse } from './memoryDiscovery.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -43,17 +44,90 @@ export interface FallbackModeChangedPayload {
   isInFallbackMode: boolean;
 }
 
+/**
+ * Payload for the 'model-changed' event.
+ */
+export interface ModelChangedPayload {
+  /**
+   * The new model that was set.
+   */
+  model: string;
+}
+
+/**
+ * Payload for the 'console-log' event.
+ */
+export interface ConsoleLogPayload {
+  type: 'log' | 'warn' | 'error' | 'debug' | 'info';
+  content: string;
+}
+
+/**
+ * Payload for the 'output' event.
+ */
+export interface OutputPayload {
+  isStderr: boolean;
+  chunk: Uint8Array | string;
+  encoding?: BufferEncoding;
+}
+
+/**
+ * Payload for the 'memory-changed' event.
+ */
+export type MemoryChangedPayload = LoadServerHierarchicalMemoryResponse;
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   FallbackModeChanged = 'fallback-mode-changed',
+  ModelChanged = 'model-changed',
+  ConsoleLog = 'console-log',
+  Output = 'output',
+  MemoryChanged = 'memory-changed',
+  ExternalEditorClosed = 'external-editor-closed',
 }
 
-export class CoreEventEmitter extends EventEmitter {
-  private _feedbackBacklog: UserFeedbackPayload[] = [];
+export interface CoreEvents {
+  [CoreEvent.UserFeedback]: [UserFeedbackPayload];
+  [CoreEvent.FallbackModeChanged]: [FallbackModeChangedPayload];
+  [CoreEvent.ModelChanged]: [ModelChangedPayload];
+  [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
+  [CoreEvent.Output]: [OutputPayload];
+  [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
+  [CoreEvent.ExternalEditorClosed]: never[];
+}
+
+type EventBacklogItem = {
+  [K in keyof CoreEvents]: {
+    event: K;
+    args: CoreEvents[K];
+  };
+}[keyof CoreEvents];
+
+export class CoreEventEmitter extends EventEmitter<CoreEvents> {
+  private _eventBacklog: EventBacklogItem[] = [];
   private static readonly MAX_BACKLOG_SIZE = 10000;
 
   constructor() {
     super();
+  }
+
+  private _emitOrQueue<K extends keyof CoreEvents>(
+    event: K,
+    ...args: CoreEvents[K]
+  ): void {
+    if (this.listenerCount(event) === 0) {
+      if (this._eventBacklog.length >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
+        this._eventBacklog.shift();
+      }
+      this._eventBacklog.push({ event, args } as EventBacklogItem);
+    } else {
+      (
+        this.emit as <K extends keyof CoreEvents>(
+          event: K,
+          ...args: CoreEvents[K]
+        ) => boolean
+      )(event, ...args);
+    }
   }
 
   /**
@@ -66,15 +140,30 @@ export class CoreEventEmitter extends EventEmitter {
     error?: unknown,
   ): void {
     const payload: UserFeedbackPayload = { severity, message, error };
+    this._emitOrQueue(CoreEvent.UserFeedback, payload);
+  }
 
-    if (this.listenerCount(CoreEvent.UserFeedback) === 0) {
-      if (this._feedbackBacklog.length >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
-        this._feedbackBacklog.shift();
-      }
-      this._feedbackBacklog.push(payload);
-    } else {
-      this.emit(CoreEvent.UserFeedback, payload);
-    }
+  /**
+   * Broadcasts a console log message.
+   */
+  emitConsoleLog(
+    type: 'log' | 'warn' | 'error' | 'debug' | 'info',
+    content: string,
+  ): void {
+    const payload: ConsoleLogPayload = { type, content };
+    this._emitOrQueue(CoreEvent.ConsoleLog, payload);
+  }
+
+  /**
+   * Broadcasts stdout/stderr output.
+   */
+  emitOutput(
+    isStderr: boolean,
+    chunk: Uint8Array | string,
+    encoding?: BufferEncoding,
+  ): void {
+    const payload: OutputPayload = { isStderr, chunk, encoding };
+    this._emitOrQueue(CoreEvent.Output, payload);
   }
 
   /**
@@ -87,60 +176,28 @@ export class CoreEventEmitter extends EventEmitter {
   }
 
   /**
+   * Notifies subscribers that the model has changed.
+   */
+  emitModelChanged(model: string): void {
+    const payload: ModelChangedPayload = { model };
+    this.emit(CoreEvent.ModelChanged, payload);
+  }
+
+  /**
    * Flushes buffered messages. Call this immediately after primary UI listener
    * subscribes.
    */
-  drainFeedbackBacklog(): void {
-    const backlog = [...this._feedbackBacklog];
-    this._feedbackBacklog.length = 0; // Clear in-place
-    for (const payload of backlog) {
-      this.emit(CoreEvent.UserFeedback, payload);
+  drainBacklogs(): void {
+    const backlog = [...this._eventBacklog];
+    this._eventBacklog.length = 0; // Clear in-place
+    for (const item of backlog) {
+      (
+        this.emit as <K extends keyof CoreEvents>(
+          event: K,
+          ...args: CoreEvents[K]
+        ) => boolean
+      )(item.event, ...item.args);
     }
-  }
-
-  override on(
-    event: CoreEvent.UserFeedback,
-    listener: (payload: UserFeedbackPayload) => void,
-  ): this;
-  override on(
-    event: CoreEvent.FallbackModeChanged,
-    listener: (payload: FallbackModeChangedPayload) => void,
-  ): this;
-  override on(
-    event: string | symbol,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    listener: (...args: any[]) => void,
-  ): this {
-    return super.on(event, listener);
-  }
-
-  override off(
-    event: CoreEvent.UserFeedback,
-    listener: (payload: UserFeedbackPayload) => void,
-  ): this;
-  override off(
-    event: CoreEvent.FallbackModeChanged,
-    listener: (payload: FallbackModeChangedPayload) => void,
-  ): this;
-  override off(
-    event: string | symbol,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    listener: (...args: any[]) => void,
-  ): this {
-    return super.off(event, listener);
-  }
-
-  override emit(
-    event: CoreEvent.UserFeedback,
-    payload: UserFeedbackPayload,
-  ): boolean;
-  override emit(
-    event: CoreEvent.FallbackModeChanged,
-    payload: FallbackModeChangedPayload,
-  ): boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  override emit(event: string | symbol, ...args: any[]): boolean {
-    return super.emit(event, ...args);
   }
 }
 

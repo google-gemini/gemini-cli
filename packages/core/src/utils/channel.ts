@@ -22,7 +22,7 @@ export function _clearCache() {
   cache.clear();
 }
 
-async function _getReleaseChannel(cwd: string): Promise<ReleaseChannel> {
+export async function getReleaseChannel(cwd: string): Promise<ReleaseChannel> {
   if (cache.has(cwd)) {
     return cache.get(cwd)!;
   }
@@ -43,13 +43,13 @@ async function _getReleaseChannel(cwd: string): Promise<ReleaseChannel> {
 }
 
 export async function isNightly(cwd: string): Promise<boolean> {
-  return (await _getReleaseChannel(cwd)) === ReleaseChannel.NIGHTLY;
+  return (await getReleaseChannel(cwd)) === ReleaseChannel.NIGHTLY;
 }
 
 export async function isPreview(cwd: string): Promise<boolean> {
-  return (await _getReleaseChannel(cwd)) === ReleaseChannel.PREVIEW;
+  return (await getReleaseChannel(cwd)) === ReleaseChannel.PREVIEW;
 }
 
 export async function isStable(cwd: string): Promise<boolean> {
-  return (await _getReleaseChannel(cwd)) === ReleaseChannel.STABLE;
+  return (await getReleaseChannel(cwd)) === ReleaseChannel.STABLE;
 }

@@ -24,6 +24,12 @@ export const CLIENT_METHODS = {
 
 export const PROTOCOL_VERSION = 1;
 
+export const authMethodSchema = z.object({
+  description: z.string().nullable(),
+  id: z.string(),
+  name: z.string(),
+});
+
 export type WriteTextFileRequest = z.infer<typeof writeTextFileRequestSchema>;
 
 export type ReadTextFileRequest = z.infer<typeof readTextFileRequestSchema>;
@@ -127,6 +133,20 @@ export type ClientRequest = z.infer<typeof clientRequestSchema>;
 export type AgentRequest = z.infer<typeof agentRequestSchema>;
 
 export type AgentNotification = z.infer<typeof agentNotificationSchema>;
+
+export type Result<T> =
+  | {
+      result: T;
+    }
+  | {
+      error: ErrorResponse;
+    };
+
+export type ErrorResponse = {
+  code: number;
+  message: string;
+  data?: unknown;
+};
 
 export const writeTextFileRequestSchema = z.object({
   content: z.string(),
@@ -281,12 +301,6 @@ export const promptCapabilitiesSchema = z.object({
 export const agentCapabilitiesSchema = z.object({
   loadSession: z.boolean().optional(),
   promptCapabilities: promptCapabilitiesSchema.optional(),
-});
-
-export const authMethodSchema = z.object({
-  description: z.string().nullable(),
-  id: z.string(),
-  name: z.string(),
 });
 
 export const clientResponseSchema = z.union([

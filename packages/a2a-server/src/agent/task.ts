@@ -66,6 +66,7 @@ export class Task {
   eventBus?: ExecutionEventBus;
   completedToolCalls: CompletedToolCall[];
   skipFinalTrueAfterInlineEdit = false;
+  modelInfo?: string;
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
@@ -113,7 +114,7 @@ export class Task {
   // state managed within the @gemini-cli/core module.
   async getMetadata(): Promise<TaskMetadata> {
     const toolRegistry = await this.config.getToolRegistry();
-    const mcpServers = this.config.getMcpServers() || {};
+    const mcpServers = this.config.getMcpClientManager()?.getMcpServers() || {};
     const serverStatuses = getAllMCPServerStatuses();
     const servers = Object.keys(mcpServers).map((serverName) => ({
       name: serverName,
@@ -135,7 +136,7 @@ export class Task {
       id: this.id,
       contextId: this.contextId,
       taskState: this.taskState,
-      model: this.config.getModel(),
+      model: this.modelInfo || this.config.getModel(),
       mcpServers: servers,
       availableTools,
     };
@@ -230,7 +231,7 @@ export class Task {
       traceId?: string;
     } = {
       coderAgent: coderAgentMessage,
-      model: this.config.getModel(),
+      model: this.modelInfo || this.config.getModel(),
       userTier: this.config.getUserTier(),
     };
 
@@ -436,7 +437,6 @@ export class Task {
       onToolCallsUpdate: this._schedulerToolCallsUpdate.bind(this),
       getPreferredEditor: () => 'vscode',
       config: this.config,
-      onEditorClose: () => {},
     });
     return scheduler;
   }
@@ -461,7 +461,7 @@ export class Task {
   ): Message {
     const messageParts: Part[] = [];
 
-    // Create a serializable version of the ToolCall (pick necesssary
+    // Create a serializable version of the ToolCall (pick necessary
     // properties/avoid methods causing circular reference errors)
     const serializableToolCall: Partial<ToolCall> = this._pickFields(
       tc,
@@ -648,6 +648,9 @@ export class Task {
       case GeminiEventType.Finished:
         logger.info(`[Task ${this.id}] Agent finished its turn.`);
         break;
+      case GeminiEventType.ModelInfo:
+        this.modelInfo = event.value;
+        break;
       case GeminiEventType.Error:
       default: {
         // Block scope for lexical declaration
@@ -659,7 +662,7 @@ export class Task {
           errorMessage,
         );
 
-        let errMessage = 'Unknown error from LLM stream';
+        let errMessage = `Unknown error from LLM stream: ${JSON.stringify(event)}`;
         if (errorEvent.value) {
           errMessage = parseAndFormatApiError(errorEvent.value);
         }
