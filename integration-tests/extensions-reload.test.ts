@@ -96,13 +96,30 @@ describe('extension reloading', () => {
       await run.expectText(
         'Extension "test-extension" successfully updated: 0.0.1 → 0.0.2',
       );
-      // Wait for the prompt to reappear.
-      await poll(() => stripAnsi(run.output).trim().endsWith('>'), 5000, 200);
-      await run.sendText('/extensions list');
-      await run.type('\r');
-      await run.expectText('test-extension (v0.0.2) - active (updated)');
-      // Wait for the prompt to reappear.
-      await poll(() => stripAnsi(run.output).trim().endsWith('>'), 5000, 200);
+
+      // Wait for the extension to be updated by repeatedly checking the list.
+      const startTime = Date.now();
+      const timeout = 10000; // 10 seconds timeout for this operation
+      let isUpdated = false;
+      while (Date.now() - startTime < timeout) {
+        // Clear previous command and output before sending new one.
+        await run.sendKeys('\u0015'); // CTRL+U to clear line
+        await run.sendText('/extensions list');
+        await run.type('\r');
+        // Give time for the output to render
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        if (
+          stripAnsi(run.output).includes(
+            'test-extension (v0.0.2) - active (updated)',
+          )
+        ) {
+          isUpdated = true;
+          break;
+        }
+      }
+      expect(isUpdated, 'Extension was not updated in time.').toBe(true);
+
+      // Now check the mcp server.
       await run.sendText('/mcp list');
       await run.type('\r');
       await run.expectText(
