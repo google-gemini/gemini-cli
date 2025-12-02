@@ -1886,7 +1886,7 @@ describe('GeminiChat', () => {
             error,
           );
           if (shouldRetry) {
-            return await apiCall();
+            return apiCall();
           }
         }
         throw error; // Stop if callback returns false/null or doesn't exist

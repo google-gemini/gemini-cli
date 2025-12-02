@@ -76,15 +76,16 @@ describe('extension reloading', () => {
       await run.expectText(
         'test-extension (v0.0.1) - active (update available)',
       );
-      await run.sendText('/mcp list');
-      await run.type('\r');
+      // Wait a bit for the UI to settle
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await run.sendKeys('\u0015/mcp list\r');
       await run.expectText(
         'test-server (from test-extension) - Ready (1 tool)',
       );
       await run.expectText('- hello');
 
       // Update the extension, expect the list to update, and mcp servers as well.
-      await run.sendKeys('/extensions update test-extension');
+      await run.sendKeys('\u0015/extensions update test-extension');
       await run.expectText('/extensions update test-extension');
       await run.sendKeys('\r');
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -96,12 +97,12 @@ describe('extension reloading', () => {
       await run.expectText(
         'Extension "test-extension" successfully updated: 0.0.1 → 0.0.2',
       );
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      await run.sendText('/extensions list');
-      await run.type('\r');
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      await run.sendKeys('\u0015/extensions list\r');
       await run.expectText('test-extension (v0.0.2) - active (updated)');
-      await run.sendText('/mcp list');
-      await run.type('\r');
+      // Wait a bit for the UI to settle
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await run.sendKeys('\u0015/mcp list\r');
       await run.expectText(
         'test-server (from test-extension) - Ready (1 tool)',
       );

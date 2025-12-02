@@ -13,6 +13,7 @@ export const clearCommand: SlashCommand = {
   name: 'clear',
   description: 'Clear the screen and conversation history',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async (context, _args) => {
     const geminiClient = context.services.config?.getGeminiClient();
     const config = context.services.config;
