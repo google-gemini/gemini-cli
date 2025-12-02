@@ -738,7 +738,7 @@ export class Task {
         // This will trigger the scheduler to continue or cancel the specific tool.
         // The scheduler's onToolCallsUpdate will then reflect the new state (e.g., executing or cancelled).
 
-        // If `edit` tool call, pass updated payload if presesent
+        // If `edit` tool call, pass updated payload if present
         if (confirmationDetails.type === 'edit') {
           const payload = part.data['newContent']
             ? ({
@@ -856,7 +856,7 @@ export class Task {
     };
     // Set task state to working as we are about to call LLM
     this.setTaskStateAndPublishUpdate('working', stateChange);
-    // TODO: Determine what it mean to have, then add a prompt ID.
+    // TODO: Determine what it means to have, then add a prompt ID.
     yield* this.geminiClient.sendMessageStream(
       llmParts,
       aborted,
@@ -896,7 +896,7 @@ export class Task {
       };
       // Set task state to working as we are about to call LLM
       this.setTaskStateAndPublishUpdate('working', stateChange);
-      // TODO: Determine what it mean to have, then add a prompt ID.
+      // TODO: Determine what it means to have, then add a prompt ID.
       yield* this.geminiClient.sendMessageStream(
         llmParts,
         aborted,
