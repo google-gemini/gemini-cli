@@ -5,9 +5,9 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { act } from 'react';
 import type { Mock, MockInstance } from 'vitest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useGeminiStream } from './useGeminiStream.js';
@@ -26,6 +26,7 @@ import type {
   EditorType,
   GeminiClient,
   AnyToolInvocation,
+  ServerGeminiStreamEvent,
 } from '@google/gemini-cli-core';
 import {
   ApprovalMode,
@@ -36,11 +37,14 @@ import {
   tokenLimit,
   debugLogger,
 } from '@google/gemini-cli-core';
-import type { Part, PartListUnion } from '@google/genai';
+import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { SlashCommandProcessorResult } from '../types.js';
 import { MessageType, StreamingState } from '../types.js';
+import { promises as fs } from 'node:fs';
 import type { LoadedSettings } from '../../config/settings.js';
+
+vi.mock('node:fs/promises');
 
 // --- MOCKS ---
 const mockSendMessageStream = vi
@@ -65,6 +69,8 @@ const MockedGeminiClientClass = vi.hoisted(() =>
       recordToolCalls: vi.fn(),
       getConversationFile: vi.fn(),
     });
+    this.getCurrentSequenceModel = vi.fn();
+    this.getHistory = vi.fn().mockResolvedValue([]);
   }),
 );
 
@@ -77,7 +83,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actualCoreModule = (await importOriginal()) as any;
   return {
     ...actualCoreModule,
-    GitService: vi.fn(),
+    GitService: MockedGitServiceClass,
     GeminiClient: MockedGeminiClientClass,
     UserPromptEvent: MockedUserPromptEvent,
     parseAndFormatApiError: mockParseAndFormatApiError,
@@ -150,10 +156,18 @@ vi.mock('./useAlternateBuffer.js', () => ({
   useAlternateBuffer: vi.fn(() => false),
 }));
 
+const mockCreateFileSnapshot = vi.fn();
+const MockedGitServiceClass = vi.hoisted(() =>
+  vi.fn().mockImplementation(() => ({
+    createFileSnapshot: mockCreateFileSnapshot,
+  })),
+);
+
 // --- END MOCKS ---
 
 // --- Tests for useGeminiStream Hook ---
 describe('useGeminiStream', () => {
+  vi.useFakeTimers();
   let mockAddItem: Mock;
   let mockConfig: Config;
   let mockOnDebugMessage: Mock;
@@ -164,6 +178,7 @@ describe('useGeminiStream', () => {
   let handleAtCommandSpy: MockInstance;
 
   beforeEach(() => {
+    vi.spyOn(React, 'useMemo').mockImplementation((factory) => factory());
     vi.clearAllMocks(); // Clear mocks before each test
 
     mockAddItem = vi.fn();
@@ -202,12 +217,15 @@ describe('useGeminiStream', () => {
       vertexai: false,
       showMemoryUsage: false,
       contextFileName: undefined,
-      getToolRegistry: vi.fn(
-        () => ({ getToolSchemaList: vi.fn(() => []) }) as any,
-      ),
+      getToolRegistry: vi.fn().mockReturnValue({
+        getTool: vi.fn().mockReturnValue({
+          name: 'replace',
+        }),
+      }),
       getProjectRoot: vi.fn(() => '/test/dir'),
       getCheckpointingEnabled: vi.fn(() => false),
       getGeminiClient: mockGetGeminiClient,
+      getCurrentSequenceModel: vi.fn(),
       getApprovalMode: () => ApprovalMode.DEFAULT,
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
@@ -224,6 +242,10 @@ describe('useGeminiStream', () => {
       getUseSmartEdit: () => false,
       isInteractive: () => false,
       getExperiments: () => {},
+      storage: {
+        getProjectTempCheckpointsDir: vi.fn(() => '/test/checkpoints'),
+      },
+      gitService: new MockedGitServiceClass(),
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
@@ -286,11 +308,7 @@ describe('useGeminiStream', () => {
       (props: typeof initialProps) => {
         // This mock needs to be stateful. When setToolCallsForDisplay is called,
         // it should trigger a rerender with the new state.
-        const mockSetToolCallsForDisplay = vi.fn((updater) => {
-          const newToolCalls =
-            typeof updater === 'function' ? updater(props.toolCalls) : updater;
-          rerender({ ...props, toolCalls: newToolCalls });
-        });
+        const mockSetToolCallsForDisplay = vi.fn();
 
         // Create a stateful mock for cancellation that updates the toolCalls state.
         const statefulCancelAllToolCalls = vi.fn((...args) => {
@@ -361,6 +379,7 @@ describe('useGeminiStream', () => {
       mockMarkToolsAsSubmitted,
       mockSendMessageStream,
       client,
+      processGeminiStreamEvents: result.current.processGeminiStreamEvents,
     };
   };
 
@@ -928,6 +947,7 @@ describe('useGeminiStream', () => {
     await act(async () => {
       if (capturedOnComplete) {
         await capturedOnComplete(completedToolCalls);
+        await vi.runAllTimersAsync(); // Flush all pending timers and promises
       }
     });
 
@@ -1102,14 +1122,9 @@ describe('useGeminiStream', () => {
     });
 
     it('should prevent further processing after cancellation', async () => {
-      let continueStream: () => void;
-      const streamPromise = new Promise<void>((resolve) => {
-        continueStream = resolve;
-      });
-
       const mockStream = (async function* () {
         yield { type: 'content', value: 'Initial' };
-        await streamPromise; // Wait until we manually continue
+        await vi.advanceTimersByTimeAsync(100); // Simulate a delay
         yield { type: 'content', value: ' Canceled' };
       })();
       mockSendMessageStream.mockReturnValue(mockStream);
@@ -1129,7 +1144,6 @@ describe('useGeminiStream', () => {
 
       // Allow the stream to continue
       await act(async () => {
-        continueStream();
         // Wait a bit to see if the second part is processed
         await new Promise((resolve) => setTimeout(resolve, 50));
       });
@@ -2700,6 +2714,162 @@ describe('useGeminiStream', () => {
       // Then verify loop detection confirmation request was set
       await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+    });
+  });
+
+  describe('useGeminiStream snapshotting', () => {
+    beforeEach(() => {
+      vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined);
+      vi.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
+      // Override getCheckpointingEnabled for snapshot tests
+      mockConfig.getCheckpointingEnabled = vi.fn(() => true);
+      // Mock the stream to resolve immediately
+      mockSendMessageStream.mockImplementation(async function* () {
+        yield {
+          type: ServerGeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'test-call-id',
+            name: 'replace',
+            args: { file_path: 'test.txt' },
+            isClientInitiated: false,
+            prompt_id: 'test-prompt-id',
+          },
+        };
+        // Give other promises a chance to resolve
+        await new Promise((resolve) => setImmediate(resolve));
+        yield {
+          type: ServerGeminiEventType.Finished,
+          value: { reason: FinishReason.STOP, usageMetadata: undefined },
+        };
+      });
+    });
+
+    it('should call createFileSnapshot when a tool call that requires it is received', async () => {
+      // 1. Arrange
+      mockConfig.getCheckpointingEnabled = vi.fn(() => true);
+      const geminiClient = new MockedGeminiClientClass(mockConfig);
+      const { result } = renderTestHook([], geminiClient);
+
+      // 2. Act
+      await act(async () => {
+        // Directly simulate the stream emitting a tool call
+        const stream =
+          (async function* (): AsyncGenerator<ServerGeminiStreamEvent> {
+            yield {
+              type: ServerGeminiEventType.ToolCallRequest,
+              value: {
+                callId: 'test-call-id',
+                name: 'replace',
+                args: { file_path: 'test.txt' },
+                isClientInitiated: false,
+                prompt_id: 'test-prompt-id',
+              },
+            };
+            yield {
+              type: ServerGeminiEventType.Finished,
+              value: { reason: FinishReason.STOP, usageMetadata: undefined },
+            };
+          })();
+        await result.current.processGeminiStreamEvents(
+          stream,
+          Date.now(),
+          new AbortController().signal,
+        );
+      });
+
+      // 3. Assert
+      expect(mockCreateFileSnapshot).toHaveBeenCalled();
+    });
+
+    it('should handle commit hash failure gracefully', async () => {
+      // Mock that we do not get a commit hash.
+      mockCreateFileSnapshot.mockResolvedValue(undefined);
+
+      const { processGeminiStreamEvents } = renderTestHook();
+      const mockStream =
+        (async function* (): AsyncGenerator<ServerGeminiStreamEvent> {
+          yield {
+            type: ServerGeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'call1',
+              name: 'replace',
+              args: {
+                file_path: 'foo.txt',
+                old_string: 'old',
+                new_string: 'new',
+              },
+              isClientInitiated: false,
+              prompt_id: 'test-prompt-id',
+            },
+          };
+          // End the stream so the test doesn't hang.
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: FinishReason.STOP, usageMetadata: undefined },
+          };
+        })();
+
+      // Start processing the stream
+      await act(async () => {
+        await processGeminiStreamEvents(
+          mockStream,
+          Date.now(),
+          new AbortController().signal,
+        );
+      });
+
+      // Then the error message should be displayed.
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.ERROR,
+            text: 'Failed to get a commit hash for the file snapshot. Aborting operation.',
+          },
+          expect.any(Number),
+        );
+      });
+    });
+
+    it('should show an error if file snapshotting fails', async () => {
+      mockCreateFileSnapshot.mockRejectedValue(new Error('Snapshot failed'));
+      const geminiClient = new MockedGeminiClientClass(mockConfig);
+      const { result } = renderTestHook([], geminiClient);
+
+      await act(async () => {
+        const stream =
+          (async function* (): AsyncGenerator<ServerGeminiStreamEvent> {
+            yield {
+              type: ServerGeminiEventType.ToolCallRequest,
+              value: {
+                callId: 'test-call-id',
+                name: 'replace',
+                args: { file_path: 'test.txt' },
+                isClientInitiated: false,
+                prompt_id: 'test-prompt-id',
+              },
+            };
+            yield {
+              type: ServerGeminiEventType.Error,
+              value: { error: { message: 'Snapshot failed' } },
+            };
+          })();
+        await result.current.processGeminiStreamEvents(
+          stream,
+          Date.now(),
+          new AbortController().signal,
+        );
+
+        expect(mockCreateFileSnapshot).toHaveBeenCalled();
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.ERROR,
+            text: expect.stringContaining(
+              'Failed to create file snapshot: Snapshot failed. Aborting operation.',
+            ),
+          }),
+          expect.any(Number),
+        );
       });
     });
   });
