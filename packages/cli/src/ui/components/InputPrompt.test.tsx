@@ -1147,7 +1147,6 @@ describe('InputPrompt', () => {
       await waitFor(() => {
         expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
           mockBuffer,
-          ['/test/project/src'],
           path.join('test', 'project', 'src'),
           mockSlashCommands,
           mockCommandContext,
@@ -2268,6 +2267,7 @@ describe('InputPrompt', () => {
   describe('queued message editing', () => {
     it('should load all queued messages when up arrow is pressed with empty input', async () => {
       const mockPopAllMessages = vi.fn();
+      mockPopAllMessages.mockReturnValue('Message 1\n\nMessage 2\n\nMessage 3');
       props.popAllMessages = mockPopAllMessages;
       props.buffer.text = '';
 
@@ -2279,11 +2279,7 @@ describe('InputPrompt', () => {
         stdin.write('\u001B[A');
       });
       await waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
-      const callback = mockPopAllMessages.mock.calls[0][0];
 
-      await act(async () => {
-        callback('Message 1\n\nMessage 2\n\nMessage 3');
-      });
       expect(props.buffer.setText).toHaveBeenCalledWith(
         'Message 1\n\nMessage 2\n\nMessage 3',
       );
@@ -2311,6 +2307,7 @@ describe('InputPrompt', () => {
 
     it('should handle undefined messages from popAllMessages', async () => {
       const mockPopAllMessages = vi.fn();
+      mockPopAllMessages.mockReturnValue(undefined);
       props.popAllMessages = mockPopAllMessages;
       props.buffer.text = '';
 
@@ -2322,10 +2319,6 @@ describe('InputPrompt', () => {
         stdin.write('\u001B[A');
       });
       await waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
-      const callback = mockPopAllMessages.mock.calls[0][0];
-      await act(async () => {
-        callback(undefined);
-      });
 
       expect(props.buffer.setText).not.toHaveBeenCalled();
       expect(mockInputHistory.navigateUp).toHaveBeenCalled();
@@ -2353,6 +2346,7 @@ describe('InputPrompt', () => {
 
     it('should handle single queued message', async () => {
       const mockPopAllMessages = vi.fn();
+      mockPopAllMessages.mockReturnValue('Single message');
       props.popAllMessages = mockPopAllMessages;
       props.buffer.text = '';
 
@@ -2364,11 +2358,6 @@ describe('InputPrompt', () => {
         stdin.write('\u001B[A');
       });
       await waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
-
-      const callback = mockPopAllMessages.mock.calls[0][0];
-      await act(async () => {
-        callback('Single message');
-      });
 
       expect(props.buffer.setText).toHaveBeenCalledWith('Single message');
       unmount();
@@ -2409,6 +2398,7 @@ describe('InputPrompt', () => {
 
     it('should navigate input history on fresh start when no queued messages exist', async () => {
       const mockPopAllMessages = vi.fn();
+      mockPopAllMessages.mockReturnValue(undefined);
       props.popAllMessages = mockPopAllMessages;
       props.buffer.text = '';
 
@@ -2420,11 +2410,6 @@ describe('InputPrompt', () => {
         stdin.write('\u001B[A');
       });
       await waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
-
-      const callback = mockPopAllMessages.mock.calls[0][0];
-      await act(async () => {
-        callback(undefined);
-      });
 
       expect(mockInputHistory.navigateUp).toHaveBeenCalled();
       expect(props.buffer.setText).not.toHaveBeenCalled();

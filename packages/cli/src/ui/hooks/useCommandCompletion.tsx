@@ -57,7 +57,6 @@ export interface UseCommandCompletionReturn {
 
 export function useCommandCompletion(
   buffer: TextBuffer,
-  dirs: readonly string[],
   cwd: string,
   slashCommands: readonly SlashCommand[],
   commandContext: CommandContext,
