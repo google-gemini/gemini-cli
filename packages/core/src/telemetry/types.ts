@@ -388,6 +388,13 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
       prompt_id: this.prompt.prompt_id,
       request_text: this.request_text,
     };
+    if (this.prompt.generate_content_config?.systemInstruction) {
+      attributes['system_instruction'] = JSON.stringify(
+        toSystemInstruction(
+          this.prompt.generate_content_config.systemInstruction,
+        ),
+      );
+    }
     return { body: `API request to ${this.model}.`, attributes };
   }
 

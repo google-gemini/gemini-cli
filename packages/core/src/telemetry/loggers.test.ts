@@ -761,6 +761,9 @@ describe('loggers', () => {
         attributes: expect.objectContaining({
           'event.name': EVENT_API_REQUEST,
           prompt_id: 'prompt-id-semantic-1',
+          system_instruction: JSON.stringify([
+            { type: 'text', content: 'be helpful' },
+          ]),
         }),
       });
 
