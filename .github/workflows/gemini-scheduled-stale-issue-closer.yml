@@ -125,3 +125,9 @@ jobs:
                 // });
               }
             }
+            
+            if (dryRun) {
+              core.info(`[DRY RUN] Total issues that would be closed: ${processedCount}`);
+            } else {
+              core.info(`Total issues closed: ${processedCount}`);
+            }
