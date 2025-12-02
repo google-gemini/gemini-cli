@@ -165,7 +165,16 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
-      const httpOptions = { headers };
+
+      // Merge custom httpOptions from config
+      const customHttpOptions = gcConfig?.getHttpOptions();
+      const httpOptions = {
+        ...customHttpOptions,
+        headers: {
+          ...customHttpOptions?.headers,
+          ...headers,
+        },
+      };
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,

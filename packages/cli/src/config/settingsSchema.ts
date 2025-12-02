@@ -1428,6 +1428,25 @@ const SETTINGS_SCHEMA = {
     showInDialog: false,
     mergeStrategy: MergeStrategy.SHALLOW_MERGE,
   },
+
+  httpOptions: {
+    type: 'object',
+    label: 'HTTP Options',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: undefined as
+      | {
+          baseUrl?: string;
+          headers?: Record<string, string>;
+          timeout?: number;
+          apiVersion?: string;
+        }
+      | undefined,
+    description:
+      'Custom HTTP options for API requests, including baseUrl for custom endpoints (e.g., corporate proxies).',
+    showInDialog: false,
+    mergeStrategy: MergeStrategy.SHALLOW_MERGE,
+  },
 } as const satisfies SettingsSchema;
 
 export type SettingsSchemaType = typeof SETTINGS_SCHEMA;
