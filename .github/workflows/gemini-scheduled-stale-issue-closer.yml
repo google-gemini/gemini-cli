@@ -70,44 +70,58 @@ jobs:
               per_page: 100
             });
 
-            // Using listForRepo directly instead of paginate to limit to first 100 results
-            const response = await github.rest.issues.listForRepo(opts);
-            const issues = response.data;
-            core.info(`Found ${issues.length} open issues to check (limit 100).`);
-
-            let processedCount = 0;
-
-            for (const issue of issues) {
-              // Safety Check: Skip Pull Requests (GitHub API treats PRs as Issues in list endpoints)
-              if (issue.pull_request) continue;
-
-              const createdAt = new Date(issue.created_at);
-              const updatedAt = new Date(issue.updated_at);
-              const reactionCount = issue.reactions.total_count;
-
-              // 3. Evaluate Conditions
-              const isOld = createdAt < threeMonthsAgo;
-              const isStale = updatedAt < tenDaysAgo;
-              const isUnpopular = reactionCount < 5;
-
-              // 4. Check Issue Type (Must be 'Bug' or 'No Type')
-              // Note: The REST API might return 'type' as null if not set.
-              // We check if type is 'Bug', explicitly 'No Type', or null/undefined.
-              const typeName = issue.type ? issue.type.name : null;
-              const isBugOrUntyped = typeName === 'Bug' || typeName === 'No Type' || !typeName;
-
-              if (isOld && isStale && isUnpopular && isBugOrUntyped) {
-                const message = `Closing stale issue #${issue.number}: "${issue.title}" (Created: ${createdAt.toISOString()}, Reactions: ${reactionCount})`;
-
-                processedCount++;
-
-                if (dryRun) {
-                  core.info(`[DRY RUN] ${message}`);
-                  continue;
-                }
-
-                core.info(message);
-
+                        // Using listForRepo directly instead of paginate to limit to first 100 results
+                        const response = await github.rest.issues.listForRepo(opts);
+                        const issues = response.data;
+                        core.info(`Found ${issues.length} open issues to check (limit 100).`);
+            
+                        // Initial Count of Issue Types in this batch
+                        let bugCount = 0;
+                        let noTypeCount = 0;
+                        let otherTypeCount = 0;
+            
+                        for (const issue of issues) {
+                          const typeName = issue.type ? issue.type.name : null;
+                          if (typeName === 'Bug') {
+                            bugCount++;
+                          } else if (!typeName || typeName === 'No Type') {
+                            noTypeCount++;
+                          } else {
+                            otherTypeCount++;
+                          }
+                        }
+                        core.info(`Issue Type Distribution in this batch: Bug=${bugCount}, No Type=${noTypeCount}, Other=${otherTypeCount}`);
+            
+                        let processedCount = 0;
+            
+                        for (const issue of issues) {
+                          // Safety Check: Skip Pull Requests (GitHub API treats PRs as Issues in list endpoints)
+                          if (issue.pull_request) continue;
+            
+                          const createdAt = new Date(issue.created_at);
+                          const updatedAt = new Date(issue.updated_at);
+                          const reactionCount = issue.reactions.total_count;
+            
+                          // 3. Evaluate Conditions
+                          const isOld = createdAt < threeMonthsAgo;
+                          const isStale = updatedAt < tenDaysAgo;
+                          const isUnpopular = reactionCount < 5;
+            
+                          // 4. Check Issue Type (Must be 'Bug' or 'No Type')
+                          const typeName = issue.type ? issue.type.name : null;
+                          const isBugOrUntyped = typeName === 'Bug' || typeName === 'No Type' || !typeName;
+            
+                          if (isOld && isStale && isUnpopular && isBugOrUntyped) {
+                            const message = `Closing stale issue #${issue.number}: "${issue.title}" (${issue.html_url}) (Created: ${createdAt.toISOString()}, Reactions: ${reactionCount})`;
+                            
+                            processedCount++;
+            
+                            if (dryRun) {
+                              core.info(`[DRY RUN] ${message}`);
+                              continue;
+                            }
+            
+                            core.info(message);
                 // 4. Comment
                 // await github.rest.issues.createComment({
                 //   owner: context.repo.owner,
