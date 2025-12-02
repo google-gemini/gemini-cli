@@ -29,6 +29,7 @@ import { retryWithBackoff, type RetryOptions } from '../utils/retry.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { HookSystem } from '../hooks/hookSystem.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { createAvailabilityServiceMock } from '../availability/availabilityTestingUtils.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -157,6 +158,10 @@ describe('GeminiChat', () => {
       setPreviewModelFallbackMode: vi.fn(),
       isInteractive: vi.fn().mockReturnValue(false),
       getEnableHooks: vi.fn().mockReturnValue(false),
+      isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(false),
+      getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
+      setActiveModel: vi.fn(),
+      getModelAvailabilityService: vi.fn(),
     } as unknown as Config;
 
     // Use proper MessageBus mocking for Phase 3 preparation
@@ -2349,6 +2354,137 @@ describe('GeminiChat', () => {
       const history: Content[] = [{ role: 'user', parts: [{ text: 'Hello' }] }];
       const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
       expect(newContents).toEqual(history);
+    });
+  });
+
+  describe('Availability Service Integration', () => {
+    let mockAvailabilityService: ReturnType<
+      typeof createAvailabilityServiceMock
+    >;
+    let mockPolicyHelpers: typeof import('../availability/policyHelpers.js');
+
+    beforeEach(async () => {
+      mockAvailabilityService = createAvailabilityServiceMock();
+      vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
+        mockAvailabilityService,
+      );
+      vi.mocked(mockConfig.isModelAvailabilityServiceEnabled).mockReturnValue(
+        true,
+      );
+
+      // Stateful mock for activeModel
+      let activeModel = 'gemini-pro';
+      vi.mocked(mockConfig.getActiveModel).mockImplementation(
+        () => activeModel,
+      );
+      vi.mocked(mockConfig.setActiveModel).mockImplementation((model) => {
+        activeModel = model;
+      });
+
+      mockPolicyHelpers = await import('../availability/policyHelpers.js');
+      vi.spyOn(mockPolicyHelpers, 'resolvePolicyChain').mockReturnValue([
+        {
+          model: 'model-a',
+          isLastResort: false,
+          actions: {},
+          stateTransitions: {},
+        },
+        {
+          model: 'model-b',
+          isLastResort: true,
+          actions: {},
+          stateTransitions: {},
+        },
+      ]);
+    });
+
+    it('should mark healthy on successful stream', async () => {
+      vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
+        selectedModel: 'model-a',
+        skipped: [],
+      });
+      // Simulate selection happening upstream
+      mockConfig.setActiveModel('model-a');
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Response' }], role: 'model' },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'test',
+        'prompt-healthy',
+        new AbortController().signal,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(mockAvailabilityService.markHealthy).toHaveBeenCalledWith(
+        'model-a',
+      );
+    });
+
+    it('should pass attempted model to onPersistent429 callback which calls handleFallback', async () => {
+      vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
+        selectedModel: 'model-a',
+        skipped: [],
+      });
+      // Simulate selection happening upstream
+      mockConfig.setActiveModel('model-a');
+
+      // Simulate retry logic behavior: catch error, call onPersistent429
+      const error = new TerminalQuotaError('Quota', {
+        code: 429,
+        message: 'quota',
+        details: [],
+      });
+      vi.mocked(mockContentGenerator.generateContentStream).mockRejectedValue(
+        error,
+      );
+
+      // We need retryWithBackoff to trigger the callback
+      mockRetryWithBackoff.mockImplementation(async (apiCall, options) => {
+        try {
+          await apiCall();
+        } catch (e) {
+          if (options?.onPersistent429) {
+            await options.onPersistent429(AuthType.LOGIN_WITH_GOOGLE, e);
+          }
+          throw e; // throw anyway to end test
+        }
+      });
+
+      const consume = async () => {
+        const stream = await chat.sendMessageStream(
+          { model: 'gemini-pro' },
+          'test',
+          'prompt-fallback-arg',
+          new AbortController().signal,
+        );
+        for await (const _ of stream) {
+          // consume
+        }
+      };
+
+      await expect(consume()).rejects.toThrow();
+
+      // handleFallback is called with the ATTEMPTED model (model-a), not the requested one (gemini-pro)
+      expect(mockHandleFallback).toHaveBeenCalledWith(
+        expect.anything(),
+        'model-a',
+        expect.anything(),
+        error,
+      );
     });
   });
 });

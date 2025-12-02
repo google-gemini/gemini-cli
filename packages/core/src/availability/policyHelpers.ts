@@ -35,20 +35,12 @@ export function resolvePolicyChain(
       config.getPreviewFeatures(),
     );
 
-  // "auto" is not a valid model ID for availability tracking.
-  // We resolve it to the default model here.
-  // Note: getEffectiveModel *might* return "auto" if config.getModel() is "auto".
-  // The actual resolution logic is scattered, but for policy chain we MUST use concrete IDs.
   if (activeModel === 'auto') {
-    // If the user requested "auto", we assume they want the standard chain starting with Pro.
-    // The default chain (getModelPolicyChain) already starts with Pro (or Preview).
-    // So we don't need to force "auto" into the chain.
-    // We just return the default chain.
-    return chain;
+    return [...chain];
   }
 
   if (chain.some((policy) => policy.model === activeModel)) {
-    return chain;
+    return [...chain];
   }
 
   // If the user specified a model not in the default chain, we assume they want

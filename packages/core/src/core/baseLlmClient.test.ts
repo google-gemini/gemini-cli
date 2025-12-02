@@ -15,14 +15,18 @@ import {
   type Mock,
 } from 'vitest';
 
-import type { GenerateContentResponse } from '@google/genai';
 import { BaseLlmClient, type GenerateJsonOptions } from './baseLlmClient.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { createAvailabilityServiceMock } from '../availability/availabilityTestingUtils.js';
 import type { GenerateContentOptions } from './baseLlmClient.js';
+import type {
+  GenerateContentConfig,
+  GenerateContentResponse,
+} from '@google/genai';
 import type { Config } from '../config/config.js';
 import { AuthType } from './contentGenerator.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { reportError } from '../utils/errorReporting.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { retryWithBackoff } from '../utils/retry.js';
@@ -765,6 +769,91 @@ describe('BaseLlmClient', () => {
         expect.objectContaining({ model: availableModel }),
         jsonOptions.promptId,
       );
+    });
+
+    it('should use legacy fallback behavior when availability is disabled', async () => {
+      mockConfig.isModelAvailabilityServiceEnabled.mockReturnValue(false);
+      mockConfig.isInFallbackMode.mockReturnValue(true);
+
+      mockGenerateContent.mockResolvedValue(
+        createMockResponse('Fallback response'),
+      );
+
+      await client.generateContent(contentOptions);
+
+      // Should explicitly switch to Flash model
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ model: DEFAULT_GEMINI_FLASH_MODEL }),
+        expect.any(String),
+      );
+      // Should NOT call availability methods
+      expect(
+        mockAvailabilityService.selectFirstAvailable,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should refresh configuration when model changes mid-retry', async () => {
+      const firstModel = 'gemini-pro';
+      const fallbackModel = 'gemini-flash';
+
+      // Provide distinct configs per model
+      const configByModel: Record<
+        string,
+        { model: string; generateContentConfig: Partial<GenerateContentConfig> }
+      > = {
+        [firstModel]: {
+          model: firstModel,
+          generateContentConfig: { temperature: 0.1 },
+        },
+        [fallbackModel]: {
+          model: fallbackModel,
+          generateContentConfig: { temperature: 0.9 },
+        },
+      };
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation(({ model }) => configByModel[model]);
+
+      // Availability selects the first model initially
+      vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
+        selectedModel: firstModel,
+        skipped: [],
+      });
+
+      // Change active model after the first attempt
+      let activeModel = firstModel;
+      mockConfig.setActiveModel = vi.fn(); // Prevent setActiveModel from resetting getActiveModel mock
+      mockConfig.getActiveModel.mockImplementation(() => activeModel);
+
+      // First response empty -> triggers retry; second response valid
+      mockGenerateContent
+        .mockResolvedValueOnce(createMockResponse(''))
+        .mockResolvedValueOnce(createMockResponse('final-response'));
+
+      // Custom retry to force two attempts
+      vi.mocked(retryWithBackoff).mockImplementation(async (fn, options) => {
+        const first = (await fn()) as GenerateContentResponse;
+        if (options?.shouldRetryOnContent?.(first)) {
+          activeModel = fallbackModel; // simulate handler switching active model before retry
+          return (await fn()) as GenerateContentResponse;
+        }
+        return first;
+      });
+
+      await client.generateContent({
+        ...contentOptions,
+        modelConfigKey: { model: firstModel },
+        maxAttempts: 2,
+      });
+
+      expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+      const secondCall = mockGenerateContent.mock.calls[1]?.[0];
+
+      expect(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).toHaveBeenCalledWith({ model: fallbackModel });
+      expect(secondCall?.model).toBe(fallbackModel);
+      expect(secondCall?.config?.temperature).toBe(0.9);
     });
   });
 });

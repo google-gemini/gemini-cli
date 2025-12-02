@@ -32,11 +32,6 @@ import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import * as policyHelpers from '../availability/policyHelpers.js';
 import { createDefaultPolicy } from '../availability/policyCatalog.js';
-import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
-import { coreEvents } from '../utils/events.js';
-import { debugLogger } from '../utils/debugLogger.js';
-import * as policyHelpers from '../availability/policyHelpers.js';
-import { createDefaultPolicy } from '../availability/policyCatalog.js';
 import {
   RetryableQuotaError,
   TerminalQuotaError,
@@ -626,6 +621,14 @@ describe('handleFallback', () => {
         expect(policyConfig.setActiveModel).toHaveBeenCalledWith(
           DEFAULT_GEMINI_FLASH_MODEL,
         );
+        // Silent actions should not trigger the legacy fallback mode (via activateFallbackMode),
+        // but setActiveModel might trigger it via legacy sync if it switches to Flash.
+        // However, the test requirement is "doesn't emit fallback mode".
+        // Since we are mocking setActiveModel, we can verify setFallbackMode isn't called *independently*.
+        // But setActiveModel is mocked, so it won't trigger side effects unless the implementation does.
+        // We verified setActiveModel is called.
+        // We verify setFallbackMode is NOT called (which would happen if activateFallbackMode was called).
+        expect(policyConfig.setFallbackMode).not.toHaveBeenCalled();
       } finally {
         chainSpy.mockRestore();
       }

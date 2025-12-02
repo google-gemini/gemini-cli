@@ -12,39 +12,40 @@ import {
 import { createDefaultPolicy } from './policyCatalog.js';
 import type { Config } from '../config/config.js';
 
+const createMockConfig = (overrides: Partial<Config> = {}): Config =>
+  ({
+    getPreviewFeatures: () => false,
+    getUserTier: () => undefined,
+    getModel: () => 'gemini-2.5-pro',
+    isInFallbackMode: () => false,
+    ...overrides,
+  }) as unknown as Config;
+
 describe('policyHelpers', () => {
   describe('resolvePolicyChain', () => {
     it('inserts the active model when missing from the catalog', () => {
-      const config = {
-        getPreviewFeatures: () => false,
-        getUserTier: () => undefined,
+      const config = createMockConfig({
         getModel: () => 'custom-model',
-        isInFallbackMode: () => false,
-      } as unknown as Config;
+      });
       const chain = resolvePolicyChain(config);
       expect(chain).toHaveLength(1);
       expect(chain[0]?.model).toBe('custom-model');
     });
 
     it('leaves catalog order untouched when active model already present', () => {
-      const config = {
-        getPreviewFeatures: () => false,
-        getUserTier: () => undefined,
+      const config = createMockConfig({
         getModel: () => 'gemini-2.5-pro',
-        isInFallbackMode: () => false,
-      } as unknown as Config;
+      });
       const chain = resolvePolicyChain(config);
       expect(chain[0]?.model).toBe('gemini-2.5-pro');
     });
 
     it('returns the default chain when active model is "auto"', () => {
-      const config = {
-        getPreviewFeatures: () => false,
-        getUserTier: () => undefined,
+      const config = createMockConfig({
         getModel: () => 'auto',
-        isInFallbackMode: () => false,
-      } as unknown as Config;
+      });
       const chain = resolvePolicyChain(config);
+
       // Expect default chain [Pro, Flash]
       expect(chain).toHaveLength(2);
       expect(chain[0]?.model).toBe('gemini-2.5-pro');

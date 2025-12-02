@@ -18,6 +18,8 @@ import {
 } from './googleQuotaErrors.js';
 import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
 import type { ModelPolicy } from '../availability/modelPolicy.js';
+import { createAvailabilityServiceMock } from '../availability/availabilityTestingUtils.js';
+import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 
 // Helper to create a mock function that fails a certain number of times
 const createFailingFunction = (
@@ -501,20 +503,12 @@ describe('retryWithBackoff', () => {
   });
 
   describe('Availability Context Integration', () => {
-    let mockService: any;
-    let mockPolicy1: any;
-    let mockPolicy2: any;
+    let mockService: ModelAvailabilityService;
+    let mockPolicy1: ModelPolicy;
+    let mockPolicy2: ModelPolicy;
 
     beforeEach(() => {
-      mockService = {
-        markTerminal: vi.fn(),
-        markRetryOncePerTurn: vi.fn(),
-        consumeStickyAttempt: vi.fn(),
-        markHealthy: vi.fn(),
-        snapshot: vi.fn(),
-        selectFirstAvailable: vi.fn(),
-        resetTurn: vi.fn(),
-      };
+      mockService = createAvailabilityServiceMock();
 
       mockPolicy1 = {
         model: 'model-1',

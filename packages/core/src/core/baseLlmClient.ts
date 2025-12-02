@@ -18,7 +18,10 @@ import { reportError } from '../utils/errorReporting.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { MalformedJsonResponseEvent } from '../telemetry/types.js';
-import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import {
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+} from '../config/models.js';
 import {
   retryWithBackoff,
   type RetryAvailabilityContext,
@@ -280,6 +283,21 @@ export class BaseLlmClient {
           service.consumeStickyAttempt(selectedModel);
         }
       }
+    } else if (this.config.isInFallbackMode()) {
+      // Legacy Fallback: If availability is disabled but fallback mode is active,
+      // force the use of Flash.
+      const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
+      if (requestParams.model !== fallbackModel) {
+        requestParams.model = fallbackModel;
+        const { generateContentConfig } =
+          this.config.modelConfigService.getResolvedConfig({
+            model: fallbackModel,
+          });
+        requestParams.config = {
+          ...requestParams.config,
+          ...generateContentConfig,
+        };
+      }
     }
 
     try {
@@ -287,7 +305,19 @@ export class BaseLlmClient {
         // If availability is enabled, ensure we use the current active model
         // in case a fallback occurred in a previous attempt.
         if (this.config.isModelAvailabilityServiceEnabled()) {
-          requestParams.model = this.config.getActiveModel();
+          const activeModel = this.config.getActiveModel();
+          if (activeModel !== requestParams.model) {
+            requestParams.model = activeModel;
+            // Re-resolve config if model changed during retry
+            const { generateContentConfig } =
+              this.config.modelConfigService.getResolvedConfig({
+                model: activeModel,
+              });
+            requestParams.config = {
+              ...requestParams.config,
+              ...generateContentConfig,
+            };
+          }
         }
         return this.contentGenerator.generateContent(requestParams, promptId);
       };

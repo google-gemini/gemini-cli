@@ -8,15 +8,16 @@ import type { GenerateContentResponse } from '@google/genai';
 import { ApiError } from '@google/genai';
 import { AuthType } from '../core/contentGenerator.js';
 import {
-  classifyGoogleError,
-  RetryableQuotaError,
   TerminalQuotaError,
+  RetryableQuotaError,
+  classifyGoogleError,
 } from './googleQuotaErrors.js';
 import { delay, createAbortError } from './delay.js';
 import { debugLogger } from './debugLogger.js';
 import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
-import type { FailureKind, ModelPolicy } from '../availability/modelPolicy.js';
+import type { ModelPolicy } from '../availability/modelPolicy.js';
+import { classifyFailureKind } from '../availability/errorClassification.js';
 
 const FETCH_FAILED_MESSAGE =
   'exception TypeError: fetch failed sending request';
@@ -281,19 +282,6 @@ export async function retryWithBackoff<T>(
   }
 
   throw new Error('Retry attempts exhausted');
-}
-
-function classifyFailureKind(error: unknown): FailureKind {
-  if (error instanceof TerminalQuotaError) {
-    return 'terminal';
-  }
-  if (error instanceof RetryableQuotaError) {
-    return 'transient';
-  }
-  if (error instanceof ModelNotFoundError) {
-    return 'not_found';
-  }
-  return 'unknown';
 }
 
 /**

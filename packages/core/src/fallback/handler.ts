@@ -16,13 +16,10 @@ import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { ModelNotFoundError } from '../utils/httpErrors.js';
-import {
-  RetryableQuotaError,
-  TerminalQuotaError,
-} from '../utils/googleQuotaErrors.js';
+import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
 import { coreEvents } from '../utils/events.js';
 import type { FallbackIntent, FallbackRecommendation } from './types.js';
-import type { FailureKind } from '../availability/modelPolicy.js';
+import { classifyFailureKind } from '../availability/errorClassification.js';
 import {
   buildFallbackPolicyContext,
   resolvePolicyChain,
@@ -127,24 +124,7 @@ async function handlePolicyDrivenFallback(
     failedModel,
   );
 
-  // --- Availability State Update ---
-  // Ensure the failed model is marked correctly in the service.
-  // retryWithBackoff tries to do this, but if we reached here via another path
-  // (or if retryWithBackoff's logic was bypassed), we must ensure it's recorded.
   const failureKind = classifyFailureKind(error);
-  if (failedPolicy) {
-    const transition = failedPolicy.stateTransitions?.[failureKind];
-    const service = config.getModelAvailabilityService();
-    if (transition === 'terminal') {
-      service.markTerminal(
-        failedModel,
-        failureKind === 'terminal' ? 'quota' : 'capacity',
-      );
-    } else if (transition === 'sticky_retry') {
-      service.markRetryOncePerTurn(failedModel);
-    }
-  }
-  // ---------------------------------
 
   if (!candidates.length) {
     return null;
@@ -308,17 +288,4 @@ function activatePreviewModelFallbackMode(config: Config) {
     config.setPreviewModelFallbackMode(true);
     // We might want a specific event for Preview Model fallback, but for now we just set the mode.
   }
-}
-
-function classifyFailureKind(error?: unknown): FailureKind {
-  if (error instanceof TerminalQuotaError) {
-    return 'terminal';
-  }
-  if (error instanceof RetryableQuotaError) {
-    return 'transient';
-  }
-  if (error instanceof ModelNotFoundError) {
-    return 'not_found';
-  }
-  return 'unknown';
 }

@@ -38,6 +38,7 @@ import { ideContextStore } from '../ide/ideContext.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { createAvailabilityServiceMock } from '../availability/availabilityTestingUtils.js';
 import type {
   ModelConfigKey,
   ResolvedModelConfig,
@@ -247,6 +248,11 @@ describe('Gemini Client (client.ts)', () => {
       },
       isInteractive: vi.fn().mockReturnValue(false),
       getExperiments: () => {},
+      isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(false),
+      getActiveModel: vi.fn().mockReturnValue('test-model'),
+      setActiveModel: vi.fn(),
+      resetTurn: vi.fn(),
+      getModelAvailabilityService: vi.fn(),
     } as unknown as Config;
     mockConfig.getHookSystem = vi
       .fn()
@@ -1585,6 +1591,7 @@ ${JSON.stringify(
       expect(events).toEqual([
         { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
         { type: GeminiEventType.InvalidStream },
+        { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
         { type: GeminiEventType.Content, value: 'Continued content' },
       ]);
 
@@ -1672,8 +1679,8 @@ ${JSON.stringify(
       const events = await fromAsync(stream);
 
       // Assert
-      // We expect 3 events (model_info + original + 1 retry)
-      expect(events.length).toBe(3);
+      // We expect 4 events (model_info + original + model_info + 1 retry)
+      expect(events.length).toBe(4);
       expect(
         events
           .filter((e) => e.type !== GeminiEventType.ModelInfo)
@@ -1945,6 +1952,152 @@ ${JSON.stringify(
         );
         expect(contextJson).toHaveProperty('activeFile');
         expect(contextJson.activeFile.path).toBe('/path/to/active/file.ts');
+      });
+    });
+
+    describe('Availability Service Integration', () => {
+      let mockAvailabilityService: ReturnType<
+        typeof createAvailabilityServiceMock
+      >;
+      let mockPolicyHelpers: typeof import('../availability/policyHelpers.js');
+
+      beforeEach(async () => {
+        mockAvailabilityService = createAvailabilityServiceMock();
+
+        vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
+          mockAvailabilityService,
+        );
+        vi.mocked(mockConfig.isModelAvailabilityServiceEnabled).mockReturnValue(
+          true,
+        );
+        vi.mocked(mockConfig.setActiveModel).mockClear();
+
+        mockPolicyHelpers = await import('../availability/policyHelpers.js');
+        vi.spyOn(mockPolicyHelpers, 'resolvePolicyChain').mockReturnValue([
+          {
+            model: 'model-a',
+            isLastResort: false,
+            actions: {},
+            stateTransitions: {},
+          },
+          {
+            model: 'model-b',
+            isLastResort: true,
+            actions: {},
+            stateTransitions: {},
+          },
+        ]);
+
+        mockTurnRunFn.mockReturnValue(
+          (async function* () {
+            yield { type: 'content', value: 'Hello' };
+          })(),
+        );
+      });
+
+      it('should select first available model, set active, and consume sticky attempt', async () => {
+        vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue(
+          {
+            selectedModel: 'model-a',
+            attempts: 1,
+            skipped: [],
+          },
+        );
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-avail',
+        );
+        await fromAsync(stream);
+
+        expect(
+          mockAvailabilityService.selectFirstAvailable,
+        ).toHaveBeenCalledWith(['model-a', 'model-b']);
+        expect(mockConfig.setActiveModel).toHaveBeenCalledWith('model-a');
+        expect(
+          mockAvailabilityService.consumeStickyAttempt,
+        ).toHaveBeenCalledWith('model-a');
+        // Ensure turn.run used the selected model
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          expect.objectContaining({ model: 'model-a' }),
+          expect.anything(),
+          expect.anything(),
+        );
+      });
+
+      it('should default to last resort model if selection returns null', async () => {
+        vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue(
+          {
+            selectedModel: null,
+            skipped: [],
+          },
+        );
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-avail-fallback',
+        );
+        await fromAsync(stream);
+
+        expect(mockConfig.setActiveModel).toHaveBeenCalledWith('model-b'); // Last resort
+        expect(
+          mockAvailabilityService.consumeStickyAttempt,
+        ).not.toHaveBeenCalled();
+      });
+
+      it('should reset turn on new message stream', async () => {
+        vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue(
+          {
+            selectedModel: 'model-a',
+            skipped: [],
+          },
+        );
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-reset',
+        );
+        await fromAsync(stream);
+
+        expect(mockConfig.resetTurn).toHaveBeenCalled();
+      });
+
+      it('should NOT reset turn on invalid stream retry', async () => {
+        vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue(
+          {
+            selectedModel: 'model-a',
+            skipped: [],
+          },
+        );
+        // We simulate a retry by calling sendMessageStream with isInvalidStreamRetry=true
+        // But the public API doesn't expose that argument directly unless we use the private method or simulate the recursion.
+        // We can simulate recursion by mocking turn run to return invalid stream once.
+
+        vi.spyOn(
+          client['config'],
+          'getContinueOnFailedApiCall',
+        ).mockReturnValue(true);
+        const mockStream1 = (async function* () {
+          yield { type: GeminiEventType.InvalidStream };
+        })();
+        const mockStream2 = (async function* () {
+          yield { type: 'content', value: 'ok' };
+        })();
+        mockTurnRunFn
+          .mockReturnValueOnce(mockStream1)
+          .mockReturnValueOnce(mockStream2);
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-retry',
+        );
+        await fromAsync(stream);
+
+        // resetTurn should be called once (for the initial call) but NOT for the recursive call
+        expect(mockConfig.resetTurn).toHaveBeenCalledTimes(1);
       });
     });
 
