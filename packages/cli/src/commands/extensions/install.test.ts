@@ -49,6 +49,10 @@ vi.mock('node:fs/promises', () => ({
   },
 }));
 
+vi.mock('../utils.js', () => ({
+  exitCli: vi.fn(),
+}));
+
 describe('extensions install command', () => {
   it('should fail if no source is provided', () => {
     const validationParser = yargs([]).command(installCommand).fail(false);

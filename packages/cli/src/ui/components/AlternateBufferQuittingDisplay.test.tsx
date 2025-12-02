@@ -12,6 +12,10 @@ import { Text } from 'ink';
 import { renderWithProviders } from '../../test-utils/render.js';
 import type { Config } from '@google/gemini-cli-core';
 
+vi.mock('../utils/terminalSetup.js', () => ({
+  getTerminalProgram: () => null,
+}));
+
 vi.mock('../contexts/AppContext.js', () => ({
   useAppContext: () => ({
     version: '0.10.0',
@@ -85,26 +89,103 @@ const mockConfig = {
   getTargetDir: () => '/tmp',
   getDebugMode: () => false,
   getGeminiMdFileCount: () => 0,
+  getExperiments: () => ({
+    flags: {},
+    experimentIds: [],
+  }),
+  getPreviewFeatures: () => false,
 } as unknown as Config;
 
 describe('AlternateBufferQuittingDisplay', () => {
+  const baseUIState = {
+    terminalWidth: 80,
+    mainAreaWidth: 80,
+    slashCommands: [],
+    activePtyId: undefined,
+    embeddedShellFocused: false,
+    renderMarkdown: false,
+    bannerData: {
+      defaultText: '',
+      warningText: '',
+    },
+  };
+
   it('renders with active and pending tool messages', () => {
     const { lastFrame } = renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
+          ...baseUIState,
           history: mockHistory,
           pendingHistoryItems: mockPendingHistoryItems,
-          terminalWidth: 80,
-          mainAreaWidth: 80,
-          slashCommands: [],
-          activePtyId: undefined,
-          embeddedShellFocused: false,
-          renderMarkdown: false,
         },
         config: mockConfig,
       },
     );
-    expect(lastFrame()).toMatchSnapshot();
+    expect(lastFrame()).toMatchSnapshot('with_history_and_pending');
+  });
+
+  it('renders with empty history and no pending items', () => {
+    const { lastFrame } = renderWithProviders(
+      <AlternateBufferQuittingDisplay />,
+      {
+        uiState: {
+          ...baseUIState,
+          history: [],
+          pendingHistoryItems: [],
+        },
+        config: mockConfig,
+      },
+    );
+    expect(lastFrame()).toMatchSnapshot('empty');
+  });
+
+  it('renders with history but no pending items', () => {
+    const { lastFrame } = renderWithProviders(
+      <AlternateBufferQuittingDisplay />,
+      {
+        uiState: {
+          ...baseUIState,
+          history: mockHistory,
+          pendingHistoryItems: [],
+        },
+        config: mockConfig,
+      },
+    );
+    expect(lastFrame()).toMatchSnapshot('with_history_no_pending');
+  });
+
+  it('renders with pending items but no history', () => {
+    const { lastFrame } = renderWithProviders(
+      <AlternateBufferQuittingDisplay />,
+      {
+        uiState: {
+          ...baseUIState,
+          history: [],
+          pendingHistoryItems: mockPendingHistoryItems,
+        },
+        config: mockConfig,
+      },
+    );
+    expect(lastFrame()).toMatchSnapshot('with_pending_no_history');
+  });
+
+  it('renders with user and gemini messages', () => {
+    const history: HistoryItem[] = [
+      { id: 1, type: 'user', text: 'Hello Gemini' },
+      { id: 2, type: 'gemini', text: 'Hello User!' },
+    ];
+    const { lastFrame } = renderWithProviders(
+      <AlternateBufferQuittingDisplay />,
+      {
+        uiState: {
+          ...baseUIState,
+          history,
+          pendingHistoryItems: [],
+        },
+        config: mockConfig,
+      },
+    );
+    expect(lastFrame()).toMatchSnapshot('with_user_gemini_messages');
   });
 });

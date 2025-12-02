@@ -150,6 +150,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
       .toString('hex')}.tmp`;
     const tempFilePath = path.join(os.tmpdir(), tempFileName);
 
+    const timeoutMs = this.config.getShellToolInactivityTimeout();
+    const timeoutController = new AbortController();
+    let timeoutTimer: NodeJS.Timeout | undefined;
+
+    // Handle signal combination manually to avoid TS issues or runtime missing features
+    const combinedController = new AbortController();
+
+    const onAbort = () => combinedController.abort();
+
     try {
       // pgrep is not available on Windows, so we can't get background PIDs
       const commandToExecute = isWindows
@@ -169,11 +178,30 @@ export class ShellToolInvocation extends BaseToolInvocation<
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
 
+      const resetTimeout = () => {
+        if (timeoutMs <= 0) {
+          return;
+        }
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+        timeoutTimer = setTimeout(() => {
+          timeoutController.abort();
+        }, timeoutMs);
+      };
+
+      signal.addEventListener('abort', onAbort, { once: true });
+      timeoutController.signal.addEventListener('abort', onAbort, {
+        once: true,
+      });
+
+      // Start timeout
+      resetTimeout();
+
       const { result: resultPromise, pid } =
         await ShellExecutionService.execute(
           commandToExecute,
           cwd,
           (event: ShellOutputEvent) => {
+            resetTimeout(); // Reset timeout on any event
             if (!updateOutput) {
               return;
             }
@@ -211,9 +239,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
               lastUpdateTime = Date.now();
             }
           },
-          signal,
+          combinedController.signal,
           this.config.getEnableInteractiveShell(),
-          shellExecutionConfig ?? {},
+          { ...shellExecutionConfig, pager: 'cat' },
         );
 
       if (pid && setPidCallback) {
@@ -246,8 +274,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       let llmContent = '';
+      let timeoutMessage = '';
       if (result.aborted) {
-        llmContent = 'Command was cancelled by user before it could complete.';
+        if (timeoutController.signal.aborted) {
+          timeoutMessage = `Command was automatically cancelled because it exceeded the timeout of ${(
+            timeoutMs / 60000
+          ).toFixed(1)} minutes without output.`;
+          llmContent = timeoutMessage;
+        } else {
+          llmContent =
+            'Command was cancelled by user before it could complete.';
+        }
         if (result.output.trim()) {
           llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
         } else {
@@ -282,7 +319,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
           returnDisplayMessage = result.output;
         } else {
           if (result.aborted) {
-            returnDisplayMessage = 'Command cancelled by user.';
+            if (timeoutMessage) {
+              returnDisplayMessage = timeoutMessage;
+            } else {
+              returnDisplayMessage = 'Command cancelled by user.';
+            }
           } else if (result.signal) {
             returnDisplayMessage = `Command terminated by signal: ${result.signal}`;
           } else if (result.error) {
@@ -327,6 +368,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
         ...executionError,
       };
     } finally {
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      signal.removeEventListener('abort', onAbort);
+      timeoutController.signal.removeEventListener('abort', onAbort);
       if (fs.existsSync(tempFilePath)) {
         fs.unlinkSync(tempFilePath);
       }

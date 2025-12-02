@@ -6,6 +6,7 @@
 
 import { execSync, spawn, spawnSync } from 'node:child_process';
 import { debugLogger } from './debugLogger.js';
+import { coreEvents, CoreEvent } from './events.js';
 
 export type EditorType =
   | 'vscode'
@@ -15,7 +16,24 @@ export type EditorType =
   | 'vim'
   | 'neovim'
   | 'zed'
-  | 'emacs';
+  | 'emacs'
+  | 'antigravity';
+
+export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
+  vscode: 'VS Code',
+  vscodium: 'VSCodium',
+  windsurf: 'Windsurf',
+  cursor: 'Cursor',
+  vim: 'Vim',
+  neovim: 'Neovim',
+  zed: 'Zed',
+  emacs: 'Emacs',
+  antigravity: 'Antigravity',
+};
+
+export function getEditorDisplayName(editor: EditorType): string {
+  return EDITOR_DISPLAY_NAMES[editor] || editor;
+}
 
 function isValidEditorType(editor: string): editor is EditorType {
   return [
@@ -27,6 +45,7 @@ function isValidEditorType(editor: string): editor is EditorType {
     'neovim',
     'zed',
     'emacs',
+    'antigravity',
   ].includes(editor);
 }
 
@@ -63,6 +82,7 @@ const editorCommands: Record<
   neovim: { win32: ['nvim'], default: ['nvim'] },
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
   emacs: { win32: ['emacs.exe'], default: ['emacs'] },
+  antigravity: { win32: ['agy.cmd'], default: ['agy'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
@@ -74,7 +94,11 @@ export function checkHasEditorType(editor: EditorType): boolean {
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   const notUsingSandbox = !process.env['SANDBOX'];
-  if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
+  if (
+    ['vscode', 'vscodium', 'windsurf', 'cursor', 'zed', 'antigravity'].includes(
+      editor,
+    )
+  ) {
     return notUsingSandbox;
   }
   // For terminal-based editors like vim and emacs, allow in sandbox.
@@ -116,6 +140,7 @@ export function getDiffCommand(
     case 'windsurf':
     case 'cursor':
     case 'zed':
+    case 'antigravity':
       return { command, args: ['--wait', '--diff', oldPath, newPath] };
     case 'vim':
     case 'neovim':
@@ -165,7 +190,6 @@ export async function openDiff(
   oldPath: string,
   newPath: string,
   editor: EditorType,
-  onEditorClose: () => void,
 ): Promise<void> {
   const diffCommand = getDiffCommand(oldPath, newPath, editor);
   if (!diffCommand) {
@@ -187,7 +211,7 @@ export async function openDiff(
         throw new Error(`${editor} exited with code ${result.status}`);
       }
     } finally {
-      onEditorClose();
+      coreEvents.emit(CoreEvent.ExternalEditorClosed);
     }
     return;
   }

@@ -1,0 +1,24 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`terminalSetup > configureVSCodeStyle > should create new keybindings file if none exists 1`] = `
+[
+  {
+    "args": {
+      "text": "\\
+",
+    },
+    "command": "workbench.action.terminal.sendSequence",
+    "key": "ctrl+enter",
+    "when": "terminalFocus",
+  },
+  {
+    "args": {
+      "text": "\\
+",
+    },
+    "command": "workbench.action.terminal.sendSequence",
+    "key": "shift+enter",
+    "when": "terminalFocus",
+  },
+]
+`;

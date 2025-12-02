@@ -18,6 +18,7 @@ import {
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 // Regular expression to match 'org/repo' format.
 const ORG_REPO_REGEX = /^[a-zA-Z0-9-]+\/[\w.-]+$/;
@@ -155,5 +156,6 @@ export const installCommand: CommandModule = {
       allowPreRelease: argv['pre-release'] as boolean | undefined,
       consent: argv['consent'] as boolean | undefined,
     });
+    await exitCli();
   },
 };
