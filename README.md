@@ -11,8 +11,16 @@
 ## What This Is
 
 **Temporary fork** of Google Gemini CLI with minimal patches for Android Termux
-compatibility. This fork exists **only** until Google adds official Termux
-support upstream.
+compatibility.
+
+### ⏳ Sunset Plan
+
+We have submitted a PR to upstream Google Gemini CLI to add native Termux
+support. **Once Google merges our fix, this fork will be discontinued** and
+users should migrate to the official `@google/gemini-cli` package.
+
+This fork exists **only** as a temporary solution until official Termux support
+is available.
 
 ### What We Do:
 
@@ -183,8 +191,4 @@ Apache License 2.0 - Same as upstream Google Gemini CLI.
 - **GitHub Repository**: https://github.com/DioNanos/gemini-cli
 - **Upstream (Google)**: https://github.com/google-gemini/gemini-cli
 - **Latest Release**: https://github.com/DioNanos/gemini-cli/releases/latest
-
----
-
-**Support this project**:
-[![ko-fi](https://img.shields.io/badge/☕_Buy_me_a_coffee-Ko--fi-FF5E5B?style=flat-square&logo=ko-fi)](https://ko-fi.com/dionanos)
+- **Upstream PR**: Pending Google review for native Termux support
