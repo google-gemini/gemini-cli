@@ -51,7 +51,7 @@ export interface UIActions {
   handleResumeSession: (session: SessionInfo) => Promise<void>;
   handleDeleteSession: (session: SessionInfo) => Promise<void>;
   setQueueErrorMessage: (message: string | null) => void;
-  popAllMessages: (onPop: (messages: string | undefined) => void) => void;
+  popAllMessages: () => string | undefined;
   handleApiKeySubmit: (apiKey: string) => Promise<void>;
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
