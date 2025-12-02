@@ -4,18 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as path from 'node:path';
 import {
   loadGlobalMemory,
   loadEnvironmentMemory,
   loadJitSubdirectoryMemory,
+  concatenateInstructions,
 } from '../utils/memoryDiscovery.js';
 import type { ExtensionLoader } from '../utils/extensionLoader.js';
 import type { Config } from '../config/config.js';
 
 export class ContextManager {
-  private loadedPaths: Set<string> = new Set();
-  private config: Config;
+  private readonly loadedPaths: Set<string> = new Set();
+  private readonly config: Config;
   private globalMemory: string = '';
   private environmentMemory: string = '';
 
@@ -29,7 +29,10 @@ export class ContextManager {
   async loadGlobalMemory(): Promise<string> {
     const result = await loadGlobalMemory(this.config.getDebugMode());
     this.markAsLoaded(result.files.map((f) => f.path));
-    this.globalMemory = this.formatMemory(result.files);
+    this.globalMemory = concatenateInstructions(
+      result.files.map((f) => ({ filePath: f.path, content: f.content })),
+      this.config.getWorkingDir(),
+    );
     return this.globalMemory;
   }
 
@@ -46,7 +49,10 @@ export class ContextManager {
       this.config.getDebugMode(),
     );
     this.markAsLoaded(result.files.map((f) => f.path));
-    this.environmentMemory = this.formatMemory(result.files);
+    this.environmentMemory = concatenateInstructions(
+      result.files.map((f) => ({ filePath: f.path, content: f.content })),
+      this.config.getWorkingDir(),
+    );
     return this.environmentMemory;
   }
 
@@ -70,7 +76,10 @@ export class ContextManager {
     }
 
     this.markAsLoaded(result.files.map((f) => f.path));
-    return this.formatMemory(result.files);
+    return concatenateInstructions(
+      result.files.map((f) => ({ filePath: f.path, content: f.content })),
+      this.config.getWorkingDir(),
+    );
   }
 
   getGlobalMemory(): string {
@@ -87,30 +96,16 @@ export class ContextManager {
     }
   }
 
-  private formatMemory(
-    files: Array<{ path: string; content: string }>,
-  ): string {
-    const cwd = this.config.getWorkingDir();
-    return files
-      .map((file) => {
-        const displayPath = path.isAbsolute(file.path)
-          ? path.relative(cwd, file.path)
-          : file.path;
-        return `--- Context from: ${displayPath} ---
-${file.content.trim()}
---- End of Context from: ${displayPath} ---`;
-      })
-      .join('\n\n');
-  }
-
   /**
-   * Resets the loaded paths tracking. Useful for testing or full reloads.
+   * Resets the loaded paths tracking and memory. Useful for testing or full reloads.
    */
   reset(): void {
     this.loadedPaths.clear();
+    this.globalMemory = '';
+    this.environmentMemory = '';
   }
 
-  getLoadedPaths(): Set<string> {
+  getLoadedPaths(): ReadonlySet<string> {
     return this.loadedPaths;
   }
 }

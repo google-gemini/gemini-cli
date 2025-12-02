@@ -11,7 +11,16 @@ import type { Config } from '../config/config.js';
 import type { ExtensionLoader } from '../utils/extensionLoader.js';
 
 // Mock memoryDiscovery module
-vi.mock('../utils/memoryDiscovery.js');
+vi.mock('../utils/memoryDiscovery.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/memoryDiscovery.js')>();
+  return {
+    ...actual,
+    loadGlobalMemory: vi.fn(),
+    loadEnvironmentMemory: vi.fn(),
+    loadJitSubdirectoryMemory: vi.fn(),
+  };
+});
 
 describe('ContextManager', () => {
   let contextManager: ContextManager;
@@ -111,6 +120,29 @@ describe('ContextManager', () => {
       ]);
 
       expect(result).toBe('');
+    });
+  });
+
+  describe('reset', () => {
+    it('should clear loaded paths and memory', async () => {
+      // Setup some state
+      const mockResult: memoryDiscovery.MemoryLoadResult = {
+        files: [
+          { path: '/home/user/.gemini/GEMINI.md', content: 'Global Content' },
+        ],
+      };
+      vi.mocked(memoryDiscovery.loadGlobalMemory).mockResolvedValue(mockResult);
+      await contextManager.loadGlobalMemory();
+
+      expect(contextManager.getLoadedPaths().size).toBeGreaterThan(0);
+      expect(contextManager.getGlobalMemory()).toBeTruthy();
+
+      // Reset
+      contextManager.reset();
+
+      expect(contextManager.getLoadedPaths().size).toBe(0);
+      expect(contextManager.getGlobalMemory()).toBe('');
+      expect(contextManager.getEnvironmentMemory()).toBe('');
     });
   });
 });
