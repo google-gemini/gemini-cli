@@ -390,7 +390,7 @@ root directory's `CONTRIBUTING.md` file.
   to act as a strategic partner. The user experience should be a primary concern
   with every change to documentation. Aim to fill gaps in existing knowledge and
   ensure that previously missing information is covered while keeping
-  documnetation concise and easy for users to understand. Whenever changes would
+  documentation concise and easy for users to understand. Whenever changes would
   hinder user understanding or accessibility, you must proactively raise these
   concerns and propose alternatives.
 - **Seek confirmation or clarification:** If there is something you do not
