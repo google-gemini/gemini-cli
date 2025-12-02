@@ -48,6 +48,7 @@ import type {
   RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
+  UserPositiveFeedbackEvent,
   LlmLoopCheckEvent,
   HookCallEvent,
 } from './types.js';
@@ -655,11 +656,11 @@ export function logWebFetchFallbackAttempt(
   logger.emit(logRecord);
 }
 
-export function logLlmLoopCheck(
+export function logUserPositiveFeedback(
   config: Config,
-  event: LlmLoopCheckEvent,
+  event: UserPositiveFeedbackEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logLlmLoopCheckEvent(event);
+  ClearcutLogger.getInstance(config)?.logUserPositiveFeedbackEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
