@@ -1,6 +1,6 @@
 # Latest stable release: v0.18.4
 
-Released: November 26, 2026
+Released: November 26, 2025
 
 For most users, our latest stable release is the recommended release. Install
 the latest stable version with:

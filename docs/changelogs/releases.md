@@ -14,9 +14,9 @@ on GitHub.
 
 | Release channel | Release                                                                               | Notes                                           |
 | :-------------- | :------------------------------------------------------------------------------------ | :---------------------------------------------- |
-| Nightly         | [v0.19.0-nightly.20251126.03845198c](#release-v0200-nightly2025120229920b16d-nightly) | Nightly release with the most recent changes.   |
+| Nightly         | [v0.20.0-nightly.20251202.29920b16d](#release-v0200-nightly2025120229920b16d-nightly) | Nightly release with the most recent changes.   |
 | Preview         | [v0.19.0-preview.0](#release-v0190-preview0-preview)                                  | Experimental features ready for early feedback. |
-| Latest          | [v0.18.0](#release-v0180---v0184-latest)                                              | Stable, recommended for general use.            |
+| Latest          | [v0.18.4](#release-v0180---v0184-latest)                                              | Stable, recommended for general use.            |
 
 ## Release v0.20.0-nightly.20251202.29920b16d (Nightly)
 
