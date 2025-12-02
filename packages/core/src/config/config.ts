@@ -309,6 +309,7 @@ export interface ConfigParameters {
   };
   previewFeatures?: boolean;
   enableModelAvailabilityService?: boolean;
+  onModelChange?: (model: string) => Promise<void>;
 }
 
 export class Config {
@@ -423,6 +424,9 @@ export class Config {
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
+  private readonly onModelChange:
+    | ((model: string) => Promise<void>)
+    | undefined;
 
   private previewModelFallbackMode = false;
   private previewModelBypassMode = false;
@@ -567,6 +571,7 @@ export class Config {
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
     this.experiments = params.experiments;
+    this.onModelChange = params.onModelChange;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -780,6 +785,9 @@ export class Config {
     if (this.model !== newModel || this.inFallbackMode) {
       this.model = newModel;
       coreEvents.emitModelChanged(newModel);
+      if (this.onModelChange) {
+        void this.onModelChange(newModel);
+      }
     }
     this.setFallbackMode(false);
   }
