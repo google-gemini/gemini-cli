@@ -56,8 +56,6 @@ export async function runZedIntegration(
   const stdout = Writable.toWeb(workingStdout) as WritableStream;
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
-  console.debug = console.error;
-
   new acp.AgentSideConnection(
     (client: acp.Client) => new GeminiAgent(config, settings, argv, client),
     stdout,
