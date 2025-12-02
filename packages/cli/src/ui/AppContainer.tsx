@@ -832,11 +832,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useLayoutEffect(() => {
     if (mainControlsRef.current) {
       const fullFooterMeasurement = measureElement(mainControlsRef.current);
-      if (fullFooterMeasurement.height > 0) {
+      if (
+        fullFooterMeasurement.height > 0 &&
+        fullFooterMeasurement.height !== controlsHeight
+      ) {
         setControlsHeight(fullFooterMeasurement.height);
       }
     }
-  }, [buffer, terminalWidth, terminalHeight]);
+  }, [buffer, terminalWidth, terminalHeight, controlsHeight]);
 
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = Math.max(
