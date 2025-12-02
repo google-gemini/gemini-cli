@@ -93,7 +93,7 @@ jobs:
             core.info(`Issue Type Distribution in this batch: Bug=${bugCount}, No Type=${noTypeCount}, Other=${otherTypeCount}`);
 
             let processedCount = 0;
-            
+
             // Buckets for logging
             const bugLogs = [];
             const noTypeLogs = [];
@@ -119,9 +119,9 @@ jobs:
 
               if (isOld && isStale && isUnpopular && (isBug || isNoType)) {
                 const message = `Closing stale issue #${issue.number}: "${issue.title}" (${issue.html_url}) (Created: ${createdAt.toISOString()}, Reactions: ${reactionCount})`;
-                
+
                 processedCount++;
-                
+
                 if (isBug) {
                    bugLogs.push(message);
                 } else if (isNoType) {
@@ -160,4 +160,3 @@ jobs:
             } else {
               core.info(`\nTotal issues closed: ${processedCount}`);
             }
-
