@@ -26,7 +26,9 @@ export interface ExtensionConfig {
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
-  includeDirectories?: string[];
+  context?: {
+    includeDirectories?: string[];
+  };
   settings?: ExtensionSetting[];
 }
 

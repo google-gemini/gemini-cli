@@ -514,7 +514,11 @@ export class ExtensionManager extends ExtensionLoader {
           this.workspaceDir,
         ),
         id: getExtensionId(config, installMetadata),
-        includeDirectories: config.includeDirectories,
+        includeDirectories: config.context?.includeDirectories?.map((dir) =>
+          path.isAbsolute(dir) || dir.startsWith('~')
+            ? dir
+            : path.resolve(effectiveExtensionPath, dir),
+        ),
       };
       this.loadedExtensions = [...this.loadedExtensions, extension];
 

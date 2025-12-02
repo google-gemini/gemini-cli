@@ -37,7 +37,7 @@ export function createExtension({
       contextFileName,
       mcpServers,
       settings,
-      includeDirectories,
+      context: includeDirectories ? { includeDirectories } : undefined,
     }),
   );
 

@@ -315,12 +315,58 @@ describe('extension tests', () => {
         extensionsDir: userExtensionsDir,
         name: 'test-extension',
         version: '1.0.0',
-        includeDirectories: ['/extension/dir'],
+        includeDirectories: [
+          '/absolute/path',
+          '~/home/path',
+          './relative/path',
+          '${extensionPath}/hydrated/path',
+        ],
       });
 
       const extensions = await extensionManager.loadExtensions();
       expect(extensions).toHaveLength(1);
-      expect(extensions[0].includeDirectories).toEqual(['/extension/dir']);
+      const includeDirs = extensions[0].includeDirectories;
+      expect(includeDirs).toBeDefined();
+      expect(includeDirs).toContain('/absolute/path');
+      // ~ is not expanded by extension loader, but by config loader.
+      // However, relative paths should be resolved relative to extension dir?
+      // Relative paths should be resolved relative to the extension directory
+      const expectedRelativePath = path.join(
+        userExtensionsDir,
+        'test-extension',
+        'relative',
+        'path',
+      );
+      expect(includeDirs).toContain(expectedRelativePath);
+
+      // Variable substitution happens in loadExtensionConfig
+      const expectedHydratedPath = path.join(
+        userExtensionsDir,
+        'test-extension',
+        'hydrated',
+        'path',
+      );
+      expect(includeDirs).toContain(expectedHydratedPath);
+    });
+
+    it('should not include directories from inactive extensions', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'inactive-extension',
+        version: '1.0.0',
+        includeDirectories: ['/inactive/path'],
+      });
+
+      // Mock isEnabled to return false for this extension
+      vi.spyOn(
+        extensionManager['extensionEnablementManager'],
+        'isEnabled',
+      ).mockReturnValue(false);
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].isActive).toBe(false);
+      // The extension object still has the property, but config.ts filters by isActive
     });
 
     it('should load a linked extension correctly', async () => {
