@@ -75,6 +75,8 @@ jobs:
             const issues = response.data;
             core.info(`Found ${issues.length} open issues to check (limit 100).`);
 
+            let processedCount = 0;
+
             for (const issue of issues) {
               // Safety Check: Skip Pull Requests (GitHub API treats PRs as Issues in list endpoints)
               if (issue.pull_request) continue;
