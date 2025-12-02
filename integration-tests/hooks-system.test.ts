@@ -1021,25 +1021,52 @@ fi`;
 
       // Wait for clear to complete - the screen clears and shows the prompt again
       // We can't check for the debug message because it gets cleared
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // Give time for hooks to execute
+      // Use longer wait time in CI/Docker environments due to I/O latency
+      const isCI = process.env['CI'] === 'true';
+      const clearWaitTime = isCI ? 10000 : 2000;
+      await new Promise((resolve) => setTimeout(resolve, clearWaitTime));
 
       // Wait for telemetry to be written to disk
       await rig.waitForTelemetryReady();
 
       // Wait for hook telemetry events to be flushed to disk
       // In interactive mode, telemetry may be buffered, so we need to poll for the events
-      await poll(
+      const pollTimeout = isCI ? 60000 : 15000; // Much longer timeout for CI
+      const pollResult = await poll(
         () => {
           const hookLogs = rig.readHookLogs();
           // We expect at least 3 hook calls: SessionStart (startup), SessionEnd (clear), SessionStart (clear)
           return hookLogs.length >= 3;
         },
-        10000, // 10 second timeout
-        200, // check every 200ms
+        pollTimeout,
+        500, // check every 500ms (less frequent to reduce I/O)
       );
+
+      // If polling failed, log diagnostic info
+      if (!pollResult) {
+        const hookLogs = rig.readHookLogs();
+        const hookEvents = hookLogs.map((log) => log.hookCall.hook_event_name);
+        console.error(
+          `Polling timeout after ${pollTimeout}ms: Expected >= 3 hooks, got ${hookLogs.length}`,
+        );
+        console.error(
+          'Hooks found:',
+          hookEvents.length > 0 ? hookEvents.join(', ') : 'NONE',
+        );
+        console.error('Full hook logs:', JSON.stringify(hookLogs, null, 2));
+      }
 
       // Verify hooks executed
       const hookLogs = rig.readHookLogs();
+
+      // Diagnostic: Log which hooks we actually got
+      const hookEvents = hookLogs.map((log) => log.hookCall.hook_event_name);
+      if (hookLogs.length < 3) {
+        console.error(
+          `TEST FAILURE: Expected 3 hooks (SessionStart-startup, SessionEnd-clear, SessionStart-clear), got ${hookLogs.length}: [${hookEvents.length > 0 ? hookEvents.join(', ') : 'NONE'}]`,
+        );
+      }
+
       expect(hookLogs.length).toBeGreaterThanOrEqual(3); // SessionStart (startup), SessionEnd (clear), SessionStart (clear)
 
       // Find SessionEnd hook log

@@ -56,6 +56,10 @@ export const clearCommand: SlashCommand = {
       await fireSessionStartHook(messageBus, SessionStartSource.Clear);
     }
 
+    // Give the event loop a chance to process any pending telemetry operations
+    // This ensures logger.emit() calls have fully propagated to the BatchLogRecordProcessor
+    await new Promise((resolve) => setImmediate(resolve));
+
     // Flush telemetry to ensure hooks are written to disk immediately
     // This is critical for tests and environments with I/O latency
     if (config) {
