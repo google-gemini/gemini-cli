@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { AsyncFzf } from 'fzf';
 import { theme } from '../semantic-colors.js';
@@ -91,23 +91,16 @@ export function SettingsDialog({
   // Search state
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
-  const [fzfInstance, setFzfInstance] = useState<AsyncFzf<string[]> | null>(
-    null,
+  const [filteredKeys, setFilteredKeys] = useState<string[]>(() =>
+    getDialogSettingKeys(),
   );
-  // Map to get key from search result (which could be label or key)
-  const [searchMap, setSearchMap] = useState<Map<string, string>>(new Map());
-
-  // Initialize FZF
-  useEffect(() => {
+  const { fzfInstance, searchMap } = useMemo(() => {
     const keys = getDialogSettingKeys();
     const map = new Map<string, string>();
     const searchItems: string[] = [];
 
     keys.forEach((key) => {
       const def = getSettingDefinition(key);
-      searchItems.push(key);
-      map.set(key.toLowerCase(), key);
       if (def?.label) {
         searchItems.push(def.label);
         map.set(def.label.toLowerCase(), key);
@@ -118,13 +111,12 @@ export function SettingsDialog({
       fuzzy: 'v2',
       casing: 'case-insensitive',
     });
-    setFzfInstance(fzf);
-    setSearchMap(map);
-    setFilteredKeys(keys); // Default to all
+    return { fzfInstance: fzf, searchMap: map };
   }, []);
 
   // Perform search
   useEffect(() => {
+    let active = true;
     if (!searchQuery.trim() || !fzfInstance) {
       setFilteredKeys(getDialogSettingKeys());
       return;
@@ -132,6 +124,9 @@ export function SettingsDialog({
 
     const doSearch = async () => {
       const results = await fzfInstance.find(searchQuery);
+
+      if (!active) return;
+
       const matchedKeys = new Set<string>();
       results.forEach((res: FzfResult) => {
         const key = searchMap.get(res.item.toLowerCase());
@@ -143,6 +138,10 @@ export function SettingsDialog({
     };
 
     doSearch();
+
+    return () => {
+      active = false;
+    };
   }, [searchQuery, fzfInstance, searchMap]);
 
   // Local pending settings state for the selected scope
