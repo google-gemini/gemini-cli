@@ -103,7 +103,6 @@ export interface LogResponse {
 export interface LogEventEntry {
   event_time_ms: number;
   source_extension_json: string;
-  gws_experiment: number[];
 }
 
 export interface EventValue {
@@ -147,6 +146,13 @@ function determineSurface(): string {
   } else {
     return 'SURFACE_NOT_SET';
   }
+}
+
+/**
+ * Determines the GitHub Actions workflow name if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHWorkflowName(): string | undefined {
+  return process.env['GH_WORKFLOW_NAME'];
 }
 
 /**
@@ -226,28 +232,55 @@ export class ClearcutLogger {
     ClearcutLogger.instance = undefined;
   }
 
+  enqueueHelper(event: LogEvent): void {
+    // Manually handle overflow for FixedDeque, which throws when full.
+    const wasAtCapacity = this.events.size >= MAX_EVENTS;
+
+    if (wasAtCapacity) {
+      this.events.shift(); // Evict oldest element to make space.
+    }
+
+    this.events.push([
+      {
+        event_time_ms: Date.now(),
+        source_extension_json: safeJsonStringify(event),
+      },
+    ]);
+
+    if (wasAtCapacity && this.config?.getDebugMode()) {
+      debugLogger.debug(
+        `ClearcutLogger: Dropped old event to prevent memory leak (queue size: ${this.events.size})`,
+      );
+    }
+  }
+
   enqueueLogEvent(event: LogEvent): void {
     try {
-      // Manually handle overflow for FixedDeque, which throws when full.
-      const wasAtCapacity = this.events.size >= MAX_EVENTS;
-
-      if (wasAtCapacity) {
-        this.events.shift(); // Evict oldest element to make space.
+      this.enqueueHelper(event);
+    } catch (error) {
+      if (this.config?.getDebugMode()) {
+        console.error('ClearcutLogger: Failed to enqueue log event.', error);
       }
+    }
+  }
 
-      this.events.push([
-        {
-          event_time_ms: Date.now(),
-          source_extension_json: safeJsonStringify(event),
-          gws_experiment: this.config?.getExperiments()?.experimentIds ?? [],
-        },
-      ]);
+  async enqueueLogEventAfterExperimentsLoadAsync(
+    event: LogEvent,
+  ): Promise<void> {
+    try {
+      this.config?.getExperimentsAsync().then((experiments) => {
+        if (experiments) {
+          const exp_id_data: EventValue[] = [
+            {
+              gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXPERIMENT_IDS,
+              value: experiments.experimentIds.toString() ?? 'NA',
+            },
+          ];
+          event.event_metadata = [[...event.event_metadata[0], ...exp_id_data]];
+        }
 
-      if (wasAtCapacity && this.config?.getDebugMode()) {
-        debugLogger.debug(
-          `ClearcutLogger: Dropped old event to prevent memory leak (queue size: ${this.events.size})`,
-        );
-      }
+        this.enqueueHelper(event);
+      });
     } catch (error) {
       if (this.config?.getDebugMode()) {
         console.error('ClearcutLogger: Failed to enqueue log event.', error);
@@ -259,46 +292,43 @@ export class ClearcutLogger {
     eventName: EventNames,
     data: EventValue[] = [],
   ): LogEvent {
+    const email = this.userAccountManager.getCachedGoogleAccount();
     const surface = determineSurface();
-    return {
+    const ghWorkflowName = determineGHWorkflowName();
+
+    const baseMetadata: EventValue[] = [
+      ...data,
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
+        value: CLI_VERSION,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
+        value: GIT_COMMIT_INFO,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
+        value: process.platform,
+      },
+    ];
+
+    if (ghWorkflowName) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
+        value: ghWorkflowName,
+      });
+    }
+
+    const logEvent: LogEvent = {
       console_type: 'GEMINI_CLI',
       application: 102, // GEMINI_CLI
       event_name: eventName as string,
-      event_metadata: [
-        [
-          ...data,
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-            value: surface,
-          },
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
-            value: CLI_VERSION,
-          },
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
-            value: GIT_COMMIT_INFO,
-          },
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
-            value: process.platform,
-          },
-        ],
-      ],
+      event_metadata: [baseMetadata],
     };
-  }
-
-  createLogEvent(eventName: EventNames, data: EventValue[] = []): LogEvent {
-    const email = this.userAccountManager.getCachedGoogleAccount();
-
-    if (eventName !== EventNames.START_SESSION) {
-      data.push(...this.sessionData);
-    }
-    const totalAccounts = this.userAccountManager.getLifetimeGoogleAccounts();
-
-    data = this.addDefaultFields(data, totalAccounts);
-
-    const logEvent = this.createBasicLogEvent(eventName, data);
 
     // Should log either email or install ID, not both. See go/cloudmill-1p-oss-instrumentation#define-sessionable-id
     if (email) {
@@ -308,6 +338,17 @@ export class ClearcutLogger {
     }
 
     return logEvent;
+  }
+
+  createLogEvent(eventName: EventNames, data: EventValue[] = []): LogEvent {
+    if (eventName !== EventNames.START_SESSION) {
+      data.push(...this.sessionData);
+    }
+    const totalAccounts = this.userAccountManager.getLifetimeGoogleAccounts();
+
+    data = this.addDefaultFields(data, totalAccounts);
+
+    return this.createBasicLogEvent(eventName, data);
   }
 
   flushIfNeeded(): void {
@@ -492,10 +533,13 @@ export class ClearcutLogger {
     ];
     this.sessionData = data;
 
-    // Flush start event immediately
-    this.enqueueLogEvent(this.createLogEvent(EventNames.START_SESSION, data));
-    this.flushToClearcut().catch((error) => {
-      debugLogger.debug('Error flushing to Clearcut:', error);
+    // Flush after experiments finish loading from CCPA server
+    this.enqueueLogEventAfterExperimentsLoadAsync(
+      this.createLogEvent(EventNames.START_SESSION, data),
+    ).then(() => {
+      this.flushToClearcut().catch((error) => {
+        debugLogger.debug('Error flushing to Clearcut:', error);
+      });
     });
   }
 
@@ -832,8 +876,14 @@ export class ClearcutLogger {
       },
     ];
 
-    this.enqueueLogEvent(this.createLogEvent(EventNames.IDE_CONNECTION, data));
-    this.flushIfNeeded();
+    // Flush after experiments finish loading from CCPA server
+    this.enqueueLogEventAfterExperimentsLoadAsync(
+      this.createLogEvent(EventNames.START_SESSION, data),
+    ).then(() => {
+      this.flushToClearcut().catch((error) => {
+        debugLogger.debug('Error flushing to Clearcut:', error);
+      });
+    });
   }
 
   logConversationFinishedEvent(event: ConversationFinishedEvent): void {
@@ -1342,6 +1392,12 @@ export class ClearcutLogger {
         value: this.config?.isInteractive().toString() ?? 'false',
       },
     ];
+    if (this.config?.getExperiments()) {
+      defaultLogMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXPERIMENT_IDS,
+        value: this.config?.getExperiments()?.experimentIds.toString() ?? 'NA',
+      });
+    }
     return [...data, ...defaultLogMetadata];
   }
 

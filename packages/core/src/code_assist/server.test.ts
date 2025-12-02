@@ -380,4 +380,38 @@ describe('CodeAssistServer', () => {
     });
     expect(response).toEqual(mockResponse);
   });
+
+  it('should call the retrieveUserQuota endpoint', async () => {
+    const client = new OAuth2Client();
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
+    const mockResponse = {
+      buckets: [
+        {
+          modelId: 'gemini-2.5-pro',
+          tokenType: 'REQUESTS',
+          remainingFraction: 0.75,
+          resetTime: '2025-10-22T16:01:15Z',
+        },
+      ],
+    };
+    const requestPostSpy = vi
+      .spyOn(server, 'requestPost')
+      .mockResolvedValue(mockResponse);
+
+    const req = {
+      project: 'projects/my-cloudcode-project',
+      userAgent: 'CloudCodePlugin/1.0 (gaghosh)',
+    };
+
+    const response = await server.retrieveUserQuota(req);
+
+    expect(requestPostSpy).toHaveBeenCalledWith('retrieveUserQuota', req);
+    expect(response).toEqual(mockResponse);
+  });
 });
