@@ -1,7 +1,7 @@
 This file contains third-party software notices and license terms.
 
 ============================================================
-@modelcontextprotocol/sdk@1.22.0
+@modelcontextprotocol/sdk@1.23.0
 (git+https://github.com/modelcontextprotocol/typescript-sdk.git)
 
 MIT License
@@ -2352,7 +2352,7 @@ SOFTWARE.
 
 
 ============================================================
-zod-to-json-schema@3.24.6
+zod-to-json-schema@3.25.0
 (https://github.com/StefanTerdell/zod-to-json-schema)
 
 ISC License

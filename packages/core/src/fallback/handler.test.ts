@@ -32,6 +32,11 @@ import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import * as policyHelpers from '../availability/policyHelpers.js';
 import { createDefaultPolicy } from '../availability/policyCatalog.js';
+import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
+import { coreEvents } from '../utils/events.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import * as policyHelpers from '../availability/policyHelpers.js';
+import { createDefaultPolicy } from '../availability/policyCatalog.js';
 import {
   RetryableQuotaError,
   TerminalQuotaError,
