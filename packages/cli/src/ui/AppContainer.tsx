@@ -286,6 +286,37 @@ export const AppContainer = (props: AppContainerProps) => {
       startupProfiler.flush(config);
     })();
     registerCleanup(async () => {
+      // Fire SessionEnd hook
+      try {
+        const hookSystem = config.getHookSystem();
+        if (hookSystem) {
+          const { SessionEndReason } = await import('@google/gemini-cli-core');
+          await hookSystem
+            .getEventHandler()
+            .fireSessionEndEvent(SessionEndReason.Exit);
+        }
+      } catch (error) {
+        debugLogger.debug(
+          `[SessionEnd] Error firing SessionEnd hook: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      // Generate and save session summary
+      const chatRecordingService = config
+        .getGeminiClient()
+        ?.getChatRecordingService();
+      if (chatRecordingService) {
+        try {
+          const { generateAndSaveSummary } = await import(
+            '@google/gemini-cli-core'
+          );
+          await generateAndSaveSummary(config, chatRecordingService);
+        } catch (error) {
+          // Silently fail - we don't want to block exit
+          debugLogger.debug(
+            `[SessionSummary] Error during cleanup: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
       // Turn off mouse scroll.
       disableMouseEvents();
       const ideClient = await IdeClient.getInstance();
