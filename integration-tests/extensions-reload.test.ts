@@ -5,7 +5,7 @@
  */
 
 import { expect, it, describe } from 'vitest';
-import { TestRig, poll } from './test-helper.js';
+import { TestRig } from './test-helper.js';
 import { TestMcpServer } from './test-mcp-server.js';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -77,18 +77,40 @@ describe('extension reloading', () => {
       await run.expectText(
         'test-extension (v0.0.1) - active (update available)',
       );
-      // Wait for the prompt to reappear.
-      await poll(() => stripAnsi(run.output).trim().endsWith('>'), 5000, 200);
-      await run.sendText('/mcp list');
-      await run.type('\r');
+      // Poll until the initial tool is loaded.
+      const pollForInitialTool = async () => {
+        const startTime = Date.now();
+        const timeout = 15000; // 15 seconds
+        while (Date.now() - startTime < timeout) {
+          await run.sendKeys('\u0015/mcp list\r');
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          const cleanOutput = stripAnsi(run.output);
+          if (cleanOutput.includes('- hello')) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      const initialToolAppeared = await pollForInitialTool();
+      expect(
+        initialToolAppeared,
+        `Initial tool "- hello" did not appear in /mcp list. Output:\n${stripAnsi(
+          run.output,
+        )}`,
+      ).toBe(true);
+
+      // Now check the full output
       await run.expectText(
         'test-server (from test-extension) - Ready (1 tool)',
       );
-      await run.expectText('- hello');
 
       // Update the extension, expect the list to update, and mcp servers as well.
-      await run.sendText('/extensions update test-extension');
-      await run.type('\r');
+      await run.sendKeys('\u0015/extensions update test-extension');
+      await run.expectText('/extensions update test-extension');
+      await run.sendKeys('\r');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await run.sendKeys('\r');
       await run.expectText(
         ` * test-server (remote): http://localhost:${portB}/mcp`,
       );
@@ -97,37 +119,42 @@ describe('extension reloading', () => {
         'Extension "test-extension" successfully updated: 0.0.1 → 0.0.2',
       );
 
-      // Wait for the extension to be updated by repeatedly checking the list.
-      const startTime = Date.now();
-      const timeout = 10000; // 10 seconds timeout for this operation
-      let isUpdated = false;
-      while (Date.now() - startTime < timeout) {
-        // Clear previous command and output before sending new one.
-        await run.sendKeys('\u0015'); // CTRL+U to clear line
-        await run.sendText('/extensions list');
-        await run.type('\r');
-        // Give time for the output to render
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        if (
-          stripAnsi(run.output).includes(
-            'test-extension (v0.0.2) - active (updated)',
-          )
-        ) {
-          isUpdated = true;
-          break;
+      // Poll until the new tool is loaded.
+      const pollForNewTool = async () => {
+        const startTime = Date.now();
+        const timeout = 15000; // 15 seconds
+        while (Date.now() - startTime < timeout) {
+          await run.sendKeys('\u0015/mcp list\r');
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          const cleanOutput = stripAnsi(run.output);
+          if (cleanOutput.includes('- goodbye')) {
+            return true;
+          }
         }
-      }
-      expect(isUpdated, 'Extension was not updated in time.').toBe(true);
+        return false;
+      };
 
-      // Now check the mcp server.
-      await run.sendText('/mcp list');
-      await run.type('\r');
+      const newToolAppeared = await pollForNewTool();
+      expect(
+        newToolAppeared,
+        `New tool "- goodbye" did not appear in /mcp list after update. Output:\n${stripAnsi(
+          run.output,
+        )}`,
+      ).toBe(true);
+
+      // Now that the new tool is present, the extension has been reloaded.
+      // We can check the output of /extensions list.
+      await run.sendKeys('\u0015/extensions list\r');
+      await run.expectText('test-extension (v0.0.2) - active (updated)');
+
+      // And we can check the full output of /mcp list as well.
+      await run.sendKeys('\u0015/mcp list\r');
       await run.expectText(
         'test-server (from test-extension) - Ready (1 tool)',
       );
       await run.expectText('- goodbye');
       await run.sendText('/quit');
-      await run.type('\r');
+      await run.sendKeys('\r');
 
       // Clean things up.
       await serverA.stop();
