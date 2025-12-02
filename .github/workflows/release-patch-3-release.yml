@@ -205,7 +205,7 @@ jobs:
           gh issue create \
             --title 'Patch Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
             --body 'The patch-release workflow failed. See the full run for details: ${DETAILS_URL}' \
-            --label 'kind/bug,release-failure,priority/p0'
+            --label 'release-failure,priority/p0'
 
       - name: 'Comment Success on Original PR'
         if: '${{ success() && github.event.inputs.original_pr }}'
