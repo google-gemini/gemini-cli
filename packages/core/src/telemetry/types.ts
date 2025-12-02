@@ -1081,11 +1081,13 @@ export class InvalidChunkEvent implements BaseTelemetryEvent {
   'event.name': 'invalid_chunk';
   'event.timestamp': string;
   error_message?: string; // Optional: validation error details
+  error_type?: string;
 
-  constructor(error_message?: string) {
+  constructor(error_message?: string, error_type?: string) {
     this['event.name'] = 'invalid_chunk';
     this['event.timestamp'] = new Date().toISOString();
     this.error_message = error_message;
+    this.error_type = error_type;
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
@@ -1098,11 +1100,14 @@ export class InvalidChunkEvent implements BaseTelemetryEvent {
     if (this.error_message) {
       attributes['error.message'] = this.error_message;
     }
+    if (this.error_type) {
+      attributes['error.type'] = this.error_type;
+    }
     return attributes;
   }
 
   toLogBody(): string {
-    return `Invalid chunk received from stream.`;
+    return `Invalid chunk received from stream. Type: ${this.error_type ?? 'unknown'}`;
   }
 }
 

@@ -80,6 +80,9 @@ export type ServerGeminiContextWindowWillOverflowEvent = {
 
 export type ServerGeminiInvalidStreamEvent = {
   type: GeminiEventType.InvalidStream;
+  value: {
+    errorType: string;
+  };
 };
 
 export type ServerGeminiModelInfoEvent = {
@@ -330,7 +333,10 @@ export class Turn {
       }
 
       if (e instanceof InvalidStreamError) {
-        yield { type: GeminiEventType.InvalidStream };
+        yield {
+          type: GeminiEventType.InvalidStream,
+          value: { errorType: e.type },
+        };
         return;
       }
 

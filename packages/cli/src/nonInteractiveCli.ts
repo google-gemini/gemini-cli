@@ -353,10 +353,12 @@ export async function runNonInteractive({
           } else if (event.type === GeminiEventType.Error) {
             throw event.value.error;
           } else if (event.type === GeminiEventType.InvalidStream) {
+            const errorType = event.value.errorType;
             logInvalidChunk(
               config,
               new InvalidChunkEvent(
-                '[silviojr]Invalid stream received from model',
+                'Invalid stream received from model',
+                errorType,
               ),
             );
             if (streamFormatter) {
@@ -364,11 +366,11 @@ export async function runNonInteractive({
                 type: JsonStreamEventType.ERROR,
                 timestamp: new Date().toISOString(),
                 severity: 'error',
-                message: '[silviojr]Invalid stream received from model',
+                message: `Invalid stream received from model: ${errorType}`,
               });
             } else {
               process.stderr.write(
-                '[silviojr]Invalid stream received from model\n',
+                `Invalid stream received from model: ${errorType}\n`,
               );
             }
           }
