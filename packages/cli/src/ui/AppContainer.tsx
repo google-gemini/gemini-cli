@@ -121,6 +121,7 @@ import { useSettings } from './contexts/SettingsContext.js';
 import { enableSupportedProtocol } from './utils/kittyProtocolDetector.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { enableBracketedPaste } from './utils/bracketedPaste.js';
+import { useBanner } from './hooks/useBanner.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -198,6 +199,16 @@ export const AppContainer = (props: AppContainerProps) => {
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');
   const [bannerVisible, setBannerVisible] = useState(true);
+
+  const bannerData = useMemo(
+    () => ({
+      defaultText: defaultBannerText,
+      warningText: warningBannerText,
+    }),
+    [defaultBannerText, warningBannerText],
+  );
+
+  const { bannerText } = useBanner(bannerData, config);
 
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
@@ -358,6 +369,7 @@ export const AppContainer = (props: AppContainerProps) => {
     }
     setHistoryRemountKey((prev) => prev + 1);
   }, [setHistoryRemountKey, isAlternateBuffer, stdout]);
+
   const handleEditorClose = useCallback(() => {
     if (
       shouldEnterAlternateScreen(isAlternateBuffer, config.getScreenReader())
@@ -380,6 +392,18 @@ export const AppContainer = (props: AppContainerProps) => {
       coreEvents.off(CoreEvent.ExternalEditorClosed, handleEditorClose);
     };
   }, [handleEditorClose]);
+
+  useEffect(() => {
+    if (
+      !(settings.merged.ui?.hideBanner || config.getScreenReader()) &&
+      bannerVisible &&
+      bannerText
+    ) {
+      // The header should show a banner but the Header is rendered in static
+      // so we must trigger a static refresh for it to be visible.
+      refreshStatic();
+    }
+  }, [bannerVisible, bannerText, settings, config, refreshStatic]);
 
   const {
     isThemeDialogOpen,
@@ -1363,7 +1387,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setDefaultBannerText(defaultBanner);
         setWarningBannerText(warningBanner);
         setBannerVisible(true);
-        refreshStatic();
         const authType = config.getContentGeneratorConfig()?.authType;
         if (
           authType === AuthType.USE_GEMINI ||
@@ -1472,10 +1495,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       customDialog,
       copyModeEnabled,
       warningMessage,
-      bannerData: {
-        defaultText: defaultBannerText,
-        warningText: warningBannerText,
-      },
+      bannerData,
       bannerVisible,
     }),
     [
@@ -1566,8 +1586,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       authState,
       copyModeEnabled,
       warningMessage,
-      defaultBannerText,
-      warningBannerText,
+      bannerData,
       bannerVisible,
     ],
   );
