@@ -43,7 +43,7 @@ jobs:
         env:
           DRY_RUN: '${{ inputs.dry_run }}'
         with:
-          github-token: '${{ steps.generate_token.outputs.token }}''
+          github-token: '${{ steps.generate_token.outputs.token }}'
           script: |
             const dryRun = process.env.DRY_RUN === 'true';
             if (dryRun) {
@@ -99,19 +99,19 @@ jobs:
                 core.info(message);
 
                 // 4. Comment
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issue.number,
-                  body: "Hello! As part of our effort to keep our backlog manageable and focus on the most active issues, we are tidying up older reports.\n\nIt looks like this issue hasn't been active for a while, so we are closing it for now. However, if you are still experiencing this bug on the latest stable build, please feel free to reopen this issue or create a new one with updated details.\n\nThank you for your contribution!"
-                });
+                // await github.rest.issues.createComment({
+                //   owner: context.repo.owner,
+                //   repo: context.repo.repo,
+                //   issue_number: issue.number,
+                //   body: "Hello! As part of our effort to keep our backlog manageable and focus on the most active issues, we are tidying up older reports.\n\nIt looks like this issue hasn't been active for a while, so we are closing it for now. However, if you are still experiencing this bug on the latest stable build, please feel free to reopen this issue or create a new one with updated details.\n\nThank you for your contribution!"
+                // });
 
                 // 5. Close
-                await github.rest.issues.update({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issue.number,
-                  state: 'closed'
-                });
+                // await github.rest.issues.update({
+                //   owner: context.repo.owner,
+                //   repo: context.repo.repo,
+                //   issue_number: issue.number,
+                //   state: 'closed'
+                // });
               }
             }
