@@ -1,4 +1,4 @@
-# Shell Tool (`run_shell_command`)
+# Shell tool (`run_shell_command`)
 
 This document describes the `run_shell_command` tool for the Gemini CLI.
 
@@ -71,7 +71,7 @@ run_shell_command(command="npm run dev &", description="Start development server
 You can configure the behavior of the `run_shell_command` tool by modifying your
 `settings.json` file or by using the `/settings` command in the Gemini CLI.
 
-### Enabling Interactive Commands
+### Enabling interactive commands
 
 To enable interactive commands, you need to set the
 `tools.shell.enableInteractiveShell` setting to `true`. This will use `node-pty`
@@ -91,7 +91,7 @@ implementation, which does not support interactive commands.
 }
 ```
 
-### Showing Color in Output
+### Showing color in output
 
 To show color in the shell output, you need to set the `tools.shell.showColor`
 setting to `true`. **Note: This setting only applies when
@@ -109,7 +109,7 @@ setting to `true`. **Note: This setting only applies when
 }
 ```
 
-### Setting the Pager
+### Setting the pager
 
 You can set a custom pager for the shell output by setting the
 `tools.shell.pager` setting. The default pager is `cat`. **Note: This setting
@@ -127,7 +127,7 @@ only applies when `tools.shell.enableInteractiveShell` is enabled.**
 }
 ```
 
-## Interactive Commands
+## Interactive commands
 
 The `run_shell_command` tool now supports interactive commands by integrating a
 pseudo-terminal (pty). This allows you to run commands that require real-time
@@ -149,13 +149,13 @@ including complex TUIs, will be rendered correctly.
   background. The `Background PIDs` field will contain the process ID of the
   background process.
 
-## Environment Variables
+## Environment variables
 
 When `run_shell_command` executes a command, it sets the `GEMINI_CLI=1`
 environment variable in the subprocess's environment. This allows scripts or
 tools to detect if they are being run from within the Gemini CLI.
 
-## Command Restrictions
+## Command restrictions
 
 You can restrict the commands that can be executed by the `run_shell_command`
 tool by using the `tools.core` and `tools.exclude` settings in your
@@ -174,16 +174,16 @@ configuration file.
 
 The validation logic is designed to be secure and flexible:
 
-1.  **Command Chaining Disabled**: The tool automatically splits commands
+1.  **Command chaining disabled**: The tool automatically splits commands
     chained with `&&`, `||`, or `;` and validates each part separately. If any
     part of the chain is disallowed, the entire command is blocked.
-2.  **Prefix Matching**: The tool uses prefix matching. For example, if you
+2.  **Prefix matching**: The tool uses prefix matching. For example, if you
     allow `git`, you can run `git status` or `git log`.
-3.  **Blocklist Precedence**: The `tools.exclude` list is always checked first.
+3.  **Blocklist precedence**: The `tools.exclude` list is always checked first.
     If a command matches a blocked prefix, it will be denied, even if it also
     matches an allowed prefix in `tools.core`.
 
-### Command Restriction Examples
+### Command restriction examples
 
 **Allow only specific command prefixes**
 
@@ -251,7 +251,7 @@ To block all shell commands, add the `run_shell_command` wildcard to
 - `ls -l`: Blocked
 - `any other command`: Blocked
 
-## Security Note for `excludeTools`
+## Security note for `excludeTools`
 
 Command-specific restrictions in `excludeTools` for `run_shell_command` are
 based on simple string matching and can be easily bypassed. This feature is

@@ -29,6 +29,7 @@ import {
   EDIT_TOOL_NAME,
   debugLogger,
   loadServerHierarchicalMemory,
+  WEB_FETCH_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -530,6 +531,7 @@ export async function loadCliConfig(
       SHELL_TOOL_NAME,
       EDIT_TOOL_NAME,
       WRITE_FILE_TOOL_NAME,
+      WEB_FETCH_TOOL_NAME,
     ];
     const autoEditExcludes = [SHELL_TOOL_NAME];
 
@@ -643,6 +645,7 @@ export async function loadCliConfig(
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell:
       settings.tools?.shell?.enableInteractiveShell ?? true,
+    shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,

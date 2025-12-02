@@ -56,6 +56,8 @@ import {
   enterAlternateScreen,
   disableLineWrapping,
   shouldEnterAlternateScreen,
+  startupProfiler,
+  ExitCodes,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -280,6 +282,7 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
+  const cliStartupHandle = startupProfiler.start('cli_startup');
   const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
@@ -288,7 +291,11 @@ export async function main() {
   });
 
   setupUnhandledRejectionHandler();
+  const loadSettingsHandle = startupProfiler.start('load_settings');
   const settings = loadSettings();
+  loadSettingsHandle?.end();
+
+  const migrateHandle = startupProfiler.start('migrate_settings');
   migrateDeprecatedSettings(
     settings,
     // Temporary extension manager only used during this non-interactive UI phase.
@@ -300,9 +307,12 @@ export async function main() {
       requestSetting: null,
     }),
   );
+  migrateHandle?.end();
   await cleanupCheckpoints();
 
+  const parseArgsHandle = startupProfiler.start('parse_arguments');
   const argv = await parseArguments(settings.merged);
+  parseArgsHandle?.end();
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
@@ -310,7 +320,7 @@ export async function main() {
       'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.\n',
     );
     await runExitCleanup();
-    process.exit(1);
+    process.exit(ExitCodes.FATAL_INPUT_ERROR);
   }
 
   const isDebugMode = cliConfig.isDebugMode(argv);
@@ -396,7 +406,7 @@ export async function main() {
         } catch (err) {
           debugLogger.error('Error authenticating:', err);
           await runExitCleanup();
-          process.exit(1);
+          process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
         }
       }
       let stdinData = '';
@@ -433,7 +443,7 @@ export async function main() {
         start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),
       );
       await runExitCleanup();
-      process.exit(0);
+      process.exit(ExitCodes.SUCCESS);
     } else {
       // Relaunch app so we always have a child process that can be internally
       // restarted if needed.
@@ -445,7 +455,9 @@ export async function main() {
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
   {
+    const loadConfigHandle = startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv);
+    loadConfigHandle?.end();
 
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
@@ -464,14 +476,14 @@ export async function main() {
         debugLogger.log(`- ${extension.name}`);
       }
       await runExitCleanup();
-      process.exit(0);
+      process.exit(ExitCodes.SUCCESS);
     }
 
     // Handle --list-sessions flag
     if (config.getListSessions()) {
       await listSessions(config);
       await runExitCleanup();
-      process.exit(0);
+      process.exit(ExitCodes.SUCCESS);
     }
 
     // Handle --delete-session flag
@@ -479,7 +491,7 @@ export async function main() {
     if (sessionToDelete) {
       await deleteSession(config, sessionToDelete);
       await runExitCleanup();
-      process.exit(0);
+      process.exit(ExitCodes.SUCCESS);
     }
 
     const wasRaw = process.stdin.isRaw;
@@ -513,7 +525,9 @@ export async function main() {
     }
 
     setMaxSizedBoxDebugging(isDebugMode);
+    const initAppHandle = startupProfiler.start('initialize_app');
     const initializationResult = await initializeApp(config, settings);
+    initAppHandle?.end();
 
     if (
       settings.merged.security?.auth?.selectedType ===
@@ -551,10 +565,11 @@ export async function main() {
           `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
         await runExitCleanup();
-        process.exit(1);
+        process.exit(ExitCodes.FATAL_INPUT_ERROR);
       }
     }
 
+    cliStartupHandle?.end();
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
       await startInteractiveUI(
@@ -569,6 +584,7 @@ export async function main() {
     }
 
     await config.initialize();
+    startupProfiler.flush(config);
 
     // If not a TTY, read from stdin
     // This is for cases where the user pipes input directly into the command
@@ -583,7 +599,7 @@ export async function main() {
         `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
       );
       await runExitCleanup();
-      process.exit(1);
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
     }
 
     const prompt_id = Math.random().toString(16).slice(2);
@@ -623,7 +639,7 @@ export async function main() {
     });
     // Call cleanup before process.exit, which causes cleanup to not run
     await runExitCleanup();
-    process.exit(0);
+    process.exit(ExitCodes.SUCCESS);
   }
 }
 
