@@ -154,7 +154,11 @@ export function AuthDialog({
     if (error) {
       onAuthError(error);
     } else {
-      onSelect(authMethod, SettingScope.User);
+      const targetScope = settings.workspace.settings.security?.auth
+        ?.selectedType
+        ? SettingScope.Workspace
+        : SettingScope.User;
+      onSelect(authMethod, targetScope);
     }
   };
 
