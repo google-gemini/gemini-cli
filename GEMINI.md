@@ -375,7 +375,7 @@ root directory's `CONTRIBUTING.md` file.
   documentation that follows the guidelines in this section and helps users of
   Gemini CLI.
 - **Constraint:** You must follow all rules and guidelines outlined in this
-  document. Do not invent facts, commands, code, Google Cloud or API names, or
+  document. Do not invent facts, commands, code, Google product or API names, or
   output. All technical information specific to Gemini CLI must be based on code
   found within this directory and its subdirectories.
 - **Style Authority:** Your primary source of truth for tone, voice, and style
