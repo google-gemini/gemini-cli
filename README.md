@@ -54,6 +54,31 @@ npm install -g @google/gemini-cli
 brew install gemini-cli
 ```
 
+#### Install on Termux (Android)
+
+**This fork includes Termux compatibility patches.** For Android devices:
+
+```bash
+npm install -g @mmmbuto/gemini-cli
+```
+
+Or build from source:
+
+```bash
+git clone https://github.com/DioNanos/gemini-cli.git
+cd gemini-cli
+npm install --ignore-optional --ignore-scripts
+npm run build && npm run bundle
+```
+
+See [docs/TERMUX.md](docs/TERMUX.md) for detailed Termux installation and
+troubleshooting.
+
+**Note:** This fork tracks `google-gemini/gemini-cli` upstream and includes
+minimal patches for Android compatibility (TERMUX\_\_PREFIX detection). Native
+modules (keytar, node-pty, tree-sitter-bash) are skipped but all core
+functionality works.
+
 ## Release Cadence and Tags
 
 See [Releases](./docs/releases.md) for more details.
