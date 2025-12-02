@@ -95,7 +95,7 @@ describe('ContextManager', () => {
         expect.any(Set),
         false,
       );
-      expect(result).toContain('--- Context from: src/GEMINI.md ---');
+      expect(result).toMatch(/--- Context from: src[\\/]GEMINI\.md ---/);
       expect(result).toContain('Src Content');
       expect(contextManager.getLoadedPaths()).toContain('/app/src/GEMINI.md');
     });
