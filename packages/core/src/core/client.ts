@@ -46,8 +46,6 @@ import {
   fireBeforeAgentHook,
   fireAfterAgentHook,
 } from './clientHookTriggers.js';
-import { firePreCompressHook } from './sessionHookTriggers.js';
-import { PreCompressTrigger } from '../hooks/types.js';
 import {
   ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
@@ -726,16 +724,6 @@ export class GeminiClient {
     prompt_id: string,
     force: boolean = false,
   ): Promise<ChatCompressionInfo> {
-    // Fire PreCompress hook before compression through MessageBus (only if hooks are enabled)
-    const hooksEnabled = this.config.getEnableHooks();
-    const messageBus = this.config.getMessageBus();
-    if (hooksEnabled && messageBus) {
-      const trigger = force
-        ? PreCompressTrigger.Manual
-        : PreCompressTrigger.Auto;
-      await firePreCompressHook(messageBus, trigger);
-    }
-
     // If the model is 'auto', we will use a placeholder model to check.
     // Compression occurs before we choose a model, so calling `count_tokens`
     // before the model is chosen would result in an error.

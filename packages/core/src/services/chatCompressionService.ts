@@ -21,8 +21,8 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
 } from '../config/models.js';
-import { fireSessionStartHook } from '../core/sessionHookTriggers.js';
-import { SessionStartSource } from '../hooks/types.js';
+import { firePreCompressHook } from '../core/sessionHookTriggers.js';
+import { PreCompressTrigger } from '../hooks/types.js';
 
 /**
  * Default threshold for compression token count as a fraction of the model's
@@ -125,6 +125,17 @@ export class ChatCompressionService {
       };
     }
 
+    // Fire PreCompress hook before compression (only if hooks are enabled)
+    // This fires for both manual and auto compression attempts
+    const hooksEnabled = config.getEnableHooks();
+    const messageBus = config.getMessageBus();
+    if (hooksEnabled && messageBus) {
+      const trigger = force
+        ? PreCompressTrigger.Manual
+        : PreCompressTrigger.Auto;
+      await firePreCompressHook(messageBus, trigger);
+    }
+
     const originalTokenCount = chat.getLastPromptTokenCount();
 
     // Don't compress if not forced and we are under the limit.
@@ -223,14 +234,6 @@ export class ChatCompressionService {
         },
       };
     } else {
-      // Fire SessionStart hook after successful compression through MessageBus
-      // This fires for both manual and auto compression
-      const hooksEnabled = config.getEnableHooks();
-      const messageBus = config.getMessageBus();
-      if (hooksEnabled && messageBus) {
-        await fireSessionStartHook(messageBus, SessionStartSource.Compress);
-      }
-
       return {
         newHistory: extraHistory,
         info: {
