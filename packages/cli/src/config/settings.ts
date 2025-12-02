@@ -35,16 +35,31 @@ import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import type { ExtensionManager } from './extension-manager.js';
 import { SettingPaths } from './settingPaths.js';
 
-function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
+export function getMergeStrategyForPath(
+  path: string[],
+): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
   let currentSchema: SettingsSchema | undefined = getSettingsSchema();
 
   for (const key of path) {
-    if (!currentSchema || !currentSchema[key]) {
+    if (currentSchema && currentSchema[key]) {
+      current = currentSchema[key];
+      currentSchema = current.properties;
+    } else if (current?.additionalProperties) {
+      // If the key is not explicitly defined, check if the parent has additionalProperties
+      // and if so, use that definition.
+      const additionalPropsDef = current.additionalProperties;
+      current = {
+        ...additionalPropsDef,
+        label: '', // Dummy values to satisfy SettingDefinition interface
+        category: '',
+        requiresRestart: false,
+        default: undefined,
+      } as SettingDefinition;
+      currentSchema = current.properties;
+    } else {
       return undefined;
     }
-    current = currentSchema[key];
-    currentSchema = current.properties;
   }
 
   return current?.mergeStrategy;

@@ -173,7 +173,7 @@
         "customThemes": {
           "title": "Custom Themes",
           "description": "Custom theme definitions.",
-          "markdownDescription": "Custom theme definitions. Can be an inline theme definition or a path to a theme file.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `{}`",
+          "markdownDescription": "Custom theme definitions.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `{}`",
           "default": {},
           "type": "object",
           "additionalProperties": {

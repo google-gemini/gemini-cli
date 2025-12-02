@@ -38,7 +38,7 @@ export const DEFAULT_THEME: Theme = DefaultDark;
 export class ThemeManager {
   private readonly availableThemes: Theme[];
   private activeTheme: Theme;
-  private customThemes: Map<string, Theme> = new Map(); // Key: settings.json key, Value: Theme object
+  private customThemes: Map<string, Theme> = new Map();
   private resolvedNameToTheme: Map<string, Theme> = new Map(); // Key: resolved theme name, Value: Theme object
   readonly themeFilePaths: Map<string, string> = new Map(); // Key: canonicalPath, Value: settings.json key
 
@@ -67,7 +67,7 @@ export class ThemeManager {
    */
   loadCustomThemes(customThemesSettings?: Record<string, CustomTheme>): void {
     this.customThemes.clear();
-    this.resolvedNameToTheme.clear(); // Clear this map as well
+    this.resolvedNameToTheme.clear();
     this.themeFilePaths.clear();
 
     if (!customThemesSettings) {
@@ -79,6 +79,14 @@ export class ThemeManager {
     )) {
       // Check if it's a file-based theme
       if (customThemeConfig.path) {
+        const invalidProperties = Object.keys(customThemeConfig).filter(
+          (prop) => prop !== 'path' && prop !== 'name' && prop !== 'type',
+        );
+        if (invalidProperties.length > 0) {
+          debugLogger.warn(
+            `Theme "${key}": File-based themes (with "path") must not have other properties specified in settings.json. Ignoring: ${invalidProperties.join(', ')}.`,
+          );
+        }
         this.loadThemeFromFileWithKey(
           key,
           customThemeConfig.path,

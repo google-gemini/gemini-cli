@@ -80,6 +80,7 @@ export interface SettingCollectionDefinition {
    * For example, a JSON schema generator can use this to point to a shared definition.
    */
   ref?: string;
+  mergeStrategy?: MergeStrategy;
 }
 
 export enum MergeStrategy {
@@ -360,6 +361,7 @@ const SETTINGS_SCHEMA = {
         additionalProperties: {
           type: 'object',
           ref: 'CustomTheme',
+          mergeStrategy: MergeStrategy.REPLACE,
         },
       },
       hideWindowTitle: {
