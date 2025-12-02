@@ -15,6 +15,7 @@ export const toolsCommand: SlashCommand = {
   name: 'tools',
   description: 'List available Gemini CLI tools. Usage: /tools [desc]',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: async (context: CommandContext, args?: string): Promise<void> => {
     const subCommand = args?.trim();
 
