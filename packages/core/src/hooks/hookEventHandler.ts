@@ -268,7 +268,7 @@ export class HookEventHandler {
     };
 
     const context: HookEventContext = { toolName };
-    return await this.executeHooks(HookEventName.BeforeTool, input, context);
+    return this.executeHooks(HookEventName.BeforeTool, input, context);
   }
 
   /**
@@ -288,7 +288,7 @@ export class HookEventHandler {
     };
 
     const context: HookEventContext = { toolName };
-    return await this.executeHooks(HookEventName.AfterTool, input, context);
+    return this.executeHooks(HookEventName.AfterTool, input, context);
   }
 
   /**
@@ -301,7 +301,7 @@ export class HookEventHandler {
       prompt,
     };
 
-    return await this.executeHooks(HookEventName.BeforeAgent, input);
+    return this.executeHooks(HookEventName.BeforeAgent, input);
   }
 
   /**
@@ -319,7 +319,7 @@ export class HookEventHandler {
       details,
     };
 
-    return await this.executeHooks(HookEventName.Notification, input);
+    return this.executeHooks(HookEventName.Notification, input);
   }
 
   /**
@@ -338,7 +338,7 @@ export class HookEventHandler {
       stop_hook_active: stopHookActive,
     };
 
-    return await this.executeHooks(HookEventName.AfterAgent, input);
+    return this.executeHooks(HookEventName.AfterAgent, input);
   }
 
   /**
@@ -353,7 +353,7 @@ export class HookEventHandler {
     };
 
     const context: HookEventContext = { trigger: source };
-    return await this.executeHooks(HookEventName.SessionStart, input, context);
+    return this.executeHooks(HookEventName.SessionStart, input, context);
   }
 
   /**
@@ -368,7 +368,7 @@ export class HookEventHandler {
     };
 
     const context: HookEventContext = { trigger: reason };
-    return await this.executeHooks(HookEventName.SessionEnd, input, context);
+    return this.executeHooks(HookEventName.SessionEnd, input, context);
   }
 
   /**
@@ -383,7 +383,7 @@ export class HookEventHandler {
     };
 
     const context: HookEventContext = { trigger };
-    return await this.executeHooks(HookEventName.PreCompress, input, context);
+    return this.executeHooks(HookEventName.PreCompress, input, context);
   }
 
   /**
@@ -398,7 +398,7 @@ export class HookEventHandler {
       llm_request: defaultHookTranslator.toHookLLMRequest(llmRequest),
     };
 
-    return await this.executeHooks(HookEventName.BeforeModel, input);
+    return this.executeHooks(HookEventName.BeforeModel, input);
   }
 
   /**
@@ -415,7 +415,7 @@ export class HookEventHandler {
       llm_response: defaultHookTranslator.toHookLLMResponse(llmResponse),
     };
 
-    return await this.executeHooks(HookEventName.AfterModel, input);
+    return this.executeHooks(HookEventName.AfterModel, input);
   }
 
   /**
@@ -430,7 +430,7 @@ export class HookEventHandler {
       llm_request: defaultHookTranslator.toHookLLMRequest(llmRequest),
     };
 
-    return await this.executeHooks(HookEventName.BeforeToolSelection, input);
+    return this.executeHooks(HookEventName.BeforeToolSelection, input);
   }
 
   /**

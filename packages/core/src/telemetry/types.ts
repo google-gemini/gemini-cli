@@ -31,6 +31,7 @@ import type { AgentTerminateMode } from '../agents/types.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import type { OTelFinishReason } from './semantic.js';
 import {
   toInputMessages,
   toOutputMessages,
@@ -363,30 +364,64 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
   'event.name': 'api_request';
   'event.timestamp': string;
   model: string;
-  prompt_id: string;
+  prompt: GenAIPromptDetails;
   request_text?: string;
 
-  constructor(model: string, prompt_id: string, request_text?: string) {
+  constructor(
+    model: string,
+    prompt_details: GenAIPromptDetails,
+    request_text?: string,
+  ) {
     this['event.name'] = 'api_request';
     this['event.timestamp'] = new Date().toISOString();
     this.model = model;
-    this.prompt_id = prompt_id;
+    this.prompt = prompt_details;
     this.request_text = request_text;
   }
 
-  toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
+  toLogRecord(config: Config): LogRecord {
+    const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': EVENT_API_REQUEST,
       'event.timestamp': this['event.timestamp'],
       model: this.model,
-      prompt_id: this.prompt_id,
+      prompt_id: this.prompt.prompt_id,
       request_text: this.request_text,
     };
+    return { body: `API request to ${this.model}.`, attributes };
   }
 
-  toLogBody(): string {
-    return `API request to ${this.model}.`;
+  toSemanticLogRecord(config: Config): LogRecord {
+    const { 'gen_ai.response.model': _, ...requestConventionAttributes } =
+      getConventionAttributes({
+        model: this.model,
+        auth_type: config.getContentGeneratorConfig()?.authType,
+      });
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_GEN_AI_OPERATION_DETAILS,
+      'event.timestamp': this['event.timestamp'],
+      ...toGenerateContentConfigAttributes(this.prompt.generate_content_config),
+      ...requestConventionAttributes,
+    };
+
+    if (this.prompt.server) {
+      attributes['server.address'] = this.prompt.server.address;
+      attributes['server.port'] = this.prompt.server.port;
+    }
+
+    if (config.getTelemetryLogPromptsEnabled() && this.prompt.contents) {
+      attributes['gen_ai.input.messages'] = JSON.stringify(
+        toInputMessages(this.prompt.contents),
+      );
+    }
+
+    const logRecord: LogRecord = {
+      body: `GenAI operation request details from ${this.model}.`,
+      attributes,
+    };
+
+    return logRecord;
   }
 }
 
@@ -545,6 +580,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
   prompt: GenAIPromptDetails;
   response: GenAIResponseDetails;
   usage: GenAIUsageDetails;
+  finish_reasons: OTelFinishReason[];
 
   constructor(
     model: string,
@@ -573,6 +609,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       tool_token_count: usage_data?.toolUsePromptTokenCount ?? 0,
       total_token_count: usage_data?.totalTokenCount ?? 0,
     };
+    this.finish_reasons = toFinishReasons(this.response.candidates);
   }
 
   toLogRecord(config: Config): LogRecord {
@@ -591,6 +628,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       prompt_id: this.prompt.prompt_id,
       auth_type: this.auth_type,
       status_code: this.status_code,
+      finish_reasons: this.finish_reasons,
     };
     if (this.response_text) {
       attributes['response_text'] = this.response_text;
@@ -613,9 +651,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       'event.name': EVENT_GEN_AI_OPERATION_DETAILS,
       'event.timestamp': this['event.timestamp'],
       'gen_ai.response.id': this.response.response_id,
-      'gen_ai.response.finish_reasons': toFinishReasons(
-        this.response.candidates,
-      ),
+      'gen_ai.response.finish_reasons': this.finish_reasons,
       'gen_ai.output.messages': JSON.stringify(
         toOutputMessages(this.response.candidates),
       ),
