@@ -157,24 +157,30 @@ export class EndSessionEvent implements BaseTelemetryEvent {
   'event.name': 'end_session';
   'event.timestamp': string;
   session_id?: string;
+  exit_code?: number;
 
-  constructor(config?: Config) {
+  constructor(exit_code?: number, config?: Config) {
     this['event.name'] = 'end_session';
     this['event.timestamp'] = new Date().toISOString();
     this.session_id = config?.getSessionId();
+    this.exit_code = exit_code;
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
+    const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': this['event.name'],
       'event.timestamp': this['event.timestamp'],
       session_id: this.session_id,
     };
+    if (this.exit_code !== undefined) {
+      attributes['exit_code'] = this.exit_code;
+    }
+    return attributes;
   }
 
   toLogBody(): string {
-    return 'Session ended.';
+    return `Session ended. Exit code: ${this.exit_code ?? 'unknown'}`;
   }
 }
 

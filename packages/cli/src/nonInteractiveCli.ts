@@ -28,6 +28,10 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
+  logInvalidChunk,
+  InvalidChunkEvent,
+  logEndSession,
+  EndSessionEvent,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -42,6 +46,8 @@ import {
   handleToolError,
   handleCancellationError,
   handleMaxTurnsExceededError,
+  getNumericExitCode,
+  extractErrorCode,
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
 
@@ -346,6 +352,25 @@ export async function runNonInteractive({
             }
           } else if (event.type === GeminiEventType.Error) {
             throw event.value.error;
+          } else if (event.type === GeminiEventType.InvalidStream) {
+            logInvalidChunk(
+              config,
+              new InvalidChunkEvent(
+                '[silviojr]Invalid stream received from model',
+              ),
+            );
+            if (streamFormatter) {
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.ERROR,
+                timestamp: new Date().toISOString(),
+                severity: 'error',
+                message: '[silviojr]Invalid stream received from model',
+              });
+            } else {
+              process.stderr.write(
+                '[silviojr]Invalid stream received from model\n',
+              );
+            }
           }
         }
 
@@ -432,11 +457,15 @@ export async function runNonInteractive({
           } else {
             textOutput.ensureTrailingNewline(); // Ensure a final newline
           }
+          logEndSession(config, new EndSessionEvent(0, config));
           return;
         }
       }
     } catch (error) {
       errorToHandle = error;
+      // Log end session event with error code before cleanup
+      const exitCode = getNumericExitCode(extractErrorCode(error));
+      logEndSession(config, new EndSessionEvent(exitCode, config));
     } finally {
       // Cleanup stdin cancellation before other cleanup
       cleanupStdinCancellation();

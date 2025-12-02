@@ -35,7 +35,7 @@ interface ErrorWithCode extends Error {
 /**
  * Extracts the appropriate error code from an error object.
  */
-function extractErrorCode(error: unknown): string | number {
+export function extractErrorCode(error: unknown): string | number {
   const errorWithCode = error as ErrorWithCode;
 
   // Prioritize exitCode for FatalError types, fall back to other codes
@@ -55,7 +55,7 @@ function extractErrorCode(error: unknown): string | number {
 /**
  * Converts an error code to a numeric exit code.
  */
-function getNumericExitCode(errorCode: string | number): number {
+export function getNumericExitCode(errorCode: string | number): number {
   return typeof errorCode === 'number' ? errorCode : 1;
 }
 

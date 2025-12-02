@@ -50,6 +50,7 @@ import type {
   ExtensionUpdateEvent,
   LlmLoopCheckEvent,
   HookCallEvent,
+  EndSessionEvent, // Added this line
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -79,6 +80,18 @@ export function logCliConfiguration(
   event: StartSessionEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logStartSessionEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
+  };
+  logger.emit(logRecord);
+}
+
+export function logEndSession(config: Config, event: EndSessionEvent): void {
+  ClearcutLogger.getInstance(config)?.logEndSessionEvent();
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
