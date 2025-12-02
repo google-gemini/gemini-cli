@@ -58,6 +58,7 @@ import {
   enableMouseEvents,
   disableLineWrapping,
   shouldEnterAlternateScreen,
+  startupProfiler,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -282,6 +283,7 @@ export const AppContainer = (props: AppContainerProps) => {
       // handled by the global catch.
       await config.initialize();
       setConfigInitialized(true);
+      startupProfiler.flush(config);
     })();
     registerCleanup(async () => {
       // Turn off mouse scroll.
@@ -830,11 +832,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useLayoutEffect(() => {
     if (mainControlsRef.current) {
       const fullFooterMeasurement = measureElement(mainControlsRef.current);
-      if (fullFooterMeasurement.height > 0) {
+      if (
+        fullFooterMeasurement.height > 0 &&
+        fullFooterMeasurement.height !== controlsHeight
+      ) {
         setControlsHeight(fullFooterMeasurement.height);
       }
     }
-  }, [buffer, terminalWidth, terminalHeight]);
+  }, [buffer, terminalWidth, terminalHeight, controlsHeight]);
 
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = Math.max(
