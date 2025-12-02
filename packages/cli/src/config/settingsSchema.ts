@@ -1447,6 +1447,38 @@ const SETTINGS_SCHEMA = {
     showInDialog: false,
     mergeStrategy: MergeStrategy.SHALLOW_MERGE,
   },
+
+  vertexai: {
+    type: 'boolean',
+    label: 'Use Vertex AI',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: undefined as boolean | undefined,
+    description: 'Use Vertex AI API instead of Gemini API.',
+    showInDialog: false,
+  },
+
+  project: {
+    type: 'string',
+    label: 'Google Cloud Project',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: undefined as string | undefined,
+    description:
+      'Google Cloud project ID for Vertex AI. Can also be set via GOOGLE_CLOUD_PROJECT environment variable.',
+    showInDialog: false,
+  },
+
+  location: {
+    type: 'string',
+    label: 'Google Cloud Location',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: undefined as string | undefined,
+    description:
+      'Google Cloud location for Vertex AI (e.g., "us-central1", "global"). Can also be set via GOOGLE_CLOUD_LOCATION environment variable.',
+    showInDialog: false,
+  },
 } as const satisfies SettingsSchema;
 
 export type SettingsSchemaType = typeof SETTINGS_SCHEMA;

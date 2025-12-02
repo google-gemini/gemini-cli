@@ -622,6 +622,9 @@ export async function loadCliConfig(
       process.env['HTTP_PROXY'] ||
       process.env['http_proxy'],
     httpOptions: settings.httpOptions,
+    vertexai: settings.vertexai,
+    vertexaiProject: settings.project,
+    vertexaiLocation: settings.location,
     cwd,
     fileDiscoveryService: fileService,
     bugCommand: settings.advanced?.bugCommand,

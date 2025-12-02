@@ -258,6 +258,9 @@ export interface ConfigParameters {
     timeout?: number;
     apiVersion?: string;
   };
+  vertexai?: boolean;
+  vertexaiProject?: string;
+  vertexaiLocation?: string;
   cwd: string;
   fileDiscoveryService?: FileDiscoveryService;
   includeDirectories?: string[];
@@ -375,6 +378,9 @@ export class Config {
         apiVersion?: string;
       }
     | undefined;
+  private readonly vertexai: boolean | undefined;
+  private readonly vertexaiProject: string | undefined;
+  private readonly vertexaiLocation: string | undefined;
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
@@ -500,6 +506,9 @@ export class Config {
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
     this.httpOptions = params.httpOptions;
+    this.vertexai = params.vertexai;
+    this.vertexaiProject = params.vertexaiProject;
+    this.vertexaiLocation = params.vertexaiLocation;
     this.cwd = params.cwd ?? process.cwd();
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
@@ -1153,6 +1162,18 @@ export class Config {
       }
     | undefined {
     return this.httpOptions;
+  }
+
+  getVertexAI(): boolean | undefined {
+    return this.vertexai;
+  }
+
+  getVertexAIProject(): string | undefined {
+    return this.vertexaiProject;
+  }
+
+  getVertexAILocation(): string | undefined {
+    return this.vertexaiLocation;
   }
 
   getWorkingDir(): string {
