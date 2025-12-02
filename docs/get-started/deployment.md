@@ -1,6 +1,6 @@
 Note: This page will be replaced by [installation.md](installation.md).
 
-# Gemini CLI Installation, Execution, and Deployment
+# Gemini CLI installation, execution, and deployment
 
 Install and run Gemini CLI. This document provides an overview of Gemini CLI's
 installation methods and deployment architecture.
@@ -44,7 +44,7 @@ downloading the Gemini CLI package from the NPM registry.
 For security and isolation, Gemini CLI can be run inside a container. This is
 the default way that the CLI executes tools that might have side effects.
 
-- **Directly from the Registry:** You can run the published sandbox image
+- **Directly from the registry:** You can run the published sandbox image
   directly. This is useful for environments where you only have Docker and want
   to run the CLI.
   ```bash
@@ -63,7 +63,7 @@ the default way that the CLI executes tools that might have side effects.
 Contributors to the project will want to run the CLI directly from the source
 code.
 
-- **Development Mode:** This method provides hot-reloading and is useful for
+- **Development mode:** This method provides hot-reloading and is useful for
   active development.
   ```bash
   # From the root of the repository
