@@ -20,10 +20,7 @@ import type { ContentGenerator } from './contentGenerator.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { createAvailabilityServiceMock } from '../availability/availabilityTestingUtils.js';
 import type { GenerateContentOptions } from './baseLlmClient.js';
-import type {
-  GenerateContentConfig,
-  GenerateContentResponse,
-} from '@google/genai';
+import type { GenerateContentResponse } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { AuthType } from './contentGenerator.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
@@ -32,6 +29,8 @@ import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { MalformedJsonResponseEvent } from '../telemetry/types.js';
 import { getErrorMessage } from '../utils/errors.js';
+import type { ModelConfigService } from '../services/modelConfigService.js';
+import { makeResolvedModelConfig } from '../test-utils/modelConfigMocks.js';
 
 vi.mock('../utils/errorReporting.js');
 vi.mock('../telemetry/loggers.js');
@@ -104,14 +103,10 @@ describe('BaseLlmClient', () => {
       getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
       isInteractive: vi.fn().mockReturnValue(false),
       modelConfigService: {
-        getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
-          model,
-          generateContentConfig: {
-            temperature: 0,
-            topP: 1,
-          },
-        })),
-      },
+        getResolvedConfig: vi
+          .fn()
+          .mockImplementation(({ model }) => makeResolvedModelConfig(model)),
+      } as unknown as ModelConfigService,
       isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(false),
       getModelAvailabilityService: vi.fn(),
       setActiveModel: vi.fn(),
@@ -797,22 +792,16 @@ describe('BaseLlmClient', () => {
       const fallbackModel = 'gemini-flash';
 
       // Provide distinct configs per model
-      const configByModel: Record<
-        string,
-        { model: string; generateContentConfig: Partial<GenerateContentConfig> }
-      > = {
-        [firstModel]: {
-          model: firstModel,
-          generateContentConfig: { temperature: 0.1 },
-        },
-        [fallbackModel]: {
-          model: fallbackModel,
-          generateContentConfig: { temperature: 0.9 },
-        },
-      };
-      vi.mocked(
+      const getResolvedConfigMock = vi.mocked(
         mockConfig.modelConfigService.getResolvedConfig,
-      ).mockImplementation(({ model }) => configByModel[model]);
+      );
+      getResolvedConfigMock
+        .mockReturnValueOnce(
+          makeResolvedModelConfig(firstModel, { temperature: 0.1 }),
+        )
+        .mockReturnValueOnce(
+          makeResolvedModelConfig(fallbackModel, { temperature: 0.9 }),
+        );
 
       // Availability selects the first model initially
       vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({

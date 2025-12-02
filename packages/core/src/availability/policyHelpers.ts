@@ -10,6 +10,7 @@ import type {
   FallbackAction,
   ModelPolicy,
   ModelPolicyChain,
+  RetryAvailabilityContext,
 } from './modelPolicy.js';
 import { createDefaultPolicy, getModelPolicyChain } from './policyCatalog.js';
 import { getEffectiveModel } from '../config/models.js';
@@ -26,7 +27,8 @@ export function resolvePolicyChain(
     previewEnabled: !!config.getPreviewFeatures(),
     userTier: config.getUserTier(),
   });
-  // TODO: This will be replaced when we get rid of Fallback Modes
+  // TODO: This will be replaced when we get rid of Fallback Modes.
+  // Switch to getActiveModel()
   const activeModel =
     preferredModel ??
     getEffectiveModel(
@@ -76,4 +78,30 @@ export function resolvePolicyAction(
   policy: ModelPolicy,
 ): FallbackAction {
   return policy.actions?.[failureKind] ?? 'prompt';
+}
+
+/**
+ * Creates a context provider for retry logic that returns the availability
+ * sevice and resolves the current model's policy.
+ *
+ * @param modelGetter A function that returns the model ID currently being attempted.
+ *        (Allows handling dynamic model changes during retries).
+ */
+export function createAvailabilityContextProvider(
+  config: Config,
+  modelGetter: () => string,
+): () => RetryAvailabilityContext | undefined {
+  return () => {
+    if (!config.isModelAvailabilityServiceEnabled()) {
+      return undefined;
+    }
+    const service = config.getModelAvailabilityService();
+    const currentModel = modelGetter();
+
+    // Resolve the chain for the specific model we are attempting.
+    const chain = resolvePolicyChain(config, currentModel);
+    const policy = chain.find((p) => p.model === currentModel);
+
+    return policy ? { service, policy } : undefined;
+  };
 }

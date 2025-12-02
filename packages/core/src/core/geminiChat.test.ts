@@ -30,6 +30,8 @@ import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { HookSystem } from '../hooks/hookSystem.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { createAvailabilityServiceMock } from '../availability/availabilityTestingUtils.js';
+import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
+import { makeResolvedModelConfig } from '../test-utils/modelConfigMocks.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -2358,9 +2360,7 @@ describe('GeminiChat', () => {
   });
 
   describe('Availability Service Integration', () => {
-    let mockAvailabilityService: ReturnType<
-      typeof createAvailabilityServiceMock
-    >;
+    let mockAvailabilityService: ModelAvailabilityService;
     let mockPolicyHelpers: typeof import('../availability/policyHelpers.js');
 
     beforeEach(async () => {
@@ -2484,6 +2484,90 @@ describe('GeminiChat', () => {
         'model-a',
         expect.anything(),
         error,
+      );
+    });
+
+    it('re-resolves generateContentConfig when active model changes between retries', async () => {
+      // Availability enabled with stateful active model
+      let activeModel = 'model-a';
+      vi.mocked(mockConfig.getActiveModel).mockImplementation(
+        () => activeModel,
+      );
+      vi.mocked(mockConfig.setActiveModel).mockImplementation((model) => {
+        activeModel = model;
+      });
+
+      // Different configs per model
+      vi.mocked(mockConfig.modelConfigService.getResolvedConfig)
+        .mockReturnValueOnce(
+          makeResolvedModelConfig('model-a', { temperature: 0.1 }),
+        )
+        .mockReturnValueOnce(
+          makeResolvedModelConfig('model-b', { temperature: 0.9 }),
+        );
+
+      // First attempt uses model-a, then simulate availability switching to model-b
+      mockRetryWithBackoff.mockImplementation(async (apiCall) => {
+        await apiCall(); // first attempt
+        activeModel = 'model-b'; // simulate switch before retry
+        return apiCall(); // second attempt
+      });
+
+      // Generators for each attempt
+      const firstResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'first' }], role: 'model' },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      const secondResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'second' }], role: 'model' },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockResolvedValueOnce(firstResponse)
+        .mockResolvedValueOnce(secondResponse);
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'test',
+        'prompt-config-refresh',
+        new AbortController().signal,
+      );
+      // Consume to drive both attempts
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          model: 'model-a',
+          config: expect.objectContaining({ temperature: 0.1 }),
+        }),
+        expect.any(String),
+      );
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          model: 'model-b',
+          config: expect.objectContaining({ temperature: 0.9 }),
+        }),
+        expect.any(String),
       );
     });
   });

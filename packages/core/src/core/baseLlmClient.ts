@@ -22,12 +22,12 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
 } from '../config/models.js';
-import {
-  retryWithBackoff,
-  type RetryAvailabilityContext,
-} from '../utils/retry.js';
+import { retryWithBackoff } from '../utils/retry.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
-import { resolvePolicyChain } from '../availability/policyHelpers.js';
+import {
+  createAvailabilityContextProvider,
+  resolvePolicyChain,
+} from '../availability/policyHelpers.js';
 
 const DEFAULT_MAX_ATTEMPTS = 5;
 
@@ -241,19 +241,10 @@ export class BaseLlmClient {
     const abortSignal = requestParams.config?.abortSignal;
 
     // Define callback to fetch context dynamically since active model may get updated during retry loop
-    const getAvailabilityContext = (): RetryAvailabilityContext | undefined => {
-      if (!this.config.isModelAvailabilityServiceEnabled()) {
-        return undefined;
-      }
-      const service = this.config.getModelAvailabilityService();
-      // We want the policy for the model that was *just attempted* (and failed).
-      // Since apiCall updates requestParams.model before calling, requestParams.model
-      // holds the model we just tried.
-      const currentModel = requestParams.model;
-      const chain = resolvePolicyChain(this.config, currentModel);
-      const policy = chain.find((p) => p.model === currentModel);
-      return policy ? { service, policy } : undefined;
-    };
+    const getAvailabilityContext = createAvailabilityContextProvider(
+      this.config,
+      () => requestParams.model,
+    );
 
     if (this.config.isModelAvailabilityServiceEnabled()) {
       const chain = resolvePolicyChain(this.config);

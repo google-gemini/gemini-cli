@@ -57,7 +57,10 @@ import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
-import { resolvePolicyChain } from '../availability/policyHelpers.js';
+import {
+  createAvailabilityContextProvider,
+  resolvePolicyChain,
+} from '../availability/policyHelpers.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 
 const MAX_TURNS = 100;
@@ -408,7 +411,6 @@ export class GeminiClient {
     isInvalidStreamRetry: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
-      // resets modelAvailabilityService turn
       this.config.resetTurn();
     }
 
@@ -543,7 +545,7 @@ export class GeminiClient {
       modelToUse = decision.model;
     }
 
-    // --- Availability Logic Integration ---
+    // availability logic
     if (this.config.isModelAvailabilityServiceEnabled()) {
       const chain = resolvePolicyChain(this.config, modelToUse);
       const service = this.config.getModelAvailabilityService();
@@ -559,10 +561,7 @@ export class GeminiClient {
         }
       }
     }
-    // --------------------------------------
 
-    // Lock the model for the rest of the sequence
-    // If availability changed it, we lock to the *available* model.
     this.currentSequenceModel = modelToUse;
     yield { type: GeminiEventType.ModelInfo, value: modelToUse };
 
@@ -692,13 +691,10 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
-
-      // --- Availability Logic Integration ---
-      let availabilityContextFn:
+      let getAvailabilityContext:
         | (() => RetryAvailabilityContext | undefined)
         | undefined;
       if (this.config.isModelAvailabilityServiceEnabled()) {
-        // ... (logic to select initial model and set context) ...
         const chain = resolvePolicyChain(this.config, currentAttemptModel);
         const service = this.config.getModelAvailabilityService();
         const selection = service.selectFirstAvailable(
@@ -726,18 +722,15 @@ export class GeminiClient {
         }
 
         // Define callback to refresh context based on currentAttemptModel which might be updated by fallback handler
-        availabilityContextFn = () => {
-          const chain = resolvePolicyChain(this.config, currentAttemptModel);
-          const policy = chain.find((p) => p.model === currentAttemptModel);
-          return policy ? { service, policy } : undefined;
-        };
+        getAvailabilityContext = createAvailabilityContextProvider(
+          this.config,
+          () => currentAttemptModel,
+        );
       }
-      // --------------------------------------
 
       const apiCall = () => {
-        // If availability service is enabled, currentAttemptModel is already set correctly above.
-        // If NOT enabled, we use the legacy logic:
         let modelConfigToUse = desiredModelConfig;
+
         if (!this.config.isModelAvailabilityServiceEnabled()) {
           modelConfigToUse = this.config.isInFallbackMode()
             ? fallbackModelConfig
@@ -746,12 +739,7 @@ export class GeminiClient {
           currentAttemptGenerateContentConfig =
             modelConfigToUse.generateContentConfig;
         } else {
-          // In enabled mode, ensure we use the ACTIVE model if it changed.
-          // But wait, apiCall closure captures `currentAttemptModel`.
-          // If fallback handler changes active model, we need to pick it up here.
-          // `handleFallback` updates `activeModel`.
-          // `currentAttemptModel` is a local variable.
-          // We MUST update `currentAttemptModel` from `config.getActiveModel()` here.
+          // AvailabilityService
           const active = this.config.getActiveModel();
           if (active !== currentAttemptModel) {
             currentAttemptModel = active;
@@ -790,14 +778,11 @@ export class GeminiClient {
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: onPersistent429Callback,
         authType: this.config.getContentGeneratorConfig()?.authType,
-        getAvailabilityContext: availabilityContextFn,
+        getAvailabilityContext,
       });
-      // On success... (rest is fine)
 
       // On success, mark the model as healthy (if enabled)
       if (this.config.isModelAvailabilityServiceEnabled()) {
-        // Use the model from the LAST successful apiCall attempt.
-        // apiCall updates currentAttemptModel if enabled.
         this.config
           .getModelAvailabilityService()
           .markHealthy(currentAttemptModel);

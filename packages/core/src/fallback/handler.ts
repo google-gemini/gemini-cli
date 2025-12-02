@@ -214,45 +214,34 @@ async function processIntent(
 
   switch (intent) {
     case 'retry_always':
-      // If the error is non-retryable, e.g. TerminalQuota Error, trigger a regular fallback to flash.
-      // For all other errors, activate previewModel fallback.
-      if (
-        failedModel === PREVIEW_GEMINI_MODEL &&
-        !(error instanceof TerminalQuotaError)
-      ) {
-        activatePreviewModelFallbackMode(config);
+      if (isAvailabilityEnabled) {
+        // TODO(telemetry): Implement generic fallback event logging. Existing
+        // logFlashFallback is specific to a single Model.
+        config.setActiveModel(fallbackModel);
       } else {
-        if (isAvailabilityEnabled) {
-          // New Path: Update active model and log telemetry if relevant
-          if (
-            authType &&
-            fallbackModel === DEFAULT_GEMINI_FLASH_MODEL &&
-            !config.isInFallbackMode()
-          ) {
-            logFlashFallback(config, new FlashFallbackEvent(authType));
-          }
-          config.setActiveModel(fallbackModel);
+        // If the error is non-retryable, e.g. TerminalQuota Error, trigger a regular fallback to flash.
+        // For all other errors, activate previewModel fallback.
+        if (
+          failedModel === PREVIEW_GEMINI_MODEL &&
+          !(error instanceof TerminalQuotaError)
+        ) {
+          activatePreviewModelFallbackMode(config);
         } else {
-          // Legacy Path: Toggle fallback mode
           activateFallbackMode(config, authType);
         }
       }
       return true;
 
     case 'retry_once':
+      if (isAvailabilityEnabled) {
+        config.setActiveModel(fallbackModel);
+      }
       return true;
 
     case 'stop':
-      // Stop intent forces fallback mode in legacy to prevent immediate retry loop?
-      // Or just to inform UI.
       if (isAvailabilityEnabled) {
-        if (
-          authType &&
-          fallbackModel === DEFAULT_GEMINI_FLASH_MODEL &&
-          !config.isInFallbackMode()
-        ) {
-          logFlashFallback(config, new FlashFallbackEvent(authType));
-        }
+        // TODO(telemetry): Implement generic fallback event logging. Existing
+        // logFlashFallback is specific to a single Model.
         config.setActiveModel(fallbackModel);
       } else {
         activateFallbackMode(config, authType);

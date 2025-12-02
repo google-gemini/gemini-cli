@@ -48,8 +48,7 @@ import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
-import { resolvePolicyChain } from '../availability/policyHelpers.js';
-import type { RetryAvailabilityContext } from '../utils/retry.js';
+import { createAvailabilityContextProvider } from '../availability/policyHelpers.js';
 import {
   fireAfterModelHook,
   fireBeforeModelHook,
@@ -404,56 +403,60 @@ export class GeminiChat {
     requestContents: Content[],
     prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    let effectiveModel = model;
     const contentsForPreviewModel =
       this.ensureActiveLoopHasThoughtSignatures(requestContents);
 
-    // --- Availability Logic Integration ---
-    const getAvailabilityContext = (): RetryAvailabilityContext | undefined => {
-      if (!this.config.isModelAvailabilityServiceEnabled()) {
-        return undefined;
-      }
-      const service = this.config.getModelAvailabilityService();
-      // Use effectiveModel which tracks the last attempted model in apiCall
-      const chain = resolvePolicyChain(this.config, effectiveModel);
-      const policy = chain.find((p) => p.model === effectiveModel);
-      return policy ? { service, policy } : undefined;
-    };
-    // --------------------------------------
-
     // Track final request parameters for AfterModel hooks
     let lastModelToUse = model;
+    let currentGenerateContentConfig: GenerateContentConfig =
+      generateContentConfig;
     let lastConfig: GenerateContentConfig = generateContentConfig;
     let lastContentsToUse: Content[] = requestContents;
 
+    const getAvailabilityContext = createAvailabilityContextProvider(
+      this.config,
+      () => lastModelToUse,
+    );
     const apiCall = async () => {
       let modelToUse: string;
 
       if (this.config.isModelAvailabilityServiceEnabled()) {
         modelToUse = this.config.getActiveModel();
+        if (modelToUse !== lastModelToUse) {
+          const { generateContentConfig: newConfig } =
+            this.config.modelConfigService.getResolvedConfig({
+              model: modelToUse,
+            });
+          const { abortSignal } = currentGenerateContentConfig;
+          currentGenerateContentConfig = {
+            ...currentGenerateContentConfig,
+            ...newConfig,
+            abortSignal,
+          };
+        }
       } else {
         modelToUse = getEffectiveModel(
           this.config.isInFallbackMode(),
           model,
           this.config.getPreviewFeatures(),
         );
+
+        // Preview Model Bypass Logic:
+        // If we are in "Preview Model Bypass Mode" (transient failure), we force downgrade to 2.5 Pro
+        // IF the effective model is currently Preview Model.
+        // Note: In availability mode, this should ideally be handled by policy, but preserving
+        // bypass logic for now as it handles specific transient behavior.
+        if (
+          this.config.isPreviewModelBypassMode() &&
+          modelToUse === PREVIEW_GEMINI_MODEL
+        ) {
+          modelToUse = DEFAULT_GEMINI_MODEL;
+        }
       }
 
-      // Preview Model Bypass Logic:
-      // If we are in "Preview Model Bypass Mode" (transient failure), we force downgrade to 2.5 Pro
-      // IF the effective model is currently Preview Model.
-      // Note: In availability mode, this should ideally be handled by policy, but preserving
-      // bypass logic for now as it handles specific transient behavior.
-      if (
-        this.config.isPreviewModelBypassMode() &&
-        modelToUse === PREVIEW_GEMINI_MODEL
-      ) {
-        modelToUse = DEFAULT_GEMINI_MODEL;
-      }
-
-      effectiveModel = modelToUse;
+      lastModelToUse = modelToUse;
       const config = {
-        ...generateContentConfig,
+        ...currentGenerateContentConfig,
         // TODO(12622): Ensure we don't overrwrite these when they are
         // passed via config.
         systemInstruction: this.systemInstruction,
@@ -558,7 +561,7 @@ export class GeminiChat {
     const onPersistent429Callback = async (
       authType?: string,
       error?: unknown,
-    ) => handleFallback(this.config, effectiveModel, authType, error);
+    ) => handleFallback(this.config, lastModelToUse, authType, error);
 
     const streamResponse = await retryWithBackoff(apiCall, {
       onPersistent429: onPersistent429Callback,
@@ -575,7 +578,7 @@ export class GeminiChat {
 
     // On success, mark the model as healthy (if enabled)
     if (this.config.isModelAvailabilityServiceEnabled()) {
-      this.config.getModelAvailabilityService().markHealthy(effectiveModel);
+      this.config.getModelAvailabilityService().markHealthy(lastModelToUse);
     }
 
     // Store the original request for AfterModel hooks
@@ -586,7 +589,7 @@ export class GeminiChat {
     };
 
     return this.processStreamResponse(
-      effectiveModel,
+      lastModelToUse,
       streamResponse,
       originalRequest,
     );

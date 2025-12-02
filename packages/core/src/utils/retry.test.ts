@@ -107,7 +107,6 @@ describe('retryWithBackoff', () => {
 
     const promise = retryWithBackoff(mockFn);
 
-    // Expect it to fail with the error from the 5th attempt.
     await Promise.all([
       expect(promise).rejects.toThrow('Simulated error attempt 3'),
       vi.runAllTimersAsync(),
@@ -508,6 +507,7 @@ describe('retryWithBackoff', () => {
     let mockPolicy2: ModelPolicy;
 
     beforeEach(() => {
+      vi.useRealTimers();
       mockService = createAvailabilityServiceMock();
 
       mockPolicy1 = {
@@ -560,13 +560,11 @@ describe('retryWithBackoff', () => {
         }),
       ).rejects.toThrow(TerminalQuotaError);
 
-      // Verify first failure hit Policy 1
+      // Verify failures
       expect(mockService.markTerminal).toHaveBeenCalledWith('model-1', 'quota');
-
-      // Verify second failure hit Policy 2
       expect(mockService.markTerminal).toHaveBeenCalledWith('model-2', 'quota');
 
-      // Verify sequence
+      // Verify sequences
       expect(mockService.markTerminal).toHaveBeenNthCalledWith(
         1,
         'model-1',
@@ -579,11 +577,11 @@ describe('retryWithBackoff', () => {
       );
     });
 
-    it('applies sticky_retry transition for transient failures', async () => {
+    it('marks sticky_retry after retries are exhausted for transient failures', async () => {
       const transientError = new RetryableQuotaError(
         'transient error',
         { code: 429, message: 'transient', details: [] },
-        1,
+        0,
       );
 
       const fn = vi.fn().mockRejectedValue(transientError);
@@ -592,14 +590,21 @@ describe('retryWithBackoff', () => {
         .fn()
         .mockReturnValue({ service: mockService, policy: mockPolicy1 });
 
-      await expect(
-        retryWithBackoff(fn, {
-          maxAttempts: 1, // Fail immediately
-          getAvailabilityContext: getContext,
-        }),
-      ).rejects.toThrow(transientError);
+      vi.useFakeTimers();
+      const promise = retryWithBackoff(fn, {
+        maxAttempts: 3,
+        getAvailabilityContext: getContext,
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      }).catch((err) => err);
 
+      await vi.runAllTimersAsync();
+      const result = await promise;
+      expect(result).toBe(transientError);
+
+      expect(fn).toHaveBeenCalledTimes(3);
       expect(mockService.markRetryOncePerTurn).toHaveBeenCalledWith('model-1');
+      expect(mockService.markRetryOncePerTurn).toHaveBeenCalledTimes(1);
       expect(mockService.markTerminal).not.toHaveBeenCalled();
     });
 
