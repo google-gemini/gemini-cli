@@ -13,6 +13,11 @@ import stripAnsi from 'strip-ansi';
 
 export class TextOutput {
   private atStartOfLine = true;
+  private outputStream: NodeJS.WriteStream;
+
+  constructor(outputStream: NodeJS.WriteStream = process.stdout) {
+    this.outputStream = outputStream;
+  }
 
   /**
    * Writes a string to stdout.
@@ -22,7 +27,7 @@ export class TextOutput {
     if (str.length === 0) {
       return;
     }
-    process.stdout.write(str);
+    this.outputStream.write(str);
     const strippedStr = stripAnsi(str);
     if (strippedStr.length > 0) {
       this.atStartOfLine = strippedStr.endsWith('\n');

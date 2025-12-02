@@ -48,7 +48,7 @@ vi.mock('../utils/browser.js', () => ({
 vi.mock('../utils/stdio.js', () => ({
   writeToStdout: vi.fn(),
   writeToStderr: vi.fn(),
-  createInkStdio: vi.fn(() => ({
+  createWorkingStdio: vi.fn(() => ({
     stdout: process.stdout,
     stderr: process.stderr,
   })),
