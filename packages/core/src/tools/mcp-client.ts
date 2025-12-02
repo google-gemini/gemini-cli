@@ -94,6 +94,8 @@ export class McpClient {
   private client: Client | undefined;
   private transport: Transport | undefined;
   private status: MCPServerStatus = MCPServerStatus.DISCONNECTED;
+  private isRefreshing: boolean = false;
+  private pendingRefresh: boolean = false;
 
   constructor(
     private readonly serverName: string,
@@ -246,34 +248,77 @@ export class McpClient {
     return this.client?.getInstructions();
   }
 
-  // Logic to purge and re-add tools
+  /**
+   * Refreshes the tools for this server by re-querying the MCP `tools/list` endpoint.
+   *
+   * This method implements a **Coalescing Pattern** to handle rapid bursts of notifications
+   * (e.g., during server startup or bulk updates) without overwhelming the server or
+   * creating race conditions in the global ToolRegistry.
+   *
+   * The logic flows as follows:
+   * 1. **Coalescing**: If a refresh is already in progress, it marks `pendingRefresh = true`
+   *    and returns immediately. The existing running Promise will notice this flag
+   *    after it finishes its current cycle and will loop back to run again.
+   *
+   * 2. **Fetch-First Strategy**: It performs the network request (`discoverTools`) *before*
+   *    removing the old tools from the registry. This ensures that during the network
+   *    latency, the global registry remains in a valid state with the "old" tools,
+   *    preventing a "Flash of Unavailability" where the server appears to have 0 tools.
+   *
+   * 3. **Atomic Swap**: The removal of old tools and registration of new tools happens
+   *    synchronously in the same tick, ensuring the registry is never empty from the
+   *    perspective of other components.
+   */
   private async refreshTools(): Promise<void> {
-    try {
-      if (this.status !== MCPServerStatus.CONNECTED || !this.client) return;
-
-      this.toolRegistry.removeMcpToolsByServer(this.serverName);
-
-      // Re-fetch tools using existing discovery logic
-      const tools = await this.discoverTools(this.cliConfig);
-
-      for (const tool of tools) {
-        this.toolRegistry.registerTool(tool);
-      }
-      this.toolRegistry.sortTools();
-
-      // Notify the Manager (to update Gemini Context)
-      if (this.onToolsUpdated) {
-        await this.onToolsUpdated();
-      }
-
-      coreEvents.emitFeedback(
-        'info',
-        `Tools updated for server: ${this.serverName}`,
+    if (this.isRefreshing) {
+      debugLogger.log(
+        `Tool refresh for '${this.serverName}' busy. Coalescing update.`,
       );
+      this.pendingRefresh = true;
+      return;
+    }
+
+    this.isRefreshing = true;
+
+    try {
+      do {
+        this.pendingRefresh = false;
+
+        if (this.status !== MCPServerStatus.CONNECTED || !this.client) break;
+
+        let newTools;
+        try {
+          newTools = await this.discoverTools(this.cliConfig);
+        } catch (err) {
+          debugLogger.error(
+            `Discovery failed during refresh: ${getErrorMessage(err)}`,
+          );
+          break;
+        }
+
+        this.toolRegistry.removeMcpToolsByServer(this.serverName);
+
+        for (const tool of newTools) {
+          this.toolRegistry.registerTool(tool);
+        }
+        this.toolRegistry.sortTools();
+
+        if (this.onToolsUpdated) {
+          await this.onToolsUpdated();
+        }
+
+        coreEvents.emitFeedback(
+          'info',
+          `Tools updated for server: ${this.serverName}`,
+        );
+      } while (this.pendingRefresh);
     } catch (error) {
       debugLogger.error(
-        `Failed to refresh tools for ${this.serverName}: ${getErrorMessage(error)}`,
+        `Critical error in refresh loop for ${this.serverName}: ${getErrorMessage(error)}`,
       );
+    } finally {
+      this.isRefreshing = false;
+      this.pendingRefresh = false;
     }
   }
 }
