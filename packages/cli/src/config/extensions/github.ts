@@ -138,7 +138,7 @@ export async function fetchReleaseFromGithub(
   allowPreRelease?: boolean,
 ): Promise<GithubReleaseData | null> {
   if (ref) {
-    return await fetchJson(
+    return fetchJson(
       `https://api.github.com/repos/${owner}/${repo}/releases/tags/${ref}`,
     );
   }
