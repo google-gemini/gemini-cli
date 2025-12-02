@@ -1279,6 +1279,13 @@
           "default": false,
           "type": "boolean"
         },
+        "jitContext": {
+          "title": "JIT Context Loading",
+          "description": "Enable Just-In-Time (JIT) context loading.",
+          "markdownDescription": "Enable Just-In-Time (JIT) context loading.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "codebaseInvestigatorSettings": {
           "title": "Codebase Investigator Settings",
           "description": "Configuration for Codebase Investigator.",
