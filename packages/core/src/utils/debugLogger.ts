@@ -20,22 +20,27 @@ import * as util from 'node:util';
  * will intercept these calls and route them to the debug drawer UI.
  */
 class DebugLogger {
-  private logFile: string | undefined;
+  private logStream: fs.WriteStream | undefined;
 
   constructor() {
-    this.logFile = process.env['GEMINI_DEBUG_LOG_FILE'];
+    this.logStream = process.env['GEMINI_DEBUG_LOG_FILE']
+      ? fs.createWriteStream(process.env['GEMINI_DEBUG_LOG_FILE'], {
+          flags: 'a',
+        })
+      : undefined;
+    // Handle potential errors with the stream
+    this.logStream?.on('error', (err) => {
+      // Log to console as a fallback, but don't crash the app
+      console.error('Error writing to debug log stream:', err);
+    });
   }
 
   private writeToFile(level: string, args: unknown[]) {
-    if (this.logFile) {
+    if (this.logStream) {
       const message = util.format(...args);
       const timestamp = new Date().toISOString();
       const logEntry = `[${timestamp}] [${level}] ${message}\n`;
-      try {
-        fs.appendFileSync(this.logFile, logEntry);
-      } catch (_e) {
-        // Ignore errors writing to log file to prevent crashing the app
-      }
+      this.logStream.write(logEntry);
     }
   }
 

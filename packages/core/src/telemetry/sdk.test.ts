@@ -323,20 +323,20 @@ describe('Telemetry SDK', () => {
     // Emit the event directly
     authEvents.emit('post_auth', mockCredentials);
 
-    // Wait for the event loop to process the promise
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Wait for the event handler to process.
+    await vi.waitFor(() => {
+      // Check if debugLogger was called, which indicates the listener ran
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        'Telemetry reinit with credentials: ',
+        mockCredentials,
+      );
 
-    // Check if debugLogger was called, which indicates the listener ran
-    expect(debugLogger.log).toHaveBeenCalledWith(
-      'Telemetry reinit with credentials: ',
-      mockCredentials,
-    );
-
-    // Should use GCP exporters now with the project ID
-    expect(GcpTraceExporter).toHaveBeenCalledWith(
-      'test-project',
-      mockCredentials,
-    );
+      // Should use GCP exporters now with the project ID
+      expect(GcpTraceExporter).toHaveBeenCalledWith(
+        'test-project',
+        mockCredentials,
+      );
+    });
   });
 
   describe('bufferTelemetryEvent', () => {

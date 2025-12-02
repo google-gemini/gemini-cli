@@ -82,6 +82,8 @@ diag.setLogger(new DiagLoggerAdapter(), DiagLogLevel.INFO);
 let sdk: NodeSDK | undefined;
 let telemetryInitialized = false;
 let callbackRegistered = false;
+let authListener: ((newCredentials: JWTInput) => Promise<void>) | undefined =
+  undefined;
 const telemetryBuffer: Array<() => void | Promise<void>> = [];
 
 export function isTelemetrySdkInitialized(): boolean {
@@ -158,7 +160,7 @@ export async function initializeTelemetry(
     // This is done only once.
     if (!callbackRegistered) {
       callbackRegistered = true;
-      authEvents.on('post_auth', async (newCredentials: JWTInput) => {
+      authListener = async (newCredentials: JWTInput) => {
         if (config.getTelemetryEnabled() && config.getTelemetryUseCliAuth()) {
           debugLogger.log(
             'Telemetry reinit with credentials: ',
@@ -166,7 +168,8 @@ export async function initializeTelemetry(
           );
           await initializeTelemetry(config, newCredentials);
         }
-      });
+      };
+      authEvents.on('post_auth', authListener);
     }
     debugLogger.log(
       'CLI auth is requested but no credentials, deferring telemetry initialization.',
@@ -338,5 +341,10 @@ export async function shutdownTelemetry(
     metrics.disable();
     propagation.disable();
     diag.disable();
+    if (authListener) {
+      authEvents.off('post_auth', authListener);
+      authListener = undefined;
+    }
+    callbackRegistered = false;
   }
 }
