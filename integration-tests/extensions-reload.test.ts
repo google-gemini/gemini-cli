@@ -13,6 +13,8 @@ import { safeJsonStringify } from '@google/gemini-cli-core/src/utils/safeJsonStr
 import { env } from 'node:process';
 import { platform } from 'node:os';
 
+import stripAnsi from 'strip-ansi';
+
 const itIf = (condition: boolean) => (condition ? it : it.skip);
 
 describe('extension reloading', () => {
@@ -76,13 +78,22 @@ describe('extension reloading', () => {
       await run.expectText(
         'test-extension (v0.0.1) - active (update available)',
       );
-      // Wait a bit for the UI to settle
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      await run.sendKeys('\u0015/mcp list\r');
-      await run.expectText(
-        'test-server (from test-extension) - Ready (1 tool)',
+      // Wait for the UI to settle and retry the command until we see the update
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Poll for the updated list
+      await rig.pollCommand(
+        () => run.sendKeys('\u0015/mcp list\r'),
+        () => {
+          const output = stripAnsi(run.output);
+          return (
+            output.includes(
+              'test-server (from test-extension) - Ready (1 tool)',
+            ) && output.includes('- hello')
+          );
+        },
+        30000, // 30s timeout
       );
-      await run.expectText('- hello');
 
       // Update the extension, expect the list to update, and mcp servers as well.
       await run.sendKeys('\u0015/extensions update test-extension');
@@ -97,16 +108,31 @@ describe('extension reloading', () => {
       await run.expectText(
         'Extension "test-extension" successfully updated: 0.0.1 → 0.0.2',
       );
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      await run.sendKeys('\u0015/extensions list\r');
-      await run.expectText('test-extension (v0.0.2) - active (updated)');
-      // Wait a bit for the UI to settle
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      await run.sendKeys('\u0015/mcp list\r');
-      await run.expectText(
-        'test-server (from test-extension) - Ready (1 tool)',
+
+      // Poll for the updated extension version
+      await rig.pollCommand(
+        () => run.sendKeys('\u0015/extensions list\r'),
+        () =>
+          stripAnsi(run.output).includes(
+            'test-extension (v0.0.2) - active (updated)',
+          ),
+        30000,
       );
-      await run.expectText('- goodbye');
+
+      // Poll for the updated mcp tool
+      await rig.pollCommand(
+        () => run.sendKeys('\u0015/mcp list\r'),
+        () => {
+          const output = stripAnsi(run.output);
+          return (
+            output.includes(
+              'test-server (from test-extension) - Ready (1 tool)',
+            ) && output.includes('- goodbye')
+          );
+        },
+        30000,
+      );
+
       await run.sendText('/quit');
       await run.sendKeys('\r');
 
