@@ -76,7 +76,9 @@ const baseConfig = {
 const cliConfig = {
   ...baseConfig,
   banner: {
-    js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+    js: `import { createRequire as __bundleCreateRequire } from 'module'; const require = __bundleCreateRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);
+// Termux compatibility: clipboardy checks TERMUX__PREFIX but Termux uses PREFIX
+if (process.platform === 'android' && process.env.PREFIX && !process.env.TERMUX__PREFIX) { process.env.TERMUX__PREFIX = process.env.PREFIX; }`,
   },
   entryPoints: ['packages/cli/index.ts'],
   outfile: 'bundle/gemini.js',

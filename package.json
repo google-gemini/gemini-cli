@@ -1,6 +1,7 @@
 {
-  "name": "@google/gemini-cli",
-  "version": "0.20.0-nightly.20251201.2fe609cb6",
+  "name": "@mmmbuto/gemini-cli",
+  "version": "0.20.1-termux",
+  "description": "Google Gemini CLI - Termux compatibility patch",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -8,11 +9,24 @@
   "workspaces": [
     "packages/*"
   ],
-  "private": "true",
+  "private": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+    "url": "git+https://github.com/DioNanos/gemini-cli.git"
   },
+  "keywords": [
+    "gemini",
+    "cli",
+    "ai",
+    "assistant",
+    "termux",
+    "android"
+  ],
+  "author": "Google LLC (original), DioNanos (Termux port)",
+  "bugs": {
+    "url": "https://github.com/DioNanos/gemini-cli/issues"
+  },
+  "homepage": "https://github.com/DioNanos/gemini-cli#readme",
   "config": {
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.20.0-nightly.20251201.2fe609cb6"
   },
