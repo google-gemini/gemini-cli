@@ -1,0 +1,114 @@
+name: '🔒 Gemini Scheduled Stale Issue Closer'
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Every Sunday at midnight UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (no changes applied)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: '${{ github.workflow }}'
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash'
+
+jobs:
+  close-stale-issues:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate GitHub App Token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Process Stale Issues
+        uses: actions/github-script@v7
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        with:
+          github-token: ${{ steps.generate_token.outputs.token }}
+          script: |
+            const dryRun = process.env.DRY_RUN === 'true';
+            if (dryRun) {
+              core.info('DRY RUN MODE ENABLED: No changes will be applied.');
+            }
+
+            // 1. Setup Date Thresholds
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+            
+            const tenDaysAgo = new Date();
+            tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+
+            core.info(`Cutoff date for creation (3 months ago): ${threeMonthsAgo.toISOString()}`);
+            core.info(`Cutoff date for updates (10 days ago): ${tenDaysAgo.toISOString()}`);
+
+            // 2. Fetch all open issues (Limited to 100 for debugging)
+            const opts = github.rest.issues.listForRepo.endpoint.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              sort: 'created',
+              direction: 'asc',
+              per_page: 100
+            });
+            
+            // Using listForRepo directly instead of paginate to limit to first 100 results
+            const response = await github.rest.issues.listForRepo(opts);
+            const issues = response.data;
+            core.info(`Found ${issues.length} open issues to check (limit 100).`);
+
+            for (const issue of issues) {
+              // Safety Check: Skip Pull Requests (GitHub API treats PRs as Issues in list endpoints)
+              if (issue.pull_request) continue;
+
+              const createdAt = new Date(issue.created_at);
+              const updatedAt = new Date(issue.updated_at);
+              const reactionCount = issue.reactions.total_count;
+
+              // 3. Evaluate Conditions
+              const isOld = createdAt < threeMonthsAgo;
+              const isStale = updatedAt < tenDaysAgo;
+              const isUnpopular = reactionCount < 5;
+
+              if (isOld && isStale && isUnpopular) {
+                const message = `Closing stale issue #${issue.number}: "${issue.title}" (Created: ${createdAt.toISOString()}, Reactions: ${reactionCount})`;
+                
+                if (dryRun) {
+                  core.info(`[DRY RUN] ${message}`);
+                  continue;
+                }
+
+                core.info(message);
+                
+                // 4. Comment
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: "Hello! As part of our effort to keep our backlog manageable and focus on the most active issues, we are tidying up older reports.\n\nIt looks like this issue hasn't been active for a while, so we are closing it for now. However, if you are still experiencing this bug on the latest stable build, please feel free to reopen this issue or create a new one with updated details.\n\nThank you for your contribution!"
+                });
+
+                // 5. Close
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed'
+                });
+              }
+            }
