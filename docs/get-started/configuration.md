@@ -782,6 +782,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.jitContext`** (boolean):
+  - **Description:** Enable Just-In-Time (JIT) context loading.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.codebaseInvestigatorSettings.enabled`** (boolean):
   - **Description:** Enable the Codebase Investigator agent.
   - **Default:** `true`

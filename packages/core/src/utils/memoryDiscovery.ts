@@ -34,7 +34,7 @@ const logger = {
     console.error('[ERROR] [MemoryDiscovery]', ...args),
 };
 
-interface GeminiFileContent {
+export interface GeminiFileContent {
   filePath: string;
   content: string | null;
 }
@@ -304,7 +304,7 @@ async function readGeminiMdFiles(
   return results;
 }
 
-function concatenateInstructions(
+export function concatenateInstructions(
   instructionContents: GeminiFileContent[],
   // CWD is needed to resolve relative paths for display markers
   currentWorkingDirectoryForDisplay: string,
