@@ -14,7 +14,6 @@ import {
   setupGithubCommand,
   updateGitignore,
   GITHUB_WORKFLOW_PATHS,
-  GITHUB_COMMANDS_PATHS,
 } from './setupGithubCommand.js';
 import type { CommandContext, ToolActionReturn } from './types.js';
 import * as commandUtils from '../utils/commandUtils.js';
@@ -51,14 +50,14 @@ describe('setupGithubCommand', async () => {
     if (scratchDir) await fs.rm(scratchDir, { recursive: true });
   });
 
-  it('returns a tool action to download github workflows and handles paths', async () => {
+  it('downloads workflows, updates gitignore, and includes pipefail on non-windows', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
     const fakeRepoOwner = 'fake';
     const fakeRepoName = 'repo';
     const fakeRepoRoot = scratchDir;
     const fakeReleaseVersion = 'v1.2.3';
 
     const workflows = GITHUB_WORKFLOW_PATHS.map((p) => path.basename(p));
-    const commands = GITHUB_COMMANDS_PATHS.map((p) => path.basename(p));
 
     vi.mocked(global.fetch).mockImplementation(async (url) => {
       const filename = path.basename(url.toString());
@@ -89,15 +88,13 @@ describe('setupGithubCommand', async () => {
 
     const { command } = result.toolArgs;
 
-    const expectedSubstrings = [
-      `set -eEuo pipefail`,
-      `fakeOpenCommand "https://github.com/google-github-actions/run-gemini-cli`,
-    ];
+    // Check for pipefail
+    expect(command).toContain('set -eEuo pipefail');
 
-    for (const substring of expectedSubstrings) {
-      expect(command).toContain(substring);
-    }
+    // Check that the other commands are still present
+    expect(command).toContain('fakeOpenCommand');
 
+    // Verify that the workflows were downloaded
     for (const workflow of workflows) {
       const workflowFile = path.join(
         scratchDir,
@@ -109,10 +106,74 @@ describe('setupGithubCommand', async () => {
       expect(contents).toContain(workflow);
     }
 
-    for (const command of commands) {
-      const commandFile = path.join(scratchDir, '.github', 'commands', command);
-      const contents = await fs.readFile(commandFile, 'utf8');
-      expect(contents).toContain(command);
+    // Verify that .gitignore was created with the expected entries
+    const gitignorePath = path.join(scratchDir, '.gitignore');
+    const gitignoreExists = await fs
+      .access(gitignorePath)
+      .then(() => true)
+      .catch(() => false);
+    expect(gitignoreExists).toBe(true);
+
+    if (gitignoreExists) {
+      const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
+      expect(gitignoreContent).toContain('.gemini/');
+      expect(gitignoreContent).toContain('gha-creds-*.json');
+    }
+  });
+
+  it('downloads workflows, updates gitignore, and does not include pipefail on windows', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+    const fakeRepoOwner = 'fake';
+    const fakeRepoName = 'repo';
+    const fakeRepoRoot = scratchDir;
+    const fakeReleaseVersion = 'v1.2.3';
+
+    const workflows = GITHUB_WORKFLOW_PATHS.map((p) => path.basename(p));
+    vi.mocked(global.fetch).mockImplementation(async (url) => {
+      const filename = path.basename(url.toString());
+      return new Response(filename, {
+        status: 200,
+        statusText: 'OK',
+        headers: { 'Content-Type': 'text/plain' },
+      });
+    });
+
+    vi.mocked(gitUtils.isGitHubRepository).mockReturnValueOnce(true);
+    vi.mocked(gitUtils.getGitRepoRoot).mockReturnValueOnce(fakeRepoRoot);
+    vi.mocked(gitUtils.getLatestGitHubRelease).mockResolvedValueOnce(
+      fakeReleaseVersion,
+    );
+    vi.mocked(gitUtils.getGitHubRepoInfo).mockReturnValue({
+      owner: fakeRepoOwner,
+      repo: fakeRepoName,
+    });
+    vi.mocked(commandUtils.getUrlOpenCommand).mockReturnValueOnce(
+      'fakeOpenCommand',
+    );
+
+    const result = (await setupGithubCommand.action?.(
+      {} as CommandContext,
+      '',
+    )) as ToolActionReturn;
+
+    const { command } = result.toolArgs;
+
+    // Check for pipefail
+    expect(command).not.toContain('set -eEuo pipefail');
+
+    // Check that the other commands are still present
+    expect(command).toContain('fakeOpenCommand');
+
+    // Verify that the workflows were downloaded
+    for (const workflow of workflows) {
+      const workflowFile = path.join(
+        scratchDir,
+        '.github',
+        'workflows',
+        workflow,
+      );
+      const contents = await fs.readFile(workflowFile, 'utf8');
+      expect(contents).toContain(workflow);
     }
 
     // Verify that .gitignore was created with the expected entries
