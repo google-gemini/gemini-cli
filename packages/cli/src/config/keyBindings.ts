@@ -72,7 +72,8 @@ export enum Command {
   REVERSE_SEARCH = 'reverseSearch',
   SUBMIT_REVERSE_SEARCH = 'submitReverseSearch',
   ACCEPT_SUGGESTION_REVERSE_SEARCH = 'acceptSuggestionReverseSearch',
-  TOGGLE_SHELL_INPUT_FOCUS = 'toggleShellInputFocus',
+  TOGGLE_SHELL_INPUT_FOCUS_IN = 'toggleShellInputFocus',
+  TOGGLE_SHELL_INPUT_FOCUS_OUT = 'toggleShellInputFocusOut',
 
   // Suggestion expansion
   EXPAND_SUGGESTION = 'expandSuggestion',
@@ -216,8 +217,11 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Note: original logic ONLY checked ctrl=false, ignored meta/shift/paste
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
-  [Command.TOGGLE_SHELL_INPUT_FOCUS]: [{ key: 'f', ctrl: true }],
-
+  [Command.TOGGLE_SHELL_INPUT_FOCUS_IN]: [{ key: 'tab', shift: false }],
+  [Command.TOGGLE_SHELL_INPUT_FOCUS_OUT]: [
+    { key: 'tab', shift: false },
+    { key: 'tab', shift: true },
+  ],
   // Suggestion expansion
   [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
   [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
@@ -312,7 +316,8 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.TOGGLE_YOLO,
       Command.TOGGLE_AUTO_EDIT,
       Command.SHOW_MORE_LINES,
-      Command.TOGGLE_SHELL_INPUT_FOCUS,
+      Command.TOGGLE_SHELL_INPUT_FOCUS_IN,
+      Command.TOGGLE_SHELL_INPUT_FOCUS_OUT,
     ],
   },
   {
@@ -370,8 +375,10 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUBMIT_REVERSE_SEARCH]: 'Insert the selected reverse-search match.',
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]:
     'Accept a suggestion while reverse searching.',
-  [Command.TOGGLE_SHELL_INPUT_FOCUS]:
+  [Command.TOGGLE_SHELL_INPUT_FOCUS_IN]:
     'Toggle focus between the shell and Gemini input.',
+  [Command.TOGGLE_SHELL_INPUT_FOCUS_OUT]:
+    'Toggle focus out of the interactive shell and into Gemini input.',
   [Command.EXPAND_SUGGESTION]: 'Expand an inline suggestion.',
   [Command.COLLAPSE_SUGGESTION]: 'Collapse an inline suggestion.',
 };

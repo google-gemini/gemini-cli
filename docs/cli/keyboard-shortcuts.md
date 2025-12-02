@@ -122,8 +122,7 @@ available combinations.
 - `Ctrl+Delete` / `Meta+Delete`: Delete the word to the right of the cursor.
 - `Ctrl+B` or `Left Arrow`: Move the cursor one character to the left while
   editing text.
-- `Ctrl+F` or `Right Arrow`: Move the cursor one character to the right; with an
-  embedded shell attached, `Ctrl+F` still toggles focus.
+- `Ctrl+F` or `Right Arrow`: Move the cursor one character to the right.
 - `Ctrl+D` or `Delete`: Remove the character immediately to the right of the
   cursor.
 - `Ctrl+H` or `Backspace`: Remove the character immediately to the left of the
