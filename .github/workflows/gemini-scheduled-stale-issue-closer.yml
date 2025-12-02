@@ -10,6 +10,9 @@ on:
         required: false
         default: false
         type: 'boolean'
+  push:
+    branches:
+      - 'galzahavi/add/stale-issue-workflow'
 
 concurrency:
   group: '${{ github.workflow }}'
