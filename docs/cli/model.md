@@ -4,6 +4,9 @@ Select your Gemini CLI model. The `/model` command opens a dialog where you can
 configure the model used by Gemini CLI, giving you more control over your
 results.
 
+**Note:** The `/model` command (and the `--model` flag) sets the desired model
+for your commands, but does not affect sub-agents such as Code Investigator.
+
 ## How to use the `/model` command
 
 Use the following command in Gemini CLI:
