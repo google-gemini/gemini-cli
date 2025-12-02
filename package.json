@@ -1,6 +1,6 @@
 {
   "name": "@mmmbuto/gemini-cli",
-  "version": "0.20.0-termux",
+  "version": "0.20.1-termux",
   "description": "Google Gemini CLI - Termux compatibility patch",
   "engines": {
     "node": ">=20.0.0"
