@@ -135,20 +135,13 @@ async function handlePolicyDrivenFallback(
     candidates.map((policy) => policy.model),
   );
 
-  let lastResortPolicy = candidates.find((policy) => policy.isLastResort);
-  if (!lastResortPolicy) {
-    debugLogger.warn(
-      'No isLastResort policy found in candidates, using last candidate as fallback.',
-    );
-    lastResortPolicy = candidates[candidates.length - 1];
-  }
+  const lastResortPolicy = candidates.find((policy) => policy.isLastResort);
+  const fallbackModel = selection.selectedModel ?? lastResortPolicy?.model;
+  const selectedPolicy = candidates.find(
+    (policy) => policy.model === fallbackModel,
+  );
 
-  const fallbackModel = selection.selectedModel ?? lastResortPolicy.model;
-  const selectedPolicy =
-    candidates.find((policy) => policy.model === fallbackModel) ??
-    lastResortPolicy;
-
-  if (!fallbackModel || fallbackModel === failedModel) {
+  if (!fallbackModel || fallbackModel === failedModel || !selectedPolicy) {
     return null;
   }
 
