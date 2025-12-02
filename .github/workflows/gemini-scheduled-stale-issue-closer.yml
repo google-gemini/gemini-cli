@@ -60,7 +60,7 @@ jobs:
             core.info(`Cutoff date for creation (3 months ago): ${threeMonthsAgo.toISOString()}`);
             core.info(`Cutoff date for updates (10 days ago): ${tenDaysAgo.toISOString()}`);
 
-            // 2. Fetch all open issues (Limited to 100 for debugging)
+            // 2. Fetch all open issues (No limit, fetching all pages)
             const opts = github.rest.issues.listForRepo.endpoint.merge({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -70,10 +70,9 @@ jobs:
               per_page: 100
             });
 
-            // Using listForRepo directly instead of paginate to limit to first 100 results
-            const response = await github.rest.issues.listForRepo(opts);
-            const issues = response.data;
-            core.info(`Found ${issues.length} open issues to check (limit 100).`);
+            // Using paginate to fetch all open issues
+            const issues = await github.paginate(opts);
+            core.info(`Found ${issues.length} open issues to check.`);
 
             // Initial Count of Issue Types in this batch
             let bugCount = 0;
