@@ -71,8 +71,12 @@ jobs:
             });
 
             // Using paginate to fetch all open issues
-            const issues = await github.paginate(opts);
-            core.info(`Found ${issues.length} open issues to check.`);
+            const allItems = await github.paginate(opts);
+            
+            // Filter out Pull Requests (GitHub API returns mixed results)
+            const issues = allItems.filter(item => !item.pull_request);
+            
+            core.info(`Found ${issues.length} open issues to check (excluding PRs).`);
 
             // Initial Count of Issue Types in this batch
             let bugCount = 0;
@@ -99,9 +103,6 @@ jobs:
             const otherLogs = []; // Should be empty given logic, but good for debugging
 
             for (const issue of issues) {
-              // Safety Check: Skip Pull Requests (GitHub API treats PRs as Issues in list endpoints)
-              if (issue.pull_request) continue;
-
               const createdAt = new Date(issue.created_at);
               const updatedAt = new Date(issue.updated_at);
               const reactionCount = issue.reactions.total_count;
