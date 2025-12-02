@@ -31,6 +31,7 @@ import {
   registerCleanup,
   registerSyncCleanup,
   runExitCleanup,
+  registerTelemetryConfig,
 } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
 import {
@@ -463,9 +464,21 @@ export async function main() {
     const config = await loadCliConfig(settings.merged, sessionId, argv);
     loadConfigHandle?.end();
 
+    // Register config for telemetry shutdown
+    // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit
+    registerTelemetryConfig(config);
+
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
     createPolicyUpdater(policyEngine, messageBus);
+
+    // Register SessionEnd hook to fire on graceful exit
+    // This runs before telemetry shutdown in runExitCleanup()
+    if (config.getEnableHooks() && messageBus) {
+      registerCleanup(async () => {
+        await fireSessionEndHook(messageBus, SessionEndReason.Exit);
+      });
+    }
 
     // Cleanup sessions after config initialization
     try {

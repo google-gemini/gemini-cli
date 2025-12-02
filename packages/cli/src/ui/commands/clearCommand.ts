@@ -10,6 +10,7 @@ import {
   fireSessionStartHook,
   SessionEndReason,
   SessionStartSource,
+  flushTelemetry,
 } from '@google/gemini-cli-core';
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
@@ -53,6 +54,12 @@ export const clearCommand: SlashCommand = {
     // Fire SessionStart hook after clearing
     if (config?.getEnableHooks() && messageBus) {
       await fireSessionStartHook(messageBus, SessionStartSource.Clear);
+    }
+
+    // Flush telemetry to ensure hooks are written to disk immediately
+    // This is critical for tests and environments with I/O latency
+    if (config) {
+      await flushTelemetry(config);
     }
 
     uiTelemetryService.setLastPromptTokenCount(0);

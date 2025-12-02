@@ -1312,6 +1312,7 @@ describe('startInteractiveUI', () => {
     registerCleanup: vi.fn(),
     runExitCleanup: vi.fn(),
     registerSyncCleanup: vi.fn(),
+    registerTelemetryConfig: vi.fn(),
   }));
 
   afterEach(() => {

@@ -1160,4 +1160,92 @@ fi`;
       }
     });
   });
+
+  describe('SessionEnd on Exit', () => {
+    it('should fire SessionEnd hook on graceful exit in non-interactive mode', async () => {
+      const sessionEndCommand =
+        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"SessionEnd hook executed on exit\\"}"';
+
+      await rig.setup('should fire SessionEnd hook on graceful exit', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.session-startup.responses',
+        ),
+        settings: {
+          tools: {
+            enableHooks: true,
+          },
+          hooks: {
+            SessionEnd: [
+              {
+                matcher: 'exit',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: sessionEndCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      // Run in non-interactive mode with a simple prompt
+      const prompt = 'Hello';
+      await rig.run(prompt);
+
+      // The process should exit gracefully, firing the SessionEnd hook
+      // Wait for telemetry to be written to disk
+      await rig.waitForTelemetryReady();
+
+      // Poll for the hook log to appear
+      const isCI = process.env['CI'] === 'true';
+      const pollTimeout = isCI ? 30000 : 10000;
+      const pollResult = await poll(
+        () => {
+          const hookLogs = rig.readHookLogs();
+          return hookLogs.some(
+            (log) => log.hookCall.hook_event_name === 'SessionEnd',
+          );
+        },
+        pollTimeout,
+        200,
+      );
+
+      if (!pollResult) {
+        const hookLogs = rig.readHookLogs();
+        console.error(
+          'Polling timeout: Expected SessionEnd hook, got:',
+          JSON.stringify(hookLogs, null, 2),
+        );
+      }
+
+      expect(pollResult).toBe(true);
+
+      const hookLogs = rig.readHookLogs();
+      const sessionEndLog = hookLogs.find(
+        (log) => log.hookCall.hook_event_name === 'SessionEnd',
+      );
+
+      expect(sessionEndLog).toBeDefined();
+      if (sessionEndLog) {
+        expect(sessionEndLog.hookCall.hook_name).toBe(sessionEndCommand);
+        expect(sessionEndLog.hookCall.exit_code).toBe(0);
+        expect(sessionEndLog.hookCall.hook_input).toBeDefined();
+
+        const hookInputStr =
+          typeof sessionEndLog.hookCall.hook_input === 'string'
+            ? sessionEndLog.hookCall.hook_input
+            : JSON.stringify(sessionEndLog.hookCall.hook_input);
+        const hookInput = JSON.parse(hookInputStr) as Record<string, unknown>;
+
+        expect(hookInput['reason']).toBe('exit');
+        expect(sessionEndLog.hookCall.stdout).toContain(
+          'SessionEnd hook executed',
+        );
+      }
+    });
+  });
 });
