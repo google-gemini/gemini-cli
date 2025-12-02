@@ -1796,12 +1796,8 @@ This extension will run the following MCP servers:
     });
 
     it('should throw an error if you request system scope', async () => {
-      await expect(
-        async () =>
-          await extensionManager.disableExtension(
-            'my-extension',
-            SettingScope.System,
-          ),
+      await expect(async () =>
+        extensionManager.disableExtension('my-extension', SettingScope.System),
       ).rejects.toThrow('System and SystemDefaults scopes are not supported.');
     });
 
