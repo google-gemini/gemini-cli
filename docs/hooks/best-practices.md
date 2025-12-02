@@ -1,4 +1,4 @@
-# Hooks Best Practices
+# Hooks on Gemini CLI: Best practices
 
 This guide covers security considerations, performance optimization, debugging
 techniques, and privacy considerations for developing and deploying hooks in
@@ -130,21 +130,16 @@ docker run --rm \
 
 ### Keep hooks fast
 
-Hooks run synchronously—slow hooks delay the agent loop. Optimize for speed:
-
-**Bad:**
+Hooks run synchronously—slow hooks delay the agent loop. Optimize for speed by
+using parallel operations:
 
 ```javascript
-// Slow: Multiple sequential API calls
+// Sequential operations are slower
 const data1 = await fetch(url1).then((r) => r.json());
 const data2 = await fetch(url2).then((r) => r.json());
 const data3 = await fetch(url3).then((r) => r.json());
-```
 
-**Good:**
-
-```javascript
-// Fast: Parallel API calls
+// Prefer parallel operations for better performance
 const [data1, data2, data3] = await Promise.all([
   fetch(url1).then((r) => r.json()),
   fetch(url2).then((r) => r.json()),
@@ -194,31 +189,12 @@ async function main() {
 
 ### Use appropriate events
 
-Don't use hooks at more frequent events than necessary:
-
-**Bad:**
-
-```json
-{
-  "hooks": {
-    "AfterModel": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "name": "final-checker",
-            "command": "./check-completion.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-**Good:**
+Choose hook events that match your use case to avoid unnecessary execution.
+`AfterAgent` fires once per agent loop completion, while `AfterModel` fires
+after every LLM call (potentially multiple times per loop):
 
 ```json
+// If checking final completion, use AfterAgent instead of AfterModel
 {
   "hooks": {
     "AfterAgent": [
@@ -236,28 +212,10 @@ Don't use hooks at more frequent events than necessary:
 }
 ```
 
-`AfterAgent` fires once per agent loop completion, while `AfterModel` fires
-after every LLM call (potentially multiple times per loop).
-
 ### Filter with matchers
 
-Use specific matchers to avoid unnecessary hook execution:
-
-**Bad:**
-
-```json
-{
-  "matcher": "*",
-  "hooks": [
-    {
-      "name": "validate-writes",
-      "command": "./validate.sh"
-    }
-  ]
-}
-```
-
-**Good:**
+Use specific matchers to avoid unnecessary hook execution. Instead of matching
+all tools with `*`, specify only the tools you need:
 
 ```json
 {
@@ -273,14 +231,15 @@ Use specific matchers to avoid unnecessary hook execution:
 
 ### Optimize JSON parsing
 
-Use streaming JSON parsers for large inputs:
+For large inputs, use streaming JSON parsers to avoid loading everything into
+memory:
 
 ```javascript
-// Bad: Load entire input into memory
+// Standard approach: parse entire input
 const input = JSON.parse(await readStdin());
 const content = input.tool_input.content;
 
-// Good: Stream and extract only needed fields
+// For very large inputs: stream and extract only needed fields
 const { createReadStream } = require('fs');
 const JSONStream = require('JSONStream');
 

@@ -1,4 +1,4 @@
-# Gemini CLI Hooks
+# Gemini CLI hooks
 
 Hooks are scripts or programs that Gemini CLI executes at specific points in the
 agentic loop, allowing you to intercept and customize behavior without modifying
@@ -88,7 +88,7 @@ trigger the hook:
 
 **Session event matchers:**
 
-- **SessionStart:** `startup`, `resume`, `clear`, `compress`
+- **SessionStart:** `startup`, `resume`, `clear`
 - **SessionEnd:** `exit`, `clear`, `logout`, `prompt_input_exit`
 - **PreCompress:** `manual`, `auto`
 - **Notification:** `ToolPermission`
@@ -335,7 +335,7 @@ echo "ReadFile,WriteFile,Edit"
 
 ```json
 {
-  "source": "startup|resume|clear|compress"
+  "source": "startup|resume|clear"
 }
 ```
 
