@@ -588,10 +588,6 @@ export function SettingsDialog({
           setSearchQuery((prev) => prev + key.sequence);
           return;
         }
-      } else if (!editingKey && key.sequence === '/') {
-        setIsSearching(true);
-        setSearchQuery('');
-        return;
       }
 
       if (name === 'tab' && showScopeSelection) {
