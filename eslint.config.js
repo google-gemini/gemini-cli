@@ -136,6 +136,25 @@ export default tseslint.config(
         },
       ],
       'import/no-relative-packages': 'error',
+      'import/order': [
+        'error',
+        {
+          groups: [
+            'builtin',   // Node.js built-in modules
+            'external',  // External npm packages
+            'internal',  // Internal modules (aliases, monorepo packages)
+            'parent',    // Parent directory imports
+            'sibling',   // Same directory imports
+            'index',     // Index file imports
+            'type',      // Type-only imports
+          ],
+          'newlines-between': 'never',
+          alphabetize: {
+            order: 'asc',
+            caseInsensitive: true,
+          },
+        },
+      ],
       'no-cond-assign': 'error',
       'no-debugger': 'error',
       'no-duplicate-case': 'error',
