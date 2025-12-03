@@ -25,9 +25,6 @@ jobs:
     permissions:
       issues: 'write'
     steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@v4'
-
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
         uses: 'actions/create-github-app-token@v1'
@@ -58,17 +55,15 @@ jobs:
             core.info(`Cutoff date for creation: ${threeMonthsAgo.toISOString()}`);
             core.info(`Cutoff date for updates: ${tenDaysAgo.toISOString()}`);
 
-            const opts = github.rest.issues.listForRepo.endpoint.merge({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
+            const query = `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open created:<${threeMonthsAgo.toISOString()}`;
+            core.info(`Searching with query: ${query}`);
+
+            const itemsToCheck = await github.paginate(github.rest.search.issuesAndPullRequests, {
+              q: query,
               sort: 'created',
-              direction: 'asc',
+              order: 'asc',
               per_page: 100
             });
-
-            const issues = await github.paginate(opts);
-            const itemsToCheck = issues.filter(item => !item.pull_request);
 
             core.info(`Found ${itemsToCheck.length} open issues to check.`);
 
@@ -80,7 +75,7 @@ jobs:
               const reactionCount = issue.reactions.total_count;
 
               // Basic thresholds
-              if (createdAt >= threeMonthsAgo || reactionCount >= 5) {
+              if (reactionCount >= 5) {
                 continue;
               }
 
