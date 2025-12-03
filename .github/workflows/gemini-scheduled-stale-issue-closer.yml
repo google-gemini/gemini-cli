@@ -8,7 +8,7 @@ on:
       dry_run:
         description: 'Run in dry-run mode (no changes applied)'
         required: false
-        default: true
+        default: false
         type: 'boolean'
 
 concurrency:
