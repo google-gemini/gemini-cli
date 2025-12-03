@@ -128,19 +128,11 @@ Each server configuration supports the following properties:
 #### Required (one of the following)
 
 - **`command`** (string): Path to the executable for Stdio transport
-- **`url`** (string): URL for HTTP or SSE transport (e.g.,
-  `"https://api.example.com/mcp"`). When used with the `type` field, supports
-  both HTTP and SSE transports. When used alone, attempts HTTP transport first,
-  then automatically falls back to SSE if HTTP fails.
+- **`url`** (string): SSE endpoint URL (e.g., `"http://localhost:8080/sse"`)
+- **`httpUrl`** (string): HTTP streaming endpoint URL
 
 #### Optional
 
-- **`type`** (string): Explicitly specifies the transport type when using `url`.
-  Can be `"http"` or `"sse"`. When omitted, the CLI attempts HTTP transport
-  first, then automatically falls back to SSE if HTTP fails. This field is
-  recommended for clarity and to avoid auto-detection behavior.
-  - `"http"`: Use Streamable HTTP transport
-  - `"sse"`: Use Server-Sent Events transport
 - **`args`** (string[]): Command-line arguments for Stdio transport
 - **`headers`** (object): Custom HTTP headers when using `url` or `httpUrl`
 - **`env`** (object): Environment variables for the server process. Values can
@@ -180,8 +172,7 @@ and let the CLI discover it automatically:
 {
   "mcpServers": {
     "discoveredServer": {
-      "url": "https://api.example.com/sse",
-      "type": "sse"
+      "url": "https://api.example.com/sse"
     }
   }
 }
@@ -280,8 +271,7 @@ property:
 {
   "mcpServers": {
     "googleCloudServer": {
-      "url": "https://my-gcp-service.run.app/mcp",
-      "type": "http",
+      "httpUrl": "https://my-gcp-service.run.app/mcp",
       "authProviderType": "google_credentials",
       "oauth": {
         "scopes": ["https://www.googleapis.com/auth/userinfo.email"]
@@ -395,8 +385,7 @@ then be used to authenticate with the MCP server.
 {
   "mcpServers": {
     "httpServer": {
-      "url": "http://localhost:3000/mcp",
-      "type": "http",
+      "httpUrl": "http://localhost:3000/mcp",
       "timeout": 5000
     }
   }
@@ -409,8 +398,7 @@ then be used to authenticate with the MCP server.
 {
   "mcpServers": {
     "httpServerWithAuth": {
-      "url": "http://localhost:3000/mcp",
-      "type": "http",
+      "httpUrl": "http://localhost:3000/mcp",
       "headers": {
         "Authorization": "Bearer your-api-token",
         "X-Custom-Header": "custom-value",
@@ -445,7 +433,6 @@ then be used to authenticate with the MCP server.
   "mcpServers": {
     "myIapProtectedServer": {
       "url": "https://my-iap-service.run.app/sse",
-      "type": "sse",
       "authProviderType": "service_account_impersonation",
       "targetAudience": "YOUR_IAP_CLIENT_ID.apps.googleusercontent.com",
       "targetServiceAccount": "your-sa@your-project.iam.gserviceaccount.com"
@@ -465,10 +452,8 @@ For each configured server in `mcpServers`:
 
 1. **Status tracking begins:** Server status is set to `CONNECTING`
 2. **Transport selection:** Based on configuration properties:
-   - `url` + `type: "http"` → `StreamableHTTPClientTransport`
-   - `url` + `type: "sse"` → `SSEClientTransport`
-   - `url` (without type) → `StreamableHTTPClientTransport` first, with
-     automatic fallback to `SSEClientTransport` if HTTP fails
+   - `httpUrl` → `StreamableHTTPClientTransport`
+   - `url` → `SSEClientTransport`
    - `command` → `StdioClientTransport`
 3. **Connection establishment:** The MCP client attempts to connect with the
    configured timeout
