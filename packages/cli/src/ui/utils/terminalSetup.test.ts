@@ -16,6 +16,10 @@ const mocks = vi.hoisted(() => ({
   copyFile: vi.fn(),
   homedir: vi.fn(),
   platform: vi.fn(),
+  writeStream: {
+    write: vi.fn(),
+    on: vi.fn(),
+  },
 }));
 
 vi.mock('node:child_process', () => ({
@@ -24,6 +28,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('node:fs', () => ({
+  createWriteStream: () => mocks.writeStream,
   promises: {
     mkdir: mocks.mkdir,
     readFile: mocks.readFile,
