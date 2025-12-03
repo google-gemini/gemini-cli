@@ -12,7 +12,9 @@ import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 describe('file-system', () => {
   it('should be able to read a file', async () => {
     const rig = new TestRig();
-    await rig.setup('should be able to read a file');
+    await rig.setup('should be able to read a file', {
+      settings: { tools: { core: ['read_file'] } },
+    });
     rig.createFile('test.txt', 'hello world');
 
     const result = await rig.run(
@@ -40,7 +42,9 @@ describe('file-system', () => {
 
   it('should be able to write a file', async () => {
     const rig = new TestRig();
-    await rig.setup('should be able to write a file');
+    await rig.setup('should be able to write a file', {
+      settings: { tools: { core: ['write_file', 'replace', 'read_file'] } },
+    });
     rig.createFile('test.txt', '');
 
     const result = await rig.run(`edit test.txt to have a hello world message`);
@@ -95,7 +99,9 @@ describe('file-system', () => {
 
   it('should correctly handle file paths with spaces', async () => {
     const rig = new TestRig();
-    await rig.setup('should correctly handle file paths with spaces');
+    await rig.setup('should correctly handle file paths with spaces', {
+      settings: { tools: { core: ['write_file', 'read_file'] } },
+    });
     const fileName = 'my test file.txt';
 
     const result = await rig.run(
@@ -117,7 +123,9 @@ describe('file-system', () => {
 
   it('should perform a read-then-write sequence', async () => {
     const rig = new TestRig();
-    await rig.setup('should perform a read-then-write sequence');
+    await rig.setup('should perform a read-then-write sequence', {
+      settings: { tools: { core: ['read_file', 'replace', 'write_file'] } },
+    });
     const fileName = 'version.txt';
     rig.createFile(fileName, '1.0.0');
 
@@ -206,6 +214,7 @@ describe('file-system', () => {
     const rig = new TestRig();
     await rig.setup(
       'should fail safely when trying to edit a non-existent file',
+      { settings: { tools: { core: ['read_file', 'replace'] } } },
     );
     const fileName = 'non_existent.txt';
 

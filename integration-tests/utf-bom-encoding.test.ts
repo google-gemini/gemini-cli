@@ -53,7 +53,9 @@ let dir: string;
 describe('BOM end-to-end integraion', () => {
   beforeAll(async () => {
     rig = new TestRig();
-    await rig.setup('bom-integration');
+    await rig.setup('bom-integration', {
+      settings: { tools: { core: ['read_file'] } },
+    });
     dir = rig.testDir!;
   });
 

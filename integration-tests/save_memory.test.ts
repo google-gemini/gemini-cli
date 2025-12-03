@@ -10,7 +10,9 @@ import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 describe('save_memory', () => {
   it('should be able to save to memory', async () => {
     const rig = new TestRig();
-    await rig.setup('should be able to save to memory');
+    await rig.setup('should be able to save to memory', {
+      settings: { tools: { core: ['save_memory'] } },
+    });
 
     const prompt = `remember that my favorite color is  blue.
 
