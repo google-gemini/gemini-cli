@@ -1,0 +1,20 @@
+{
+  "model": {
+    "name": "gemini-2.0-flash-exp"
+  },
+  "vertexai": true,
+  "project": "your-gcp-project-id",
+  "location": "us-central1",
+  "httpOptions": {
+    "baseUrl": "https://your-apogee-proxy.example.com/v1/llms/vertexai/",
+    "headers": {
+      "X-Goog-Api-Key": "YOUR_API_KEY_HERE",
+      "user_email": "your.email@example.com"
+    }
+  },
+  "security": {
+    "auth": {
+      "selectedType": "vertex-ai"
+    }
+  }
+}
