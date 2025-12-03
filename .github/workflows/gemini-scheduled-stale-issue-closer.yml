@@ -47,6 +47,7 @@ jobs:
             if (dryRun) {
               core.info('DRY RUN MODE ENABLED: No changes will be applied.');
             }
+            const batchLabel = 'Stale';
 
             const threeMonthsAgo = new Date();
             threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
@@ -120,18 +121,29 @@ jobs:
                 core.info(message);
 
                 if (!dryRun) {
-                  // await github.rest.issues.createComment({
-                  //   owner: context.repo.owner,
-                  //   repo: context.repo.repo,
-                  //   issue_number: issue.number,
-                  //   body: 'Hello! As part of our effort to keep our backlog manageable and focus on the most active issues, we are tidying up older reports.\n\nIt looks like this issue hasn't been active for a while, so we are closing it for now. However, if you are still experiencing this bug on the latest stable build, please feel free to comment on this issue or create a new one with updated details.\n\nThank you for your contribution!'
-                  // });
-                  // await github.rest.issues.update({
-                  //   owner: context.repo.owner,
-                  //   repo: context.repo.repo,
-                  //   issue_number: issue.number,
-                  //   state: 'closed'
-                  // });
+                  // Add label
+                  await github.rest.issues.addLabels({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    labels: [batchLabel]
+                  });
+
+                  // Add comment
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    body: 'Hello! As part of our effort to keep our backlog manageable and focus on the most active issues, we are tidying up older reports.\n\nIt looks like this issue hasn't been active for a while, so we are closing it for now. However, if you are still experiencing this bug on the latest stable build, please feel free to comment on this issue or create a new one with updated details.\n\nThank you for your contribution!'
+                  });
+                  
+                  // Close issue
+                  await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    state: 'closed'
+                  });
                 }
               }
             }
