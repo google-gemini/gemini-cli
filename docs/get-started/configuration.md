@@ -816,10 +816,65 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `hooks`
 
-- **`hooks`** (object):
-  - **Description:** Hook configurations for intercepting and customizing agent
-    behavior.
-  - **Default:** `{}`
+- **`hooks.disabled`** (array):
+  - **Description:** List of hook names (commands) that should be disabled.
+    Hooks in this list will not execute even if configured.
+  - **Default:** `[]`
+
+- **`hooks.BeforeTool`** (array):
+  - **Description:** Hooks that execute before tool execution. Can intercept,
+    validate, or modify tool calls.
+  - **Default:** `[]`
+
+- **`hooks.AfterTool`** (array):
+  - **Description:** Hooks that execute after tool execution. Can process
+    results, log outputs, or trigger follow-up actions.
+  - **Default:** `[]`
+
+- **`hooks.BeforeAgent`** (array):
+  - **Description:** Hooks that execute before agent loop starts. Can set up
+    context or initialize resources.
+  - **Default:** `[]`
+
+- **`hooks.AfterAgent`** (array):
+  - **Description:** Hooks that execute after agent loop completes. Can perform
+    cleanup or summarize results.
+  - **Default:** `[]`
+
+- **`hooks.Notification`** (array):
+  - **Description:** Hooks that execute on notification events (errors,
+    warnings, info). Can log or alert on specific conditions.
+  - **Default:** `[]`
+
+- **`hooks.SessionStart`** (array):
+  - **Description:** Hooks that execute when a session starts. Can initialize
+    session-specific resources or state.
+  - **Default:** `[]`
+
+- **`hooks.SessionEnd`** (array):
+  - **Description:** Hooks that execute when a session ends. Can perform cleanup
+    or persist session data.
+  - **Default:** `[]`
+
+- **`hooks.PreCompress`** (array):
+  - **Description:** Hooks that execute before chat history compression. Can
+    back up or analyze conversation before compression.
+  - **Default:** `[]`
+
+- **`hooks.BeforeModel`** (array):
+  - **Description:** Hooks that execute before LLM requests. Can modify prompts,
+    inject context, or control model parameters.
+  - **Default:** `[]`
+
+- **`hooks.AfterModel`** (array):
+  - **Description:** Hooks that execute after LLM responses. Can process
+    outputs, extract information, or log interactions.
+  - **Default:** `[]`
+
+- **`hooks.BeforeToolSelection`** (array):
+  - **Description:** Hooks that execute before tool selection. Can filter or
+    prioritize available tools dynamically.
+  - **Default:** `[]`
   <!-- SETTINGS-AUTOGEN:END -->
 
 #### `mcpServers`

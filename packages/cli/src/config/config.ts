@@ -10,6 +10,7 @@ import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
 import type { OutputFormat } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
+import { hooksCommand } from '../commands/hooks.js';
 import {
   Config,
   setGeminiMdFilename as setServerGeminiMdFilename,
@@ -279,6 +280,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
 
   if (settings?.experimental?.extensionManagement ?? true) {
     yargsInstance.command(extensionsCommand);
+  }
+
+  // Register hooks command if hooks are enabled
+  if (settings?.tools?.enableHooks) {
+    yargsInstance.command(hooksCommand);
   }
 
   yargsInstance

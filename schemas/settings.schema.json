@@ -1370,7 +1370,99 @@
       "markdownDescription": "Hook configurations for intercepting and customizing agent behavior.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `{}`",
       "default": {},
       "type": "object",
-      "additionalProperties": true
+      "properties": {
+        "disabled": {
+          "title": "Disabled Hooks",
+          "description": "List of hook names (commands) that should be disabled. Hooks in this list will not execute even if configured.",
+          "markdownDescription": "List of hook names (commands) that should be disabled. Hooks in this list will not execute even if configured.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "BeforeTool": {
+          "title": "Before Tool Hooks",
+          "description": "Hooks that execute before tool execution. Can intercept, validate, or modify tool calls.",
+          "markdownDescription": "Hooks that execute before tool execution. Can intercept, validate, or modify tool calls.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "$ref": "#/$defs/HookDefinitionArray"
+        },
+        "AfterTool": {
+          "title": "After Tool Hooks",
+          "description": "Hooks that execute after tool execution. Can process results, log outputs, or trigger follow-up actions.",
+          "markdownDescription": "Hooks that execute after tool execution. Can process results, log outputs, or trigger follow-up actions.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "$ref": "#/$defs/HookDefinitionArray"
+        },
+        "BeforeAgent": {
+          "title": "Before Agent Hooks",
+          "description": "Hooks that execute before agent loop starts. Can set up context or initialize resources.",
+          "markdownDescription": "Hooks that execute before agent loop starts. Can set up context or initialize resources.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "$ref": "#/$defs/HookDefinitionArray"
+        },
+        "AfterAgent": {
+          "title": "After Agent Hooks",
+          "description": "Hooks that execute after agent loop completes. Can perform cleanup or summarize results.",
+          "markdownDescription": "Hooks that execute after agent loop completes. Can perform cleanup or summarize results.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "$ref": "#/$defs/HookDefinitionArray"
+        },
+        "Notification": {
+          "title": "Notification Hooks",
+          "description": "Hooks that execute on notification events (errors, warnings, info). Can log or alert on specific conditions.",
+          "markdownDescription": "Hooks that execute on notification events (errors, warnings, info). Can log or alert on specific conditions.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "$ref": "#/$defs/HookDefinitionArray"
+        },
+        "SessionStart": {
+          "title": "Session Start Hooks",
+          "description": "Hooks that execute when a session starts. Can initialize session-specific resources or state.",
+          "markdownDescription": "Hooks that execute when a session starts. Can initialize session-specific resources or state.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "$ref": "#/$defs/HookDefinitionArray"
+        },
+        "SessionEnd": {
+          "title": "Session End Hooks",
+          "description": "Hooks that execute when a session ends. Can perform cleanup or persist session data.",
+          "markdownDescription": "Hooks that execute when a session ends. Can perform cleanup or persist session data.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "$ref": "#/$defs/HookDefinitionArray"
+        },
+        "PreCompress": {
+          "title": "Pre-Compress Hooks",
+          "description": "Hooks that execute before chat history compression. Can back up or analyze conversation before compression.",
+          "markdownDescription": "Hooks that execute before chat history compression. Can back up or analyze conversation before compression.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "$ref": "#/$defs/HookDefinitionArray"
+        },
+        "BeforeModel": {
+          "title": "Before Model Hooks",
+          "description": "Hooks that execute before LLM requests. Can modify prompts, inject context, or control model parameters.",
+          "markdownDescription": "Hooks that execute before LLM requests. Can modify prompts, inject context, or control model parameters.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "$ref": "#/$defs/HookDefinitionArray"
+        },
+        "AfterModel": {
+          "title": "After Model Hooks",
+          "description": "Hooks that execute after LLM responses. Can process outputs, extract information, or log interactions.",
+          "markdownDescription": "Hooks that execute after LLM responses. Can process outputs, extract information, or log interactions.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "$ref": "#/$defs/HookDefinitionArray"
+        },
+        "BeforeToolSelection": {
+          "title": "Before Tool Selection Hooks",
+          "description": "Hooks that execute before tool selection. Can filter or prioritize available tools dynamically.",
+          "markdownDescription": "Hooks that execute before tool selection. Can filter or prioritize available tools dynamically.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "$ref": "#/$defs/HookDefinitionArray"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {}
+      }
     }
   },
   "$defs": {
@@ -1709,6 +1801,42 @@
           "type": "string"
         }
       ]
+    },
+    "HookDefinitionArray": {
+      "type": "array",
+      "description": "Array of hook definition objects for a specific event.",
+      "items": {
+        "type": "object",
+        "description": "Hook definition specifying matcher pattern and hook configurations.",
+        "properties": {
+          "matcher": {
+            "type": "string",
+            "description": "Pattern to match against the event context (tool name, notification type, etc.). Supports exact match, regex (/pattern/), and wildcards (*)."
+          },
+          "hooks": {
+            "type": "array",
+            "description": "Hooks to execute when the matcher matches.",
+            "items": {
+              "type": "object",
+              "description": "Individual hook configuration.",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "Type of hook (currently only \"command\" supported)."
+                },
+                "command": {
+                  "type": "string",
+                  "description": "Shell command to execute. Receives JSON input via stdin and returns JSON output via stdout."
+                },
+                "timeout": {
+                  "type": "number",
+                  "description": "Timeout in milliseconds for hook execution."
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
