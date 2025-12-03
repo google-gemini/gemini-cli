@@ -17,6 +17,7 @@ import {
 import { ActivityType } from './activity-types.js';
 import type { ActivityEvent } from './activity-monitor.js';
 import type { Config } from '../config/config.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // Mock the dependencies
 vi.mock('./metrics.js', () => ({
@@ -191,7 +192,9 @@ describe('ActivityMonitor', () => {
       };
 
       // Spy on console.debug to check error handling
-      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+      const debugSpy = vi
+        .spyOn(debugLogger, 'debug')
+        .mockImplementation(() => {});
 
       activityMonitor.addListener(faultyListener);
       activityMonitor.addListener(goodListener);

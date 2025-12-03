@@ -10,11 +10,15 @@ import {
   type PolicyEngineConfig,
   type PolicyRule,
   type SafetyCheckerRule,
+  type HookCheckerRule,
+  type HookExecutionContext,
+  getHookSource,
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
+import type { HookExecutionRequest } from '../confirmation-bus/types.js';
 
 function ruleMatches(
   rule: PolicyRule | SafetyCheckerRule,
@@ -61,12 +65,34 @@ function ruleMatches(
   return true;
 }
 
+/**
+ * Check if a hook checker rule matches a hook execution context.
+ */
+function hookCheckerMatches(
+  rule: HookCheckerRule,
+  context: HookExecutionContext,
+): boolean {
+  // Check event name if specified
+  if (rule.eventName && rule.eventName !== context.eventName) {
+    return false;
+  }
+
+  // Check hook source if specified
+  if (rule.hookSource && rule.hookSource !== context.hookSource) {
+    return false;
+  }
+
+  return true;
+}
+
 export class PolicyEngine {
   private rules: PolicyRule[];
   private checkers: SafetyCheckerRule[];
+  private hookCheckers: HookCheckerRule[];
   private readonly defaultDecision: PolicyDecision;
   private readonly nonInteractive: boolean;
   private readonly checkerRunner?: CheckerRunner;
+  private readonly allowHooks: boolean;
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
     this.rules = (config.rules ?? []).sort(
@@ -75,9 +101,13 @@ export class PolicyEngine {
     this.checkers = (config.checkers ?? []).sort(
       (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
     );
+    this.hookCheckers = (config.hookCheckers ?? []).sort(
+      (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
+    );
     this.defaultDecision = config.defaultDecision ?? PolicyDecision.ASK_USER;
     this.nonInteractive = config.nonInteractive ?? false;
     this.checkerRunner = checkerRunner;
+    this.allowHooks = config.allowHooks ?? true;
   }
 
   /**
@@ -204,6 +234,99 @@ export class PolicyEngine {
 
   getCheckers(): readonly SafetyCheckerRule[] {
     return this.checkers;
+  }
+
+  /**
+   * Add a new hook checker to the policy engine.
+   */
+  addHookChecker(checker: HookCheckerRule): void {
+    this.hookCheckers.push(checker);
+    this.hookCheckers.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+  }
+
+  /**
+   * Get all current hook checkers.
+   */
+  getHookCheckers(): readonly HookCheckerRule[] {
+    return this.hookCheckers;
+  }
+
+  /**
+   * Check if a hook execution is allowed based on the configured policies.
+   * Runs hook-specific safety checkers if configured.
+   */
+  async checkHook(
+    request: HookExecutionRequest | HookExecutionContext,
+  ): Promise<PolicyDecision> {
+    // If hooks are globally disabled, deny all hook executions
+    if (!this.allowHooks) {
+      return PolicyDecision.DENY;
+    }
+
+    const context: HookExecutionContext =
+      'input' in request
+        ? {
+            eventName: request.eventName,
+            hookSource: getHookSource(request.input),
+            trustedFolder:
+              typeof request.input['trusted_folder'] === 'boolean'
+                ? request.input['trusted_folder']
+                : undefined,
+          }
+        : request;
+
+    // In untrusted folders, deny project-level hooks
+    if (context.trustedFolder === false && context.hookSource === 'project') {
+      return PolicyDecision.DENY;
+    }
+
+    // Run hook-specific safety checkers if configured
+    if (this.checkerRunner && this.hookCheckers.length > 0) {
+      for (const checkerRule of this.hookCheckers) {
+        if (hookCheckerMatches(checkerRule, context)) {
+          debugLogger.debug(
+            `[PolicyEngine.checkHook] Running hook checker: ${checkerRule.checker.name} for event: ${context.eventName}`,
+          );
+          try {
+            // Create a synthetic function call for the checker runner
+            // This allows reusing the existing checker infrastructure
+            const syntheticCall = {
+              name: `hook:${context.eventName}`,
+              args: {
+                hookSource: context.hookSource,
+                trustedFolder: context.trustedFolder,
+              },
+            };
+
+            const result = await this.checkerRunner.runChecker(
+              syntheticCall,
+              checkerRule.checker,
+            );
+
+            if (result.decision === SafetyCheckDecision.DENY) {
+              debugLogger.debug(
+                `[PolicyEngine.checkHook] Hook checker denied: ${result.reason}`,
+              );
+              return PolicyDecision.DENY;
+            } else if (result.decision === SafetyCheckDecision.ASK_USER) {
+              debugLogger.debug(
+                `[PolicyEngine.checkHook] Hook checker requested ASK_USER: ${result.reason}`,
+              );
+              // For hooks, ASK_USER is treated as DENY in non-interactive mode
+              return this.applyNonInteractiveMode(PolicyDecision.ASK_USER);
+            }
+          } catch (error) {
+            debugLogger.debug(
+              `[PolicyEngine.checkHook] Hook checker failed: ${error}`,
+            );
+            return PolicyDecision.DENY;
+          }
+        }
+      }
+    }
+
+    // Default: Allow hooks
+    return PolicyDecision.ALLOW;
   }
 
   private applyNonInteractiveMode(decision: PolicyDecision): PolicyDecision {

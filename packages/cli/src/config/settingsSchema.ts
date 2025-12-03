@@ -160,6 +160,15 @@ const SETTINGS_SCHEMA = {
     description: 'General application settings.',
     showInDialog: false,
     properties: {
+      previewFeatures: {
+        type: 'boolean',
+        label: 'Preview Features (e.g., models)',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description: 'Enable preview features (e.g., preview models).',
+        showInDialog: true,
+      },
       preferredEditor: {
         type: 'string',
         label: 'Preferred Editor',
@@ -251,6 +260,7 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: undefined as SessionRetentionSettings | undefined,
+        showInDialog: false,
         properties: {
           enabled: {
             type: 'boolean',
@@ -470,7 +480,7 @@ const SETTINGS_SCHEMA = {
         label: 'Show Line Numbers',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description: 'Show line numbers in the chat.',
         showInDialog: true,
       },
@@ -506,7 +516,7 @@ const SETTINGS_SCHEMA = {
         label: 'Use Alternate Screen Buffer',
         category: 'UI',
         requiresRestart: true,
-        default: true,
+        default: false,
         description:
           'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
@@ -683,7 +693,7 @@ const SETTINGS_SCHEMA = {
         label: 'Compression Threshold',
         category: 'Model',
         requiresRestart: true,
-        default: 0.7 as number,
+        default: 0.5 as number,
         description:
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
@@ -717,6 +727,16 @@ const SETTINGS_SCHEMA = {
         default: DEFAULT_MODEL_CONFIGS.aliases,
         description:
           'Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.',
+        showInDialog: false,
+      },
+      customAliases: {
+        type: 'object',
+        label: 'Custom Model Config Aliases',
+        category: 'Model',
+        requiresRestart: false,
+        default: {},
+        description:
+          'Custom named presets for model configs. These are merged with (and override) the built-in aliases.',
         showInDialog: false,
       },
       overrides: {
@@ -910,6 +930,16 @@ const SETTINGS_SCHEMA = {
             description: 'Show color in shell output.',
             showInDialog: true,
           },
+          inactivityTimeout: {
+            type: 'number',
+            label: 'Inactivity Timeout',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 300,
+            description:
+              'The maximum time in seconds allowed without output from the shell command. Defaults to 5 minutes.',
+            showInDialog: false,
+          },
         },
       },
       autoAccept: {
@@ -1025,7 +1055,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Message Bus Integration',
         category: 'Tools',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: oneLine`
           Enable policy-based tool confirmation via message bus integration.
           When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.
@@ -1271,15 +1301,23 @@ const SETTINGS_SCHEMA = {
           'Enables extension loading/unloading within the CLI session.',
         showInDialog: false,
       },
-      useModelRouter: {
+      isModelAvailabilityServiceEnabled: {
         type: 'boolean',
-        label: 'Use Model Router',
+        label: 'Enable Model Availability Service',
         category: 'Experimental',
         requiresRestart: true,
-        default: true,
-        description:
-          'Enable model routing to route requests to the best model based on complexity.',
-        showInDialog: true,
+        default: false,
+        description: 'Enable model routing using new availability service.',
+        showInDialog: false,
+      },
+      jitContext: {
+        type: 'boolean',
+        label: 'JIT Context Loading',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable Just-In-Time (JIT) context loading.',
+        showInDialog: false,
       },
       codebaseInvestigatorSettings: {
         type: 'object',
