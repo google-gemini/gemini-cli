@@ -103,7 +103,13 @@ export async function createContentGeneratorConfig(
     authType === AuthType.USE_VERTEX_AI &&
     (googleApiKey || (googleCloudProject && googleCloudLocation))
   ) {
-    contentGeneratorConfig.apiKey = googleApiKey;
+    // When using project/location, don't set apiKey as a parameter
+    // (API key may be in httpOptions headers for custom proxies)
+    if (googleCloudProject && googleCloudLocation) {
+      contentGeneratorConfig.apiKey = undefined;
+    } else {
+      contentGeneratorConfig.apiKey = googleApiKey;
+    }
     contentGeneratorConfig.vertexai = true;
     contentGeneratorConfig.project = googleCloudProject;
     contentGeneratorConfig.location = googleCloudLocation;
@@ -183,17 +189,6 @@ export async function createContentGenerator(
           ...headers,
         },
       };
-
-      // Debug logging
-      console.error('[DEBUG] Creating GoogleGenAI with:');
-      console.error('[DEBUG] vertexai:', config.vertexai);
-      console.error('[DEBUG] project:', config.project);
-      console.error('[DEBUG] location:', config.location);
-      console.error('[DEBUG] httpOptions.baseUrl:', httpOptions.baseUrl);
-      console.error(
-        '[DEBUG] httpOptions.headers:',
-        JSON.stringify(httpOptions.headers, null, 2),
-      );
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,

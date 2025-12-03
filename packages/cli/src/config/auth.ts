@@ -8,7 +8,8 @@ import { AuthType } from '@google/gemini-cli-core';
 import { loadEnvironment, loadSettings } from './settings.js';
 
 export function validateAuthMethod(authMethod: string): string | null {
-  loadEnvironment(loadSettings().merged);
+  const settings = loadSettings().merged;
+  loadEnvironment(settings);
   if (
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
     authMethod === AuthType.COMPUTE_ADC
@@ -31,11 +32,19 @@ export function validateAuthMethod(authMethod: string): string | null {
       !!process.env['GOOGLE_CLOUD_PROJECT'] &&
       !!process.env['GOOGLE_CLOUD_LOCATION'];
     const hasGoogleApiKey = !!process.env['GOOGLE_API_KEY'];
-    if (!hasVertexProjectLocationConfig && !hasGoogleApiKey) {
+    // Also check if project and location are in settings.json
+    const hasProjectLocationInSettings =
+      !!settings.project && !!settings.location;
+    if (
+      !hasVertexProjectLocationConfig &&
+      !hasGoogleApiKey &&
+      !hasProjectLocationInSettings
+    ) {
       return (
         'When using Vertex AI, you must specify either:\n' +
         '• GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment variables.\n' +
         '• GOOGLE_API_KEY environment variable (if using express mode).\n' +
+        '• project and location in settings.json.\n' +
         'Update your environment and try again (no reload needed if using .env)!'
       );
     }
