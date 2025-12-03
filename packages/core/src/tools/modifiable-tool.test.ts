@@ -13,7 +13,7 @@ import {
   modifyWithEditor,
   isModifiableDeclarativeTool,
 } from './modifiable-tool.js';
-import type { EditorType } from '../utils/editor.js';
+import { DEFAULT_GUI_EDITOR } from '../utils/editor.js';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
@@ -24,9 +24,13 @@ import { debugLogger } from '../utils/debugLogger.js';
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 const mockCreatePatch = vi.hoisted(() => vi.fn());
 
-vi.mock('../utils/editor.js', () => ({
-  openDiff: mockOpenDiff,
-}));
+vi.mock('../utils/editor.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/editor.js')>();
+  return {
+    ...actual,
+    openDiff: mockOpenDiff,
+  };
+});
 
 vi.mock('diff', () => ({
   createPatch: mockCreatePatch,
@@ -103,7 +107,7 @@ describe('modifyWithEditor', () => {
       const result = await modifyWithEditor(
         mockParams,
         mockModifyContext,
-        'vscode' as EditorType,
+        DEFAULT_GUI_EDITOR,
         abortSignal,
       );
 
@@ -169,9 +173,14 @@ describe('modifyWithEditor', () => {
       await modifyWithEditor(
         mockParams,
         mockModifyContext,
-        'vscode' as EditorType,
+        DEFAULT_GUI_EDITOR,
         abortSignal,
       );
+
+      const [oldFilePath] = mockOpenDiff.mock.calls[0];
+      const diffDir = path.dirname(oldFilePath);
+      // Temp directory should be cleaned up after modification
+      await expect(fsp.stat(diffDir)).rejects.toThrow();
     });
   });
 
@@ -184,7 +193,7 @@ describe('modifyWithEditor', () => {
     const result = await modifyWithEditor(
       mockParams,
       mockModifyContext,
-      'vscode' as EditorType,
+      DEFAULT_GUI_EDITOR,
       abortSignal,
     );
 
@@ -212,7 +221,7 @@ describe('modifyWithEditor', () => {
     const result = await modifyWithEditor(
       mockParams,
       mockModifyContext,
-      'vscode' as EditorType,
+      DEFAULT_GUI_EDITOR,
       abortSignal,
     );
 
@@ -241,7 +250,7 @@ describe('modifyWithEditor', () => {
     await modifyWithEditor(
       mockParams,
       mockModifyContext,
-      'vscode' as EditorType,
+      DEFAULT_GUI_EDITOR,
       abortSignal,
       {
         currentContent: overrideCurrent,
@@ -268,7 +277,7 @@ describe('modifyWithEditor', () => {
     await modifyWithEditor(
       mockParams,
       mockModifyContext,
-      'vscode' as EditorType,
+      DEFAULT_GUI_EDITOR,
       abortSignal,
       {
         currentContent: null,
@@ -298,7 +307,7 @@ describe('modifyWithEditor', () => {
       modifyWithEditor(
         mockParams,
         mockModifyContext,
-        'vscode' as EditorType,
+        DEFAULT_GUI_EDITOR,
         abortSignal,
       ),
     ).rejects.toThrow('Editor failed to open');
@@ -327,7 +336,7 @@ describe('modifyWithEditor', () => {
     await modifyWithEditor(
       mockParams,
       mockModifyContext,
-      'vscode' as EditorType,
+      DEFAULT_GUI_EDITOR,
       abortSignal,
     );
 
@@ -353,7 +362,7 @@ describe('modifyWithEditor', () => {
     await modifyWithEditor(
       mockParams,
       mockModifyContext,
-      'vscode' as EditorType,
+      DEFAULT_GUI_EDITOR,
       abortSignal,
     );
 
@@ -374,7 +383,7 @@ describe('modifyWithEditor', () => {
     await modifyWithEditor(
       mockParams,
       mockModifyContext,
-      'vscode' as EditorType,
+      DEFAULT_GUI_EDITOR,
       abortSignal,
     );
 
