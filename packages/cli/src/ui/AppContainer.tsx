@@ -312,20 +312,6 @@ export const AppContainer = (props: AppContainerProps) => {
       }
     })();
     registerCleanup(async () => {
-      // Fire SessionEnd hook
-      try {
-        const hookSystem = config.getHookSystem();
-        if (hookSystem) {
-          const { SessionEndReason } = await import('@google/gemini-cli-core');
-          await hookSystem
-            .getEventHandler()
-            .fireSessionEndEvent(SessionEndReason.Exit);
-        }
-      } catch (error) {
-        debugLogger.debug(
-          `[SessionEnd] Error firing SessionEnd hook: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
       // Generate and save session summary
       const chatRecordingService = config
         .getGeminiClient()
