@@ -668,7 +668,7 @@ their corresponding top-level category object in your `settings.json` file.
     integration. When enabled, tools automatically respect policy engine
     decisions (ALLOW/DENY/ASK_USER) without requiring individual tool
     implementations.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`tools.enableHooks`** (boolean):
@@ -779,6 +779,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.isModelAvailabilityServiceEnabled`** (boolean):
   - **Description:** Enable model routing using new availability service.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.jitContext`** (boolean):
+  - **Description:** Enable Just-In-Time (JIT) context loading.
   - **Default:** `false`
   - **Requires restart:** Yes
 

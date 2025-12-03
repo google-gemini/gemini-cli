@@ -1055,7 +1055,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Message Bus Integration',
         category: 'Tools',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: oneLine`
           Enable policy-based tool confirmation via message bus integration.
           When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.
@@ -1308,6 +1308,15 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable model routing using new availability service.',
+        showInDialog: false,
+      },
+      jitContext: {
+        type: 'boolean',
+        label: 'JIT Context Loading',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable Just-In-Time (JIT) context loading.',
         showInDialog: false,
       },
       codebaseInvestigatorSettings: {

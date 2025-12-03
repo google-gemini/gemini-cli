@@ -65,6 +65,7 @@ import { OutputFormat } from '../output/types.js';
 import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
+import { ContextManager } from '../services/contextManager.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
@@ -112,6 +113,7 @@ export interface TelemetrySettings {
   logPrompts?: boolean;
   outfile?: string;
   useCollector?: boolean;
+  useCliAuth?: boolean;
 }
 
 export interface OutputSettings {
@@ -189,6 +191,12 @@ export class MCPServerConfig {
     readonly headers?: Record<string, string>,
     // For websocket transport
     readonly tcp?: string,
+    // Transport type (optional, for use with 'url' field)
+    // When set to 'http', uses StreamableHTTPClientTransport
+    // When set to 'sse', uses SSEClientTransport
+    // When omitted, auto-detects transport type
+    // Note: 'httpUrl' is deprecated in favor of 'url' + 'type'
+    readonly type?: 'sse' | 'http',
     // Common
     readonly timeout?: number,
     readonly trust?: boolean,
@@ -309,6 +317,7 @@ export interface ConfigParameters {
   };
   previewFeatures?: boolean;
   enableModelAvailabilityService?: boolean;
+  experimentalJitContext?: boolean;
 }
 
 export class Config {
@@ -428,6 +437,9 @@ export class Config {
   private previewModelBypassMode = false;
   private readonly enableModelAvailabilityService: boolean;
 
+  private readonly experimentalJitContext: boolean;
+  private contextManager?: ContextManager;
+
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
     this.embeddingModel =
@@ -464,6 +476,7 @@ export class Config {
       logPrompts: params.telemetry?.logPrompts ?? true,
       outfile: params.telemetry?.outfile,
       useCollector: params.telemetry?.useCollector,
+      useCliAuth: params.telemetry?.useCliAuth,
     };
     this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
 
@@ -486,6 +499,7 @@ export class Config {
     this.model = params.model;
     this.enableModelAvailabilityService =
       params.enableModelAvailabilityService ?? false;
+    this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
@@ -649,6 +663,10 @@ export class Config {
     if (this.enableHooks) {
       this.hookSystem = new HookSystem(this);
       await this.hookSystem.initialize();
+    }
+
+    if (this.experimentalJitContext) {
+      this.contextManager = new ContextManager(this);
     }
 
     await this.geminiClient.initialize();
@@ -958,6 +976,22 @@ export class Config {
     this.userMemory = newUserMemory;
   }
 
+  getGlobalMemory(): string {
+    return this.contextManager?.getGlobalMemory() ?? '';
+  }
+
+  getEnvironmentMemory(): string {
+    return this.contextManager?.getEnvironmentMemory() ?? '';
+  }
+
+  getContextManager(): ContextManager | undefined {
+    return this.contextManager;
+  }
+
+  isJitContextEnabled(): boolean {
+    return this.experimentalJitContext;
+  }
+
   getGeminiMdFileCount(): number {
     return this.geminiMdFileCount;
   }
@@ -1033,6 +1067,10 @@ export class Config {
 
   getTelemetryUseCollector(): boolean {
     return this.telemetrySettings.useCollector ?? false;
+  }
+
+  getTelemetryUseCliAuth(): boolean {
+    return this.telemetrySettings.useCliAuth ?? false;
   }
 
   getGeminiClient(): GeminiClient {
