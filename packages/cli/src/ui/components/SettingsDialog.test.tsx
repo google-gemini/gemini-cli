@@ -301,6 +301,39 @@ describe('SettingsDialog', () => {
       // Use snapshot to capture visual layout including indicators
       expect(output).toMatchSnapshot();
     });
+
+    it('should display description for the active setting', () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame } = renderDialog(settings, onSelect);
+
+      const output = lastFrame();
+      // First setting is "Preview Features" which has a description
+      expect(output).toContain('Enable preview features');
+    });
+
+    it('should update description when navigating to a different setting', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      // Initial description for first setting
+      expect(lastFrame()).toContain('Enable preview features');
+
+      // Navigate down to Vim Mode setting
+      act(() => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
+      });
+
+      await waitFor(() => {
+        // Should now show Vim Mode description
+        expect(lastFrame()).toContain('Enable Vim keybindings');
+      });
+
+      unmount();
+    });
   });
 
   describe('Setting Descriptions', () => {
