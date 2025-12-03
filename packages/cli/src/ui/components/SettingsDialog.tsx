@@ -880,9 +880,14 @@ export function SettingsDialog({
       height="100%"
     >
       <Box flexDirection="column" flexGrow={1}>
-        <Text bold={focusSection === 'settings' && !editingKey} wrap="truncate">
-          Settings
-        </Text>
+        <Box marginX={1}>
+          <Text
+            bold={focusSection === 'settings' && !editingKey}
+            wrap="truncate"
+          >
+            Settings
+          </Text>
+        </Box>
         <Box
           borderStyle="round"
           borderColor={
@@ -894,6 +899,7 @@ export function SettingsDialog({
           }
           paddingX={1}
           height={3}
+          marginTop={1}
         >
           <TextInput
             focus={focusSection === 'settings' && !editingKey}
@@ -903,12 +909,16 @@ export function SettingsDialog({
         </Box>
         <Box height={1} />
         {isSearching && visibleItems.length === 0 ? (
-          <Box height={1} flexDirection="column">
+          <Box marginX={1} height={1} flexDirection="column">
             <Text color={theme.text.secondary}>No matches found.</Text>
           </Box>
         ) : (
           <>
-            {showScrollUp && <Text color={theme.text.secondary}>▲</Text>}
+            {showScrollUp && (
+              <Box marginX={1}>
+                <Text color={theme.text.secondary}>▲</Text>
+              </Box>
+            )}
             {visibleItems.map((item, idx) => {
               const isActive =
                 focusSection === 'settings' &&
@@ -993,7 +1003,7 @@ export function SettingsDialog({
 
               return (
                 <React.Fragment key={item.value}>
-                  <Box flexDirection="row" alignItems="center">
+                  <Box marginX={1} flexDirection="row" alignItems="center">
                     <Box minWidth={2} flexShrink={0}>
                       <Text
                         color={
@@ -1035,7 +1045,11 @@ export function SettingsDialog({
                 </React.Fragment>
               );
             })}
-            {showScrollDown && <Text color={theme.text.secondary}>▼</Text>}
+            {showScrollDown && (
+              <Box marginX={1}>
+                <Text color={theme.text.secondary}>▼</Text>
+              </Box>
+            )}
           </>
         )}
 
