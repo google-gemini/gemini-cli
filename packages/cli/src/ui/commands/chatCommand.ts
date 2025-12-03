@@ -303,7 +303,7 @@ export function serializeHistoryToMarkdown(history: Content[]): string {
           })
           .join('') || '';
       const roleIcon = item.role === 'user' ? '🧑‍💻' : '✨';
-      return `${roleIcon} ## ${(item.role || 'model').toUpperCase()}\n\n${text}`;
+      return `## ${(item.role || 'model').toUpperCase()} ${roleIcon}\n\n${text}`;
     })
     .join('\n\n---\n\n');
 }
