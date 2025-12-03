@@ -632,6 +632,14 @@ describe('loadCliConfig', () => {
       DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
     );
   });
+
+  it('should default enableMessageBusIntegration to true when unconfigured', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config['enableMessageBusIntegration']).toBe(true);
+  });
 });
 
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
