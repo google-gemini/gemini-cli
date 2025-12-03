@@ -1055,7 +1055,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Message Bus Integration',
         category: 'Tools',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: oneLine`
           Enable policy-based tool confirmation via message bus integration.
           When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.
