@@ -33,6 +33,9 @@ describe('sandboxUtils', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env = { ...originalEnv };
+    // Clean up these env vars that might affect tests
+    delete process.env['NODE_ENV'];
+    delete process.env['DEBUG'];
   });
 
   afterEach(() => {
