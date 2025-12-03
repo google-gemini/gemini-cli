@@ -10,9 +10,6 @@ on:
         required: false
         default: true
         type: 'boolean'
-  push:
-    branches:
-      - 'galzahavi/add/stale-issue-workflow'
 
 concurrency:
   group: '${{ github.workflow }}'
@@ -37,6 +34,7 @@ jobs:
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
 
       - name: 'Process Stale Issues'
         uses: 'actions/github-script@v7'
@@ -50,17 +48,15 @@ jobs:
               core.info('DRY RUN MODE ENABLED: No changes will be applied.');
             }
 
-            // 1. Setup Date Thresholds
             const threeMonthsAgo = new Date();
             threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
             const tenDaysAgo = new Date();
             tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
 
-            core.info(`Cutoff date for creation (3 months ago): ${threeMonthsAgo.toISOString()}`);
-            core.info(`Cutoff date for updates (10 days ago): ${tenDaysAgo.toISOString()}`);
+            core.info(`Cutoff date for creation: ${threeMonthsAgo.toISOString()}`);
+            core.info(`Cutoff date for updates: ${tenDaysAgo.toISOString()}`);
 
-            // 2. Fetch all open issues (No limit, fetching all pages)
             const opts = github.rest.issues.listForRepo.endpoint.merge({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -70,141 +66,74 @@ jobs:
               per_page: 100
             });
 
-            // Using paginate to fetch all open issues
-            const allItems = await github.paginate(opts);
-            
-            // Filter out Pull Requests (GitHub API returns mixed results)
-            const issues = allItems.filter(item => !item.pull_request);
-            
-            core.info(`Found ${issues.length} open issues to check (excluding PRs).`);
+            const issues = await github.paginate(opts);
+            const itemsToCheck = issues.filter(item => !item.pull_request);
 
-            // Initial Count of Issue Types in this batch
-            let bugCount = 0;
-            let noTypeCount = 0;
-            let otherTypeCount = 0;
-
-            for (const issue of issues) {
-              const typeName = issue.type ? issue.type.name : null;
-              if (typeName === 'Bug') {
-                bugCount++;
-              } else if (!typeName || typeName === 'No Type') {
-                noTypeCount++;
-              } else {
-                otherTypeCount++;
-              }
-            }
-            core.info(`Issue Type Distribution in this batch: Bug=${bugCount}, No Type=${noTypeCount}, Other=${otherTypeCount}`);
+            core.info(`Found ${itemsToCheck.length} open issues to check.`);
 
             let processedCount = 0;
 
-            // Buckets for logging
-            const bugLogs = [];
-            const noTypeLogs = [];
-            const otherLogs = []; // Should be empty given logic, but good for debugging
-
-            for (const issue of issues) {
+            for (const issue of itemsToCheck) {
               const createdAt = new Date(issue.created_at);
               const updatedAt = new Date(issue.updated_at);
               const reactionCount = issue.reactions.total_count;
 
-              // 3. Evaluate Conditions
-              const isOld = createdAt < threeMonthsAgo;
-              const isUnpopular = reactionCount < 5;
-              
-              // Determine staleness (considering Bot updates)
+              // Basic thresholds
+              if (createdAt >= threeMonthsAgo || reactionCount >= 5) {
+                continue;
+              }
+
               let isStale = updatedAt < tenDaysAgo;
 
-              if (!isStale && isOld && isUnpopular) {
-                // If it looks active, check if the last update was just a bot
-                // We only do this API call if the issue is OLD and UNPOPULAR, to save rate limits
+              // If apparently active, check if it's only bot activity
+              if (!isStale) {
                 try {
                   const comments = await github.rest.issues.listComments({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     issue_number: issue.number,
-                    per_page: 10, // Check last 10 comments
+                    per_page: 100,
                     sort: 'created',
                     direction: 'desc'
                   });
-                  
-                  let lastHumanDate = null;
-                  
-                  // Iterate comments to find last human
-                  for (const comment of comments.data) {
-                    if (comment.user.type !== 'Bot') {
-                      lastHumanDate = new Date(comment.created_at);
-                      break; // Found the latest human comment
-                    }
-                  }
-                  
-                  // If we found a human comment, check its date
-                  if (lastHumanDate) {
-                    isStale = lastHumanDate < tenDaysAgo;
+
+                  const lastHumanComment = comments.data.find(comment => comment.user.type !== 'Bot');
+                  if (lastHumanComment) {
+                    isStale = new Date(lastHumanComment.created_at) < tenDaysAgo;
                   } else {
-                    // No human comments in the last 10 (or at all if few), 
-                    // check the issue creator. If creator is human, use createdAt.
-                    // If creator is Bot, and no human comments, it's stale.
+                    // No human comments. Check if creator is human.
                     if (issue.user.type !== 'Bot') {
                        isStale = createdAt < tenDaysAgo;
                     } else {
-                       isStale = true; // Bot created, no human comments
+                       isStale = true; // Bot created, only bot comments
                     }
                   }
-                  
-                  if (isStale) {
-                     core.info(`Issue #${issue.number} is seemingly active (updated ${updatedAt.toISOString()}) but last human interaction was stale.`);
-                  }
-
                 } catch (error) {
-                  core.warning(`Failed to fetch comments for check #${issue.number}: ${error.message}`);
+                  core.warning(`Failed to fetch comments for issue #${issue.number}: ${error.message}`);
+                  continue;
                 }
               }
 
-              // 4. Check Issue Type (Must be 'Bug' or 'No Type')
-              const typeName = issue.type ? issue.type.name : null;
-              const isBug = typeName === 'Bug';
-              const isNoType = !typeName || typeName === 'No Type';
-
-              if (isOld && isStale && isUnpopular && (isBug || isNoType)) {
-                const message = `Closing stale issue #${issue.number}: "${issue.title}" (${issue.html_url}) (Created: ${createdAt.toISOString()}, Reactions: ${reactionCount})`;
-
+              if (isStale) {
                 processedCount++;
+                const message = `Closing stale issue #${issue.number}: "${issue.title}" (${issue.html_url})`;
+                core.info(message);
 
-                if (isBug) {
-                   bugLogs.push(message);
-                } else if (isNoType) {
-                   noTypeLogs.push(message);
-                } else {
-                   otherLogs.push(message);
+                if (!dryRun) {
+                  // await github.rest.issues.createComment({
+                  //   owner: context.repo.owner,
+                  //   repo: context.repo.repo,
+                  //   issue_number: issue.number,
+                  //   body: 'Hello! As part of our effort to keep our backlog manageable and focus on the most active issues, we are tidying up older reports.\n\nIt looks like this issue hasn't been active for a while, so we are closing it for now. However, if you are still experiencing this bug on the latest stable build, please feel free to comment on this issue or create a new one with updated details.\n\nThank you for your contribution!'
+                  // });
+                  // await github.rest.issues.update({
+                  //   owner: context.repo.owner,
+                  //   repo: context.repo.repo,
+                  //   issue_number: issue.number,
+                  //   state: 'closed'
+                  // });
                 }
-
-                // Actions (Only executed if not dry run and logic uncommented)
-                // 4. Comment
-                // await github.rest.issues.createComment({ ... });
-                // 5. Close
-                // await github.rest.issues.update({ ... });
               }
             }
 
-            const prefix = dryRun ? '[DRY RUN] ' : '';
-
-            if (bugLogs.length > 0) {
-              core.info(`\n=== ${prefix}Bug Issues (${bugLogs.length}) ===`);
-              bugLogs.forEach(log => core.info(`${prefix}${log}`));
-            }
-
-            if (noTypeLogs.length > 0) {
-              core.info(`\n=== ${prefix}No Type / Untyped Issues (${noTypeLogs.length}) ===`);
-              noTypeLogs.forEach(log => core.info(`${prefix}${log}`));
-            }
-
-            if (otherLogs.length > 0) {
-               core.info(`\n=== ${prefix}Other Issues (Unexpected) (${otherLogs.length}) ===`);
-               otherLogs.forEach(log => core.info(`${prefix}${log}`));
-            }
-
-            if (dryRun) {
-              core.info(`\n[DRY RUN] Total issues that would be closed: ${processedCount}`);
-            } else {
-              core.info(`\nTotal issues closed: ${processedCount}`);
-            }
+            core.info(`\nTotal issues processed: ${processedCount}`);
