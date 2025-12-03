@@ -16,7 +16,11 @@ import {
   type PolicySettings,
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
-import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
+import {
+  loadPoliciesFromToml,
+  type PolicyFileError,
+  escapeRegex,
+} from './toml-loader.js';
 import {
   MessageBusType,
   type UpdatePolicy,
@@ -242,6 +246,16 @@ export function createPolicyUpdater(
     MessageBusType.UPDATE_POLICY,
     async (message: UpdatePolicy) => {
       const toolName = message.toolName;
+      let argsPattern = message.argsPattern
+        ? new RegExp(message.argsPattern)
+        : undefined;
+
+      if (message.commandPrefix) {
+        // Convert commandPrefix to argsPattern for in-memory rule
+        // This mimics what toml-loader does
+        const escapedPrefix = escapeRegex(message.commandPrefix);
+        argsPattern = new RegExp(`"command":"${escapedPrefix}`);
+      }
 
       policyEngine.addRule({
         toolName,
@@ -250,6 +264,7 @@ export function createPolicyUpdater(
         // This ensures user "always allow" selections are high priority
         // but still lose to admin policies (3.xxx) and settings excludes (200)
         priority: 2.95,
+        argsPattern,
       });
 
       if (message.persist) {
@@ -273,6 +288,13 @@ export function createPolicyUpdater(
           content += `toolName = "${toolName}"\n`;
           content += `decision = "allow"\n`;
           content += `priority = 100\n`;
+          if (message.commandPrefix) {
+            content += `commandPrefix = "${message.commandPrefix}"\n`;
+          } else if (message.argsPattern) {
+            // Escape backslashes for TOML string
+            const escapedPattern = message.argsPattern.replace(/\\/g, '\\\\');
+            content += `argsPattern = "${escapedPattern}"\n`;
+          }
 
           await fs.appendFile(policyFile, content);
         } catch (error) {

@@ -130,10 +130,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
           outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
         ) {
           if (this.messageBus && this._toolName) {
+            let commandPrefix: string | undefined;
+            if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
+              // Use the command as the prefix
+              commandPrefix = this.params.command;
+            }
+
             this.messageBus.publish({
               type: MessageBusType.UPDATE_POLICY,
               toolName: this._toolName,
               persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
+              commandPrefix,
             });
           }
         }

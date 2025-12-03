@@ -40,6 +40,8 @@ export interface UpdatePolicy {
   type: MessageBusType.UPDATE_POLICY;
   toolName: string;
   persist?: boolean;
+  argsPattern?: string;
+  commandPrefix?: string;
 }
 
 export interface ToolPolicyRejection {

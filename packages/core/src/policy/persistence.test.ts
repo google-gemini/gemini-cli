@@ -85,4 +85,41 @@ describe('createPolicyUpdater', () => {
 
     expect(fs.appendFile).not.toHaveBeenCalled();
   });
+  it('should persist policy with commandPrefix when provided', async () => {
+    createPolicyUpdater(policyEngine, messageBus);
+
+    const userPoliciesDir = '/mock/user/policies';
+    vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(userPoliciesDir);
+    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
+    (fs.readFile as unknown as Mock).mockRejectedValue(
+      new Error('File not found'),
+    );
+    (fs.appendFile as unknown as Mock).mockResolvedValue(undefined);
+
+    const toolName = 'run_shell_command';
+    const commandPrefix = 'git status';
+
+    messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName,
+      persist: true,
+      commandPrefix,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Verify rule added to engine (should be converted to argsPattern)
+    const rules = policyEngine.getRules();
+    const addedRule = rules.find((r) => r.toolName === toolName);
+    expect(addedRule).toBeDefined();
+    expect(addedRule?.priority).toBe(2.95);
+    // In-memory rule should have argsPattern matching the prefix
+    expect(addedRule?.argsPattern).toEqual(new RegExp(`"command":"git status`));
+
+    // Verify file written (should have commandPrefix)
+    expect(fs.appendFile).toHaveBeenCalledWith(
+      path.join(userPoliciesDir, 'auto-saved.toml'),
+      expect.stringContaining(`commandPrefix = "git status"`),
+    );
+  });
 });

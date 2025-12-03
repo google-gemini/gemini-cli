@@ -126,7 +126,7 @@ export interface PolicyLoadResult {
  * @param str The string to escape
  * @returns The escaped string safe for use in a regex
  */
-function escapeRegex(str: string): string {
+export function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
