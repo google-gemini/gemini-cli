@@ -16,6 +16,7 @@ import {
   ToolConfirmationOutcome,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { MessageBusType } from '../confirmation-bus/types.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
@@ -228,6 +229,18 @@ ${textContent}
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+        }
+        if (
+          outcome === ToolConfirmationOutcome.ProceedAlways ||
+          outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
+        ) {
+          if (this.messageBus && this._toolName) {
+            this.messageBus.publish({
+              type: MessageBusType.UPDATE_POLICY,
+              toolName: this._toolName,
+              persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            });
+          }
         }
       },
     };

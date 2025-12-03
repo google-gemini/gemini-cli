@@ -129,11 +129,15 @@ export abstract class BaseToolInvocation<
       title: `Confirm: ${this._toolDisplayName || this._toolName}`,
       prompt: this.getDescription(),
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+        if (
+          outcome === ToolConfirmationOutcome.ProceedAlways ||
+          outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
+        ) {
           if (this.messageBus && this._toolName) {
             this.messageBus.publish({
               type: MessageBusType.UPDATE_POLICY,
               toolName: this._toolName,
+              persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
             });
           }
         }
@@ -684,6 +688,7 @@ export type ToolCallConfirmationDetails =
 export enum ToolConfirmationOutcome {
   ProceedOnce = 'proceed_once',
   ProceedAlways = 'proceed_always',
+  ProceedAlwaysAndSave = 'proceed_always_and_save',
   ProceedAlwaysServer = 'proceed_always_server',
   ProceedAlwaysTool = 'proceed_always_tool',
   ModifyWithEditor = 'modify_with_editor',

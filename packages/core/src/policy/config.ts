@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
@@ -239,7 +240,7 @@ export function createPolicyUpdater(
 ) {
   messageBus.subscribe(
     MessageBusType.UPDATE_POLICY,
-    (message: UpdatePolicy) => {
+    async (message: UpdatePolicy) => {
       const toolName = message.toolName;
 
       policyEngine.addRule({
@@ -250,6 +251,38 @@ export function createPolicyUpdater(
         // but still lose to admin policies (3.xxx) and settings excludes (200)
         priority: 2.95,
       });
+
+      if (message.persist) {
+        try {
+          const userPoliciesDir = Storage.getUserPoliciesDir();
+          await fs.mkdir(userPoliciesDir, { recursive: true });
+          const policyFile = path.join(userPoliciesDir, 'auto-saved.toml');
+
+          // Check if file exists to determine if we need to add a newline
+          let content = '';
+          try {
+            const existingContent = await fs.readFile(policyFile, 'utf-8');
+            if (existingContent && !existingContent.endsWith('\n')) {
+              content = '\n';
+            }
+          } catch {
+            // File doesn't exist, start fresh
+          }
+
+          content += `[[rule]]\n`;
+          content += `toolName = "${toolName}"\n`;
+          content += `decision = "allow"\n`;
+          content += `priority = 100\n`;
+
+          await fs.appendFile(policyFile, content);
+        } catch (error) {
+          coreEvents.emitFeedback(
+            'error',
+            `Failed to persist policy for ${toolName}`,
+            error,
+          );
+        }
+      }
     },
   );
 }

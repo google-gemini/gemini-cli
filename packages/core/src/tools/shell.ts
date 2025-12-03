@@ -43,6 +43,7 @@ import {
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { MessageBusType } from '../confirmation-bus/types.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -123,6 +124,18 @@ export class ShellToolInvocation extends BaseToolInvocation<
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           commandsToConfirm.forEach((command) => this.allowlist.add(command));
+        }
+        if (
+          outcome === ToolConfirmationOutcome.ProceedAlways ||
+          outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
+        ) {
+          if (this.messageBus && this._toolName) {
+            this.messageBus.publish({
+              type: MessageBusType.UPDATE_POLICY,
+              toolName: this._toolName,
+              persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            });
+          }
         }
       },
     };

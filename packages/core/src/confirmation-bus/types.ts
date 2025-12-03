@@ -39,6 +39,7 @@ export interface ToolConfirmationResponse {
 export interface UpdatePolicy {
   type: MessageBusType.UPDATE_POLICY;
   toolName: string;
+  persist?: boolean;
 }
 
 export interface ToolPolicyRejection {

@@ -21,6 +21,7 @@ import type { CallableTool, FunctionCall, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { MessageBusType } from '../confirmation-bus/types.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -115,6 +116,15 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
           DiscoveredMCPToolInvocation.allowlist.add(serverAllowListKey);
         } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysTool) {
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
+        } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
+          DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
+          if (this.messageBus && this._toolName) {
+            this.messageBus.publish({
+              type: MessageBusType.UPDATE_POLICY,
+              toolName: this._toolName,
+              persist: true,
+            });
+          }
         }
       },
     };
