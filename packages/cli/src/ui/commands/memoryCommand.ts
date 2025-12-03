@@ -119,7 +119,7 @@ export const memoryCommand: SlashCommand = {
     },
     {
       name: 'list',
-      description: 'Lists the paths of the GEMINI.md files in use',
+      description: 'List the paths of the GEMINI.md files in use',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: async (context) => {
