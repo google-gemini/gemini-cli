@@ -74,6 +74,10 @@ export async function setup() {
 export async function teardown() {
   // Cleanup the test run directory unless KEEP_OUTPUT is set
   if (process.env['KEEP_OUTPUT'] !== 'true' && runDir) {
-    await rm(runDir, { recursive: true, force: true });
+    try {
+      await rm(runDir, { recursive: true, force: true });
+    } catch (e) {
+      console.warn('Failed to clean up test run directory:', e);
+    }
   }
 }
