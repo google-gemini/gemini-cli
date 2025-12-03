@@ -45,6 +45,9 @@ import {
 import { debugLogger } from '@google/gemini-cli-core';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { Config } from '@google/gemini-cli-core';
+import { useUIState } from '../contexts/UIStateContext.js';
+import { useTextBuffer } from './shared/text-buffer.js';
+import { TextInput } from './shared/TextInput.js';
 
 interface FzfResult {
   item: string;
@@ -856,6 +859,21 @@ export function SettingsDialog({
     { isActive: true },
   );
 
+  const { mainAreaWidth } = useUIState();
+  const viewportWidth = mainAreaWidth - 8;
+
+  const buffer = useTextBuffer({
+    initialText: '',
+    initialCursorOffset: 0,
+    viewport: {
+      width: viewportWidth,
+      height: 4,
+    },
+    isValidPath: () => false, // No path validation needed for API key
+    singleLine: true,
+    onChange: (text) => setSearchQuery(text),
+  });
+
   return (
     <Box
       borderStyle="round"
@@ -866,17 +884,27 @@ export function SettingsDialog({
       height="100%"
     >
       <Box flexDirection="column" flexGrow={1}>
-        {isSearching || searchQuery ? (
-          <Text bold color={theme.text.accent} wrap="truncate">
-            {isSearching ? '> ' : '  '}Search: {searchQuery}
-            {isSearching ? '_' : ''}
-          </Text>
-        ) : (
-          <Text bold={focusSection === 'settings'} wrap="truncate">
-            {focusSection === 'settings' ? '> ' : '  '}Settings{' '}
-            <Text color={theme.text.secondary}>(press / to search)</Text>
-          </Text>
-        )}
+        <Text bold={focusSection === 'settings' && !editingKey} wrap="truncate">
+          Settings
+        </Text>
+        <Box
+          borderStyle="round"
+          borderColor={
+            editingKey
+              ? theme.border.default
+              : focusSection === 'settings'
+                ? theme.border.focused
+                : theme.border.default
+          }
+          paddingX={1}
+          height={3}
+        >
+          <TextInput
+            focus={focusSection === 'settings' && !editingKey}
+            buffer={buffer}
+            placeholder="Search to filter"
+          />
+        </Box>
         <Box height={1} />
         {isSearching && visibleItems.length === 0 ? (
           <Box height={1} flexDirection="column">
