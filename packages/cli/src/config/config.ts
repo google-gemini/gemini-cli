@@ -513,7 +513,7 @@ export async function loadCliConfig(
   );
 
   const enableMessageBusIntegration =
-    settings.tools?.enableMessageBusIntegration ?? false;
+    settings.tools?.enableMessageBusIntegration ?? true;
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -635,6 +635,7 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableModelAvailabilityService:
       settings.experimental?.isModelAvailabilityServiceEnabled,
+    experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
