@@ -21,7 +21,8 @@ export type ClientMetadataIdeType =
   | 'INTELLIJ'
   | 'VSCODE_CLOUD_WORKSTATION'
   | 'INTELLIJ_CLOUD_WORKSTATION'
-  | 'CLOUD_SHELL';
+  | 'CLOUD_SHELL'
+  | 'GEMINI_CLI';
 export type ClientMetadataPlatform =
   | 'PLATFORM_UNSPECIFIED'
   | 'DARWIN_AMD64'
@@ -198,4 +199,21 @@ export interface GoogleRpcResponse {
  */
 interface GoogleRpcErrorInfo {
   reason?: string;
+}
+
+export interface RetrieveUserQuotaRequest {
+  project: string;
+  userAgent?: string;
+}
+
+export interface BucketInfo {
+  remainingAmount?: string;
+  remainingFraction?: number;
+  resetTime?: string;
+  tokenType?: string;
+  modelId?: string;
+}
+
+export interface RetrieveUserQuotaResponse {
+  buckets?: BucketInfo[];
 }

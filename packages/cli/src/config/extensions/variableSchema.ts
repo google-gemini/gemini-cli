@@ -15,11 +15,6 @@ export interface VariableSchema {
   [key: string]: VariableDefinition;
 }
 
-export interface LoadExtensionContext {
-  extensionDir: string;
-  workspaceDir: string;
-}
-
 const PATH_SEPARATOR_DEFINITION = {
   type: 'string',
   description: 'The path separator.',

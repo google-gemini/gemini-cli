@@ -11,6 +11,7 @@ import type {
   GeminiChat,
   ToolResult,
   ToolCallConfirmationDetails,
+  FilterFilesOptions,
 } from '@google/gemini-cli-core';
 import {
   AuthType,
@@ -25,6 +26,12 @@ import {
   MCPServerConfig,
   DiscoveredMCPTool,
   StreamEventType,
+  ToolCallEvent,
+  debugLogger,
+  ReadManyFilesTool,
+  getEffectiveModel,
+  createWorkingStdio,
+  startupProfiler,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -37,41 +44,32 @@ import * as path from 'node:path';
 import { z } from 'zod';
 
 import { randomUUID } from 'node:crypto';
-import type { Extension } from '../config/extension.js';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
 
 export async function runZedIntegration(
   config: Config,
   settings: LoadedSettings,
-  extensions: Extension[],
   argv: CliArgs,
 ) {
-  const stdout = Writable.toWeb(process.stdout) as WritableStream;
+  const { stdout: workingStdout } = createWorkingStdio();
+  const stdout = Writable.toWeb(workingStdout) as WritableStream;
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
-  // Stdout is used to send messages to the client, so console.log/console.info
-  // messages to stderr so that they don't interfere with ACP.
-  console.log = console.error;
-  console.info = console.error;
-  console.debug = console.error;
-
   new acp.AgentSideConnection(
-    (client: acp.Client) =>
-      new GeminiAgent(config, settings, extensions, argv, client),
+    (client: acp.Client) => new GeminiAgent(config, settings, argv, client),
     stdout,
     stdin,
   );
 }
 
-class GeminiAgent {
+export class GeminiAgent {
   private sessions: Map<string, Session> = new Map();
   private clientCapabilities: acp.ClientCapabilities | undefined;
 
   constructor(
     private config: Config,
     private settings: LoadedSettings,
-    private extensions: Extension[],
     private argv: CliArgs,
     private client: acp.Client,
   ) {}
@@ -148,7 +146,7 @@ class GeminiAgent {
         );
         isAuthenticated = true;
       } catch (e) {
-        console.error(`Authentication failed: ${e}`);
+        debugLogger.error(`Authentication failed: ${e}`);
       }
     }
 
@@ -193,15 +191,10 @@ class GeminiAgent {
 
     const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };
 
-    const config = await loadCliConfig(
-      settings,
-      this.extensions,
-      sessionId,
-      this.argv,
-      cwd,
-    );
+    const config = await loadCliConfig(settings, sessionId, this.argv, cwd);
 
     await config.initialize();
+    startupProfiler.flush(config);
     return config;
   }
 
@@ -222,7 +215,7 @@ class GeminiAgent {
   }
 }
 
-class Session {
+export class Session {
   private pendingPrompt: AbortController | null = null;
 
   constructor(
@@ -262,15 +255,16 @@ class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const responseStream = await chat.sendMessageStream(
+        const model = getEffectiveModel(
+          this.config.isInFallbackMode(),
           this.config.getModel(),
-          {
-            message: nextMessage?.parts ?? [],
-            config: {
-              abortSignal: pendingSend.signal,
-            },
-          },
+          this.config.getPreviewFeatures(),
+        );
+        const responseStream = await chat.sendMessageStream(
+          { model },
+          nextMessage?.parts ?? [],
           promptId,
+          pendingSend.signal,
         );
         nextMessage = null;
 
@@ -308,12 +302,23 @@ class Session {
             functionCalls.push(...resp.value.functionCalls);
           }
         }
+
+        if (pendingSend.signal.aborted) {
+          return { stopReason: 'cancelled' };
+        }
       } catch (error) {
         if (getErrorStatus(error) === 429) {
           throw new acp.RequestError(
             429,
             'Rate limit exceeded. Try again later.',
           );
+        }
+
+        if (
+          pendingSend.signal.aborted ||
+          (error instanceof Error && error.name === 'AbortError')
+        ) {
+          return { stopReason: 'cancelled' };
         }
 
         throw error;
@@ -355,20 +360,21 @@ class Session {
 
     const errorResponse = (error: Error) => {
       const durationMs = Date.now() - startTime;
-      logToolCall(this.config, {
-        'event.name': 'tool_call',
-        'event.timestamp': new Date().toISOString(),
-        prompt_id: promptId,
-        function_name: fc.name ?? '',
-        function_args: args,
-        duration_ms: durationMs,
-        success: false,
-        error: error.message,
-        tool_type:
+      logToolCall(
+        this.config,
+        new ToolCallEvent(
+          undefined,
+          fc.name ?? '',
+          args,
+          durationMs,
+          false,
+          promptId,
           typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
             ? 'mcp'
             : 'native',
-      });
+          error.message,
+        ),
+      );
 
       return [
         {
@@ -474,19 +480,20 @@ class Session {
       });
 
       const durationMs = Date.now() - startTime;
-      logToolCall(this.config, {
-        'event.name': 'tool_call',
-        'event.timestamp': new Date().toISOString(),
-        function_name: fc.name,
-        function_args: args,
-        duration_ms: durationMs,
-        success: true,
-        prompt_id: promptId,
-        tool_type:
+      logToolCall(
+        this.config,
+        new ToolCallEvent(
+          undefined,
+          fc.name ?? '',
+          args,
+          durationMs,
+          true,
+          promptId,
           typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
             ? 'mcp'
             : 'native',
-      });
+        ),
+      );
 
       return convertToFunctionResponse(fc.name, callId, toolResult.llmContent);
     } catch (e) {
@@ -559,14 +566,15 @@ class Session {
 
     // Get centralized file discovery service
     const fileDiscovery = this.config.getFileService();
-    const respectGitIgnore = this.config.getFileFilteringRespectGitIgnore();
+    const fileFilteringOptions: FilterFilesOptions =
+      this.config.getFileFilteringOptions();
 
     const pathSpecsToRead: string[] = [];
     const contentLabelsForDisplay: string[] = [];
     const ignoredPaths: string[] = [];
 
     const toolRegistry = this.config.getToolRegistry();
-    const readManyFilesTool = toolRegistry.getTool('read_many_files');
+    const readManyFilesTool = new ReadManyFilesTool(this.config);
     const globTool = toolRegistry.getTool('glob');
 
     if (!readManyFilesTool) {
@@ -575,13 +583,10 @@ class Session {
 
     for (const atPathPart of atPathCommandParts) {
       const pathName = atPathPart.fileData!.fileUri;
-      // Check if path should be ignored by git
-      if (fileDiscovery.shouldGitIgnoreFile(pathName)) {
+      // Check if path should be ignored
+      if (fileDiscovery.shouldIgnoreFile(pathName, fileFilteringOptions)) {
         ignoredPaths.push(pathName);
-        const reason = respectGitIgnore
-          ? 'git-ignored and will be skipped'
-          : 'ignored by custom patterns';
-        console.warn(`Path ${pathName} is ${reason}.`);
+        debugLogger.warn(`Path ${pathName} is ignored and will be skipped.`);
         continue;
       }
       let currentPathSpec = pathName;
@@ -648,7 +653,7 @@ class Session {
                 );
               }
             } catch (globError) {
-              console.error(
+              debugLogger.error(
                 `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
               );
             }
@@ -658,7 +663,7 @@ class Session {
             );
           }
         } else {
-          console.error(
+          debugLogger.error(
             `Error stating path ${pathName}. Path ${pathName} will be skipped.`,
           );
         }
@@ -718,9 +723,8 @@ class Session {
     initialQueryText = initialQueryText.trim();
     // Inform user about ignored paths
     if (ignoredPaths.length > 0) {
-      const ignoreType = respectGitIgnore ? 'git-ignored' : 'custom-ignored';
       this.debug(
-        `Ignored ${ignoredPaths.length} ${ignoreType} files: ${ignoredPaths.join(', ')}`,
+        `Ignored ${ignoredPaths.length} files: ${ignoredPaths.join(', ')}`,
       );
     }
 
@@ -728,14 +732,13 @@ class Session {
 
     if (pathSpecsToRead.length === 0 && embeddedContext.length === 0) {
       // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
-      console.warn('No valid file paths found in @ commands to read.');
+      debugLogger.warn('No valid file paths found in @ commands to read.');
       return [{ text: initialQueryText }];
     }
 
     if (pathSpecsToRead.length > 0) {
       const toolArgs = {
-        paths: pathSpecsToRead,
-        respectGitIgnore, // Use configuration setting
+        include: pathSpecsToRead,
       };
 
       const callId = `${readManyFilesTool.name}-${Date.now()}`;
@@ -791,7 +794,7 @@ class Session {
             }
           }
         } else {
-          console.warn(
+          debugLogger.warn(
             'read_many_files tool returned no content or empty content.',
           );
         }
@@ -844,7 +847,7 @@ class Session {
 
   debug(msg: string) {
     if (this.config.getDebugMode()) {
-      console.warn(msg);
+      debugLogger.warn(msg);
     }
   }
 }

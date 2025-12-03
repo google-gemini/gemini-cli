@@ -6,11 +6,8 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { Config } from '@google/gemini-cli-core';
-import {
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  getResponseText,
-} from '@google/gemini-cli-core';
-import type { Content, GenerateContentConfig } from '@google/genai';
+import { debugLogger, getResponseText } from '@google/gemini-cli-core';
+import type { Content } from '@google/genai';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 
@@ -109,19 +106,10 @@ export function usePromptCompletion({
         },
       ];
 
-      const generationConfig: GenerateContentConfig = {
-        temperature: 0.3,
-        maxOutputTokens: 16000,
-        thinkingConfig: {
-          thinkingBudget: 0,
-        },
-      };
-
       const response = await geminiClient.generateContent(
+        { model: 'prompt-completion' },
         contents,
-        generationConfig,
         signal,
-        DEFAULT_GEMINI_FLASH_LITE_MODEL,
       );
 
       if (signal.aborted) {
@@ -151,7 +139,9 @@ export function usePromptCompletion({
           (error instanceof Error && error.name === 'AbortError')
         )
       ) {
-        console.error('prompt completion error:', error);
+        debugLogger.warn(
+          `[WARN] prompt completion failed: : (${error instanceof Error ? error.message : String(error)})`,
+        );
         // Clear the last requested text to allow retry only on real errors
         lastRequestedTextRef.current = '';
       }

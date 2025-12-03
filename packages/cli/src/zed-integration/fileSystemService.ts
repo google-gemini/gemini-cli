@@ -44,4 +44,7 @@ export class AcpFileSystemService implements FileSystemService {
       sessionId: this.sessionId,
     });
   }
+  findFiles(fileName: string, searchPaths: readonly string[]): string[] {
+    return this.fallback.findFiles(fileName, searchPaths);
+  }
 }

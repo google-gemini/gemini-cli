@@ -6,8 +6,8 @@
 
 import type {
   Settings,
-  SettingScope,
   LoadedSettings,
+  LoadableSettingScope,
 } from '../config/settings.js';
 import type {
   SettingDefinition,
@@ -391,7 +391,7 @@ export function saveModifiedSettings(
   modifiedSettings: Set<string>,
   pendingSettings: Settings,
   loadedSettings: LoadedSettings,
-  scope: SettingScope,
+  scope: LoadableSettingScope,
 ): void {
   modifiedSettings.forEach((settingKey) => {
     const path = settingKey.split('.');

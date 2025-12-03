@@ -17,6 +17,7 @@ import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import type { ToolInvocation, ToolResult } from './tools.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
@@ -29,18 +30,22 @@ describe('ReadFileTool', () => {
 
   beforeEach(async () => {
     // Create a unique temporary root directory for each test run
-    tempRootDir = await fsp.mkdtemp(
-      path.join(os.tmpdir(), 'read-file-tool-root-'),
-    );
+    const realTmp = await fsp.realpath(os.tmpdir());
+    tempRootDir = await fsp.mkdtemp(path.join(realTmp, 'read-file-tool-root-'));
 
     const mockConfigInstance = {
       getFileService: () => new FileDiscoveryService(tempRootDir),
       getFileSystemService: () => new StandardFileSystemService(),
       getTargetDir: () => tempRootDir,
       getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+      getFileFilteringOptions: () => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
       storage: {
         getProjectTempDir: () => path.join(tempRootDir, '.temp'),
       },
+      isInteractive: () => false,
     } as unknown as Config;
     tool = new ReadFileTool(mockConfigInstance);
   });
@@ -55,24 +60,30 @@ describe('ReadFileTool', () => {
   describe('build', () => {
     it('should return an invocation for valid params (absolute path within root)', () => {
       const params: ReadFileToolParams = {
-        absolute_path: path.join(tempRootDir, 'test.txt'),
+        file_path: path.join(tempRootDir, 'test.txt'),
       };
       const result = tool.build(params);
       expect(typeof result).not.toBe('string');
     });
 
-    it('should throw error if file path is relative', () => {
+    it('should return an invocation for valid params (relative path within root)', () => {
       const params: ReadFileToolParams = {
-        absolute_path: 'relative/path.txt',
+        file_path: 'test.txt',
       };
-      expect(() => tool.build(params)).toThrow(
-        'File path must be absolute, but was relative: relative/path.txt. You must provide an absolute path.',
+      const result = tool.build(params);
+      expect(typeof result).not.toBe('string');
+      const invocation = result as ToolInvocation<
+        ReadFileToolParams,
+        ToolResult
+      >;
+      expect(invocation.toolLocations()[0].path).toBe(
+        path.join(tempRootDir, 'test.txt'),
       );
     });
 
     it('should throw error if path is outside root', () => {
       const params: ReadFileToolParams = {
-        absolute_path: '/outside/root.txt',
+        file_path: '/outside/root.txt',
       };
       expect(() => tool.build(params)).toThrow(
         /File path must be within one of the workspace directories/,
@@ -82,7 +93,7 @@ describe('ReadFileTool', () => {
     it('should allow access to files in project temp directory', () => {
       const tempDir = path.join(tempRootDir, '.temp');
       const params: ReadFileToolParams = {
-        absolute_path: path.join(tempDir, 'temp-file.txt'),
+        file_path: path.join(tempDir, 'temp-file.txt'),
       };
       const result = tool.build(params);
       expect(typeof result).not.toBe('string');
@@ -90,7 +101,7 @@ describe('ReadFileTool', () => {
 
     it('should show temp directory in error message when path is outside workspace and temp dir', () => {
       const params: ReadFileToolParams = {
-        absolute_path: '/completely/outside/path.txt',
+        file_path: '/completely/outside/path.txt',
       };
       expect(() => tool.build(params)).toThrow(
         /File path must be within one of the workspace directories.*or within the project temp directory/,
@@ -99,16 +110,16 @@ describe('ReadFileTool', () => {
 
     it('should throw error if path is empty', () => {
       const params: ReadFileToolParams = {
-        absolute_path: '',
+        file_path: '',
       };
       expect(() => tool.build(params)).toThrow(
-        /The 'absolute_path' parameter must be non-empty./,
+        /The 'file_path' parameter must be non-empty./,
       );
     });
 
     it('should throw error if offset is negative', () => {
       const params: ReadFileToolParams = {
-        absolute_path: path.join(tempRootDir, 'test.txt'),
+        file_path: path.join(tempRootDir, 'test.txt'),
         offset: -1,
       };
       expect(() => tool.build(params)).toThrow(
@@ -118,7 +129,7 @@ describe('ReadFileTool', () => {
 
     it('should throw error if limit is zero or negative', () => {
       const params: ReadFileToolParams = {
-        absolute_path: path.join(tempRootDir, 'test.txt'),
+        file_path: path.join(tempRootDir, 'test.txt'),
         limit: 0,
       };
       expect(() => tool.build(params)).toThrow(
@@ -131,7 +142,7 @@ describe('ReadFileTool', () => {
     it('should return relative path without limit/offset', () => {
       const subDir = path.join(tempRootDir, 'sub', 'dir');
       const params: ReadFileToolParams = {
-        absolute_path: path.join(subDir, 'file.txt'),
+        file_path: path.join(subDir, 'file.txt'),
       };
       const invocation = tool.build(params);
       expect(typeof invocation).not.toBe('string');
@@ -156,7 +167,7 @@ describe('ReadFileTool', () => {
         'limit',
         'file.txt',
       );
-      const params: ReadFileToolParams = { absolute_path: deepPath };
+      const params: ReadFileToolParams = { file_path: deepPath };
       const invocation = tool.build(params);
       expect(typeof invocation).not.toBe('string');
       const desc = (
@@ -169,7 +180,7 @@ describe('ReadFileTool', () => {
     it('should handle non-normalized file paths correctly', () => {
       const subDir = path.join(tempRootDir, 'sub', 'dir');
       const params: ReadFileToolParams = {
-        absolute_path: path.join(subDir, '..', 'dir', 'file.txt'),
+        file_path: path.join(subDir, '..', 'dir', 'file.txt'),
       };
       const invocation = tool.build(params);
       expect(typeof invocation).not.toBe('string');
@@ -181,7 +192,7 @@ describe('ReadFileTool', () => {
     });
 
     it('should return . if path is the root directory', () => {
-      const params: ReadFileToolParams = { absolute_path: tempRootDir };
+      const params: ReadFileToolParams = { file_path: tempRootDir };
       const invocation = tool.build(params);
       expect(typeof invocation).not.toBe('string');
       expect(
@@ -193,9 +204,25 @@ describe('ReadFileTool', () => {
   });
 
   describe('execute', () => {
+    it('should successfully read a file with a relative path', async () => {
+      const filePath = path.join(tempRootDir, 'textfile.txt');
+      const fileContent = 'This is a test file.';
+      await fsp.writeFile(filePath, fileContent, 'utf-8');
+      const params: ReadFileToolParams = { file_path: 'textfile.txt' };
+      const invocation = tool.build(params) as ToolInvocation<
+        ReadFileToolParams,
+        ToolResult
+      >;
+
+      expect(await invocation.execute(abortSignal)).toEqual({
+        llmContent: fileContent,
+        returnDisplay: '',
+      });
+    });
+
     it('should return error if file does not exist', async () => {
       const filePath = path.join(tempRootDir, 'nonexistent.txt');
-      const params: ReadFileToolParams = { absolute_path: filePath };
+      const params: ReadFileToolParams = { file_path: filePath };
       const invocation = tool.build(params) as ToolInvocation<
         ReadFileToolParams,
         ToolResult
@@ -217,7 +244,7 @@ describe('ReadFileTool', () => {
       const filePath = path.join(tempRootDir, 'textfile.txt');
       const fileContent = 'This is a test file.';
       await fsp.writeFile(filePath, fileContent, 'utf-8');
-      const params: ReadFileToolParams = { absolute_path: filePath };
+      const params: ReadFileToolParams = { file_path: filePath };
       const invocation = tool.build(params) as ToolInvocation<
         ReadFileToolParams,
         ToolResult
@@ -232,7 +259,7 @@ describe('ReadFileTool', () => {
     it('should return error if path is a directory', async () => {
       const dirPath = path.join(tempRootDir, 'directory');
       await fsp.mkdir(dirPath);
-      const params: ReadFileToolParams = { absolute_path: dirPath };
+      const params: ReadFileToolParams = { file_path: dirPath };
       const invocation = tool.build(params) as ToolInvocation<
         ReadFileToolParams,
         ToolResult
@@ -255,7 +282,7 @@ describe('ReadFileTool', () => {
       // 21MB of content exceeds 20MB limit
       const largeContent = 'x'.repeat(21 * 1024 * 1024);
       await fsp.writeFile(filePath, largeContent, 'utf-8');
-      const params: ReadFileToolParams = { absolute_path: filePath };
+      const params: ReadFileToolParams = { file_path: filePath };
       const invocation = tool.build(params) as ToolInvocation<
         ReadFileToolParams,
         ToolResult
@@ -274,7 +301,7 @@ describe('ReadFileTool', () => {
       const longLine = 'a'.repeat(2500); // Exceeds MAX_LINE_LENGTH_TEXT_FILE (2000)
       const fileContent = `Short line\n${longLine}\nAnother short line`;
       await fsp.writeFile(filePath, fileContent, 'utf-8');
-      const params: ReadFileToolParams = { absolute_path: filePath };
+      const params: ReadFileToolParams = { file_path: filePath };
       const invocation = tool.build(params) as ToolInvocation<
         ReadFileToolParams,
         ToolResult
@@ -295,7 +322,7 @@ describe('ReadFileTool', () => {
         0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
       ]);
       await fsp.writeFile(imagePath, pngHeader);
-      const params: ReadFileToolParams = { absolute_path: imagePath };
+      const params: ReadFileToolParams = { file_path: imagePath };
       const invocation = tool.build(params) as ToolInvocation<
         ReadFileToolParams,
         ToolResult
@@ -316,7 +343,7 @@ describe('ReadFileTool', () => {
       // Minimal PDF header
       const pdfHeader = Buffer.from('%PDF-1.4');
       await fsp.writeFile(pdfPath, pdfHeader);
-      const params: ReadFileToolParams = { absolute_path: pdfPath };
+      const params: ReadFileToolParams = { file_path: pdfPath };
       const invocation = tool.build(params) as ToolInvocation<
         ReadFileToolParams,
         ToolResult
@@ -337,7 +364,7 @@ describe('ReadFileTool', () => {
       // Binary data with null bytes
       const binaryData = Buffer.from([0x00, 0xff, 0x00, 0xff]);
       await fsp.writeFile(binPath, binaryData);
-      const params: ReadFileToolParams = { absolute_path: binPath };
+      const params: ReadFileToolParams = { file_path: binPath };
       const invocation = tool.build(params) as ToolInvocation<
         ReadFileToolParams,
         ToolResult
@@ -354,7 +381,7 @@ describe('ReadFileTool', () => {
       const svgPath = path.join(tempRootDir, 'image.svg');
       const svgContent = '<svg><circle cx="50" cy="50" r="40"/></svg>';
       await fsp.writeFile(svgPath, svgContent, 'utf-8');
-      const params: ReadFileToolParams = { absolute_path: svgPath };
+      const params: ReadFileToolParams = { file_path: svgPath };
       const invocation = tool.build(params) as ToolInvocation<
         ReadFileToolParams,
         ToolResult
@@ -370,7 +397,7 @@ describe('ReadFileTool', () => {
       // Create SVG content larger than 1MB
       const largeContent = '<svg>' + 'x'.repeat(1024 * 1024 + 1) + '</svg>';
       await fsp.writeFile(svgPath, largeContent, 'utf-8');
-      const params: ReadFileToolParams = { absolute_path: svgPath };
+      const params: ReadFileToolParams = { file_path: svgPath };
       const invocation = tool.build(params) as ToolInvocation<
         ReadFileToolParams,
         ToolResult
@@ -388,7 +415,7 @@ describe('ReadFileTool', () => {
     it('should handle empty file', async () => {
       const emptyPath = path.join(tempRootDir, 'empty.txt');
       await fsp.writeFile(emptyPath, '', 'utf-8');
-      const params: ReadFileToolParams = { absolute_path: emptyPath };
+      const params: ReadFileToolParams = { file_path: emptyPath };
       const invocation = tool.build(params) as ToolInvocation<
         ReadFileToolParams,
         ToolResult
@@ -406,7 +433,7 @@ describe('ReadFileTool', () => {
       await fsp.writeFile(filePath, fileContent, 'utf-8');
 
       const params: ReadFileToolParams = {
-        absolute_path: filePath,
+        file_path: filePath,
         offset: 5, // Start from line 6
         limit: 3,
       };
@@ -437,7 +464,7 @@ describe('ReadFileTool', () => {
       const tempFileContent = 'This is temporary output content';
       await fsp.writeFile(tempFilePath, tempFileContent, 'utf-8');
 
-      const params: ReadFileToolParams = { absolute_path: tempFilePath };
+      const params: ReadFileToolParams = { file_path: tempFilePath };
       const invocation = tool.build(params) as ToolInvocation<
         ReadFileToolParams,
         ToolResult
@@ -454,15 +481,29 @@ describe('ReadFileTool', () => {
           path.join(tempRootDir, '.geminiignore'),
           ['foo.*', 'ignored/'].join('\n'),
         );
+        const mockConfigInstance = {
+          getFileService: () => new FileDiscoveryService(tempRootDir),
+          getFileSystemService: () => new StandardFileSystemService(),
+          getTargetDir: () => tempRootDir,
+          getWorkspaceContext: () => new WorkspaceContext(tempRootDir),
+          getFileFilteringOptions: () => ({
+            respectGitIgnore: true,
+            respectGeminiIgnore: true,
+          }),
+          storage: {
+            getProjectTempDir: () => path.join(tempRootDir, '.temp'),
+          },
+        } as unknown as Config;
+        tool = new ReadFileTool(mockConfigInstance);
       });
 
       it('should throw error if path is ignored by a .geminiignore pattern', async () => {
         const ignoredFilePath = path.join(tempRootDir, 'foo.bar');
         await fsp.writeFile(ignoredFilePath, 'content', 'utf-8');
         const params: ReadFileToolParams = {
-          absolute_path: ignoredFilePath,
+          file_path: ignoredFilePath,
         };
-        const expectedError = `File path '${ignoredFilePath}' is ignored by .geminiignore pattern(s).`;
+        const expectedError = `File path '${ignoredFilePath}' is ignored by configured ignore patterns.`;
         expect(() => tool.build(params)).toThrow(expectedError);
       });
 
@@ -472,9 +513,9 @@ describe('ReadFileTool', () => {
         const ignoredFilePath = path.join(ignoredDirPath, 'file.txt');
         await fsp.writeFile(ignoredFilePath, 'content', 'utf-8');
         const params: ReadFileToolParams = {
-          absolute_path: ignoredFilePath,
+          file_path: ignoredFilePath,
         };
-        const expectedError = `File path '${ignoredFilePath}' is ignored by .geminiignore pattern(s).`;
+        const expectedError = `File path '${ignoredFilePath}' is ignored by configured ignore patterns.`;
         expect(() => tool.build(params)).toThrow(expectedError);
       });
 
@@ -482,7 +523,7 @@ describe('ReadFileTool', () => {
         const allowedFilePath = path.join(tempRootDir, 'allowed.txt');
         await fsp.writeFile(allowedFilePath, 'content', 'utf-8');
         const params: ReadFileToolParams = {
-          absolute_path: allowedFilePath,
+          file_path: allowedFilePath,
         };
         const invocation = tool.build(params);
         expect(typeof invocation).not.toBe('string');

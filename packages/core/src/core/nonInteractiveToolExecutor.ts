@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
-  Config,
-} from '../index.js';
-import { CoreToolScheduler } from './coreToolScheduler.js';
+import type { ToolCallRequestInfo, Config } from '../index.js';
+import {
+  CoreToolScheduler,
+  type CompletedToolCall,
+} from './coreToolScheduler.js';
 
 /**
  * Executes a single tool call non-interactively by leveraging the CoreToolScheduler.
@@ -18,17 +17,22 @@ export async function executeToolCall(
   config: Config,
   toolCallRequest: ToolCallRequestInfo,
   abortSignal: AbortSignal,
-): Promise<ToolCallResponseInfo> {
-  return new Promise<ToolCallResponseInfo>((resolve, reject) => {
-    new CoreToolScheduler({
+): Promise<CompletedToolCall> {
+  return new Promise<CompletedToolCall>((resolve, reject) => {
+    const scheduler = new CoreToolScheduler({
       config,
       getPreferredEditor: () => undefined,
-      onEditorClose: () => {},
       onAllToolCallsComplete: async (completedToolCalls) => {
-        resolve(completedToolCalls[0].response);
+        if (completedToolCalls.length > 0) {
+          resolve(completedToolCalls[0]);
+        } else {
+          reject(new Error('No completed tool calls returned.'));
+        }
       },
-    })
-      .schedule(toolCallRequest, abortSignal)
-      .catch(reject);
+    });
+
+    scheduler.schedule(toolCallRequest, abortSignal).catch((error) => {
+      reject(error);
+    });
   });
 }

@@ -1,0 +1,100 @@
+name: 'Verify an NPM release'
+description: 'Fetches a package from NPM and does some basic smoke tests'
+
+inputs:
+  npm-package:
+    description: 'NPM Package'
+    required: true
+    default: '@google/gemini-cli@latest'
+  npm-registry-url:
+    description: 'NPM Registry URL'
+    required: true
+  npm-registry-scope:
+    description: 'NPM Registry Scope'
+    required: true
+  expected-version:
+    description: 'Expected version'
+    required: true
+  gemini_api_key:
+    description: 'The API key for running integration tests.'
+    required: true
+  github-token:
+    description: 'The GitHub token for running integration tests.'
+    required: true
+  working-directory:
+    description: 'The working directory to run the tests in.'
+    required: false
+    default: '.'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: '📝 Print Inputs'
+      shell: 'bash'
+      env:
+        JSON_INPUTS: '${{ toJSON(inputs) }}'
+      run: 'echo "$JSON_INPUTS"'
+
+    - name: 'setup node'
+      uses: 'actions/setup-node@v4'
+      with:
+        node-version: '20'
+
+    - name: 'configure .npmrc'
+      uses: './.github/actions/setup-npmrc'
+      with:
+        github-token: '${{ inputs.github-token }}'
+
+    - name: 'Clear npm cache'
+      shell: 'bash'
+      run: 'npm cache clean --force'
+
+    - name: 'Install from NPM'
+      uses: 'nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08' # ratchet:nick-fields/retry@v3
+      with:
+        timeout_seconds: 900
+        retry_wait_seconds: 30
+        max_attempts: 10
+        command: |-
+          cd ${{ inputs.working-directory }}
+          npm install --prefer-online --no-cache -g "${{ inputs.npm-package }}"
+
+    - name: 'Smoke test - NPM Install'
+      shell: 'bash'
+      working-directory: '${{ inputs.working-directory }}'
+      run: |-
+        gemini_version=$(gemini --version)
+        if [ "$gemini_version" != "${{ inputs.expected-version }}" ]; then
+          echo "❌ NPM Version mismatch: Got $gemini_version from ${{ inputs.npm-package }}, expected ${{ inputs.expected-version }}"
+          exit 1
+        fi
+
+    - name: 'Clear npm cache'
+      shell: 'bash'
+      run: 'npm cache clean --force'
+
+    - name: 'Smoke test - NPX Run'
+      shell: 'bash'
+      working-directory: '${{ inputs.working-directory }}'
+      run: |-
+        gemini_version=$(npx --prefer-online "${{ inputs.npm-package}}" --version)
+        if [ "$gemini_version" != "${{ inputs.expected-version }}" ]; then
+          echo "❌ NPX Run Version mismatch: Got $gemini_version from ${{ inputs.npm-package }}, expected ${{ inputs.expected-version }}"
+          exit 1
+        fi
+
+    - name: 'Install dependencies for integration tests'
+      shell: 'bash'
+      working-directory: '${{ inputs.working-directory }}'
+      run: 'npm ci'
+
+    - name: '🔬 Run integration tests against NPM release'
+      working-directory: '${{ inputs.working-directory }}'
+      env:
+        GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
+        INTEGRATION_TEST_USE_INSTALLED_GEMINI: 'true'
+        # We must diable CI mode here because it interferes with interactive tests.
+        # See https://github.com/google-gemini/gemini-cli/issues/10517
+        CI: 'false'
+      shell: 'bash'
+      run: 'npm run test:integration:sandbox:none'
