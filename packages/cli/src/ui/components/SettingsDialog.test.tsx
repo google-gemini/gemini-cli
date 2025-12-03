@@ -1113,7 +1113,7 @@ describe('SettingsDialog', () => {
   });
 
   describe('Search Functionality', () => {
-    it('should enter search mode when "/" is pressed', async () => {
+    it('should display text entered in search', async () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
@@ -1156,7 +1156,7 @@ describe('SettingsDialog', () => {
       unmount();
     });
 
-    it('should exit search mode when Escape is pressed', async () => {
+    it('should exit search settings when Escape is pressed', async () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
@@ -1175,9 +1175,9 @@ describe('SettingsDialog', () => {
       });
 
       await waitFor(() => {
-        expect(lastFrame()).not.toContain('Search to filter');
-        expect(lastFrame()).toContain('Vim Mode'); // All settings should be visible again
-        expect(lastFrame()).toContain('Disable Auto Update'); // All settings should be visible again
+        // onSelect is called with (settingName, scope).
+        // undefined settingName means "close dialog"
+        expect(onSelect).toHaveBeenCalledWith(undefined, expect.anything());
       });
 
       unmount();
@@ -1207,34 +1207,6 @@ describe('SettingsDialog', () => {
         expect(lastFrame()).not.toContain(
           'Codebase Investigator Max Num Turns',
         );
-      });
-
-      unmount();
-    });
-
-    it('should clear search query and show all settings when exiting search mode', async () => {
-      const settings = createMockSettings();
-      const onSelect = vi.fn();
-
-      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
-
-      act(() => {
-        stdin.write('test');
-      });
-      await waitFor(() => {
-        expect(lastFrame()).toContain('test');
-      });
-
-      // Press Escape
-      act(() => {
-        stdin.write(TerminalKeys.ESCAPE);
-      });
-
-      await waitFor(() => {
-        expect(lastFrame()).not.toContain('> Search:');
-        expect(lastFrame()).toContain('');
-        expect(lastFrame()).toContain('Vim Mode');
-        expect(lastFrame()).toContain('Disable Auto Update');
       });
 
       unmount();
