@@ -78,27 +78,12 @@ export class SessionSummaryService {
         // If fewer messages than max, include all
         relevantMessages = filteredMessages;
       } else {
-        // Calculate window sizes based on maxMessages parameter
+        // Sliding window: take the first and last messages.
         const firstWindowSize = Math.ceil(maxMessages / 2);
         const lastWindowSize = Math.floor(maxMessages / 2);
-
-        // Take first window
         const firstMessages = filteredMessages.slice(0, firstWindowSize);
-
-        // Take last window
-        const lastMessages = filteredMessages.slice(
-          Math.max(firstWindowSize, filteredMessages.length - lastWindowSize),
-        );
-
-        // Check if windows overlap (happens when total messages < 2x window size)
-        const lastStartIndex = filteredMessages.length - lastWindowSize;
-        if (lastStartIndex <= firstWindowSize) {
-          // Windows overlap, return all messages up to the max
-          relevantMessages = filteredMessages.slice(0, maxMessages);
-        } else {
-          // Clean separation between windows
-          relevantMessages = firstMessages.concat(lastMessages);
-        }
+        const lastMessages = filteredMessages.slice(-lastWindowSize);
+        relevantMessages = firstMessages.concat(lastMessages);
       }
 
       if (relevantMessages.length === 0) {
