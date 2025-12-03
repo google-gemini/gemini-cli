@@ -186,6 +186,13 @@ describe('InputPrompt', () => {
       setActiveSuggestionIndex: vi.fn(),
       setShowSuggestions: vi.fn(),
       handleAutocomplete: vi.fn(),
+      getCommandFromSuggestion: vi.fn(),
+      slashCompletionRange: {
+        completionStart: 0,
+        completionEnd: 0,
+        getCommandFromSuggestion: vi.fn(),
+      },
+      getCompletedText: vi.fn(),
       promptCompletion: {
         text: '',
         accept: vi.fn(),
@@ -220,7 +227,6 @@ describe('InputPrompt', () => {
     );
 
     mockedUseKittyKeyboardProtocol.mockReturnValue({
-      supported: false,
       enabled: false,
       checking: false,
     });
@@ -247,7 +253,10 @@ describe('InputPrompt', () => {
       suggestionsWidth: 80,
       focus: true,
       setQueueErrorMessage: vi.fn(),
+      setBannerVisible: vi.fn(),
       streamingState: StreamingState.Idle,
+      suggestionsPosition: 'below',
+      onSuggestionsVisibilityChange: vi.fn(),
     };
   });
 
@@ -445,7 +454,7 @@ describe('InputPrompt', () => {
   describe('clipboard image paste', () => {
     beforeEach(() => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
-      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue({
+      vi.mocked(clipboardUtils.saveClipboardImageDetailed).mockResolvedValue({
         filePath: null,
         error: 'No image in clipboard',
       });
@@ -457,7 +466,7 @@ describe('InputPrompt', () => {
     it('should handle Ctrl+V when clipboard has an image', async () => {
       const imagePath = '/test/.gemini-clipboard/clipboard-123.png';
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
-      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue({
+      vi.mocked(clipboardUtils.saveClipboardImageDetailed).mockResolvedValue({
         filePath: imagePath,
         error: undefined,
       });
@@ -480,12 +489,12 @@ describe('InputPrompt', () => {
 
       // Wait for the clipboard operations to complete
       await vi.waitFor(() => {
-        expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
+        expect(clipboardUtils.saveClipboardImageDetailed).toHaveBeenCalled();
       });
 
       // Verify clipboard operations were called correctly
       expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
-      expect(clipboardUtils.saveClipboardImage).toHaveBeenCalledWith(
+      expect(clipboardUtils.saveClipboardImageDetailed).toHaveBeenCalledWith(
         props.config.getTargetDir(),
       );
       expect(clipboardUtils.cleanupOldClipboardImages).toHaveBeenCalledWith(
@@ -516,14 +525,14 @@ describe('InputPrompt', () => {
       });
 
       // Verify no save or buffer modification occurred
-      expect(clipboardUtils.saveClipboardImage).not.toHaveBeenCalled();
+      expect(clipboardUtils.saveClipboardImageDetailed).not.toHaveBeenCalled();
       expect(mockBuffer.replaceRangeByOffset).not.toHaveBeenCalled();
       unmount();
     });
 
     it('should handle image save failure gracefully', async () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
-      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue({
+      vi.mocked(clipboardUtils.saveClipboardImageDetailed).mockResolvedValue({
         filePath: null,
         error: 'Failed to save image',
       });
@@ -541,7 +550,7 @@ describe('InputPrompt', () => {
 
       // Wait for clipboard operations
       await vi.waitFor(() => {
-        expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
+        expect(clipboardUtils.saveClipboardImageDetailed).toHaveBeenCalled();
       });
 
       // Verify no buffer modification occurred on failure
@@ -565,7 +574,7 @@ describe('InputPrompt', () => {
       const expectedInsertion = `[${displayName}](@${relativePath})`;
 
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
-      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue({
+      vi.mocked(clipboardUtils.saveClipboardImageDetailed).mockResolvedValue({
         filePath: imagePath,
         error: undefined,
       });
@@ -588,7 +597,7 @@ describe('InputPrompt', () => {
 
       // Wait for the clipboard operations to complete
       await vi.waitFor(() => {
-        expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
+        expect(clipboardUtils.saveClipboardImageDetailed).toHaveBeenCalled();
       });
 
       // Verify the buffer was updated with the correct parameters
@@ -995,13 +1004,11 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
         mockBuffer,
-        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
         false,
         false,
-        expect.any(Object),
       );
       unmount();
     });
@@ -1484,7 +1491,6 @@ describe('InputPrompt', () => {
     beforeEach(() => {
       vi.useFakeTimers();
       mockedUseKittyKeyboardProtocol.mockReturnValue({
-        supported: false,
         enabled: false,
         checking: false,
       });
@@ -1559,7 +1565,6 @@ describe('InputPrompt', () => {
         name: 'kitty',
         setup: () =>
           mockedUseKittyKeyboardProtocol.mockReturnValue({
-            supported: true,
             enabled: true,
             checking: false,
           }),
@@ -1572,7 +1577,7 @@ describe('InputPrompt', () => {
 
         const { stdin, unmount } = renderWithProviders(
           <InputPrompt {...props} />,
-          { kittyProtocolEnabled: true },
+          {},
         );
         await vi.runAllTimersAsync();
 
@@ -1624,7 +1629,7 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
+        {},
       );
 
       await act(async () => {
@@ -1651,7 +1656,7 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
+        {},
       );
 
       await act(async () => {
@@ -1677,7 +1682,7 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
+        {},
       );
 
       await act(async () => {
@@ -1698,7 +1703,7 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
+        {},
       );
 
       await act(async () => {
@@ -1717,7 +1722,7 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
+        {},
       );
       await vi.runAllTimersAsync();
 
@@ -1733,7 +1738,7 @@ describe('InputPrompt', () => {
     it('should not interfere with existing keyboard shortcuts', async () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
+        {},
       );
 
       await act(async () => {
