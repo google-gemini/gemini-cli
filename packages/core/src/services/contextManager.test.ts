@@ -37,6 +37,9 @@ describe('ContextManager', () => {
         getDirectories: vi.fn().mockReturnValue(['/app']),
       }),
       getExtensionLoader: vi.fn().mockReturnValue({}),
+      getMcpClientManager: vi.fn().mockReturnValue({
+        getMcpInstructions: vi.fn().mockReturnValue('MCP Instructions'),
+      }),
     } as unknown as Config;
 
     contextManager = new ContextManager(mockConfig);
@@ -84,6 +87,9 @@ describe('ContextManager', () => {
         '--- Context from: GEMINI.md ---',
       );
       expect(contextManager.getEnvironmentMemory()).toContain('Env Content');
+      expect(contextManager.getEnvironmentMemory()).toContain(
+        'MCP Instructions',
+      );
 
       expect(contextManager.getLoadedPaths()).toContain(
         '/home/user/.gemini/GEMINI.md',

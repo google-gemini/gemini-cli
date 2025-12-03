@@ -59,6 +59,13 @@ vi.mock('../tools/tool-registry', () => {
   return { ToolRegistry: ToolRegistryMock };
 });
 
+vi.mock('../tools/mcp-client-manager.js', () => ({
+  McpClientManager: vi.fn().mockImplementation(() => ({
+    startConfiguredMcpServers: vi.fn(),
+    getMcpInstructions: vi.fn().mockReturnValue('MCP Instructions'),
+  })),
+}));
+
 vi.mock('../utils/memoryDiscovery.js', () => ({
   loadServerHierarchicalMemory: vi.fn(),
 }));
@@ -1650,7 +1657,9 @@ describe('Config JIT Initialization', () => {
     mockContextManager = {
       refresh: vi.fn(),
       getGlobalMemory: vi.fn().mockReturnValue('Global Memory'),
-      getEnvironmentMemory: vi.fn().mockReturnValue('Environment Memory'),
+      getEnvironmentMemory: vi
+        .fn()
+        .mockReturnValue('Environment Memory\n\nMCP Instructions'),
       getLoadedPaths: vi.fn().mockReturnValue(new Set(['/path/to/GEMINI.md'])),
     };
     (ContextManager as unknown as Mock).mockImplementation(
@@ -1674,7 +1683,9 @@ describe('Config JIT Initialization', () => {
 
     expect(ContextManager).toHaveBeenCalledWith(config);
     expect(mockContextManager.refresh).toHaveBeenCalled();
-    expect(config.getUserMemory()).toBe('Global Memory\n\nEnvironment Memory');
+    expect(config.getUserMemory()).toBe(
+      'Global Memory\n\nEnvironment Memory\n\nMCP Instructions',
+    );
 
     // Verify state update (delegated to ContextManager)
     expect(config.getGeminiMdFileCount()).toBe(1);

@@ -49,10 +49,15 @@ export class ContextManager {
       this.config.getDebugMode(),
     );
     this.markAsLoaded(result.files.map((f) => f.path));
-    this.environmentMemory = concatenateInstructions(
+    const envMemory = concatenateInstructions(
       result.files.map((f) => ({ filePath: f.path, content: f.content })),
       this.config.getWorkingDir(),
     );
+    const mcpInstructions =
+      this.config.getMcpClientManager()?.getMcpInstructions() || '';
+    this.environmentMemory = [envMemory, mcpInstructions.trimStart()]
+      .filter(Boolean)
+      .join('\n\n');
   }
 
   /**
