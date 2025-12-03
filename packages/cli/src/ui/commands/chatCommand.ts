@@ -11,11 +11,13 @@ import { theme } from '../semantic-colors.js';
 import type {
   CommandContext,
   SlashCommand,
-  MessageActionReturn,
   SlashCommandActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
-import { decodeTagName } from '@google/gemini-cli-core';
+import {
+  decodeTagName,
+  type MessageActionReturn,
+} from '@google/gemini-cli-core';
 import path from 'node:path';
 import type {
   HistoryItemWithoutId,

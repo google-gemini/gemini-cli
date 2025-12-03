@@ -71,6 +71,9 @@ export async function loadConfig(
     ideMode: false,
     folderTrust: settings.folderTrust === true,
     extensionLoader,
+    checkpointing: process.env['CHECKPOINTING']
+      ? process.env['CHECKPOINTING'] === 'true'
+      : settings.checkpointing?.enabled,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);

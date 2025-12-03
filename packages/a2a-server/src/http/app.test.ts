@@ -36,7 +36,7 @@ import {
   createMockConfig,
 } from '../utils/testing_utils.js';
 import { MockTool } from '@google/gemini-cli-core';
-import type { Command } from '../commands/types.js';
+import type { Command, CommandContext } from '../commands/types.js';
 
 const mockToolConfirmationFn = async () =>
   ({}) as unknown as ToolCallConfirmationDetails;
@@ -97,8 +97,16 @@ vi.mock('@google/gemini-cli-core', async () => {
       getUserTier: vi.fn().mockReturnValue('free'),
       initialize: vi.fn(),
     })),
+    performRestore: vi.fn(),
   };
 });
+
+vi.mock('../utils/checkpoint_utils.js', () => ({
+  listCheckpointFiles: vi.fn(),
+  readCheckpointData: vi.fn(),
+  getCheckpointInfoList: vi.fn(),
+  getFormattedCheckpointList: vi.fn(),
+}));
 
 describe('E2E Tests', () => {
   let app: express.Express;
@@ -939,6 +947,17 @@ describe('E2E Tests', () => {
     });
 
     it('should return extensions for valid command', async () => {
+      const mockExtensionsCommand = {
+        name: 'extensions list',
+        description: 'a mock command',
+        execute: vi.fn(async (context: CommandContext) => {
+          // Simulate the actual command's behavior
+          const extensions = context.config.getExtensions();
+          return { name: 'extensions list', data: extensions };
+        }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockExtensionsCommand);
+
       const agent = request.agent(app);
       const res = await agent
         .post('/executeCommand')
@@ -953,7 +972,123 @@ describe('E2E Tests', () => {
       expect(getExtensionsSpy).toHaveBeenCalled();
     });
 
+    it('should return a message when no restorable checkpoints are found', async () => {
+      const mockRestoreCommand = {
+        name: 'restore',
+        description: 'a mock command',
+        execute: vi.fn().mockResolvedValue({
+          name: 'restore',
+          data: (async function* () {
+            yield {
+              type: 'message',
+              messageType: 'info',
+              content: 'No restorable checkpoints found.',
+            };
+          })(),
+        }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockRestoreCommand);
+
+      const agent = request.agent(app);
+      const res = await agent
+        .post('/executeCommand')
+        .send({ command: 'restore', args: [] })
+        .set('Content-Type', 'application/json')
+        .expect(200);
+
+      expect(res.body).toEqual({
+        name: 'restore',
+        data: [
+          {
+            type: 'message',
+            messageType: 'info',
+            content: 'No restorable checkpoints found.',
+          },
+        ],
+      });
+    });
+
+    it('should return a list of available checkpoints for restore command', async () => {
+      const mockRestoreCommand = {
+        name: 'restore',
+        description: 'a mock command',
+        execute: vi.fn().mockResolvedValue({
+          name: 'restore',
+          data: (async function* () {
+            yield {
+              type: 'message',
+              messageType: 'info',
+              content: 'Available checkpoints to restore:\n\ncheckpoint1',
+            };
+          })(),
+        }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockRestoreCommand);
+
+      const agent = request.agent(app);
+      const res = await agent
+        .post('/executeCommand')
+        .send({ command: 'restore', args: [] })
+        .set('Content-Type', 'application/json')
+        .expect(200);
+
+      expect(res.body).toEqual({
+        name: 'restore',
+        data: [
+          {
+            type: 'message',
+            messageType: 'info',
+            content: 'Available checkpoints to restore:\n\ncheckpoint1',
+          },
+        ],
+      });
+    });
+
+    it('should return a list of available checkpoints for restore list command', async () => {
+      const mockListCheckpointsCommand = {
+        name: 'restore list',
+        description: 'a mock command',
+        execute: vi.fn().mockResolvedValue({
+          name: 'restore list',
+          data: (async function* () {
+            yield {
+              type: 'message',
+              messageType: 'info',
+              content: JSON.stringify([
+                { file: 'checkpoint1.json', description: 'Test' },
+              ]),
+            };
+          })(),
+        }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(
+        mockListCheckpointsCommand,
+      );
+
+      const agent = request.agent(app);
+      const res = await agent
+        .post('/executeCommand')
+        .send({ command: 'restore list', args: [] })
+        .set('Content-Type', 'application/json')
+        .expect(200);
+
+      expect(res.body).toEqual({
+        name: 'restore list',
+        data: [
+          {
+            type: 'message',
+            messageType: 'info',
+            content: JSON.stringify([
+              { file: 'checkpoint1.json', description: 'Test' },
+            ]),
+          },
+        ],
+      });
+    });
+
     it('should return 404 for invalid command', async () => {
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(undefined);
+
       const agent = request.agent(app);
       const res = await agent
         .post('/executeCommand')
@@ -985,6 +1120,72 @@ describe('E2E Tests', () => {
 
       expect(res.body.error).toBe('"args" field must be an array.');
       expect(getExtensionsSpy).not.toHaveBeenCalled();
+    });
+
+    describe('/executeCommand streaming', () => {
+      it('should execute a streaming command and stream back events', (done: (
+        err?: unknown,
+      ) => void) => {
+        const executeStreamSpy = vi.fn((context, args, eventBus) => {
+          eventBus.publish({ kind: 'test-event-1' });
+          eventBus.publish({ kind: 'test-event-2' });
+          eventBus.finished();
+          return Promise.resolve({ name: 'stream-test', data: 'done' });
+        });
+
+        const mockStreamCommand = {
+          name: 'stream-test',
+          description: 'A test streaming command',
+          execute: vi.fn(),
+          executeStream: executeStreamSpy,
+        };
+        vi.spyOn(commandRegistry, 'get').mockReturnValue(mockStreamCommand);
+
+        const agent = request.agent(app);
+        agent
+          .post('/executeCommand')
+          .send({ command: 'stream-test', args: [] })
+          .set('Content-Type', 'application/json')
+          .on('response', (res) => {
+            let data = '';
+            res.on('data', (chunk: Buffer) => {
+              data += chunk.toString();
+            });
+            res.on('end', () => {
+              try {
+                const events = streamToSSEEvents(data);
+                expect(events.length).toBe(2);
+                expect(events[0].result).toEqual({ kind: 'test-event-1' });
+                expect(events[1].result).toEqual({ kind: 'test-event-2' });
+                expect(executeStreamSpy).toHaveBeenCalled();
+                done();
+              } catch (e) {
+                done(e);
+              }
+            });
+          })
+          .end();
+      });
+
+      it('should handle non-streaming commands gracefully', async () => {
+        const mockNonStreamCommand = {
+          name: 'non-stream-test',
+          description: 'A test non-streaming command',
+          execute: vi
+            .fn()
+            .mockResolvedValue({ name: 'non-stream-test', data: 'done' }),
+        };
+        vi.spyOn(commandRegistry, 'get').mockReturnValue(mockNonStreamCommand);
+
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'non-stream-test', args: [] })
+          .set('Content-Type', 'application/json')
+          .expect(200);
+
+        expect(res.body).toEqual({ name: 'non-stream-test', data: 'done' });
+      });
     });
   });
 });

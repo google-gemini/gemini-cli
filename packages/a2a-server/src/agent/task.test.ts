@@ -18,11 +18,24 @@ import {
   GeminiEventType,
   type Config,
   type ToolCallRequestInfo,
+  ApprovalMode,
+  ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus } from '@a2a-js/sdk/server';
 import { CoderAgentEvent } from '../types.js';
 import type { ToolCall } from '@google/gemini-cli-core';
+
+const mockSaveRestorableToolCall = vi.hoisted(() => vi.fn());
+
+vi.mock('../utils/checkpoint_utils.js', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('../utils/checkpoint_utils.js')>();
+  return {
+    ...original,
+    saveRestorableToolCall: mockSaveRestorableToolCall,
+  };
+});
 
 describe('Task', () => {
   it('scheduleToolCalls should not modify the input requests array', async () => {
@@ -69,6 +82,130 @@ describe('Task', () => {
     await task.scheduleToolCalls(requests, abortController.signal);
 
     expect(requests).toEqual(originalRequests);
+  });
+
+  describe('scheduleToolCalls', () => {
+    const mockConfig = createMockConfig();
+    const mockEventBus: ExecutionEventBus = {
+      publish: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+      once: vi.fn(),
+      removeAllListeners: vi.fn(),
+      finished: vi.fn(),
+    };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should not create a checkpoint if no restorable tools are called', async () => {
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+      const requests: ToolCallRequestInfo[] = [
+        {
+          callId: '1',
+          name: 'run_shell_command',
+          args: { command: 'ls' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-1',
+        },
+      ];
+      const abortController = new AbortController();
+      await task.scheduleToolCalls(requests, abortController.signal);
+      expect(mockSaveRestorableToolCall).not.toHaveBeenCalled();
+    });
+
+    it('should create a checkpoint if a restorable tool is called', async () => {
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+      const requests: ToolCallRequestInfo[] = [
+        {
+          callId: '1',
+          name: 'replace',
+          args: {
+            file_path: 'test.txt',
+            old_string: 'old',
+            new_string: 'new',
+          },
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-1',
+        },
+      ];
+      const abortController = new AbortController();
+      await task.scheduleToolCalls(requests, abortController.signal);
+      expect(mockSaveRestorableToolCall).toHaveBeenCalledOnce();
+    });
+
+    it('should only create one checkpoint even if multiple restorable tools are called', async () => {
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+      const requests: ToolCallRequestInfo[] = [
+        {
+          callId: '1',
+          name: 'replace',
+          args: {
+            file_path: 'test.txt',
+            old_string: 'old',
+            new_string: 'new',
+          },
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-1',
+        },
+        {
+          callId: '2',
+          name: 'write_file',
+          args: { file_path: 'test2.txt', content: 'new content' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-2',
+        },
+      ];
+      const abortController = new AbortController();
+      await task.scheduleToolCalls(requests, abortController.signal);
+      expect(mockSaveRestorableToolCall).toHaveBeenCalledOnce();
+    });
+
+    it('should not create a new checkpoint if one already exists', async () => {
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+      task.checkpoint = 'existing-checkpoint';
+      const requests: ToolCallRequestInfo[] = [
+        {
+          callId: '1',
+          name: 'replace',
+          args: {
+            file_path: 'test.txt',
+            old_string: 'old',
+            new_string: 'new',
+          },
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-1',
+        },
+      ];
+      const abortController = new AbortController();
+      await task.scheduleToolCalls(requests, abortController.signal);
+      expect(mockSaveRestorableToolCall).not.toHaveBeenCalled();
+    });
   });
 
   describe('acceptAgentMessage', () => {
@@ -205,10 +342,12 @@ describe('Task', () => {
     let task: Task;
     type SpyInstance = ReturnType<typeof vi.spyOn>;
     let setTaskStateAndPublishUpdateSpy: SpyInstance;
+    let mockConfig: Config;
+    let mockEventBus: ExecutionEventBus;
 
     beforeEach(() => {
-      const mockConfig = createMockConfig();
-      const mockEventBus: ExecutionEventBus = {
+      mockConfig = createMockConfig() as Config;
+      mockEventBus = {
         publish: vi.fn(),
         on: vi.fn(),
         off: vi.fn(),
@@ -251,6 +390,9 @@ describe('Task', () => {
         undefined,
         undefined,
         true, // final: true
+        undefined,
+        undefined,
+        undefined,
       );
     });
 
@@ -316,6 +458,66 @@ describe('Task', () => {
         (call) => call[4] === true,
       );
       expect(finalCall).toBeUndefined();
+    });
+
+    describe('auto-approval', () => {
+      it('should auto-approve tool calls when autoConfirm is true', () => {
+        task.autoConfirm = true;
+        const onConfirmSpy = vi.fn();
+        const toolCalls = [
+          {
+            request: { callId: '1' },
+            status: 'awaiting_approval',
+            confirmationDetails: { onConfirm: onConfirmSpy },
+          },
+        ] as unknown as ToolCall[];
+
+        // @ts-expect-error - Calling private method
+        task._schedulerToolCallsUpdate(toolCalls);
+
+        expect(onConfirmSpy).toHaveBeenCalledWith(
+          ToolConfirmationOutcome.ProceedOnce,
+        );
+      });
+
+      it('should auto-approve tool calls when approval mode is YOLO', () => {
+        (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.YOLO);
+        const onConfirmSpy = vi.fn();
+        const toolCalls = [
+          {
+            request: { callId: '1' },
+            status: 'awaiting_approval',
+            confirmationDetails: { onConfirm: onConfirmSpy },
+          },
+        ] as unknown as ToolCall[];
+
+        // @ts-expect-error - Calling private method
+        task._schedulerToolCallsUpdate(toolCalls);
+
+        expect(onConfirmSpy).toHaveBeenCalledWith(
+          ToolConfirmationOutcome.ProceedOnce,
+        );
+      });
+
+      it('should NOT auto-approve when autoConfirm is false and mode is not YOLO', () => {
+        task.autoConfirm = false;
+        (mockConfig.getApprovalMode as Mock).mockReturnValue(
+          ApprovalMode.DEFAULT,
+        );
+        const onConfirmSpy = vi.fn();
+        const toolCalls = [
+          {
+            request: { callId: '1' },
+            status: 'awaiting_approval',
+            confirmationDetails: { onConfirm: onConfirmSpy },
+          },
+        ] as unknown as ToolCall[];
+
+        // @ts-expect-error - Calling private method
+        task._schedulerToolCallsUpdate(toolCalls);
+
+        expect(onConfirmSpy).not.toHaveBeenCalled();
+      });
     });
   });
 });

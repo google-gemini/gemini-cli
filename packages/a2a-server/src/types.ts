@@ -46,6 +46,7 @@ export enum CoderAgentEvent {
 export interface AgentSettings {
   kind: CoderAgentEvent.StateAgentSettingsEvent;
   workspacePath: string;
+  autoConfirm?: boolean;
 }
 
 export interface ToolCallConfirmation {
@@ -110,6 +111,7 @@ export interface TaskMetadata {
     description: string;
     parameterSchema: unknown;
   }>;
+  checkpoint?: string;
 }
 
 export interface PersistedStateMetadata {
