@@ -150,6 +150,8 @@ describe('StreamJsonFormatter', () => {
           total_tokens: 100,
           input_tokens: 50,
           output_tokens: 50,
+          cached_tokens: 0,
+          thoughts_tokens: 0,
           duration_ms: 1200,
           tool_calls: 2,
         },
@@ -174,6 +176,8 @@ describe('StreamJsonFormatter', () => {
           total_tokens: 100,
           input_tokens: 50,
           output_tokens: 50,
+          cached_tokens: 0,
+          thoughts_tokens: 0,
           duration_ms: 1200,
           tool_calls: 0,
         },
@@ -260,8 +264,8 @@ describe('StreamJsonFormatter', () => {
               prompt: 50,
               candidates: 30,
               total: 80,
-              cached: 0,
-              thoughts: 0,
+              cached: 10,
+              thoughts: 5,
               tool: 0,
             },
           },
@@ -291,6 +295,8 @@ describe('StreamJsonFormatter', () => {
         total_tokens: 80,
         input_tokens: 50,
         output_tokens: 30,
+        cached_tokens: 10,
+        thoughts_tokens: 5,
         duration_ms: 1200,
         tool_calls: 2,
       });
@@ -309,8 +315,8 @@ describe('StreamJsonFormatter', () => {
               prompt: 50,
               candidates: 30,
               total: 80,
-              cached: 0,
-              thoughts: 0,
+              cached: 10,
+              thoughts: 5,
               tool: 0,
             },
           },
@@ -324,8 +330,8 @@ describe('StreamJsonFormatter', () => {
               prompt: 100,
               candidates: 70,
               total: 170,
-              cached: 0,
-              thoughts: 0,
+              cached: 20,
+              thoughts: 10,
               tool: 0,
             },
           },
@@ -355,6 +361,8 @@ describe('StreamJsonFormatter', () => {
         total_tokens: 250, // 80 + 170
         input_tokens: 150, // 50 + 100
         output_tokens: 100, // 30 + 70
+        cached_tokens: 30, // 10 + 20
+        thoughts_tokens: 15, // 5 + 10
         duration_ms: 3000,
         tool_calls: 5,
       });
@@ -388,6 +396,8 @@ describe('StreamJsonFormatter', () => {
         total_tokens: 0,
         input_tokens: 0,
         output_tokens: 0,
+        cached_tokens: 0,
+        thoughts_tokens: 0,
         duration_ms: 100,
         tool_calls: 0,
       });
@@ -515,6 +525,8 @@ describe('StreamJsonFormatter', () => {
             total_tokens: 0,
             input_tokens: 0,
             output_tokens: 0,
+            cached_tokens: 0,
+            thoughts_tokens: 0,
             duration_ms: 0,
             tool_calls: 0,
           },
@@ -536,6 +548,8 @@ describe('StreamJsonFormatter', () => {
           total_tokens: 100,
           input_tokens: 50,
           output_tokens: 50,
+          cached_tokens: 10,
+          thoughts_tokens: 5,
           duration_ms: 1200,
           tool_calls: 2,
         },
@@ -547,6 +561,8 @@ describe('StreamJsonFormatter', () => {
       expect(typeof parsed.stats.total_tokens).toBe('number');
       expect(typeof parsed.stats.input_tokens).toBe('number');
       expect(typeof parsed.stats.output_tokens).toBe('number');
+      expect(typeof parsed.stats.cached_tokens).toBe('number');
+      expect(typeof parsed.stats.thoughts_tokens).toBe('number');
       expect(typeof parsed.stats.duration_ms).toBe('number');
       expect(typeof parsed.stats.tool_calls).toBe('number');
     });
