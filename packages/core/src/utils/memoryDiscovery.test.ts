@@ -932,7 +932,9 @@ included directory memory
       path.join(extensionPath, 'CustomContext.md'),
     );
     expect(config.getGeminiMdFilePaths()).equals(refreshResult.filePaths);
-    expect(mockEventListener).toHaveBeenCalledExactlyOnceWith(refreshResult);
+    expect(mockEventListener).toHaveBeenCalledExactlyOnceWith({
+      fileCount: refreshResult.fileCount,
+    });
   });
 
   it('should include MCP instructions in user memory', async () => {
