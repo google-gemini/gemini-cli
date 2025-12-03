@@ -5,6 +5,7 @@
  */
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { saveClipboardImageDetailed } from './clipboardUtils.js';
 
 // Mock modules first (hoisted)
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -47,7 +48,6 @@ type ClipboardUtilsModule = typeof clipboardUtils & {
 const utils = clipboardUtils as unknown as ClipboardUtilsModule;
 
 const {
-  saveClipboardImageDetailed,
   cleanupOldClipboardImages,
   clipboardState,
   getClipboardContent,
@@ -159,10 +159,10 @@ describe('clipboardUtils', () => {
 
       const result = await saveClipboardImageDetailed();
 
-      expect(result.filePath).toBeNull();
-      expect(typeof result.error).toBe('string');
+      expect(result!.filePath).toBeNull();
+      expect(typeof result!.error).toBe('string');
       // The implementation returns a generic error message for security reasons
-      expect(result.error).toBe(
+      expect(result!.error).toBe(
         'Unsupported platform or no image in clipboard',
       );
     }, 20000); // 20 second timeout for this test
