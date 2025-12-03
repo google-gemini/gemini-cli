@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { isDevelopment } from '../utils/installationInfo.js';
 import type { ICommandLoader } from './types.js';
 import type { SlashCommand } from '../ui/commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
+import { startupProfiler } from '@google/gemini-cli-core';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
@@ -24,9 +26,14 @@ import { ideCommand } from '../ui/commands/ideCommand.js';
 import { initCommand } from '../ui/commands/initCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
+import { modelCommand } from '../ui/commands/modelCommand.js';
+import { permissionsCommand } from '../ui/commands/permissionsCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
+import { policiesCommand } from '../ui/commands/policiesCommand.js';
+import { profileCommand } from '../ui/commands/profileCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
+import { resumeCommand } from '../ui/commands/resumeCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
@@ -50,6 +57,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
    * @returns A promise that resolves to an array of `SlashCommand` objects.
    */
   async loadCommands(_signal: AbortSignal): Promise<SlashCommand[]> {
+    const handle = startupProfiler.start('load_builtin_commands');
     const allDefinitions: Array<SlashCommand | null> = [
       aboutCommand,
       authCommand,
@@ -62,15 +70,22 @@ export class BuiltinCommandLoader implements ICommandLoader {
       docsCommand,
       directoryCommand,
       editorCommand,
-      extensionsCommand,
+      extensionsCommand(this.config?.getEnableExtensionReloading()),
       helpCommand,
       await ideCommand(),
       initCommand,
       mcpCommand,
       memoryCommand,
+      modelCommand,
+      ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),
       privacyCommand,
+      ...(this.config?.getEnableMessageBusIntegration()
+        ? [policiesCommand]
+        : []),
+      ...(isDevelopment ? [profileCommand] : []),
       quitCommand,
       restoreCommand(this.config),
+      resumeCommand,
       statsCommand,
       themeCommand,
       toolsCommand,
@@ -79,7 +94,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       setupGithubCommand,
       terminalSetupCommand,
     ];
-
+    handle?.end();
     return allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);
   }
 }

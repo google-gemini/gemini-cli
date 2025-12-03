@@ -12,18 +12,33 @@ export enum MessageBusType {
   TOOL_POLICY_REJECTION = 'tool-policy-rejection',
   TOOL_EXECUTION_SUCCESS = 'tool-execution-success',
   TOOL_EXECUTION_FAILURE = 'tool-execution-failure',
+  UPDATE_POLICY = 'update-policy',
+  HOOK_EXECUTION_REQUEST = 'hook-execution-request',
+  HOOK_EXECUTION_RESPONSE = 'hook-execution-response',
+  HOOK_POLICY_DECISION = 'hook-policy-decision',
 }
 
 export interface ToolConfirmationRequest {
   type: MessageBusType.TOOL_CONFIRMATION_REQUEST;
   toolCall: FunctionCall;
   correlationId: string;
+  serverName?: string;
 }
 
 export interface ToolConfirmationResponse {
   type: MessageBusType.TOOL_CONFIRMATION_RESPONSE;
   correlationId: string;
   confirmed: boolean;
+  /**
+   * When true, indicates that policy decision was ASK_USER and the tool should
+   * show its legacy confirmation UI instead of auto-proceeding.
+   */
+  requiresUserConfirmation?: boolean;
+}
+
+export interface UpdatePolicy {
+  type: MessageBusType.UPDATE_POLICY;
+  toolName: string;
 }
 
 export interface ToolPolicyRejection {
@@ -43,9 +58,36 @@ export interface ToolExecutionFailure<E = Error> {
   error: E;
 }
 
+export interface HookExecutionRequest {
+  type: MessageBusType.HOOK_EXECUTION_REQUEST;
+  eventName: string;
+  input: Record<string, unknown>;
+  correlationId: string;
+}
+
+export interface HookExecutionResponse {
+  type: MessageBusType.HOOK_EXECUTION_RESPONSE;
+  correlationId: string;
+  success: boolean;
+  output?: Record<string, unknown>;
+  error?: Error;
+}
+
+export interface HookPolicyDecision {
+  type: MessageBusType.HOOK_POLICY_DECISION;
+  eventName: string;
+  hookSource: 'project' | 'user' | 'system' | 'extension';
+  decision: 'allow' | 'deny';
+  reason?: string;
+}
+
 export type Message =
   | ToolConfirmationRequest
   | ToolConfirmationResponse
   | ToolPolicyRejection
   | ToolExecutionSuccess
-  | ToolExecutionFailure;
+  | ToolExecutionFailure
+  | UpdatePolicy
+  | HookExecutionRequest
+  | HookExecutionResponse
+  | HookPolicyDecision;

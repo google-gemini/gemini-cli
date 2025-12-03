@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { debugLogger } from '@google/gemini-cli-core';
 import type { SlashCommand } from '../ui/commands/types.js';
 import type { ICommandLoader } from './types.js';
 
@@ -57,7 +58,7 @@ export class CommandService {
       if (result.status === 'fulfilled') {
         allCommands.push(...result.value);
       } else {
-        console.debug('A command loader failed:', result.reason);
+        debugLogger.debug('A command loader failed:', result.reason);
       }
     }
 

@@ -33,6 +33,6 @@ describe('privacyCommand', () => {
 
   it('should have the correct name and description', () => {
     expect(privacyCommand.name).toBe('privacy');
-    expect(privacyCommand.description).toBe('display the privacy notice');
+    expect(privacyCommand.description).toBe('Display the privacy notice');
   });
 });

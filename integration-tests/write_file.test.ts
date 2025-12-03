@@ -15,7 +15,9 @@ import {
 describe('write_file', () => {
   it('should be able to write a file', async () => {
     const rig = new TestRig();
-    await rig.setup('should be able to write a file');
+    await rig.setup('should be able to write a file', {
+      settings: { tools: { core: ['write_file', 'read_file'] } },
+    });
     const prompt = `show me an example of using the write tool. put a dad joke in dad.txt`;
 
     const result = await rig.run(prompt);
@@ -28,13 +30,14 @@ describe('write_file', () => {
     }
 
     const allTools = rig.readToolLogs();
-    expect(foundToolCall, 'Expected to find a write_file tool call').toBeTruthy(
+    expect(
+      foundToolCall,
       createToolCallErrorMessage(
         'write_file',
         allTools.map((t) => t.toolRequest.name),
         result,
       ),
-    );
+    ).toBeTruthy();
 
     // Validate model output - will throw if no output, warn if missing expected content
     validateModelOutput(result, 'dad.txt', 'Write file test');

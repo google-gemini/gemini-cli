@@ -4,20 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SandboxConfig } from '@google/gemini-cli-core';
-import { FatalSandboxError } from '@google/gemini-cli-core';
+import {
+  getPackageJson,
+  type SandboxConfig,
+  FatalSandboxError,
+} from '@google/gemini-cli-core';
 import commandExists from 'command-exists';
 import * as os from 'node:os';
-import { getPackageJson } from '../utils/package.js';
 import type { Settings } from './settings.js';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // This is a stripped-down version of the CliArgs interface from config.ts
 // to avoid circular dependencies.
 interface SandboxCliArgs {
-  sandbox?: boolean | string;
-  sandboxImage?: string;
+  sandbox?: boolean | string | null;
 }
-
 const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
   'docker',
   'podman',
@@ -29,7 +34,7 @@ function isSandboxCommand(value: string): value is SandboxConfig['command'] {
 }
 
 function getSandboxCommand(
-  sandbox?: boolean | string,
+  sandbox?: boolean | string | null,
 ): SandboxConfig['command'] | '' {
   // If the SANDBOX env var is set, we're already inside the sandbox.
   if (process.env['SANDBOX']) {
@@ -95,11 +100,9 @@ export async function loadSandboxConfig(
   const sandboxOption = argv.sandbox ?? settings.tools?.sandbox;
   const command = getSandboxCommand(sandboxOption);
 
-  const packageJson = await getPackageJson();
+  const packageJson = await getPackageJson(__dirname);
   const image =
-    argv.sandboxImage ??
-    process.env['GEMINI_SANDBOX_IMAGE'] ??
-    packageJson?.config?.sandboxImageUri;
+    process.env['GEMINI_SANDBOX_IMAGE'] ?? packageJson?.config?.sandboxImageUri;
 
   return command && image ? { command, image } : undefined;
 }
