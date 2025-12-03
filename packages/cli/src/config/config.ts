@@ -513,7 +513,7 @@ export async function loadCliConfig(
   );
 
   const enableMessageBusIntegration =
-    settings.tools?.enableMessageBusIntegration ?? false;
+    settings.tools?.enableMessageBusIntegration ?? true;
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
