@@ -1,7 +1,6 @@
 {
   "name": "@google/gemini-cli",
   "version": "0.21.0-nightly.20251202.2d935b379",
-  "license": "Apache-2.0",
   "engines": {
     "node": ">=20.0.0"
   },
