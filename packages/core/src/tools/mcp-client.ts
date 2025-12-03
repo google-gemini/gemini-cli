@@ -1285,9 +1285,6 @@ export async function connectToMcpServer(
     roots: {
       listChanged: true,
     },
-    resources: {
-      listChanged: true,
-    },
   });
 
   mcpClient.setRequestHandler(ListRootsRequestSchema, async () => {
