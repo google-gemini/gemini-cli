@@ -194,6 +194,23 @@
     ]
   },
   {
+    "label": "Hooks",
+    "items": [
+      {
+        "label": "Introduction",
+        "slug": "docs/hooks"
+      },
+      {
+        "label": "Writing hooks",
+        "slug": "docs/hooks/writing-hooks"
+      },
+      {
+        "label": "Best practices",
+        "slug": "docs/hooks/best-practices"
+      }
+    ]
+  },
+  {
     "label": "IDE integration",
     "items": [
       {
