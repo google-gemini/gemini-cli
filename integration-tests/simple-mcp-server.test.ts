@@ -177,6 +177,7 @@ describe('simple-mcp-server', () => {
             args: ['mcp-server.cjs'],
           },
         },
+        tools: { core: [] },
       },
     });
 
