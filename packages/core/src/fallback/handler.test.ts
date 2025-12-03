@@ -17,7 +17,7 @@ import {
 import { handleFallback } from './handler.js';
 import type { Config } from '../config/config.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
-import { createAvailabilityServiceMock } from '../availability/availabilityTestingUtils.js';
+import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import { AuthType } from '../core/contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,

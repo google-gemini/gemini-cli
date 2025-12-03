@@ -29,9 +29,10 @@ import { retryWithBackoff, type RetryOptions } from '../utils/retry.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { HookSystem } from '../hooks/hookSystem.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
-import { createAvailabilityServiceMock } from '../availability/availabilityTestingUtils.js';
+import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
-import { makeResolvedModelConfig } from '../test-utils/modelConfigMocks.js';
+import * as policyHelpers from '../availability/policyHelpers.js';
+import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -110,7 +111,14 @@ describe('GeminiChat', () => {
 
     mockHandleFallback.mockClear();
     // Default mock implementation for tests that don't care about retry logic
-    mockRetryWithBackoff.mockImplementation(async (apiCall) => apiCall());
+    mockRetryWithBackoff.mockImplementation(async (apiCall, options) => {
+      const result = await apiCall();
+      const context = options?.getAvailabilityContext?.();
+      if (context) {
+        context.service.markHealthy(context.policy.model);
+      }
+      return result;
+    });
     mockConfig = {
       getSessionId: () => 'test-session-id',
       getTelemetryLogPromptsEnabled: () => true,
@@ -136,6 +144,7 @@ describe('GeminiChat', () => {
       }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
+      getUserTier: vi.fn().mockReturnValue(undefined),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {
           const thinkingConfig = modelConfigKey.model.startsWith('gemini-3')
@@ -2361,7 +2370,6 @@ describe('GeminiChat', () => {
 
   describe('Availability Service Integration', () => {
     let mockAvailabilityService: ModelAvailabilityService;
-    let mockPolicyHelpers: typeof import('../availability/policyHelpers.js');
 
     beforeEach(async () => {
       mockAvailabilityService = createAvailabilityServiceMock();
@@ -2373,7 +2381,7 @@ describe('GeminiChat', () => {
       );
 
       // Stateful mock for activeModel
-      let activeModel = 'gemini-pro';
+      let activeModel = 'model-a';
       vi.mocked(mockConfig.getActiveModel).mockImplementation(
         () => activeModel,
       );
@@ -2381,8 +2389,7 @@ describe('GeminiChat', () => {
         activeModel = model;
       });
 
-      mockPolicyHelpers = await import('../availability/policyHelpers.js');
-      vi.spyOn(mockPolicyHelpers, 'resolvePolicyChain').mockReturnValue([
+      vi.spyOn(policyHelpers, 'resolvePolicyChain').mockReturnValue([
         {
           model: 'model-a',
           isLastResort: false,
@@ -2391,6 +2398,12 @@ describe('GeminiChat', () => {
         },
         {
           model: 'model-b',
+          isLastResort: false,
+          actions: {},
+          stateTransitions: {},
+        },
+        {
+          model: 'model-c',
           isLastResort: true,
           actions: {},
           stateTransitions: {},
@@ -2400,11 +2413,11 @@ describe('GeminiChat', () => {
 
     it('should mark healthy on successful stream', async () => {
       vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
-        selectedModel: 'model-a',
+        selectedModel: 'model-b',
         skipped: [],
       });
       // Simulate selection happening upstream
-      mockConfig.setActiveModel('model-a');
+      mockConfig.setActiveModel('model-b');
 
       vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
         (async function* () {
@@ -2430,7 +2443,7 @@ describe('GeminiChat', () => {
       }
 
       expect(mockAvailabilityService.markHealthy).toHaveBeenCalledWith(
-        'model-a',
+        'model-b',
       );
     });
 

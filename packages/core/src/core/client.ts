@@ -59,7 +59,7 @@ import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
 import {
   createAvailabilityContextProvider,
-  resolvePolicyChain,
+  selectModelForAvailability,
 } from '../availability/policyHelpers.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 
@@ -546,18 +546,19 @@ export class GeminiClient {
     }
 
     // availability logic
-    if (this.config.isModelAvailabilityServiceEnabled()) {
-      const chain = resolvePolicyChain(this.config, modelToUse);
-      const service = this.config.getModelAvailabilityService();
-      const selection = service.selectFirstAvailable(chain.map((p) => p.model));
-      const finalModel =
-        selection.selectedModel ?? chain.find((p) => p.isLastResort)?.model;
-
+    const availabilitySelection = selectModelForAvailability(
+      this.config,
+      modelToUse,
+    );
+    if (availabilitySelection) {
+      const finalModel = availabilitySelection.selectedModel;
       if (finalModel) {
         modelToUse = finalModel;
         this.config.setActiveModel(modelToUse);
-        if (selection.attempts) {
-          service.consumeStickyAttempt(modelToUse);
+        if (availabilitySelection.attempts) {
+          this.config
+            .getModelAvailabilityService()
+            .consumeStickyAttempt(modelToUse);
         }
       }
     }
@@ -691,42 +692,33 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
-      let getAvailabilityContext:
-        | (() => RetryAvailabilityContext | undefined)
-        | undefined;
-      if (this.config.isModelAvailabilityServiceEnabled()) {
-        const chain = resolvePolicyChain(this.config, currentAttemptModel);
-        const service = this.config.getModelAvailabilityService();
-        const selection = service.selectFirstAvailable(
-          chain.map((p) => p.model),
-        );
-        const finalModel =
-          selection.selectedModel ?? chain.find((p) => p.isLastResort)?.model;
-
-        if (finalModel) {
-          currentAttemptModel = finalModel;
-          this.config.setActiveModel(currentAttemptModel);
-          if (selection.attempts) {
-            service.consumeStickyAttempt(currentAttemptModel);
-          }
-          // We also need to update currentAttemptGenerateContentConfig if the model changed?
-          // ... (existing comments) ...
-          if (currentAttemptModel !== desiredModelConfig.model) {
-            const newConfig = this.config.modelConfigService.getResolvedConfig({
-              ...modelConfigKey,
-              model: currentAttemptModel,
-            });
-            currentAttemptGenerateContentConfig =
-              newConfig.generateContentConfig;
-          }
+      const availabilitySelection = selectModelForAvailability(
+        this.config,
+        currentAttemptModel,
+      );
+      if (availabilitySelection?.selectedModel) {
+        currentAttemptModel = availabilitySelection.selectedModel;
+        this.config.setActiveModel(currentAttemptModel);
+        if (availabilitySelection.attempts) {
+          this.config
+            .getModelAvailabilityService()
+            .consumeStickyAttempt(currentAttemptModel);
         }
+        if (currentAttemptModel !== desiredModelConfig.model) {
+          const newConfig = this.config.modelConfigService.getResolvedConfig({
+            ...modelConfigKey,
+            model: currentAttemptModel,
+          });
+          currentAttemptGenerateContentConfig = newConfig.generateContentConfig;
+        }
+      }
 
-        // Define callback to refresh context based on currentAttemptModel which might be updated by fallback handler
-        getAvailabilityContext = createAvailabilityContextProvider(
+      // Define callback to refresh context based on currentAttemptModel which might be updated by fallback handler
+      const getAvailabilityContext: () => RetryAvailabilityContext | undefined =
+        createAvailabilityContextProvider(
           this.config,
           () => currentAttemptModel,
         );
-      }
 
       const apiCall = () => {
         let modelConfigToUse = desiredModelConfig;
@@ -780,13 +772,6 @@ export class GeminiClient {
         authType: this.config.getContentGeneratorConfig()?.authType,
         getAvailabilityContext,
       });
-
-      // On success, mark the model as healthy (if enabled)
-      if (this.config.isModelAvailabilityServiceEnabled()) {
-        this.config
-          .getModelAvailabilityService()
-          .markHealthy(currentAttemptModel);
-      }
 
       return result;
     } catch (error: unknown) {

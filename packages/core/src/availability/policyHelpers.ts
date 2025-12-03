@@ -13,7 +13,8 @@ import type {
   RetryAvailabilityContext,
 } from './modelPolicy.js';
 import { createDefaultPolicy, getModelPolicyChain } from './policyCatalog.js';
-import { getEffectiveModel } from '../config/models.js';
+import { DEFAULT_GEMINI_MODEL, getEffectiveModel } from '../config/models.js';
+import type { ModelSelectionResult } from './modelAvailabilityService.js';
 
 /**
  * Resolves the active policy chain for the given config, ensuring the
@@ -104,4 +105,52 @@ export function createAvailabilityContextProvider(
 
     return policy ? { service, policy } : undefined;
   };
+}
+
+/**
+ * Selects the model to use for an attempt via the availability service and
+ * returns the selection context.
+ */
+export function selectModelForAvailability(
+  config: Config,
+  requestedModel: string,
+): ModelSelectionResult | undefined {
+  if (!config.isModelAvailabilityServiceEnabled()) {
+    return undefined;
+  }
+
+  const chain = resolvePolicyChain(config, requestedModel);
+  const selection = config
+    .getModelAvailabilityService()
+    .selectFirstAvailable(chain.map((p) => p.model));
+  const finalModel =
+    selection.selectedModel ??
+    chain.find((p) => p.isLastResort)?.model ??
+    DEFAULT_GEMINI_MODEL;
+
+  const normalizedSelection: ModelSelectionResult = selection.selectedModel
+    ? selection
+    : { selectedModel: finalModel, skipped: [] };
+
+  return normalizedSelection;
+}
+
+export function applyAvailabilityTransition(
+  getContext: (() => RetryAvailabilityContext | undefined) | undefined,
+  failureKind: FailureKind,
+): void {
+  const context = getContext?.();
+  if (!context) return;
+
+  const transition = context.policy.stateTransitions?.[failureKind];
+  if (!transition) return;
+
+  if (transition === 'terminal') {
+    context.service.markTerminal(
+      context.policy.model,
+      failureKind === 'terminal' ? 'quota' : 'capacity',
+    );
+  } else if (transition === 'sticky_retry') {
+    context.service.markRetryOncePerTurn(context.policy.model);
+  }
 }

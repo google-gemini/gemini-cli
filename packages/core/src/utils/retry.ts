@@ -15,11 +15,9 @@ import {
 import { delay, createAbortError } from './delay.js';
 import { debugLogger } from './debugLogger.js';
 import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
-import type {
-  FailureKind,
-  RetryAvailabilityContext,
-} from '../availability/modelPolicy.js';
+import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
 import { classifyFailureKind } from '../availability/errorClassification.js';
+import { applyAvailabilityTransition } from '../availability/policyHelpers.js';
 
 const FETCH_FAILED_MESSAGE =
   'exception TypeError: fetch failed sending request';
@@ -126,26 +124,6 @@ export async function retryWithBackoff<T>(
   let attempt = 0;
   let currentDelay = initialDelayMs;
 
-  const applyAvailabilityTransition = (
-    getContext: (() => RetryAvailabilityContext | undefined) | undefined,
-    failureKind: FailureKind,
-  ): void => {
-    const context = getContext?.();
-    if (!context) return;
-
-    const transition = context.policy.stateTransitions?.[failureKind];
-    if (!transition) return;
-
-    if (transition === 'terminal') {
-      context.service.markTerminal(
-        context.policy.model,
-        failureKind === 'terminal' ? 'quota' : 'capacity',
-      );
-    } else if (transition === 'sticky_retry') {
-      context.service.markRetryOncePerTurn(context.policy.model);
-    }
-  };
-
   while (attempt < maxAttempts) {
     if (signal?.aborted) {
       throw createAbortError();
@@ -163,6 +141,11 @@ export async function retryWithBackoff<T>(
         await delay(delayWithJitter, signal);
         currentDelay = Math.min(maxDelayMs, currentDelay * 2);
         continue;
+      }
+
+      const successContext = getAvailabilityContext?.();
+      if (successContext) {
+        successContext.service.markHealthy(successContext.policy.model);
       }
 
       return result;

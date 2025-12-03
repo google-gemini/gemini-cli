@@ -38,13 +38,15 @@ import { ideContextStore } from '../ide/ideContext.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
-import { createAvailabilityServiceMock } from '../availability/availabilityTestingUtils.js';
+import { createAvailabilityServiceMock } from '../availability/testUtils.js';
+import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import type {
   ModelConfigKey,
   ResolvedModelConfig,
 } from '../services/modelConfigService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { HookSystem } from '../hooks/hookSystem.js';
+import * as policyCatalog from '../availability/policyCatalog.js';
 
 vi.mock('../services/chatCompressionService.js');
 
@@ -142,6 +144,7 @@ describe('Gemini Client (client.ts)', () => {
   let mockConfig: Config;
   let client: GeminiClient;
   let mockGenerateContentFn: Mock;
+  let mockRouterService: { route: Mock };
   beforeEach(async () => {
     vi.resetAllMocks();
     ClearcutLogger.clearInstance();
@@ -162,6 +165,12 @@ describe('Gemini Client (client.ts)', () => {
 
     // Disable 429 simulation for tests
     setSimulate429(false);
+
+    mockRouterService = {
+      route: vi
+        .fn()
+        .mockResolvedValue({ model: 'default-routed-model', reason: 'test' }),
+    };
 
     mockContentGenerator = {
       generateContent: mockGenerateContentFn,
@@ -189,6 +198,7 @@ describe('Gemini Client (client.ts)', () => {
         .mockReturnValue(contentGeneratorConfig),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getModel: vi.fn().mockReturnValue('test-model'),
+      getUserTier: vi.fn().mockReturnValue(undefined),
       getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
       getApiKey: vi.fn().mockReturnValue('test-key'),
       getVertexAI: vi.fn().mockReturnValue(false),
@@ -212,9 +222,9 @@ describe('Gemini Client (client.ts)', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getGeminiClient: vi.fn(),
-      getModelRouterService: vi.fn().mockReturnValue({
-        route: vi.fn().mockResolvedValue({ model: 'default-routed-model' }),
-      }),
+      getModelRouterService: vi
+        .fn()
+        .mockReturnValue(mockRouterService as unknown as ModelRouterService),
       getMessageBus: vi.fn().mockReturnValue(undefined),
       getEnableHooks: vi.fn().mockReturnValue(false),
       isInFallbackMode: vi.fn().mockReturnValue(false),
@@ -1956,12 +1966,9 @@ ${JSON.stringify(
     });
 
     describe('Availability Service Integration', () => {
-      let mockAvailabilityService: ReturnType<
-        typeof createAvailabilityServiceMock
-      >;
-      let mockPolicyHelpers: typeof import('../availability/policyHelpers.js');
+      let mockAvailabilityService: ModelAvailabilityService;
 
-      beforeEach(async () => {
+      beforeEach(() => {
         mockAvailabilityService = createAvailabilityServiceMock();
 
         vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
@@ -1971,9 +1978,14 @@ ${JSON.stringify(
           true,
         );
         vi.mocked(mockConfig.setActiveModel).mockClear();
-
-        mockPolicyHelpers = await import('../availability/policyHelpers.js');
-        vi.spyOn(mockPolicyHelpers, 'resolvePolicyChain').mockReturnValue([
+        mockRouterService.route.mockResolvedValue({
+          model: 'model-a',
+          reason: 'test',
+        });
+        vi.mocked(mockConfig.getModelRouterService).mockReturnValue(
+          mockRouterService as unknown as ModelRouterService,
+        );
+        vi.spyOn(policyCatalog, 'getModelPolicyChain').mockReturnValue([
           {
             model: 'model-a',
             isLastResort: false,

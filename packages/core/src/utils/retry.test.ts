@@ -18,7 +18,7 @@ import {
 } from './googleQuotaErrors.js';
 import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
 import type { ModelPolicy } from '../availability/modelPolicy.js';
-import { createAvailabilityServiceMock } from '../availability/availabilityTestingUtils.js';
+import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 
 // Helper to create a mock function that fails a certain number of times

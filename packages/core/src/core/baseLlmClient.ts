@@ -18,15 +18,11 @@ import { reportError } from '../utils/errorReporting.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { MalformedJsonResponseEvent } from '../telemetry/types.js';
-import {
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
-} from '../config/models.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import {
   createAvailabilityContextProvider,
-  resolvePolicyChain,
+  selectModelForAvailability,
 } from '../availability/policyHelpers.js';
 
 const DEFAULT_MAX_ATTEMPTS = 5;
@@ -246,48 +242,29 @@ export class BaseLlmClient {
       () => requestParams.model,
     );
 
-    if (this.config.isModelAvailabilityServiceEnabled()) {
-      const chain = resolvePolicyChain(this.config);
-      const service = this.config.getModelAvailabilityService();
-      const selection = service.selectFirstAvailable(chain.map((p) => p.model));
-
-      // Default to last resort if nothing selected (shouldn't happen with correct chain)
-      const lastResort = chain.find((p) => p.isLastResort);
-      const selectedModel =
-        selection.selectedModel ?? lastResort?.model ?? DEFAULT_GEMINI_MODEL;
-
-      if (selectedModel) {
-        if (selectedModel !== requestParams.model) {
-          requestParams.model = selectedModel;
-          const { generateContentConfig } =
-            this.config.modelConfigService.getResolvedConfig({
-              model: selectedModel,
-            });
-          requestParams.config = {
-            ...requestParams.config,
-            ...generateContentConfig,
-          };
-        }
-        this.config.setActiveModel(selectedModel);
-
-        if (selection.attempts) {
-          service.consumeStickyAttempt(selectedModel);
-        }
-      }
-    } else if (this.config.isInFallbackMode()) {
-      // Legacy Fallback: If availability is disabled but fallback mode is active,
-      // force the use of Flash.
-      const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
-      if (requestParams.model !== fallbackModel) {
-        requestParams.model = fallbackModel;
+    const availabilitySelection = selectModelForAvailability(
+      this.config,
+      requestParams.model,
+    );
+    if (availabilitySelection?.selectedModel) {
+      const finalModel = availabilitySelection.selectedModel;
+      if (finalModel !== requestParams.model) {
+        requestParams.model = finalModel;
         const { generateContentConfig } =
           this.config.modelConfigService.getResolvedConfig({
-            model: fallbackModel,
+            model: finalModel,
           });
         requestParams.config = {
           ...requestParams.config,
           ...generateContentConfig,
         };
+      }
+      this.config.setActiveModel(finalModel);
+
+      if (availabilitySelection.attempts) {
+        this.config
+          .getModelAvailabilityService()
+          .consumeStickyAttempt(finalModel);
       }
     }
 
@@ -318,13 +295,6 @@ export class BaseLlmClient {
         maxAttempts: maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
         getAvailabilityContext,
       });
-
-      if (this.config.isModelAvailabilityServiceEnabled()) {
-        const modelUsed = requestParams.model;
-        if (modelUsed) {
-          this.config.getModelAvailabilityService().markHealthy(modelUsed);
-        }
-      }
 
       return result;
     } catch (error) {

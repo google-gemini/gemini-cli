@@ -48,7 +48,10 @@ import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
-import { createAvailabilityContextProvider } from '../availability/policyHelpers.js';
+import {
+  createAvailabilityContextProvider,
+  selectModelForAvailability,
+} from '../availability/policyHelpers.js';
 import {
   fireAfterModelHook,
   fireBeforeModelHook,
@@ -407,11 +410,38 @@ export class GeminiChat {
       this.ensureActiveLoopHasThoughtSignatures(requestContents);
 
     // Track final request parameters for AfterModel hooks
-    let lastModelToUse = model;
+    const availabilitySelection = selectModelForAvailability(
+      this.config,
+      model,
+    );
+    const availabilityFinalModel =
+      availabilitySelection?.selectedModel ?? model;
+    let lastModelToUse = availabilityFinalModel;
     let currentGenerateContentConfig: GenerateContentConfig =
       generateContentConfig;
     let lastConfig: GenerateContentConfig = generateContentConfig;
     let lastContentsToUse: Content[] = requestContents;
+
+    if (availabilitySelection?.selectedModel) {
+      if (availabilityFinalModel !== model) {
+        const { generateContentConfig: newConfig } =
+          this.config.modelConfigService.getResolvedConfig({
+            model: availabilityFinalModel,
+          });
+        const { abortSignal } = currentGenerateContentConfig;
+        currentGenerateContentConfig = {
+          ...currentGenerateContentConfig,
+          ...newConfig,
+          abortSignal,
+        };
+      }
+      this.config.setActiveModel(availabilityFinalModel);
+      if (availabilitySelection.attempts) {
+        this.config
+          .getModelAvailabilityService()
+          .consumeStickyAttempt(availabilityFinalModel);
+      }
+    }
 
     const getAvailabilityContext = createAvailabilityContextProvider(
       this.config,
@@ -575,11 +605,6 @@ export class GeminiChat {
           : undefined,
       getAvailabilityContext,
     });
-
-    // On success, mark the model as healthy (if enabled)
-    if (this.config.isModelAvailabilityServiceEnabled()) {
-      this.config.getModelAvailabilityService().markHealthy(lastModelToUse);
-    }
 
     // Store the original request for AfterModel hooks
     const originalRequest: GenerateContentParameters = {

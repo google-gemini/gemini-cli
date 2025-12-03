@@ -18,19 +18,18 @@ import {
 import { BaseLlmClient, type GenerateJsonOptions } from './baseLlmClient.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
-import { createAvailabilityServiceMock } from '../availability/availabilityTestingUtils.js';
+import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { GenerateContentOptions } from './baseLlmClient.js';
 import type { GenerateContentResponse } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { AuthType } from './contentGenerator.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { reportError } from '../utils/errorReporting.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { MalformedJsonResponseEvent } from '../telemetry/types.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { ModelConfigService } from '../services/modelConfigService.js';
-import { makeResolvedModelConfig } from '../test-utils/modelConfigMocks.js';
+import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
 
 vi.mock('../utils/errorReporting.js');
 vi.mock('../telemetry/loggers.js');
@@ -62,6 +61,11 @@ vi.mock('../utils/retry.js', () => ({
           throw new Error('Retry attempts exhausted for invalid content');
         }
       }
+    }
+
+    const context = options?.getAvailabilityContext?.();
+    if (context) {
+      context.service.markHealthy(context.policy.model);
     }
 
     return result;
@@ -730,7 +734,14 @@ describe('BaseLlmClient', () => {
       mockGenerateContent.mockResolvedValue(
         createMockResponse('Some text response'),
       );
-      vi.mocked(retryWithBackoff).mockImplementation(async (fn) => fn());
+      vi.mocked(retryWithBackoff).mockImplementation(async (fn, options) => {
+        const result = await fn();
+        const context = options?.getAvailabilityContext?.();
+        if (context) {
+          context.service.markHealthy(context.policy.model);
+        }
+        return result;
+      });
 
       await client.generateContent({
         ...contentOptions,
@@ -751,7 +762,14 @@ describe('BaseLlmClient', () => {
       mockGenerateContent.mockResolvedValue(
         createMockResponse('{"color":"violet"}'),
       );
-      vi.mocked(retryWithBackoff).mockImplementation(async (fn) => fn());
+      vi.mocked(retryWithBackoff).mockImplementation(async (fn, options) => {
+        const result = await fn();
+        const context = options?.getAvailabilityContext?.();
+        if (context) {
+          context.service.markHealthy(context.policy.model);
+        }
+        return result;
+      });
 
       const result = await client.generateJson(jsonOptions);
 
@@ -764,27 +782,6 @@ describe('BaseLlmClient', () => {
         expect.objectContaining({ model: availableModel }),
         jsonOptions.promptId,
       );
-    });
-
-    it('should use legacy fallback behavior when availability is disabled', async () => {
-      mockConfig.isModelAvailabilityServiceEnabled.mockReturnValue(false);
-      mockConfig.isInFallbackMode.mockReturnValue(true);
-
-      mockGenerateContent.mockResolvedValue(
-        createMockResponse('Fallback response'),
-      );
-
-      await client.generateContent(contentOptions);
-
-      // Should explicitly switch to Flash model
-      expect(mockGenerateContent).toHaveBeenCalledWith(
-        expect.objectContaining({ model: DEFAULT_GEMINI_FLASH_MODEL }),
-        expect.any(String),
-      );
-      // Should NOT call availability methods
-      expect(
-        mockAvailabilityService.selectFirstAvailable,
-      ).not.toHaveBeenCalled();
     });
 
     it('should refresh configuration when model changes mid-retry', async () => {
