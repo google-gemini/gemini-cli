@@ -885,7 +885,7 @@ export function SettingsDialog({
             bold={focusSection === 'settings' && !editingKey}
             wrap="truncate"
           >
-            Settings
+            {focusSection === 'settings' ? '> ' : '  '}Settings{' '}
           </Text>
         </Box>
         <Box

@@ -3,7 +3,7 @@
 exports[`SettingsDialog > Initial Rendering > should render settings list with visual indicators 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│  Settings                                                                                        │
+│  > Settings                                                                                      │
 │                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
@@ -41,7 +41,7 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings enabled' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│  Settings                                                                                        │
+│  > Settings                                                                                      │
 │                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
@@ -79,7 +79,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings disabled' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│  Settings                                                                                        │
+│  > Settings                                                                                      │
 │                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
@@ -117,7 +117,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 exports[`SettingsDialog > Snapshot Tests > should render 'default state' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│  Settings                                                                                        │
+│  > Settings                                                                                      │
 │                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
@@ -155,7 +155,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 exports[`SettingsDialog > Snapshot Tests > should render 'file filtering settings configured' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│  Settings                                                                                        │
+│  > Settings                                                                                      │
 │                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
@@ -193,7 +193,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selector' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│  Settings                                                                                        │
+│    Settings                                                                                      │
 │                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
@@ -231,7 +231,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and number settings' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│  Settings                                                                                        │
+│  > Settings                                                                                      │
 │                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
@@ -269,7 +269,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 exports[`SettingsDialog > Snapshot Tests > should render 'tools and security settings' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│  Settings                                                                                        │
+│  > Settings                                                                                      │
 │                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
@@ -307,7 +307,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settings enabled' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│  Settings                                                                                        │
+│  > Settings                                                                                      │
 │                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
