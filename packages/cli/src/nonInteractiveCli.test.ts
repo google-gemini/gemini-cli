@@ -1731,4 +1731,24 @@ describe('runNonInteractive', () => {
     );
     expect(getWrittenOutput()).toContain('Done');
   });
+
+  it('should throw an error when GeminiEventType.InvalidStream is received', async () => {
+    const events: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.InvalidStream },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    const runPromise = runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Invalid stream test',
+      prompt_id: 'prompt-id-invalid-stream',
+    });
+
+    await expect(runPromise).rejects.toThrow(
+      'Stream ended with invalid content.',
+    );
+  });
 });
