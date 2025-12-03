@@ -867,9 +867,9 @@ export function SettingsDialog({
     initialCursorOffset: 0,
     viewport: {
       width: viewportWidth,
-      height: 4,
+      height: 1,
     },
-    isValidPath: () => false, // No path validation needed for API key
+    isValidPath: () => false,
     singleLine: true,
     onChange: (text) => setSearchQuery(text),
   });
