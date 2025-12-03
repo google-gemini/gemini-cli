@@ -29,6 +29,7 @@ import {
   EDIT_TOOL_NAME,
   debugLogger,
   loadServerHierarchicalMemory,
+  WEB_FETCH_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -512,7 +513,7 @@ export async function loadCliConfig(
   );
 
   const enableMessageBusIntegration =
-    settings.tools?.enableMessageBusIntegration ?? false;
+    settings.tools?.enableMessageBusIntegration ?? true;
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -530,6 +531,7 @@ export async function loadCliConfig(
       SHELL_TOOL_NAME,
       EDIT_TOOL_NAME,
       WRITE_FILE_TOOL_NAME,
+      WEB_FETCH_TOOL_NAME,
     ];
     const autoEditExcludes = [SHELL_TOOL_NAME];
 
@@ -633,6 +635,7 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableModelAvailabilityService:
       settings.experimental?.isModelAvailabilityServiceEnabled,
+    experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,

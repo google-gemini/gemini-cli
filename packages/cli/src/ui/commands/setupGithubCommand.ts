@@ -203,6 +203,7 @@ export const setupGithubCommand: SlashCommand = {
   name: 'setup-github',
   description: 'Set up GitHub Actions',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async (
     context: CommandContext,
   ): Promise<SlashCommandActionReturn> => {
@@ -250,7 +251,9 @@ export const setupGithubCommand: SlashCommand = {
 
     // Print out a message
     const commands = [];
-    commands.push('set -eEuo pipefail');
+    if (process.platform !== 'win32') {
+      commands.push('set -eEuo pipefail');
+    }
     commands.push(
       `echo "Successfully downloaded ${GITHUB_WORKFLOW_PATHS.length} workflows , ${GITHUB_COMMANDS_PATHS.length} commands and updated .gitignore. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup."`,
     );

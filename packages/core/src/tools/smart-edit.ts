@@ -966,7 +966,7 @@ A good instruction should concisely answer:
       getFilePath: (params: EditToolParams) => params.file_path,
       getCurrentContent: async (params: EditToolParams): Promise<string> => {
         try {
-          return this.config
+          return await this.config
             .getFileSystemService()
             .readTextFile(params.file_path);
         } catch (err) {
