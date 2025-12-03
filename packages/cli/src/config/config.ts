@@ -414,10 +414,6 @@ export async function loadCliConfig(
     ...settings.context?.fileFiltering,
   };
 
-  const includeDirectories = (settings.context?.includeDirectories || [])
-    .map(resolvePath)
-    .concat((argv.includeDirectories || []).map(resolvePath));
-
   const extensionManager = new ExtensionManager({
     settings,
     requestConsent: requestConsentNonInteractive,
@@ -427,6 +423,17 @@ export async function loadCliConfig(
     eventEmitter: appEvents as EventEmitter<ExtensionEvents>,
   });
   await extensionManager.loadExtensions();
+
+  const includeDirectories = (settings.context?.includeDirectories || [])
+    .map(resolvePath)
+    .concat((argv.includeDirectories || []).map(resolvePath))
+    .concat(
+      extensionManager
+        .getExtensions()
+        .filter((e) => e.isActive && e.includeDirectories)
+        .flatMap((e) => e.includeDirectories!)
+        .map(resolvePath),
+    );
 
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount, filePaths } =

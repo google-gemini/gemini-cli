@@ -188,6 +188,26 @@ describe('consent', () => {
         await maybeRequestConsentOrFail(newConfig, requestConsent, prevConfig);
         expect(requestConsent).toHaveBeenCalledTimes(1);
       });
+
+      it('should request consent if includeDirectories changes', async () => {
+        const prevConfig: ExtensionConfig = { ...baseConfig };
+        const newConfig: ExtensionConfig = {
+          ...baseConfig,
+          context: {
+            includeDirectories: ['/path/to/include'],
+          },
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(newConfig, requestConsent, prevConfig);
+
+        const expectedConsentString = [
+          'Installing extension "test-ext".',
+          INSTALL_WARNING_MESSAGE,
+          'This extension will add the following directories to your context (while active): /path/to/include',
+        ].join('\n');
+
+        expect(requestConsent).toHaveBeenCalledWith(expectedConsentString);
+      });
     });
   });
 });

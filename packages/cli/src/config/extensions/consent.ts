@@ -130,6 +130,11 @@ function extensionConsentString(extensionConfig: ExtensionConfig): string {
       `This extension will exclude the following core tools: ${sanitizedConfig.excludeTools}`,
     );
   }
+  if (sanitizedConfig.context?.includeDirectories) {
+    output.push(
+      `This extension will add the following directories to your context (while active): ${sanitizedConfig.context.includeDirectories.join(', ')}`,
+    );
+  }
   return output.join('\n');
 }
 
