@@ -489,7 +489,8 @@ export function SettingsDialog({
   const SCOPE_SELECTION_HEIGHT = 4; // Apply To section height
   const BOTTOM_HELP_TEXT_HEIGHT = 1; // Help text
   const RESTART_PROMPT_HEIGHT = showRestartPrompt ? 1 : 0;
-  const DESCRIPTION_HEIGHT = 2; // Description text area for active setting
+  // Description text area for active setting (allows for wrapping)
+  const DESCRIPTION_HEIGHT = 3;
 
   let currentAvailableTerminalHeight =
     availableTerminalHeight ?? Number.MAX_SAFE_INTEGER;
