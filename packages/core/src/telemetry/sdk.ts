@@ -198,17 +198,6 @@ export async function initializeTelemetry(
   const useDirectGcpExport =
     telemetryTarget === TelemetryTarget.GCP && !useCollector;
 
-  debugLogger.log('Telemetry initialization config:', {
-    telemetryTarget,
-    gcpProjectId,
-    useCliAuth: config.getTelemetryUseCliAuth(),
-    hasCredentials: !!credentials,
-    useCollector,
-    useDirectGcpExport,
-    useOtlp,
-    hasOutfile: !!telemetryOutfile,
-  });
-
   let spanExporter:
     | OTLPTraceExporter
     | OTLPTraceExporterHttp
