@@ -20,7 +20,13 @@ interface AppHeaderProps {
 export const AppHeader = ({ version }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
-  const { nightly, mainAreaWidth, bannerData, bannerVisible } = useUIState();
+  const {
+    nightly,
+    mainAreaWidth,
+    bannerData,
+    bannerVisible,
+    customLogoVariants,
+  } = useUIState();
 
   const { bannerText } = useBanner(bannerData, config);
 
@@ -28,7 +34,11 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
     <Box flexDirection="column">
       {!(settings.merged.ui?.hideBanner || config.getScreenReader()) && (
         <>
-          <Header version={version} nightly={nightly} />
+          <Header
+            version={version}
+            nightly={nightly}
+            customLogoVariants={customLogoVariants}
+          />
           {bannerVisible && bannerText && (
             <Banner
               width={mainAreaWidth}

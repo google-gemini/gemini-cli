@@ -74,7 +74,11 @@ describe('<Header />', () => {
   it('renders custom ASCII art when provided', () => {
     const customArt = 'CUSTOM ART';
     render(
-      <Header version="1.0.0" nightly={false} customAsciiArt={customArt} />,
+      <Header
+        version="1.0.0"
+        nightly={false}
+        customLogoVariants={{ longAsciiLogo: customArt }}
+      />,
     );
     expect(Text).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -88,7 +92,11 @@ describe('<Header />', () => {
     const customArt = 'CUSTOM ART';
     vi.mocked(terminalSetup.getTerminalProgram).mockReturnValue('vscode');
     render(
-      <Header version="1.0.0" nightly={false} customAsciiArt={customArt} />,
+      <Header
+        version="1.0.0"
+        nightly={false}
+        customLogoVariants={{ longAsciiLogoIde: customArt }}
+      />,
     );
     expect(Text).toHaveBeenCalledWith(
       expect.objectContaining({
