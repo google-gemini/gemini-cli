@@ -238,8 +238,18 @@ export class HookRunner {
             debugLogger.warn(`Hook stdin error: ${err}`);
           }
         });
-        child.stdin.write(JSON.stringify(input));
-        child.stdin.end();
+
+        // Wrap write operations in try-catch to handle synchronous EPIPE errors
+        // that occur when the child process exits before we finish writing
+        try {
+          child.stdin.write(JSON.stringify(input));
+          child.stdin.end();
+        } catch (err) {
+          // Ignore EPIPE errors which happen when the child process closes stdin early
+          if (err instanceof Error && 'code' in err && err.code !== 'EPIPE') {
+            debugLogger.warn(`Hook stdin write error: ${err}`);
+          }
+        }
       }
 
       // Collect stdout

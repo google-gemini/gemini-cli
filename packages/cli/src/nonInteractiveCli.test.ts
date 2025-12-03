@@ -16,7 +16,6 @@ import type {
 import {
   executeToolCall,
   ToolErrorType,
-  shutdownTelemetry,
   GeminiEventType,
   OutputFormat,
   uiTelemetryService,
@@ -61,7 +60,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...original,
     executeToolCall: vi.fn(),
-    shutdownTelemetry: vi.fn(),
     isTelemetrySdkInitialized: vi.fn().mockReturnValue(true),
     ChatRecordingService: MockChatRecordingService,
     uiTelemetryService: {
@@ -91,7 +89,6 @@ describe('runNonInteractive', () => {
   let mockSettings: LoadedSettings;
   let mockToolRegistry: ToolRegistry;
   let mockCoreExecuteToolCall: Mock;
-  let mockShutdownTelemetry: Mock;
   let consoleErrorSpy: MockInstance;
   let processStdoutSpy: MockInstance;
   let processStderrSpy: MockInstance;
@@ -123,7 +120,6 @@ describe('runNonInteractive', () => {
 
   beforeEach(async () => {
     mockCoreExecuteToolCall = vi.mocked(executeToolCall);
-    mockShutdownTelemetry = vi.mocked(shutdownTelemetry);
 
     mockCommandServiceCreate.mockResolvedValue({
       getCommands: mockGetCommands,
@@ -247,7 +243,8 @@ describe('runNonInteractive', () => {
       'prompt-id-1',
     );
     expect(getWrittenOutput()).toBe('Hello World\n');
-    expect(mockShutdownTelemetry).toHaveBeenCalled();
+    // Note: Telemetry shutdown is now handled in runExitCleanup() in cleanup.ts
+    // so we no longer expect shutdownTelemetry to be called directly here
   });
 
   it('should handle a single tool call and respond', async () => {

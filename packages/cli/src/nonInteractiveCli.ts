@@ -15,8 +15,6 @@ import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
 import {
   executeToolCall,
-  shutdownTelemetry,
-  isTelemetrySdkInitialized,
   GeminiEventType,
   FatalInputError,
   promptIdContext,
@@ -445,9 +443,6 @@ export async function runNonInteractive({
 
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
-      if (isTelemetrySdkInitialized()) {
-        await shutdownTelemetry(config);
-      }
     }
 
     if (errorToHandle) {
