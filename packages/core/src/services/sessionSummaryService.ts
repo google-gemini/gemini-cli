@@ -124,10 +124,12 @@ export class SessionSummaryService {
 
         // Clean and truncate the summary
         let cleanedSummary = summary
-          .trim()
-          .replace(/\n+/g, ' ')
-          .replace(/\s+/g, ' ')
-          .replace(/[^\x20-\x7E]+/g, '');
+          .replace(/\n+/g, ' ') // Collapse newlines to spaces
+          .replace(/\s+/g, ' ') // Normalize whitespace
+          .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '') // Remove emoji (preserves ZWJ/ZWNJ as they're not Emoji_Presentation)
+          // eslint-disable-next-line no-control-regex
+          .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '') // Remove control characters
+          .trim(); // Trim after all processing
 
         // Remove quotes if the model added them
         cleanedSummary = cleanedSummary.replace(/^["']|["']$/g, '');

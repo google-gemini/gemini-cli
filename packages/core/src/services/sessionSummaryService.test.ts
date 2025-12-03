@@ -725,4 +725,168 @@ describe('SessionSummaryService', () => {
       expect(mockGenerateContent).toHaveBeenCalled();
     });
   });
+
+  describe('Internationalization Support', () => {
+    it('should preserve international characters (Chinese)', async () => {
+      mockGenerateContent.mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: '添加深色模式到应用' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
+
+      const messages: MessageRecord[] = [
+        {
+          id: '1',
+          timestamp: '2025-12-03T00:00:00Z',
+          type: 'user',
+          content: [{ text: 'How do I add dark mode?' }],
+        },
+      ];
+
+      const summary = await service.generateSummary({ messages });
+
+      expect(summary).toBe('添加深色模式到应用');
+    });
+
+    it('should preserve international characters (Arabic)', async () => {
+      mockGenerateContent.mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'إضافة الوضع الداكن' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
+
+      const messages: MessageRecord[] = [
+        {
+          id: '1',
+          timestamp: '2025-12-03T00:00:00Z',
+          type: 'user',
+          content: [{ text: 'How do I add dark mode?' }],
+        },
+      ];
+
+      const summary = await service.generateSummary({ messages });
+
+      expect(summary).toBe('إضافة الوضع الداكن');
+    });
+
+    it('should preserve accented characters', async () => {
+      mockGenerateContent.mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'Añadir modo oscuro à la aplicación' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
+
+      const messages: MessageRecord[] = [
+        {
+          id: '1',
+          timestamp: '2025-12-03T00:00:00Z',
+          type: 'user',
+          content: [{ text: 'How do I add dark mode?' }],
+        },
+      ];
+
+      const summary = await service.generateSummary({ messages });
+
+      expect(summary).toBe('Añadir modo oscuro à la aplicación');
+    });
+
+    it('should remove emojis from summaries', async () => {
+      mockGenerateContent.mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: '🌙 Add dark mode 🎨 to the app ✨' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
+
+      const messages: MessageRecord[] = [
+        {
+          id: '1',
+          timestamp: '2025-12-03T00:00:00Z',
+          type: 'user',
+          content: [{ text: 'How do I add dark mode?' }],
+        },
+      ];
+
+      const summary = await service.generateSummary({ messages });
+
+      // Emojis removed (may leave double spaces where emoji was between words)
+      expect(summary).toBe('Add dark mode  to the app');
+      expect(summary).not.toContain('🌙');
+      expect(summary).not.toContain('🎨');
+      expect(summary).not.toContain('✨');
+    });
+
+    it('should preserve zero-width characters for language rendering', async () => {
+      // Arabic with Zero-Width Joiner (ZWJ) for proper ligatures
+      mockGenerateContent.mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'كلمة\u200Dمتصلة' }], // Contains ZWJ
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
+
+      const messages: MessageRecord[] = [
+        {
+          id: '1',
+          timestamp: '2025-12-03T00:00:00Z',
+          type: 'user',
+          content: [{ text: 'Test' }],
+        },
+      ];
+
+      const summary = await service.generateSummary({ messages });
+
+      // ZWJ is preserved (it's not considered whitespace)
+      expect(summary).toBe('كلمة\u200Dمتصلة');
+      expect(summary).toContain('\u200D'); // ZWJ should be preserved
+    });
+
+    it('should remove control characters', async () => {
+      mockGenerateContent.mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'Add\x07dark\x08mode\x0Bto\x0Capp' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
+
+      const messages: MessageRecord[] = [
+        {
+          id: '1',
+          timestamp: '2025-12-03T00:00:00Z',
+          type: 'user',
+          content: [{ text: 'Test' }],
+        },
+      ];
+
+      const summary = await service.generateSummary({ messages });
+
+      // Control chars removed, spaces normalized
+      expect(summary).toBe('Adddarkmode to app');
+      expect(summary).not.toContain('\x07'); // Bell
+      expect(summary).not.toContain('\x08'); // Backspace
+      expect(summary).not.toContain('\x0B'); // Vertical tab
+      expect(summary).not.toContain('\x0C'); // Form feed
+    });
+  });
 });
