@@ -911,7 +911,7 @@ async function getStoredOAuthToken(serverName: string): Promise<string | null> {
   if (!credentials) return null;
 
   const authProvider = new MCPOAuthProvider(tokenStorage);
-  return await authProvider.getValidToken(serverName, {
+  return authProvider.getValidToken(serverName, {
     // Pass client ID if available
     clientId: credentials.clientId,
   });
