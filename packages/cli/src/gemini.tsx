@@ -314,6 +314,14 @@ export async function main() {
   const argv = await parseArguments(settings.merged);
   parseArgsHandle?.end();
 
+  if (argv.modelFallback === false) {
+    settings.applyCliOverrides({
+      general: {
+        disableModelFallback: true,
+      },
+    });
+  }
+
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
     writeToStderr(

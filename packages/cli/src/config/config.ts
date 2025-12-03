@@ -72,6 +72,7 @@ export interface CliArgs {
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
+  modelFallback: boolean | undefined;
   recordResponses: string | undefined;
 }
 
@@ -236,6 +237,12 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
           hidden: true,
+        })
+        .option('model-fallback', {
+          type: 'boolean',
+          default: true,
+          description:
+            'Enable automatic fallback to Flash model on rate limit (use --no-model-fallback to disable).',
         })
         .deprecateOption(
           'prompt',

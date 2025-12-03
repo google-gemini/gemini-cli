@@ -205,6 +205,15 @@ const SETTINGS_SCHEMA = {
         description: 'Disable update notification prompts.',
         showInDialog: false,
       },
+      disableModelFallback: {
+        type: 'boolean',
+        label: 'Disable Model Fallback',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description: 'Disable automatic fallback to Flash model on rate limit.',
+        showInDialog: true,
+      },
       checkpointing: {
         type: 'object',
         label: 'Checkpointing',
