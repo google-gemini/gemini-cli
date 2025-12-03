@@ -1057,7 +1057,7 @@ export function SettingsDialog({
 
         {/* Scope Selection - conditionally visible based on height constraints */}
         {showScopeSelection && (
-          <Box marginTop={1} flexDirection="column">
+          <Box marginX={1} flexDirection="column">
             <Text bold={focusSection === 'scope'} wrap="truncate">
               {focusSection === 'scope' ? '> ' : '  '}Apply To
             </Text>
@@ -1075,15 +1075,19 @@ export function SettingsDialog({
         )}
 
         <Box height={1} />
-        <Text color={theme.text.secondary}>
-          (Use Enter to select
-          {showScopeSelection ? ', Tab to change focus' : ''}, Esc to close)
-        </Text>
-        {showRestartPrompt && (
-          <Text color={theme.status.warning}>
-            To see changes, Gemini CLI must be restarted. Press r to exit and
-            apply changes now.
+        <Box marginX={1}>
+          <Text color={theme.text.secondary}>
+            (Use Enter to select
+            {showScopeSelection ? ', Tab to change focus' : ''}, Esc to close)
           </Text>
+        </Box>
+        {showRestartPrompt && (
+          <Box marginX={1}>
+            <Text color={theme.status.warning}>
+              To see changes, Gemini CLI must be restarted. Press r to exit and
+              apply changes now.
+            </Text>
+          </Box>
         )}
       </Box>
     </Box>
