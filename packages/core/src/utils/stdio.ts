@@ -80,9 +80,9 @@ export function patchStdio(): () => void {
 /**
  * Creates proxies for process.stdout and process.stderr that use the real write methods
  * (writeToStdout and writeToStderr) bypassing any monkey patching.
- * This is used by Ink to render to the real output.
+ * This is used to write to the real output even when stdio is patched.
  */
-export function createInkStdio() {
+export function createWorkingStdio() {
   const inkStdout = new Proxy(process.stdout, {
     get(target, prop, receiver) {
       if (prop === 'write') {

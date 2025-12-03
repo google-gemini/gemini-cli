@@ -30,6 +30,7 @@ import {
   debugLogger,
   ReadManyFilesTool,
   getEffectiveModel,
+  createWorkingStdio,
   startupProfiler,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
@@ -51,14 +52,9 @@ export async function runZedIntegration(
   settings: LoadedSettings,
   argv: CliArgs,
 ) {
-  const stdout = Writable.toWeb(process.stdout) as WritableStream;
+  const { stdout: workingStdout } = createWorkingStdio();
+  const stdout = Writable.toWeb(workingStdout) as WritableStream;
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
-
-  // Stdout is used to send messages to the client, so console.log/console.info
-  // messages to stderr so that they don't interfere with ACP.
-  console.log = console.error;
-  console.info = console.error;
-  console.debug = console.error;
 
   new acp.AgentSideConnection(
     (client: acp.Client) => new GeminiAgent(config, settings, argv, client),
