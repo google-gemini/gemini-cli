@@ -52,7 +52,9 @@ export const copyCommand: SlashCommand = {
         return {
           type: 'message',
           messageType: 'error',
-          content: `Failed to copy to the clipboard. ${message}`,
+          content: `Failed to copy to the clipboard. ` +
+            `This may be blocked in remote sessions.\n` +
+            `(Error: ${message})`
         };
       }
     } else {
