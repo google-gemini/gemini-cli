@@ -1,4 +1,4 @@
-# Integration tests
+# Integration Tests
 
 This document provides information about the integration testing framework used
 in this project.
@@ -34,6 +34,33 @@ The integration tests can also be run using the following shortcut:
 ```bash
 npm run test:e2e
 ```
+
+## System Requirements
+
+Some integration tests require platform-specific tools to be available on your
+system:
+
+### Clipboard Tests
+
+The clipboard E2E tests (`clipboardUtils.e2e.test.ts`) require clipboard
+utilities:
+
+- **macOS**: Requires `osascript` and `pbpaste` (pre-installed)
+- **Linux**: Requires `xclip` or `xsel` clipboard utilities
+- **Windows**: Requires PowerShell (pre-installed)
+
+Install missing clipboard tools if you encounter skipped tests:
+
+```bash
+# Linux with apt
+sudo apt-get install xclip
+
+# Or alternative
+sudo apt-get install xsel
+```
+
+**Note**: Clipboard tests will be automatically skipped if the required tools
+are not available, with a warning message indicating the missing dependency.
 
 ## Running a specific set of tests
 
@@ -86,7 +113,7 @@ with the deflake script or workflow to make sure that it is not flaky.
 npm run deflake -- --runs=5 --command="npm run test:e2e -- -- --test-name-pattern '<your-new-test-name>'"
 ```
 
-#### Deflake workflow
+#### Deflake Workflow
 
 ```bash
 gh workflow run deflake.yml --ref <your-branch> -f test_name_pattern="<your-test-name-pattern>"
