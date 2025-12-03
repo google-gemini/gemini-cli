@@ -1081,8 +1081,8 @@
         "enableMessageBusIntegration": {
           "title": "Enable Message Bus Integration",
           "description": "Enable policy-based tool confirmation via message bus integration. When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.",
-          "markdownDescription": "Enable policy-based tool confirmation via message bus integration. When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Enable policy-based tool confirmation via message bus integration. When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "enableHooks": {
