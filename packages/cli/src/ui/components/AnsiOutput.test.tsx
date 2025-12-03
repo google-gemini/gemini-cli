@@ -33,33 +33,28 @@ describe('<AnsiOutputText />', () => {
     expect(lastFrame()).toBe('Hello, world!');
   });
 
-  it('correctly applies all the styles', () => {
-    const data: AnsiOutput = [
-      [
-        createAnsiToken({ text: 'Bold', bold: true }),
-        createAnsiToken({ text: 'Italic', italic: true }),
-        createAnsiToken({ text: 'Underline', underline: true }),
-        createAnsiToken({ text: 'Dim', dim: true }),
-        createAnsiToken({ text: 'Inverse', inverse: true }),
-      ],
-    ];
-    // Note: ink-testing-library doesn't render styles, so we can only check the text.
-    // We are testing that it renders without crashing.
+  // Note: ink-testing-library doesn't render styles, so we can only check the text.
+  // We are testing that it renders without crashing.
+  it.each([
+    { style: { bold: true }, text: 'Bold' },
+    { style: { italic: true }, text: 'Italic' },
+    { style: { underline: true }, text: 'Underline' },
+    { style: { dim: true }, text: 'Dim' },
+    { style: { inverse: true }, text: 'Inverse' },
+  ])('correctly applies style $text', ({ style, text }) => {
+    const data: AnsiOutput = [[createAnsiToken({ text, ...style })]];
     const { lastFrame } = render(<AnsiOutputText data={data} width={80} />);
-    expect(lastFrame()).toBe('BoldItalicUnderlineDimInverse');
+    expect(lastFrame()).toBe(text);
   });
 
-  it('correctly applies foreground and background colors', () => {
-    const data: AnsiOutput = [
-      [
-        createAnsiToken({ text: 'Red FG', fg: '#ff0000' }),
-        createAnsiToken({ text: 'Blue BG', bg: '#0000ff' }),
-      ],
-    ];
-    // Note: ink-testing-library doesn't render colors, so we can only check the text.
-    // We are testing that it renders without crashing.
+  it.each([
+    { color: { fg: '#ff0000' }, text: 'Red FG' },
+    { color: { bg: '#0000ff' }, text: 'Blue BG' },
+    { color: { fg: '#00ff00', bg: '#ff00ff' }, text: 'Green FG Magenta BG' },
+  ])('correctly applies color $text', ({ color, text }) => {
+    const data: AnsiOutput = [[createAnsiToken({ text, ...color })]];
     const { lastFrame } = render(<AnsiOutputText data={data} width={80} />);
-    expect(lastFrame()).toBe('Red FGBlue BG');
+    expect(lastFrame()).toBe(text);
   });
 
   it('handles empty lines and empty tokens', () => {

@@ -1,0 +1,22 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Notifications > renders init error 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Initialization Error: Something went wrong Please check API key and configuration.               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`Notifications > renders screen reader nudge when enabled and not seen 1`] = `
+"You are currently in screen reader-friendly view. To switch out, open
+/mock/home/.gemini/settings.json and remove the entry for "screenReader". This will disappear on
+next run."
+`;
+
+exports[`Notifications > renders update notification 1`] = `
+"
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Update available                                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;

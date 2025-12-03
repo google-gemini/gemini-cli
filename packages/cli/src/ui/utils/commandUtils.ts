@@ -6,6 +6,7 @@
 
 import { debugLogger } from '@google/gemini-cli-core';
 import clipboardy from 'clipboardy';
+import type { SlashCommand } from '../commands/types.js';
 
 /**
  * Checks if a query string potentially represents an '@' command.
@@ -72,3 +73,24 @@ export const getUrlOpenCommand = (): string => {
   }
   return openCmd;
 };
+
+/**
+ * Determines if a slash command should auto-execute when selected.
+ *
+ * All built-in commands have autoExecute explicitly set to true or false.
+ * Custom commands (.toml files) and extension commands without this flag
+ * will default to false (safe default - won't auto-execute).
+ *
+ * @param command The slash command to check
+ * @returns true if the command should auto-execute on Enter
+ */
+export function isAutoExecutableCommand(
+  command: SlashCommand | undefined,
+): boolean {
+  if (!command) {
+    return false;
+  }
+
+  // Simply return the autoExecute flag value, defaulting to false if undefined
+  return command.autoExecute ?? false;
+}

@@ -1,20 +1,17 @@
-# Gemini CLI: Quotas and Pricing
+# Gemini CLI: Quotas and pricing
 
-Gemini CLI offers a generous free tier that covers the use cases for many
-individual developers. For enterprise / professional usage, or if you need
-higher limits, there are multiple possible avenues depending on what type of
-account you use to authenticate.
+Gemini CLI offers a generous free tier that covers many individual developers'
+use cases. For enterprise or professional usage, or if you need higher limits,
+several options are available depending on your authentication account type.
 
-See [privacy and terms](./tos-privacy.md) for details on Privacy policy and
+See [privacy and terms](./tos-privacy.md) for details on the Privacy Policy and
 Terms of Service.
 
-> [!NOTE]
->
-> Published prices are list price; additional negotiated commercial discounting
-> may apply.
+> **Note:** Published prices are list price; additional negotiated commercial
+> discounting may apply.
 
-This article outlines the specific quotas and pricing applicable to the Gemini
-CLI when using different authentication methods.
+This article outlines the specific quotas and pricing applicable to Gemini CLI
+when using different authentication methods.
 
 Generally, there are three categories to choose from:
 
@@ -24,7 +21,7 @@ Generally, there are three categories to choose from:
 - Pay-As-You-Go: The most flexible option for professional use, long-running
   tasks, or when you need full control over your usage.
 
-## Free Usage
+## Free usage
 
 Your journey begins with a generous free tier, perfect for experimentation and
 light use.
@@ -44,7 +41,7 @@ Assist for individuals. This includes:
 Learn more at
 [Gemini Code Assist for Individuals Limits](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli).
 
-### Log in with Gemini API Key (Unpaid)
+### Log in with Gemini API Key (unpaid)
 
 If you are using a Gemini API key, you can also benefit from a free tier. This
 includes:
@@ -72,11 +69,9 @@ Learn more at
 If you use up your initial number of requests, you can continue to benefit from
 Gemini CLI by upgrading to one of the following subscriptions:
 
-- [Google AI Pro and AI Ultra](https://cloud.google.com/products/gemini/pricing)
-  by signing up at
-  [Set up Gemini Code Assist](https://goo.gle/set-up-gemini-code-assist). This
-  is recommended for individual developers. Quotas and pricing are based on a
-  fixed price subscription.
+- [Google AI Pro and AI Ultra](https://gemini.google/subscriptions/). This is
+  recommended for individual developers. Quotas and pricing are based on a fixed
+  price subscription.
 
   For predictable costs, you can log in with Google.
 
@@ -85,7 +80,8 @@ Gemini CLI by upgrading to one of the following subscriptions:
 
 - [Purchase a Gemini Code Assist Subscription through Google Cloud ](https://cloud.google.com/gemini/docs/codeassist/overview)
   by signing up in the Google Cloud console. Learn more at
-  [Set up Gemini Code Assist](https://cloud.google.com/gemini/docs/discover/set-up-gemini)
+  [Set up Gemini Code Assist](https://cloud.google.com/gemini/docs/discover/set-up-gemini).
+
   Quotas and pricing are based on a fixed price subscription with assigned
   license seats. For predictable costs, you can sign in with Google.
 
@@ -101,7 +97,7 @@ Gemini CLI by upgrading to one of the following subscriptions:
 
   [Learn more about Gemini Code Assist Standard and Enterprise license limits](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli).
 
-## Pay As You Go
+## Pay as you go
 
 If you hit your daily request limits or exhaust your Gemini Pro quota even after
 upgrading, the most flexible solution is to switch to a pay-as-you-go model,
@@ -131,7 +127,7 @@ It’s important to highlight that when using an API key, you pay per token/call
 This can be more expensive for many small calls with few tokens, but it's the
 only way to ensure your workflow isn't interrupted by quota limits.
 
-## Gemini for Workspace plans
+## Gemini for workspace plans
 
 These plans currently apply only to the use of Gemini web-based products
 provided by Google-based experiences (for example, the Gemini web app or the
@@ -139,7 +135,7 @@ Flow video editor). These plans do not apply to the API usage which powers the
 Gemini CLI. Supporting these plans is under active consideration for future
 support.
 
-## Tips to Avoid High Costs
+## Tips to avoid high costs
 
 When using a Pay as you Go API key, be mindful of your usage to avoid unexpected
 costs.

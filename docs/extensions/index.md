@@ -1,4 +1,4 @@
-# Gemini CLI Extensions
+# Gemini CLI extensions
 
 _This documentation is up-to-date with the v0.4.0 release._
 
@@ -54,10 +54,11 @@ gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release]
 
 ### Uninstalling an extension
 
-To uninstall, run `gemini extensions uninstall <name>`:
+To uninstall one or more extensions, run
+`gemini extensions uninstall <name...>`:
 
 ```
-gemini extensions uninstall gemini-cli-security
+gemini extensions uninstall gemini-cli-security gemini-cli-another-extension
 ```
 
 ### Disabling an extension

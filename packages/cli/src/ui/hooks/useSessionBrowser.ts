@@ -4,11 +4,114 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useState, useCallback } from 'react';
 import type { HistoryItemWithoutId } from '../types.js';
-import type { ConversationRecord } from '@google/gemini-cli-core';
+import * as fs from 'node:fs/promises';
+import path from 'node:path';
+import type {
+  Config,
+  ConversationRecord,
+  ResumedSessionData,
+} from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { partListUnionToString } from '@google/gemini-cli-core';
+import type { SessionInfo } from '../../utils/sessionUtils.js';
 import { MessageType, ToolCallStatus } from '../types.js';
+
+export const useSessionBrowser = (
+  config: Config,
+  onLoadHistory: (
+    uiHistory: HistoryItemWithoutId[],
+    clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
+    resumedSessionData: ResumedSessionData,
+  ) => void,
+) => {
+  const [isSessionBrowserOpen, setIsSessionBrowserOpen] = useState(false);
+
+  return {
+    isSessionBrowserOpen,
+
+    openSessionBrowser: useCallback(() => {
+      setIsSessionBrowserOpen(true);
+    }, []),
+
+    closeSessionBrowser: useCallback(() => {
+      setIsSessionBrowserOpen(false);
+    }, []),
+
+    /**
+     * Loads a conversation by ID, and reinitializes the chat recording service with it.
+     */
+    handleResumeSession: useCallback(
+      async (session: SessionInfo) => {
+        try {
+          const chatsDir = path.join(
+            config.storage.getProjectTempDir(),
+            'chats',
+          );
+
+          const fileName = session.fileName;
+
+          const originalFilePath = path.join(chatsDir, fileName);
+
+          // Load up the conversation.
+          const conversation: ConversationRecord = JSON.parse(
+            await fs.readFile(originalFilePath, 'utf8'),
+          );
+
+          // Use the old session's ID to continue it.
+          const existingSessionId = conversation.sessionId;
+          config.setSessionId(existingSessionId);
+
+          const resumedSessionData = {
+            conversation,
+            filePath: originalFilePath,
+          };
+
+          // We've loaded it; tell the UI about it.
+          setIsSessionBrowserOpen(false);
+          const historyData = convertSessionToHistoryFormats(
+            conversation.messages,
+          );
+          onLoadHistory(
+            historyData.uiHistory,
+            historyData.clientHistory,
+            resumedSessionData,
+          );
+        } catch (error) {
+          console.error('Error resuming session:', error);
+          setIsSessionBrowserOpen(false);
+        }
+      },
+      [config, onLoadHistory],
+    ),
+
+    /**
+     * Deletes a session by ID using the ChatRecordingService.
+     */
+    handleDeleteSession: useCallback(
+      (session: SessionInfo) => {
+        // Note: Chat sessions are stored on disk using a filename derived from
+        // the session, e.g. "session-<timestamp>-<sessionIdPrefix>.json".
+        // The ChatRecordingService.deleteSession API expects this file basename
+        // (without the ".json" extension), not the full session UUID.
+        try {
+          const chatRecordingService = config
+            .getGeminiClient()
+            ?.getChatRecordingService();
+          if (chatRecordingService) {
+            chatRecordingService.deleteSession(session.file);
+          }
+        } catch (error) {
+          console.error('Error deleting session:', error);
+          throw error;
+        }
+      },
+      [config],
+    ),
+  };
+};
+
 /**
  * Converts session/conversation data into UI history and Gemini client history formats.
  */
@@ -28,6 +131,15 @@ export function convertSessionToHistoryFormats(
       switch (msg.type) {
         case 'user':
           messageType = MessageType.USER;
+          break;
+        case 'info':
+          messageType = MessageType.INFO;
+          break;
+        case 'error':
+          messageType = MessageType.ERROR;
+          break;
+        case 'warning':
+          messageType = MessageType.WARNING;
           break;
         default:
           messageType = MessageType.GEMINI;
@@ -70,9 +182,9 @@ export function convertSessionToHistoryFormats(
 
   for (const msg of messages) {
     // Skip system/error messages and user slash commands
-    // if (msg.type === 'system' || msg.type === 'error') {
-    //   continue;
-    // }
+    if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
+      continue;
+    }
 
     if (msg.type === 'user') {
       // Skip user slash commands
@@ -91,8 +203,7 @@ export function convertSessionToHistoryFormats(
       });
     } else if (msg.type === 'gemini') {
       // Handle Gemini messages with potential tool calls
-      const hasToolCalls =
-        'toolCalls' in msg && msg.toolCalls && msg.toolCalls.length > 0;
+      const hasToolCalls = msg.toolCalls && msg.toolCalls.length > 0;
 
       if (hasToolCalls) {
         // Create model message with function calls

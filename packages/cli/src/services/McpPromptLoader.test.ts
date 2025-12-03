@@ -28,7 +28,7 @@ const mockPrompt = {
     { name: 'trail', required: false, description: "The animal's trail." },
   ],
   invoke: vi.fn().mockResolvedValue({
-    messages: [{ content: { text: 'Hello, world!' } }],
+    messages: [{ content: { type: 'text', text: 'Hello, world!' } }],
   }),
 };
 
@@ -172,6 +172,40 @@ describe('McpPromptLoader', () => {
       expect(commands).toHaveLength(1);
       expect(commands[0].name).toBe('test-prompt');
       expect(commands[0].description).toBe('A test prompt.');
+      expect(commands[0].kind).toBe(CommandKind.MCP_PROMPT);
+    });
+
+    it('should sanitize prompt names by replacing spaces with hyphens', async () => {
+      const mockPromptWithSpaces = {
+        ...mockPrompt,
+        name: 'Prompt Name',
+      };
+      vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([
+        mockPromptWithSpaces,
+      ]);
+
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+
+      expect(commands).toHaveLength(1);
+      expect(commands[0].name).toBe('Prompt-Name');
+      expect(commands[0].kind).toBe(CommandKind.MCP_PROMPT);
+    });
+
+    it('should trim whitespace from prompt names before sanitizing', async () => {
+      const mockPromptWithWhitespace = {
+        ...mockPrompt,
+        name: '  Prompt Name  ',
+      };
+      vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([
+        mockPromptWithWhitespace,
+      ]);
+
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+
+      expect(commands).toHaveLength(1);
+      expect(commands[0].name).toBe('Prompt-Name');
       expect(commands[0].kind).toBe(CommandKind.MCP_PROMPT);
     });
 

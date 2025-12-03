@@ -108,13 +108,17 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           selectedAuthType={itemForDisplay.selectedAuthType}
           gcpProject={itemForDisplay.gcpProject}
           ideClient={itemForDisplay.ideClient}
+          userEmail={itemForDisplay.userEmail}
         />
       )}
       {itemForDisplay.type === 'help' && commands && (
         <Help commands={commands} />
       )}
       {itemForDisplay.type === 'stats' && (
-        <StatsDisplay duration={itemForDisplay.duration} />
+        <StatsDisplay
+          duration={itemForDisplay.duration}
+          quotas={itemForDisplay.quotas}
+        />
       )}
       {itemForDisplay.type === 'model_stats' && <ModelStatsDisplay />}
       {itemForDisplay.type === 'tool_stats' && <ToolStatsDisplay />}

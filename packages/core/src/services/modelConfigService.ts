@@ -43,6 +43,7 @@ export interface ModelConfigAlias {
 
 export interface ModelConfigServiceConfig {
   aliases?: Record<string, ModelConfigAlias>;
+  customAliases?: Record<string, ModelConfigAlias>;
   overrides?: ModelConfigOverride[];
 }
 
@@ -56,8 +57,14 @@ export interface _ResolvedModelConfig {
 }
 
 export class ModelConfigService {
+  private readonly runtimeAliases: Record<string, ModelConfigAlias> = {};
+
   // TODO(12597): Process config to build a typed alias hierarchy.
   constructor(private readonly config: ModelConfigServiceConfig) {}
+
+  registerRuntimeModelConfig(aliasName: string, alias: ModelConfigAlias): void {
+    this.runtimeAliases[aliasName] = alias;
+  }
 
   private resolveAlias(
     aliasName: string,
@@ -98,13 +105,18 @@ export class ModelConfigService {
     generateContentConfig: GenerateContentConfig;
   } {
     const config = this.config || {};
-    const { aliases = {}, overrides = [] } = config;
+    const { aliases = {}, customAliases = {}, overrides = [] } = config;
+    const allAliases = {
+      ...aliases,
+      ...customAliases,
+      ...this.runtimeAliases,
+    };
     let baseModel: string | undefined = context.model;
     let resolvedConfig: GenerateContentConfig = {};
 
     // Step 1: Alias Resolution
-    if (aliases[context.model]) {
-      const resolvedAlias = this.resolveAlias(context.model, aliases);
+    if (allAliases[context.model]) {
+      const resolvedAlias = this.resolveAlias(context.model, allAliases);
       baseModel = resolvedAlias.modelConfig.model; // This can now be undefined
       resolvedConfig = this.deepMerge(
         resolvedConfig,

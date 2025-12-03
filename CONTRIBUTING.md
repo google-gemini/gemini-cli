@@ -1,4 +1,4 @@
-# How to Contribute
+# How to contribute
 
 We would love to accept your patches and contributions to this project. This
 document includes:

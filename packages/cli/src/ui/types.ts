@@ -12,6 +12,7 @@ import type {
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolResultDisplay,
+  RetrieveUserQuotaResponse,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
@@ -19,7 +20,7 @@ import { type ReactNode } from 'react';
 export type { ThoughtSummary };
 
 export enum AuthState {
-  // Attemtping to authenticate or re-authenticate
+  // Attempting to authenticate or re-authenticate
   Unauthenticated = 'unauthenticated',
   // Auth dialog is open for user to select auth method
   Updating = 'updating',
@@ -131,6 +132,7 @@ export type HistoryItemAbout = HistoryItemBase & {
   selectedAuthType: string;
   gcpProject: string;
   ideClient: string;
+  userEmail?: string;
 };
 
 export type HistoryItemHelp = HistoryItemBase & {
@@ -141,6 +143,7 @@ export type HistoryItemHelp = HistoryItemBase & {
 export type HistoryItemStats = HistoryItemBase & {
   type: 'stats';
   duration: string;
+  quotas?: RetrieveUserQuotaResponse;
 };
 
 export type HistoryItemModelStats = HistoryItemBase & {
@@ -302,6 +305,7 @@ export type Message =
       selectedAuthType: string;
       gcpProject: string;
       ideClient: string;
+      userEmail?: string;
       content?: string; // Optional content, not really used for ABOUT
     }
   | {

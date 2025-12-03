@@ -25,6 +25,7 @@ import { Config, type GeminiCLIExtension } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { SimpleExtensionLoader } from './extensionLoader.js';
 import { CoreEvent, coreEvents } from './events.js';
+import { debugLogger } from './debugLogger.js';
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -439,7 +440,7 @@ My code memory
 
   it('should respect the maxDirs parameter during downward scan', async () => {
     const consoleDebugSpy = vi
-      .spyOn(console, 'debug')
+      .spyOn(debugLogger, 'debug')
       .mockImplementation(() => {});
 
     // Create directories in parallel for better performance
@@ -469,7 +470,7 @@ My code memory
       expect.stringContaining('Scanning [1/1]:'),
     );
 
-    vi.mocked(console.debug).mockRestore();
+    consoleDebugSpy.mockRestore();
 
     const result = await loadServerHierarchicalMemory(
       cwd,
@@ -932,5 +933,44 @@ included directory memory
     );
     expect(config.getGeminiMdFilePaths()).equals(refreshResult.filePaths);
     expect(mockEventListener).toHaveBeenCalledExactlyOnceWith(refreshResult);
+  });
+
+  it('should include MCP instructions in user memory', async () => {
+    const mockConfig = {
+      getWorkingDir: vi.fn().mockReturnValue(cwd),
+      shouldLoadMemoryFromIncludeDirectories: vi.fn().mockReturnValue(false),
+      getDebugMode: vi.fn().mockReturnValue(false),
+      getFileService: vi
+        .fn()
+        .mockReturnValue(new FileDiscoveryService(projectRoot)),
+      getExtensionLoader: vi
+        .fn()
+        .mockReturnValue(new SimpleExtensionLoader([])),
+      isTrustedFolder: vi.fn().mockReturnValue(true),
+      getImportFormat: vi.fn().mockReturnValue('tree'),
+      getFileFilteringOptions: vi.fn().mockReturnValue(undefined),
+      getDiscoveryMaxDirs: vi.fn().mockReturnValue(200),
+      setUserMemory: vi.fn(),
+      setGeminiMdFileCount: vi.fn(),
+      setGeminiMdFilePaths: vi.fn(),
+      getMcpClientManager: vi.fn().mockReturnValue({
+        getMcpInstructions: vi
+          .fn()
+          .mockReturnValue(
+            "\n\n# Instructions for MCP Server 'extension-server'\nAlways be polite.",
+          ),
+      }),
+    } as unknown as Config;
+
+    await refreshServerHierarchicalMemory(mockConfig);
+
+    expect(mockConfig.setUserMemory).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "# Instructions for MCP Server 'extension-server'",
+      ),
+    );
+    expect(mockConfig.setUserMemory).toHaveBeenCalledWith(
+      expect.stringContaining('Always be polite.'),
+    );
   });
 });

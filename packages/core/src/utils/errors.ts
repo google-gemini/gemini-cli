@@ -117,3 +117,42 @@ function parseResponseData(error: GaxiosError): ResponseData {
   }
   return error.response?.data as ResponseData;
 }
+
+/**
+ * Checks if an error is a 401 authentication error.
+ * Uses structured error properties from MCP SDK errors.
+ *
+ * @param error The error to check
+ * @returns true if this is a 401/authentication error
+ */
+export function isAuthenticationError(error: unknown): boolean {
+  // Check for MCP SDK errors with code property
+  // (SseError and StreamableHTTPError both have numeric 'code' property)
+  if (error && typeof error === 'object' && 'code' in error) {
+    const errorCode = (error as { code: unknown }).code;
+    if (errorCode === 401) {
+      return true;
+    }
+  }
+
+  // Check for UnauthorizedError class (from MCP SDK or our own)
+  if (
+    error instanceof Error &&
+    error.constructor.name === 'UnauthorizedError'
+  ) {
+    return true;
+  }
+
+  if (error instanceof UnauthorizedError) {
+    return true;
+  }
+
+  // Fallback: Check for MCP SDK's plain Error messages with HTTP 401
+  // The SDK sometimes throws: new Error(`Error POSTing to endpoint (HTTP 401): ...`)
+  const message = getErrorMessage(error);
+  if (message.includes('401')) {
+    return true;
+  }
+
+  return false;
+}

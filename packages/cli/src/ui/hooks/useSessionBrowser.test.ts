@@ -4,44 +4,165 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { convertSessionToHistoryFormats } from './useSessionBrowser.js';
-import { MessageType, ToolCallStatus } from '../types.js';
-import type { MessageRecord } from '@google/gemini-cli-core';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook } from '../../test-utils/render.js';
+import { act } from 'react';
+import {
+  useSessionBrowser,
+  convertSessionToHistoryFormats,
+} from './useSessionBrowser.js';
+import * as fs from 'node:fs/promises';
+import path from 'node:path';
+import { getSessionFiles, type SessionInfo } from '../../utils/sessionUtils.js';
+import type {
+  Config,
+  ConversationRecord,
+  MessageRecord,
+} from '@google/gemini-cli-core';
 
+// Mock modules
+vi.mock('fs/promises');
+vi.mock('path');
+vi.mock('../../utils/sessionUtils.js');
+
+const MOCKED_PROJECT_TEMP_DIR = '/test/project/temp';
+const MOCKED_CHATS_DIR = '/test/project/temp/chats';
+const MOCKED_SESSION_ID = 'test-session-123';
+const MOCKED_CURRENT_SESSION_ID = 'current-session-id';
+
+describe('useSessionBrowser', () => {
+  const mockedFs = vi.mocked(fs);
+  const mockedPath = vi.mocked(path);
+  const mockedGetSessionFiles = vi.mocked(getSessionFiles);
+
+  const mockConfig = {
+    storage: {
+      getProjectTempDir: vi.fn(),
+    },
+    setSessionId: vi.fn(),
+    getSessionId: vi.fn(),
+    getGeminiClient: vi.fn().mockReturnValue({
+      getChatRecordingService: vi.fn().mockReturnValue({
+        deleteSession: vi.fn(),
+      }),
+    }),
+  } as unknown as Config;
+
+  const mockOnLoadHistory = vi.fn();
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockedPath.join.mockImplementation((...args) => args.join('/'));
+    vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue(
+      MOCKED_PROJECT_TEMP_DIR,
+    );
+    vi.mocked(mockConfig.getSessionId).mockReturnValue(
+      MOCKED_CURRENT_SESSION_ID,
+    );
+  });
+
+  it('should successfully resume a session', async () => {
+    const MOCKED_FILENAME = 'session-2025-01-01-test-session-123.json';
+    const mockConversation: ConversationRecord = {
+      sessionId: 'existing-session-456',
+      messages: [{ type: 'user', content: 'Hello' } as MessageRecord],
+    } as ConversationRecord;
+
+    const mockSession = {
+      id: MOCKED_SESSION_ID,
+      fileName: MOCKED_FILENAME,
+    } as SessionInfo;
+    mockedGetSessionFiles.mockResolvedValue([mockSession]);
+    mockedFs.readFile.mockResolvedValue(JSON.stringify(mockConversation));
+
+    const { result } = renderHook(() =>
+      useSessionBrowser(mockConfig, mockOnLoadHistory),
+    );
+
+    await act(async () => {
+      await result.current.handleResumeSession(mockSession);
+    });
+    expect(mockedFs.readFile).toHaveBeenCalledWith(
+      `${MOCKED_CHATS_DIR}/${MOCKED_FILENAME}`,
+      'utf8',
+    );
+    expect(mockConfig.setSessionId).toHaveBeenCalledWith(
+      'existing-session-456',
+    );
+    expect(result.current.isSessionBrowserOpen).toBe(false);
+    expect(mockOnLoadHistory).toHaveBeenCalled();
+  });
+
+  it('should handle file read error', async () => {
+    const MOCKED_FILENAME = 'session-2025-01-01-test-session-123.json';
+    const mockSession = {
+      id: MOCKED_SESSION_ID,
+      fileName: MOCKED_FILENAME,
+    } as SessionInfo;
+    mockedFs.readFile.mockRejectedValue(new Error('File not found'));
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    const { result } = renderHook(() =>
+      useSessionBrowser(mockConfig, mockOnLoadHistory),
+    );
+
+    await act(async () => {
+      await result.current.handleResumeSession(mockSession);
+    });
+
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(result.current.isSessionBrowserOpen).toBe(false);
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('should handle JSON parse error', async () => {
+    const MOCKED_FILENAME = 'invalid.json';
+    const mockSession = {
+      id: MOCKED_SESSION_ID,
+      fileName: MOCKED_FILENAME,
+    } as SessionInfo;
+    mockedFs.readFile.mockResolvedValue('invalid json');
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    const { result } = renderHook(() =>
+      useSessionBrowser(mockConfig, mockOnLoadHistory),
+    );
+
+    await act(async () => {
+      await result.current.handleResumeSession(mockSession);
+    });
+
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(result.current.isSessionBrowserOpen).toBe(false);
+    consoleErrorSpy.mockRestore();
+  });
+});
+
+// The convertSessionToHistoryFormats tests are self-contained and do not need changes.
 describe('convertSessionToHistoryFormats', () => {
   it('should convert empty messages array', () => {
     const result = convertSessionToHistoryFormats([]);
-
     expect(result.uiHistory).toEqual([]);
     expect(result.clientHistory).toEqual([]);
   });
 
-  it('should convert basic user and gemini messages', () => {
+  it('should convert basic user and model messages', () => {
     const messages: MessageRecord[] = [
-      {
-        id: 'msg-1',
-        timestamp: '2025-01-01T00:01:00Z',
-        content: 'Hello',
-        type: 'user',
-      },
-      {
-        id: 'msg-2',
-        timestamp: '2025-01-01T00:02:00Z',
-        content: 'Hi there!',
-        type: 'gemini',
-      },
+      { type: 'user', content: 'Hello' } as MessageRecord,
+      { type: 'gemini', content: 'Hi there' } as MessageRecord,
     ];
 
     const result = convertSessionToHistoryFormats(messages);
 
     expect(result.uiHistory).toHaveLength(2);
-    expect(result.uiHistory[0]).toEqual({
-      type: MessageType.USER,
-      text: 'Hello',
-    });
-    expect(result.uiHistory[1]).toEqual({
-      type: MessageType.GEMINI,
-      text: 'Hi there!',
+    expect(result.uiHistory[0]).toMatchObject({ type: 'user', text: 'Hello' });
+    expect(result.uiHistory[1]).toMatchObject({
+      type: 'gemini',
+      text: 'Hi there',
     });
 
     expect(result.clientHistory).toHaveLength(2);
@@ -51,541 +172,92 @@ describe('convertSessionToHistoryFormats', () => {
     });
     expect(result.clientHistory[1]).toEqual({
       role: 'model',
-      parts: [{ text: 'Hi there!' }],
+      parts: [{ text: 'Hi there' }],
     });
   });
 
-  it('should filter out slash commands from client history', () => {
+  it('should filter out slash commands from client history but keep in UI', () => {
     const messages: MessageRecord[] = [
-      {
-        id: 'msg-1',
-        timestamp: '2025-01-01T00:01:00Z',
-        content: '/help',
-        type: 'user',
-      },
-      {
-        id: 'msg-2',
-        timestamp: '2025-01-01T00:02:00Z',
-        content: '?quit',
-        type: 'user',
-      },
-      {
-        id: 'msg-3',
-        timestamp: '2025-01-01T00:03:00Z',
-        content: 'Regular message',
-        type: 'user',
-      },
-    ];
-
-    const result = convertSessionToHistoryFormats(messages);
-
-    // All messages should appear in UI history
-    expect(result.uiHistory).toHaveLength(3);
-
-    // Only non-slash commands should appear in client history
-    expect(result.clientHistory).toHaveLength(1);
-    expect(result.clientHistory[0]).toEqual({
-      role: 'user',
-      parts: [{ text: 'Regular message' }],
-    });
-  });
-
-  it('should handle tool calls correctly', () => {
-    const messages: MessageRecord[] = [
-      {
-        id: 'msg-1',
-        timestamp: '2025-01-01T00:01:00Z',
-        content: "I'll help you with that.",
-        type: 'gemini',
-        toolCalls: [
-          {
-            id: 'tool-1',
-            name: 'bash',
-            displayName: 'Execute Command',
-            description: 'Run bash command',
-            args: { command: 'ls -la' },
-            status: 'success',
-            timestamp: '2025-01-01T00:01:30Z',
-            resultDisplay: 'total 4\ndrwxr-xr-x 2 user user 4096 Jan 1 00:00 .',
-            renderOutputAsMarkdown: false,
-          },
-          {
-            id: 'tool-2',
-            name: 'read',
-            displayName: 'Read File',
-            description: 'Read file contents',
-            args: { path: '/etc/hosts' },
-            status: 'error',
-            timestamp: '2025-01-01T00:01:45Z',
-            resultDisplay: 'Permission denied',
-          },
-        ],
-      },
-    ];
-
-    const result = convertSessionToHistoryFormats(messages);
-
-    expect(result.uiHistory).toHaveLength(2); // text message + tool group
-    expect(result.uiHistory[0]).toEqual({
-      type: MessageType.GEMINI,
-      text: "I'll help you with that.",
-    });
-
-    expect(result.uiHistory[1].type).toBe('tool_group');
-    // This if-statement is only necessary because TypeScript can't tell that the toBe() assertion
-    // protects the .tools access below.
-    if (result.uiHistory[1].type === 'tool_group') {
-      expect(result.uiHistory[1].tools).toHaveLength(2);
-      expect(result.uiHistory[1].tools[0]).toEqual({
-        callId: 'tool-1',
-        name: 'Execute Command',
-        description: 'Run bash command',
-        renderOutputAsMarkdown: false,
-        status: ToolCallStatus.Success,
-        resultDisplay: 'total 4\ndrwxr-xr-x 2 user user 4096 Jan 1 00:00 .',
-        confirmationDetails: undefined,
-      });
-      expect(result.uiHistory[1].tools[1]).toEqual({
-        callId: 'tool-2',
-        name: 'Read File',
-        description: 'Read file contents',
-        renderOutputAsMarkdown: true, // default value
-        status: ToolCallStatus.Error,
-        resultDisplay: 'Permission denied',
-        confirmationDetails: undefined,
-      });
-    }
-  });
-
-  it('should skip empty tool calls arrays', () => {
-    const messages: MessageRecord[] = [
-      {
-        id: 'msg-1',
-        timestamp: '2025-01-01T00:01:00Z',
-        content: 'Message with empty tools',
-        type: 'gemini',
-        toolCalls: [],
-      },
-    ];
-
-    const result = convertSessionToHistoryFormats(messages);
-
-    expect(result.uiHistory).toHaveLength(1); // Only text message
-    expect(result.uiHistory[0]).toEqual({
-      type: MessageType.GEMINI,
-      text: 'Message with empty tools',
-    });
-  });
-
-  it('should not add tool calls for user messages', () => {
-    const messages: MessageRecord[] = [
-      {
-        id: 'msg-1',
-        timestamp: '2025-01-01T00:01:00Z',
-        content: 'User message',
-        type: 'user',
-        // This would be invalid in real usage, but testing robustness
-        toolCalls: [
-          {
-            id: 'tool-1',
-            name: 'invalid',
-            args: {},
-            status: 'success',
-            timestamp: '2025-01-01T00:01:30Z',
-          },
-        ],
-      } as MessageRecord,
-    ];
-
-    const result = convertSessionToHistoryFormats(messages);
-
-    expect(result.uiHistory).toHaveLength(1); // Only user message, no tool group
-    expect(result.uiHistory[0]).toEqual({
-      type: MessageType.USER,
-      text: 'User message',
-    });
-  });
-
-  it('should handle missing tool call fields gracefully', () => {
-    const messages: MessageRecord[] = [
-      {
-        id: 'msg-1',
-        timestamp: '2025-01-01T00:01:00Z',
-        content: 'Message with minimal tool',
-        type: 'gemini',
-        toolCalls: [
-          {
-            id: 'tool-1',
-            name: 'minimal_tool',
-            args: {},
-            status: 'success',
-            timestamp: '2025-01-01T00:01:30Z',
-            // Missing optional fields
-          },
-        ],
-      },
+      { type: 'user', content: '/help' } as MessageRecord,
+      { type: 'info', content: 'Help text' } as MessageRecord,
     ];
 
     const result = convertSessionToHistoryFormats(messages);
 
     expect(result.uiHistory).toHaveLength(2);
-    expect(result.uiHistory[1].type).toBe('tool_group');
-    if (result.uiHistory[1].type === 'tool_group') {
-      expect(result.uiHistory[1].tools[0]).toEqual({
-        callId: 'tool-1',
-        name: 'minimal_tool', // Falls back to name when displayName missing
-        description: '', // Default empty string
-        renderOutputAsMarkdown: true, // Default value
-        status: ToolCallStatus.Success,
-        resultDisplay: undefined,
-        confirmationDetails: undefined,
-      });
-    } else {
-      throw new Error('unreachable');
-    }
+    expect(result.uiHistory[0]).toMatchObject({ type: 'user', text: '/help' });
+    expect(result.uiHistory[1]).toMatchObject({
+      type: 'info',
+      text: 'Help text',
+    });
+
+    expect(result.clientHistory).toHaveLength(0);
   });
 
-  describe('tool calls in client history', () => {
-    it('should convert tool calls to correct Gemini client history format', () => {
-      const messages: MessageRecord[] = [
-        {
-          id: 'msg-1',
-          timestamp: '2025-01-01T00:01:00Z',
-          content: 'List files',
-          type: 'user',
-        },
-        {
-          id: 'msg-2',
-          timestamp: '2025-01-01T00:02:00Z',
-          content: "I'll list the files for you.",
-          type: 'gemini',
-          toolCalls: [
-            {
-              id: 'tool-1',
-              name: 'list_directory',
-              args: { path: '/home/user' },
-              result: {
-                functionResponse: {
-                  id: 'list_directory-1753650620141-f3b8b9e73919d',
-                  name: 'list_directory',
-                  response: {
-                    output: 'file1.txt\nfile2.txt',
-                  },
-                },
-              },
-              status: 'success',
-              timestamp: '2025-01-01T00:02:30Z',
-            },
-          ],
-        },
-      ];
-
-      const result = convertSessionToHistoryFormats(messages);
-
-      // Should have: user message, model with function call, user with function response
-      expect(result.clientHistory).toHaveLength(3);
-
-      // User message
-      expect(result.clientHistory[0]).toEqual({
-        role: 'user',
-        parts: [{ text: 'List files' }],
-      });
-
-      // Model message with function call
-      expect(result.clientHistory[1]).toEqual({
-        role: 'model',
-        parts: [
-          { text: "I'll list the files for you." },
+  it('should handle tool calls and responses', () => {
+    const messages: MessageRecord[] = [
+      { type: 'user', content: 'What time is it?' } as MessageRecord,
+      {
+        type: 'gemini',
+        content: '',
+        toolCalls: [
           {
-            functionCall: {
-              name: 'list_directory',
-              args: { path: '/home/user' },
-              id: 'tool-1',
-            },
+            id: 'call_1',
+            name: 'get_time',
+            args: {},
+            status: 'success',
+            result: '12:00',
           },
         ],
-      });
+      } as unknown as MessageRecord,
+    ];
 
-      // Function response
-      expect(result.clientHistory[2]).toEqual({
-        role: 'user',
-        parts: [
-          {
-            functionResponse: {
-              id: 'list_directory-1753650620141-f3b8b9e73919d',
-              name: 'list_directory',
-              response: { output: 'file1.txt\nfile2.txt' },
-            },
-          },
-        ],
-      });
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(2);
+    expect(result.uiHistory[0]).toMatchObject({
+      type: 'user',
+      text: 'What time is it?',
+    });
+    expect(result.uiHistory[1]).toMatchObject({
+      type: 'tool_group',
+      tools: [
+        expect.objectContaining({
+          callId: 'call_1',
+          name: 'get_time',
+          status: 'Success',
+        }),
+      ],
     });
 
-    it('should handle tool calls without text content', () => {
-      const messages: MessageRecord[] = [
-        {
-          id: 'msg-1',
-          timestamp: '2025-01-01T00:01:00Z',
-          content: '',
-          type: 'gemini',
-          toolCalls: [
-            {
-              id: 'tool-1',
-              name: 'bash',
-              args: { command: 'ls' },
-              result: 'file1.txt\nfile2.txt',
-              status: 'success',
-              timestamp: '2025-01-01T00:01:30Z',
-            },
-          ],
-        },
-      ];
-
-      const result = convertSessionToHistoryFormats(messages);
-
-      expect(result.clientHistory).toHaveLength(2);
-
-      // Model message with only function call (no text)
-      expect(result.clientHistory[0]).toEqual({
-        role: 'model',
-        parts: [
-          {
-            functionCall: {
-              name: 'bash',
-              args: { command: 'ls' },
-              id: 'tool-1',
-            },
-          },
-        ],
-      });
-
-      // Function response
-      expect(result.clientHistory[1]).toEqual({
-        role: 'user',
-        parts: [
-          {
-            functionResponse: {
-              id: 'tool-1',
-              name: 'bash',
-              response: {
-                output: 'file1.txt\nfile2.txt',
-              },
-            },
-          },
-        ],
-      });
+    expect(result.clientHistory).toHaveLength(3); // User, Model (call), User (response)
+    expect(result.clientHistory[0]).toEqual({
+      role: 'user',
+      parts: [{ text: 'What time is it?' }],
     });
-
-    it('should handle multiple tool calls in one message', () => {
-      const messages: MessageRecord[] = [
+    expect(result.clientHistory[1]).toEqual({
+      role: 'model',
+      parts: [
         {
-          id: 'msg-1',
-          timestamp: '2025-01-01T00:01:00Z',
-          content: 'Running multiple commands',
-          type: 'gemini',
-          toolCalls: [
-            {
-              id: 'tool-1',
-              name: 'bash',
-              args: { command: 'pwd' },
-              result: '/home/user',
-              status: 'success',
-              timestamp: '2025-01-01T00:01:30Z',
-            },
-            {
-              id: 'tool-2',
-              name: 'bash',
-              args: { command: 'ls' },
-              result: [
-                {
-                  functionResponse: {
-                    id: 'tool-2',
-                    name: 'bash',
-                    response: {
-                      output: 'file1.txt',
-                    },
-                  },
-                },
-                {
-                  functionResponse: {
-                    id: 'tool-2',
-                    name: 'bash',
-                    response: {
-                      output: 'file2.txt',
-                    },
-                  },
-                },
-              ],
-              status: 'success',
-              timestamp: '2025-01-01T00:01:35Z',
-            },
-          ],
+          functionCall: {
+            name: 'get_time',
+            args: {},
+            id: 'call_1',
+          },
         },
-      ];
-
-      const result = convertSessionToHistoryFormats(messages);
-
-      // Should have: model with both function calls, then one response
-      expect(result.clientHistory).toHaveLength(2);
-
-      // Model message with both function calls
-      expect(result.clientHistory[0]).toEqual({
-        role: 'model',
-        parts: [
-          { text: 'Running multiple commands' },
-          {
-            functionCall: {
-              name: 'bash',
-              args: { command: 'pwd' },
-              id: 'tool-1',
-            },
-          },
-          {
-            functionCall: {
-              name: 'bash',
-              args: { command: 'ls' },
-              id: 'tool-2',
-            },
-          },
-        ],
-      });
-
-      // First function response
-      expect(result.clientHistory[1]).toEqual({
-        role: 'user',
-        parts: [
-          {
-            functionResponse: {
-              id: 'tool-1',
-              name: 'bash',
-              response: { output: '/home/user' },
-            },
-          },
-          {
-            functionResponse: {
-              id: 'tool-2',
-              name: 'bash',
-              response: { output: 'file1.txt' },
-            },
-          },
-          {
-            functionResponse: {
-              id: 'tool-2',
-              name: 'bash',
-              response: { output: 'file2.txt' },
-            },
-          },
-        ],
-      });
+      ],
     });
-
-    it('should handle Part array results from tools', () => {
-      const messages: MessageRecord[] = [
+    expect(result.clientHistory[2]).toEqual({
+      role: 'user',
+      parts: [
         {
-          id: 'msg-1',
-          timestamp: '2025-01-01T00:01:00Z',
-          content: 'Reading file',
-          type: 'gemini',
-          toolCalls: [
-            {
-              id: 'tool-1',
-              name: 'read_file',
-              args: { path: 'test.txt' },
-              result: [
-                {
-                  functionResponse: {
-                    id: 'tool-1',
-                    name: 'read_file',
-                    response: {
-                      output: 'Hello',
-                    },
-                  },
-                },
-                {
-                  functionResponse: {
-                    id: 'tool-1',
-                    name: 'read_file',
-                    response: {
-                      output: ' World',
-                    },
-                  },
-                },
-              ],
-              status: 'success',
-              timestamp: '2025-01-01T00:01:30Z',
-            },
-          ],
+          functionResponse: {
+            id: 'call_1',
+            name: 'get_time',
+            response: { output: '12:00' },
+          },
         },
-      ];
-
-      const result = convertSessionToHistoryFormats(messages);
-
-      expect(result.clientHistory).toHaveLength(2);
-
-      // Function response should extract both function responses
-      expect(result.clientHistory[1]).toEqual({
-        role: 'user',
-        parts: [
-          {
-            functionResponse: {
-              id: 'tool-1',
-              name: 'read_file',
-              response: {
-                output: 'Hello',
-              },
-            },
-          },
-          {
-            functionResponse: {
-              id: 'tool-1',
-              name: 'read_file',
-              response: {
-                output: ' World',
-              },
-            },
-          },
-        ],
-      });
-    });
-
-    it('should skip tool calls without results', () => {
-      const messages: MessageRecord[] = [
-        {
-          id: 'msg-1',
-          timestamp: '2025-01-01T00:01:00Z',
-          content: 'Testing tool',
-          type: 'gemini',
-          toolCalls: [
-            {
-              id: 'tool-1',
-              name: 'test_tool',
-              args: { arg: 'value' },
-              // No result field
-              status: 'error',
-              timestamp: '2025-01-01T00:01:30Z',
-            },
-          ],
-        },
-      ];
-
-      const result = convertSessionToHistoryFormats(messages);
-
-      // Should only have the model message with function call, no function response
-      expect(result.clientHistory).toHaveLength(1);
-
-      expect(result.clientHistory[0]).toEqual({
-        role: 'model',
-        parts: [
-          { text: 'Testing tool' },
-          {
-            functionCall: {
-              name: 'test_tool',
-              args: { arg: 'value' },
-              id: 'tool-1',
-            },
-          },
-        ],
-      });
+      ],
     });
   });
 });

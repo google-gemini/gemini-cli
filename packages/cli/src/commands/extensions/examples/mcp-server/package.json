@@ -12,7 +12,7 @@
     "@types/node": "^20.11.25"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.11.0",
+    "@modelcontextprotocol/sdk": "^1.23.0",
     "zod": "^3.22.4"
   }
 }

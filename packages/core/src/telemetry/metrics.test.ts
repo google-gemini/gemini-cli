@@ -1342,5 +1342,115 @@ describe('Telemetry Metrics', () => {
         expect(mockHistogramRecordFn).not.toHaveBeenCalled();
       });
     });
+
+    describe('recordHookCallMetrics', () => {
+      let recordHookCallMetricsModule: typeof import('./metrics.js').recordHookCallMetrics;
+
+      beforeEach(async () => {
+        recordHookCallMetricsModule = (await import('./metrics.js'))
+          .recordHookCallMetrics;
+      });
+
+      it('should record hook call metrics with counter and histogram', () => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
+        mockHistogramRecordFn.mockClear();
+
+        recordHookCallMetricsModule(
+          mockConfig,
+          'BeforeTool',
+          'test-hook',
+          150,
+          true,
+        );
+
+        // Verify counter recorded
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          hook_event_name: 'BeforeTool',
+          hook_name: 'test-hook',
+          success: true,
+        });
+
+        // Verify histogram recorded
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(150, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          hook_event_name: 'BeforeTool',
+          hook_name: 'test-hook',
+          success: true,
+        });
+      });
+
+      it('should always sanitize hook names regardless of content', () => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
+
+        // Test with a command that has sensitive information
+        recordHookCallMetricsModule(
+          mockConfig,
+          'BeforeTool',
+          '/path/to/.gemini/hooks/check-secrets.sh --api-key=abc123',
+          150,
+          true,
+        );
+
+        // Verify hook name is sanitized (detailed sanitization tested in hook-call-event.test.ts)
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          hook_event_name: 'BeforeTool',
+          hook_name: 'check-secrets.sh', // Sanitized
+          success: true,
+        });
+      });
+
+      it('should track both success and failure', () => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
+
+        // Success case
+        recordHookCallMetricsModule(
+          mockConfig,
+          'BeforeTool',
+          'test-hook',
+          100,
+          true,
+        );
+
+        expect(mockCounterAddFn).toHaveBeenNthCalledWith(
+          1,
+          1,
+          expect.objectContaining({
+            hook_event_name: 'BeforeTool',
+            hook_name: 'test-hook',
+            success: true,
+          }),
+        );
+
+        // Failure case
+        recordHookCallMetricsModule(
+          mockConfig,
+          'AfterTool',
+          'test-hook',
+          150,
+          false,
+        );
+
+        expect(mockCounterAddFn).toHaveBeenNthCalledWith(
+          2,
+          1,
+          expect.objectContaining({
+            hook_event_name: 'AfterTool',
+            hook_name: 'test-hook',
+            success: false,
+          }),
+        );
+      });
+    });
   });
 });

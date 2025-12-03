@@ -48,6 +48,10 @@ import { ShellToolInvocation } from '../tools/shell.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import {
+  fireToolNotificationHook,
+  executeToolWithHooks,
+} from './coreToolHookTriggers.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -329,7 +333,6 @@ interface CoreToolSchedulerOptions {
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
   getPreferredEditor: () => EditorType | undefined;
-  onEditorClose: () => void;
 }
 
 export class CoreToolScheduler {
@@ -346,7 +349,6 @@ export class CoreToolScheduler {
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
-  private onEditorClose: () => void;
   private isFinalizingToolCalls = false;
   private isScheduling = false;
   private isCancelling = false;
@@ -365,7 +367,6 @@ export class CoreToolScheduler {
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
-    this.onEditorClose = options.onEditorClose;
 
     // Subscribe to message bus for ASK_USER policy decisions
     // Use a static WeakMap to ensure we only subscribe ONCE per MessageBus instance
@@ -870,6 +871,13 @@ export class CoreToolScheduler {
             );
             this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
           } else {
+            // Fire Notification hook before showing confirmation to user
+            const messageBus = this.config.getMessageBus();
+            const hooksEnabled = this.config.getEnableHooks();
+            if (hooksEnabled && messageBus) {
+              await fireToolNotificationHook(messageBus, confirmationDetails);
+            }
+
             // Allow IDE to resolve confirmation
             if (
               confirmationDetails.type === 'edit' &&
@@ -995,7 +1003,6 @@ export class CoreToolScheduler {
           modifyContext as ModifyContext<typeof waitingToolCall.request.args>,
           editorType,
           signal,
-          this.onEditorClose,
           contentOverrides,
         );
         this.setArgsInternal(callId, updatedParams);
@@ -1107,6 +1114,8 @@ export class CoreToolScheduler {
             : undefined;
 
         const shellExecutionConfig = this.config.getShellExecutionConfig();
+        const hooksEnabled = this.config.getEnableHooks();
+        const messageBus = this.config.getMessageBus();
 
         await runInDevTraceSpan(
           {
@@ -1131,15 +1140,23 @@ export class CoreToolScheduler {
                 );
                 this.notifyToolCallsUpdate();
               };
-              promise = invocation.execute(
+              promise = executeToolWithHooks(
+                invocation,
+                toolName,
                 signal,
+                messageBus,
+                hooksEnabled,
                 liveOutputCallback,
                 shellExecutionConfig,
                 setPidCallback,
               );
             } else {
-              promise = invocation.execute(
+              promise = executeToolWithHooks(
+                invocation,
+                toolName,
                 signal,
+                messageBus,
+                hooksEnabled,
                 liveOutputCallback,
                 shellExecutionConfig,
               );

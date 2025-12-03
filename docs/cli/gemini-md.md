@@ -1,4 +1,4 @@
-# Provide Context with GEMINI.md Files
+# Provide context with GEMINI.md files
 
 Context files, which use the default name `GEMINI.md`, are a powerful feature
 for providing instructional context to the Gemini model. You can use these files

@@ -13,6 +13,10 @@ import path from 'node:path';
 import * as os from 'node:os';
 import { debugLogger } from '@google/gemini-cli-core';
 
+vi.mock('../utils.js', () => ({
+  exitCli: vi.fn(),
+}));
+
 describe('extensions validate command', () => {
   it('should fail if no path is provided', () => {
     const validationParser = yargs([]).command(validateCommand).fail(false);

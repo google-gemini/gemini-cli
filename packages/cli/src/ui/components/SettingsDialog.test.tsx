@@ -48,6 +48,7 @@ enum TerminalKeys {
   LEFT_ARROW = '\u001B[D',
   RIGHT_ARROW = '\u001B[C',
   ESCAPE = '\u001B',
+  BACKSPACE = '\u0008',
 }
 
 const createMockSettings = (
@@ -1099,6 +1100,195 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(onSelect).toHaveBeenCalledWith(undefined, 'User');
+      });
+
+      unmount();
+    });
+  });
+
+  describe('Search Functionality', () => {
+    it('should enter search mode when "/" is pressed', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      // Wait for initial render and verify that search is not active
+      await waitFor(() => {
+        expect(lastFrame()).not.toContain('> Search:');
+      });
+      expect(lastFrame()).toContain('(press / to search)');
+
+      // Press '/' to enter search mode
+      act(() => {
+        stdin.write('/');
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Search:');
+        expect(lastFrame()).not.toContain('(press / to search)');
+      });
+
+      unmount();
+    });
+
+    it('should show search query and filter settings as user types', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      // Enter search mode
+      act(() => {
+        stdin.write('/');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Search:');
+      });
+
+      // Type "vim"
+      act(() => {
+        stdin.write('yolo');
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Search: yolo');
+        expect(lastFrame()).toContain('Disable YOLO Mode'); // Should be filtered to show Vim Mode
+      });
+
+      unmount();
+    });
+
+    it('should exit search mode when Escape is pressed', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      act(() => {
+        stdin.write('/');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Search:');
+      });
+
+      act(() => {
+        stdin.write('vim');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Search: vim');
+      });
+
+      // Press Escape
+      act(() => {
+        stdin.write(TerminalKeys.ESCAPE);
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).not.toContain('> Search:');
+        expect(lastFrame()).toContain('(press / to search)');
+        expect(lastFrame()).toContain('Vim Mode'); // All settings should be visible again
+        expect(lastFrame()).toContain('Disable Auto Update'); // All settings should be visible again
+      });
+
+      unmount();
+    });
+
+    it('should handle backspace to modify search query', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      act(() => {
+        stdin.write('/');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Search:');
+      });
+
+      act(() => {
+        stdin.write('vimm');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Search: vimm');
+      });
+
+      // Press backspace
+      act(() => {
+        stdin.write(TerminalKeys.BACKSPACE);
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Search: vim');
+        expect(lastFrame()).toContain('Vim Mode');
+        expect(lastFrame()).not.toContain(
+          'Codebase Investigator Max Num Turns',
+        );
+      });
+
+      unmount();
+    });
+
+    it('should clear search query and show all settings when exiting search mode', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      act(() => {
+        stdin.write('/');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Search:');
+      });
+
+      act(() => {
+        stdin.write('test');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Search: test');
+      });
+
+      // Press Escape
+      act(() => {
+        stdin.write(TerminalKeys.ESCAPE);
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).not.toContain('> Search:');
+        expect(lastFrame()).toContain('(press / to search)');
+        expect(lastFrame()).toContain('Vim Mode');
+        expect(lastFrame()).toContain('Disable Auto Update');
+      });
+
+      unmount();
+    });
+
+    it('should display "No matches found." when search yields no results', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      // Enter search mode
+      act(() => {
+        stdin.write('/');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Search:');
+      });
+
+      // Type a search query that won't match any settings
+      act(() => {
+        stdin.write('nonexistentsetting');
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('> Search: nonexistentsetting');
+        expect(lastFrame()).toContain('No matches found.');
+        expect(lastFrame()).not.toContain('Vim Mode'); // Should not contain any settings
+        expect(lastFrame()).not.toContain('Disable Auto Update'); // Should not contain any settings
       });
 
       unmount();

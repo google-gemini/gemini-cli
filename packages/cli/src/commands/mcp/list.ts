@@ -17,6 +17,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 const COLOR_GREEN = '\u001b[32m';
 const COLOR_YELLOW = '\u001b[33m';
@@ -87,7 +88,7 @@ async function getServerStatus(
   server: MCPServerConfig,
 ): Promise<MCPServerStatus> {
   // Test all server types by attempting actual connection
-  return await testMCPConnection(serverName, server);
+  return testMCPConnection(serverName, server);
 }
 
 export async function listMcpServers(): Promise<void> {
@@ -145,5 +146,6 @@ export const listCommand: CommandModule = {
   describe: 'List all configured MCP servers',
   handler: async () => {
     await listMcpServers();
+    await exitCli();
   },
 };

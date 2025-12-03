@@ -183,7 +183,8 @@ describe('useSlashCompletion', () => {
         createTestCommand({
           name: 'stats',
           altNames: ['usage'],
-          description: 'check session stats. Usage: /stats [model|tools]',
+          description:
+            'check session stats. Usage: /stats [session|model|tools]',
         }),
         createTestCommand({ name: 'clear', description: 'Clear the screen' }),
         createTestCommand({
@@ -282,7 +283,8 @@ describe('useSlashCompletion', () => {
         createTestCommand({
           name: 'stats',
           altNames: ['usage'],
-          description: 'check session stats. Usage: /stats [model|tools]',
+          description:
+            'check session stats. Usage: /stats [session|model|tools]',
         }),
       ];
       let result: {
@@ -293,7 +295,7 @@ describe('useSlashCompletion', () => {
         const hook = renderHook(() =>
           useTestHarnessForSlashCompletion(
             true,
-            '/usag',
+            '/usage',
             slashCommands,
             mockCommandContext,
           ),
@@ -307,7 +309,8 @@ describe('useSlashCompletion', () => {
           {
             label: 'stats',
             value: 'stats',
-            description: 'check session stats. Usage: /stats [model|tools]',
+            description:
+              'check session stats. Usage: /stats [session|model|tools]',
             commandKind: CommandKind.BUILT_IN,
           },
         ]);
@@ -360,7 +363,8 @@ describe('useSlashCompletion', () => {
           createTestCommand({
             name: 'stats',
             altNames: ['usage'],
-            description: 'check session stats. Usage: /stats [model|tools]',
+            description:
+              'check session stats. Usage: /stats [session|model|tools]',
             action: vi.fn(),
           }),
         ];

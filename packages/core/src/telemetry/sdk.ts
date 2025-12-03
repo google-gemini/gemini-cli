@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { DiagConsoleLogger, DiagLogLevel, diag } from '@opentelemetry/api';
+import {
+  DiagLogLevel,
+  diag,
+  trace,
+  context,
+  metrics,
+  propagation,
+} from '@opentelemetry/api';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-grpc';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-grpc';
@@ -28,6 +35,7 @@ import {
   PeriodicExportingMetricReader,
 } from '@opentelemetry/sdk-metrics';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
+import type { JWTInput } from 'google-auth-library';
 import type { Config } from '../config/config.js';
 import { SERVICE_NAME } from './constants.js';
 import { initializeMetrics } from './metrics.js';
@@ -44,15 +52,64 @@ import {
 } from './gcp-exporters.js';
 import { TelemetryTarget } from './index.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { authEvents } from '../code_assist/oauth2.js';
 
 // For troubleshooting, set the log level to DiagLogLevel.DEBUG
-diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
+class DiagLoggerAdapter {
+  error(message: string, ...args: unknown[]): void {
+    debugLogger.error(message, ...args);
+  }
+
+  warn(message: string, ...args: unknown[]): void {
+    debugLogger.warn(message, ...args);
+  }
+
+  info(message: string, ...args: unknown[]): void {
+    debugLogger.log(message, ...args);
+  }
+
+  debug(message: string, ...args: unknown[]): void {
+    debugLogger.debug(message, ...args);
+  }
+
+  verbose(message: string, ...args: unknown[]): void {
+    debugLogger.debug(message, ...args);
+  }
+}
+
+diag.setLogger(new DiagLoggerAdapter(), DiagLogLevel.INFO);
 
 let sdk: NodeSDK | undefined;
 let telemetryInitialized = false;
+let callbackRegistered = false;
+let authListener: ((newCredentials: JWTInput) => Promise<void>) | undefined =
+  undefined;
+const telemetryBuffer: Array<() => void | Promise<void>> = [];
 
 export function isTelemetrySdkInitialized(): boolean {
   return telemetryInitialized;
+}
+
+export function bufferTelemetryEvent(fn: () => void | Promise<void>): void {
+  if (telemetryInitialized) {
+    fn();
+  } else {
+    telemetryBuffer.push(fn);
+  }
+}
+
+async function flushTelemetryBuffer(): Promise<void> {
+  if (!telemetryInitialized) return;
+  while (telemetryBuffer.length > 0) {
+    const fn = telemetryBuffer.shift();
+    if (fn) {
+      try {
+        await fn();
+      } catch (e) {
+        debugLogger.error('Error executing buffered telemetry event', e);
+      }
+    }
+  }
 }
 
 function parseOtlpEndpoint(
@@ -80,8 +137,43 @@ function parseOtlpEndpoint(
   }
 }
 
-export function initializeTelemetry(config: Config): void {
+export async function initializeTelemetry(
+  config: Config,
+  credentials?: JWTInput,
+): Promise<void> {
   if (telemetryInitialized || !config.getTelemetryEnabled()) {
+    return;
+  }
+
+  if (config.getTelemetryUseCollector() && config.getTelemetryUseCliAuth()) {
+    debugLogger.error(
+      'Telemetry configuration error: "useCollector" and "useCliAuth" cannot both be true. ' +
+        'CLI authentication is only supported with in-process exporters. ' +
+        'Disabling telemetry.',
+    );
+    return;
+  }
+
+  // If using CLI auth and no credentials provided, defer initialization
+  if (config.getTelemetryUseCliAuth() && !credentials) {
+    // Register a callback to initialize telemetry when the user logs in.
+    // This is done only once.
+    if (!callbackRegistered) {
+      callbackRegistered = true;
+      authListener = async (newCredentials: JWTInput) => {
+        if (config.getTelemetryEnabled() && config.getTelemetryUseCliAuth()) {
+          debugLogger.log(
+            'Telemetry reinit with credentials: ',
+            newCredentials,
+          );
+          await initializeTelemetry(config, newCredentials);
+        }
+      };
+      authEvents.on('post_auth', authListener);
+    }
+    debugLogger.log(
+      'CLI auth is requested but no credentials, deferring telemetry initialization.',
+    );
     return;
   }
 
@@ -95,6 +187,7 @@ export function initializeTelemetry(config: Config): void {
   const otlpProtocol = config.getTelemetryOtlpProtocol();
   const telemetryTarget = config.getTelemetryTarget();
   const useCollector = config.getTelemetryUseCollector();
+
   const parsedEndpoint = parseOtlpEndpoint(otlpEndpoint, otlpProtocol);
   const telemetryOutfile = config.getTelemetryOutfile();
   const useOtlp = !!parsedEndpoint && !telemetryOutfile;
@@ -103,7 +196,7 @@ export function initializeTelemetry(config: Config): void {
     process.env['OTLP_GOOGLE_CLOUD_PROJECT'] ||
     process.env['GOOGLE_CLOUD_PROJECT'];
   const useDirectGcpExport =
-    telemetryTarget === TelemetryTarget.GCP && !!gcpProjectId && !useCollector;
+    telemetryTarget === TelemetryTarget.GCP && !useCollector;
 
   let spanExporter:
     | OTLPTraceExporter
@@ -120,10 +213,16 @@ export function initializeTelemetry(config: Config): void {
   let metricReader: PeriodicExportingMetricReader;
 
   if (useDirectGcpExport) {
-    spanExporter = new GcpTraceExporter(gcpProjectId);
-    logExporter = new GcpLogExporter(gcpProjectId);
+    debugLogger.log(
+      'Creating GCP exporters with projectId:',
+      gcpProjectId,
+      'using',
+      credentials ? 'provided credentials' : 'ADC',
+    );
+    spanExporter = new GcpTraceExporter(gcpProjectId, credentials);
+    logExporter = new GcpLogExporter(gcpProjectId, credentials);
     metricReader = new PeriodicExportingMetricReader({
-      exporter: new GcpMetricExporter(gcpProjectId),
+      exporter: new GcpMetricExporter(gcpProjectId, credentials),
       exportIntervalMillis: 30000,
     });
   } else if (useOtlp) {
@@ -183,12 +282,13 @@ export function initializeTelemetry(config: Config): void {
   });
 
   try {
-    sdk.start();
+    await sdk.start();
     if (config.getDebugMode()) {
       debugLogger.log('OpenTelemetry SDK started successfully.');
     }
     telemetryInitialized = true;
     initializeMetrics(config);
+    void flushTelemetryBuffer();
   } catch (error) {
     console.error('Error starting OpenTelemetry SDK:', error);
   }
@@ -204,19 +304,36 @@ export function initializeTelemetry(config: Config): void {
   });
 }
 
-export async function shutdownTelemetry(config: Config): Promise<void> {
+export async function shutdownTelemetry(
+  config: Config,
+  fromProcessExit = true,
+): Promise<void> {
   if (!telemetryInitialized || !sdk) {
     return;
   }
   try {
-    ClearcutLogger.getInstance()?.shutdown();
+    await ClearcutLogger.getInstance()?.shutdown();
     await sdk.shutdown();
-    if (config.getDebugMode()) {
+    if (config.getDebugMode() && fromProcessExit) {
       debugLogger.log('OpenTelemetry SDK shut down successfully.');
     }
   } catch (error) {
     console.error('Error shutting down SDK:', error);
   } finally {
     telemetryInitialized = false;
+    sdk = undefined;
+    // Fully reset the global APIs to allow for re-initialization.
+    // This is primarily for testing environments where the SDK is started
+    // and stopped multiple times in the same process.
+    trace.disable();
+    context.disable();
+    metrics.disable();
+    propagation.disable();
+    diag.disable();
+    if (authListener) {
+      authEvents.off('post_auth', authListener);
+      authListener = undefined;
+    }
+    callbackRegistered = false;
   }
 }

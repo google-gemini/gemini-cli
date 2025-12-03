@@ -16,11 +16,13 @@ export const memoryCommand: SlashCommand = {
   name: 'memory',
   description: 'Commands for interacting with memory',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   subCommands: [
     {
       name: 'show',
       description: 'Show the current memory contents',
       kind: CommandKind.BUILT_IN,
+      autoExecute: true,
       action: async (context) => {
         const memoryContent = context.services.config?.getUserMemory() || '';
         const fileCount = context.services.config?.getGeminiMdFileCount() || 0;
@@ -43,6 +45,7 @@ export const memoryCommand: SlashCommand = {
       name: 'add',
       description: 'Add content to the memory',
       kind: CommandKind.BUILT_IN,
+      autoExecute: false,
       action: (context, args): SlashCommandActionReturn | void => {
         if (!args || args.trim() === '') {
           return {
@@ -71,6 +74,7 @@ export const memoryCommand: SlashCommand = {
       name: 'refresh',
       description: 'Refresh the memory from the source',
       kind: CommandKind.BUILT_IN,
+      autoExecute: true,
       action: async (context) => {
         context.ui.addItem(
           {
@@ -85,6 +89,8 @@ export const memoryCommand: SlashCommand = {
           if (config) {
             const { memoryContent, fileCount } =
               await refreshServerHierarchicalMemory(config);
+
+            await config.updateSystemInstructionIfInitialized();
 
             const successMessage =
               memoryContent.length > 0
@@ -115,6 +121,7 @@ export const memoryCommand: SlashCommand = {
       name: 'list',
       description: 'Lists the paths of the GEMINI.md files in use',
       kind: CommandKind.BUILT_IN,
+      autoExecute: true,
       action: async (context) => {
         const filePaths = context.services.config?.getGeminiMdFilePaths() || [];
         const fileCount = filePaths.length;

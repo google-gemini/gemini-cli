@@ -11,7 +11,7 @@ import * as path from 'node:path';
 const STATE_FILENAME = 'state.json';
 
 interface PersistentStateData {
-  defaultBannerShownCount?: number;
+  defaultBannerShownCount?: Record<string, number>;
   // Add other persistent state keys here as needed
 }
 

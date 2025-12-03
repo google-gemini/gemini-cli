@@ -1,4 +1,4 @@
-# Gemini CLI Settings (`/settings` Command)
+# Gemini CLI settings (`/settings` command)
 
 Control your Gemini CLI experience with the `/settings` command. The `/settings`
 command opens a dialog to view and edit all your Gemini CLI settings, including
@@ -106,8 +106,7 @@ they appear in the UI.
 
 ### Experimental
 
-| UI Label                            | Setting                                                 | Description                                                                   | Default |
-| ----------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- | ------- |
-| Use Model Router                    | `experimental.useModelRouter`                           | Enable model routing to route requests to the best model based on complexity. | `true`  |
-| Enable Codebase Investigator        | `experimental.codebaseInvestigatorSettings.enabled`     | Enable the Codebase Investigator agent.                                       | `true`  |
-| Codebase Investigator Max Num Turns | `experimental.codebaseInvestigatorSettings.maxNumTurns` | Maximum number of turns for the Codebase Investigator agent.                  | `10`    |
+| UI Label                            | Setting                                                 | Description                                                  | Default |
+| ----------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------ | ------- |
+| Enable Codebase Investigator        | `experimental.codebaseInvestigatorSettings.enabled`     | Enable the Codebase Investigator agent.                      | `true`  |
+| Codebase Investigator Max Num Turns | `experimental.codebaseInvestigatorSettings.maxNumTurns` | Maximum number of turns for the Codebase Investigator agent. | `10`    |

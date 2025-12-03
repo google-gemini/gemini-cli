@@ -123,6 +123,7 @@ export interface OpenDialogActionReturn {
     | 'editor'
     | 'privacy'
     | 'settings'
+    | 'sessionBrowser'
     | 'model'
     | 'permissions';
 }
@@ -200,6 +201,14 @@ export interface SlashCommand {
   hidden?: boolean;
 
   kind: CommandKind;
+
+  /**
+   * Controls whether the command auto-executes when selected with Enter.
+   *
+   * If true, pressing Enter on the suggestion will execute the command immediately.
+   * If false or undefined, pressing Enter will autocomplete the command into the prompt window.
+   */
+  autoExecute?: boolean;
 
   // Optional metadata for extension commands
   extensionName?: string;

@@ -78,38 +78,33 @@ describe('ApiAuthDialog', () => {
     );
   });
 
-  it('calls onSubmit when the text input is submitted', () => {
-    mockBuffer.text = 'submitted-key';
-    render(<ApiAuthDialog onSubmit={onSubmit} onCancel={onCancel} />);
-    const keypressHandler = mockedUseKeypress.mock.calls[0][0];
-
-    keypressHandler({
-      name: 'return',
+  it.each([
+    {
+      keyName: 'return',
       sequence: '\r',
-      ctrl: false,
-      meta: false,
-      shift: false,
-      paste: false,
-    });
+      expectedCall: onSubmit,
+      args: ['submitted-key'],
+    },
+    { keyName: 'escape', sequence: '\u001b', expectedCall: onCancel, args: [] },
+  ])(
+    'calls $expectedCall.name when $keyName is pressed',
+    ({ keyName, sequence, expectedCall, args }) => {
+      mockBuffer.text = 'submitted-key'; // Set for the onSubmit case
+      render(<ApiAuthDialog onSubmit={onSubmit} onCancel={onCancel} />);
+      const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
-    expect(onSubmit).toHaveBeenCalledWith('submitted-key');
-  });
+      keypressHandler({
+        name: keyName,
+        sequence,
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
+      });
 
-  it('calls onCancel when the text input is cancelled', () => {
-    render(<ApiAuthDialog onSubmit={onSubmit} onCancel={onCancel} />);
-    const keypressHandler = mockedUseKeypress.mock.calls[0][0];
-
-    keypressHandler({
-      name: 'escape',
-      sequence: '\u001b',
-      ctrl: false,
-      meta: false,
-      shift: false,
-      paste: false,
-    });
-
-    expect(onCancel).toHaveBeenCalled();
-  });
+      expect(expectedCall).toHaveBeenCalledWith(...args);
+    },
+  );
 
   it('displays an error message', () => {
     const { lastFrame } = render(

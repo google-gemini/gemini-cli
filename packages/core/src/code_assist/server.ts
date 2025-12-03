@@ -14,6 +14,8 @@ import type {
   OnboardUserRequest,
   SetCodeAssistGlobalUserSettingRequest,
   ClientMetadata,
+  RetrieveUserQuotaRequest,
+  RetrieveUserQuotaResponse,
 } from './types.js';
 import type {
   ListExperimentsRequest,
@@ -100,10 +102,7 @@ export class CodeAssistServer implements ContentGenerator {
   async onboardUser(
     req: OnboardUserRequest,
   ): Promise<LongRunningOperationResponse> {
-    return await this.requestPost<LongRunningOperationResponse>(
-      'onboardUser',
-      req,
-    );
+    return this.requestPost<LongRunningOperationResponse>('onboardUser', req);
   }
 
   async loadCodeAssist(
@@ -126,7 +125,7 @@ export class CodeAssistServer implements ContentGenerator {
   }
 
   async getCodeAssistGlobalUserSetting(): Promise<CodeAssistGlobalUserSettingResponse> {
-    return await this.requestGet<CodeAssistGlobalUserSettingResponse>(
+    return this.requestGet<CodeAssistGlobalUserSettingResponse>(
       'getCodeAssistGlobalUserSetting',
     );
   }
@@ -134,7 +133,7 @@ export class CodeAssistServer implements ContentGenerator {
   async setCodeAssistGlobalUserSetting(
     req: SetCodeAssistGlobalUserSettingRequest,
   ): Promise<CodeAssistGlobalUserSettingResponse> {
-    return await this.requestPost<CodeAssistGlobalUserSettingResponse>(
+    return this.requestPost<CodeAssistGlobalUserSettingResponse>(
       'setCodeAssistGlobalUserSetting',
       req,
     );
@@ -165,8 +164,14 @@ export class CodeAssistServer implements ContentGenerator {
       project: projectId,
       metadata: { ...metadata, duetProject: projectId },
     };
-    return await this.requestPost<ListExperimentsResponse>(
-      'listExperiments',
+    return this.requestPost<ListExperimentsResponse>('listExperiments', req);
+  }
+
+  async retrieveUserQuota(
+    req: RetrieveUserQuotaRequest,
+  ): Promise<RetrieveUserQuotaResponse> {
+    return this.requestPost<RetrieveUserQuotaResponse>(
+      'retrieveUserQuota',
       req,
     );
   }

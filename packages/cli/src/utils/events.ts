@@ -9,7 +9,6 @@ import { EventEmitter } from 'node:events';
 
 export enum AppEvent {
   OpenDebugConsole = 'open-debug-console',
-  LogError = 'log-error',
   OauthDisplayMessage = 'oauth-display-message',
   Flicker = 'flicker',
   McpClientUpdate = 'mcp-client-update',
@@ -19,7 +18,6 @@ export enum AppEvent {
 
 export interface AppEvents extends ExtensionEvents {
   [AppEvent.OpenDebugConsole]: never[];
-  [AppEvent.LogError]: string[];
   [AppEvent.OauthDisplayMessage]: string[];
   [AppEvent.Flicker]: never[];
   [AppEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;

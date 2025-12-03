@@ -120,6 +120,14 @@ function buildSchemaObject(schema: SettingsSchemaType): JsonSchema {
     properties: {},
   };
 
+  root.properties!['$schema'] = {
+    title: 'Schema',
+    description:
+      'The URL of the JSON schema for this settings file. Used by editors for validation and autocompletion.',
+    type: 'string',
+    default: SCHEMA_ID,
+  };
+
   for (const [key, definition] of Object.entries(schema)) {
     root.properties![key] = buildSettingSchema(definition, [key], defs);
   }

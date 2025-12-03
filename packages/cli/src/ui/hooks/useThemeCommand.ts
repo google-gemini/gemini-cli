@@ -10,8 +10,9 @@ import type {
   LoadableSettingScope,
   LoadedSettings,
 } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
-import { type HistoryItem, MessageType } from '../types.js';
+import { MessageType } from '../types.js';
 import process from 'node:process';
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;
@@ -24,7 +25,7 @@ interface UseThemeCommandReturn {
 export const useThemeCommand = (
   loadedSettings: LoadedSettings,
   setThemeError: (error: string | null) => void,
-  addItem: (item: Omit<HistoryItem, 'id'>, timestamp: number) => void,
+  addItem: UseHistoryManagerReturn['addItem'],
   initialThemeError: string | null,
 ): UseThemeCommandReturn => {
   const [isThemeDialogOpen, setIsThemeDialogOpen] =

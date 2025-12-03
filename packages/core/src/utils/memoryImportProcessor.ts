@@ -20,7 +20,7 @@ const logger = {
     debugLogger.warn('[WARN] [ImportProcessor]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) =>
-    console.error('[ERROR] [ImportProcessor]', ...args),
+    debugLogger.error('[ERROR] [ImportProcessor]', ...args),
 };
 
 /**

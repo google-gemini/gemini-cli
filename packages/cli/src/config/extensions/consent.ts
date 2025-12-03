@@ -45,7 +45,7 @@ export async function requestConsentInteractive(
   consentDescription: string,
   addExtensionUpdateConfirmationRequest: (value: ConfirmationRequest) => void,
 ): Promise<boolean> {
-  return await promptForConsentInteractive(
+  return promptForConsentInteractive(
     consentDescription + '\n\nDo you want to continue?',
     addExtensionUpdateConfirmationRequest,
   );
@@ -89,7 +89,7 @@ async function promptForConsentInteractive(
   prompt: string,
   addExtensionUpdateConfirmationRequest: (value: ConfirmationRequest) => void,
 ): Promise<boolean> {
-  return await new Promise<boolean>((resolve) => {
+  return new Promise<boolean>((resolve) => {
     addExtensionUpdateConfirmationRequest({
       prompt,
       onConfirm: (resolvedConfirmed) => {

@@ -10,17 +10,20 @@
 import type {
   GenerateContentResponse,
   Content,
-  GenerateContentConfig,
-  SendMessageParameters,
   Part,
   Tool,
+  PartListUnion,
+  GenerateContentConfig,
+  GenerateContentParameters,
 } from '@google/genai';
+import { ThinkingLevel } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
 import { createUserContent, FinishReason } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
 import type { Config } from '../config/config.js';
 import {
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_THINKING_MODE,
   PREVIEW_GEMINI_MODEL,
   getEffectiveModel,
   isGemini2Model,
@@ -43,6 +46,13 @@ import {
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
+import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
+import {
+  fireAfterModelHook,
+  fireBeforeModelHook,
+  fireBeforeToolSelectionHook,
+} from './geminiChatHookTriggers.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -202,20 +212,21 @@ export class GeminiChat {
 
   constructor(
     private readonly config: Config,
-    private readonly generationConfig: GenerateContentConfig = {},
+    private systemInstruction: string = '',
+    private tools: Tool[] = [],
     private history: Content[] = [],
     resumedSessionData?: ResumedSessionData,
   ) {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(config);
     this.chatRecordingService.initialize(resumedSessionData);
-    this.lastPromptTokenCount = Math.ceil(
-      JSON.stringify(this.history).length / 4,
+    this.lastPromptTokenCount = estimateTokenCountSync(
+      this.history.flatMap((c) => c.parts || []),
     );
   }
 
   setSystemInstruction(sysInstr: string) {
-    this.generationConfig.systemInstruction = sysInstr;
+    this.systemInstruction = sysInstr;
   }
 
   /**
@@ -226,7 +237,10 @@ export class GeminiChat {
    * sending the next message.
    *
    * @see {@link Chat#sendMessage} for non-streaming method.
-   * @param params - parameters for sending the message.
+   * @param modelConfigKey - The key for the model config.
+   * @param message - The list of messages to send.
+   * @param prompt_id - The ID of the prompt.
+   * @param signal - An abort signal for this message.
    * @return The model's response.
    *
    * @example
@@ -241,9 +255,10 @@ export class GeminiChat {
    * ```
    */
   async sendMessageStream(
-    model: string,
-    params: SendMessageParameters,
+    modelConfigKey: ModelConfigKey,
+    message: PartListUnion,
     prompt_id: string,
+    signal: AbortSignal,
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
@@ -251,21 +266,21 @@ export class GeminiChat {
     // This ensures that we attempt to use Preview Model for every new user turn
     // (unless the "Always" fallback mode is active, which is handled separately).
     this.config.setPreviewModelBypassMode(false);
-
     let streamDoneResolver: () => void;
     const streamDonePromise = new Promise<void>((resolve) => {
       streamDoneResolver = resolve;
     });
     this.sendPromise = streamDonePromise;
 
-    const userContent = createUserContent(params.message);
+    const userContent = createUserContent(message);
+    const { model, generateContentConfig } =
+      this.config.modelConfigService.getResolvedConfig(modelConfigKey);
+    generateContentConfig.abortSignal = signal;
 
     // Record user input - capture complete message with all parts (text, files, images, etc.)
     // but skip recording function responses (tool call results) as they should be stored in tool call records
     if (!isFunctionResponse(userContent)) {
-      const userMessage = Array.isArray(params.message)
-        ? params.message
-        : [params.message];
+      const userMessage = Array.isArray(message) ? message : [message];
       const userMessageContent = partListUnionToString(toParts(userMessage));
       this.chatRecordingService.recordMessage({
         model,
@@ -278,9 +293,9 @@ export class GeminiChat {
     this.history.push(userContent);
     const requestContents = this.getHistory(true);
 
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const self = this;
-    return (async function* () {
+    const streamWithRetries = async function* (
+      this: GeminiChat,
+    ): AsyncGenerator<StreamEvent, void, void> {
       try {
         let lastError: unknown = new Error('Request failed after all retries.');
 
@@ -288,7 +303,7 @@ export class GeminiChat {
         // If we are in Preview Model Fallback Mode, we want to fail fast (1 attempt)
         // when probing the Preview Model.
         if (
-          self.config.isPreviewModelFallbackMode() &&
+          this.config.isPreviewModelFallbackMode() &&
           model === PREVIEW_GEMINI_MODEL
         ) {
           maxAttempts = 1;
@@ -301,18 +316,14 @@ export class GeminiChat {
             }
 
             // If this is a retry, set temperature to 1 to encourage different output.
-            const currentParams = { ...params };
             if (attempt > 0) {
-              currentParams.config = {
-                ...currentParams.config,
-                temperature: 1,
-              };
+              generateContentConfig.temperature = 1;
             }
 
-            const stream = await self.makeApiCallAndProcessStream(
+            const stream = await this.makeApiCallAndProcessStream(
               model,
+              generateContentConfig,
               requestContents,
-              currentParams,
               prompt_id,
             );
 
@@ -330,7 +341,7 @@ export class GeminiChat {
               // Check if we have more attempts left.
               if (attempt < maxAttempts - 1) {
                 logContentRetry(
-                  self.config,
+                  this.config,
                   new ContentRetryEvent(
                     attempt,
                     (error as InvalidStreamError).type,
@@ -358,7 +369,7 @@ export class GeminiChat {
             isGemini2Model(model)
           ) {
             logContentRetryFailure(
-              self.config,
+              this.config,
               new ContentRetryFailureEvent(
                 maxAttempts,
                 (lastError as InvalidStreamError).type,
@@ -372,27 +383,35 @@ export class GeminiChat {
           // We only do this if we didn't bypass Preview Model (i.e. we actually used it).
           if (
             model === PREVIEW_GEMINI_MODEL &&
-            !self.config.isPreviewModelBypassMode()
+            !this.config.isPreviewModelBypassMode()
           ) {
-            self.config.setPreviewModelFallbackMode(false);
+            this.config.setPreviewModelFallbackMode(false);
           }
         }
       } finally {
         streamDoneResolver!();
       }
-    })();
+    };
+
+    return streamWithRetries.call(this);
   }
 
   private async makeApiCallAndProcessStream(
     model: string,
+    generateContentConfig: GenerateContentConfig,
     requestContents: Content[],
-    params: SendMessageParameters,
     prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     let effectiveModel = model;
     const contentsForPreviewModel =
       this.ensureActiveLoopHasThoughtSignatures(requestContents);
-    const apiCall = () => {
+
+    // Track final request parameters for AfterModel hooks
+    let lastModelToUse = model;
+    let lastConfig: GenerateContentConfig = generateContentConfig;
+    let lastContentsToUse: Content[] = requestContents;
+
+    const apiCall = async () => {
       let modelToUse = getEffectiveModel(
         this.config.isInFallbackMode(),
         model,
@@ -410,15 +429,104 @@ export class GeminiChat {
       }
 
       effectiveModel = modelToUse;
+      const config = {
+        ...generateContentConfig,
+        // TODO(12622): Ensure we don't overrwrite these when they are
+        // passed via config.
+        systemInstruction: this.systemInstruction,
+        tools: this.tools,
+      };
+
+      // TODO(joshualitt): Clean this up with model configs.
+      if (modelToUse.startsWith('gemini-3')) {
+        config.thinkingConfig = {
+          ...config.thinkingConfig,
+          thinkingLevel: ThinkingLevel.HIGH,
+        };
+        delete config.thinkingConfig?.thinkingBudget;
+      } else {
+        // The `gemini-3` configs use thinkingLevel, so we have to invert the
+        // change above.
+        config.thinkingConfig = {
+          ...config.thinkingConfig,
+          thinkingBudget: DEFAULT_THINKING_MODE,
+        };
+        delete config.thinkingConfig?.thinkingLevel;
+      }
+      let contentsToUse =
+        modelToUse === PREVIEW_GEMINI_MODEL
+          ? contentsForPreviewModel
+          : requestContents;
+
+      // Fire BeforeModel and BeforeToolSelection hooks if enabled
+      const hooksEnabled = this.config.getEnableHooks();
+      const messageBus = this.config.getMessageBus();
+      if (hooksEnabled && messageBus) {
+        // Fire BeforeModel hook
+        const beforeModelResult = await fireBeforeModelHook(messageBus, {
+          model: modelToUse,
+          config,
+          contents: contentsToUse,
+        });
+
+        // Check if hook blocked the model call
+        if (beforeModelResult.blocked) {
+          // Return a synthetic response generator
+          const syntheticResponse = beforeModelResult.syntheticResponse;
+          if (syntheticResponse) {
+            return (async function* () {
+              yield syntheticResponse;
+            })();
+          }
+          // If blocked without synthetic response, return empty generator
+          return (async function* () {
+            // Empty generator - no response
+          })();
+        }
+
+        // Apply modifications from BeforeModel hook
+        if (beforeModelResult.modifiedConfig) {
+          Object.assign(config, beforeModelResult.modifiedConfig);
+        }
+        if (
+          beforeModelResult.modifiedContents &&
+          Array.isArray(beforeModelResult.modifiedContents)
+        ) {
+          contentsToUse = beforeModelResult.modifiedContents as Content[];
+        }
+
+        // Fire BeforeToolSelection hook
+        const toolSelectionResult = await fireBeforeToolSelectionHook(
+          messageBus,
+          {
+            model: modelToUse,
+            config,
+            contents: contentsToUse,
+          },
+        );
+
+        // Apply tool configuration modifications
+        if (toolSelectionResult.toolConfig) {
+          config.toolConfig = toolSelectionResult.toolConfig;
+        }
+        if (
+          toolSelectionResult.tools &&
+          Array.isArray(toolSelectionResult.tools)
+        ) {
+          config.tools = toolSelectionResult.tools as Tool[];
+        }
+      }
+
+      // Track final request parameters for AfterModel hooks
+      lastModelToUse = modelToUse;
+      lastConfig = config;
+      lastContentsToUse = contentsToUse;
 
       return this.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
-          contents:
-            modelToUse === PREVIEW_GEMINI_MODEL
-              ? contentsForPreviewModel
-              : requestContents,
-          config: { ...this.generationConfig, ...params.config },
+          contents: contentsToUse,
+          config,
         },
         prompt_id,
       );
@@ -427,13 +535,13 @@ export class GeminiChat {
     const onPersistent429Callback = async (
       authType?: string,
       error?: unknown,
-    ) => await handleFallback(this.config, effectiveModel, authType, error);
+    ) => handleFallback(this.config, effectiveModel, authType, error);
 
     const streamResponse = await retryWithBackoff(apiCall, {
       onPersistent429: onPersistent429Callback,
       authType: this.config.getContentGeneratorConfig()?.authType,
       retryFetchErrors: this.config.getRetryFetchErrors(),
-      signal: params.config?.abortSignal,
+      signal: generateContentConfig.abortSignal,
       maxAttempts:
         this.config.isPreviewModelFallbackMode() &&
         model === PREVIEW_GEMINI_MODEL
@@ -441,7 +549,18 @@ export class GeminiChat {
           : undefined,
     });
 
-    return this.processStreamResponse(model, streamResponse);
+    // Store the original request for AfterModel hooks
+    const originalRequest: GenerateContentParameters = {
+      model: lastModelToUse,
+      config: lastConfig,
+      contents: lastContentsToUse,
+    };
+
+    return this.processStreamResponse(
+      effectiveModel,
+      streamResponse,
+      originalRequest,
+    );
   }
 
   /**
@@ -561,7 +680,7 @@ export class GeminiChat {
   }
 
   setTools(tools: Tool[]): void {
-    this.generationConfig.tools = tools;
+    this.tools = tools;
   }
 
   async maybeIncludeSchemaDepthContext(error: StructuredError): Promise<void> {
@@ -595,6 +714,7 @@ export class GeminiChat {
   private async *processStreamResponse(
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
+    originalRequest: GenerateContentParameters,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
 
@@ -634,7 +754,19 @@ export class GeminiChat {
         }
       }
 
-      yield chunk; // Yield every chunk to the UI immediately.
+      // Fire AfterModel hook through MessageBus (only if hooks are enabled)
+      const hooksEnabled = this.config.getEnableHooks();
+      const messageBus = this.config.getMessageBus();
+      if (hooksEnabled && messageBus && originalRequest && chunk) {
+        const hookResult = await fireAfterModelHook(
+          messageBus,
+          originalRequest,
+          chunk,
+        );
+        yield hookResult.response;
+      } else {
+        yield chunk; // Yield every chunk to the UI immediately.
+      }
     }
 
     // String thoughts and consolidate text parts.

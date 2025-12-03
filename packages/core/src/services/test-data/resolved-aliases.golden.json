@@ -10,8 +10,41 @@
       "temperature": 1,
       "topP": 0.95,
       "thinkingConfig": {
+        "includeThoughts": true
+      },
+      "topK": 64
+    }
+  },
+  "chat-base-2.5": {
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
+        "thinkingBudget": 8192
+      },
+      "topK": 64
+    }
+  },
+  "chat-base-3": {
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      },
+      "topK": 64
+    }
+  },
+  "gemini-3-pro-preview": {
+    "model": "gemini-3-pro-preview",
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
       },
       "topK": 64
     }
@@ -23,7 +56,7 @@
       "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
+        "thinkingBudget": 8192
       },
       "topK": 64
     }
@@ -35,7 +68,7 @@
       "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
+        "thinkingBudget": 8192
       },
       "topK": 64
     }
@@ -47,7 +80,7 @@
       "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
+        "thinkingBudget": 8192
       },
       "topK": 64
     }
@@ -165,5 +198,25 @@
       "temperature": 0,
       "topP": 1
     }
+  },
+  "chat-compression-3-pro": {
+    "model": "gemini-3-pro-preview",
+    "generateContentConfig": {}
+  },
+  "chat-compression-2.5-pro": {
+    "model": "gemini-2.5-pro",
+    "generateContentConfig": {}
+  },
+  "chat-compression-2.5-flash": {
+    "model": "gemini-2.5-flash",
+    "generateContentConfig": {}
+  },
+  "chat-compression-2.5-flash-lite": {
+    "model": "gemini-2.5-flash-lite",
+    "generateContentConfig": {}
+  },
+  "chat-compression-default": {
+    "model": "gemini-2.5-pro",
+    "generateContentConfig": {}
   }
 }

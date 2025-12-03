@@ -28,6 +28,7 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
+  createWorkingStdio,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -66,8 +67,12 @@ export async function runNonInteractive({
     const consolePatcher = new ConsolePatcher({
       stderr: true,
       debugMode: config.getDebugMode(),
+      onNewMessage: (msg) => {
+        coreEvents.emitConsoleLog(msg.type, msg.content);
+      },
     });
-    const textOutput = new TextOutput();
+    const { stdout: workingStdout } = createWorkingStdio();
+    const textOutput = new TextOutput(workingStdout);
 
     const handleUserFeedback = (payload: UserFeedbackPayload) => {
       const prefix = payload.severity.toUpperCase();
@@ -177,7 +182,7 @@ export async function runNonInteractive({
       setupStdinCancellation();
 
       coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
-      coreEvents.drainFeedbackBacklog();
+      coreEvents.drainBacklogs();
 
       // Handle EPIPE errors when the output is piped to a command that closes early.
       process.stdout.on('error', (err: NodeJS.ErrnoException) => {

@@ -69,8 +69,6 @@ export function useIncludeDirsTrust(
       return;
     }
 
-    console.log('Inside useIncludeDirsTrust');
-
     // If folder trust is disabled, isTrustedFolder will be undefined.
     // In that case, or if the user decided not to trust the main folder,
     // we can just add the directories without checking them.

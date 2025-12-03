@@ -10,7 +10,9 @@ import { TestRig } from './test-helper.js';
 describe('replace', () => {
   it('should be able to replace content in a file', async () => {
     const rig = new TestRig();
-    await rig.setup('should be able to replace content in a file');
+    await rig.setup('should be able to replace content in a file', {
+      settings: { tools: { core: ['replace', 'read_file'] } },
+    });
 
     const fileName = 'file_to_replace.txt';
     const originalContent = 'foo content';
@@ -30,6 +32,7 @@ describe('replace', () => {
     const rig = new TestRig();
     await rig.setup(
       'should handle $ literally when replacing text ending with $',
+      { settings: { tools: { core: ['replace', 'read_file'] } } },
     );
 
     const fileName = 'regex.yml';
@@ -50,7 +53,9 @@ describe('replace', () => {
 
   it.skip('should insert a multi-line block of text', async () => {
     const rig = new TestRig();
-    await rig.setup('should insert a multi-line block of text');
+    await rig.setup('should insert a multi-line block of text', {
+      settings: { tools: { core: ['replace', 'read_file'] } },
+    });
     const fileName = 'insert_block.txt';
     const originalContent = 'Line A\n<INSERT_TEXT_HERE>\nLine C';
     const newBlock = 'First line\nSecond line\nThird line';
@@ -69,7 +74,9 @@ describe('replace', () => {
 
   it.skip('should delete a block of text', async () => {
     const rig = new TestRig();
-    await rig.setup('should delete a block of text');
+    await rig.setup('should delete a block of text', {
+      settings: { tools: { core: ['replace', 'read_file'] } },
+    });
     const fileName = 'delete_block.txt';
     const blockToDelete =
       '## DELETE THIS ##\nThis is a block of text to delete.\n## END DELETE ##';

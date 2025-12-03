@@ -550,4 +550,151 @@ describe('ModelConfigService', () => {
       ]);
     });
   });
+
+  describe('runtime aliases', () => {
+    it('should resolve a simple runtime-registered alias', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {},
+        overrides: [],
+      };
+      const service = new ModelConfigService(config);
+
+      service.registerRuntimeModelConfig('runtime-alias', {
+        modelConfig: {
+          model: 'gemini-runtime-model',
+          generateContentConfig: {
+            temperature: 0.123,
+          },
+        },
+      });
+
+      const resolved = service.getResolvedConfig({ model: 'runtime-alias' });
+
+      expect(resolved.model).toBe('gemini-runtime-model');
+      expect(resolved.generateContentConfig).toEqual({
+        temperature: 0.123,
+      });
+    });
+  });
+
+  describe('custom aliases', () => {
+    it('should resolve a custom alias', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {},
+        customAliases: {
+          'my-custom-alias': {
+            modelConfig: {
+              model: 'gemini-custom',
+              generateContentConfig: {
+                temperature: 0.9,
+              },
+            },
+          },
+        },
+        overrides: [],
+      };
+      const service = new ModelConfigService(config);
+      const resolved = service.getResolvedConfig({ model: 'my-custom-alias' });
+
+      expect(resolved.model).toBe('gemini-custom');
+      expect(resolved.generateContentConfig).toEqual({
+        temperature: 0.9,
+      });
+    });
+
+    it('should allow custom aliases to override built-in aliases', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {
+          'standard-alias': {
+            modelConfig: {
+              model: 'gemini-standard',
+              generateContentConfig: {
+                temperature: 0.5,
+              },
+            },
+          },
+        },
+        customAliases: {
+          'standard-alias': {
+            modelConfig: {
+              model: 'gemini-custom-override',
+              generateContentConfig: {
+                temperature: 0.1,
+              },
+            },
+          },
+        },
+        overrides: [],
+      };
+      const service = new ModelConfigService(config);
+      const resolved = service.getResolvedConfig({ model: 'standard-alias' });
+
+      expect(resolved.model).toBe('gemini-custom-override');
+      expect(resolved.generateContentConfig).toEqual({
+        temperature: 0.1,
+      });
+    });
+  });
+
+  describe('unrecognized models', () => {
+    it('should apply overrides to unrecognized model names', () => {
+      const unregisteredModelName = 'my-unregistered-model-v1';
+      const config: ModelConfigServiceConfig = {
+        aliases: {}, // No aliases defined
+        overrides: [
+          {
+            match: { model: unregisteredModelName },
+            modelConfig: {
+              generateContentConfig: {
+                temperature: 0.01,
+              },
+            },
+          },
+        ],
+      };
+      const service = new ModelConfigService(config);
+
+      // Request the unregistered model directly
+      const resolved = service.getResolvedConfig({
+        model: unregisteredModelName,
+      });
+
+      // It should preserve the model name and apply the override
+      expect(resolved.model).toBe(unregisteredModelName);
+      expect(resolved.generateContentConfig).toEqual({
+        temperature: 0.01,
+      });
+    });
+
+    it('should apply scoped overrides to unrecognized model names', () => {
+      const unregisteredModelName = 'my-unregistered-model-v1';
+      const config: ModelConfigServiceConfig = {
+        aliases: {},
+        overrides: [
+          {
+            match: {
+              model: unregisteredModelName,
+              overrideScope: 'special-agent',
+            },
+            modelConfig: {
+              generateContentConfig: {
+                temperature: 0.99,
+              },
+            },
+          },
+        ],
+      };
+      const service = new ModelConfigService(config);
+
+      const resolved = service.getResolvedConfig({
+        model: unregisteredModelName,
+        overrideScope: 'special-agent',
+      });
+
+      expect(resolved.model).toBe(unregisteredModelName);
+      expect(resolved.generateContentConfig).toEqual({
+        temperature: 0.99,
+      });
+    });
+  });
 });

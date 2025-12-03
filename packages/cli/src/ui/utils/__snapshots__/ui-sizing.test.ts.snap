@@ -1,0 +1,20 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ui-sizing > calculateMainAreaWidth > should match snapshot for interpolation range 1`] = `
+{
+  "100": 95,
+  "104": 98,
+  "108": 101,
+  "112": 104,
+  "116": 107,
+  "120": 110,
+  "124": 113,
+  "128": 116,
+  "132": 119,
+  "80": 78,
+  "84": 82,
+  "88": 85,
+  "92": 88,
+  "96": 92,
+}
+`;
