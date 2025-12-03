@@ -1258,6 +1258,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "enableAgents": {
+          "title": "Enable Agents",
+          "description": "Enable local and remote subagents.",
+          "markdownDescription": "Enable local and remote subagents.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "extensionManagement": {
           "title": "Extension Management",
           "description": "Enable extension management features.",
