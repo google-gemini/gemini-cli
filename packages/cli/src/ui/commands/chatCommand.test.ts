@@ -655,13 +655,13 @@ How are you?`;
         },
       ];
 
-      const expectedMarkdown = `🧑‍💻 ## USER
+      const expectedMarkdown = `## USER 🧑‍💻
 
 Please call a function.
 
 ---
 
-✨ ## MODEL
+## MODEL ✨
 
 **Tool Command**:
 \`\`\`json
@@ -675,7 +675,7 @@ Please call a function.
 
 ---
 
-🧑‍💻 ## USER
+## USER 🧑‍💻
 
 **Tool Response**:
 \`\`\`json
@@ -697,13 +697,13 @@ Please call a function.
         { parts: [{ text: 'Hi there!' }] },
       ];
 
-      const expectedMarkdown = `🧑‍💻 ## USER
+      const expectedMarkdown = `## USER 🧑‍💻
 
 Hello
 
 ---
 
-✨ ## MODEL
+## MODEL ✨
 
 Hi there!`;
 
