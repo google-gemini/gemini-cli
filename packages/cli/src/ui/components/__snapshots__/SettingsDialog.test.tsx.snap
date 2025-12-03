@@ -26,6 +26,8 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
+│                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
@@ -63,6 +65,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Output Format                                        Text                                     │
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
+│                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -102,6 +106,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │    Hide Window Title                                    false*                                   │
 │                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
+│                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
@@ -139,6 +145,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Output Format                                        Text                                     │
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
+│                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -178,6 +186,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
+│                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
@@ -215,6 +225,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Output Format                                        Text                                     │
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
+│                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -254,6 +266,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │    Hide Window Title                                    false*                                   │
 │                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
+│                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
@@ -292,6 +306,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
+│                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
@@ -329,6 +345,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Output Format                                        Text                                     │
 │                                                                                                  │
 │    Hide Window Title                                    true*                                    │
+│                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
