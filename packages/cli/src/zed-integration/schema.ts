@@ -223,7 +223,6 @@ export const cancelNotificationSchema = z.object({
 
 export const authenticateRequestSchema = z.object({
   methodId: z.string(),
-  authMethod: authMethodSchema,
 });
 
 export const authenticateResponseSchema = z.null();

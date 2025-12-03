@@ -1081,8 +1081,8 @@
         "enableMessageBusIntegration": {
           "title": "Enable Message Bus Integration",
           "description": "Enable policy-based tool confirmation via message bus integration. When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.",
-          "markdownDescription": "Enable policy-based tool confirmation via message bus integration. When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Enable policy-based tool confirmation via message bus integration. When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "enableHooks": {
@@ -1279,6 +1279,13 @@
           "default": false,
           "type": "boolean"
         },
+        "jitContext": {
+          "title": "JIT Context Loading",
+          "description": "Enable Just-In-Time (JIT) context loading.",
+          "markdownDescription": "Enable Just-In-Time (JIT) context loading.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "codebaseInvestigatorSettings": {
           "title": "Codebase Investigator Settings",
           "description": "Configuration for Codebase Investigator.",
@@ -1467,10 +1474,6 @@
         "targetServiceAccount": {
           "type": "string",
           "description": "Service account email to impersonate (name@project.iam.gserviceaccount.com)."
-        },
-        "useInstructions": {
-          "type": "boolean",
-          "description": "If true, instructions from this server will be included in the system prompt."
         }
       }
     },
