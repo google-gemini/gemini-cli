@@ -41,6 +41,8 @@ import {
   type MCPServerConfig,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
+  type HookDefinition,
+  type HookEventName,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -253,10 +255,20 @@ export class ExtensionManager extends ExtensionLoader {
           );
         }
 
+        const newHasHooks = fs.existsSync(
+          path.join(localSourcePath, 'hooks', 'hooks.json'),
+        );
+        let previousHasHooks = false;
+        if (isUpdate && previous && previous.hooks) {
+          previousHasHooks = Object.keys(previous.hooks).length > 0;
+        }
+
         await maybeRequestConsentOrFail(
           newExtensionConfig,
           this.requestConsent,
+          newHasHooks,
           previousExtensionConfig,
+          previousHasHooks,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);
         const destinationPath = new ExtensionStorage(
@@ -501,6 +513,11 @@ export class ExtensionManager extends ExtensionLoader {
         )
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
+      const hooks = this.loadExtensionHooks(effectiveExtensionPath, {
+        extensionPath: effectiveExtensionPath,
+        workspacePath: this.workspaceDir,
+      });
+
       const extension = {
         name: config.name,
         version: config.version,
@@ -509,6 +526,7 @@ export class ExtensionManager extends ExtensionLoader {
         installMetadata,
         mcpServers: config.mcpServers,
         excludeTools: config.excludeTools,
+        hooks,
         isActive: this.extensionEnablementManager.isEnabled(
           config.name,
           this.workspaceDir,
@@ -573,6 +591,47 @@ export class ExtensionManager extends ExtensionLoader {
           e,
         )}`,
       );
+    }
+  }
+
+  private loadExtensionHooks(
+    extensionDir: string,
+    context: { extensionPath: string; workspacePath: string },
+  ): { [K in HookEventName]?: HookDefinition[] } | undefined {
+    const hooksFilePath = path.join(extensionDir, 'hooks', 'hooks.json');
+    if (!fs.existsSync(hooksFilePath)) {
+      return undefined;
+    }
+
+    try {
+      const hooksContent = fs.readFileSync(hooksFilePath, 'utf-8');
+      const rawHooks = JSON.parse(hooksContent);
+
+      if (!rawHooks || typeof rawHooks !== 'object' || !rawHooks.hooks) {
+        debugLogger.warn(
+          `Invalid hooks configuration in ${hooksFilePath}: missing "hooks" property`,
+        );
+        return undefined;
+      }
+
+      // Hydrate variables in the hooks configuration
+      const hydratedHooks = recursivelyHydrateStrings(
+        rawHooks.hooks as unknown as JsonObject,
+        {
+          ...context,
+          '/': path.sep,
+          pathSeparator: path.sep,
+        },
+      ) as { [K in HookEventName]?: HookDefinition[] };
+
+      return hydratedHooks;
+    } catch (e) {
+      debugLogger.warn(
+        `Failed to load extension hooks from ${hooksFilePath}: ${getErrorMessage(
+          e,
+        )}`,
+      );
+      return undefined;
     }
   }
 
