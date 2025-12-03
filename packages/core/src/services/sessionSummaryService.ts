@@ -62,9 +62,14 @@ export class SessionSummaryService {
     } = options;
 
     try {
-      // Filter out empty messages and limit to first N messages
+      // Filter to user/gemini messages only (exclude system messages)
+      // and limit to first N messages
       const relevantMessages = messages
         .filter((msg) => {
+          // Skip system messages (info, error, warning)
+          if (msg.type !== 'user' && msg.type !== 'gemini') {
+            return false;
+          }
           const content = partListUnionToString(msg.content);
           return content.trim().length > 0;
         })
@@ -78,12 +83,7 @@ export class SessionSummaryService {
       // Format conversation for the prompt
       const conversationText = relevantMessages
         .map((msg) => {
-          const role =
-            msg.type === 'user'
-              ? 'User'
-              : msg.type === 'gemini'
-                ? 'Assistant'
-                : 'System';
+          const role = msg.type === 'user' ? 'User' : 'Assistant';
           const content = partListUnionToString(msg.content);
           // Truncate very long messages to avoid token limit
           const truncated =
@@ -144,11 +144,7 @@ export class SessionSummaryService {
       }
     } catch (error) {
       // Log the error but don't throw - we want graceful degradation
-      if (
-        error instanceof Error &&
-        error.name === 'AbortError' &&
-        error.message === 'This operation was aborted'
-      ) {
+      if (error instanceof Error && error.name === 'AbortError') {
         debugLogger.debug('[SessionSummary] Timeout generating summary');
       } else {
         debugLogger.debug(
