@@ -186,6 +186,7 @@ describe('gemini.tsx main function cleanup', () => {
       getDebugMode: vi.fn(() => false),
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: vi.fn(() => false),
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
