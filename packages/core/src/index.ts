@@ -82,6 +82,7 @@ export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
 export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
+export * from './services/contextManager.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';
