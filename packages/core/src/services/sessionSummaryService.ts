@@ -63,17 +63,43 @@ export class SessionSummaryService {
 
     try {
       // Filter to user/gemini messages only (exclude system messages)
-      // and limit to first N messages
-      const relevantMessages = messages
-        .filter((msg) => {
-          // Skip system messages (info, error, warning)
-          if (msg.type !== 'user' && msg.type !== 'gemini') {
-            return false;
-          }
-          const content = partListUnionToString(msg.content);
-          return content.trim().length > 0;
-        })
-        .slice(0, maxMessages);
+      const filteredMessages = messages.filter((msg) => {
+        // Skip system messages (info, error, warning)
+        if (msg.type !== 'user' && msg.type !== 'gemini') {
+          return false;
+        }
+        const content = partListUnionToString(msg.content);
+        return content.trim().length > 0;
+      });
+
+      // Apply sliding window selection: first N + last N messages
+      let relevantMessages: MessageRecord[];
+      if (filteredMessages.length <= maxMessages) {
+        // If fewer messages than max, include all
+        relevantMessages = filteredMessages;
+      } else {
+        // Calculate window sizes based on maxMessages parameter
+        const firstWindowSize = Math.ceil(maxMessages / 2);
+        const lastWindowSize = Math.floor(maxMessages / 2);
+
+        // Take first window
+        const firstMessages = filteredMessages.slice(0, firstWindowSize);
+
+        // Take last window
+        const lastMessages = filteredMessages.slice(
+          Math.max(firstWindowSize, filteredMessages.length - lastWindowSize),
+        );
+
+        // Check if windows overlap (happens when total messages < 2x window size)
+        const lastStartIndex = filteredMessages.length - lastWindowSize;
+        if (lastStartIndex <= firstWindowSize) {
+          // Windows overlap, return all messages up to the max
+          relevantMessages = filteredMessages.slice(0, maxMessages);
+        } else {
+          // Clean separation between windows
+          relevantMessages = firstMessages.concat(lastMessages);
+        }
+      }
 
       if (relevantMessages.length === 0) {
         debugLogger.debug('[SessionSummary] No messages to summarize');

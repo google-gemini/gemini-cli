@@ -614,6 +614,141 @@ describe('SessionSummaryService', () => {
     });
   });
 
+  describe('Sliding Window Message Selection', () => {
+    it('should return all messages when fewer than 20 exist', async () => {
+      const messages = Array.from({ length: 5 }, (_, i) => ({
+        id: `${i}`,
+        timestamp: '2025-12-03T00:00:00Z',
+        type: i % 2 === 0 ? ('user' as const) : ('gemini' as const),
+        content: [{ text: `Message ${i}` }],
+      }));
+
+      await service.generateSummary({ messages });
+
+      const callArgs = mockGenerateContent.mock.calls[0][0];
+      const promptText = callArgs.contents[0].parts[0].text;
+
+      const messageCount = (promptText.match(/Message \d+/g) || []).length;
+      expect(messageCount).toBe(5);
+    });
+
+    it('should select first 10 + last 10 from 50 messages', async () => {
+      const messages = Array.from({ length: 50 }, (_, i) => ({
+        id: `${i}`,
+        timestamp: '2025-12-03T00:00:00Z',
+        type: i % 2 === 0 ? ('user' as const) : ('gemini' as const),
+        content: [{ text: `Message ${i}` }],
+      }));
+
+      await service.generateSummary({ messages });
+
+      const callArgs = mockGenerateContent.mock.calls[0][0];
+      const promptText = callArgs.contents[0].parts[0].text;
+
+      // Should include first 10
+      expect(promptText).toContain('Message 0');
+      expect(promptText).toContain('Message 9');
+
+      // Should skip middle
+      expect(promptText).not.toContain('Message 25');
+
+      // Should include last 10
+      expect(promptText).toContain('Message 40');
+      expect(promptText).toContain('Message 49');
+
+      const messageCount = (promptText.match(/Message \d+/g) || []).length;
+      expect(messageCount).toBe(20);
+    });
+
+    it('should return all messages when exactly 20 exist', async () => {
+      const messages = Array.from({ length: 20 }, (_, i) => ({
+        id: `${i}`,
+        timestamp: '2025-12-03T00:00:00Z',
+        type: i % 2 === 0 ? ('user' as const) : ('gemini' as const),
+        content: [{ text: `Message ${i}` }],
+      }));
+
+      await service.generateSummary({ messages });
+
+      const callArgs = mockGenerateContent.mock.calls[0][0];
+      const promptText = callArgs.contents[0].parts[0].text;
+
+      const messageCount = (promptText.match(/Message \d+/g) || []).length;
+      expect(messageCount).toBe(20);
+    });
+
+    it('should preserve message ordering in sliding window', async () => {
+      const messages = Array.from({ length: 30 }, (_, i) => ({
+        id: `${i}`,
+        timestamp: '2025-12-03T00:00:00Z',
+        type: i % 2 === 0 ? ('user' as const) : ('gemini' as const),
+        content: [{ text: `Message ${i}` }],
+      }));
+
+      await service.generateSummary({ messages });
+
+      const callArgs = mockGenerateContent.mock.calls[0][0];
+      const promptText = callArgs.contents[0].parts[0].text;
+
+      const matches = promptText.match(/Message (\d+)/g) || [];
+      const indices = matches.map((m: string) => parseInt(m.split(' ')[1], 10));
+
+      // Verify ordering is preserved
+      for (let i = 1; i < indices.length; i++) {
+        expect(indices[i]).toBeGreaterThan(indices[i - 1]);
+      }
+    });
+
+    it('should not count system messages when calculating window', async () => {
+      const messages: MessageRecord[] = [
+        // First 10 user/gemini messages
+        ...Array.from({ length: 10 }, (_, i) => ({
+          id: `${i}`,
+          timestamp: '2025-12-03T00:00:00Z',
+          type: i % 2 === 0 ? ('user' as const) : ('gemini' as const),
+          content: [{ text: `Message ${i}` }],
+        })),
+        // System messages (should be filtered out)
+        {
+          id: 'info1',
+          timestamp: '2025-12-03T00:10:00Z',
+          type: 'info' as const,
+          content: [{ text: 'Info' }],
+        },
+        {
+          id: 'warn1',
+          timestamp: '2025-12-03T00:11:00Z',
+          type: 'warning' as const,
+          content: [{ text: 'Warning' }],
+        },
+        // Last 40 user/gemini messages
+        ...Array.from({ length: 40 }, (_, i) => ({
+          id: `${i + 10}`,
+          timestamp: '2025-12-03T00:12:00Z',
+          type: i % 2 === 0 ? ('user' as const) : ('gemini' as const),
+          content: [{ text: `Message ${i + 10}` }],
+        })),
+      ];
+
+      await service.generateSummary({ messages });
+
+      const callArgs = mockGenerateContent.mock.calls[0][0];
+      const promptText = callArgs.contents[0].parts[0].text;
+
+      // Should include early messages
+      expect(promptText).toContain('Message 0');
+      expect(promptText).toContain('Message 9');
+
+      // Should include late messages
+      expect(promptText).toContain('Message 40');
+      expect(promptText).toContain('Message 49');
+
+      // Should not include system messages
+      expect(promptText).not.toContain('Info');
+      expect(promptText).not.toContain('Warning');
+    });
+  });
+
   describe('Edge Cases', () => {
     it('should handle conversation with only user messages', async () => {
       const messages: MessageRecord[] = [
