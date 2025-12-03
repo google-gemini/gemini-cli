@@ -38,11 +38,17 @@ import { SettingPaths } from './settingPaths.js';
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
   let currentSchema: SettingsSchema | undefined = getSettingsSchema();
+  let parent: SettingDefinition | undefined = undefined;
 
   for (const key of path) {
     if (!currentSchema || !currentSchema[key]) {
+      // Key not found in schema - check if parent has additionalProperties
+      if (parent?.additionalProperties?.mergeStrategy) {
+        return parent.additionalProperties.mergeStrategy;
+      }
       return undefined;
     }
+    parent = current;
     current = currentSchema[key];
     currentSchema = current.properties;
   }

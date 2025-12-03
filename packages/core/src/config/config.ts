@@ -113,6 +113,7 @@ export interface TelemetrySettings {
   logPrompts?: boolean;
   outfile?: string;
   useCollector?: boolean;
+  useCliAuth?: boolean;
 }
 
 export interface OutputSettings {
@@ -311,9 +312,13 @@ export interface ConfigParameters {
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   experiments?: Experiments;
-  hooks?: {
-    [K in HookEventName]?: HookDefinition[];
-  };
+  hooks?:
+    | {
+        [K in HookEventName]?: HookDefinition[];
+      }
+    | ({
+        [K in HookEventName]?: HookDefinition[];
+      } & { disabled?: string[] });
   previewFeatures?: boolean;
   enableModelAvailabilityService?: boolean;
   experimentalJitContext?: boolean;
@@ -428,6 +433,7 @@ export class Config {
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
+  private readonly disabledHooks: string[];
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
@@ -475,6 +481,7 @@ export class Config {
       logPrompts: params.telemetry?.logPrompts ?? true,
       outfile: params.telemetry?.outfile,
       useCollector: params.telemetry?.useCollector,
+      useCliAuth: params.telemetry?.useCliAuth,
     };
     this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
 
@@ -539,6 +546,10 @@ export class Config {
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? true;
     this.enableHooks = params.enableHooks ?? false;
+    this.disabledHooks =
+      (params.hooks && 'disabled' in params.hooks
+        ? params.hooks.disabled
+        : undefined) ?? [];
 
     // Enable MessageBus integration if:
     // 1. Explicitly enabled via setting, OR
@@ -1067,6 +1078,10 @@ export class Config {
     return this.telemetrySettings.useCollector ?? false;
   }
 
+  getTelemetryUseCliAuth(): boolean {
+    return this.telemetrySettings.useCliAuth ?? false;
+  }
+
   getGeminiClient(): GeminiClient {
     return this.geminiClient;
   }
@@ -1555,6 +1570,13 @@ export class Config {
    */
   getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.hooks;
+  }
+
+  /**
+   * Get disabled hooks list
+   */
+  getDisabledHooks(): string[] {
+    return this.disabledHooks;
   }
 
   /**
