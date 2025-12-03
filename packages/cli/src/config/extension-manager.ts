@@ -513,7 +513,7 @@ export class ExtensionManager extends ExtensionLoader {
         )
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
-      const hooks = this.loadExtensionHooks(effectiveExtensionPath, {
+      const hooks = await this.loadExtensionHooks(effectiveExtensionPath, {
         extensionPath: effectiveExtensionPath,
         workspacePath: this.workspaceDir,
       });
@@ -594,22 +594,25 @@ export class ExtensionManager extends ExtensionLoader {
     }
   }
 
-  private loadExtensionHooks(
+  private async loadExtensionHooks(
     extensionDir: string,
     context: { extensionPath: string; workspacePath: string },
-  ): { [K in HookEventName]?: HookDefinition[] } | undefined {
+  ): Promise<{ [K in HookEventName]?: HookDefinition[] } | undefined> {
     const hooksFilePath = path.join(extensionDir, 'hooks', 'hooks.json');
-    if (!fs.existsSync(hooksFilePath)) {
-      return undefined;
-    }
 
     try {
-      const hooksContent = fs.readFileSync(hooksFilePath, 'utf-8');
+      const hooksContent = await fs.promises.readFile(hooksFilePath, 'utf-8');
       const rawHooks = JSON.parse(hooksContent);
 
-      if (!rawHooks || typeof rawHooks !== 'object' || !rawHooks.hooks) {
+      if (
+        !rawHooks ||
+        typeof rawHooks !== 'object' ||
+        typeof rawHooks.hooks !== 'object' ||
+        rawHooks.hooks === null ||
+        Array.isArray(rawHooks.hooks)
+      ) {
         debugLogger.warn(
-          `Invalid hooks configuration in ${hooksFilePath}: missing "hooks" property`,
+          `Invalid hooks configuration in ${hooksFilePath}: "hooks" property must be an object`,
         );
         return undefined;
       }
@@ -626,6 +629,9 @@ export class ExtensionManager extends ExtensionLoader {
 
       return hydratedHooks;
     } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
+        return undefined; // File not found is not an error here.
+      }
       debugLogger.warn(
         `Failed to load extension hooks from ${hooksFilePath}: ${getErrorMessage(
           e,
