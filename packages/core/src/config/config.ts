@@ -190,6 +190,12 @@ export class MCPServerConfig {
     readonly headers?: Record<string, string>,
     // For websocket transport
     readonly tcp?: string,
+    // Transport type (optional, for use with 'url' field)
+    // When set to 'http', uses StreamableHTTPClientTransport
+    // When set to 'sse', uses SSEClientTransport
+    // When omitted, auto-detects transport type
+    // Note: 'httpUrl' is deprecated in favor of 'url' + 'type'
+    readonly type?: 'sse' | 'http',
     // Common
     readonly timeout?: number,
     readonly trust?: boolean,
