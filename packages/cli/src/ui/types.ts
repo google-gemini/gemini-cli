@@ -240,6 +240,18 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
   showSchema: boolean;
 };
 
+export type HistoryItemHooksList = HistoryItemBase & {
+  type: 'hooks_list';
+  hooks: Array<{
+    config: { command?: string; type: string; timeout?: number };
+    source: string;
+    eventName: string;
+    matcher?: string;
+    sequential?: boolean;
+    enabled: boolean;
+  }>;
+};
+
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
 // type inference e.g. historyItem.type === 'tool_group' isn't auto-inferring that
 // 'tools' in historyItem.
@@ -264,7 +276,8 @@ export type HistoryItemWithoutId =
   | HistoryItemExtensionsList
   | HistoryItemToolsList
   | HistoryItemMcpStatus
-  | HistoryItemChatList;
+  | HistoryItemChatList
+  | HistoryItemHooksList;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -286,6 +299,7 @@ export enum MessageType {
   TOOLS_LIST = 'tools_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
+  HOOKS_LIST = 'hooks_list',
 }
 
 // Simplified message structure for internal feedback
