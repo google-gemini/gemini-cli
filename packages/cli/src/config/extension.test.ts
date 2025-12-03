@@ -713,10 +713,87 @@ describe('extension tests', () => {
           name: 'no-meta-name',
           version: '1.0.0',
         });
-
         const extensions = await extensionManager.loadExtensions();
         const extension = extensions.find((e) => e.name === 'no-meta-name');
         expect(extension?.id).toBe(hashValue('no-meta-name'));
+      });
+
+      it('should load extension hooks and hydrate variables', async () => {
+        const extDir = createExtension({
+          extensionsDir: userExtensionsDir,
+          name: 'hook-extension',
+          version: '1.0.0',
+        });
+
+        const hooksDir = path.join(extDir, 'hooks');
+        fs.mkdirSync(hooksDir);
+
+        const hooksConfig = {
+          hooks: {
+            BeforeTool: [
+              {
+                matcher: '.*',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: 'echo ${extensionPath}',
+                  },
+                ],
+              },
+            ],
+          },
+        };
+
+        fs.writeFileSync(
+          path.join(hooksDir, 'hooks.json'),
+          JSON.stringify(hooksConfig),
+        );
+
+        const extensions = await extensionManager.loadExtensions();
+        expect(extensions).toHaveLength(1);
+        const extension = extensions[0];
+
+        expect(extension.hooks).toBeDefined();
+        expect(extension.hooks?.BeforeTool).toHaveLength(1);
+        expect(extension.hooks?.BeforeTool?.[0].hooks[0].command).toBe(
+          `echo ${extDir}`,
+        );
+      });
+
+      it('should warn about hooks during installation', async () => {
+        const requestConsentSpy = vi.fn().mockResolvedValue(true);
+        extensionManager.setRequestConsent(requestConsentSpy);
+
+        const sourceExtDir = path.join(
+          tempWorkspaceDir,
+          'hook-extension-source',
+        );
+        fs.mkdirSync(sourceExtDir, { recursive: true });
+
+        const hooksDir = path.join(sourceExtDir, 'hooks');
+        fs.mkdirSync(hooksDir);
+        fs.writeFileSync(
+          path.join(hooksDir, 'hooks.json'),
+          JSON.stringify({ hooks: {} }),
+        );
+
+        fs.writeFileSync(
+          path.join(sourceExtDir, 'gemini-extension.json'),
+          JSON.stringify({
+            name: 'hook-extension-install',
+            version: '1.0.0',
+          }),
+        );
+
+        await extensionManager.loadExtensions();
+        await extensionManager.installOrUpdateExtension({
+          source: sourceExtDir,
+          type: 'local',
+        });
+
+        expect(requestConsentSpy).toHaveBeenCalledWith(
+          expect.stringContaining('⚠️  This extension contains Hooks'),
+        );
       });
     });
   });
