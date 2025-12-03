@@ -250,21 +250,15 @@ function findPrevWordBoundary(line: string, cursorCol: number): number {
   const prefix = codePoints.slice(0, cursorCol).join('');
   const cursorIdx = prefix.length;
 
-  const segments = Array.from(segmenter.segment(line));
   let targetIdx = 0;
 
-  // Search backwards for the start of the previous word
-  for (let i = segments.length - 1; i >= 0; i--) {
-    const seg = segments[i];
-    const segStart = seg.index;
+  for (const seg of segmenter.segment(line)) {
+    // We want the last word start strictly before the cursor.
+    // If we've reached or passed the cursor, we stop.
+    if (seg.index >= cursorIdx) break;
 
-    // We are looking for a word start strictly before the cursor
-    if (segStart >= cursorIdx) continue;
-
-    // If we found a word-like segment
     if (seg.isWordLike) {
-      targetIdx = segStart;
-      break;
+      targetIdx = seg.index;
     }
   }
 
@@ -276,18 +270,16 @@ function findNextWordBoundary(line: string, cursorCol: number): number {
   const prefix = codePoints.slice(0, cursorCol).join('');
   const cursorIdx = prefix.length;
 
-  const segments = Array.from(segmenter.segment(line));
   let targetIdx = line.length;
 
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i];
+  for (const seg of segmenter.segment(line)) {
     const segEnd = seg.index + seg.segment.length;
 
-    if (segEnd <= cursorIdx) continue;
-
-    if (seg.isWordLike) {
-      targetIdx = segEnd;
-      break;
+    if (segEnd > cursorIdx) {
+      if (seg.isWordLike) {
+        targetIdx = segEnd;
+        break;
+      }
     }
   }
 

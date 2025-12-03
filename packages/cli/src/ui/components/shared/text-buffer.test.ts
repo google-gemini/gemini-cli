@@ -2275,6 +2275,12 @@ describe('Unicode helper functions', () => {
       // Should be at start of "你好" (index 0)
       expect(result.current.cursor[1]).toBe(0);
 
+      // Move word left again (should stay at 0)
+      act(() => {
+        result.current.move('wordLeft');
+      });
+      expect(result.current.cursor[1]).toBe(0);
+
       // Move word right
       act(() => {
         result.current.move('wordRight');
@@ -2289,6 +2295,12 @@ describe('Unicode helper functions', () => {
       });
 
       // Should be at end of "世界" (index 4)
+      expect(result.current.cursor[1]).toBe(4);
+
+      // Move word right again (should stay at end)
+      act(() => {
+        result.current.move('wordRight');
+      });
       expect(result.current.cursor[1]).toBe(4);
     });
 
@@ -2320,6 +2332,10 @@ describe('Unicode helper functions', () => {
       expect(result.current.cursor[1]).toBe(5);
 
       // wordLeft -> start of "Hello" (index 0)
+      act(() => result.current.move('wordLeft'));
+      expect(result.current.cursor[1]).toBe(0);
+
+      // wordLeft -> start of line (should stay at 0)
       act(() => result.current.move('wordLeft'));
       expect(result.current.cursor[1]).toBe(0);
     });
