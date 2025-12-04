@@ -221,6 +221,7 @@ export class ShellExecutionService {
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: 'cat',
+          GIT_PAGER: 'cat',
         },
       });
 
@@ -434,6 +435,7 @@ export class ShellExecutionService {
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: shellExecutionConfig.pager ?? 'cat',
+          GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
         },
         handleFlowControl: true,
       });
@@ -484,24 +486,14 @@ export class ShellExecutionService {
           if (shellExecutionConfig.showColor) {
             newOutput = serializeTerminalToObject(headlessTerminal);
           } else {
-            const lines: AnsiOutput = [];
-            for (let y = 0; y < headlessTerminal.rows; y++) {
-              const line = buffer.getLine(buffer.viewportY + y);
-              const lineContent = line ? line.translateToString(true) : '';
-              lines.push([
-                {
-                  text: lineContent,
-                  bold: false,
-                  italic: false,
-                  underline: false,
-                  dim: false,
-                  inverse: false,
-                  fg: '',
-                  bg: '',
-                },
-              ]);
-            }
-            newOutput = lines;
+            newOutput = (serializeTerminalToObject(headlessTerminal) || []).map(
+              (line) =>
+                line.map((token) => {
+                  token.fg = '';
+                  token.bg = '';
+                  return token;
+                }),
+            );
           }
 
           let lastNonEmptyLine = -1;
