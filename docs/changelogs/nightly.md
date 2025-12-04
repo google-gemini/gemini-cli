@@ -55,20 +55,5 @@ npm install -g @google/gemini-cli@nightly
 - docs: Update 4 files by @g-samroberts in
   https://github.com/google-gemini/gemini-cli/pull/13628
 
-## New Contributors
-
-- @pcoet made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13717
-- @Transient-Onlooker made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13976
-- @JuanCS-Dev made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13866
-- @amsminn made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13714
-- @marcocondrache made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13646
-- @g-samroberts made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13628
-
 **Full Changelog**:
 https://github.com/google-gemini/gemini-cli/compare/v0.19.0-nightly.20251125.f6d97d448...v0.19.0-nightly.20251126.03845198c

@@ -31,19 +31,6 @@ npm install -g @google/gemini-cli
 
 ![Uninstalling Gemini extensions with a single command](https://i.imgur.com/pi7nEBI.png)
 
-And a huge shout out to our new contributors:
-
-- @aswinashok44 made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13291
-- @gmackall made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13312
-- @avilladsen made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13352
-- @holtskinner made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13289
-- @kevin-ramdass made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13454
-
 ## What's Changed
 
 - Remove obsolete reference to "help wanted" label in CONTRIBUTING.md by

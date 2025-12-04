@@ -64,21 +64,6 @@ on GitHub.
 - docs: Update 4 files by @g-samroberts in
   https://github.com/google-gemini/gemini-cli/pull/13628
 
-### New Contributors
-
-- @pcoet made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13717
-- @Transient-Onlooker made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13976
-- @JuanCS-Dev made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13866
-- @amsminn made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13714
-- @marcocondrache made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13646
-- @g-samroberts made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13628
-
 **Full Changelog**:
 https://github.com/google-gemini/gemini-cli/compare/v0.20.0-nightly.20251201.2fe609cb6...v0.20.0-nightly.20251202.29920b16d
 
@@ -111,13 +96,6 @@ https://github.com/google-gemini/gemini-cli/compare/v0.20.0-nightly.20251201.2fe
   https://github.com/google-gemini/gemini-cli/pull/14182
 - fix(core): handle EPIPE error in hook runner when writing to stdin by
   @SandyTao520 in https://github.com/google-gemini/gemini-cli/pull/14231
-
-### New Contributors
-
-- @maryamariyan made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13497
-- @korade-krushna made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/14182
 
 **Full Changelog**:
 https://github.com/google-gemini/gemini-cli/compare/v0.20.0-nightly.20251127.5bed97064...v0.20.0-nightly.20251201.2fe609cb6
@@ -345,19 +323,6 @@ https://github.com/google-gemini/gemini-cli/compare/v0.19.0-nightly.20251125.f6d
   a single command: `gemini extensions uninstall`.
 
 ![Uninstalling Gemini extensions with a single command](https://i.imgur.com/pi7nEBI.png)
-
-And a huge shout out to our new contributors:
-
-- @aswinashok44 made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13291
-- @gmackall made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13312
-- @avilladsen made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13352
-- @holtskinner made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13289
-- @kevin-ramdass made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/13454
 
 ## What's changed
 
