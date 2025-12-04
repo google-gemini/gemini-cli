@@ -149,7 +149,9 @@ describe('getInstallationInfo', () => {
     );
     expect(info.packageManager).toBe(PackageManager.HOMEBREW);
     expect(info.isGlobal).toBe(true);
-    expect(info.updateMessage).toContain('brew upgrade');
+    expect(info.updateMessage).toBe(
+      'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
+    );
   });
 
   it('should fall through if brew command fails', () => {
