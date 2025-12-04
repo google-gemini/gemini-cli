@@ -12,11 +12,11 @@ on GitHub.
 
 ## Current releases
 
-| Release channel | Release                                          | Notes                                           |
-| :-------------- | :----------------------------------------------- | :---------------------------------------------- |
-| Nightly         | [v0.20.0-nightly.20251202.29920b16d](nightly.md) | Nightly release with the most recent changes.   |
-| Preview         | [v0.19.0-preview.0](preview.md)                  | Experimental features ready for early feedback. |
-| Stable          | [v0.18.0](latest.md)                             | Stable, recommended for general use.            |
+| Release channel       | Notes                                           |
+| :-------------------- | :---------------------------------------------- |
+| [Nightly](nightly.md) | Nightly release with the most recent changes.   |
+| [Preview](preview.md) | Experimental features ready for early feedback. |
+| [Stable](latest.md)   | Stable, recommended for general use.            |
 
 ## Announcements: v0.19.0 - 2025-11-24
 
