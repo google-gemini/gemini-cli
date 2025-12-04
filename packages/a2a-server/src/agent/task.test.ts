@@ -18,20 +18,21 @@ import {
   GeminiEventType,
   type Config,
   type ToolCallRequestInfo,
+  type GitService,
 } from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus } from '@a2a-js/sdk/server';
 import { CoderAgentEvent } from '../types.js';
 import type { ToolCall } from '@google/gemini-cli-core';
 
-const mockSaveRestorableToolCall = vi.hoisted(() => vi.fn());
+const mockProcessRestorableToolCalls = vi.hoisted(() => vi.fn());
 
-vi.mock('../utils/checkpoint_utils.js', async (importOriginal) => {
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
-    await importOriginal<typeof import('../utils/checkpoint_utils.js')>();
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...original,
-    saveRestorableToolCall: mockSaveRestorableToolCall,
+    processRestorableToolCalls: mockProcessRestorableToolCalls,
   };
 });
 
@@ -116,10 +117,19 @@ describe('Task', () => {
       ];
       const abortController = new AbortController();
       await task.scheduleToolCalls(requests, abortController.signal);
-      expect(mockSaveRestorableToolCall).not.toHaveBeenCalled();
+      expect(mockProcessRestorableToolCalls).not.toHaveBeenCalled();
     });
 
     it('should create a checkpoint if a restorable tool is called', async () => {
+      const mockConfig = createMockConfig({
+        getCheckpointingEnabled: () => true,
+        getGitService: () => Promise.resolve({} as GitService),
+      });
+      mockProcessRestorableToolCalls.mockResolvedValue({
+        checkpointsToWrite: new Map([['test.json', 'test content']]),
+        toolCallToCheckpointMap: new Map(),
+        errors: [],
+      });
       // @ts-expect-error - Calling private constructor for test purposes.
       const task = new Task(
         'task-id',
@@ -142,10 +152,25 @@ describe('Task', () => {
       ];
       const abortController = new AbortController();
       await task.scheduleToolCalls(requests, abortController.signal);
-      expect(mockSaveRestorableToolCall).toHaveBeenCalledOnce();
+      expect(mockProcessRestorableToolCalls).toHaveBeenCalledOnce();
     });
 
-    it('should only create one checkpoint even if multiple restorable tools are called', async () => {
+    it('should process all restorable tools for checkpointing in a single batch', async () => {
+      const mockConfig = createMockConfig({
+        getCheckpointingEnabled: () => true,
+        getGitService: () => Promise.resolve({} as GitService),
+      });
+      mockProcessRestorableToolCalls.mockResolvedValue({
+        checkpointsToWrite: new Map([
+          ['test1.json', 'test content 1'],
+          ['test2.json', 'test content 2'],
+        ]),
+        toolCallToCheckpointMap: new Map([
+          ['1', 'test1'],
+          ['2', 'test2'],
+        ]),
+        errors: [],
+      });
       // @ts-expect-error - Calling private constructor for test purposes.
       const task = new Task(
         'task-id',
@@ -172,37 +197,24 @@ describe('Task', () => {
           isClientInitiated: false,
           prompt_id: 'prompt-id-2',
         },
-      ];
-      const abortController = new AbortController();
-      await task.scheduleToolCalls(requests, abortController.signal);
-      expect(mockSaveRestorableToolCall).toHaveBeenCalledOnce();
-    });
-
-    it('should not create a new checkpoint if one already exists', async () => {
-      // @ts-expect-error - Calling private constructor for test purposes.
-      const task = new Task(
-        'task-id',
-        'context-id',
-        mockConfig as Config,
-        mockEventBus,
-      );
-      task.checkpoint = 'existing-checkpoint';
-      const requests: ToolCallRequestInfo[] = [
         {
-          callId: '1',
-          name: 'replace',
-          args: {
-            file_path: 'test.txt',
-            old_string: 'old',
-            new_string: 'new',
-          },
+          callId: '3',
+          name: 'not_restorable',
+          args: {},
           isClientInitiated: false,
-          prompt_id: 'prompt-id-1',
+          prompt_id: 'prompt-id-3',
         },
       ];
       const abortController = new AbortController();
       await task.scheduleToolCalls(requests, abortController.signal);
-      expect(mockSaveRestorableToolCall).not.toHaveBeenCalled();
+      expect(mockProcessRestorableToolCalls).toHaveBeenCalledExactlyOnceWith(
+        [
+          expect.objectContaining({ callId: '1' }),
+          expect.objectContaining({ callId: '2' }),
+        ],
+        expect.anything(),
+        expect.anything(),
+      );
     });
   });
 
@@ -386,9 +398,6 @@ describe('Task', () => {
         undefined,
         undefined,
         true, // final: true
-        undefined,
-        undefined,
-        undefined,
       );
     });
 

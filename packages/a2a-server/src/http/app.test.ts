@@ -978,13 +978,13 @@ describe('E2E Tests', () => {
         description: 'a mock command',
         execute: vi.fn().mockResolvedValue({
           name: 'restore',
-          data: (async function* () {
-            yield {
+          data: [
+            {
               type: 'message',
               messageType: 'info',
               content: 'No restorable checkpoints found.',
-            };
-          })(),
+            },
+          ],
         }),
       };
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockRestoreCommand);
@@ -1014,13 +1014,13 @@ describe('E2E Tests', () => {
         description: 'a mock command',
         execute: vi.fn().mockResolvedValue({
           name: 'restore',
-          data: (async function* () {
-            yield {
+          data: [
+            {
               type: 'message',
               messageType: 'info',
               content: 'Available checkpoints to restore:\n\ncheckpoint1',
-            };
-          })(),
+            },
+          ],
         }),
       };
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockRestoreCommand);
@@ -1050,15 +1050,15 @@ describe('E2E Tests', () => {
         description: 'a mock command',
         execute: vi.fn().mockResolvedValue({
           name: 'restore list',
-          data: (async function* () {
-            yield {
+          data: [
+            {
               type: 'message',
               messageType: 'info',
               content: JSON.stringify([
                 { file: 'checkpoint1.json', description: 'Test' },
               ]),
-            };
-          })(),
+            },
+          ],
         }),
       };
       vi.spyOn(commandRegistry, 'get').mockReturnValue(

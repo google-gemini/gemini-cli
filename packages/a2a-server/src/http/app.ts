@@ -21,7 +21,6 @@ import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { commandRegistry } from '../commands/command-registry.js';
 import { SimpleExtensionLoader } from '@google/gemini-cli-core';
-import type { CommandActionReturn } from '@google/gemini-cli-core';
 import type { Command, CommandArgument } from '../commands/types.js';
 import { GitService } from '@google/gemini-cli-core';
 
@@ -176,51 +175,6 @@ export async function createApp() {
         }
 
         const result = await commandToExecute.execute(context, args ?? []);
-
-        // Check if data is an async generator
-        function isAsyncGenerator(
-          data: unknown,
-        ): data is AsyncGenerator<CommandActionReturn> {
-          return (
-            data != null &&
-            typeof (data as AsyncGenerator<CommandActionReturn>)[
-              Symbol.asyncIterator
-            ] === 'function'
-          );
-        }
-
-        const data = result.data;
-        if (isAsyncGenerator(data)) {
-          const processedChunks = [];
-          for await (const chunk of data) {
-            if (chunk.type === 'tool') {
-              const toolRegistry = context.config.getToolRegistry();
-              const tool = toolRegistry.getTool(chunk.toolName);
-              if (tool) {
-                const abortController = new AbortController();
-                const signal = abortController.signal;
-                const shellExecutionConfig = {};
-                const toolResult = await tool.buildAndExecute(
-                  chunk.toolArgs,
-                  signal,
-                  undefined,
-                  shellExecutionConfig,
-                );
-                processedChunks.push(toolResult);
-              } else {
-                processedChunks.push({
-                  type: 'error',
-                  message: `Tool ${chunk.toolName} not found`,
-                });
-              }
-            } else {
-              processedChunks.push(chunk);
-            }
-          }
-          return res
-            .status(200)
-            .json({ name: result.name, data: processedChunks });
-        }
         return res.status(200).json(result);
       } catch (e) {
         logger.error('Error executing /executeCommand:', e);

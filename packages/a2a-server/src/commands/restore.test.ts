@@ -4,17 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RestoreCommand, ListCheckpointsCommand } from './restore.js';
 import type { CommandContext } from './types.js';
 import type { Config } from '@google/gemini-cli-core';
+import { createMockConfig } from '../utils/testing_utils.js';
 
-const mockListCheckpointFiles = vi.hoisted(() => vi.fn());
-const mockReadCheckpointData = vi.hoisted(() => vi.fn());
-const mockGetCheckpointInfoList = vi.hoisted(() => vi.fn());
-const mockGetFormattedCheckpointList = vi.hoisted(() => vi.fn());
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
 const mockPerformRestore = vi.hoisted(() => vi.fn());
 const mockLoggerInfo = vi.hoisted(() => vi.fn());
+const mockGetCheckpointInfoList = vi.hoisted(() => vi.fn());
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
@@ -22,15 +24,17 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...original,
     performRestore: mockPerformRestore,
+    getCheckpointInfoList: mockGetCheckpointInfoList,
   };
 });
 
-vi.mock('../utils/checkpoint_utils.js', () => ({
-  listCheckpointFiles: mockListCheckpointFiles,
-  readCheckpointData: mockReadCheckpointData,
-  getCheckpointInfoList: mockGetCheckpointInfoList,
-  getFormattedCheckpointList: mockGetFormattedCheckpointList,
+const mockFs = vi.hoisted(() => ({
+  readFile: vi.fn(),
+  readdir: vi.fn(),
+  mkdir: vi.fn(),
 }));
+
+vi.mock('node:fs/promises', () => mockFs);
 
 vi.mock('../utils/logger.js', () => ({
   logger: {
@@ -40,36 +44,44 @@ vi.mock('../utils/logger.js', () => ({
 
 describe('RestoreCommand', () => {
   const mockConfig = {
-    config: {} as Config,
+    config: createMockConfig() as Config,
+    git: {},
   } as CommandContext;
 
-  it('should show "no checkpoints" message when none are found', async () => {
+  it('should return error if no checkpoint name is provided', async () => {
     const command = new RestoreCommand();
-    mockListCheckpointFiles.mockResolvedValue([]);
     const result = await command.execute(mockConfig, []);
-    const data = result.data as AsyncGenerator;
-    const yieldedValue = (await data.next()).value;
-    expect(yieldedValue.content).toEqual('No restorable checkpoints found.');
-  });
-
-  it('should list available checkpoints when no arguments are provided', async () => {
-    const command = new RestoreCommand();
-    mockListCheckpointFiles.mockResolvedValue(['checkpoint1.json']);
-    mockGetFormattedCheckpointList.mockResolvedValue('checkpoint1');
-    const result = await command.execute(mockConfig, []);
-    const data = result.data as AsyncGenerator;
-    const yieldedValue = (await data.next()).value;
-    expect(yieldedValue.content).toContain('Available checkpoints to restore:');
-    expect(yieldedValue.content).toContain('checkpoint1');
+    expect(result.data).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'Please provide a checkpoint name to restore.',
+    });
   });
 
   it('should restore a checkpoint when a valid file is provided', async () => {
     const command = new RestoreCommand();
-    mockListCheckpointFiles.mockResolvedValue(['checkpoint1.json']);
-    mockReadCheckpointData.mockResolvedValue({});
-    mockPerformRestore.mockResolvedValue('Restored');
+    const toolCallData = {
+      toolCall: {
+        name: 'test-tool',
+        args: {},
+      },
+      history: [],
+      clientHistory: [],
+      commitHash: '123',
+    };
+    mockFs.readFile.mockResolvedValue(JSON.stringify(toolCallData));
+    const restoreContent = {
+      type: 'message',
+      messageType: 'info',
+      content: 'Restored',
+    };
+    mockPerformRestore.mockReturnValue(
+      (async function* () {
+        yield restoreContent;
+      })(),
+    );
     const result = await command.execute(mockConfig, ['checkpoint1.json']);
-    expect(result.data).toEqual('Restored');
+    expect(result.data).toEqual([restoreContent]);
     expect(mockLoggerInfo).toHaveBeenCalledWith(
       '[Command] Restored to checkpoint checkpoint1.json.',
     );
@@ -77,46 +89,52 @@ describe('RestoreCommand', () => {
 
   it('should show "file not found" error for a non-existent checkpoint', async () => {
     const command = new RestoreCommand();
-    mockListCheckpointFiles.mockResolvedValue(['checkpoint1.json']);
+    const error = new Error('File not found');
+    (error as NodeJS.ErrnoException).code = 'ENOENT';
+    mockFs.readFile.mockRejectedValue(error);
     const result = await command.execute(mockConfig, ['checkpoint2.json']);
-    const data = result.data as AsyncGenerator;
-    const yieldedValue = (await data.next()).value;
-    expect(yieldedValue.content).toEqual('File not found: checkpoint2.json');
+    expect(result.data).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'File not found: checkpoint2.json',
+    });
   });
 
-  it('should handle errors when listing checkpoints', async () => {
+  it('should handle invalid JSON in checkpoint file', async () => {
     const command = new RestoreCommand();
-    mockListCheckpointFiles.mockRejectedValue(new Error('Read error'));
-    const result = await command.execute(mockConfig, []);
-    const data = result.data as AsyncGenerator;
-    const yieldedValue = (await data.next()).value;
-    expect(yieldedValue.content).toContain(
-      'Could not read restorable checkpoints.',
+    mockFs.readFile.mockResolvedValue('invalid json');
+    const result = await command.execute(mockConfig, ['checkpoint1.json']);
+    expect((result.data as { content: string }).content).toContain(
+      'Unexpected token',
     );
   });
 });
 
 describe('ListCheckpointsCommand', () => {
   const mockConfig = {
-    config: {} as Config,
+    config: createMockConfig() as Config,
   } as CommandContext;
 
   it('should list all available checkpoints', async () => {
     const command = new ListCheckpointsCommand();
     const checkpointInfo = [{ file: 'checkpoint1.json', description: 'Test' }];
-    mockGetCheckpointInfoList.mockResolvedValue(checkpointInfo);
+    mockFs.readdir.mockResolvedValue(['checkpoint1.json']);
+    mockFs.readFile.mockResolvedValue(
+      JSON.stringify({ toolCall: { name: 'Test', args: {} } }),
+    );
+    mockGetCheckpointInfoList.mockReturnValue(checkpointInfo);
     const result = await command.execute(mockConfig);
-    const data = result.data as AsyncGenerator;
-    const yieldedValue = (await data.next()).value;
-    expect(yieldedValue.content).toEqual(JSON.stringify(checkpointInfo));
+    expect((result.data as { content: string }).content).toEqual(
+      JSON.stringify(checkpointInfo),
+    );
   });
 
   it('should handle errors when listing checkpoints', async () => {
     const command = new ListCheckpointsCommand();
-    mockGetCheckpointInfoList.mockRejectedValue(new Error('Read error'));
+    mockFs.readdir.mockRejectedValue(new Error('Read error'));
     const result = await command.execute(mockConfig);
-    const data = result.data as AsyncGenerator;
-    const yieldedValue = (await data.next()).value;
-    expect(yieldedValue.content).toContain('Could not read checkpoints.');
+    expect((result.data as { content: string }).content).toContain(
+      'Could not read checkpoints.',
+    );
   });
 });

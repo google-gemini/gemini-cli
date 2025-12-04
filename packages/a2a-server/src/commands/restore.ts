@@ -4,18 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { performRestore } from '@google/gemini-cli-core';
+import {
+  getCheckpointInfoList,
+  getToolCallDataSchema,
+  isNodeError,
+  performRestore,
+} from '@google/gemini-cli-core';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import type {
   Command,
   CommandContext,
   CommandExecutionResponse,
 } from './types.js';
-import {
-  listCheckpointFiles,
-  readCheckpointData,
-  getCheckpointInfoList,
-  getFormattedCheckpointList,
-} from '../utils/checkpoint_utils.js';
 import { logger } from '../utils/logger.js';
 
 export class RestoreCommand implements Command {
@@ -33,31 +34,14 @@ export class RestoreCommand implements Command {
     const argsStr = args.join(' ');
 
     try {
-      const jsonFiles = await listCheckpointFiles(config);
-
       if (!argsStr) {
-        if (jsonFiles.length === 0) {
-          return {
-            name: this.name,
-            data: (async function* () {
-              yield {
-                type: 'message',
-                messageType: 'info',
-                content: 'No restorable checkpoints found.',
-              };
-            })(),
-          };
-        }
-        const fileList = await getFormattedCheckpointList(config);
         return {
           name: this.name,
-          data: (async function* () {
-            yield {
-              type: 'message',
-              messageType: 'info',
-              content: `Available checkpoints to restore:\n\n${fileList}`,
-            };
-          })(),
+          data: {
+            type: 'message',
+            messageType: 'error',
+            content: 'Please provide a checkpoint name to restore.',
+          },
         };
       }
 
@@ -65,21 +49,49 @@ export class RestoreCommand implements Command {
         ? argsStr
         : `${argsStr}.json`;
 
-      if (!jsonFiles.includes(selectedFile)) {
-        return {
-          name: this.name,
-          data: (async function* () {
-            yield {
+      const checkpointDir = config.storage.getProjectTempCheckpointsDir();
+      const filePath = path.join(checkpointDir, selectedFile);
+
+      let data: string;
+      try {
+        data = await fs.readFile(filePath, 'utf-8');
+      } catch (error) {
+        if (isNodeError(error) && error.code === 'ENOENT') {
+          return {
+            name: this.name,
+            data: {
               type: 'message',
               messageType: 'error',
               content: `File not found: ${selectedFile}`,
-            };
-          })(),
+            },
+          };
+        }
+        throw error;
+      }
+
+      const toolCallData = JSON.parse(data);
+      const ToolCallDataSchema = getToolCallDataSchema();
+      const parseResult = ToolCallDataSchema.safeParse(toolCallData);
+
+      if (!parseResult.success) {
+        return {
+          name: this.name,
+          data: {
+            type: 'message',
+            messageType: 'error',
+            content: `Checkpoint file is invalid: ${parseResult.error.message}`,
+          },
         };
       }
 
-      const toolCallData = await readCheckpointData(config, selectedFile);
-      const restoreResult = await performRestore(toolCallData, gitService);
+      const restoreResultGenerator = performRestore(
+        parseResult.data,
+        gitService,
+      );
+      const restoreResult = [];
+      for await (const result of restoreResultGenerator) {
+        restoreResult.push(result);
+      }
 
       logger.info(`[Command] Restored to checkpoint ${argsStr}.`);
 
@@ -90,13 +102,11 @@ export class RestoreCommand implements Command {
     } catch (error) {
       return {
         name: this.name,
-        data: (async function* () {
-          yield {
-            type: 'message',
-            messageType: 'error',
-            content: `Could not read restorable checkpoints. This is the error: ${error}`,
-          };
-        })(),
+        data: {
+          type: 'message',
+          messageType: 'error',
+          content: `Could not read restorable checkpoints. This is the error: ${error}`,
+        },
       };
     }
   }
@@ -111,28 +121,36 @@ export class ListCheckpointsCommand implements Command {
     const { config } = context;
 
     try {
-      const checkpointInfoList = await getCheckpointInfoList(config);
+      const checkpointDir = config.storage.getProjectTempCheckpointsDir();
+      await fs.mkdir(checkpointDir, { recursive: true });
+      const files = await fs.readdir(checkpointDir);
+      const jsonFiles = files.filter((file) => file.endsWith('.json'));
+
+      const checkpointFiles = new Map<string, string>();
+      for (const file of jsonFiles) {
+        const filePath = path.join(checkpointDir, file);
+        const data = await fs.readFile(filePath, 'utf-8');
+        checkpointFiles.set(file, data);
+      }
+
+      const checkpointInfoList = getCheckpointInfoList(checkpointFiles);
 
       return {
         name: this.name,
-        data: (async function* () {
-          yield {
-            type: 'message',
-            messageType: 'info',
-            content: JSON.stringify(checkpointInfoList),
-          };
-        })(),
+        data: {
+          type: 'message',
+          messageType: 'info',
+          content: JSON.stringify(checkpointInfoList),
+        },
       };
     } catch (error) {
       return {
         name: this.name,
-        data: (async function* () {
-          yield {
-            type: 'message',
-            messageType: 'error',
-            content: `Could not read checkpoints. This is the error: ${error}`,
-          };
-        })(),
+        data: {
+          type: 'message',
+          messageType: 'error',
+          content: `Could not read checkpoints. This is the error: ${error}`,
+        },
       };
     }
   }

@@ -555,9 +555,6 @@ export class CoderAgentExecutor implements AgentExecutor {
         undefined,
         undefined,
         true,
-        undefined,
-        undefined,
-        currentTask.checkpoint,
       );
     } catch (error) {
       if (abortSignal.aborted) {

@@ -27,6 +27,8 @@ import {
   type Config,
   type UserTierId,
   type AnsiOutput,
+  EDIT_TOOL_NAMES,
+  processRestorableToolCalls,
 } from '@google/gemini-cli-core';
 import type { RequestContext } from '@a2a-js/sdk/server';
 import { type ExecutionEventBus } from '@a2a-js/sdk/server';
@@ -40,7 +42,8 @@ import type {
 } from '@a2a-js/sdk';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { CoderAgentEvent } from '../types.js';
 import type {
   CoderAgentMessage,
@@ -52,17 +55,9 @@ import type {
   ThoughtSummary,
   Citation,
 } from '../types.js';
-import { saveRestorableToolCall } from '../utils/checkpoint_utils.js';
 import type { PartUnion, Part as genAiPart } from '@google/genai';
 
 type UnionKeys<T> = T extends T ? keyof T : never;
-
-const RESTORABLE_TOOLS = new Set([
-  'replace',
-  'write_file',
-  'delete_file',
-  'edit',
-]);
 
 export class Task {
   id: string;
@@ -74,7 +69,6 @@ export class Task {
   taskState: TaskState;
   eventBus?: ExecutionEventBus;
   completedToolCalls: CompletedToolCall[];
-  checkpoint?: string;
   skipFinalTrueAfterInlineEdit = false;
   modelInfo?: string;
 
@@ -232,7 +226,6 @@ export class Task {
     timestamp?: string,
     metadataError?: string,
     traceId?: string,
-    checkpoint?: string,
   ): TaskStatusUpdateEvent {
     const metadata: {
       coderAgent: CoderAgentMessage;
@@ -240,7 +233,6 @@ export class Task {
       userTier?: UserTierId;
       error?: string;
       traceId?: string;
-      checkpoint?: string;
     } = {
       coderAgent: coderAgentMessage,
       model: this.modelInfo || this.config.getModel(),
@@ -253,10 +245,6 @@ export class Task {
 
     if (traceId) {
       metadata.traceId = traceId;
-    }
-
-    if (checkpoint) {
-      metadata.checkpoint = checkpoint;
     }
 
     return {
@@ -281,7 +269,6 @@ export class Task {
     final = false,
     metadataError?: string,
     traceId?: string,
-    checkpoint?: string,
   ): void {
     this.taskState = newState;
     let message: Message | undefined;
@@ -307,7 +294,6 @@ export class Task {
       undefined,
       metadataError,
       traceId,
-      checkpoint,
     );
     this.eventBus?.publish(event);
   }
@@ -403,10 +389,6 @@ export class Task {
           coderAgentMessage,
           message,
           false, // Always false for these continuous updates
-          undefined,
-          undefined,
-          undefined,
-          this.checkpoint,
         );
         this.eventBus?.publish(event);
       }
@@ -448,9 +430,6 @@ export class Task {
         undefined,
         undefined,
         /*final*/ true,
-        undefined,
-        undefined,
-        this.checkpoint,
       );
     }
   }
@@ -532,7 +511,7 @@ export class Task {
     new_string: string,
   ): Promise<string> {
     try {
-      const currentContent = fs.readFileSync(file_path, 'utf8');
+      const currentContent = await fs.readFile(file_path, 'utf8');
       return this._applyReplacement(
         currentContent,
         old_string,
@@ -576,16 +555,39 @@ export class Task {
     }
 
     // Set checkpoint file before any file modification tool executes
-    if (!this.checkpoint) {
-      for (const request of requests) {
-        if (RESTORABLE_TOOLS.has(request.name)) {
-          const currentCheckpoint = await saveRestorableToolCall(
-            request,
-            this.config,
+    const restorableToolCalls = requests.filter((request) =>
+      EDIT_TOOL_NAMES.has(request.name),
+    );
+
+    if (restorableToolCalls.length > 0) {
+      const gitService = await this.config.getGitService();
+      if (gitService) {
+        const { checkpointsToWrite, toolCallToCheckpointMap, errors } =
+          await processRestorableToolCalls(
+            restorableToolCalls,
+            gitService,
             this.geminiClient,
           );
-          this.checkpoint = currentCheckpoint;
-          break;
+
+        if (errors.length > 0) {
+          errors.forEach((error) => logger.error(error));
+        }
+
+        if (checkpointsToWrite.size > 0) {
+          const checkpointDir =
+            this.config.storage.getProjectTempCheckpointsDir();
+          await fs.mkdir(checkpointDir, { recursive: true });
+          for (const [fileName, content] of checkpointsToWrite) {
+            const filePath = path.join(checkpointDir, fileName);
+            await fs.writeFile(filePath, content);
+          }
+        }
+
+        for (const request of requests) {
+          const checkpoint = toolCallToCheckpointMap.get(request.callId);
+          if (checkpoint) {
+            request.checkpoint = checkpoint;
+          }
         }
       }
     }
@@ -908,7 +910,6 @@ export class Task {
     requestContext: RequestContext,
     aborted: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
-    this.checkpoint = undefined;
     const userMessage = requestContext.userMessage;
     const llmParts: PartUnion[] = [];
     let anyConfirmationHandled = false;
