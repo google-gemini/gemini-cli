@@ -144,4 +144,25 @@ describe('performRestore', () => {
     const nextResult = await generator.next();
     expect(nextResult.done).toBe(true);
   });
+
+  it('should yield error message if commitHash is present but gitService is undefined', async () => {
+    const toolCallData: ToolCallData = {
+      toolCall: { name: 'test', args: {} },
+      commitHash: 'test-commit-hash',
+    };
+
+    const generator = performRestore(toolCallData, undefined);
+    const result = await generator.next();
+
+    expect(result.value).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content:
+        'Git service is not available, cannot restore checkpoint. Please ensure you are in a git repository.',
+    });
+    expect(result.done).toBe(false);
+
+    const nextResult = await generator.next();
+    expect(nextResult.done).toBe(true);
+  });
 });

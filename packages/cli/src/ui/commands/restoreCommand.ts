@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
+import { z } from 'zod';
 import {
   type Config,
   performRestore,
@@ -19,6 +20,31 @@ import {
 } from './types.js';
 import type { HistoryItem } from '../types.js';
 import type { Content } from '@google/genai';
+
+const HistoryItemSchema = z
+  .object({
+    type: z.string(),
+    id: z.number(),
+  })
+  .passthrough();
+
+const ContentSchema = z
+  .object({
+    role: z.string().optional(),
+    parts: z.array(z.record(z.unknown())),
+  })
+  .passthrough();
+
+const ToolCallDataSchema = z.object({
+  history: z.array(HistoryItemSchema).optional(),
+  clientHistory: z.array(ContentSchema).optional(),
+  commitHash: z.string().optional(),
+  toolCall: z.object({
+    name: z.string(),
+    args: z.record(z.unknown()),
+  }),
+  messageId: z.string().optional(),
+});
 
 async function restoreAction(
   context: CommandContext,
@@ -80,7 +106,23 @@ async function restoreAction(
 
     const filePath = path.join(checkpointDir, selectedFile);
     const data = await fs.readFile(filePath, 'utf-8');
-    const toolCallData = JSON.parse(data) as ToolCallData;
+    const parseResult = ToolCallDataSchema.safeParse(JSON.parse(data));
+
+    if (!parseResult.success) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Checkpoint file is invalid: ${parseResult.error.message}`,
+      };
+    }
+
+    // We safely cast here because:
+    // 1. ToolCallDataSchema strictly validates the existence of 'history' as an array and 'id'/'type' on each item.
+    // 2. We trust that files valid according to this schema (written by useGeminiStream) contain the full HistoryItem structure.
+    const toolCallData = parseResult.data as ToolCallData<
+      HistoryItem[],
+      Record<string, unknown>
+    >;
 
     const actionStream = performRestore(toolCallData, gitService);
 
@@ -94,7 +136,7 @@ async function restoreAction(
           Date.now(),
         );
       } else if (action.type === 'load_history' && loadHistory) {
-        loadHistory(action.history as HistoryItem[]);
+        loadHistory(action.history);
         if (action.clientHistory) {
           await config
             ?.getGeminiClient()
@@ -106,7 +148,7 @@ async function restoreAction(
     return {
       type: 'tool',
       toolName: toolCallData.toolCall.name,
-      toolArgs: toolCallData.toolCall.args as Record<string, unknown>,
+      toolArgs: toolCallData.toolCall.args,
     };
   } catch (error) {
     return {

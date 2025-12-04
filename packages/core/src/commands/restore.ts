@@ -8,21 +8,24 @@ import type { Content } from '@google/genai';
 import type { GitService } from '../services/gitService.js';
 import type { CommandActionReturn } from './types.js';
 
-export interface ToolCallData {
-  history?: unknown;
+export interface ToolCallData<HistoryType = unknown, ArgsType = unknown> {
+  history?: HistoryType;
   clientHistory?: Content[];
   commitHash?: string;
   toolCall: {
     name: string;
-    args: unknown;
+    args: ArgsType;
   };
   messageId?: string;
 }
 
-export async function* performRestore(
-  toolCallData: ToolCallData,
+export async function* performRestore<
+  HistoryType = unknown,
+  ArgsType = unknown,
+>(
+  toolCallData: ToolCallData<HistoryType, ArgsType>,
   gitService: GitService | undefined,
-): AsyncGenerator<CommandActionReturn> {
+): AsyncGenerator<CommandActionReturn<HistoryType>> {
   if (toolCallData.history && toolCallData.clientHistory) {
     yield {
       type: 'load_history',
@@ -31,7 +34,17 @@ export async function* performRestore(
     };
   }
 
-  if (toolCallData.commitHash && gitService) {
+  if (toolCallData.commitHash) {
+    if (!gitService) {
+      yield {
+        type: 'message',
+        messageType: 'error',
+        content:
+          'Git service is not available, cannot restore checkpoint. Please ensure you are in a git repository.',
+      };
+      return;
+    }
+
     try {
       await gitService.restoreProjectFromSnapshot(toolCallData.commitHash);
       yield {

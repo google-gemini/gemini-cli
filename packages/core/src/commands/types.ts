@@ -28,9 +28,9 @@ export interface MessageActionReturn {
  * The return type for a command action that results in replacing
  * the entire conversation history.
  */
-export interface LoadHistoryActionReturn {
+export interface LoadHistoryActionReturn<HistoryType = unknown> {
   type: 'load_history';
-  history: unknown;
+  history: HistoryType;
   clientHistory: Content[]; // The history for the generative client
 }
 
@@ -43,8 +43,8 @@ export interface SubmitPromptActionReturn {
   content: PartListUnion;
 }
 
-export type CommandActionReturn =
+export type CommandActionReturn<HistoryType = unknown> =
   | ToolActionReturn
   | MessageActionReturn
-  | LoadHistoryActionReturn
+  | LoadHistoryActionReturn<HistoryType>
   | SubmitPromptActionReturn;

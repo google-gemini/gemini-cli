@@ -143,7 +143,7 @@ export interface OpenCustomDialogActionReturn {
 }
 
 export type SlashCommandActionReturn =
-  | CommandActionReturn
+  | CommandActionReturn<HistoryItemWithoutId[]>
   | QuitActionReturn
   | OpenDialogActionReturn
   | ConfirmShellCommandsActionReturn
