@@ -553,7 +553,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const slashCommandActions = useMemo(
     () => ({
       openAuthDialog: () => setAuthState(AuthState.Updating),
-      logout: () => setAuthState(AuthState.Unauthenticated),
       openThemeDialog,
       openEditorDialog,
       openPrivacyNotice: () => setShowPrivacyNotice(true),
