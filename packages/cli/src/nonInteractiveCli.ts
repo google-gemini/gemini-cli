@@ -346,6 +346,8 @@ export async function runNonInteractive({
             }
           } else if (event.type === GeminiEventType.Error) {
             throw event.value.error;
+          } else if (event.type === GeminiEventType.InvalidStream) {
+            throw new Error('Stream ended with invalid content.');
           }
         }
 
