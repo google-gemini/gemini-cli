@@ -714,7 +714,7 @@ export function SettingsDialog({
           } else if (newIndex >= scrollOffset + effectiveMaxItemsToShow) {
             setScrollOffset(newIndex - effectiveMaxItemsToShow + 1);
           }
-        } else if (keyMatchers[Command.RETURN](key) || name === 'space') {
+        } else if (keyMatchers[Command.RETURN](key)) {
           const currentItem = items[activeSettingIndex];
           if (
             currentItem?.type === 'number' ||
