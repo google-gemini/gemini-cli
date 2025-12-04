@@ -124,8 +124,6 @@ function buildResourceCandidates(
     } satisfies ResourceSuggestionCandidate;
   });
 
-  // Template instantiation via @ will be added in a follow-up. For now we only
-  // surface concrete resources that can be read directly via resources/read.
   return resources;
 }
 
