@@ -49,21 +49,20 @@ describe('ResourceRegistry', () => {
     expect(resources[0].uri).toBe('baz');
   });
 
-  it('finds resources by uri across servers', () => {
+  it('finds resources by serverName:uri identifier', () => {
     registry.setResourcesForServer('a', [createResource()]);
     registry.setResourcesForServer('b', [
       createResource({ uri: 'file:///tmp/bar.txt' }),
     ]);
 
-    expect(registry.findResourceByUri('file:///tmp/bar.txt')?.serverName).toBe(
-      'b',
-    );
     expect(
-      registry.findResourceByUri('file:///tmp/bar.txt', 'b')?.serverName,
+      registry.findResourceByUri('b:file:///tmp/bar.txt')?.serverName,
     ).toBe('b');
     expect(
-      registry.findResourceByUri('file:///tmp/bar.txt', 'a'),
-    ).toBeUndefined();
+      registry.findResourceByUri('a:file:///tmp/foo.txt')?.serverName,
+    ).toBe('a');
+    expect(registry.findResourceByUri('a:file:///tmp/bar.txt')).toBeUndefined();
+    expect(registry.findResourceByUri('nonexistent')).toBeUndefined();
   });
 
   it('clears resources for a server', () => {

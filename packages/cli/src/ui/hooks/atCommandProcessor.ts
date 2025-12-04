@@ -201,7 +201,7 @@ export async function handleAtCommand({
       return { processedQuery: null, shouldProceed: false };
     }
 
-    // Check if path should be ignored based on filtering options
+    // Check if this is an MCP resource reference (serverName:uri format)
     const resourceMatch = resourceRegistry.findResourceByUri(pathName);
     if (resourceMatch) {
       resourceAttachments.push(resourceMatch);

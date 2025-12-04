@@ -198,7 +198,7 @@ describe('useAtCompletion', () => {
         expect(
           result.current.suggestions.some(
             (suggestion) =>
-              suggestion.value === 'file:///tmp/server-1/logs.txt',
+              suggestion.value === 'server-1:file:///tmp/server-1/logs.txt',
           ),
         ).toBe(true);
       });

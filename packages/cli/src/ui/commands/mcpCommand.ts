@@ -13,7 +13,7 @@ import { CommandKind } from './types.js';
 import type {
   DiscoveredMCPPrompt,
   DiscoveredMCPResource,
-  MessageActionReturn
+  MessageActionReturn,
 } from '@google/gemini-cli-core';
 import {
   DiscoveredMCPTool,

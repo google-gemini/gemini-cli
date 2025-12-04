@@ -1250,18 +1250,20 @@ describe('handleAtCommand', () => {
   });
 
   describe('MCP resource attachments', () => {
-    it('attaches MCP resource content when @uri matches registry', async () => {
+    it('attaches MCP resource content when @serverName:uri matches registry', async () => {
+      const serverName = 'server-1';
       const resourceUri = 'resource://server-1/logs';
+      const prefixedUri = `${serverName}:${resourceUri}`;
       const resource = {
-        serverName: 'server-1',
+        serverName,
         uri: resourceUri,
         name: 'logs',
         discoveredAt: Date.now(),
       } as DiscoveredMCPResource;
 
       vi.spyOn(mockConfig, 'getResourceRegistry').mockReturnValue({
-        findResourceByUri: (uri: string) =>
-          uri === resourceUri ? resource : undefined,
+        findResourceByUri: (identifier: string) =>
+          identifier === prefixedUri ? resource : undefined,
         getAllResources: () => [],
       } as never);
 
@@ -1273,7 +1275,7 @@ describe('handleAtCommand', () => {
       } as never);
 
       const result = await handleAtCommand({
-        query: `@${resourceUri}`,
+        query: `@${prefixedUri}`,
         config: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
@@ -1297,12 +1299,14 @@ describe('handleAtCommand', () => {
     });
 
     it('returns an error if MCP client is unavailable', async () => {
+      const serverName = 'server-1';
       const resourceUri = 'resource://server-1/logs';
+      const prefixedUri = `${serverName}:${resourceUri}`;
       vi.spyOn(mockConfig, 'getResourceRegistry').mockReturnValue({
-        findResourceByUri: (uri: string) =>
-          uri === resourceUri
+        findResourceByUri: (identifier: string) =>
+          identifier === prefixedUri
             ? ({
-                serverName: 'server-1',
+                serverName,
                 uri: resourceUri,
                 discoveredAt: Date.now(),
               } as DiscoveredMCPResource)
@@ -1314,7 +1318,7 @@ describe('handleAtCommand', () => {
       } as never);
 
       const result = await handleAtCommand({
-        query: `@${resourceUri}`,
+        query: `@${prefixedUri}`,
         config: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
