@@ -153,3 +153,6 @@ export * from './hooks/types.js';
 // Export stdio utils
 export * from './utils/stdio.js';
 export * from './utils/terminal.js';
+
+// Export MCP server
+export * from './mcp-server/index.js';

@@ -8,6 +8,7 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
+import { mcpServerCommand } from '../commands/mcp-server.js';
 import type { OutputFormat } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
 import { hooksCommand } from '../commands/hooks.js';
@@ -245,6 +246,8 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     )
     // Register MCP subcommands
     .command(mcpCommand)
+    // Register MCP server command
+    .command(mcpServerCommand)
     // Ensure validation flows through .fail() for clean UX
     .fail((msg, err) => {
       if (err) throw err;
