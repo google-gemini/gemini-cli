@@ -45,6 +45,9 @@ import {
 import { debugLogger } from '@google/gemini-cli-core';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { Config } from '@google/gemini-cli-core';
+import { useUIState } from '../contexts/UIStateContext.js';
+import { useTextBuffer } from './shared/text-buffer.js';
+import { TextInput } from './shared/TextInput.js';
 
 interface FzfResult {
   item: string;
@@ -585,10 +588,6 @@ export function SettingsDialog({
           setSearchQuery((prev) => prev + key.sequence);
           return;
         }
-      } else if (!editingKey && key.sequence === '/') {
-        setIsSearching(true);
-        setSearchQuery('');
-        return;
       }
 
       if (name === 'tab' && showScopeSelection) {
@@ -856,6 +855,21 @@ export function SettingsDialog({
     { isActive: true },
   );
 
+  const { mainAreaWidth } = useUIState();
+  const viewportWidth = mainAreaWidth - 8;
+
+  const buffer = useTextBuffer({
+    initialText: '',
+    initialCursorOffset: 0,
+    viewport: {
+      width: viewportWidth,
+      height: 1,
+    },
+    isValidPath: () => false,
+    singleLine: true,
+    onChange: (text) => setSearchQuery(text),
+  });
+
   return (
     <Box
       borderStyle="round"
@@ -866,25 +880,45 @@ export function SettingsDialog({
       height="100%"
     >
       <Box flexDirection="column" flexGrow={1}>
-        {isSearching || searchQuery ? (
-          <Text bold color={theme.text.accent} wrap="truncate">
-            {isSearching ? '> ' : '  '}Search: {searchQuery}
-            {isSearching ? '_' : ''}
-          </Text>
-        ) : (
-          <Text bold={focusSection === 'settings'} wrap="truncate">
+        <Box marginX={1}>
+          <Text
+            bold={focusSection === 'settings' && !editingKey}
+            wrap="truncate"
+          >
             {focusSection === 'settings' ? '> ' : '  '}Settings{' '}
-            <Text color={theme.text.secondary}>(press / to search)</Text>
           </Text>
-        )}
+        </Box>
+        <Box
+          borderStyle="round"
+          borderColor={
+            editingKey
+              ? theme.border.default
+              : focusSection === 'settings'
+                ? theme.border.focused
+                : theme.border.default
+          }
+          paddingX={1}
+          height={3}
+          marginTop={1}
+        >
+          <TextInput
+            focus={focusSection === 'settings' && !editingKey}
+            buffer={buffer}
+            placeholder="Search to filter"
+          />
+        </Box>
         <Box height={1} />
         {isSearching && visibleItems.length === 0 ? (
-          <Box height={1} flexDirection="column">
+          <Box marginX={1} height={1} flexDirection="column">
             <Text color={theme.text.secondary}>No matches found.</Text>
           </Box>
         ) : (
           <>
-            {showScrollUp && <Text color={theme.text.secondary}>▲</Text>}
+            {showScrollUp && (
+              <Box marginX={1}>
+                <Text color={theme.text.secondary}>▲</Text>
+              </Box>
+            )}
             {visibleItems.map((item, idx) => {
               const isActive =
                 focusSection === 'settings' &&
@@ -969,7 +1003,7 @@ export function SettingsDialog({
 
               return (
                 <React.Fragment key={item.value}>
-                  <Box flexDirection="row" alignItems="center">
+                  <Box marginX={1} flexDirection="row" alignItems="center">
                     <Box minWidth={2} flexShrink={0}>
                       <Text
                         color={
@@ -1011,7 +1045,11 @@ export function SettingsDialog({
                 </React.Fragment>
               );
             })}
-            {showScrollDown && <Text color={theme.text.secondary}>▼</Text>}
+            {showScrollDown && (
+              <Box marginX={1}>
+                <Text color={theme.text.secondary}>▼</Text>
+              </Box>
+            )}
           </>
         )}
 
@@ -1019,7 +1057,7 @@ export function SettingsDialog({
 
         {/* Scope Selection - conditionally visible based on height constraints */}
         {showScopeSelection && (
-          <Box marginTop={1} flexDirection="column">
+          <Box marginX={1} flexDirection="column">
             <Text bold={focusSection === 'scope'} wrap="truncate">
               {focusSection === 'scope' ? '> ' : '  '}Apply To
             </Text>
@@ -1037,15 +1075,19 @@ export function SettingsDialog({
         )}
 
         <Box height={1} />
-        <Text color={theme.text.secondary}>
-          (Use Enter to select
-          {showScopeSelection ? ', Tab to change focus' : ''}, Esc to close)
-        </Text>
-        {showRestartPrompt && (
-          <Text color={theme.status.warning}>
-            To see changes, Gemini CLI must be restarted. Press r to exit and
-            apply changes now.
+        <Box marginX={1}>
+          <Text color={theme.text.secondary}>
+            (Use Enter to select
+            {showScopeSelection ? ', Tab to change focus' : ''}, Esc to close)
           </Text>
+        </Box>
+        {showRestartPrompt && (
+          <Box marginX={1}>
+            <Text color={theme.status.warning}>
+              To see changes, Gemini CLI must be restarted. Press r to exit and
+              apply changes now.
+            </Text>
+          </Box>
         )}
       </Box>
     </Box>
