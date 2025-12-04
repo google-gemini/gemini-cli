@@ -675,6 +675,227 @@ describe('mcp-client', () => {
         expect.stringContaining('Tools updated'),
       );
     });
+
+    it('should handle concurrent updates from multiple servers', async () => {
+      const createMockSdkClient = (toolName: string) => ({
+        connect: vi.fn(),
+        getServerCapabilities: vi
+          .fn()
+          .mockReturnValue({ tools: { listChanged: true } }),
+        setNotificationHandler: vi.fn(),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: toolName,
+              inputSchema: { type: 'object', properties: {} },
+            },
+          ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
+        registerCapabilities: vi.fn().mockResolvedValue({}),
+        setRequestHandler: vi.fn().mockResolvedValue({}),
+      });
+
+      const mockClientA = createMockSdkClient('tool-from-A');
+      const mockClientB = createMockSdkClient('tool-from-B');
+
+      vi.mocked(ClientLib.Client)
+        .mockReturnValueOnce(mockClientA as unknown as ClientLib.Client)
+        .mockReturnValueOnce(mockClientB as unknown as ClientLib.Client);
+
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+
+      const mockedToolRegistry = {
+        removeMcpToolsByServer: vi.fn(),
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+      } as unknown as ToolRegistry;
+
+      const onToolsUpdatedSpy = vi.fn().mockResolvedValue(undefined);
+
+      const clientA = new McpClient(
+        'server-A',
+        { command: 'cmd-a' },
+        mockedToolRegistry,
+        {} as PromptRegistry,
+        workspaceContext,
+        {} as Config,
+        false,
+        onToolsUpdatedSpy,
+      );
+
+      const clientB = new McpClient(
+        'server-B',
+        { command: 'cmd-b' },
+        mockedToolRegistry,
+        {} as PromptRegistry,
+        workspaceContext,
+        {} as Config,
+        false,
+        onToolsUpdatedSpy,
+      );
+
+      await clientA.connect();
+      await clientB.connect();
+
+      const handlerA = mockClientA.setNotificationHandler.mock.calls[0][1];
+      const handlerB = mockClientB.setNotificationHandler.mock.calls[0][1];
+
+      // Trigger burst updates simultaneously
+      await Promise.all([handlerA(), handlerB()]);
+
+      expect(mockedToolRegistry.removeMcpToolsByServer).toHaveBeenCalledWith(
+        'server-A',
+      );
+      expect(mockedToolRegistry.removeMcpToolsByServer).toHaveBeenCalledWith(
+        'server-B',
+      );
+
+      // Verify fetching happened on both clients
+      expect(mockClientA.listTools).toHaveBeenCalled();
+      expect(mockClientB.listTools).toHaveBeenCalled();
+
+      // Verify tools from both servers were registered (2 total calls)
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledTimes(2);
+
+      // Verify the update callback was triggered for both
+      expect(onToolsUpdatedSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('should abort discovery and log error if timeout is exceeded during refresh', async () => {
+      vi.useFakeTimers();
+
+      const mockedClient = {
+        connect: vi.fn(),
+        getServerCapabilities: vi
+          .fn()
+          .mockReturnValue({ tools: { listChanged: true } }),
+        setNotificationHandler: vi.fn(),
+        // Mock listTools to simulate a long running process that respects the abort signal
+        listTools: vi.fn().mockImplementation(
+          async (params, options) =>
+            new Promise((resolve, reject) => {
+              if (options?.signal?.aborted) {
+                return reject(new Error('Operation aborted'));
+              }
+              options?.signal?.addEventListener('abort', () => {
+                reject(new Error('Operation aborted'));
+              });
+              // Intentionally do not resolve immediately to simulate lag
+            }),
+        ),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
+        registerCapabilities: vi.fn().mockResolvedValue({}),
+        setRequestHandler: vi.fn().mockResolvedValue({}),
+      };
+
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+
+      const mockedToolRegistry = {
+        removeMcpToolsByServer: vi.fn(),
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+      } as unknown as ToolRegistry;
+
+      const client = new McpClient(
+        'test-server',
+        // Set a short timeout
+        { command: 'test-command', timeout: 100 },
+        mockedToolRegistry,
+        {} as PromptRegistry,
+        workspaceContext,
+        {} as Config,
+        false,
+      );
+
+      await client.connect();
+
+      const notificationCallback =
+        mockedClient.setNotificationHandler.mock.calls[0][1];
+
+      const refreshPromise = notificationCallback();
+
+      vi.advanceTimersByTime(150);
+
+      await refreshPromise;
+
+      expect(mockedClient.listTools).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          signal: expect.any(AbortSignal),
+        }),
+      );
+
+      expect(mockedToolRegistry.registerTool).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
+    it('should pass abort signal to onToolsUpdated callback', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        getServerCapabilities: vi
+          .fn()
+          .mockReturnValue({ tools: { listChanged: true } }),
+        setNotificationHandler: vi.fn(),
+        listTools: vi.fn().mockResolvedValue({ tools: [] }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
+        registerCapabilities: vi.fn().mockResolvedValue({}),
+        setRequestHandler: vi.fn().mockResolvedValue({}),
+      };
+
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+
+      const mockedToolRegistry = {
+        removeMcpToolsByServer: vi.fn(),
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+      } as unknown as ToolRegistry;
+
+      const onToolsUpdatedSpy = vi.fn().mockResolvedValue(undefined);
+
+      const client = new McpClient(
+        'test-server',
+        { command: 'test-command' },
+        mockedToolRegistry,
+        {} as PromptRegistry,
+        workspaceContext,
+        {} as Config,
+        false,
+        onToolsUpdatedSpy,
+      );
+
+      await client.connect();
+
+      const notificationCallback =
+        mockedClient.setNotificationHandler.mock.calls[0][1];
+
+      await notificationCallback();
+
+      expect(onToolsUpdatedSpy).toHaveBeenCalledWith(expect.any(AbortSignal));
+
+      // Verify the signal passed was not aborted (happy path)
+      const signal = onToolsUpdatedSpy.mock.calls[0][0];
+      expect(signal.aborted).toBe(false);
+    });
   });
 
   describe('appendMcpServerCommand', () => {

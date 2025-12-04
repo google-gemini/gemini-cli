@@ -105,7 +105,7 @@ export class McpClient {
     private readonly workspaceContext: WorkspaceContext,
     private readonly cliConfig: Config,
     private readonly debugMode: boolean,
-    private readonly onToolsUpdated?: () => Promise<void>,
+    private readonly onToolsUpdated?: (signal?: AbortSignal) => Promise<void>,
   ) {}
 
   /**
@@ -224,7 +224,10 @@ export class McpClient {
     }
   }
 
-  private async discoverTools(cliConfig: Config): Promise<DiscoveredMCPTool[]> {
+  private async discoverTools(
+    cliConfig: Config,
+    options?: { timeout?: number; signal?: AbortSignal },
+  ): Promise<DiscoveredMCPTool[]> {
     this.assertConnected();
     return discoverTools(
       this.serverName,
@@ -232,6 +235,9 @@ export class McpClient {
       this.client!,
       cliConfig,
       this.toolRegistry.getMessageBus(),
+      options ?? {
+        timeout: this.serverConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+      },
     );
   }
 
@@ -254,20 +260,6 @@ export class McpClient {
    * This method implements a **Coalescing Pattern** to handle rapid bursts of notifications
    * (e.g., during server startup or bulk updates) without overwhelming the server or
    * creating race conditions in the global ToolRegistry.
-   *
-   * The logic flows as follows:
-   * 1. **Coalescing**: If a refresh is already in progress, it marks `pendingRefresh = true`
-   *    and returns immediately. The existing running Promise will notice this flag
-   *    after it finishes its current cycle and will loop back to run again.
-   *
-   * 2. **Fetch-First Strategy**: It performs the network request (`discoverTools`) *before*
-   *    removing the old tools from the registry. This ensures that during the network
-   *    latency, the global registry remains in a valid state with the "old" tools,
-   *    preventing a "Flash of Unavailability" where the server appears to have 0 tools.
-   *
-   * 3. **Atomic Swap**: The removal of old tools and registration of new tools happens
-   *    synchronously in the same tick, ensuring the registry is never empty from the
-   *    perspective of other components.
    */
   private async refreshTools(): Promise<void> {
     if (this.isRefreshing) {
@@ -286,13 +278,20 @@ export class McpClient {
 
         if (this.status !== MCPServerStatus.CONNECTED || !this.client) break;
 
+        const timeoutMs = this.serverConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC;
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+
         let newTools;
         try {
-          newTools = await this.discoverTools(this.cliConfig);
+          newTools = await this.discoverTools(this.cliConfig, {
+            signal: abortController.signal,
+          });
         } catch (err) {
           debugLogger.error(
             `Discovery failed during refresh: ${getErrorMessage(err)}`,
           );
+          clearTimeout(timeoutId);
           break;
         }
 
@@ -304,8 +303,10 @@ export class McpClient {
         this.toolRegistry.sortTools();
 
         if (this.onToolsUpdated) {
-          await this.onToolsUpdated();
+          await this.onToolsUpdated(abortController.signal);
         }
+
+        clearTimeout(timeoutId);
 
         coreEvents.emitFeedback(
           'info',
@@ -743,6 +744,7 @@ export async function connectAndDiscover(
       mcpClient,
       cliConfig,
       toolRegistry.getMessageBus(),
+      { timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC },
     );
 
     // If we have neither prompts nor tools, it's a failed discovery
@@ -792,12 +794,13 @@ export async function discoverTools(
   mcpClient: Client,
   cliConfig: Config,
   messageBus?: MessageBus,
+  options?: { timeout?: number; signal?: AbortSignal },
 ): Promise<DiscoveredMCPTool[]> {
   try {
     // Only request tools if the server supports them.
     if (mcpClient.getServerCapabilities()?.tools == null) return [];
 
-    const response = await mcpClient.listTools({});
+    const response = await mcpClient.listTools({}, options);
     const discoveredTools: DiscoveredMCPTool[] = [];
     for (const toolDef of response.tools) {
       try {
