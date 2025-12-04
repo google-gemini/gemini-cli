@@ -1291,4 +1291,186 @@ fi`;
       }
     });
   });
+
+  describe('Hook Disabling', () => {
+    it('should not execute hooks disabled in settings file', async () => {
+      await rig.setup('should not execute hooks disabled in settings file', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.disabled-via-settings.responses',
+        ),
+      });
+
+      // Create two hook scripts - one enabled, one disabled
+      const enabledHookScript = `#!/bin/bash
+echo '{"decision": "allow", "systemMessage": "Enabled hook executed"}'`;
+
+      const disabledHookScript = `#!/bin/bash
+echo '{"decision": "block", "systemMessage": "Disabled hook should not execute", "reason": "This hook should be disabled"}'`;
+
+      const enabledPath = join(rig.testDir!, 'enabled_hook.sh');
+      const disabledPath = join(rig.testDir!, 'disabled_hook.sh');
+
+      writeFileSync(enabledPath, enabledHookScript);
+      writeFileSync(disabledPath, disabledHookScript);
+      const { execSync } = await import('node:child_process');
+      execSync(`chmod +x "${enabledPath}"`);
+      execSync(`chmod +x "${disabledPath}"`);
+
+      await rig.setup('should not execute hooks disabled in settings file', {
+        settings: {
+          tools: {
+            enableHooks: true,
+          },
+          hooks: {
+            BeforeTool: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: enabledPath,
+                    timeout: 5000,
+                  },
+                  {
+                    type: 'command',
+                    command: disabledPath,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+            disabled: [disabledPath], // Disable the second hook
+          },
+        },
+      });
+
+      const prompt =
+        'Create a file called disabled-test.txt with content "test"';
+      const result = await rig.run(prompt);
+
+      // Tool should execute (enabled hook allows it)
+      const foundWriteFile = await rig.waitForToolCall('write_file');
+      expect(foundWriteFile).toBeTruthy();
+
+      // File should be created
+      const fileContent = rig.readFile('disabled-test.txt');
+      expect(fileContent).toContain('test');
+
+      // Result should contain message from enabled hook but not from disabled hook
+      expect(result).toContain('Enabled hook executed');
+      expect(result).not.toContain('Disabled hook should not execute');
+
+      // Check hook telemetry - only enabled hook should have executed
+      const hookLogs = rig.readHookLogs();
+      const enabledHookLog = hookLogs.find(
+        (log) => log.hookCall.hook_name === enabledPath,
+      );
+      const disabledHookLog = hookLogs.find(
+        (log) => log.hookCall.hook_name === disabledPath,
+      );
+
+      expect(enabledHookLog).toBeDefined();
+      expect(disabledHookLog).toBeUndefined();
+    });
+
+    it('should respect disabled hooks across multiple operations', async () => {
+      await rig.setup(
+        'should respect disabled hooks across multiple operations',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.disabled-via-command.responses',
+          ),
+        },
+      );
+
+      // Create two hook scripts - one that will be disabled, one that won't
+      const activeHookScript = `#!/bin/bash
+echo '{"decision": "allow", "systemMessage": "Active hook executed"}'`;
+
+      const disabledHookScript = `#!/bin/bash
+echo '{"decision": "block", "systemMessage": "Disabled hook should not execute", "reason": "This hook is disabled"}'`;
+
+      const activePath = join(rig.testDir!, 'active_hook.sh');
+      const disabledPath = join(rig.testDir!, 'disabled_hook.sh');
+
+      writeFileSync(activePath, activeHookScript);
+      writeFileSync(disabledPath, disabledHookScript);
+      const { execSync } = await import('node:child_process');
+      execSync(`chmod +x "${activePath}"`);
+      execSync(`chmod +x "${disabledPath}"`);
+
+      await rig.setup(
+        'should respect disabled hooks across multiple operations',
+        {
+          settings: {
+            tools: {
+              enableHooks: true,
+            },
+            hooks: {
+              BeforeTool: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: activePath,
+                      timeout: 5000,
+                    },
+                    {
+                      type: 'command',
+                      command: disabledPath,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+              disabled: [disabledPath], // Disable the second hook
+            },
+          },
+        },
+      );
+
+      // First run - only active hook should execute
+      const prompt1 = 'Create a file called first-run.txt with "test1"';
+      const result1 = await rig.run(prompt1);
+
+      // Tool should execute (active hook allows it)
+      const foundWriteFile1 = await rig.waitForToolCall('write_file');
+      expect(foundWriteFile1).toBeTruthy();
+
+      // Result should contain active hook message but not disabled hook message
+      expect(result1).toContain('Active hook executed');
+      expect(result1).not.toContain('Disabled hook should not execute');
+
+      // Check hook telemetry
+      const hookLogs1 = rig.readHookLogs();
+      const activeHookLog1 = hookLogs1.find(
+        (log) => log.hookCall.hook_name === activePath,
+      );
+      const disabledHookLog1 = hookLogs1.find(
+        (log) => log.hookCall.hook_name === disabledPath,
+      );
+
+      expect(activeHookLog1).toBeDefined();
+      expect(disabledHookLog1).toBeUndefined();
+
+      // Second run - verify disabled hook stays disabled
+      const prompt2 = 'Create a file called second-run.txt with "test2"';
+      const result2 = await rig.run(prompt2);
+
+      const foundWriteFile2 = await rig.waitForToolCall('write_file');
+      expect(foundWriteFile2).toBeTruthy();
+
+      // Same expectations as first run
+      expect(result2).toContain('Active hook executed');
+      expect(result2).not.toContain('Disabled hook should not execute');
+
+      // Verify disabled hook still hasn't executed
+      const hookLogs2 = rig.readHookLogs();
+      const disabledHookCalls = hookLogs2.filter(
+        (log) => log.hookCall.hook_name === disabledPath,
+      );
+      expect(disabledHookCalls.length).toBe(0);
+    });
+  });
 });
