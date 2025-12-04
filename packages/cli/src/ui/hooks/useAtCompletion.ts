@@ -111,17 +111,18 @@ function buildResourceCandidates(
     return [];
   }
 
-  const resources = registry.getAllResources().map(
-    (resource) =>
-      ({
-        searchKey:
-          `${resource.serverName} ${resource.name ?? ''} ${resource.uri}`.toLowerCase(),
-        suggestion: {
-          label: resource.uri,
-          value: resource.uri,
-        },
-      }) satisfies ResourceSuggestionCandidate,
-  );
+  const resources = registry.getAllResources().map((resource) => {
+    // Use serverName:uri format to disambiguate resources from different MCP servers
+    const prefixedUri = `${resource.serverName}:${resource.uri}`;
+    return {
+      searchKey:
+        `${resource.serverName} ${resource.name ?? ''} ${resource.uri}`.toLowerCase(),
+      suggestion: {
+        label: prefixedUri,
+        value: prefixedUri,
+      },
+    } satisfies ResourceSuggestionCandidate;
+  });
 
   // Template instantiation via @ will be added in a follow-up. For now we only
   // surface concrete resources that can be read directly via resources/read.

@@ -44,16 +44,18 @@ export class ResourceRegistry {
     return Array.from(this.resources.values());
   }
 
-  findResourceByUri(uri: string, serverName?: string): MCPResource | undefined {
-    if (serverName) {
-      return this.resources.get(resourceKey(serverName, uri));
+  /**
+   * Find a resource by its identifier.
+   * Format: serverName:uri (e.g., "myserver:file:///data.txt")
+   */
+  findResourceByUri(identifier: string): MCPResource | undefined {
+    const colonIndex = identifier.indexOf(':');
+    if (colonIndex <= 0) {
+      return undefined;
     }
-    for (const resource of this.resources.values()) {
-      if (resource.uri === uri) {
-        return resource;
-      }
-    }
-    return undefined;
+    const serverName = identifier.substring(0, colonIndex);
+    const uri = identifier.substring(colonIndex + 1);
+    return this.resources.get(resourceKey(serverName, uri));
   }
 
   removeResourcesByServer(serverName: string): void {
