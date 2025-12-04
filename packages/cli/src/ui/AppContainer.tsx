@@ -63,6 +63,7 @@ import {
   SessionEndReason,
   fireSessionStartHook,
   fireSessionEndHook,
+  generateAndSaveSummary,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -318,9 +319,6 @@ export const AppContainer = (props: AppContainerProps) => {
         ?.getChatRecordingService();
       if (chatRecordingService) {
         try {
-          const { generateAndSaveSummary } = await import(
-            '@google/gemini-cli-core'
-          );
           await generateAndSaveSummary(config, chatRecordingService);
         } catch (error) {
           // Silently fail - we don't want to block exit
