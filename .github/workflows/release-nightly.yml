@@ -52,7 +52,7 @@ jobs:
           fetch-depth: 0
 
       - name: 'Setup Node.js'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4.4.0
         with:
           node-version-file: './release/.nvmrc'
           cache: 'npm'
