@@ -15,6 +15,7 @@ import {
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
+import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
 
 /**
  * Constant for the resume "latest" identifier.
@@ -261,7 +262,9 @@ export const getAllSessionFiles = async (
             startTime: content.startTime,
             lastUpdated: content.lastUpdated,
             messageCount: content.messages.length,
-            displayName: content.summary || firstUserMessage,
+            displayName: content.summary
+              ? stripUnsafeCharacters(content.summary)
+              : firstUserMessage,
             firstUserMessage,
             isCurrentSession,
             index: 0, // Will be set after sorting valid sessions

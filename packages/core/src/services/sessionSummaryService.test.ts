@@ -130,40 +130,6 @@ describe('SessionSummaryService', () => {
       const messageCount = (promptText.match(/Message \d+/g) || []).length;
       expect(messageCount).toBe(10);
     });
-
-    it('should truncate summary to maxChars with ellipsis', async () => {
-      mockGenerateContent.mockResolvedValue({
-        candidates: [
-          {
-            content: {
-              parts: [
-                {
-                  text: 'This is a very long summary that exceeds the maximum character limit and needs to be truncated',
-                },
-              ],
-            },
-          },
-        ],
-      } as unknown as GenerateContentResponse);
-
-      const messages: MessageRecord[] = [
-        {
-          id: '1',
-          timestamp: '2025-12-03T00:00:00Z',
-          type: 'user',
-          content: [{ text: 'Hello' }],
-        },
-      ];
-
-      const summary = await service.generateSummary({
-        messages,
-        maxChars: 50,
-      });
-
-      expect(summary).not.toBeNull();
-      expect(summary!.length).toBeLessThanOrEqual(50);
-      expect(summary).toMatch(/\.\.\.$/);
-    });
   });
 
   describe('Message Type Filtering', () => {
@@ -520,38 +486,6 @@ describe('SessionSummaryService', () => {
       const summary = await service.generateSummary({ messages });
 
       expect(summary).toBe('Add dark mode to the app');
-    });
-
-    it('should truncate long summaries correctly', async () => {
-      const longText =
-        'This is a very long summary that definitely exceeds the eighty character maximum limit';
-      mockGenerateContent.mockResolvedValue({
-        candidates: [
-          {
-            content: {
-              parts: [{ text: longText }],
-            },
-          },
-        ],
-      } as unknown as GenerateContentResponse);
-
-      const messages: MessageRecord[] = [
-        {
-          id: '1',
-          timestamp: '2025-12-03T00:00:00Z',
-          type: 'user',
-          content: [{ text: 'Hello' }],
-        },
-      ];
-
-      const summary = await service.generateSummary({
-        messages,
-        maxChars: 80,
-      });
-
-      expect(summary).not.toBeNull();
-      expect(summary!.length).toBe(80);
-      expect(summary).toMatch(/\.\.\.$/);
     });
 
     it('should handle messages longer than 500 chars', async () => {
@@ -992,36 +926,6 @@ describe('SessionSummaryService', () => {
       // ZWJ is preserved (it's not considered whitespace)
       expect(summary).toBe('كلمة\u200Dمتصلة');
       expect(summary).toContain('\u200D'); // ZWJ should be preserved
-    });
-
-    it('should remove control characters', async () => {
-      mockGenerateContent.mockResolvedValue({
-        candidates: [
-          {
-            content: {
-              parts: [{ text: 'Add\x07dark\x08mode\x0Bto\x0Capp' }],
-            },
-          },
-        ],
-      } as unknown as GenerateContentResponse);
-
-      const messages: MessageRecord[] = [
-        {
-          id: '1',
-          timestamp: '2025-12-03T00:00:00Z',
-          type: 'user',
-          content: [{ text: 'Test' }],
-        },
-      ];
-
-      const summary = await service.generateSummary({ messages });
-
-      // Control chars removed, spaces normalized
-      expect(summary).toBe('Adddarkmode to app');
-      expect(summary).not.toContain('\x07'); // Bell
-      expect(summary).not.toContain('\x08'); // Backspace
-      expect(summary).not.toContain('\x0B'); // Vertical tab
-      expect(summary).not.toContain('\x0C'); // Form feed
     });
   });
 });

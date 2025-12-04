@@ -12,7 +12,6 @@ import type { Content } from '@google/genai';
 import { getResponseText } from '../utils/partUtils.js';
 
 const DEFAULT_MAX_MESSAGES = 20;
-const DEFAULT_MAX_CHARS = 80;
 const DEFAULT_TIMEOUT_MS = 5000;
 const MAX_MESSAGE_LENGTH = 500;
 
@@ -37,7 +36,6 @@ Summary (max 80 chars):`;
 export interface GenerateSummaryOptions {
   messages: MessageRecord[];
   maxMessages?: number;
-  maxChars?: number;
   timeout?: number;
 }
 
@@ -58,7 +56,6 @@ export class SessionSummaryService {
     const {
       messages,
       maxMessages = DEFAULT_MAX_MESSAGES,
-      maxChars = DEFAULT_MAX_CHARS,
       timeout = DEFAULT_TIMEOUT_MS,
     } = options;
 
@@ -136,22 +133,15 @@ export class SessionSummaryService {
           return null;
         }
 
-        // Clean and truncate the summary
+        // Clean the summary
         let cleanedSummary = summary
           .replace(/\n+/g, ' ') // Collapse newlines to spaces
           .replace(/\s+/g, ' ') // Normalize whitespace
           .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '') // Remove emoji (preserves ZWJ/ZWNJ as they're not Emoji_Presentation)
-          // eslint-disable-next-line no-control-regex
-          .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '') // Remove control characters
           .trim(); // Trim after all processing
 
         // Remove quotes if the model added them
         cleanedSummary = cleanedSummary.replace(/^["']|["']$/g, '');
-
-        // Truncate to maxChars
-        if (cleanedSummary.length > maxChars) {
-          cleanedSummary = cleanedSummary.slice(0, maxChars - 3) + '...';
-        }
 
         debugLogger.debug(`[SessionSummary] Generated: "${cleanedSummary}"`);
         return cleanedSummary;
