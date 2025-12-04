@@ -466,20 +466,6 @@ describe('SettingsDialog', () => {
       });
     });
 
-    it('should toggle setting with Space key', async () => {
-      const settings = createMockSettings();
-      const onSelect = vi.fn();
-
-      const { stdin, unmount } = renderDialog(settings, onSelect);
-
-      // Press Space to toggle current setting
-      act(() => {
-        stdin.write(' '); // Space key
-      });
-
-      unmount();
-    });
-
     it('should handle vim mode setting specially', async () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
