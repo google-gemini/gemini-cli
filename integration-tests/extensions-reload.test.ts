@@ -21,6 +21,7 @@ describe('extension reloading', () => {
   const sandboxEnv = env['GEMINI_SANDBOX'];
 
   // Fails in linux non-sandbox e2e tests
+  // TODO(#14527): Re-enable this once fixed
   const isLinuxNonE2e =
     (!sandboxEnv || sandboxEnv === 'false') && platform() === 'linux';
   itIf(!isLinuxNonE2e)(
