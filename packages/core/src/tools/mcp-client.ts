@@ -272,7 +272,7 @@ export class McpClient {
   private async refreshTools(): Promise<void> {
     if (this.isRefreshing) {
       debugLogger.log(
-        `Tool refresh for '${this.serverName}' busy. Coalescing update.`,
+        `Tool refresh for '${this.serverName}' is already in progress. Pending update.`,
       );
       this.pendingRefresh = true;
       return;
