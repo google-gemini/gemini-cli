@@ -449,7 +449,7 @@ export async function handleAtCommand({
         display: {
           callId: `mcp-resource-${resource.serverName}-${uri}`,
           name: `resources/read (${resource.serverName})`,
-          description: `resources/read ${uri}`,
+          description: uri,
           status: ToolCallStatus.Success,
           resultDisplay: `Successfully read resource ${uri}`,
           confirmationDetails: undefined,
@@ -463,7 +463,7 @@ export async function handleAtCommand({
         display: {
           callId: `mcp-resource-${resource.serverName}-${uri}`,
           name: `resources/read (${resource.serverName})`,
-          description: `resources/read ${uri}`,
+          description: uri,
           status: ToolCallStatus.Error,
           resultDisplay: `Error reading resource ${uri}: ${getErrorMessage(error)}`,
           confirmationDetails: undefined,
