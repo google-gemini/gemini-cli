@@ -181,6 +181,7 @@ export const Composer = () => {
           streamingState={uiState.streamingState}
           suggestionsPosition={suggestionsPosition}
           onSuggestionsVisibilityChange={setSuggestionsVisible}
+          isAlternateBuffer={isAlternateBuffer}
         />
       )}
 
