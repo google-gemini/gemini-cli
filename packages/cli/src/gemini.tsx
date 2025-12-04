@@ -78,7 +78,7 @@ import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SessionSelector } from './utils/sessionUtils.js';
-import { isMcpServerRunning } from './commands/mcp-server.js';
+import { isMcpServeRunning } from './commands/mcp/serve.js';
 import { computeWindowTitle } from './utils/windowTitle.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { MouseProvider } from './ui/contexts/MouseContext.js';
@@ -320,10 +320,10 @@ export async function main() {
   const argv = await parseArguments(settings.merged);
   parseArgsHandle?.end();
 
-  // If the MCP server subcommand is running, wait for it to complete
+  // If the MCP serve subcommand is running, wait for it to complete
   // The handler will block on stdin until the MCP client disconnects
-  if (isMcpServerRunning) {
-    // Wait forever - the MCP server handler will call process.exit when done
+  if (isMcpServeRunning) {
+    // Wait forever - the MCP serve handler will call process.exit when done
     await new Promise(() => {});
     return;
   }
