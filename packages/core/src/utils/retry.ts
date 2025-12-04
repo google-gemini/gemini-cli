@@ -6,15 +6,15 @@
 
 import type { GenerateContentResponse } from '@google/genai';
 import { ApiError } from '@google/genai';
-import { AuthType } from '../core/contentGenerator.js';
-import {
-  classifyGoogleError,
-  RetryableQuotaError,
-  TerminalQuotaError,
-} from './googleQuotaErrors.js';
+//import { AuthType } from '../core/contentGenerator.js';
+// import {
+//   classifyGoogleError,
+//   RetryableQuotaError,
+//   TerminalQuotaError,
+// } from './googleQuotaErrors.js';
 import { delay, createAbortError } from './delay.js';
 import { debugLogger } from './debugLogger.js';
-import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
+import { getErrorStatus /* ModelNotFoundError*/ } from './httpErrors.js';
 
 export interface RetryOptions {
   maxAttempts: number;
@@ -139,11 +139,11 @@ export async function retryWithBackoff<T>(
     maxAttempts,
     initialDelayMs,
     maxDelayMs,
-    onPersistent429,
-    authType,
-    shouldRetryOnError,
+    //onPersistent429,
+    //authType,
+    //shouldRetryOnError,
     shouldRetryOnContent,
-    retryFetchErrors,
+    //retryFetchErrors,
     signal,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
@@ -154,9 +154,6 @@ export async function retryWithBackoff<T>(
   let currentDelay = initialDelayMs;
 
   while (attempt < maxAttempts) {
-    if (signal?.aborted) {
-      throw createAbortError();
-    }
     attempt++;
     try {
       const result = await fn();
@@ -174,87 +171,14 @@ export async function retryWithBackoff<T>(
 
       return result;
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw error;
+      // TODO(hack): always retry.
+      try {
+        process.stdout.write(
+          `Received error: ${JSON.stringify(error, null, 2)}, retrying.`,
+        );
+      } catch (_) {
+        process.stdout.write(`Received unstringifiable error retrying.`);
       }
-
-      const classifiedError = classifyGoogleError(error);
-      const errorCode = getErrorStatus(error);
-
-      if (
-        classifiedError instanceof TerminalQuotaError ||
-        classifiedError instanceof ModelNotFoundError
-      ) {
-        if (onPersistent429 && authType === AuthType.LOGIN_WITH_GOOGLE) {
-          try {
-            const fallbackModel = await onPersistent429(
-              authType,
-              classifiedError,
-            );
-            if (fallbackModel) {
-              attempt = 0; // Reset attempts and retry with the new model.
-              currentDelay = initialDelayMs;
-              continue;
-            }
-          } catch (fallbackError) {
-            debugLogger.warn('Fallback to Flash model failed:', fallbackError);
-          }
-        }
-        throw classifiedError; // Throw if no fallback or fallback failed.
-      }
-
-      const is500 =
-        errorCode !== undefined && errorCode >= 500 && errorCode < 600;
-
-      if (classifiedError instanceof RetryableQuotaError || is500) {
-        if (attempt >= maxAttempts) {
-          if (onPersistent429 && authType === AuthType.LOGIN_WITH_GOOGLE) {
-            try {
-              const fallbackModel = await onPersistent429(
-                authType,
-                classifiedError,
-              );
-              if (fallbackModel) {
-                attempt = 0; // Reset attempts and retry with the new model.
-                currentDelay = initialDelayMs;
-                continue;
-              }
-            } catch (fallbackError) {
-              console.warn('Model fallback failed:', fallbackError);
-            }
-          }
-          throw classifiedError instanceof RetryableQuotaError
-            ? classifiedError
-            : error;
-        }
-
-        if (classifiedError instanceof RetryableQuotaError) {
-          console.warn(
-            `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${classifiedError.retryDelayMs}ms...`,
-          );
-          await delay(classifiedError.retryDelayMs, signal);
-          continue;
-        } else {
-          const errorStatus = getErrorStatus(error);
-          logRetryAttempt(attempt, error, errorStatus);
-
-          // Exponential backoff with jitter for non-quota errors
-          const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
-          const delayWithJitter = Math.max(0, currentDelay + jitter);
-          await delay(delayWithJitter, signal);
-          currentDelay = Math.min(maxDelayMs, currentDelay * 2);
-          continue;
-        }
-      }
-
-      // Generic retry logic for other errors
-      if (
-        attempt >= maxAttempts ||
-        !shouldRetryOnError(error as Error, retryFetchErrors)
-      ) {
-        throw error;
-      }
-
       const errorStatus = getErrorStatus(error);
       logRetryAttempt(attempt, error, errorStatus);
 

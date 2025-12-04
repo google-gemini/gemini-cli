@@ -429,13 +429,18 @@ export class GeminiChat {
       }
 
       effectiveModel = modelToUse;
-      const config = {
+      const config: GenerateContentConfig = {
         ...generateContentConfig,
         // TODO(12622): Ensure we don't overrwrite these when they are
         // passed via config.
         systemInstruction: this.systemInstruction,
         tools: this.tools,
+        // TODO(hack),
+        temperature: 0.5,
       };
+
+      // TODO(hack): Hardcode model.
+      modelToUse = 'gemini-2.5-pro';
 
       // TODO(joshualitt): Clean this up with model configs.
       if (modelToUse.startsWith('gemini-3')) {
@@ -542,11 +547,8 @@ export class GeminiChat {
       authType: this.config.getContentGeneratorConfig()?.authType,
       retryFetchErrors: this.config.getRetryFetchErrors(),
       signal: generateContentConfig.abortSignal,
-      maxAttempts:
-        this.config.isPreviewModelFallbackMode() &&
-        model === PREVIEW_GEMINI_MODEL
-          ? 1
-          : undefined,
+      maxAttempts: Number.MAX_SAFE_INTEGER,
+      shouldRetryOnError: () => true,
     });
 
     // Store the original request for AfterModel hooks

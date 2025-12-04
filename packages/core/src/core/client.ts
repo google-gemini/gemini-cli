@@ -39,7 +39,7 @@ import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
-  logContentRetryFailure,
+  //logContentRetryFailure,
   logNextSpeakerCheck,
 } from '../telemetry/loggers.js';
 import {
@@ -47,7 +47,7 @@ import {
   fireAfterAgentHook,
 } from './clientHookTriggers.js';
 import {
-  ContentRetryFailureEvent,
+  //ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
@@ -403,7 +403,7 @@ export class GeminiClient {
     signal: AbortSignal,
     prompt_id: string,
     turns: number = MAX_TURNS,
-    isInvalidStreamRetry: boolean = false,
+    _isInvalidStreamRetry: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Fire BeforeAgent hook through MessageBus (only if hooks are enabled)
     const hooksEnabled = this.config.getEnableHooks();
@@ -541,43 +541,31 @@ export class GeminiClient {
 
     const resultStream = turn.run({ model: modelToUse }, request, linkedSignal);
     for await (const event of resultStream) {
-      if (this.loopDetector.addAndCheck(event)) {
-        yield { type: GeminiEventType.LoopDetected };
-        controller.abort();
+      const loopDetected = this.loopDetector.addAndCheck(event);
+      const shouldRetry =
+        loopDetected ||
+        event.type === GeminiEventType.Error ||
+        event.type === GeminiEventType.InvalidStream ||
+        event.type === GeminiEventType.LoopDetected ||
+        event.type === GeminiEventType.MaxSessionTurns ||
+        event.type === GeminiEventType.ContextWindowWillOverflow;
+      if (shouldRetry) {
+        process.stdout.write(
+          `CLI level retry: ${event.type}, loop: ${loopDetected}`,
+        );
+        yield* this.sendMessageStream(
+          request,
+          signal,
+          prompt_id,
+          boundedTurns,
+          false,
+        );
         return turn;
+      } else {
+        yield event;
       }
-      yield event;
 
       this.updateTelemetryTokenCount();
-
-      if (event.type === GeminiEventType.InvalidStream) {
-        if (this.config.getContinueOnFailedApiCall()) {
-          if (isInvalidStreamRetry) {
-            // We already retried once, so stop here.
-            logContentRetryFailure(
-              this.config,
-              new ContentRetryFailureEvent(
-                4, // 2 initial + 2 after injections
-                'FAILED_AFTER_PROMPT_INJECTION',
-                modelToUse,
-              ),
-            );
-            return turn;
-          }
-          const nextRequest = [{ text: 'System: Please continue.' }];
-          yield* this.sendMessageStream(
-            nextRequest,
-            signal,
-            prompt_id,
-            boundedTurns - 1,
-            true, // Set isInvalidStreamRetry to true
-          );
-          return turn;
-        }
-      }
-      if (event.type === GeminiEventType.Error) {
-        return turn;
-      }
     }
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
       // Check if next speaker check is needed
