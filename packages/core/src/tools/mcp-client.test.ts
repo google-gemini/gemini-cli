@@ -115,7 +115,10 @@ describe('mcp-client', () => {
       );
       await client.connect();
       await client.discover({} as Config);
-      expect(mockedClient.listTools).toHaveBeenCalledWith({});
+      expect(mockedClient.listTools).toHaveBeenCalledWith(
+        {},
+        { timeout: 600000 },
+      );
     });
 
     it('should not skip tools even if a parameter is missing a type', async () => {
