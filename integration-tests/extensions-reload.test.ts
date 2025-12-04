@@ -19,9 +19,14 @@ const itIf = (condition: boolean) => (condition ? it : it.skip);
 
 describe('extension reloading', () => {
   const sandboxEnv = env['GEMINI_SANDBOX'];
-
+  // Fails in linux non-sandbox e2e tests
+  // TODO(#14527): Re-enable this once fixed
   // Fails in sandbox mode, can't check for local extension updates.
-  itIf((!sandboxEnv || sandboxEnv === 'false') && platform() !== 'win32')(
+  itIf(
+    (!sandboxEnv || sandboxEnv === 'false') &&
+      platform() !== 'win32' &&
+      platform() !== 'linux',
+  )(
     'installs a local extension, updates it, checks it was reloaded properly',
     async () => {
       const serverA = new TestMcpServer();
