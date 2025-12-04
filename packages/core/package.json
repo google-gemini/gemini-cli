@@ -13,8 +13,8 @@
     "build": "node ../../scripts/build_package.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
-    "test": "vitest run",
-    "test:ci": "vitest run",
+    "test": "cross-env LC_ALL=C vitest run",
+    "test:ci": "cross-env LC_ALL=C vitest run",
     "typecheck": "tsc --noEmit"
   },
   "files": [
