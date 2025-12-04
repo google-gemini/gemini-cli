@@ -92,7 +92,6 @@ export function SettingsDialog({
   const [showRestartPrompt, setShowRestartPrompt] = useState(false);
 
   // Search state
-  const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredKeys, setFilteredKeys] = useState<string[]>(() =>
     getDialogSettingKeys(),
@@ -195,8 +194,7 @@ export function SettingsDialog({
   }, [selectedScope, settings, globalPendingChanges]);
 
   const generateSettingsItems = () => {
-    const settingKeys =
-      isSearching || searchQuery ? filteredKeys : getDialogSettingKeys();
+    const settingKeys = searchQuery ? filteredKeys : getDialogSettingKeys();
 
     return settingKeys.map((key: string) => {
       const definition = getSettingDefinition(key);
@@ -563,33 +561,6 @@ export function SettingsDialog({
     (key) => {
       const { name } = key;
 
-      if (isSearching) {
-        if (keyMatchers[Command.ESCAPE](key)) {
-          setIsSearching(false);
-          setSearchQuery('');
-          return;
-        }
-        if (keyMatchers[Command.RETURN](key)) {
-          setIsSearching(false);
-          return;
-        }
-        if (name === 'backspace') {
-          setSearchQuery((prev) => prev.slice(0, -1));
-          return;
-        }
-        if (
-          key.sequence &&
-          key.sequence.length === 1 &&
-          !key.ctrl &&
-          !key.meta &&
-          !keyMatchers[Command.DIALOG_NAVIGATION_UP](key) &&
-          !keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)
-        ) {
-          setSearchQuery((prev) => prev + key.sequence);
-          return;
-        }
-      }
-
       if (name === 'tab' && showScopeSelection) {
         setFocusSection((prev) => (prev === 'settings' ? 'scope' : 'settings'));
       }
@@ -908,7 +879,7 @@ export function SettingsDialog({
           />
         </Box>
         <Box height={1} />
-        {isSearching && visibleItems.length === 0 ? (
+        {visibleItems.length === 0 ? (
           <Box marginX={1} height={1} flexDirection="column">
             <Text color={theme.text.secondary}>No matches found.</Text>
           </Box>
