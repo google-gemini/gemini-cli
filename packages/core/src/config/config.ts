@@ -19,6 +19,7 @@ import {
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
+import { isLocalFileDeclarativeTool } from '../tools/local-file-tool.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
@@ -239,6 +240,7 @@ export interface ConfigParameters {
   coreTools?: string[];
   allowedTools?: string[];
   excludeTools?: string[];
+  excludeLocalTools?: boolean;
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
   mcpServerCommand?: string;
@@ -349,6 +351,7 @@ export class Config {
   private readonly coreTools: string[] | undefined;
   private readonly allowedTools: string[] | undefined;
   private readonly excludeTools: string[] | undefined;
+  private readonly excludeLocalTools: boolean;
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
@@ -466,6 +469,7 @@ export class Config {
     this.coreTools = params.coreTools;
     this.allowedTools = params.allowedTools;
     this.excludeTools = params.excludeTools;
+    this.excludeLocalTools = params.excludeLocalTools ?? false;
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
@@ -971,6 +975,18 @@ export class Config {
    */
   getExcludeTools(): Set<string> | undefined {
     const excludeToolsSet = new Set([...(this.excludeTools ?? [])]);
+
+    if (this.excludeLocalTools) {
+      const toolRegistry = this.getToolRegistry();
+      // toolRegistry.getAllTools is not used here as it calls getExcludeTools
+      const allKnownTools = toolRegistry.getAllKnownTools();
+      allKnownTools.forEach((tool) => {
+        if (isLocalFileDeclarativeTool(tool)) {
+          excludeToolsSet.add(tool.name);
+        }
+      });
+    }
+
     for (const extension of this.getExtensionLoader().getExtensions()) {
       if (!extension.isActive) {
         continue;

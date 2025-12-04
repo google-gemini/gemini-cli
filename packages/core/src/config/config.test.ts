@@ -54,6 +54,7 @@ vi.mock('../tools/tool-registry', () => {
   ToolRegistryMock.prototype.discoverAllTools = vi.fn();
   ToolRegistryMock.prototype.sortTools = vi.fn();
   ToolRegistryMock.prototype.getAllTools = vi.fn(() => []); // Mock methods if needed
+  ToolRegistryMock.prototype.getAllKnownTools = vi.fn(() => []); // Mock methods if needed
   ToolRegistryMock.prototype.getTool = vi.fn();
   ToolRegistryMock.prototype.getFunctionDeclarations = vi.fn(() => []);
   return { ToolRegistry: ToolRegistryMock };
@@ -73,7 +74,12 @@ vi.mock('../tools/ripGrep.js', () => ({
 }));
 vi.mock('../tools/glob');
 vi.mock('../tools/edit');
-vi.mock('../tools/shell');
+vi.mock('../tools/shell', () => ({
+  ShellTool: class {
+    name = 'ShellTool';
+    accessesLocalFiles = true;
+  },
+}));
 vi.mock('../tools/write-file');
 vi.mock('../tools/web-fetch');
 vi.mock('../tools/read-many-files');
@@ -168,6 +174,8 @@ import { uiTelemetryService } from '../telemetry/index.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
+import { WebFetchTool } from '../tools/web-fetch.js';
+import { isLocalFileDeclarativeTool } from '../tools/local-file-tool.js';
 
 vi.mock('../core/baseLlmClient.js');
 vi.mock('../core/tokenLimits.js', () => ({
@@ -1729,5 +1737,43 @@ describe('Availability Service Integration', () => {
 
     config.resetTurn();
     expect(spy).toHaveBeenCalled();
+  });
+});
+
+describe('getExcludeTools', () => {
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    targetDir: '/path/to/target',
+    debugMode: false,
+    sessionId: 'test-session-id',
+    model: 'gemini-pro',
+    usageStatisticsEnabled: false,
+  };
+
+  it('should exclude local tools when excludeLocalTools is true', async () => {
+    const config = new Config({
+      ...baseParams,
+      coreTools: ['ShellTool', 'WebFetchTool'],
+      excludeLocalTools: true,
+    });
+    await config.initialize(); // to set up tool registry
+
+    const shellTool = new ShellTool(config); // local tool
+    expect(shellTool).toBeDefined();
+    expect(isLocalFileDeclarativeTool(shellTool)).toBe(true);
+
+    const webFetchTool = new WebFetchTool(config); // non-local tool
+    expect(webFetchTool).toBeDefined();
+    expect(isLocalFileDeclarativeTool(webFetchTool)).toBe(false);
+
+    const toolRegistry = config.getToolRegistry();
+    vi.spyOn(toolRegistry, 'getAllKnownTools').mockReturnValue([
+      shellTool,
+      webFetchTool,
+    ]);
+
+    const excluded = config.getExcludeTools();
+    expect(excluded).toBeDefined();
+    expect(excluded).toEqual(new Set([shellTool.name]));
   });
 });

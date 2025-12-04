@@ -23,6 +23,7 @@ import {
   FileExclusions,
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
+import type { LocalFileDeclarativeTool } from './local-file-tool.js';
 
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
 
@@ -474,11 +475,12 @@ class GrepToolInvocation extends BaseToolInvocation<
 /**
  * Implementation of the Grep tool logic (moved from CLI)
  */
-export class RipGrepTool extends BaseDeclarativeTool<
-  RipGrepToolParams,
-  ToolResult
-> {
+export class RipGrepTool
+  extends BaseDeclarativeTool<RipGrepToolParams, ToolResult>
+  implements LocalFileDeclarativeTool<RipGrepToolParams>
+{
   static readonly Name = GREP_TOOL_NAME;
+  readonly accessesLocalFiles = true;
 
   constructor(
     private readonly config: Config,
