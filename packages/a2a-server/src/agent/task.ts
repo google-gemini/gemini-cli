@@ -15,6 +15,7 @@ import {
   isNodeError,
   parseAndFormatApiError,
   safeLiteralReplace,
+  DEFAULT_GUI_EDITOR,
   type AnyDeclarativeTool,
   type ToolCall,
   type ToolConfirmationPayload,
@@ -435,7 +436,7 @@ export class Task {
       outputUpdateHandler: this._schedulerOutputUpdate.bind(this),
       onAllToolCallsComplete: this._schedulerAllToolCallsComplete.bind(this),
       onToolCallsUpdate: this._schedulerToolCallsUpdate.bind(this),
-      getPreferredEditor: () => 'vscode',
+      getPreferredEditor: () => DEFAULT_GUI_EDITOR,
       config: this.config,
     });
     return scheduler;

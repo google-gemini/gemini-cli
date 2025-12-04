@@ -15,8 +15,6 @@ import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
 import {
   executeToolCall,
-  shutdownTelemetry,
-  isTelemetrySdkInitialized,
   GeminiEventType,
   FatalInputError,
   promptIdContext,
@@ -28,6 +26,7 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
+  createWorkingStdio,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -70,7 +69,8 @@ export async function runNonInteractive({
         coreEvents.emitConsoleLog(msg.type, msg.content);
       },
     });
-    const textOutput = new TextOutput();
+    const { stdout: workingStdout } = createWorkingStdio();
+    const textOutput = new TextOutput(workingStdout);
 
     const handleUserFeedback = (payload: UserFeedbackPayload) => {
       const prefix = payload.severity.toUpperCase();
@@ -443,9 +443,6 @@ export async function runNonInteractive({
 
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
-      if (isTelemetrySdkInitialized()) {
-        await shutdownTelemetry(config);
-      }
     }
 
     if (errorToHandle) {
