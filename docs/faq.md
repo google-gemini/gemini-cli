@@ -1,4 +1,4 @@
-# Frequently Asked Questions (FAQ)
+# Frequently asked questions (FAQ)
 
 This page provides answers to common questions and solutions to frequent
 problems encountered while using Gemini CLI.

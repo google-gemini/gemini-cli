@@ -107,6 +107,7 @@ describe('mcp add command', () => {
     expect(mockSetValue).toHaveBeenCalledWith(SettingScope.User, 'mcpServers', {
       'sse-server': {
         url: 'https://example.com/sse-endpoint',
+        type: 'sse',
         headers: { 'X-API-Key': 'your-key' },
       },
     });
@@ -122,7 +123,8 @@ describe('mcp add command', () => {
       'mcpServers',
       {
         'http-server': {
-          httpUrl: 'https://example.com/mcp',
+          url: 'https://example.com/mcp',
+          type: 'http',
           headers: { Authorization: 'Bearer your-token' },
         },
       },
