@@ -13,7 +13,7 @@ import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
 
-export async function handleList() {
+export async function handleList(options?: { outputFormat?: 'text' | 'json' }) {
   try {
     const workspaceDir = process.cwd();
     const extensionManager = new ExtensionManager({
@@ -24,16 +24,25 @@ export async function handleList() {
     });
     const extensions = await extensionManager.loadExtensions();
     if (extensions.length === 0) {
-      debugLogger.log('No extensions installed.');
+      if (options?.outputFormat === 'json') {
+        debugLogger.log('[]');
+      } else {
+        debugLogger.log('No extensions installed.');
+      }
       return;
     }
-    debugLogger.log(
-      extensions
-        .map((extension, _): string =>
-          extensionManager.toOutputString(extension),
-        )
-        .join('\n\n'),
-    );
+
+    if (options?.outputFormat === 'json') {
+      debugLogger.log(JSON.stringify(extensions, null, 2));
+    } else {
+      debugLogger.log(
+        extensions
+          .map((extension, _): string =>
+            extensionManager.toOutputString(extension),
+          )
+          .join('\n\n'),
+      );
+    }
   } catch (error) {
     debugLogger.error(getErrorMessage(error));
     process.exit(1);
@@ -43,9 +52,18 @@ export async function handleList() {
 export const listCommand: CommandModule = {
   command: 'list',
   describe: 'Lists installed extensions.',
-  builder: (yargs) => yargs,
-  handler: async () => {
-    await handleList();
+  builder: (yargs) =>
+    yargs.option('output-format', {
+      alias: 'o',
+      type: 'string',
+      describe: 'The format of the CLI output.',
+      choices: ['text', 'json'],
+      default: 'text',
+    }),
+  handler: async (argv) => {
+    await handleList({
+      outputFormat: argv['output-format'] as 'text' | 'json',
+    });
     await exitCli();
   },
 };
