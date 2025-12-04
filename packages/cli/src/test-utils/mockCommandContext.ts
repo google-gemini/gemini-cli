@@ -88,7 +88,7 @@ export const createMockCommandContext = (
         const targetValue = output[key];
 
         if (
-          // We only want to recursivlty merge plain objects
+          // We only want to recursively merge plain objects
           Object.prototype.toString.call(sourceValue) === '[object Object]' &&
           Object.prototype.toString.call(targetValue) === '[object Object]'
         ) {

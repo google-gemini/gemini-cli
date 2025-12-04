@@ -10,12 +10,12 @@ import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
 import type { OutputFormat } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
+import { hooksCommand } from '../commands/hooks.js';
 import {
   Config,
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
-  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -30,6 +30,7 @@ import {
   EDIT_TOOL_NAME,
   debugLogger,
   loadServerHierarchicalMemory,
+  WEB_FETCH_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -37,6 +38,7 @@ import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
 import { appEvents } from '../utils/events.js';
+import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createPolicyEngineConfig } from './policy.js';
@@ -45,6 +47,7 @@ import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensio
 import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
+import { runExitCleanup } from '../utils/cleanup.js';
 
 export interface CliArgs {
   query: string | undefined;
@@ -61,7 +64,7 @@ export interface CliArgs {
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
-  resume: string | 'latest' | undefined;
+  resume: string | typeof RESUME_LATEST | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
@@ -189,7 +192,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
             // When --resume not passed at all: this `coerce` function is not called at all, and
             //   `yargsInstance.argv.resume` is undefined.
             if (value === '') {
-              return 'latest';
+              return RESUME_LATEST;
             }
             return value;
           },
@@ -238,43 +241,50 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .deprecateOption(
           'prompt',
           'Use the positional prompt instead. This flag will be removed in a future version.',
-        )
-        // Ensure validation flows through .fail() for clean UX
-        .fail((msg, err, yargs) => {
-          debugLogger.error(msg || err?.message || 'Unknown error');
-          yargs.showHelp();
-          process.exit(1);
-        })
-        .check((argv) => {
-          // The 'query' positional can be a string (for one arg) or string[] (for multiple).
-          // This guard safely checks if any positional argument was provided.
-          const query = argv['query'] as string | string[] | undefined;
-          const hasPositionalQuery = Array.isArray(query)
-            ? query.length > 0
-            : !!query;
-
-          if (argv['prompt'] && hasPositionalQuery) {
-            return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
-          }
-          if (argv['prompt'] && argv['promptInteractive']) {
-            return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
-          }
-          if (argv.resume && !argv.prompt && !process.stdin.isTTY) {
-            throw new Error(
-              'When resuming a session, you must provide a message via --prompt (-p) or stdin',
-            );
-          }
-          if (argv.yolo && argv['approvalMode']) {
-            return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
-          }
-          return true;
-        }),
+        ),
     )
     // Register MCP subcommands
-    .command(mcpCommand);
+    .command(mcpCommand)
+    // Ensure validation flows through .fail() for clean UX
+    .fail((msg, err) => {
+      if (err) throw err;
+      throw new Error(msg);
+    })
+    .check((argv) => {
+      // The 'query' positional can be a string (for one arg) or string[] (for multiple).
+      // This guard safely checks if any positional argument was provided.
+      const query = argv['query'] as string | string[] | undefined;
+      const hasPositionalQuery = Array.isArray(query)
+        ? query.length > 0
+        : !!query;
+
+      if (argv['prompt'] && hasPositionalQuery) {
+        return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
+      }
+      if (argv['prompt'] && argv['promptInteractive']) {
+        return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
+      }
+      if (argv['yolo'] && argv['approvalMode']) {
+        return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
+      }
+      if (
+        argv['outputFormat'] &&
+        !['text', 'json', 'stream-json'].includes(
+          argv['outputFormat'] as string,
+        )
+      ) {
+        return `Invalid values:\n  Argument: output-format, Given: "${argv['outputFormat']}", Choices: "text", "json", "stream-json"`;
+      }
+      return true;
+    });
 
   if (settings?.experimental?.extensionManagement ?? true) {
     yargsInstance.command(extensionsCommand);
+  }
+
+  // Register hooks command if hooks are enabled
+  if (settings?.tools?.enableHooks) {
+    yargsInstance.command(hooksCommand);
   }
 
   yargsInstance
@@ -283,20 +293,24 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .help()
     .alias('h', 'help')
     .strict()
-    .demandCommand(0, 0); // Allow base command to run with no subcommands
+    .demandCommand(0, 0) // Allow base command to run with no subcommands
+    .exitProcess(false);
 
   yargsInstance.wrap(yargsInstance.terminalWidth());
-  const result = await yargsInstance.parse();
+  let result;
+  try {
+    result = await yargsInstance.parse();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    debugLogger.error(msg);
+    yargsInstance.showHelp();
+    await runExitCleanup();
+    process.exit(1);
+  }
 
-  // If yargs handled --help/--version it will have exited; nothing to do here.
-
-  // Handle case where MCP subcommands are executed - they should exit the process
-  // and not return to main CLI logic
-  if (
-    result._.length > 0 &&
-    (result._[0] === 'mcp' || result._[0] === 'extensions')
-  ) {
-    // MCP commands handle their own execution and process exit
+  // Handle help and version flags manually since we disabled exitProcess
+  if (result['help'] || result['version']) {
+    await runExitCleanup();
     process.exit(0);
   }
 
@@ -424,9 +438,7 @@ export async function loadCliConfig(
   const { memoryContent, fileCount, filePaths } =
     await loadServerHierarchicalMemory(
       cwd,
-      settings.context?.loadMemoryFromIncludeDirectories
-        ? includeDirectories
-        : [],
+      [],
       debugMode,
       fileService,
       extensionManager,
@@ -507,7 +519,7 @@ export async function loadCliConfig(
   );
 
   const enableMessageBusIntegration =
-    settings.tools?.enableMessageBusIntegration ?? false;
+    settings.tools?.enableMessageBusIntegration ?? true;
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -516,14 +528,16 @@ export async function loadCliConfig(
   const hasQuery = !!argv.query;
   const interactive =
     !!argv.promptInteractive ||
+    !!argv.experimentalAcp ||
     (process.stdin.isTTY && !hasQuery && !argv.prompt);
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
-  if (!interactive && !argv.experimentalAcp) {
+  if (!interactive) {
     const defaultExcludes = [
       SHELL_TOOL_NAME,
       EDIT_TOOL_NAME,
       WRITE_FILE_TOOL_NAME,
+      WEB_FETCH_TOOL_NAME,
     ];
     const autoEditExcludes = [SHELL_TOOL_NAME];
 
@@ -555,10 +569,7 @@ export async function loadCliConfig(
     extraExcludes.length > 0 ? extraExcludes : undefined,
   );
 
-  const useModelRouter = settings.experimental?.useModelRouter ?? true;
-  const defaultModel = useModelRouter
-    ? DEFAULT_GEMINI_MODEL_AUTO
-    : DEFAULT_GEMINI_MODEL;
+  const defaultModel = DEFAULT_GEMINI_MODEL_AUTO;
   const resolvedModel: string =
     argv.model ||
     process.env['GEMINI_MODEL'] ||
@@ -583,6 +594,7 @@ export async function loadCliConfig(
       settings.context?.loadMemoryFromIncludeDirectories || false,
     debugMode,
     question,
+    previewFeatures: settings.general?.previewFeatures,
 
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
@@ -627,6 +639,10 @@ export async function loadCliConfig(
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,
+    enableAgents: settings.experimental?.enableAgents,
+    enableModelAvailabilityService:
+      settings.experimental?.isModelAvailabilityServiceEnabled,
+    experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
@@ -637,6 +653,7 @@ export async function loadCliConfig(
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell:
       settings.tools?.shell?.enableInteractiveShell ?? true,
+    shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
@@ -648,7 +665,6 @@ export async function loadCliConfig(
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
-    useModelRouter,
     enableMessageBusIntegration,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,

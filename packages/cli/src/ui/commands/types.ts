@@ -72,6 +72,7 @@ export interface CommandContext {
     extensionsUpdateState: Map<string, ExtensionUpdateStatus>;
     dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
     addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
+    removeComponent: () => void;
   };
   // Session-specific data
   session: {
@@ -113,6 +114,7 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
+  props?: Record<string, unknown>;
 
   dialog:
     | 'help'
@@ -121,6 +123,7 @@ export interface OpenDialogActionReturn {
     | 'editor'
     | 'privacy'
     | 'settings'
+    | 'sessionBrowser'
     | 'model'
     | 'permissions';
 }
@@ -168,6 +171,11 @@ export interface ConfirmActionReturn {
   };
 }
 
+export interface OpenCustomDialogActionReturn {
+  type: 'custom_dialog';
+  component: ReactNode;
+}
+
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
@@ -176,7 +184,8 @@ export type SlashCommandActionReturn =
   | LoadHistoryActionReturn
   | SubmitPromptActionReturn
   | ConfirmShellCommandsActionReturn
-  | ConfirmActionReturn;
+  | ConfirmActionReturn
+  | OpenCustomDialogActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
@@ -192,6 +201,14 @@ export interface SlashCommand {
   hidden?: boolean;
 
   kind: CommandKind;
+
+  /**
+   * Controls whether the command auto-executes when selected with Enter.
+   *
+   * If true, pressing Enter on the suggestion will execute the command immediately.
+   * If false or undefined, pressing Enter will autocomplete the command into the prompt window.
+   */
+  autoExecute?: boolean;
 
   // Optional metadata for extension commands
   extensionName?: string;
