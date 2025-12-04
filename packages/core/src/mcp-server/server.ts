@@ -64,16 +64,18 @@ export class GeminiMcpServer {
           const effectiveSessionId = sessionId || this.generateSessionId();
           let session = this.sessions.get(effectiveSessionId);
 
-          // Resolve model alias (e.g., "auto" -> "gemini-2.5-pro")
-          const requestedModel = model || this.config.getModel();
-          const resolvedModel = resolveModel(requestedModel, this.config.getPreviewFeatures());
-
           if (!session) {
+            // Resolve model alias (e.g., "auto" -> "gemini-2.5-pro")
+            const requestedModel = model || this.config.getModel();
+            const resolvedModel = resolveModel(requestedModel, this.config.getPreviewFeatures());
             session = {
               history: [],
               model: resolvedModel,
             };
             this.sessions.set(effectiveSessionId, session);
+          } else if (model) {
+            // If model explicitly provided for existing session, update it
+            session.model = resolveModel(model, this.config.getPreviewFeatures());
           }
 
           // Add user message to history
