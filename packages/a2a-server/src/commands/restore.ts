@@ -17,13 +17,13 @@ import type {
   CommandContext,
   CommandExecutionResponse,
 } from './types.js';
-import { logger } from '../utils/logger.js';
 
 export class RestoreCommand implements Command {
   readonly name = 'restore';
   readonly description =
     'Restore to a previous checkpoint, or list available checkpoints to restore. This will reset the conversation and file history to the state it was in when the checkpoint was created';
   readonly topLevel = true;
+  readonly requiresWorkspace = true;
   readonly subCommands = [new ListCheckpointsCommand()];
 
   async execute(
@@ -92,8 +92,6 @@ export class RestoreCommand implements Command {
       for await (const result of restoreResultGenerator) {
         restoreResult.push(result);
       }
-
-      logger.info(`[Command] Restored to checkpoint ${argsStr}.`);
 
       return {
         name: this.name,

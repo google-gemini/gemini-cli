@@ -23,6 +23,7 @@ export interface Command {
   readonly arguments?: CommandArgument[];
   readonly subCommands?: Command[];
   readonly topLevel?: boolean;
+  readonly requiresWorkspace?: boolean;
 
   execute(
     config: CommandContext,

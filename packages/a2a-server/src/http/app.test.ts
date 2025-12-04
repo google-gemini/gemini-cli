@@ -101,13 +101,6 @@ vi.mock('@google/gemini-cli-core', async () => {
   };
 });
 
-vi.mock('../utils/checkpoint_utils.js', () => ({
-  listCheckpointFiles: vi.fn(),
-  readCheckpointData: vi.fn(),
-  getCheckpointInfoList: vi.fn(),
-  getFormattedCheckpointList: vi.fn(),
-}));
-
 describe('E2E Tests', () => {
   let app: express.Express;
   let server: Server;
@@ -972,120 +965,6 @@ describe('E2E Tests', () => {
       expect(getExtensionsSpy).toHaveBeenCalled();
     });
 
-    it('should return a message when no restorable checkpoints are found', async () => {
-      const mockRestoreCommand = {
-        name: 'restore',
-        description: 'a mock command',
-        execute: vi.fn().mockResolvedValue({
-          name: 'restore',
-          data: [
-            {
-              type: 'message',
-              messageType: 'info',
-              content: 'No restorable checkpoints found.',
-            },
-          ],
-        }),
-      };
-      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockRestoreCommand);
-
-      const agent = request.agent(app);
-      const res = await agent
-        .post('/executeCommand')
-        .send({ command: 'restore', args: [] })
-        .set('Content-Type', 'application/json')
-        .expect(200);
-
-      expect(res.body).toEqual({
-        name: 'restore',
-        data: [
-          {
-            type: 'message',
-            messageType: 'info',
-            content: 'No restorable checkpoints found.',
-          },
-        ],
-      });
-    });
-
-    it('should return a list of available checkpoints for restore command', async () => {
-      const mockRestoreCommand = {
-        name: 'restore',
-        description: 'a mock command',
-        execute: vi.fn().mockResolvedValue({
-          name: 'restore',
-          data: [
-            {
-              type: 'message',
-              messageType: 'info',
-              content: 'Available checkpoints to restore:\n\ncheckpoint1',
-            },
-          ],
-        }),
-      };
-      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockRestoreCommand);
-
-      const agent = request.agent(app);
-      const res = await agent
-        .post('/executeCommand')
-        .send({ command: 'restore', args: [] })
-        .set('Content-Type', 'application/json')
-        .expect(200);
-
-      expect(res.body).toEqual({
-        name: 'restore',
-        data: [
-          {
-            type: 'message',
-            messageType: 'info',
-            content: 'Available checkpoints to restore:\n\ncheckpoint1',
-          },
-        ],
-      });
-    });
-
-    it('should return a list of available checkpoints for restore list command', async () => {
-      const mockListCheckpointsCommand = {
-        name: 'restore list',
-        description: 'a mock command',
-        execute: vi.fn().mockResolvedValue({
-          name: 'restore list',
-          data: [
-            {
-              type: 'message',
-              messageType: 'info',
-              content: JSON.stringify([
-                { file: 'checkpoint1.json', description: 'Test' },
-              ]),
-            },
-          ],
-        }),
-      };
-      vi.spyOn(commandRegistry, 'get').mockReturnValue(
-        mockListCheckpointsCommand,
-      );
-
-      const agent = request.agent(app);
-      const res = await agent
-        .post('/executeCommand')
-        .send({ command: 'restore list', args: [] })
-        .set('Content-Type', 'application/json')
-        .expect(200);
-
-      expect(res.body).toEqual({
-        name: 'restore list',
-        data: [
-          {
-            type: 'message',
-            messageType: 'info',
-            content: JSON.stringify([
-              { file: 'checkpoint1.json', description: 'Test' },
-            ]),
-          },
-        ],
-      });
-    });
-
     it('should return 404 for invalid command', async () => {
       vi.spyOn(commandRegistry, 'get').mockReturnValue(undefined);
 
@@ -1120,6 +999,67 @@ describe('E2E Tests', () => {
 
       expect(res.body.error).toBe('"args" field must be an array.');
       expect(getExtensionsSpy).not.toHaveBeenCalled();
+    });
+
+    it('should execute a command that does not require a workspace when CODER_AGENT_WORKSPACE_PATH is not set', async () => {
+      const mockCommand = {
+        name: 'test-command',
+        description: 'a mock command',
+        execute: vi
+          .fn()
+          .mockResolvedValue({ name: 'test-command', data: 'success' }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockCommand);
+
+      delete process.env['CODER_AGENT_WORKSPACE_PATH'];
+      const response = await request(app)
+        .post('/executeCommand')
+        .send({ command: 'test-command', args: [] });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toBe('success');
+    });
+
+    it('should return 400 for a command that requires a workspace when CODER_AGENT_WORKSPACE_PATH is not set', async () => {
+      const mockWorkspaceCommand = {
+        name: 'workspace-command',
+        description: 'A command that requires a workspace',
+        requiresWorkspace: true,
+        execute: vi
+          .fn()
+          .mockResolvedValue({ name: 'workspace-command', data: 'success' }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
+
+      delete process.env['CODER_AGENT_WORKSPACE_PATH'];
+      const response = await request(app)
+        .post('/executeCommand')
+        .send({ command: 'workspace-command', args: [] });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe(
+        'Command "workspace-command" requires a workspace, but CODER_AGENT_WORKSPACE_PATH is not set.',
+      );
+    });
+
+    it('should execute a command that requires a workspace when CODER_AGENT_WORKSPACE_PATH is set', async () => {
+      const mockWorkspaceCommand = {
+        name: 'workspace-command',
+        description: 'A command that requires a workspace',
+        requiresWorkspace: true,
+        execute: vi
+          .fn()
+          .mockResolvedValue({ name: 'workspace-command', data: 'success' }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
+
+      process.env['CODER_AGENT_WORKSPACE_PATH'] = '/tmp/test-workspace';
+      const response = await request(app)
+        .post('/executeCommand')
+        .send({ command: 'workspace-command', args: [] });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toBe('success');
     });
   });
 });

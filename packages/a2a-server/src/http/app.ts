@@ -153,6 +153,7 @@ export async function createApp() {
     });
 
     expressApp.post('/executeCommand', async (req, res) => {
+      logger.info('[CoreAgent] Received /executeCommand request: ', req.body);
       try {
         const { command, args } = req.body;
 
@@ -168,6 +169,14 @@ export async function createApp() {
 
         const commandToExecute = commandRegistry.get(command);
 
+        if (commandToExecute?.requiresWorkspace) {
+          if (!process.env['CODER_AGENT_WORKSPACE_PATH']) {
+            return res.status(400).json({
+              error: `Command "${command}" requires a workspace, but CODER_AGENT_WORKSPACE_PATH is not set.`,
+            });
+          }
+        }
+
         if (!commandToExecute) {
           return res
             .status(404)
@@ -175,6 +184,7 @@ export async function createApp() {
         }
 
         const result = await commandToExecute.execute(context, args ?? []);
+        logger.info('[CoreAgent] Sending /executeCommand response: ', result);
         return res.status(200).json(result);
       } catch (e) {
         logger.error('Error executing /executeCommand:', e);
