@@ -21,6 +21,7 @@ import type { FileExclusions } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { LocalFileDeclarativeTool } from './local-file-tool.js';
 
 // --- Interfaces ---
 
@@ -567,8 +568,12 @@ class GrepToolInvocation extends BaseToolInvocation<
 /**
  * Implementation of the Grep tool logic (moved from CLI)
  */
-export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
+export class GrepTool
+  extends BaseDeclarativeTool<GrepToolParams, ToolResult>
+  implements LocalFileDeclarativeTool<GrepToolParams>
+{
   static readonly Name = GREP_TOOL_NAME;
+  readonly accessesLocalFiles = true;
   constructor(
     private readonly config: Config,
     messageBus?: MessageBus,

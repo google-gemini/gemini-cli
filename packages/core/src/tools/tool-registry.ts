@@ -530,4 +530,14 @@ export class ToolRegistry {
     }
     return;
   }
+
+  /**
+   * Returns an array of all registered and discovered tool names,
+   * including those that are excluded via configuration.
+   *
+   * This function does not call config.getExcludeTools().
+   */
+  getAllKnownTools(): AnyDeclarativeTool[] {
+    return Array.from(this.allKnownTools.values());
+  }
 }

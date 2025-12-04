@@ -299,7 +299,8 @@ export interface ToolBuilder<
   description: string;
 
   /**
-   * The kind of tool for categorization and permissions
+   * The kind of tool for categorization and permissions.
+   * See also {@link LocalFileDeclarativeTool} to check if the tool may access local files.
    */
   kind: Kind;
 
@@ -732,7 +733,7 @@ export enum Kind {
   Edit = 'edit',
   Delete = 'delete',
   Move = 'move',
-  Search = 'search',
+  Search = 'search', // covers both local and web search
   Execute = 'execute',
   Think = 'think',
   Fetch = 'fetch',

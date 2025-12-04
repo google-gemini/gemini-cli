@@ -73,6 +73,7 @@ export interface CliArgs {
   useSmartEdit: boolean | undefined;
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
+  excludeLocalTools: boolean | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
 }
@@ -238,6 +239,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
           hidden: true,
+        })
+        .option('exclude-local-tools', {
+          type: 'boolean',
+          description:
+            'Disable core tools that perform local file operations and command executions (e.g. read/write files, shell). Default to false.',
         })
         .deprecateOption(
           'prompt',
@@ -613,6 +619,8 @@ export async function loadCliConfig(
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
     excludeTools,
+    excludeLocalTools:
+      argv.excludeLocalTools ?? settings.tools?.excludeLocalTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
     mcpServerCommand: settings.mcp?.serverCommand,

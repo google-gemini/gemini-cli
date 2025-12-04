@@ -1004,6 +1004,16 @@ const SETTINGS_SCHEMA = {
         items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
+      excludeLocalTools: {
+        type: 'boolean',
+        label: 'Exclude Local Tools',
+        category: 'Tools',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Disable core tools that perform local file operations and command executions (e.g. read/write files, shell).',
+        showInDialog: true,
+      },
       discoveryCommand: {
         type: 'string',
         label: 'Tool Discovery Command',

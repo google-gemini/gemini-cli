@@ -646,6 +646,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`tools.excludeLocalTools`** (boolean):
+  - **Description:** Disable core tools that perform local file operations and
+    command executions (e.g. read/write files, shell).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`tools.discoveryCommand`** (string):
   - **Description:** Command to run for tool discovery.
   - **Default:** `undefined`

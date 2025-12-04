@@ -21,6 +21,7 @@ import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { READ_FILE_TOOL_NAME } from './tool-names.js';
+import type { LocalFileDeclarativeTool } from './local-file-tool.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -141,11 +142,12 @@ ${result.llmContent}`;
 /**
  * Implementation of the ReadFile tool logic
  */
-export class ReadFileTool extends BaseDeclarativeTool<
-  ReadFileToolParams,
-  ToolResult
-> {
+export class ReadFileTool
+  extends BaseDeclarativeTool<ReadFileToolParams, ToolResult>
+  implements LocalFileDeclarativeTool<ReadFileToolParams>
+{
   static readonly Name = READ_FILE_TOOL_NAME;
+  readonly accessesLocalFiles = true;
 
   constructor(
     private config: Config,

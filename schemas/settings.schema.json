@@ -1081,6 +1081,13 @@
             "type": "string"
           }
         },
+        "excludeLocalTools": {
+          "title": "Exclude Local Tools",
+          "description": "Disable core tools that perform local file operations and command executions (e.g. read/write files, shell).",
+          "markdownDescription": "Disable core tools that perform local file operations and command executions (e.g. read/write files, shell).\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "discoveryCommand": {
           "title": "Tool Discovery Command",
           "description": "Command to run for tool discovery.",
