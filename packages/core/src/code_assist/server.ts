@@ -20,6 +20,7 @@ import type {
   ConversationInteraction,
   StreamingLatency,
   RecordCodeAssistMetricsRequest,
+  ReceiveEventRequest,
 } from './types.js';
 import type {
   ListExperimentsRequest,
@@ -271,6 +272,10 @@ export class CodeAssistServer implements ContentGenerator {
     request: RecordCodeAssistMetricsRequest,
   ): Promise<void> {
     return this.requestPost<void>('recordCodeAssistMetrics', request);
+  }
+  async receiveEvents(req: ReceiveEventRequest): Promise<void> {
+    const res = await this.requestPost('event:receive', req);
+    console.log(res);
   }
 
   async requestPost<T>(
