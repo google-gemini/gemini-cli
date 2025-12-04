@@ -11,6 +11,8 @@ import ignore from 'ignore';
 export interface GeminiIgnoreFilter {
   isIgnored(filePath: string): boolean;
   getPatterns(): string[];
+  getIgnoreFilePath(): string | null;
+  hasPatterns(): boolean;
 }
 
 export class GeminiIgnoreParser implements GeminiIgnoreFilter {
@@ -77,5 +79,27 @@ export class GeminiIgnoreParser implements GeminiIgnoreFilter {
 
   getPatterns(): string[] {
     return this.patterns;
+  }
+
+  /**
+   * Returns the path to .geminiignore file if it exists and has patterns.
+   * Useful for tools like ripgrep that support --ignore-file flag.
+   */
+  getIgnoreFilePath(): string | null {
+    if (this.patterns.length === 0) {
+      return null;
+    }
+    const ignoreFilePath = path.join(this.projectRoot, '.geminiignore');
+    if (!fs.existsSync(ignoreFilePath)) {
+      return null;
+    }
+    return ignoreFilePath;
+  }
+
+  /**
+   * Returns true if .geminiignore exists and has patterns.
+   */
+  hasPatterns(): boolean {
+    return this.patterns.length > 0;
   }
 }
