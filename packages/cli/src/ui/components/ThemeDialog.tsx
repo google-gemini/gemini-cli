@@ -21,6 +21,7 @@ import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { ScopeSelector } from './shared/ScopeSelector.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
@@ -46,6 +47,7 @@ export function ThemeDialog({
   terminalWidth,
 }: ThemeDialogProps): React.JSX.Element {
   const isAlternateBuffer = useAlternateBuffer();
+  const { refreshStatic } = useUIActions();
   const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
   );
@@ -93,8 +95,9 @@ export function ThemeDialog({
   const handleThemeSelect = useCallback(
     (themeName: string) => {
       onSelect(themeName, selectedScope);
+      refreshStatic();
     },
-    [onSelect, selectedScope],
+    [onSelect, selectedScope, refreshStatic],
   );
 
   const handleThemeHighlight = (themeName: string) => {
@@ -109,8 +112,9 @@ export function ThemeDialog({
   const handleScopeSelect = useCallback(
     (scope: LoadableSettingScope) => {
       onSelect(highlightedThemeName, scope);
+      refreshStatic();
     },
-    [onSelect, highlightedThemeName],
+    [onSelect, highlightedThemeName, refreshStatic],
   );
 
   const [mode, setMode] = useState<'theme' | 'scope'>('theme');

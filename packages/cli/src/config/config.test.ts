@@ -13,6 +13,7 @@ import {
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
   type ExtensionLoader,
   debugLogger,
 } from '@google/gemini-cli-core';
@@ -631,6 +632,14 @@ describe('loadCliConfig', () => {
       DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
     );
   });
+
+  it('should default enableMessageBusIntegration to true when unconfigured', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config['enableMessageBusIntegration']).toBe(true);
+  });
 });
 
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
@@ -693,39 +702,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       undefined, // maxDirs
     );
   });
-
-  // NOTE TO FUTURE DEVELOPERS:
-  // To re-enable tests for loadHierarchicalGeminiMemory, ensure that:
-  // 1. os.homedir() is reliably mocked *before* the config.ts module is loaded
-  //    and its functions (which use os.homedir()) are called.
-  // 2. fs/promises and fs mocks correctly simulate file/directory existence,
-  //    readability, and content based on paths derived from the mocked os.homedir().
-  // 3. Spies on console functions (for logger output) are correctly set up if needed.
-  // Example of a previously failing test structure:
-  it.skip('should correctly use mocked homedir for global path', async () => {
-    // This test is skipped because mockFs and fsPromises are not properly imported/mocked
-    // TODO: Fix this test by properly setting up mock-fs and fs/promises mocks
-    /*
-    const MOCK_GEMINI_DIR_LOCAL = path.join(
-      '/mock/home/user',
-      ServerConfig.GEMINI_DIR,
-    );
-    const MOCK_GLOBAL_PATH_LOCAL = path.join(
-      MOCK_GEMINI_DIR_LOCAL,
-      'GEMINI.md',
-    );
-    mockFs({
-      [MOCK_GLOBAL_PATH_LOCAL]: { type: 'file', content: 'GlobalContentOnly' },
-    });
-    const memory = await loadHierarchicalGeminiMemory('/some/other/cwd', false);
-    expect(memory).toBe('GlobalContentOnly');
-    expect(vi.mocked(os.homedir)).toHaveBeenCalled();
-    expect(fsPromises.readFile).toHaveBeenCalledWith(
-      MOCK_GLOBAL_PATH_LOCAL,
-      'utf-8',
-    );
-    */
-  });
 });
 
 describe('mergeMcpServers', () => {
@@ -767,6 +743,7 @@ describe('mergeExcludeTools', () => {
     SHELL_TOOL_NAME,
     EDIT_TOOL_NAME,
     WRITE_FILE_TOOL_NAME,
+    WEB_FETCH_TOOL_NAME,
   ]);
   const originalIsTTY = process.stdin.isTTY;
 
@@ -1643,6 +1620,29 @@ describe('loadCliConfig tool exclusions', () => {
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getExcludeTools()).not.toContain(SHELL_TOOL_NAME);
+  });
+
+  it('should exclude web-fetch in non-interactive mode when not allowed', async () => {
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js', '-p', 'test'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.getExcludeTools()).toContain(WEB_FETCH_TOOL_NAME);
+  });
+
+  it('should not exclude web-fetch in non-interactive mode when allowed', async () => {
+    process.stdin.isTTY = false;
+    process.argv = [
+      'node',
+      'script.js',
+      '-p',
+      'test',
+      '--allowed-tools',
+      WEB_FETCH_TOOL_NAME,
+    ];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.getExcludeTools()).not.toContain(WEB_FETCH_TOOL_NAME);
   });
 
   it('should not exclude shell tool in non-interactive mode when --allowed-tools="run_shell_command" is set', async () => {

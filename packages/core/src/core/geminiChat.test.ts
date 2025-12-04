@@ -48,6 +48,10 @@ vi.mock('node:fs', () => {
       });
     }),
     existsSync: vi.fn((path: string) => mockFileSystem.has(path)),
+    createWriteStream: vi.fn(() => ({
+      write: vi.fn(),
+      on: vi.fn(),
+    })),
   };
 
   return {
@@ -1886,7 +1890,7 @@ describe('GeminiChat', () => {
             error,
           );
           if (shouldRetry) {
-            return await apiCall();
+            return apiCall();
           }
         }
         throw error; // Stop if callback returns false/null or doesn't exist
