@@ -5,10 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { generateAndSaveSummary } from './sessionSummaryHelper.js';
+import { generateAndSaveSummary } from './sessionSummaryUtils.js';
 import type { Config } from '../config/config.js';
 import type { ChatRecordingService } from './chatRecordingService.js';
 import type { ContentGenerator } from '../core/contentGenerator.js';
+import type { GeminiClient } from '../core/client.js';
 
 // Mock the SessionSummaryService module
 vi.mock('./sessionSummaryService.js', () => ({
@@ -22,9 +23,10 @@ vi.mock('../core/baseLlmClient.js', () => ({
   BaseLlmClient: vi.fn(),
 }));
 
-describe('sessionSummaryHelper', () => {
+describe('sessionSummaryUtils', () => {
   let mockConfig: Config;
   let mockChatRecordingService: ChatRecordingService;
+  let mockGeminiClient: GeminiClient;
   let mockContentGenerator: ContentGenerator;
   let mockGenerateSummary: ReturnType<typeof vi.fn>;
 
@@ -34,9 +36,23 @@ describe('sessionSummaryHelper', () => {
     // Setup mock content generator
     mockContentGenerator = {} as ContentGenerator;
 
+    // Setup mock chat recording service
+    mockChatRecordingService = {
+      getConversation: vi.fn(),
+      saveSummary: vi.fn(),
+    } as unknown as ChatRecordingService;
+
+    // Setup mock gemini client
+    mockGeminiClient = {
+      getChatRecordingService: vi
+        .fn()
+        .mockReturnValue(mockChatRecordingService),
+    } as unknown as GeminiClient;
+
     // Setup mock config
     mockConfig = {
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
+      getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
     } as unknown as Config;
 
     // Setup mock generateSummary function
@@ -51,12 +67,6 @@ describe('sessionSummaryHelper', () => {
     ).mockImplementation(() => ({
       generateSummary: mockGenerateSummary,
     }));
-
-    // Setup mock chat recording service
-    mockChatRecordingService = {
-      getConversation: vi.fn(),
-      saveSummary: vi.fn(),
-    } as unknown as ChatRecordingService;
   });
 
   afterEach(() => {
@@ -90,7 +100,7 @@ describe('sessionSummaryHelper', () => {
         mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
       ).mockReturnValue(mockConversation);
 
-      await generateAndSaveSummary(mockConfig, mockChatRecordingService);
+      await generateAndSaveSummary(mockConfig);
 
       expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
       expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
@@ -103,12 +113,24 @@ describe('sessionSummaryHelper', () => {
       );
     });
 
+    it('should skip if no chat recording service is available', async () => {
+      (
+        mockGeminiClient.getChatRecordingService as ReturnType<typeof vi.fn>
+      ).mockReturnValue(undefined);
+
+      await generateAndSaveSummary(mockConfig);
+
+      expect(mockGeminiClient.getChatRecordingService).toHaveBeenCalledTimes(1);
+      expect(mockGenerateSummary).not.toHaveBeenCalled();
+      expect(mockChatRecordingService.saveSummary).not.toHaveBeenCalled();
+    });
+
     it('should skip if no conversation exists', async () => {
       (
         mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
       ).mockReturnValue(null);
 
-      await generateAndSaveSummary(mockConfig, mockChatRecordingService);
+      await generateAndSaveSummary(mockConfig);
 
       expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
       expect(mockGenerateSummary).not.toHaveBeenCalled();
@@ -136,7 +158,7 @@ describe('sessionSummaryHelper', () => {
         mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
       ).mockReturnValue(mockConversation);
 
-      await generateAndSaveSummary(mockConfig, mockChatRecordingService);
+      await generateAndSaveSummary(mockConfig);
 
       expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
       expect(mockGenerateSummary).not.toHaveBeenCalled();
@@ -156,7 +178,7 @@ describe('sessionSummaryHelper', () => {
         mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
       ).mockReturnValue(mockConversation);
 
-      await generateAndSaveSummary(mockConfig, mockChatRecordingService);
+      await generateAndSaveSummary(mockConfig);
 
       expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
       expect(mockGenerateSummary).not.toHaveBeenCalled();
@@ -184,7 +206,7 @@ describe('sessionSummaryHelper', () => {
       ).mockReturnValue(mockConversation);
       mockGenerateSummary.mockResolvedValue(null);
 
-      await generateAndSaveSummary(mockConfig, mockChatRecordingService);
+      await generateAndSaveSummary(mockConfig);
 
       expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
       expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
@@ -213,9 +235,7 @@ describe('sessionSummaryHelper', () => {
       mockGenerateSummary.mockRejectedValue(new Error('API Error'));
 
       // Should not throw
-      await expect(
-        generateAndSaveSummary(mockConfig, mockChatRecordingService),
-      ).resolves.not.toThrow();
+      await expect(generateAndSaveSummary(mockConfig)).resolves.not.toThrow();
 
       expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
       expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
@@ -244,7 +264,7 @@ describe('sessionSummaryHelper', () => {
         mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
       ).mockReturnValue(mockConversation);
 
-      await generateAndSaveSummary(mockConfig, mockChatRecordingService);
+      await generateAndSaveSummary(mockConfig);
 
       expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
       expect(mockChatRecordingService.getConversation).toHaveBeenCalledWith();
@@ -278,7 +298,7 @@ describe('sessionSummaryHelper', () => {
         mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
       ).mockReturnValue(mockConversation);
 
-      await generateAndSaveSummary(mockConfig, mockChatRecordingService);
+      await generateAndSaveSummary(mockConfig);
 
       expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
       expect(mockGenerateSummary).toHaveBeenCalledWith({
@@ -307,7 +327,7 @@ describe('sessionSummaryHelper', () => {
       ).mockReturnValue(mockConversation);
       mockGenerateSummary.mockResolvedValue('Test summary');
 
-      await generateAndSaveSummary(mockConfig, mockChatRecordingService);
+      await generateAndSaveSummary(mockConfig);
 
       expect(mockChatRecordingService.saveSummary).toHaveBeenCalledTimes(1);
       expect(mockChatRecordingService.saveSummary).toHaveBeenCalledWith(
@@ -336,7 +356,7 @@ describe('sessionSummaryHelper', () => {
       ).mockReturnValue(mockConversation);
       mockGenerateSummary.mockResolvedValue(null);
 
-      await generateAndSaveSummary(mockConfig, mockChatRecordingService);
+      await generateAndSaveSummary(mockConfig);
 
       expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
       expect(mockChatRecordingService.saveSummary).not.toHaveBeenCalled();
@@ -363,7 +383,7 @@ describe('sessionSummaryHelper', () => {
       ).mockReturnValue(mockConversation);
       mockGenerateSummary.mockRejectedValue(new Error('Generation failed'));
 
-      await generateAndSaveSummary(mockConfig, mockChatRecordingService);
+      await generateAndSaveSummary(mockConfig);
 
       expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
       expect(mockChatRecordingService.saveSummary).not.toHaveBeenCalled();

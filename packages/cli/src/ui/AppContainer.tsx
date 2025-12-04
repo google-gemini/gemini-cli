@@ -313,20 +313,7 @@ export const AppContainer = (props: AppContainerProps) => {
       }
     })();
     registerCleanup(async () => {
-      // Generate and save session summary
-      const chatRecordingService = config
-        .getGeminiClient()
-        ?.getChatRecordingService();
-      if (chatRecordingService) {
-        try {
-          await generateAndSaveSummary(config, chatRecordingService);
-        } catch (error) {
-          // Silently fail - we don't want to block exit
-          debugLogger.debug(
-            `[SessionSummary] Error during cleanup: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-      }
+      await generateAndSaveSummary(config);
       // Turn off mouse scroll.
       disableMouseEvents();
       const ideClient = await IdeClient.getInstance();

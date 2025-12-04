@@ -5,7 +5,6 @@
  */
 
 import type { Config } from '../config/config.js';
-import type { ChatRecordingService } from './chatRecordingService.js';
 import { SessionSummaryService } from './sessionSummaryService.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -14,11 +13,17 @@ import { debugLogger } from '../utils/debugLogger.js';
  * Generates and saves a summary for the current session.
  * This is called during session cleanup and is non-blocking - errors are logged but don't prevent exit.
  */
-export async function generateAndSaveSummary(
-  config: Config,
-  chatRecordingService: ChatRecordingService,
-): Promise<void> {
+export async function generateAndSaveSummary(config: Config): Promise<void> {
   try {
+    // Get the chat recording service from config
+    const chatRecordingService = config
+      .getGeminiClient()
+      ?.getChatRecordingService();
+    if (!chatRecordingService) {
+      debugLogger.debug('[SessionSummary] No chat recording service available');
+      return;
+    }
+
     // Get the current conversation
     const conversation = chatRecordingService.getConversation();
     if (!conversation) {
@@ -57,7 +62,7 @@ export async function generateAndSaveSummary(
     }
   } catch (error) {
     // Log but don't throw - we want graceful degradation
-    debugLogger.debug(
+    debugLogger.warn(
       `[SessionSummary] Error in generateAndSaveSummary: ${error instanceof Error ? error.message : String(error)}`,
     );
   }

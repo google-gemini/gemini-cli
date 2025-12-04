@@ -14,6 +14,7 @@ import { getResponseText } from '../utils/partUtils.js';
 const DEFAULT_MAX_MESSAGES = 20;
 const DEFAULT_MAX_CHARS = 80;
 const DEFAULT_TIMEOUT_MS = 5000;
+const MAX_MESSAGE_LENGTH = 500;
 
 const SUMMARY_PROMPT = `Summarize the user's primary intent or goal in this conversation in ONE sentence (max 80 characters).
 Focus on what the user was trying to accomplish, not the technical details.
@@ -98,7 +99,9 @@ export class SessionSummaryService {
           const content = partListUnionToString(msg.content);
           // Truncate very long messages to avoid token limit
           const truncated =
-            content.length > 500 ? content.slice(0, 500) + '...' : content;
+            content.length > MAX_MESSAGE_LENGTH
+              ? content.slice(0, MAX_MESSAGE_LENGTH) + '...'
+              : content;
           return `${role}: ${truncated}`;
         })
         .join('\n\n');
