@@ -313,10 +313,15 @@ export interface ConfigParameters {
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   experiments?: Experiments;
-  hooks?: {
-    [K in HookEventName]?: HookDefinition[];
-  };
+  hooks?:
+    | {
+        [K in HookEventName]?: HookDefinition[];
+      }
+    | ({
+        [K in HookEventName]?: HookDefinition[];
+      } & { disabled?: string[] });
   previewFeatures?: boolean;
+  enableAgents?: boolean;
   enableModelAvailabilityService?: boolean;
   experimentalJitContext?: boolean;
 }
@@ -430,6 +435,7 @@ export class Config {
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
+  private readonly disabledHooks: string[];
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
@@ -437,6 +443,7 @@ export class Config {
   private previewModelFallbackMode = false;
   private previewModelBypassMode = false;
   private readonly enableModelAvailabilityService: boolean;
+  private readonly enableAgents: boolean;
 
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
@@ -500,6 +507,7 @@ export class Config {
     this.model = params.model;
     this.enableModelAvailabilityService =
       params.enableModelAvailabilityService ?? false;
+    this.enableAgents = params.enableAgents ?? false;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
@@ -542,6 +550,10 @@ export class Config {
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? true;
     this.enableHooks = params.enableHooks ?? false;
+    this.disabledHooks =
+      (params.hooks && 'disabled' in params.hooks
+        ? params.hooks.disabled
+        : undefined) ?? [];
 
     // Enable MessageBus integration if:
     // 1. Explicitly enabled via setting, OR
@@ -1203,6 +1215,10 @@ export class Config {
     return this.enableModelAvailabilityService;
   }
 
+  isAgentsEnabled(): boolean {
+    return this.enableAgents;
+  }
+
   getNoBrowser(): boolean {
     return this.noBrowser;
   }
@@ -1562,6 +1578,13 @@ export class Config {
    */
   getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.hooks;
+  }
+
+  /**
+   * Get disabled hooks list
+   */
+  getDisabledHooks(): string[] {
+    return this.disabledHooks;
   }
 
   /**
