@@ -637,7 +637,11 @@ describe('runNonInteractive', () => {
     );
     expect(processStdoutSpy).toHaveBeenCalledWith(
       JSON.stringify(
-        { response: 'Hello World', stats: MOCK_SESSION_METRICS },
+        {
+          session_id: 'test-session-id',
+          response: 'Hello World',
+          stats: MOCK_SESSION_METRICS,
+        },
         null,
         2,
       ),
@@ -720,7 +724,15 @@ describe('runNonInteractive', () => {
 
     // This should output JSON with empty response but include stats
     expect(processStdoutSpy).toHaveBeenCalledWith(
-      JSON.stringify({ response: '', stats: MOCK_SESSION_METRICS }, null, 2),
+      JSON.stringify(
+        {
+          session_id: 'test-session-id',
+          response: '',
+          stats: MOCK_SESSION_METRICS,
+        },
+        null,
+        2,
+      ),
     );
   });
 
@@ -755,7 +767,15 @@ describe('runNonInteractive', () => {
 
     // This should output JSON with empty response but include stats
     expect(processStdoutSpy).toHaveBeenCalledWith(
-      JSON.stringify({ response: '', stats: MOCK_SESSION_METRICS }, null, 2),
+      JSON.stringify(
+        {
+          session_id: 'test-session-id',
+          response: '',
+          stats: MOCK_SESSION_METRICS,
+        },
+        null,
+        2,
+      ),
     );
   });
 
@@ -792,6 +812,7 @@ describe('runNonInteractive', () => {
     expect(consoleErrorJsonSpy).toHaveBeenCalledWith(
       JSON.stringify(
         {
+          session_id: 'test-session-id',
           error: {
             type: 'Error',
             message: 'Invalid input provided',
@@ -837,6 +858,7 @@ describe('runNonInteractive', () => {
     expect(consoleErrorJsonSpy).toHaveBeenCalledWith(
       JSON.stringify(
         {
+          session_id: 'test-session-id',
           error: {
             type: 'FatalInputError',
             message: 'Invalid command syntax provided',

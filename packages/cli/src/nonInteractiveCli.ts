@@ -428,7 +428,9 @@ export async function runNonInteractive({
           } else if (config.getOutputFormat() === OutputFormat.JSON) {
             const formatter = new JsonFormatter();
             const stats = uiTelemetryService.getMetrics();
-            textOutput.write(formatter.format(responseText, stats));
+            textOutput.write(
+              formatter.format(config.getSessionId(), responseText, stats),
+            );
           } else {
             textOutput.ensureTrailingNewline(); // Ensure a final newline
           }
