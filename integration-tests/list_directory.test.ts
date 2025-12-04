@@ -17,7 +17,9 @@ import { join } from 'node:path';
 describe('list_directory', () => {
   it('should be able to list a directory', async () => {
     const rig = new TestRig();
-    rig.setup('should be able to list a directory');
+    await rig.setup('should be able to list a directory', {
+      settings: { tools: { core: ['list_directory'] } },
+    });
     rig.createFile('file1.txt', 'file 1 content');
     rig.mkdir('subdir');
     rig.sync();
