@@ -71,19 +71,24 @@ export async function loadConfig(
     ideMode: false,
     folderTrust: settings.folderTrust === true,
     extensionLoader,
+    checkpointing: process.env['CHECKPOINTING']
+      ? process.env['CHECKPOINTING'] === 'true'
+      : settings.checkpointing?.enabled,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
-  const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
-    workspaceDir,
-    [workspaceDir],
-    false,
-    fileService,
-    extensionLoader,
-    settings.folderTrust === true,
-  );
+  const { memoryContent, fileCount, filePaths } =
+    await loadServerHierarchicalMemory(
+      workspaceDir,
+      [workspaceDir],
+      false,
+      fileService,
+      extensionLoader,
+      settings.folderTrust === true,
+    );
   configParams.userMemory = memoryContent;
   configParams.geminiMdFileCount = fileCount;
+  configParams.geminiMdFilePaths = filePaths;
   const config = new Config({
     ...configParams,
   });

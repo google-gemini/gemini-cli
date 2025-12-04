@@ -19,7 +19,7 @@ import {
   updateExtension,
 } from '../../config/extensions/update.js';
 import { type ExtensionUpdateInfo } from '../../config/extension.js';
-import { checkExhaustive } from '../../utils/checks.js';
+import { checkExhaustive } from '@google/gemini-cli-core';
 import type { ExtensionManager } from '../../config/extension-manager.js';
 
 type ConfirmationRequestWrapper = {
