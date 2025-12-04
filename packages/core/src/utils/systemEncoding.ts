@@ -165,3 +165,24 @@ export function detectEncodingFromBuffer(buffer: Buffer): string | null {
 
   return null;
 }
+
+/**
+ * Detects encoding from a buffer and returns a compatible Node.js BufferEncoding.
+ * Defaults to 'utf-8' if detection fails or the encoding is not one of the
+ * special cases handled (ISO-8859-*, Windows-125*).
+ *
+ * @param buffer The buffer to analyze.
+ * @returns 'latin1' if a single-byte encoding is detected, otherwise 'utf-8'.
+ */
+export function getEncodingForBuffer(buffer: Buffer): BufferEncoding {
+  const detected = detectEncodingFromBuffer(buffer);
+  if (detected) {
+    if (
+      detected.startsWith('iso-8859-') ||
+      detected.startsWith('windows-125')
+    ) {
+      return 'latin1';
+    }
+  }
+  return 'utf-8';
+}
