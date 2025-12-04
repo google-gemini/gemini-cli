@@ -23,15 +23,6 @@ const __dirname = path.dirname(__filename);
 interface SandboxCliArgs {
   sandbox?: boolean | string | null;
 }
-const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
-  'docker',
-  'podman',
-  'sandbox-exec',
-];
-
-function isSandboxCommand(value: string): value is SandboxConfig['command'] {
-  return (VALID_SANDBOX_COMMANDS as readonly string[]).includes(value);
-}
 
 function getSandboxCommand(
   sandbox?: boolean | string | null,
@@ -56,13 +47,6 @@ function getSandboxCommand(
   }
 
   if (typeof sandbox === 'string' && sandbox) {
-    if (!isSandboxCommand(sandbox)) {
-      throw new FatalSandboxError(
-        `Invalid sandbox command '${sandbox}'. Must be one of ${VALID_SANDBOX_COMMANDS.join(
-          ', ',
-        )}`,
-      );
-    }
     // confirm that specified command exists
     if (commandExists.sync(sandbox)) {
       return sandbox;
