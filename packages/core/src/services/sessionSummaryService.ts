@@ -16,7 +16,7 @@ const DEFAULT_TIMEOUT_MS = 5000;
 const MAX_MESSAGE_LENGTH = 500;
 
 const SUMMARY_PROMPT = `Summarize the user's primary intent or goal in this conversation in ONE sentence (max 80 characters).
-Focus on what the user was trying to accomplish, not the technical details.
+Focus on what the user was trying to accomplish.
 
 Examples:
 - "Add dark mode to the app"
