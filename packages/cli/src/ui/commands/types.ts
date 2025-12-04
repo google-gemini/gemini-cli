@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ReactNode } from 'react';
+import type { ReactNode, Dispatch, SetStateAction } from 'react';
 import type { Content, PartListUnion } from '@google/genai';
 import type {
   HistoryItemWithoutId,
@@ -68,6 +68,7 @@ export interface CommandContext {
     toggleCorgiMode: () => void;
     toggleDebugProfiler: () => void;
     toggleVimEnabled: () => Promise<boolean>;
+    setIsPlanMode: Dispatch<SetStateAction<boolean>>;
     reloadCommands: () => void;
     extensionsUpdateState: Map<string, ExtensionUpdateStatus>;
     dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;

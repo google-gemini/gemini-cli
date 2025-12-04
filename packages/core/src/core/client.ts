@@ -19,7 +19,7 @@ import type { ServerGeminiStreamEvent, ChatCompressionInfo } from './turn.js';
 import { CompressionStatus } from './turn.js';
 import { Turn, GeminiEventType } from './turn.js';
 import type { Config } from '../config/config.js';
-import { getCoreSystemPrompt } from './prompts.js';
+import { getCoreSystemPrompt, getPlanModeSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
@@ -33,6 +33,7 @@ import type {
 import type { ContentGenerator } from './contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
   getEffectiveModel,
 } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
@@ -57,6 +58,14 @@ import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
+
+export function isThinkingSupported(model: string) {
+  return (
+    model.startsWith('gemini-2.5') ||
+    model.startsWith('gemini-3') ||
+    model === DEFAULT_GEMINI_MODEL_AUTO
+  );
+}
 
 const MAX_TURNS = 100;
 
@@ -198,7 +207,10 @@ export class GeminiClient {
 
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+      const systemInstruction = this.config.getIsPlanMode()
+        ? getPlanModeSystemPrompt(this.config, userMemory)
+        : getCoreSystemPrompt(this.config, userMemory);
+
       return new GeminiChat(
         this.config,
         systemInstruction,
@@ -664,7 +676,9 @@ export class GeminiClient {
 
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+      const systemInstruction = this.config.getIsPlanMode()
+        ? getPlanModeSystemPrompt(this.config, userMemory)
+        : getCoreSystemPrompt(this.config, userMemory);
 
       const apiCall = () => {
         const modelConfigToUse = this.config.isInFallbackMode()

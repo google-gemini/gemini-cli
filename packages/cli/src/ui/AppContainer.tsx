@@ -185,6 +185,7 @@ export const AppContainer = (props: AppContainerProps) => {
     null,
   );
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
+  const [isPlanMode, setIsPlanMode] = useState<boolean>(false);
   const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
 
   const [shellModeActive, setShellModeActive] = useState(false);
@@ -661,6 +662,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     refreshStatic,
     toggleVimEnabled,
     setIsProcessing,
+    setIsPlanMode,
     slashCommandActions,
     extensionsUpdateStateInternal,
     isConfigInitialized,
@@ -771,6 +773,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     getPreferredEditor,
     onAuthError,
     performMemoryRefresh,
+    isPlanMode,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
     onCancelSubmit,
@@ -1474,6 +1477,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       shouldShowIdePrompt,
       isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
       isTrustedFolder,
+      isPlanMode,
       constrainHeight,
       showErrorDetails,
       showFullTodos,
@@ -1562,6 +1566,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       shouldShowIdePrompt,
       isFolderTrustDialogOpen,
       isTrustedFolder,
+      isPlanMode,
       constrainHeight,
       showErrorDetails,
       showFullTodos,

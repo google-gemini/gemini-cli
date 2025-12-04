@@ -21,6 +21,7 @@ import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import { isDestructiveTool } from './tool-types.js';
 
 export const DISCOVERED_TOOL_PREFIX = 'discovered_tool_';
 
@@ -465,11 +466,25 @@ export class ToolRegistry {
    * Retrieves the list of tool schemas (FunctionDeclaration array).
    * Extracts the declarations from the ToolListUnion structure.
    * Includes discovered (vs registered) tools if configured.
+   * In plan mode, filters out destructive tools to prevent file modifications.
    * @returns An array of FunctionDeclarations.
    */
   getFunctionDeclarations(): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
+    const isPlanMode = this.config.getIsPlanMode();
+
     this.getActiveTools().forEach((tool) => {
+      // In plan mode, skip destructive built-in tools
+      if (isPlanMode && isDestructiveTool(tool.name)) {
+        return;
+      }
+      // In plan mode, skip all discovered and MCP tools since we can't verify their safety
+      if (
+        isPlanMode &&
+        (tool instanceof DiscoveredTool || tool instanceof DiscoveredMCPTool)
+      ) {
+        return;
+      }
       declarations.push(tool.schema);
     });
     return declarations;
@@ -477,14 +492,28 @@ export class ToolRegistry {
 
   /**
    * Retrieves a filtered list of tool schemas based on a list of tool names.
+   * In plan mode, filters out destructive tools to prevent file modifications.
    * @param toolNames - An array of tool names to include.
    * @returns An array of FunctionDeclarations for the specified tools.
    */
   getFunctionDeclarationsFiltered(toolNames: string[]): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
+    const isPlanMode = this.config.getIsPlanMode();
+
     for (const name of toolNames) {
       const tool = this.allKnownTools.get(name);
       if (tool && this.isActiveTool(tool)) {
+        // In plan mode, skip destructive built-in tools
+        if (isPlanMode && isDestructiveTool(tool.name)) {
+          continue;
+        }
+        // In plan mode, skip all discovered and MCP tools since we can't verify their safety
+        if (
+          isPlanMode &&
+          (tool instanceof DiscoveredTool || tool instanceof DiscoveredMCPTool)
+        ) {
+          continue;
+        }
         declarations.push(tool.schema);
       }
     }

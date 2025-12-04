@@ -37,6 +37,7 @@ import {
   tokenLimit,
   debugLogger,
   runInDevTraceSpan,
+  isDestructiveTool,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -103,6 +104,7 @@ export const useGeminiStream = (
   getPreferredEditor: () => EditorType | undefined,
   onAuthError: (error: string) => void,
   performMemoryRefresh: () => Promise<void>,
+  isPlanMode: boolean,
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
   onCancelSubmit: (shouldRestorePrompt?: boolean) => void,
@@ -120,9 +122,21 @@ export const useGeminiStream = (
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
+  const submitQueryRef = useRef<
+    | ((query: PartListUnion, options?: { isContinuation: boolean }) => void)
+    | null
+  >(null);
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
   const logger = useLogger(storage);
+
+  // Update config when plan mode changes
+  useEffect(() => {
+    if (config && config.setIsPlanMode) {
+      config.setIsPlanMode(isPlanMode);
+    }
+  }, [config, isPlanMode]);
+
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
       return;
@@ -861,7 +875,44 @@ export const useGeminiStream = (
         }
       }
       if (toolCallRequests.length > 0) {
-        scheduleToolCalls(toolCallRequests, signal);
+        if (isPlanMode) {
+          const safeTools = toolCallRequests.filter(
+            (t) => !isDestructiveTool(t.name),
+          );
+          const blockedTools = toolCallRequests.filter((t) =>
+            isDestructiveTool(t.name),
+          );
+
+          if (blockedTools.length > 0) {
+            addItem(
+              {
+                type: MessageType.INFO,
+                text: `Blocked destructive tools (plan mode): ${blockedTools.map((t) => t.name).join(', ')}`,
+              },
+              Date.now(),
+            );
+
+            const blockedResponses: Part[] = blockedTools.map((t) => ({
+              functionResponse: {
+                name: t.name,
+                id: t.callId,
+                response: {
+                  error:
+                    'Wait! PLAN MODE ACTIVE: This tool is blocked. You must complete the planning phase first. ' +
+                    'Present your plan to the user and wait for their confirmation before any modifications can be made.',
+                },
+              },
+            }));
+            scheduleToolCalls(safeTools, signal);
+            submitQueryRef.current?.(blockedResponses, {
+              isContinuation: true,
+            });
+          } else if (safeTools.length > 0) {
+            scheduleToolCalls(safeTools, signal);
+          }
+        } else {
+          scheduleToolCalls(toolCallRequests, signal);
+        }
       }
       return StreamProcessingStatus.Completed;
     },
@@ -876,6 +927,8 @@ export const useGeminiStream = (
       handleContextWindowWillOverflowEvent,
       handleCitationEvent,
       handleChatModelEvent,
+      isPlanMode,
+      addItem,
     ],
   );
   const submitQuery = useCallback(
@@ -1053,6 +1106,7 @@ export const useGeminiStream = (
       getPromptCount,
     ],
   );
+  submitQueryRef.current = submitQuery;
 
   const handleApprovalModeChange = useCallback(
     async (newApprovalMode: ApprovalMode) => {
