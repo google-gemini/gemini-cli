@@ -115,8 +115,8 @@ function buildResourceCandidates(
     // Use serverName:uri format to disambiguate resources from different MCP servers
     const prefixedUri = `${resource.serverName}:${resource.uri}`;
     return {
-      searchKey:
-        `${resource.serverName} ${resource.name ?? ''} ${resource.uri}`.toLowerCase(),
+      // Include prefixedUri in searchKey so users can search by the displayed format
+      searchKey: `${prefixedUri} ${resource.name ?? ''}`.toLowerCase(),
       suggestion: {
         label: prefixedUri,
         value: prefixedUri,
