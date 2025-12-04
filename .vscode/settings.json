@@ -16,5 +16,8 @@
   "[markdown]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "vitest.disableWorkspaceWarning": true
+  "vitest.disableWorkspaceWarning": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "never"
+  }
 }
