@@ -58,7 +58,7 @@ export async function generateAndSaveSummary(config: Config): Promise<void> {
       chatRecordingService.saveSummary(summary);
       debugLogger.debug(`[SessionSummary] Saved summary: "${summary}"`);
     } else {
-      debugLogger.debug('[SessionSummary] Failed to generate summary');
+      debugLogger.warn('[SessionSummary] Failed to generate summary');
     }
   } catch (error) {
     // Log but don't throw - we want graceful degradation

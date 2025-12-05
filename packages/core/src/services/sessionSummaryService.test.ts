@@ -17,6 +17,7 @@ describe('SessionSummaryService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
 
     // Setup mock BaseLlmClient with generateContent
     mockGenerateContent = vi.fn().mockResolvedValue({
@@ -37,6 +38,7 @@ describe('SessionSummaryService', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -362,10 +364,15 @@ describe('SessionSummaryService', () => {
         },
       ];
 
-      const summary = await service.generateSummary({
+      const summaryPromise = service.generateSummary({
         messages,
         timeout: 100,
       });
+
+      // Advance timers past the timeout to trigger abort
+      await vi.advanceTimersByTimeAsync(100);
+
+      const summary = await summaryPromise;
 
       expect(summary).toBeNull();
     });
