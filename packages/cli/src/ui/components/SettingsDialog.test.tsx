@@ -40,6 +40,12 @@ import {
 const mockToggleVimEnabled = vi.fn();
 const mockSetVimMode = vi.fn();
 
+vi.mock('../contexts/UIStateContext.js', () => ({
+  useUIState: () => ({
+    mainAreaWidth: 100, // Fixed width for consistent snapshots
+  }),
+}));
+
 enum TerminalKeys {
   ENTER = '\u000D',
   TAB = '\t',
@@ -48,6 +54,7 @@ enum TerminalKeys {
   LEFT_ARROW = '\u001B[D',
   RIGHT_ARROW = '\u001B[C',
   ESCAPE = '\u001B',
+  BACKSPACE = '\u0008',
 }
 
 const createMockSettings = (
@@ -457,20 +464,6 @@ describe('SettingsDialog', () => {
 
         unmount();
       });
-    });
-
-    it('should toggle setting with Space key', async () => {
-      const settings = createMockSettings();
-      const onSelect = vi.fn();
-
-      const { stdin, unmount } = renderDialog(settings, onSelect);
-
-      // Press Space to toggle current setting
-      act(() => {
-        stdin.write(' '); // Space key
-      });
-
-      unmount();
     });
 
     it('should handle vim mode setting specially', async () => {
@@ -1099,6 +1092,128 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(onSelect).toHaveBeenCalledWith(undefined, 'User');
+      });
+
+      unmount();
+    });
+  });
+
+  describe('Search Functionality', () => {
+    it('should display text entered in search', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      // Wait for initial render and verify that search is not active
+      await waitFor(() => {
+        expect(lastFrame()).not.toContain('> Search:');
+      });
+      expect(lastFrame()).toContain('Search to filter');
+
+      // Press '/' to enter search mode
+      act(() => {
+        stdin.write('/');
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('/');
+        expect(lastFrame()).not.toContain('Search to filter');
+      });
+
+      unmount();
+    });
+
+    it('should show search query and filter settings as user types', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      act(() => {
+        stdin.write('yolo');
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('yolo');
+        expect(lastFrame()).toContain('Disable YOLO Mode');
+      });
+
+      unmount();
+    });
+
+    it('should exit search settings when Escape is pressed', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      act(() => {
+        stdin.write('vim');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('vim');
+      });
+
+      // Press Escape
+      act(() => {
+        stdin.write(TerminalKeys.ESCAPE);
+      });
+
+      await waitFor(() => {
+        // onSelect is called with (settingName, scope).
+        // undefined settingName means "close dialog"
+        expect(onSelect).toHaveBeenCalledWith(undefined, expect.anything());
+      });
+
+      unmount();
+    });
+
+    it('should handle backspace to modify search query', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      act(() => {
+        stdin.write('vimm');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('vimm');
+      });
+
+      // Press backspace
+      act(() => {
+        stdin.write(TerminalKeys.BACKSPACE);
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('vim');
+        expect(lastFrame()).toContain('Vim Mode');
+        expect(lastFrame()).not.toContain(
+          'Codebase Investigator Max Num Turns',
+        );
+      });
+
+      unmount();
+    });
+
+    it('should display nothing when search yields no results', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      // Type a search query that won't match any settings
+      act(() => {
+        stdin.write('nonexistentsetting');
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('nonexistentsetting');
+        expect(lastFrame()).toContain('');
+        expect(lastFrame()).not.toContain('Vim Mode'); // Should not contain any settings
+        expect(lastFrame()).not.toContain('Disable Auto Update'); // Should not contain any settings
       });
 
       unmount();
