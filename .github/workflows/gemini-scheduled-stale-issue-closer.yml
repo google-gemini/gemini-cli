@@ -79,6 +79,11 @@ jobs:
                 continue;
               }
 
+              // Skip if it has a maintainer label
+              if (issue.labels.some(label => label.name.toLowerCase().includes('maintainer'))) {
+                continue;
+              }
+
               let isStale = updatedAt < tenDaysAgo;
 
               // If apparently active, check if it's only bot activity
