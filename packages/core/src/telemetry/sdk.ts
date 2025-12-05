@@ -144,9 +144,12 @@ export async function initializeTelemetry(
   config: Config,
   credentials?: JWTInput,
 ): Promise<void> {
-  if (telemetryInitialized || !config.getTelemetryEnabled()) {
+  if (!config.getTelemetryEnabled()) {
+    return;
+  }
+
+  if (telemetryInitialized) {
     if (
-      telemetryInitialized &&
       credentials?.client_email &&
       activeTelemetryEmail &&
       credentials.client_email !== activeTelemetryEmail
