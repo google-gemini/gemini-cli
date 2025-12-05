@@ -481,7 +481,7 @@ const updateExtensionsCommand: SlashCommand = {
   name: 'update',
   description: 'Update extensions. Usage: update <extension-names>|--all',
   kind: CommandKind.BUILT_IN,
-  autoExecute: true,
+  autoExecute: false,
   action: updateAction,
   completion: completeExtensions,
 };
@@ -516,7 +516,7 @@ const restartCommand: SlashCommand = {
   name: 'restart',
   description: 'Restart all extensions',
   kind: CommandKind.BUILT_IN,
-  autoExecute: true,
+  autoExecute: false,
   action: restartAction,
   completion: completeExtensions,
 };
