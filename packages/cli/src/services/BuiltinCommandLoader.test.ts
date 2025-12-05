@@ -75,6 +75,7 @@ vi.mock('../ui/commands/modelCommand.js', () => ({
 }));
 vi.mock('../ui/commands/privacyCommand.js', () => ({ privacyCommand: {} }));
 vi.mock('../ui/commands/quitCommand.js', () => ({ quitCommand: {} }));
+vi.mock('../ui/commands/resumeCommand.js', () => ({ resumeCommand: {} }));
 vi.mock('../ui/commands/statsCommand.js', () => ({ statsCommand: {} }));
 vi.mock('../ui/commands/themeCommand.js', () => ({ themeCommand: {} }));
 vi.mock('../ui/commands/toolsCommand.js', () => ({ toolsCommand: {} }));
@@ -97,6 +98,7 @@ describe('BuiltinCommandLoader', () => {
       getFolderTrust: vi.fn().mockReturnValue(true),
       getEnableMessageBusIntegration: () => false,
       getEnableExtensionReloading: () => false,
+      getEnableHooks: () => false,
     } as unknown as Config;
 
     restoreCommandMock.mockReturnValue({
@@ -171,6 +173,7 @@ describe('BuiltinCommandLoader', () => {
     const mockConfigWithMessageBus = {
       ...mockConfig,
       getEnableMessageBusIntegration: () => true,
+      getEnableHooks: () => false,
     } as unknown as Config;
     const loader = new BuiltinCommandLoader(mockConfigWithMessageBus);
     const commands = await loader.loadCommands(new AbortController().signal);
@@ -182,6 +185,7 @@ describe('BuiltinCommandLoader', () => {
     const mockConfigWithoutMessageBus = {
       ...mockConfig,
       getEnableMessageBusIntegration: () => false,
+      getEnableHooks: () => false,
     } as unknown as Config;
     const loader = new BuiltinCommandLoader(mockConfigWithoutMessageBus);
     const commands = await loader.loadCommands(new AbortController().signal);
@@ -200,6 +204,7 @@ describe('BuiltinCommandLoader profile', () => {
       getCheckpointingEnabled: () => false,
       getEnableMessageBusIntegration: () => false,
       getEnableExtensionReloading: () => false,
+      getEnableHooks: () => false,
     } as unknown as Config;
   });
 
