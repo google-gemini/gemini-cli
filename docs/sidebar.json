@@ -260,10 +260,6 @@
         "slug": "docs/changelogs/preview"
       },
       {
-        "label": "Nightly release",
-        "slug": "docs/changelogs/nightly"
-      },
-      {
         "label": "Changelog",
         "slug": "docs/changelog/releases"
       }
