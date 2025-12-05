@@ -22,10 +22,10 @@ import { createUserContent, FinishReason } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
 import type { Config } from '../config/config.js';
 import {
-  DEFAULT_GEMINI_MODEL,
+  // DEFAULT_GEMINI_MODEL,
   DEFAULT_THINKING_MODE,
   PREVIEW_GEMINI_MODEL,
-  getEffectiveModel,
+  // getEffectiveModel,
   isGemini2Model,
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
@@ -412,22 +412,23 @@ export class GeminiChat {
     let lastContentsToUse: Content[] = requestContents;
 
     const apiCall = async () => {
-      let modelToUse = getEffectiveModel(
-        this.config.isInFallbackMode(),
-        model,
-        this.config.getPreviewFeatures(),
-      );
+      // let modelToUse = getEffectiveModel(
+      //   this.config.isInFallbackMode(),
+      //   model,
+      //   this.config.getPreviewFeatures(),
+      // );
 
-      // Preview Model Bypass Logic:
-      // If we are in "Preview Model Bypass Mode" (transient failure), we force downgrade to 2.5 Pro
-      // IF the effective model is currently Preview Model.
-      if (
-        this.config.isPreviewModelBypassMode() &&
-        modelToUse === PREVIEW_GEMINI_MODEL
-      ) {
-        modelToUse = DEFAULT_GEMINI_MODEL;
-      }
+      // // Preview Model Bypass Logic:
+      // // If we are in "Preview Model Bypass Mode" (transient failure), we force downgrade to 2.5 Pro
+      // // IF the effective model is currently Preview Model.
+      // if (
+      //   this.config.isPreviewModelBypassMode() &&
+      //   modelToUse === PREVIEW_GEMINI_MODEL
+      // ) {
+      //   modelToUse = DEFAULT_GEMINI_MODEL;
+      // }
 
+      const modelToUse = model;
       effectiveModel = modelToUse;
       const config = {
         ...generateContentConfig,

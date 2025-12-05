@@ -53,7 +53,7 @@ import {
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
-import type { RoutingContext } from '../routing/routingStrategy.js';
+// import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
@@ -519,25 +519,26 @@ export class GeminiClient {
       return turn;
     }
 
-    const routingContext: RoutingContext = {
-      history: this.getChat().getHistory(/*curated=*/ true),
-      request,
-      signal,
-    };
+    // const routingContext: RoutingContext = {
+    //   history: this.getChat().getHistory(/*curated=*/ true),
+    //   request,
+    //   signal,
+    // };
 
-    let modelToUse: string;
+    this.currentSequenceModel = this.config.getModel();
+    const modelToUse = this.currentSequenceModel;
 
-    // Determine Model (Stickiness vs. Routing)
-    if (this.currentSequenceModel) {
-      modelToUse = this.currentSequenceModel;
-    } else {
-      const router = await this.config.getModelRouterService();
-      const decision = await router.route(routingContext);
-      modelToUse = decision.model;
-      // Lock the model for the rest of the sequence
-      this.currentSequenceModel = modelToUse;
-      yield { type: GeminiEventType.ModelInfo, value: modelToUse };
-    }
+    // // Determine Model (Stickiness vs. Routing)
+    // if (this.currentSequenceModel) {
+    //   modelToUse = this.currentSequenceModel;
+    // } else {
+    //   const router = await this.config.getModelRouterService();
+    //   const decision = await router.route(routingContext);
+    //   modelToUse = decision.model;
+    //   // Lock the model for the rest of the sequence
+    //   this.currentSequenceModel = modelToUse;
+    //   yield { type: GeminiEventType.ModelInfo, value: modelToUse };
+    // }
 
     const resultStream = turn.run({ model: modelToUse }, request, linkedSignal);
     for await (const event of resultStream) {
