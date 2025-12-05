@@ -4,26 +4,26 @@ Headless mode allows you to run Gemini CLI programmatically from command line
 scripts and automation tools without any interactive UI. This is ideal for
 scripting, automation, CI/CD pipelines, and building AI-powered tools.
 
-- [Headless Mode](#headless-mode)
+- [Headless mode](#headless-mode)
   - [Overview](#overview)
-  - [Basic Usage](#basic-usage)
-    - [Direct Prompts](#direct-prompts)
-    - [Stdin Input](#stdin-input)
-    - [Combining with File Input](#combining-with-file-input)
-  - [Output Formats](#output-formats)
-    - [Text Output (Default)](#text-output-default)
-    - [JSON Output](#json-output)
-      - [Response Schema](#response-schema)
-      - [Example Usage](#example-usage)
-    - [Streaming JSON Output](#streaming-json-output)
-      - [When to Use Streaming JSON](#when-to-use-streaming-json)
-      - [Event Types](#event-types)
-      - [Basic Usage](#basic-usage)
-      - [Example Output](#example-output)
-      - [Processing Stream Events](#processing-stream-events)
-      - [Real-World Examples](#real-world-examples)
-    - [File Redirection](#file-redirection)
-  - [Configuration Options](#configuration-options)
+  - [Basic usage](#basic-usage)
+    - [Direct prompts](#direct-prompts)
+    - [Stdin input](#stdin-input)
+    - [Combining with file input](#combining-with-file-input)
+  - [Output formats](#output-formats)
+    - [Text output (default)](#text-output-default)
+    - [JSON output](#json-output)
+      - [Response schema](#response-schema)
+      - [Example usage](#example-usage)
+    - [Streaming JSON output](#streaming-json-output)
+      - [When to use streaming JSON](#when-to-use-streaming-json)
+      - [Event types](#event-types)
+      - [Basic usage](#basic-usage)
+      - [Example output](#example-output)
+      - [Processing stream events](#processing-stream-events)
+      - [Real-World examples](#real-world-examples)
+    - [File redirection](#file-redirection)
+  - [Configuration options](#configuration-options)
   - [Examples](#examples)
     - [Code review](#code-review)
     - [Generate commit messages](#generate-commit-messages)
@@ -39,7 +39,7 @@ scripting, automation, CI/CD pipelines, and building AI-powered tools.
 
 The headless mode provides a headless interface to Gemini CLI that:
 
-- Accepts prompts via command line arguments or stdin
+- Accepts prompts as positional arguments, via stdin, or both combined
 - Returns structured output (text or JSON)
 - Supports file redirection and piping
 - Enables automation and scripting workflows
@@ -49,10 +49,10 @@ The headless mode provides a headless interface to Gemini CLI that:
 
 ### Direct prompts
 
-Use the `--prompt` (or `-p`) flag to run in headless mode:
+Use a positional argument to run in headless mode:
 
 ```bash
-gemini --prompt "What is machine learning?"
+gemini "What is machine learning?"
 ```
 
 ### Stdin input
@@ -68,7 +68,7 @@ echo "Explain this code" | gemini
 Read from files and process with Gemini:
 
 ```bash
-cat README.md | gemini --prompt "Summarize this documentation"
+cat README.md | gemini "Summarize this documentation"
 ```
 
 ## Output formats
@@ -78,10 +78,10 @@ cat README.md | gemini --prompt "Summarize this documentation"
 Standard human-readable output:
 
 ```bash
-gemini -p "What is the capital of France?"
+gemini "What is the capital of France?"
 ```
 
-Response format:
+Response:
 
 ```
 The capital of France is Paris.
@@ -143,7 +143,7 @@ The JSON output follows this high-level structure:
 #### Example usage
 
 ```bash
-gemini -p "What is the capital of France?" --output-format json
+gemini "What is the capital of France?" --output-format json
 ```
 
 Response:
@@ -252,13 +252,13 @@ The streaming format emits 6 event types:
 
 ```bash
 # Stream events to console
-gemini --output-format stream-json --prompt "What is 2+2?"
+gemini --output-format stream-json "What is 2+2?"
 
 # Save event stream to file
-gemini --output-format stream-json --prompt "Analyze this code" > events.jsonl
+gemini --output-format stream-json "Analyze this code" > events.jsonl
 
 # Parse with jq
-gemini --output-format stream-json --prompt "List files" | jq -r '.type'
+gemini --output-format stream-json "List files" | jq -r '.type'
 ```
 
 #### Example output
@@ -280,34 +280,33 @@ Save output to files or pipe to other commands:
 
 ```bash
 # Save to file
-gemini -p "Explain Docker" > docker-explanation.txt
-gemini -p "Explain Docker" --output-format json > docker-explanation.json
+gemini "Explain Docker" > docker-explanation.txt
+gemini "Explain Docker" --output-format json > docker-explanation.json
 
 # Append to file
-gemini -p "Add more details" >> docker-explanation.txt
+gemini "Add more details" >> docker-explanation.txt
 
 # Pipe to other tools
-gemini -p "What is Kubernetes?" --output-format json | jq '.response'
-gemini -p "Explain microservices" | wc -w
-gemini -p "List programming languages" | grep -i "python"
+gemini "What is Kubernetes?" --output-format json | jq '.response'
+gemini "Explain microservices" | wc -w
+gemini "List programming languages" | grep -i "python"
 ```
 
 ## Configuration options
 
 Key command-line options for headless usage:
 
-| Option                  | Description                        | Example                                            |
-| ----------------------- | ---------------------------------- | -------------------------------------------------- |
-| `--prompt`, `-p`        | Run in headless mode               | `gemini -p "query"`                                |
-| `--output-format`       | Specify output format (text, json) | `gemini -p "query" --output-format json`           |
-| `--model`, `-m`         | Specify the Gemini model           | `gemini -p "query" -m gemini-2.5-flash`            |
-| `--debug`, `-d`         | Enable debug mode                  | `gemini -p "query" --debug`                        |
-| `--include-directories` | Include additional directories     | `gemini -p "query" --include-directories src,docs` |
-| `--yolo`, `-y`          | Auto-approve all actions           | `gemini -p "query" --yolo`                         |
-| `--approval-mode`       | Set approval mode                  | `gemini -p "query" --approval-mode auto_edit`      |
+| Argument / Option       | Effect                             | Example                                         |
+| ----------------------- | ---------------------------------- | ----------------------------------------------- |
+| `[prompt]`              | Run in headless mode               | `gemini "query"`                                |
+| `-o`, `--output-format` | Choose output format (text, json)  | `gemini "query" -o json`                        |
+| `-m`, `--model`         | Specify the Gemini model           | `gemini "query" -m gemini-2.5-flash`            |
+| `-d`, `--debug`         | Enable debug mode                  | `gemini "query" -d`                             |
+| `-y`, `--yolo`          | Auto-approve all actions           | `gemini "query" -y`                             |
+| `--approval-mode`       | Set approval mode                  | `gemini "query" --approval-mode auto_edit`      |
+| `--include-directories` | Include additional directories     | `gemini "query" --include-directories src,docs` |
 
-For complete details on all available configuration options, settings files, and
-environment variables, see the
+For complete details on all available configuration options, settings files, and environment variables, see the
 [Configuration Guide](../get-started/configuration.md).
 
 ## Examples
@@ -315,20 +314,20 @@ environment variables, see the
 #### Code review
 
 ```bash
-cat src/auth.py | gemini -p "Review this authentication code for security issues" > security-review.txt
+cat src/auth.py | gemini "Review this authentication code for security issues" > security-review.txt
 ```
 
 #### Generate commit messages
 
 ```bash
-result=$(git diff --cached | gemini -p "Write a concise commit message for these changes" --output-format json)
+result=$(git diff --cached | gemini "Write a concise commit message for these changes" --output-format json)
 echo "$result" | jq -r '.response'
 ```
 
 #### API documentation
 
 ```bash
-result=$(cat api/routes.js | gemini -p "Generate OpenAPI spec for these routes" --output-format json)
+result=$(cat api/routes.js | gemini "Generate OpenAPI spec for these routes" --output-format json)
 echo "$result" | jq -r '.response' > openapi.json
 ```
 
@@ -337,7 +336,7 @@ echo "$result" | jq -r '.response' > openapi.json
 ```bash
 for file in src/*.py; do
     echo "Analyzing $file..."
-    result=$(cat "$file" | gemini -p "Find potential bugs and suggest improvements" --output-format json)
+    result=$(cat "$file" | gemini "Find potential bugs and suggest improvements" --output-format json)
     echo "$result" | jq -r '.response' > "reports/$(basename "$file").analysis"
     echo "Completed analysis for $(basename "$file")" >> reports/progress.log
 done
@@ -346,20 +345,20 @@ done
 #### Code review
 
 ```bash
-result=$(git diff origin/main...HEAD | gemini -p "Review these changes for bugs, security issues, and code quality" --output-format json)
+result=$(git diff origin/main...HEAD | gemini "Review these changes for bugs, security issues, and code quality" --output-format json)
 echo "$result" | jq -r '.response' > pr-review.json
 ```
 
 #### Log analysis
 
 ```bash
-grep "ERROR" /var/log/app.log | tail -20 | gemini -p "Analyze these errors and suggest root cause and fixes" > error-analysis.txt
+grep "ERROR" /var/log/app.log | tail -20 | gemini "Analyze these errors and suggest root cause and fixes" > error-analysis.txt
 ```
 
 #### Release notes generation
 
 ```bash
-result=$(git log --oneline v1.0.0..HEAD | gemini -p "Generate release notes from these commits" --output-format json)
+result=$(git log --oneline v1.0.0..HEAD | gemini "Generate release notes from these commits" --output-format json)
 response=$(echo "$result" | jq -r '.response')
 echo "$response"
 echo "$response" >> CHANGELOG.md
@@ -368,7 +367,7 @@ echo "$response" >> CHANGELOG.md
 #### Model and tool usage tracking
 
 ```bash
-result=$(gemini -p "Explain this database schema" --include-directories db --output-format json)
+result=$(gemini "Explain this database schema" --include-directories db --output-format json)
 total_tokens=$(echo "$result" | jq -r '.stats.models // {} | to_entries | map(.value.tokens.total) | add // 0')
 models_used=$(echo "$result" | jq -r '.stats.models // {} | keys | join(", ") | if . == "" then "none" else . end')
 tool_calls=$(echo "$result" | jq -r '.stats.tools.totalCalls // 0')
@@ -381,8 +380,7 @@ tail -5 usage.log
 
 ## Resources
 
-- [CLI Configuration](../get-started/configuration.md) - Complete configuration
-  guide
+- [CLI Configuration](../get-started/configuration.md) - Complete configuration guide
 - [Authentication](../get-started/authentication.md) - Setup authentication
 - [Commands](./commands.md) - Interactive commands reference
 - [Tutorials](./tutorials.md) - Step-by-step automation guides
