@@ -14,6 +14,7 @@ import { enableCommand } from './extensions/enable.js';
 import { linkCommand } from './extensions/link.js';
 import { newCommand } from './extensions/new.js';
 import { validateCommand } from './extensions/validate.js';
+import { settingsCommand } from './extensions/settings.js';
 import { initializeOutputListenersAndFlush } from '../gemini.js';
 
 export const extensionsCommand: CommandModule = {
@@ -32,6 +33,7 @@ export const extensionsCommand: CommandModule = {
       .command(linkCommand)
       .command(newCommand)
       .command(validateCommand)
+      .command(settingsCommand)
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
   handler: () => {
