@@ -308,6 +308,7 @@ describe('retryWithBackoff', () => {
 
   describe('Fetch error retries', () => {
     it("should retry on 'fetch failed' when retryFetchErrors is true", async () => {
+      const mockFn = vi.fn();
       mockFn.mockRejectedValueOnce(new TypeError('fetch failed'));
       mockFn.mockResolvedValueOnce('success');
 
