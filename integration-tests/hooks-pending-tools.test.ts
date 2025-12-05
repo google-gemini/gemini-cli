@@ -44,7 +44,7 @@ describe('Hooks System - Pending Tool Calls', () => {
               hooks: [
                 {
                   type: 'command',
-                  command: 'echo "{"decision": "allow"}" ',
+                  command: 'echo \'{"decision": "allow"}\'',
                   timeout: 5000,
                 },
               ],
