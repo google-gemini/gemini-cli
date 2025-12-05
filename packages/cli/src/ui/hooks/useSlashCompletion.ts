@@ -418,6 +418,8 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
   getCommandFromSuggestion: (
     suggestion: Suggestion,
   ) => SlashCommand | undefined;
+  isArgumentCompletion: boolean;
+  leafCommand: SlashCommand | null;
 } {
   const {
     enabled,
@@ -567,5 +569,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
     completionEnd,
     getCommandFromSuggestion: (suggestion: Suggestion) =>
       getCommandFromSuggestion(suggestion, parserResult),
+    isArgumentCompletion: parserResult.isArgumentCompletion,
+    leafCommand: parserResult.leafCommand,
   };
 }
