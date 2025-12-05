@@ -50,7 +50,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       ),
     ),
     patchStdio: vi.fn(() => () => {}),
-    createInkStdio: vi.fn(() => ({
+    createWorkingStdio: vi.fn(() => ({
       stdout: {
         write: vi.fn((...args) =>
           process.stdout.write(
@@ -257,6 +257,7 @@ describe('gemini.tsx main function', () => {
         getMessageBus: () => ({
           subscribe: vi.fn(),
         }),
+        getEnableHooks: () => false,
         getToolRegistry: vi.fn(),
         getContentGeneratorConfig: vi.fn(),
         getModel: () => 'gemini-pro',
@@ -489,6 +490,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getMessageBus: () => ({
         subscribe: vi.fn(),
       }),
+      getEnableHooks: () => false,
       getToolRegistry: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getModel: () => 'gemini-pro',
@@ -588,6 +590,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getExtensions: () => [{ name: 'ext1' }],
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -668,6 +671,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getExtensions: () => [],
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -733,6 +737,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getDebugMode: () => false,
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -814,6 +819,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getDebugMode: () => false,
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -890,6 +896,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getDebugMode: () => false,
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -961,6 +968,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getDebugMode: () => false,
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -1130,6 +1138,7 @@ describe('gemini.tsx main function exit codes', () => {
       getGeminiMdFileCount: () => 0,
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       getToolRegistry: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getModel: () => 'gemini-pro',
@@ -1191,6 +1200,7 @@ describe('gemini.tsx main function exit codes', () => {
       getGeminiMdFileCount: () => 0,
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       getToolRegistry: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getModel: () => 'gemini-pro',
@@ -1302,6 +1312,7 @@ describe('startInteractiveUI', () => {
     registerCleanup: vi.fn(),
     runExitCleanup: vi.fn(),
     registerSyncCleanup: vi.fn(),
+    registerTelemetryConfig: vi.fn(),
   }));
 
   afterEach(() => {

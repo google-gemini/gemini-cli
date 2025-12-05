@@ -96,6 +96,7 @@ describe('HookSystem Integration', () => {
       stdin: {
         write: vi.fn(),
         end: vi.fn(),
+        on: vi.fn(),
       } as unknown as Writable,
       stdout: {
         on: mockStdoutOn,
@@ -275,6 +276,164 @@ describe('HookSystem Integration', () => {
       const status = hookSystem.getStatus();
 
       expect(status.initialized).toBe(false);
+    });
+  });
+
+  describe('hook disabling via settings', () => {
+    it('should not execute disabled hooks from settings', async () => {
+      // Create config with two hooks, one enabled and one disabled via settings
+      const configWithDisabled = new Config({
+        model: 'gemini-1.5-flash',
+        targetDir: '/tmp/test-hooks-disabled',
+        sessionId: 'test-session-disabled',
+        debugMode: false,
+        cwd: '/tmp/test-hooks-disabled',
+        hooks: {
+          BeforeTool: [
+            {
+              matcher: 'TestTool',
+              hooks: [
+                {
+                  type: HookType.Command,
+                  command: 'echo "enabled-hook"',
+                  timeout: 5000,
+                },
+                {
+                  type: HookType.Command,
+                  command: 'echo "disabled-hook"',
+                  timeout: 5000,
+                },
+              ],
+            },
+          ],
+          disabled: ['echo "disabled-hook"'], // Disable the second hook
+        },
+      });
+
+      (
+        configWithDisabled as unknown as { getMessageBus: () => unknown }
+      ).getMessageBus = () => undefined;
+
+      const systemWithDisabled = new HookSystem(configWithDisabled);
+      await systemWithDisabled.initialize();
+
+      // Set up spawn mock - only enabled hook should execute
+      let executionCount = 0;
+      mockSpawn.mockStdoutOn.mockImplementation(
+        (event: string, callback: (data: Buffer) => void) => {
+          if (event === 'data') {
+            executionCount++;
+            setTimeout(() => callback(Buffer.from('output')), 5);
+          }
+        },
+      );
+
+      mockSpawn.mockProcessOn.mockImplementation(
+        (event: string, callback: (code: number) => void) => {
+          if (event === 'close') {
+            setTimeout(() => callback(0), 10);
+          }
+        },
+      );
+
+      const eventBus = systemWithDisabled.getEventHandler();
+      const result = await eventBus.fireBeforeToolEvent('TestTool', {
+        test: 'data',
+      });
+
+      expect(result.success).toBe(true);
+      // Only the enabled hook should have executed
+      expect(executionCount).toBe(1);
+    });
+  });
+
+  describe('hook disabling via command', () => {
+    it('should disable hook when setHookEnabled is called', async () => {
+      // Create config with a hook
+      const configForDisabling = new Config({
+        model: 'gemini-1.5-flash',
+        targetDir: '/tmp/test-hooks-setEnabled',
+        sessionId: 'test-session-setEnabled',
+        debugMode: false,
+        cwd: '/tmp/test-hooks-setEnabled',
+        hooks: {
+          BeforeTool: [
+            {
+              matcher: 'TestTool',
+              hooks: [
+                {
+                  type: HookType.Command,
+                  command: 'echo "will-be-disabled"',
+                  timeout: 5000,
+                },
+              ],
+            },
+          ],
+        },
+      });
+
+      (
+        configForDisabling as unknown as { getMessageBus: () => unknown }
+      ).getMessageBus = () => undefined;
+
+      const systemForDisabling = new HookSystem(configForDisabling);
+      await systemForDisabling.initialize();
+
+      // First execution - hook should run
+      let executionCount = 0;
+      mockSpawn.mockStdoutOn.mockImplementation(
+        (event: string, callback: (data: Buffer) => void) => {
+          if (event === 'data') {
+            executionCount++;
+            setTimeout(() => callback(Buffer.from('output')), 5);
+          }
+        },
+      );
+
+      mockSpawn.mockProcessOn.mockImplementation(
+        (event: string, callback: (code: number) => void) => {
+          if (event === 'close') {
+            setTimeout(() => callback(0), 10);
+          }
+        },
+      );
+
+      const eventBus = systemForDisabling.getEventHandler();
+      const result1 = await eventBus.fireBeforeToolEvent('TestTool', {
+        test: 'data',
+      });
+
+      expect(result1.success).toBe(true);
+      expect(executionCount).toBe(1);
+
+      // Disable the hook via setHookEnabled (simulating /hooks disable command)
+      systemForDisabling.setHookEnabled('echo "will-be-disabled"', false);
+
+      // Reset execution count
+      executionCount = 0;
+
+      // Second execution - hook should NOT run
+      const result2 = await eventBus.fireBeforeToolEvent('TestTool', {
+        test: 'data',
+      });
+
+      expect(result2.success).toBe(true);
+      // Hook should not have executed
+      expect(executionCount).toBe(0);
+
+      // Re-enable the hook
+      systemForDisabling.setHookEnabled('echo "will-be-disabled"', true);
+
+      // Reset execution count
+      executionCount = 0;
+
+      // Third execution - hook should run again
+      const result3 = await eventBus.fireBeforeToolEvent('TestTool', {
+        test: 'data',
+      });
+
+      expect(result3.success).toBe(true);
+      expect(executionCount).toBe(1);
     });
   });
 });

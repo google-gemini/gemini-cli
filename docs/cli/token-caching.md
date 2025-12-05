@@ -1,4 +1,4 @@
-# Token Caching and Cost Optimization
+# Token caching and cost optimization
 
 Gemini CLI automatically optimizes API costs through token caching when using
 API key authentication (Gemini API key or Vertex AI). This feature reuses
