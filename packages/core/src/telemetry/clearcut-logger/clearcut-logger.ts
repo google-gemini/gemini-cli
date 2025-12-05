@@ -1035,7 +1035,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createBasicLogEvent(EventNames.EXTENSION_INSTALL, data),
+      this.createLogEvent(EventNames.EXTENSION_INSTALL, data),
     );
     await this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
@@ -1061,7 +1061,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createBasicLogEvent(EventNames.EXTENSION_UNINSTALL, data),
+      this.createLogEvent(EventNames.EXTENSION_UNINSTALL, data),
     );
     await this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
@@ -1097,7 +1097,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createBasicLogEvent(EventNames.EXTENSION_UPDATE, data),
+      this.createLogEvent(EventNames.EXTENSION_UPDATE, data),
     );
     await this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
@@ -1186,7 +1186,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createBasicLogEvent(EventNames.EXTENSION_ENABLE, data),
+      this.createLogEvent(EventNames.EXTENSION_ENABLE, data),
     );
     await this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
@@ -1225,7 +1225,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createBasicLogEvent(EventNames.EXTENSION_DISABLE, data),
+      this.createLogEvent(EventNames.EXTENSION_DISABLE, data),
     );
     await this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
