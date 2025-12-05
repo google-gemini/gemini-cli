@@ -29,6 +29,7 @@ export interface Settings {
   showMemoryUsage?: boolean;
   checkpointing?: CheckpointingSettings;
   folderTrust?: boolean;
+  previewFeatures?: boolean;
 
   // Git-aware file filtering settings
   fileFiltering?: {
