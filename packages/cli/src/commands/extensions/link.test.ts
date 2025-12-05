@@ -138,6 +138,7 @@ describe('extensions link command', () => {
     describe('builder', () => {
       interface MockYargs {
         positional: Mock;
+        option: Mock;
         check: Mock;
       }
 
@@ -145,6 +146,7 @@ describe('extensions link command', () => {
       beforeEach(() => {
         yargsMock = {
           positional: vi.fn().mockReturnThis(),
+          option: vi.fn().mockReturnThis(),
           check: vi.fn().mockReturnThis(),
         };
       });
@@ -156,6 +158,12 @@ describe('extensions link command', () => {
         expect(yargsMock.positional).toHaveBeenCalledWith('path', {
           describe: 'The name of the extension to link.',
           type: 'string',
+        });
+        expect(yargsMock.option).toHaveBeenCalledWith('consent', {
+          describe:
+            'Acknowledge the security risks of installing an extension and skip the confirmation prompt.',
+          type: 'boolean',
+          default: false,
         });
         expect(yargsMock.check).toHaveBeenCalled();
       });

@@ -253,9 +253,7 @@ describe('useMessageQueue', () => {
       // Pop all messages
       let poppedMessages: string | undefined;
       act(() => {
-        result.current.popAllMessages((messages) => {
-          poppedMessages = messages;
-        });
+        poppedMessages = result.current.popAllMessages();
       });
 
       expect(poppedMessages).toBe('Message 1\n\nMessage 2\n\nMessage 3');
@@ -271,9 +269,7 @@ describe('useMessageQueue', () => {
 
       let poppedMessages: string | undefined = 'not-undefined';
       act(() => {
-        result.current.popAllMessages((messages) => {
-          poppedMessages = messages;
-        });
+        poppedMessages = result.current.popAllMessages();
       });
 
       expect(poppedMessages).toBeUndefined();
@@ -293,9 +289,7 @@ describe('useMessageQueue', () => {
 
       let poppedMessages: string | undefined;
       act(() => {
-        result.current.popAllMessages((messages) => {
-          poppedMessages = messages;
-        });
+        poppedMessages = result.current.popAllMessages();
       });
 
       expect(poppedMessages).toBe('Single message');
@@ -315,7 +309,7 @@ describe('useMessageQueue', () => {
       });
 
       act(() => {
-        result.current.popAllMessages(() => {});
+        result.current.popAllMessages();
       });
 
       // Queue should be empty
@@ -325,9 +319,7 @@ describe('useMessageQueue', () => {
       // Popping again should return undefined
       let secondPop: string | undefined = 'not-undefined';
       act(() => {
-        result.current.popAllMessages((messages) => {
-          secondPop = messages;
-        });
+        secondPop = result.current.popAllMessages();
       });
 
       expect(secondPop).toBeUndefined();
@@ -349,9 +341,7 @@ describe('useMessageQueue', () => {
       // Pop all messages
       let firstPop: string | undefined;
       act(() => {
-        result.current.popAllMessages((messages) => {
-          firstPop = messages;
-        });
+        firstPop = result.current.popAllMessages();
       });
 
       expect(firstPop).toBe('First\n\nSecond');
@@ -365,9 +355,7 @@ describe('useMessageQueue', () => {
       // Pop again
       let secondPop: string | undefined;
       act(() => {
-        result.current.popAllMessages((messages) => {
-          secondPop = messages;
-        });
+        secondPop = result.current.popAllMessages();
       });
 
       expect(secondPop).toBe('Third\n\nFourth');

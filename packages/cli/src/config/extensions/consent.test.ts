@@ -112,20 +112,31 @@ describe('consent', () => {
 
     it('should request consent if there is no previous config', async () => {
       const requestConsent = vi.fn().mockResolvedValue(true);
-      await maybeRequestConsentOrFail(baseConfig, requestConsent, undefined);
+      await maybeRequestConsentOrFail(
+        baseConfig,
+        requestConsent,
+        false,
+        undefined,
+      );
       expect(requestConsent).toHaveBeenCalledTimes(1);
     });
 
     it('should not request consent if configs are identical', async () => {
       const requestConsent = vi.fn().mockResolvedValue(true);
-      await maybeRequestConsentOrFail(baseConfig, requestConsent, baseConfig);
+      await maybeRequestConsentOrFail(
+        baseConfig,
+        requestConsent,
+        false,
+        baseConfig,
+        false,
+      );
       expect(requestConsent).not.toHaveBeenCalled();
     });
 
     it('should throw an error if consent is denied', async () => {
       const requestConsent = vi.fn().mockResolvedValue(false);
       await expect(
-        maybeRequestConsentOrFail(baseConfig, requestConsent, undefined),
+        maybeRequestConsentOrFail(baseConfig, requestConsent, false, undefined),
       ).rejects.toThrow('Installation cancelled for "test-ext".');
     });
 
@@ -141,7 +152,12 @@ describe('consent', () => {
           excludeTools: ['tool1', 'tool2'],
         };
         const requestConsent = vi.fn().mockResolvedValue(true);
-        await maybeRequestConsentOrFail(config, requestConsent, undefined);
+        await maybeRequestConsentOrFail(
+          config,
+          requestConsent,
+          false,
+          undefined,
+        );
 
         const expectedConsentString = [
           'Installing extension "test-ext".',
@@ -163,7 +179,13 @@ describe('consent', () => {
           mcpServers: { server1: { command: 'npm', args: ['start'] } },
         };
         const requestConsent = vi.fn().mockResolvedValue(true);
-        await maybeRequestConsentOrFail(newConfig, requestConsent, prevConfig);
+        await maybeRequestConsentOrFail(
+          newConfig,
+          requestConsent,
+          false,
+          prevConfig,
+          false,
+        );
         expect(requestConsent).toHaveBeenCalledTimes(1);
       });
 
@@ -174,7 +196,13 @@ describe('consent', () => {
           contextFileName: 'new-context.md',
         };
         const requestConsent = vi.fn().mockResolvedValue(true);
-        await maybeRequestConsentOrFail(newConfig, requestConsent, prevConfig);
+        await maybeRequestConsentOrFail(
+          newConfig,
+          requestConsent,
+          false,
+          prevConfig,
+          false,
+        );
         expect(requestConsent).toHaveBeenCalledTimes(1);
       });
 
@@ -185,7 +213,41 @@ describe('consent', () => {
           excludeTools: ['new-tool'],
         };
         const requestConsent = vi.fn().mockResolvedValue(true);
-        await maybeRequestConsentOrFail(newConfig, requestConsent, prevConfig);
+        await maybeRequestConsentOrFail(
+          newConfig,
+          requestConsent,
+          false,
+          prevConfig,
+          false,
+        );
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+      });
+
+      it('should include warning when hooks are present', async () => {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          baseConfig,
+          requestConsent,
+          true,
+          undefined,
+        );
+
+        expect(requestConsent).toHaveBeenCalledWith(
+          expect.stringContaining(
+            '⚠️  This extension contains Hooks which can automatically execute commands.',
+          ),
+        );
+      });
+
+      it('should request consent if hooks status changes', async () => {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          baseConfig,
+          requestConsent,
+          true,
+          baseConfig,
+          false,
+        );
         expect(requestConsent).toHaveBeenCalledTimes(1);
       });
     });

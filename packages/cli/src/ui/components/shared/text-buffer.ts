@@ -32,14 +32,6 @@ export type Direction =
   | 'home'
   | 'end';
 
-// Simple helper for word‑wise ops.
-function isWordChar(ch: string | undefined): boolean {
-  if (ch === undefined) {
-    return false;
-  }
-  return !/[\s,.;!?]/.test(ch);
-}
-
 // Helper functions for line-based word navigation
 export const isWordCharStrict = (char: string): boolean =>
   /[\w\p{L}\p{N}]/u.test(char); // Matches a single character that is any Unicode letter, any Unicode number, or an underscore
@@ -248,6 +240,51 @@ export const findWordEndInLine = (line: string, col: number): number | null => {
 
   return null;
 };
+
+// Initialize segmenter for word boundary detection
+const segmenter = new Intl.Segmenter(undefined, { granularity: 'word' });
+
+function findPrevWordBoundary(line: string, cursorCol: number): number {
+  const codePoints = toCodePoints(line);
+  // Convert cursorCol (CP index) to string index
+  const prefix = codePoints.slice(0, cursorCol).join('');
+  const cursorIdx = prefix.length;
+
+  let targetIdx = 0;
+
+  for (const seg of segmenter.segment(line)) {
+    // We want the last word start strictly before the cursor.
+    // If we've reached or passed the cursor, we stop.
+    if (seg.index >= cursorIdx) break;
+
+    if (seg.isWordLike) {
+      targetIdx = seg.index;
+    }
+  }
+
+  return toCodePoints(line.slice(0, targetIdx)).length;
+}
+
+function findNextWordBoundary(line: string, cursorCol: number): number {
+  const codePoints = toCodePoints(line);
+  const prefix = codePoints.slice(0, cursorCol).join('');
+  const cursorIdx = prefix.length;
+
+  let targetIdx = line.length;
+
+  for (const seg of segmenter.segment(line)) {
+    const segEnd = seg.index + seg.segment.length;
+
+    if (segEnd > cursorIdx) {
+      if (seg.isWordLike) {
+        targetIdx = segEnd;
+        break;
+      }
+    }
+  }
+
+  return toCodePoints(line.slice(0, targetIdx)).length;
+}
 
 // Find next word across lines
 export const findNextWordAcrossLines = (
@@ -1201,22 +1238,7 @@ function textBufferReducerLogic(
             newCursorCol = cpLen(lines[newCursorRow] ?? '');
           } else {
             const lineContent = lines[cursorRow];
-            const arr = toCodePoints(lineContent);
-            let start = cursorCol;
-            let onlySpaces = true;
-            for (let i = 0; i < start; i++) {
-              if (isWordChar(arr[i])) {
-                onlySpaces = false;
-                break;
-              }
-            }
-            if (onlySpaces && start > 0) {
-              start--;
-            } else {
-              while (start > 0 && !isWordChar(arr[start - 1])) start--;
-              while (start > 0 && isWordChar(arr[start - 1])) start--;
-            }
-            newCursorCol = start;
+            newCursorCol = findPrevWordBoundary(lineContent, cursorCol);
           }
           return {
             ...state,
@@ -1226,26 +1248,23 @@ function textBufferReducerLogic(
           };
         }
         case 'wordRight': {
+          const lineContent = lines[cursorRow] ?? '';
           if (
             cursorRow === lines.length - 1 &&
-            cursorCol === cpLen(lines[cursorRow] ?? '')
+            cursorCol === cpLen(lineContent)
           ) {
             return state;
           }
 
           let newCursorRow = cursorRow;
           let newCursorCol = cursorCol;
-          const lineContent = lines[cursorRow] ?? '';
-          const arr = toCodePoints(lineContent);
+          const lineLen = cpLen(lineContent);
 
-          if (cursorCol >= arr.length) {
+          if (cursorCol >= lineLen) {
             newCursorRow++;
             newCursorCol = 0;
           } else {
-            let end = cursorCol;
-            while (end < arr.length && !isWordChar(arr[end])) end++;
-            while (end < arr.length && isWordChar(arr[end])) end++;
-            newCursorCol = end;
+            newCursorCol = findNextWordBoundary(lineContent, cursorCol);
           }
           return {
             ...state,

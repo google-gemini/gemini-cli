@@ -182,7 +182,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   private async executeTurn(
     chat: GeminiChat,
     currentMessage: Content,
-    tools: FunctionDeclaration[],
     turnCounter: number,
     combinedSignal: AbortSignal,
     timeoutSignal: AbortSignal, // Pass the timeout controller's signal
@@ -192,7 +191,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     await this.tryCompressChat(chat, promptId);
 
     const { functionCalls } = await promptIdContext.run(promptId, async () =>
-      this.callModel(chat, currentMessage, tools, combinedSignal, promptId),
+      this.callModel(chat, currentMessage, combinedSignal, promptId),
     );
 
     if (combinedSignal.aborted) {
@@ -272,7 +271,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
    */
   private async executeFinalWarningTurn(
     chat: GeminiChat,
-    tools: FunctionDeclaration[],
     turnCounter: number,
     reason:
       | AgentTerminateMode.TIMEOUT
@@ -309,7 +307,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       const turnResult = await this.executeTurn(
         chat,
         recoveryMessage,
-        tools,
         turnCounter, // This will be the "last" turn number
         combinedSignal,
         graceTimeoutController.signal, // Pass grace signal to identify a *grace* timeout
@@ -387,8 +384,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     let chat: GeminiChat | undefined;
     let tools: FunctionDeclaration[] | undefined;
     try {
-      chat = await this.createChatObject(inputs);
       tools = this.prepareToolsList();
+      chat = await this.createChatObject(inputs, tools);
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, inputs)
         : 'Get Started!';
@@ -414,7 +411,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         const turnResult = await this.executeTurn(
           chat,
           currentMessage,
-          tools,
           turnCounter++,
           combinedSignal,
           timeoutController.signal,
@@ -443,7 +439,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       ) {
         const recoveryResult = await this.executeFinalWarningTurn(
           chat,
-          tools,
           turnCounter, // Use current turnCounter for the recovery attempt
           terminateReason,
           signal, // Pass the external signal
@@ -509,7 +504,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         if (chat && tools) {
           const recoveryResult = await this.executeFinalWarningTurn(
             chat,
-            tools,
             turnCounter, // Use current turnCounter
             AgentTerminateMode.TIMEOUT,
             signal,
@@ -591,15 +585,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   private async callModel(
     chat: GeminiChat,
     message: Content,
-    tools: FunctionDeclaration[],
     signal: AbortSignal,
     promptId: string,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
-    if (tools.length > 0) {
-      // TODO(12622): Move tools back to config.
-      chat.setTools([{ functionDeclarations: tools }]);
-    }
-
     const responseStream = await chat.sendMessageStream(
       {
         model: getModelConfigAlias(this.definition),
@@ -650,7 +638,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   }
 
   /** Initializes a `GeminiChat` instance for the agent run. */
-  private async createChatObject(inputs: AgentInputs): Promise<GeminiChat> {
+  private async createChatObject(
+    inputs: AgentInputs,
+    tools: FunctionDeclaration[],
+  ): Promise<GeminiChat> {
     const { promptConfig } = this.definition;
 
     if (!promptConfig.systemPrompt && !promptConfig.initialMessages) {
@@ -673,7 +664,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       return new GeminiChat(
         this.runtimeContext,
         systemInstruction,
-        [], // set in `callModel`,
+        [{ functionDeclarations: tools }],
         startHistory,
       );
     } catch (error) {

@@ -1,4 +1,4 @@
-# Integration Tests
+# Integration tests
 
 This document provides information about the integration testing framework used
 in this project.
@@ -86,7 +86,7 @@ with the deflake script or workflow to make sure that it is not flaky.
 npm run deflake -- --runs=5 --command="npm run test:e2e -- -- --test-name-pattern '<your-new-test-name>'"
 ```
 
-#### Deflake Workflow
+#### Deflake workflow
 
 ```bash
 gh workflow run deflake.yml --ref <your-branch> -f test_name_pattern="<your-test-name-pattern>"

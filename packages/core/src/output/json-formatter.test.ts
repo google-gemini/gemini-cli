@@ -13,8 +13,20 @@ describe('JsonFormatter', () => {
   it('should format the response as JSON', () => {
     const formatter = new JsonFormatter();
     const response = 'This is a test response.';
-    const formatted = formatter.format(response);
+    const formatted = formatter.format(undefined, response);
     const expected = {
+      response,
+    };
+    expect(JSON.parse(formatted)).toEqual(expected);
+  });
+
+  it('should format the response as JSON with a session ID', () => {
+    const formatter = new JsonFormatter();
+    const response = 'This is a test response.';
+    const sessionId = 'test-session-id';
+    const formatted = formatter.format(sessionId, response);
+    const expected = {
+      session_id: sessionId,
       response,
     };
     expect(JSON.parse(formatted)).toEqual(expected);
@@ -24,7 +36,7 @@ describe('JsonFormatter', () => {
     const formatter = new JsonFormatter();
     const responseWithAnsi =
       '\x1B[31mRed text\x1B[0m and \x1B[32mGreen text\x1B[0m';
-    const formatted = formatter.format(responseWithAnsi);
+    const formatted = formatter.format(undefined, responseWithAnsi);
     const parsed = JSON.parse(formatted);
     expect(parsed.response).toBe('Red text and Green text');
   });
@@ -33,7 +45,7 @@ describe('JsonFormatter', () => {
     const formatter = new JsonFormatter();
     const responseWithControlChars =
       'Text with\x07 bell\x08 and\x0B vertical tab';
-    const formatted = formatter.format(responseWithControlChars);
+    const formatted = formatter.format(undefined, responseWithControlChars);
     const parsed = JSON.parse(formatted);
     // Only ANSI codes are stripped, other control chars are preserved
     expect(parsed.response).toBe('Text with\x07 bell\x08 and\x0B vertical tab');
@@ -42,7 +54,7 @@ describe('JsonFormatter', () => {
   it('should preserve newlines and tabs in response text', () => {
     const formatter = new JsonFormatter();
     const responseWithWhitespace = 'Line 1\nLine 2\r\nLine 3\twith tab';
-    const formatted = formatter.format(responseWithWhitespace);
+    const formatted = formatter.format(undefined, responseWithWhitespace);
     const parsed = JSON.parse(formatted);
     expect(parsed.response).toBe('Line 1\nLine 2\r\nLine 3\twith tab');
   });
@@ -114,7 +126,7 @@ describe('JsonFormatter', () => {
         totalLinesRemoved: 0,
       },
     };
-    const formatted = formatter.format(response, stats);
+    const formatted = formatter.format(undefined, response, stats);
     const expected = {
       response,
       stats,
@@ -129,7 +141,7 @@ describe('JsonFormatter', () => {
       message: 'Invalid input provided',
       code: 400,
     };
-    const formatted = formatter.format(undefined, undefined, error);
+    const formatted = formatter.format(undefined, undefined, undefined, error);
     const expected = {
       error,
     };
@@ -144,7 +156,7 @@ describe('JsonFormatter', () => {
       message: 'Request timed out',
       code: 'TIMEOUT',
     };
-    const formatted = formatter.format(response, undefined, error);
+    const formatted = formatter.format(undefined, response, undefined, error);
     const expected = {
       response,
       error,
@@ -167,6 +179,23 @@ describe('JsonFormatter', () => {
     });
   });
 
+  it('should format error using formatError method with a session ID', () => {
+    const formatter = new JsonFormatter();
+    const error = new Error('Something went wrong');
+    const sessionId = 'test-session-id';
+    const formatted = formatter.formatError(error, 500, sessionId);
+    const parsed = JSON.parse(formatted);
+
+    expect(parsed).toEqual({
+      session_id: sessionId,
+      error: {
+        type: 'Error',
+        message: 'Something went wrong',
+        code: 500,
+      },
+    });
+  });
+
   it('should format custom error using formatError method', () => {
     class CustomError extends Error {
       constructor(message: string) {
@@ -177,7 +206,7 @@ describe('JsonFormatter', () => {
 
     const formatter = new JsonFormatter();
     const error = new CustomError('Custom error occurred');
-    const formatted = formatter.formatError(error);
+    const formatted = formatter.formatError(error, undefined);
     const parsed = JSON.parse(formatted);
 
     expect(parsed).toEqual({
@@ -217,7 +246,7 @@ describe('JsonFormatter', () => {
       code: 429,
     };
 
-    const formatted = formatter.format(response, stats, error);
+    const formatted = formatter.format(undefined, response, stats, error);
     const expected = {
       response,
       stats,

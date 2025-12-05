@@ -171,6 +171,26 @@ describe('terminalSerializer', () => {
       expect(result[0][0].bg).toBe('#008000');
       expect(result[0][0].text).toBe('Styled text');
     });
+
+    it('should set inverse for the cursor position', async () => {
+      const terminal = new Terminal({
+        cols: 80,
+        rows: 24,
+        allowProposedApi: true,
+      });
+      await writeToTerminal(terminal, 'Cursor test');
+      // Move cursor to the start of the line (0,0) using ANSI escape code
+      await writeToTerminal(terminal, '\x1b[H');
+
+      const result = serializeTerminalToObject(terminal);
+      // The character at (0,0) should have inverse: true due to cursor
+      expect(result[0][0].text).toBe('C');
+      expect(result[0][0].inverse).toBe(true);
+
+      // The rest of the text should not have inverse: true (unless explicitly set)
+      expect(result[0][1].text.trim()).toBe('ursor test');
+      expect(result[0][1].inverse).toBe(false);
+    });
   });
   describe('convertColorToHex', () => {
     it('should convert RGB color to hex', () => {

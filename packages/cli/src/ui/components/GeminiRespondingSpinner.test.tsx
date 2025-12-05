@@ -24,6 +24,10 @@ vi.mock('ink', async () => {
   };
 });
 
+vi.mock('./CliSpinner.js', () => ({
+  CliSpinner: () => 'Spinner',
+}));
+
 describe('GeminiRespondingSpinner', () => {
   const mockUseStreamingContext = vi.mocked(useStreamingContext);
   const mockUseIsScreenReaderEnabled = vi.mocked(useIsScreenReaderEnabled);

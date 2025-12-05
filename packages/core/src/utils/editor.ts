@@ -8,16 +8,36 @@ import { execSync, spawn, spawnSync } from 'node:child_process';
 import { debugLogger } from './debugLogger.js';
 import { coreEvents, CoreEvent } from './events.js';
 
-export type EditorType =
-  | 'vscode'
-  | 'vscodium'
-  | 'windsurf'
-  | 'cursor'
-  | 'vim'
-  | 'neovim'
-  | 'zed'
-  | 'emacs'
-  | 'antigravity';
+const GUI_EDITORS = [
+  'vscode',
+  'vscodium',
+  'windsurf',
+  'cursor',
+  'zed',
+  'antigravity',
+] as const;
+const TERMINAL_EDITORS = ['vim', 'neovim', 'emacs'] as const;
+const EDITORS = [...GUI_EDITORS, ...TERMINAL_EDITORS] as const;
+
+const GUI_EDITORS_SET = new Set<string>(GUI_EDITORS);
+const TERMINAL_EDITORS_SET = new Set<string>(TERMINAL_EDITORS);
+const EDITORS_SET = new Set<string>(EDITORS);
+
+export const DEFAULT_GUI_EDITOR: GuiEditorType = 'vscode';
+
+export type GuiEditorType = (typeof GUI_EDITORS)[number];
+export type TerminalEditorType = (typeof TERMINAL_EDITORS)[number];
+export type EditorType = (typeof EDITORS)[number];
+
+export function isGuiEditor(editor: EditorType): editor is GuiEditorType {
+  return GUI_EDITORS_SET.has(editor);
+}
+
+export function isTerminalEditor(
+  editor: EditorType,
+): editor is TerminalEditorType {
+  return TERMINAL_EDITORS_SET.has(editor);
+}
 
 export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   vscode: 'VS Code',
@@ -36,17 +56,7 @@ export function getEditorDisplayName(editor: EditorType): string {
 }
 
 function isValidEditorType(editor: string): editor is EditorType {
-  return [
-    'vscode',
-    'vscodium',
-    'windsurf',
-    'cursor',
-    'vim',
-    'neovim',
-    'zed',
-    'emacs',
-    'antigravity',
-  ].includes(editor);
+  return EDITORS_SET.has(editor);
 }
 
 interface DiffCommand {
@@ -94,11 +104,7 @@ export function checkHasEditorType(editor: EditorType): boolean {
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   const notUsingSandbox = !process.env['SANDBOX'];
-  if (
-    ['vscode', 'vscodium', 'windsurf', 'cursor', 'zed', 'antigravity'].includes(
-      editor,
-    )
-  ) {
+  if (isGuiEditor(editor)) {
     return notUsingSandbox;
   }
   // For terminal-based editors like vim and emacs, allow in sandbox.
@@ -197,9 +203,7 @@ export async function openDiff(
     return;
   }
 
-  const isTerminalEditor = ['vim', 'emacs', 'neovim'].includes(editor);
-
-  if (isTerminalEditor) {
+  if (isTerminalEditor(editor)) {
     try {
       const result = spawnSync(diffCommand.command, diffCommand.args, {
         stdio: 'inherit',

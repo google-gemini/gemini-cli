@@ -200,3 +200,20 @@ export interface GoogleRpcResponse {
 interface GoogleRpcErrorInfo {
   reason?: string;
 }
+
+export interface RetrieveUserQuotaRequest {
+  project: string;
+  userAgent?: string;
+}
+
+export interface BucketInfo {
+  remainingAmount?: string;
+  remainingFraction?: number;
+  resetTime?: string;
+  tokenType?: string;
+  modelId?: string;
+}
+
+export interface RetrieveUserQuotaResponse {
+  buckets?: BucketInfo[];
+}

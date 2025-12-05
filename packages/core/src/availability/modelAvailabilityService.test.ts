@@ -64,7 +64,7 @@ describe('ModelAvailabilityService', () => {
       healthyModel,
     ]);
     expect(first).toEqual({
-      selected: stickyModel,
+      selectedModel: stickyModel,
       attempts: 1,
       skipped: [
         {
@@ -81,7 +81,7 @@ describe('ModelAvailabilityService', () => {
       healthyModel,
     ]);
     expect(second).toEqual({
-      selected: healthyModel,
+      selectedModel: healthyModel,
       skipped: [
         {
           model,
@@ -101,7 +101,7 @@ describe('ModelAvailabilityService', () => {
       healthyModel,
     ]);
     expect(third).toEqual({
-      selected: stickyModel,
+      selectedModel: stickyModel,
       attempts: 1,
       skipped: [
         {

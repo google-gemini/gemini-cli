@@ -65,6 +65,10 @@ vi.mock('node:fs', () => {
       });
     }),
     existsSync: vi.fn((path: string) => mockFileSystem.has(path)),
+    createWriteStream: vi.fn(() => ({
+      write: vi.fn(),
+      on: vi.fn(),
+    })),
   };
 
   return {
@@ -506,6 +510,31 @@ describe('Gemini Client (client.ts)', () => {
           true, // hasFailedCompressionAttempt
         );
       });
+    });
+    it('should correctly latch hasFailedCompressionAttempt flag', async () => {
+      // 1. Setup: Call setup() from this test file
+      // This helper function mocks the compression service for us.
+      const { client } = setup({
+        originalTokenCount: 100,
+        newTokenCount: 200, // Inflated
+        compressionStatus:
+          CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+      });
+
+      // 2. Test Step 1: Trigger a non-forced failure
+      await client.tryCompressChat('prompt-1', false); // force = false
+
+      // 3. Assert Step 1: Check that the flag became true
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((client as any).hasFailedCompressionAttempt).toBe(true);
+
+      // 4. Test Step 2: Trigger a forced failure
+
+      await client.tryCompressChat('prompt-2', true); // force = true
+
+      // 5. Assert Step 2: Check that the flag REMAINS true
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((client as any).hasFailedCompressionAttempt).toBe(true);
     });
 
     it('should not trigger summarization if token count is below threshold', async () => {

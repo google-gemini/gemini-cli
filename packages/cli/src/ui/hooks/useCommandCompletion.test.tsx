@@ -94,7 +94,6 @@ describe('useCommandCompletion', () => {
     getEnablePromptCompletion: () => false,
     getGeminiClient: vi.fn(),
   } as unknown as Config;
-  const testDirs: string[] = [];
   const testRootDir = '/';
 
   // Helper to create real TextBuffer objects within renderHook
@@ -121,7 +120,6 @@ describe('useCommandCompletion', () => {
       const textBuffer = useTextBufferForTest(initialText, cursorOffset);
       const completion = useCommandCompletion(
         textBuffer,
-        testDirs,
         testRootDir,
         [],
         mockCommandContext,
@@ -505,7 +503,6 @@ describe('useCommandCompletion', () => {
         const textBuffer = useTextBufferForTest('// This is a line comment');
         const completion = useCommandCompletion(
           textBuffer,
-          testDirs,
           testRootDir,
           [],
           mockCommandContext,
@@ -538,7 +535,6 @@ describe('useCommandCompletion', () => {
         );
         const completion = useCommandCompletion(
           textBuffer,
-          testDirs,
           testRootDir,
           [],
           mockCommandContext,
@@ -571,7 +567,6 @@ describe('useCommandCompletion', () => {
         );
         const completion = useCommandCompletion(
           textBuffer,
-          testDirs,
           testRootDir,
           [],
           mockCommandContext,

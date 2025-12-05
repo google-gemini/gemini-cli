@@ -478,25 +478,25 @@ describe('chatCommand', () => {
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
       const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
       expect(actualPath).toEqual(expectedPath);
-      const expectedContent = `🧑‍💻 ## USER
+      const expectedContent = `## USER 🧑‍💻
 
 context
 
 ---
 
-✨ ## MODEL
+## MODEL ✨
 
 context response
 
 ---
 
-🧑‍💻 ## USER
+## USER 🧑‍💻
 
 Hello
 
 ---
 
-✨ ## MODEL
+## MODEL ✨
 
 Hi there!`;
       expect(actualContent).toEqual(expectedContent);
@@ -570,7 +570,7 @@ Hi there!`;
         const { role, parts } = mockHistory[index];
         const text = parts.map((p) => p.text).join('');
         const roleIcon = role === 'user' ? '🧑‍💻' : '✨';
-        expect(entry).toBe(`${roleIcon} ## ${role.toUpperCase()}\n\n${text}`);
+        expect(entry).toBe(`## ${role.toUpperCase()} ${roleIcon}\n\n${text}`);
       });
     });
   });
@@ -584,9 +584,9 @@ Hi there!`;
       ];
 
       const expectedMarkdown =
-        '🧑‍💻 ## USER\n\nHello\n\n---\n\n' +
-        '✨ ## MODEL\n\nHi there!\n\n---\n\n' +
-        '🧑‍💻 ## USER\n\nHow are you?';
+        '## USER 🧑‍💻\n\nHello\n\n---\n\n' +
+        '## MODEL ✨\n\nHi there!\n\n---\n\n' +
+        '## USER 🧑‍💻\n\nHow are you?';
 
       const result = serializeHistoryToMarkdown(history);
       expect(result).toBe(expectedMarkdown);
@@ -605,19 +605,19 @@ Hi there!`;
         { role: 'user', parts: [{ text: 'How are you?' }] },
       ];
 
-      const expectedMarkdown = `🧑‍💻 ## USER
+      const expectedMarkdown = `## USER 🧑‍💻
 
 Hello
 
 ---
 
-✨ ## MODEL
+## MODEL ✨
 
 
 
 ---
 
-🧑‍💻 ## USER
+## USER 🧑‍💻
 
 How are you?`;
 
@@ -655,13 +655,13 @@ How are you?`;
         },
       ];
 
-      const expectedMarkdown = `🧑‍💻 ## USER
+      const expectedMarkdown = `## USER 🧑‍💻
 
 Please call a function.
 
 ---
 
-✨ ## MODEL
+## MODEL ✨
 
 **Tool Command**:
 \`\`\`json
@@ -675,7 +675,7 @@ Please call a function.
 
 ---
 
-🧑‍💻 ## USER
+## USER 🧑‍💻
 
 **Tool Response**:
 \`\`\`json
@@ -697,13 +697,13 @@ Please call a function.
         { parts: [{ text: 'Hi there!' }] },
       ];
 
-      const expectedMarkdown = `🧑‍💻 ## USER
+      const expectedMarkdown = `## USER 🧑‍💻
 
 Hello
 
 ---
 
-✨ ## MODEL
+## MODEL ✨
 
 Hi there!`;
 

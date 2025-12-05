@@ -72,8 +72,11 @@ export function getModelPolicyChain(
 /**
  * Provides a default policy scaffold for models not present in the catalog.
  */
-export function createDefaultPolicy(model: string): ModelPolicy {
-  return definePolicy({ model });
+export function createDefaultPolicy(
+  model: string,
+  options?: { isLastResort?: boolean },
+): ModelPolicy {
+  return definePolicy({ model, isLastResort: options?.isLastResort });
 }
 
 export function validateModelPolicyChain(chain: ModelPolicyChain): void {

@@ -22,10 +22,8 @@ vi.mock('./installationInfo.js', async () => {
   };
 });
 
-vi.mock(
-  './updateEventEmitter.js',
-  async (importOriginal) =>
-    await importOriginal<typeof import('./updateEventEmitter.js')>(),
+vi.mock('./updateEventEmitter.js', async (importOriginal) =>
+  importOriginal<typeof import('./updateEventEmitter.js')>(),
 );
 
 interface MockChildProcess extends EventEmitter {

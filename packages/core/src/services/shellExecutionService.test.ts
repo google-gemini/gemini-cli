@@ -8,9 +8,12 @@ import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import EventEmitter from 'node:events';
 import type { Readable } from 'node:stream';
 import { type ChildProcess } from 'node:child_process';
-import type { ShellOutputEvent } from './shellExecutionService.js';
+import type {
+  ShellOutputEvent,
+  ShellExecutionConfig,
+} from './shellExecutionService.js';
 import { ShellExecutionService } from './shellExecutionService.js';
-import type { AnsiOutput } from '../utils/terminalSerializer.js';
+import type { AnsiOutput, AnsiToken } from '../utils/terminalSerializer.js';
 
 // Hoisted Mocks
 const mockPtySpawn = vi.hoisted(() => vi.fn());
@@ -64,7 +67,7 @@ const mockProcessKill = vi
   .spyOn(process, 'kill')
   .mockImplementation(() => true);
 
-const shellExecutionConfig = {
+const shellExecutionConfig: ShellExecutionConfig = {
   terminalWidth: 80,
   terminalHeight: 24,
   pager: 'cat',
@@ -72,23 +75,41 @@ const shellExecutionConfig = {
   disableDynamicLineTrimming: true,
 };
 
+const createMockSerializeTerminalToObjectReturnValue = (
+  text: string | string[],
+): AnsiOutput => {
+  const lines = Array.isArray(text) ? text : text.split('\n');
+  const len = (shellExecutionConfig.terminalHeight ?? 24) as number;
+  const expected: AnsiOutput = Array.from({ length: len }, (_, i) => [
+    {
+      text: (lines[i] || '').trim(),
+      bold: false,
+      italic: false,
+      underline: false,
+      dim: false,
+      inverse: false,
+      fg: '#ffffff',
+      bg: '#000000',
+    },
+  ]);
+  return expected;
+};
+
 const createExpectedAnsiOutput = (text: string | string[]): AnsiOutput => {
   const lines = Array.isArray(text) ? text : text.split('\n');
-  const expected: AnsiOutput = Array.from(
-    { length: shellExecutionConfig.terminalHeight },
-    (_, i) => [
-      {
-        text: expect.stringMatching((lines[i] || '').trim()),
-        bold: false,
-        italic: false,
-        underline: false,
-        dim: false,
-        inverse: false,
-        fg: '',
-        bg: '',
-      },
-    ],
-  );
+  const len = (shellExecutionConfig.terminalHeight ?? 24) as number;
+  const expected: AnsiOutput = Array.from({ length: len }, (_, i) => [
+    {
+      text: expect.stringMatching((lines[i] || '').trim()),
+      bold: false,
+      italic: false,
+      underline: false,
+      dim: false,
+      inverse: false,
+      fg: '',
+      bg: '',
+    } as AnsiToken,
+  ]);
   return expected;
 };
 
@@ -114,7 +135,7 @@ describe('ShellExecutionService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-
+    mockSerializeTerminalToObject.mockReturnValue([]);
     mockIsBinary.mockReturnValue(false);
     mockPlatform.mockReturnValue('linux');
     mockGetPty.mockResolvedValue({
@@ -179,6 +200,9 @@ describe('ShellExecutionService', () => {
 
   describe('Successful Execution', () => {
     it('should execute a command and capture output', async () => {
+      mockSerializeTerminalToObject.mockReturnValue(
+        createMockSerializeTerminalToObjectReturnValue('file1.txt'),
+      );
       const { result, handle } = await simulateExecution('ls -l', (pty) => {
         pty.onData.mock.calls[0][0]('file1.txt\n');
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
@@ -205,7 +229,10 @@ describe('ShellExecutionService', () => {
       });
     });
 
-    it('should strip ANSI codes from output', async () => {
+    it('should strip ANSI color codes from output', async () => {
+      mockSerializeTerminalToObject.mockReturnValue(
+        createMockSerializeTerminalToObjectReturnValue('aredword'),
+      );
       const { result } = await simulateExecution('ls --color=auto', (pty) => {
         pty.onData.mock.calls[0][0]('a\u001b[31mred\u001b[0mword');
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
@@ -231,6 +258,9 @@ describe('ShellExecutionService', () => {
     });
 
     it('should handle commands with no output', async () => {
+      mockSerializeTerminalToObject.mockReturnValue(
+        createMockSerializeTerminalToObjectReturnValue(''),
+      );
       await simulateExecution('touch file', (pty) => {
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
@@ -239,6 +269,113 @@ describe('ShellExecutionService', () => {
         expect.objectContaining({
           chunk: createExpectedAnsiOutput(''),
         }),
+      );
+    });
+
+    it('should capture large output (10000 lines)', async () => {
+      const lineCount = 10000;
+      const lines = Array.from({ length: lineCount }, (_, i) => `line ${i}`);
+      const expectedOutput = lines.join('\n');
+
+      const { result } = await simulateExecution(
+        'large-output-command',
+        (pty) => {
+          // Send data in chunks to simulate realistic streaming
+          // Use \r\n to ensure the terminal moves the cursor to the start of the line
+          const chunkSize = 1000;
+          for (let i = 0; i < lineCount; i += chunkSize) {
+            const chunk = lines.slice(i, i + chunkSize).join('\r\n') + '\r\n';
+            pty.onData.mock.calls[0][0](chunk);
+          }
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        },
+      );
+
+      expect(result.exitCode).toBe(0);
+      // The terminal buffer output includes trailing spaces for each line (up to terminal width).
+      // We trim each line to match our expected simple string.
+      const processedOutput = result.output
+        .split('\n')
+        .map((l) => l.trimEnd())
+        .join('\n')
+        .trim();
+      expect(processedOutput).toBe(expectedOutput);
+      expect(result.output.split('\n').length).toBeGreaterThanOrEqual(
+        lineCount,
+      );
+    });
+
+    it('should not wrap long lines in the final output', async () => {
+      // Set a small width to force wrapping
+      const narrowConfig = { ...shellExecutionConfig, terminalWidth: 10 };
+      const longString = '123456789012345'; // 15 chars, should wrap at 10
+
+      const { result } = await simulateExecution(
+        'long-line-command',
+        (pty) => {
+          pty.onData.mock.calls[0][0](longString);
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        },
+        narrowConfig,
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.output.trim()).toBe(longString);
+    });
+
+    it('should not add extra padding but preserve explicit trailing whitespace', async () => {
+      const { result } = await simulateExecution('cmd', (pty) => {
+        // "value" should not get terminal-width padding
+        // "value2    " should keep its spaces
+        pty.onData.mock.calls[0][0]('value\r\nvalue2    ');
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      expect(result.output).toBe('value\nvalue2    ');
+    });
+
+    it('should truncate output exceeding the scrollback limit', async () => {
+      const scrollbackLimit = 100;
+      const totalLines = 150;
+      // Generate lines: "line 0", "line 1", ...
+      const lines = Array.from({ length: totalLines }, (_, i) => `line ${i}`);
+
+      const { result } = await simulateExecution(
+        'overflow-command',
+        (pty) => {
+          const chunk = lines.join('\r\n') + '\r\n';
+          pty.onData.mock.calls[0][0](chunk);
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        },
+        { ...shellExecutionConfig, scrollback: scrollbackLimit },
+      );
+
+      expect(result.exitCode).toBe(0);
+
+      // The terminal should keep the *last* 'scrollbackLimit' lines + lines in the viewport.
+      // xterm.js scrollback is the number of lines *above* the viewport.
+      // So total lines retained = scrollback + rows.
+      // However, our `getFullBufferText` implementation iterates the *active* buffer.
+      // In headless xterm, the buffer length grows.
+      // Let's verify that we have fewer lines than totalLines.
+
+      const outputLines = result.output
+        .trim()
+        .split('\n')
+        .map((l) => l.trimEnd());
+
+      // We expect the *start* of the output to be truncated.
+      // The first retained line should be > "line 0".
+      // Specifically, if we sent 150 lines and have space for roughly 100 + viewport(24),
+      // we should miss the first ~26 lines.
+
+      // Check that we lost some lines from the beginning
+      expect(outputLines.length).toBeLessThan(totalLines);
+      expect(outputLines[0]).not.toBe('line 0');
+
+      // Check that we have the *last* lines
+      expect(outputLines[outputLines.length - 1]).toBe(
+        `line ${totalLines - 1}`,
       );
     });
 
@@ -604,6 +741,9 @@ describe('ShellExecutionService', () => {
     });
 
     it('should call onOutputEvent with AnsiOutput when showColor is false', async () => {
+      mockSerializeTerminalToObject.mockReturnValue(
+        createMockSerializeTerminalToObjectReturnValue('aredword'),
+      );
       await simulateExecution(
         'ls --color=auto',
         (pty) => {
@@ -628,6 +768,13 @@ describe('ShellExecutionService', () => {
     });
 
     it('should handle multi-line output correctly when showColor is false', async () => {
+      mockSerializeTerminalToObject.mockReturnValue(
+        createMockSerializeTerminalToObjectReturnValue([
+          'line 1',
+          'line 2',
+          'line 3',
+        ]),
+      );
       await simulateExecution(
         'ls --color=auto',
         (pty) => {
@@ -733,7 +880,7 @@ describe('ShellExecutionService child_process fallback', () => {
       });
     });
 
-    it('should strip ANSI codes from output', async () => {
+    it('should strip ANSI color codes from output', async () => {
       const { result } = await simulateExecution('ls --color=auto', (cp) => {
         cp.stdout?.emit('data', Buffer.from('a\u001b[31mred\u001b[0mword'));
         cp.emit('exit', 0, null);
@@ -1072,6 +1219,7 @@ describe('ShellExecutionService execution method selection', () => {
   });
 
   it('should use node-pty when shouldUseNodePty is true and pty is available', async () => {
+    mockSerializeTerminalToObject.mockReturnValue([]);
     const abortController = new AbortController();
     const handle = await ShellExecutionService.execute(
       'test command',
