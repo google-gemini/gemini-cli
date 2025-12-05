@@ -136,10 +136,10 @@ export function entrypoint(workdir: string, cliArgs: string[]): string[] {
   const quotedCliArgs = cliArgs.slice(2).map((arg) => quote([arg]));
   const cliCmd =
     process.env['NODE_ENV'] === 'development'
-      ? process.env['DEBUG']
+      ? process.env['DEBUG'] === 'true' || process.env['DEBUG'] === '1'
         ? 'npm run debug --'
         : 'npm rebuild && npm run start --'
-      : process.env['DEBUG']
+      : process.env['DEBUG'] === 'true' || process.env['DEBUG'] === '1'
         ? `node --inspect-brk=0.0.0.0:${process.env['DEBUG_PORT'] || '9229'} $(which gemini)`
         : 'gemini';
 
