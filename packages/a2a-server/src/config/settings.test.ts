@@ -7,12 +7,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { loadSettings, USER_SETTINGS_PATH } from './settings.js';
 
-vi.mock('node:fs');
-vi.mock('node:os', () => ({
-  homedir: () => '/mock/home',
-}));
+const mocks = vi.hoisted(() => {
+  const suffix = Math.random().toString(36).slice(2);
+  return {
+    suffix,
+  };
+});
+
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  const path = await import('node:path');
+  return {
+    ...actual,
+    homedir: () => path.join(actual.tmpdir(), `gemini-home-${mocks.suffix}`),
+  };
+});
+
 vi.mock('@google/gemini-cli-core', () => ({
   GEMINI_DIR: '.gemini',
   debugLogger: {
@@ -22,161 +35,163 @@ vi.mock('@google/gemini-cli-core', () => ({
 }));
 
 describe('loadSettings', () => {
-  const mockWorkspaceDir = '/mock/workspace';
-  const mockWorkspaceSettingsPath = path.join(
-    mockWorkspaceDir,
-    '.gemini',
-    'settings.json',
+  const mockHomeDir = path.join(os.tmpdir(), `gemini-home-${mocks.suffix}`);
+  const mockWorkspaceDir = path.join(
+    os.tmpdir(),
+    `gemini-workspace-${mocks.suffix}`,
   );
+  const mockGeminiHomeDir = path.join(mockHomeDir, '.gemini');
+  const mockGeminiWorkspaceDir = path.join(mockWorkspaceDir, '.gemini');
 
   beforeEach(() => {
-    vi.resetAllMocks();
-    // Default mock implementation for fs.existsSync to return false
-    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.clearAllMocks();
+    // Create the directories using the real fs
+    if (!fs.existsSync(mockGeminiHomeDir)) {
+      fs.mkdirSync(mockGeminiHomeDir, { recursive: true });
+    }
+    if (!fs.existsSync(mockGeminiWorkspaceDir)) {
+      fs.mkdirSync(mockGeminiWorkspaceDir, { recursive: true });
+    }
+
+    // Clean up settings files before each test
+    if (fs.existsSync(USER_SETTINGS_PATH)) {
+      fs.rmSync(USER_SETTINGS_PATH);
+    }
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    if (fs.existsSync(workspaceSettingsPath)) {
+      fs.rmSync(workspaceSettingsPath);
+    }
   });
 
   afterEach(() => {
+    try {
+      if (fs.existsSync(mockHomeDir)) {
+        fs.rmSync(mockHomeDir, { recursive: true, force: true });
+      }
+      if (fs.existsSync(mockWorkspaceDir)) {
+        fs.rmSync(mockWorkspaceDir, { recursive: true, force: true });
+      }
+    } catch (e) {
+      console.error('Failed to cleanup temp dirs', e);
+    }
     vi.restoreAllMocks();
   });
 
   it('should load nested previewFeatures from user settings', () => {
-    vi.mocked(fs.existsSync).mockImplementation(
-      (p) => p === USER_SETTINGS_PATH,
-    );
-    vi.mocked(fs.readFileSync).mockImplementation((p) => {
-      if (p === USER_SETTINGS_PATH) {
-        return JSON.stringify({
-          general: {
-            previewFeatures: true,
-          },
-        });
-      }
-      return '';
-    });
+    const settings = {
+      general: {
+        previewFeatures: true,
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
 
-    const settings = loadSettings(mockWorkspaceDir);
-    expect(settings.general?.previewFeatures).toBe(true);
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.general?.previewFeatures).toBe(true);
   });
 
   it('should load nested previewFeatures from workspace settings', () => {
-    vi.mocked(fs.existsSync).mockImplementation(
-      (p) => p === mockWorkspaceSettingsPath,
+    const settings = {
+      general: {
+        previewFeatures: true,
+      },
+    };
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
     );
-    vi.mocked(fs.readFileSync).mockImplementation((p) => {
-      if (p === mockWorkspaceSettingsPath) {
-        return JSON.stringify({
-          general: {
-            previewFeatures: true,
-          },
-        });
-      }
-      return '';
-    });
+    fs.writeFileSync(workspaceSettingsPath, JSON.stringify(settings));
 
-    const settings = loadSettings(mockWorkspaceDir);
-    expect(settings.general?.previewFeatures).toBe(true);
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.general?.previewFeatures).toBe(true);
   });
 
   it('should prioritize workspace settings over user settings', () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockImplementation((p) => {
-      if (p === USER_SETTINGS_PATH) {
-        return JSON.stringify({
-          general: {
-            previewFeatures: false,
-          },
-        });
-      }
-      if (p === mockWorkspaceSettingsPath) {
-        return JSON.stringify({
-          general: {
-            previewFeatures: true,
-          },
-        });
-      }
-      return '';
-    });
+    const userSettings = {
+      general: {
+        previewFeatures: false,
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
 
-    const settings = loadSettings(mockWorkspaceDir);
-    expect(settings.general?.previewFeatures).toBe(true);
+    const workspaceSettings = {
+      general: {
+        previewFeatures: true,
+      },
+    };
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.general?.previewFeatures).toBe(true);
   });
 
   it('should handle missing previewFeatures', () => {
-    vi.mocked(fs.existsSync).mockImplementation(
-      (p) => p === USER_SETTINGS_PATH,
-    );
-    vi.mocked(fs.readFileSync).mockImplementation((p) => {
-      if (p === USER_SETTINGS_PATH) {
-        return JSON.stringify({
-          general: {},
-        });
-      }
-      return '';
-    });
+    const settings = {
+      general: {},
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
 
-    const settings = loadSettings(mockWorkspaceDir);
-    expect(settings.general?.previewFeatures).toBeUndefined();
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.general?.previewFeatures).toBeUndefined();
   });
 
   it('should load other top-level settings correctly', () => {
-    vi.mocked(fs.existsSync).mockImplementation(
-      (p) => p === USER_SETTINGS_PATH,
-    );
-    vi.mocked(fs.readFileSync).mockImplementation((p) => {
-      if (p === USER_SETTINGS_PATH) {
-        return JSON.stringify({
-          showMemoryUsage: true,
-          coreTools: ['tool1', 'tool2'],
-          mcpServers: {
-            server1: {
-              command: 'cmd',
-              args: ['arg'],
-            },
-          },
-          fileFiltering: {
-            respectGitIgnore: true,
-          },
-        });
-      }
-      return '';
-    });
+    const settings = {
+      showMemoryUsage: true,
+      coreTools: ['tool1', 'tool2'],
+      mcpServers: {
+        server1: {
+          command: 'cmd',
+          args: ['arg'],
+        },
+      },
+      fileFiltering: {
+        respectGitIgnore: true,
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
 
-    const settings = loadSettings(mockWorkspaceDir);
-    expect(settings.showMemoryUsage).toBe(true);
-    expect(settings.coreTools).toEqual(['tool1', 'tool2']);
-    expect(settings.mcpServers).toHaveProperty('server1');
-    expect(settings.fileFiltering?.respectGitIgnore).toBe(true);
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.showMemoryUsage).toBe(true);
+    expect(result.coreTools).toEqual(['tool1', 'tool2']);
+    expect(result.mcpServers).toHaveProperty('server1');
+    expect(result.fileFiltering?.respectGitIgnore).toBe(true);
   });
 
   it('should overwrite top-level settings from workspace (shallow merge)', () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockImplementation((p) => {
-      if (p === USER_SETTINGS_PATH) {
-        return JSON.stringify({
-          showMemoryUsage: false,
-          fileFiltering: {
-            respectGitIgnore: true,
-            enableRecursiveFileSearch: true,
-          },
-        });
-      }
-      if (p === mockWorkspaceSettingsPath) {
-        return JSON.stringify({
-          showMemoryUsage: true,
-          fileFiltering: {
-            respectGitIgnore: false,
-          },
-        });
-      }
-      return '';
-    });
+    const userSettings = {
+      showMemoryUsage: false,
+      fileFiltering: {
+        respectGitIgnore: true,
+        enableRecursiveFileSearch: true,
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
 
-    const settings = loadSettings(mockWorkspaceDir);
+    const workspaceSettings = {
+      showMemoryUsage: true,
+      fileFiltering: {
+        respectGitIgnore: false,
+      },
+    };
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
+
+    const result = loadSettings(mockWorkspaceDir);
     // Primitive value overwritten
-    expect(settings.showMemoryUsage).toBe(true);
+    expect(result.showMemoryUsage).toBe(true);
 
     // Object value completely replaced (shallow merge behavior)
-    expect(settings.fileFiltering?.respectGitIgnore).toBe(false);
-    expect(settings.fileFiltering?.enableRecursiveFileSearch).toBeUndefined();
+    expect(result.fileFiltering?.respectGitIgnore).toBe(false);
+    expect(result.fileFiltering?.enableRecursiveFileSearch).toBeUndefined();
   });
 });
