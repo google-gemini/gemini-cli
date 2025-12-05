@@ -35,7 +35,7 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   maxAttempts: 3,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
-  shouldRetryOnError: defaultShouldRetry,
+  shouldRetryOnError: isRetryableError,
 };
 
 const RETRYABLE_NETWORK_CODES = [
@@ -79,7 +79,7 @@ const FETCH_FAILED_MESSAGE = 'fetch failed';
  * @param retryFetchErrors Whether to retry on specific fetch errors.
  * @returns True if the error is a transient error, false otherwise.
  */
-function defaultShouldRetry(
+export function isRetryableError(
   error: Error | unknown,
   retryFetchErrors?: boolean,
 ): boolean {
@@ -147,6 +147,7 @@ export async function retryWithBackoff<T>(
     signal,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
+    shouldRetryOnError: isRetryableError,
     ...cleanOptions,
   };
 
