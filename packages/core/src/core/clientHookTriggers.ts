@@ -75,6 +75,7 @@ export async function fireAfterAgentHook(
   messageBus: MessageBus,
   request: PartListUnion,
   responseText: string,
+  hasPendingToolCalls: boolean = false,
 ): Promise<DefaultHookOutput | undefined> {
   try {
     const promptText = partToString(request);
@@ -90,6 +91,7 @@ export async function fireAfterAgentHook(
           prompt: promptText,
           prompt_response: responseText,
           stop_hook_active: false,
+          has_pending_tool_calls: hasPendingToolCalls,
         },
       },
       MessageBusType.HOOK_EXECUTION_RESPONSE,

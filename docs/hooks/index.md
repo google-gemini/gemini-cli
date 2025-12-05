@@ -199,6 +199,31 @@ Or simple exit codes:
 }
 ```
 
+#### AfterAgent
+
+**Input:**
+
+```json
+{
+  "prompt": "Fix the authentication bug",
+  "prompt_response": "I have fixed the bug.",
+  "stop_hook_active": false,
+  "has_pending_tool_calls": false
+}
+```
+
+**Output:**
+
+```json
+{
+  "decision": "allow|deny",
+  "hookSpecificOutput": {
+    "hookEventName": "AfterAgent",
+    "additionalContext": "Feedback for next turn..."
+  }
+}
+```
+
 #### BeforeModel
 
 **Input:**

@@ -579,64 +579,99 @@ export class GeminiClient {
         return turn;
       }
     }
+
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
       // Check if next speaker check is needed
+
+      let shouldCheckNextSpeaker = true;
+
       if (this.config.getQuotaErrorOccurred()) {
-        return turn;
+        shouldCheckNextSpeaker = false;
       }
 
       if (this.config.getSkipNextSpeakerCheck()) {
-        return turn;
+        shouldCheckNextSpeaker = false;
       }
 
-      const nextSpeakerCheck = await checkNextSpeaker(
-        this.getChat(),
-        this.config.getBaseLlmClient(),
-        signal,
-        prompt_id,
-      );
-      logNextSpeakerCheck(
-        this.config,
-        new NextSpeakerCheckEvent(
-          prompt_id,
-          turn.finishReason?.toString() || '',
-          nextSpeakerCheck?.next_speaker || '',
-        ),
-      );
-      if (nextSpeakerCheck?.next_speaker === 'model') {
-        const nextRequest = [{ text: 'Please continue.' }];
-        // This recursive call's events will be yielded out, and the final
-        // turn object from the recursive call will be returned.
-        return yield* this.sendMessageStream(
-          nextRequest,
+      if (shouldCheckNextSpeaker) {
+        const nextSpeakerCheck = await checkNextSpeaker(
+          this.getChat(),
+
+          this.config.getBaseLlmClient(),
+
           signal,
+
           prompt_id,
-          boundedTurns - 1,
-          // isInvalidStreamRetry is false here, as this is a next speaker check
         );
+
+        logNextSpeakerCheck(
+          this.config,
+
+          new NextSpeakerCheckEvent(
+            prompt_id,
+
+            turn.finishReason?.toString() || '',
+
+            nextSpeakerCheck?.next_speaker || '',
+          ),
+        );
+
+        if (nextSpeakerCheck?.next_speaker === 'model') {
+          const nextRequest = [{ text: 'Please continue.' }];
+
+          // This recursive call's events will be yielded out, and the final
+
+          // turn object from the recursive call will be returned.
+
+          return yield* this.sendMessageStream(
+            nextRequest,
+
+            signal,
+
+            prompt_id,
+
+            boundedTurns - 1,
+
+            // isInvalidStreamRetry is false here, as this is a next speaker check
+          );
+        }
       }
     }
 
     // Fire AfterAgent hook through MessageBus (only if hooks are enabled)
+
     if (hooksEnabled && messageBus) {
       const responseText = turn.getResponseText() || '[no response text]';
+
+      const hasPendingToolCalls = turn.pendingToolCalls.length > 0;
+
       const hookOutput = await fireAfterAgentHook(
         messageBus,
+
         request,
+
         responseText,
+
+        hasPendingToolCalls,
       );
 
       // For AfterAgent hooks, blocking/stop execution should force continuation
+
       if (
         hookOutput?.isBlockingDecision() ||
         hookOutput?.shouldStopExecution()
       ) {
         const continueReason = hookOutput.getEffectiveReason();
+
         const continueRequest = [{ text: continueReason }];
+
         yield* this.sendMessageStream(
           continueRequest,
+
           signal,
+
           prompt_id,
+
           boundedTurns - 1,
         );
       }
