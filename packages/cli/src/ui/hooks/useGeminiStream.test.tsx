@@ -98,6 +98,19 @@ vi.mock('./useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
+const mockUseVimMode = vi.hoisted(() =>
+  vi.fn().mockReturnValue({
+    vimEnabled: false,
+    vimMode: 'NORMAL',
+    toggleVimEnabled: vi.fn(),
+    setVimMode: vi.fn(),
+  }),
+);
+
+vi.mock('../contexts/VimModeContext.js', () => ({
+  useVimMode: mockUseVimMode,
+}));
+
 vi.mock('./shellCommandProcessor.js', () => ({
   useShellCommandProcessor: vi.fn().mockReturnValue({
     handleShellCommand: vi.fn(),
@@ -1237,6 +1250,93 @@ describe('useGeminiStream', () => {
       });
 
       // The final state should be idle
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
+    it('should NOT cancel an in-progress stream when escape is pressed in Vim INSERT mode', async () => {
+      // Setup Vim mode to INSERT
+      mockUseVimMode.mockReturnValue({
+        vimEnabled: true,
+        vimMode: 'INSERT',
+        toggleVimEnabled: vi.fn(),
+        setVimMode: vi.fn(),
+      });
+
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Part 1' };
+        // Keep the stream open
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderTestHook();
+
+      // Start a query
+      await act(async () => {
+        result.current.submitQuery('test query');
+      });
+
+      // Wait for the first part of the response
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // Simulate escape key press
+      simulateEscapeKeyPress();
+
+      // Should still be responding (cancellation prevented)
+      expect(result.current.streamingState).toBe(StreamingState.Responding);
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: 'Request cancelled.',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should cancel an in-progress stream when escape is pressed in Vim NORMAL mode', async () => {
+      // Setup Vim mode to NORMAL
+      mockUseVimMode.mockReturnValue({
+        vimEnabled: true,
+        vimMode: 'NORMAL',
+        toggleVimEnabled: vi.fn(),
+        setVimMode: vi.fn(),
+      });
+
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Part 1' };
+        // Keep the stream open
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderTestHook();
+
+      // Start a query
+      await act(async () => {
+        result.current.submitQuery('test query');
+      });
+
+      // Wait for the first part of the response
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // Simulate escape key press
+      simulateEscapeKeyPress();
+
+      // Verify cancellation message is added
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Request cancelled.',
+          },
+          expect.any(Number),
+        );
+      });
+
+      // Verify state is reset
       expect(result.current.streamingState).toBe(StreamingState.Idle);
     });
   });
