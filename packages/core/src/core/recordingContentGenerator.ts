@@ -14,7 +14,7 @@ import type {
 } from '@google/genai';
 import { appendFileSync } from 'node:fs';
 import type { ContentGenerator } from './contentGenerator.js';
-import type { FakeResponse } from './fakeContentGenerator.js';
+import { type FakeResponse, getRequestString } from './fakeContentGenerator.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
@@ -42,6 +42,7 @@ export class RecordingContentGenerator implements ContentGenerator {
     );
     const recordedResponse: FakeResponse = {
       method: 'generateContent',
+      request: getRequestString(request),
       response: {
         candidates: response.candidates,
         usageMetadata: response.usageMetadata,
@@ -57,6 +58,7 @@ export class RecordingContentGenerator implements ContentGenerator {
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const recordedResponse: FakeResponse = {
       method: 'generateContentStream',
+      request: getRequestString(request),
       response: [],
     };
 
@@ -85,6 +87,7 @@ export class RecordingContentGenerator implements ContentGenerator {
     const response = await this.realGenerator.countTokens(request);
     const recordedResponse: FakeResponse = {
       method: 'countTokens',
+      request: getRequestString(request),
       response: {
         totalTokens: response.totalTokens,
         cachedContentTokenCount: response.cachedContentTokenCount,
@@ -101,6 +104,7 @@ export class RecordingContentGenerator implements ContentGenerator {
 
     const recordedResponse: FakeResponse = {
       method: 'embedContent',
+      request: getRequestString(request),
       response: {
         embeddings: response.embeddings,
         metadata: response.metadata,
