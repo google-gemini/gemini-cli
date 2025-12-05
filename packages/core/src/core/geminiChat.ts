@@ -54,6 +54,30 @@ import {
   fireBeforeToolSelectionHook,
 } from './geminiChatHookTriggers.js';
 
+import fs from 'node:fs';
+import path from 'node:path';
+let i = 0;
+const uuid = crypto.randomUUID();
+const lgp = `/tmp/evals/${uuid}/log.json`;
+const clearOnStart = true;
+function log(...args: object[]): void {
+  if (i === 0 && clearOnStart) {
+    fs.rmSync(lgp, { recursive: true, force: true });
+    fs.mkdirSync(path.dirname(lgp), { recursive: true });
+  }
+  const text =
+    args
+      .map((arg) => {
+        try {
+          return JSON.stringify(arg, null, 2);
+        } catch (_) {
+          return arg;
+        }
+      })
+      .join('\n') + '\n';
+  fs.appendFileSync(lgp, `T${i++}: ${text}`);
+}
+
 export enum StreamEventType {
   /** A regular content chunk from the API. */
   CHUNK = 'chunk',
@@ -723,7 +747,9 @@ export class GeminiChat {
     let hasToolCall = false;
     let finishReason: FinishReason | undefined;
 
+    const rawChunks = [];
     for await (const chunk of streamResponse) {
+      rawChunks.push(chunk);
       const candidateWithReason = chunk?.candidates?.find(
         (candidate) => candidate.finishReason,
       );
@@ -817,6 +843,11 @@ export class GeminiChat {
         );
       }
       if (finishReason === FinishReason.MALFORMED_FUNCTION_CALL) {
+        log({
+          type: 'NO_FINISH_REASON',
+          request: originalRequest,
+          chunks: rawChunks,
+        });
         throw new InvalidStreamError(
           'Model stream ended with malformed function call.',
           'MALFORMED_FUNCTION_CALL',
