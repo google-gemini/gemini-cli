@@ -23,6 +23,10 @@ vi.mock('node:os', () => ({
 // Mock fs module
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(() => false),
+  createWriteStream: vi.fn(() => ({
+    write: vi.fn(),
+    on: vi.fn(),
+  })),
 }));
 
 describe('StartupProfiler', () => {

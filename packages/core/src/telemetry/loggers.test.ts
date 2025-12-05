@@ -117,6 +117,7 @@ describe('loggers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(true);
+    vi.spyOn(sdk, 'bufferTelemetryEvent').mockImplementation((cb) => cb());
     vi.spyOn(logs, 'getLogger').mockReturnValue(mockLogger);
     vi.spyOn(uiTelemetry.uiTelemetryService, 'addEvent').mockImplementation(
       mockUiEvent.addEvent,
@@ -1719,6 +1720,7 @@ describe('loggers', () => {
 
     it('should only log to Clearcut if OTEL SDK is not initialized', () => {
       vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(false);
+      vi.spyOn(sdk, 'bufferTelemetryEvent').mockImplementation(() => {});
       const event = new ModelRoutingEvent(
         'gemini-pro',
         'default',
@@ -2084,6 +2086,21 @@ describe('loggers', () => {
           reason: 'private_ip',
         },
       });
+    });
+  });
+  describe('Telemetry Buffering', () => {
+    it('should buffer events when SDK is not initialized', () => {
+      vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(false);
+      const bufferSpy = vi
+        .spyOn(sdk, 'bufferTelemetryEvent')
+        .mockImplementation(() => {});
+
+      const mockConfig = makeFakeConfig();
+      const event = new StartSessionEvent(mockConfig);
+      logCliConfiguration(mockConfig, event);
+
+      expect(bufferSpy).toHaveBeenCalled();
+      expect(mockLogger.emit).not.toHaveBeenCalled();
     });
   });
 });
