@@ -37,6 +37,15 @@ describe('JSON output', () => {
     expect(typeof parsed.stats).toBe('object');
   });
 
+  it('should return a valid JSON with a session ID', async () => {
+    const result = await rig.run('Hello', '--output-format', 'json');
+    const parsed = JSON.parse(result);
+
+    expect(parsed).toHaveProperty('session_id');
+    expect(typeof parsed.session_id).toBe('string');
+    expect(parsed.session_id).not.toBe('');
+  });
+
   it('should return a JSON error for sd auth mismatch before running', async () => {
     process.env['GOOGLE_GENAI_USE_GCA'] = 'true';
     await rig.setup('json-output-auth-mismatch', {
@@ -87,6 +96,9 @@ describe('JSON output', () => {
       "enforced authentication type is 'gemini-api-key'",
     );
     expect(payload.error.message).toContain("current type is 'oauth-personal'");
+    expect(payload).toHaveProperty('session_id');
+    expect(typeof payload.session_id).toBe('string');
+    expect(payload.session_id).not.toBe('');
   });
 
   it('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
@@ -129,5 +141,9 @@ describe('JSON output', () => {
 
     // Should NOT have an error field at the top level
     expect(parsed.error).toBeUndefined();
+
+    expect(parsed).toHaveProperty('session_id');
+    expect(typeof parsed.session_id).toBe('string');
+    expect(parsed.session_id).not.toBe('');
   });
 });
