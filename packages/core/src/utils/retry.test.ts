@@ -307,7 +307,7 @@ describe('retryWithBackoff', () => {
   });
 
   describe('Fetch error retries', () => {
-    it('should retry on specific fetch error when retryFetchErrors is true', async () => {
+    it("should retry on 'fetch failed' when retryFetchErrors is true", async () => {
       const mockFn = vi.fn();
       mockFn.mockRejectedValueOnce(new TypeError('fetch failed'));
       mockFn.mockResolvedValueOnce('success');
@@ -365,19 +365,48 @@ describe('retryWithBackoff', () => {
       expect(mockFn).toHaveBeenCalledTimes(2);
     });
 
-    it.each([false, undefined])(
-      'should not retry on specific fetch error when retryFetchErrors is %s',
-      async (retryFetchErrors) => {
-        const mockFn = vi.fn().mockRejectedValue(new TypeError('fetch failed'));
+    it("should retry on 'fetch failed' when retryFetchErrors is true (short delays)", async () => {
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(new TypeError('fetch failed'))
+        .mockResolvedValue('success');
 
-        const promise = retryWithBackoff(mockFn, {
-          retryFetchErrors,
-        });
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: true,
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+    });
 
-        await expect(promise).rejects.toThrow('fetch failed');
-        expect(mockFn).toHaveBeenCalledTimes(1);
-      },
-    );
+    it("should not retry on 'fetch failed' when retryFetchErrors is false", async () => {
+      const mockFn = vi.fn().mockRejectedValue(new TypeError('fetch failed'));
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: false,
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await expect(promise).rejects.toThrow('fetch failed');
+      expect(mockFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should retry on network error code (ETIMEDOUT) even when retryFetchErrors is false', async () => {
+      const error = new Error('connect ETIMEDOUT');
+      (error as any).code = 'ETIMEDOUT';
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: false,
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+    });
   });
 
   describe('Flash model fallback for OAuth users', () => {
