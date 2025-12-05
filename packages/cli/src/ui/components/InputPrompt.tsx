@@ -132,7 +132,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const { setEmbeddedShellFocused } = useUIActions();
-  const { mainAreaWidth } = useUIState();
+  const { mainAreaWidth, activePtyId } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
@@ -789,6 +789,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      if (keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS](key)) {
+        // If we got here, Autocomplete didn't handle the key (e.g. no suggestions).
+        // If it's Tab, we want to Toggle Focus (because AppContainer skipped it for Tab when not focused).
+        if (key.name === 'tab' && activePtyId) {
+          setEmbeddedShellFocused(true);
+        }
+        return;
+      }
+
       // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
 
@@ -830,6 +839,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       tryLoadQueuedMessages,
       setBannerVisible,
+      activePtyId,
+      setEmbeddedShellFocused,
     ],
   );
 
