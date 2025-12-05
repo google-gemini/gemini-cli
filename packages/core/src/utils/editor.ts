@@ -15,6 +15,8 @@ const GUI_EDITORS = [
   'cursor',
   'zed',
   'antigravity',
+  'idea',
+  'pycharm',
 ] as const;
 const TERMINAL_EDITORS = ['vim', 'neovim', 'emacs'] as const;
 const EDITORS = [...GUI_EDITORS, ...TERMINAL_EDITORS] as const;
@@ -49,6 +51,8 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   zed: 'Zed',
   emacs: 'Emacs',
   antigravity: 'Antigravity',
+  idea: 'IntelliJ IDEA',
+  pycharm: 'PyCharm',
 };
 
 export function getEditorDisplayName(editor: EditorType): string {
@@ -93,6 +97,8 @@ const editorCommands: Record<
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
   emacs: { win32: ['emacs.exe'], default: ['emacs'] },
   antigravity: { win32: ['agy.cmd'], default: ['agy'] },
+  idea: { win32: ['idea64.exe'], default: ['idea'] },
+  pycharm: { win32: ['pycharm64.exe'], default: ['pycharm'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
@@ -182,6 +188,9 @@ export function getDiffCommand(
         command: 'emacs',
         args: ['--eval', `(ediff "${oldPath}" "${newPath}")`],
       };
+    case 'idea':
+    case 'pycharm':
+      return { command, args: ['diff', '--wait', oldPath, newPath] };
     default:
       return null;
   }
