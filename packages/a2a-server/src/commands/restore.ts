@@ -97,13 +97,13 @@ export class RestoreCommand implements Command {
         name: this.name,
         data: restoreResult,
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         name: this.name,
         data: {
           type: 'message',
           messageType: 'error',
-          content: `Could not read restorable checkpoints. This is the error: ${error}`,
+          content: 'An unexpected error occurred during restore.',
         },
       };
     }
@@ -141,7 +141,7 @@ export class ListCheckpointsCommand implements Command {
           content: JSON.stringify(checkpointInfoList),
         },
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         name: this.name,
         data: {

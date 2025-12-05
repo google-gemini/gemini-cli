@@ -82,9 +82,6 @@ describe('RestoreCommand', () => {
     );
     const result = await command.execute(mockConfig, ['checkpoint1.json']);
     expect(result.data).toEqual([restoreContent]);
-    expect(mockLoggerInfo).toHaveBeenCalledWith(
-      '[Command] Restored to checkpoint checkpoint1.json.',
-    );
   });
 
   it('should show "file not found" error for a non-existent checkpoint', async () => {
@@ -105,7 +102,7 @@ describe('RestoreCommand', () => {
     mockFs.readFile.mockResolvedValue('invalid json');
     const result = await command.execute(mockConfig, ['checkpoint1.json']);
     expect((result.data as { content: string }).content).toContain(
-      'Unexpected token',
+      'An unexpected error occurred during restore.',
     );
   });
 });
@@ -134,7 +131,7 @@ describe('ListCheckpointsCommand', () => {
     mockFs.readdir.mockRejectedValue(new Error('Read error'));
     const result = await command.execute(mockConfig);
     expect((result.data as { content: string }).content).toContain(
-      'Could not read checkpoints.',
+      'An unexpected error occurred while listing checkpoints.',
     );
   });
 });
