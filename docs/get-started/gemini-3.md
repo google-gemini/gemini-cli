@@ -39,7 +39,7 @@ granted access to Gemini 3 Pro, you’ll receive an acceptance email to your
 submitted email address.
 
 **Note:** Please wait until you have been approved to use Gemini 3 Pro to enable
-**Preview features**. If enabled early, the CLI will fallback to Gemini 2.5 Pro.
+**Preview Features**. If enabled early, the CLI will fallback to Gemini 2.5 Pro.
 
 ## How to use Gemini 3 Pro with Gemini CLI
 
