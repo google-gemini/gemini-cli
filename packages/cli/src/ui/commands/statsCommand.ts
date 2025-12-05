@@ -34,8 +34,18 @@ async function defaultSessionView(context: CommandContext) {
   };
 
   if (context.services.config) {
+<<<<<<< HEAD
     const quota = await context.services.config.refreshUserQuota();
     if (quota) {
+=======
+    const server = getCodeAssistServer(context.services.config);
+    if (server instanceof CodeAssistServer && server.projectId) {
+      const quota = await server.retrieveUserQuota({
+        project: server.projectId,
+      });
+      const res = await server.receiveEvents();
+      console.log(res);
+>>>>>>> c00a3a7a1 (hits endpoint; no events)
       statsItem.quotas = quota;
     }
   }

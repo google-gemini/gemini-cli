@@ -206,11 +206,6 @@ export interface RetrieveUserQuotaRequest {
   userAgent?: string;
 }
 
-export interface ReceiveEventRequest {
-  project: string;
-  userAgent?: string;
-}
-
 export interface BucketInfo {
   remainingAmount?: string;
   remainingFraction?: number;
