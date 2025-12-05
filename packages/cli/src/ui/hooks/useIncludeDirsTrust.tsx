@@ -87,6 +87,7 @@ export function useIncludeDirsTrust(
       }
 
       if (added.length > 0 || errors.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         finishAddingDirectories(config, addItem, added, errors);
       }
       config.clearPendingIncludeDirectories();
@@ -151,6 +152,7 @@ export function useIncludeDirsTrust(
         />,
       );
     } else if (added.length > 0 || errors.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       finishAddingDirectories(config, addItem, added, errors);
       config.clearPendingIncludeDirectories();
     }
