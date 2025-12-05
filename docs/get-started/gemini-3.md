@@ -1,7 +1,7 @@
 # Gemini 3 Pro on Gemini CLI
 
 We’re excited to bring Gemini 3 Pro to Gemini CLI. Gemini 3 Pro is **currently
-available** on Gemini CLI for the following subscribers:
+available** on Gemini CLI to all of the following subscribers:
 
 - Google AI Ultra (except Google AI Ultra for Business).
 - Google AI Pro.
@@ -12,9 +12,10 @@ available** on Gemini CLI for the following subscribers:
 - Paid Gemini API key holders.
 - Paid Vertex API key holders.
 
-For everyone else, we're gradually expanding access
-[through a waitlist](https://goo.gle/geminicli-waitlist-signup). Sign up for the
-waitlist now to access Gemini 3 Pro once approved.
+For **everyone else**, we're gradually expanding access
+[through a waitlist](https://goo.gle/geminicli-waitlist-signup). If you don't
+have one of the listed subscriptions, sign up for the waitlist to access Gemini
+3 Pro once approved.
 
 **Note:** Whether you’re automatically granted access or accepted from the
 waitlist, you’ll still need to enable Gemini 3 Pro
