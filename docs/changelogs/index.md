@@ -29,8 +29,8 @@ on GitHub.
   ([pr](https://github.com/google-gemini/gemini-cli/pull/13398) by
   [@benbrandt](https://github.com/benbrandt))
 - **Interactive shell:**
-  - **Click-to-Focus:** When "Use Alternate Buffer" setting is enabled users can
-    click within the embedded shell output to focus it for input.
+  - **Click-to-Focus:** When "Use Alternate Buffer" setting is enabled, users
+    can click within the embedded shell output to focus it for input.
     ([pr](https://github.com/google-gemini/gemini-cli/pull/13341) by
     [@galz10](https://github.com/galz10))
   - **Loading phrase:** Clearly indicates when the interactive shell is awaiting

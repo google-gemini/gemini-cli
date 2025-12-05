@@ -14,9 +14,8 @@ npm install -g @google/gemini-cli
 - **Zed integration:** Users can now leverage Gemini 3 within the Zed
   integration after enabling "Preview Features" in their CLI’s `/settings`.
 - **Interactive shell:**
-  - **Click-to-Focus:** Go to `/settings` and enable **Use Alternate Buffer**
-    WhenUse Alternate Buffer" setting is enabled users can click within the
-    embedded shell output to focus it for input.
+  - **Click-to-Focus:** Go to `/settings` and enable **Use Alternate Buffer** to
+    click within the embedded shell output to focus it for input.
   - **Loading phrase:** Clearly indicates when the interactive shell is awaiting
     user input. ([vid](https://imgur.com/a/kjK8bUK),
     [pr](https://github.com/google-gemini/gemini-cli/pull/12535) by
