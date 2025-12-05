@@ -151,9 +151,15 @@ export class IdeClient {
     this.setState(IDEConnectionStatus.Connecting);
 
     this.connectionConfig = await this.getConnectionConfigFromFile();
-    if (this.connectionConfig?.authToken) {
-      this.authToken = this.connectionConfig.authToken;
+    if (!this.connectionConfig?.authToken) {
+      this.setState(
+        IDEConnectionStatus.Disconnected,
+        `Failed to get authentication token for IDE connection.`,
+        logError,
+      );
+      return;
     }
+    this.authToken = this.connectionConfig.authToken;
     const workspacePath =
       this.connectionConfig?.workspacePath ??
       process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
