@@ -137,7 +137,6 @@ export class SessionSummaryService {
         let cleanedSummary = summary
           .replace(/\n+/g, ' ') // Collapse newlines to spaces
           .replace(/\s+/g, ' ') // Normalize whitespace
-          .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '') // Remove emoji (preserves ZWJ/ZWNJ as they're not Emoji_Presentation)
           .trim(); // Trim after all processing
 
         // Remove quotes if the model added them

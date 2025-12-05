@@ -878,7 +878,7 @@ describe('SessionSummaryService', () => {
       expect(summary).toBe('Añadir modo oscuro à la aplicación');
     });
 
-    it('should remove emojis from summaries', async () => {
+    it('should preserve emojis in summaries', async () => {
       mockGenerateContent.mockResolvedValue({
         candidates: [
           {
@@ -900,11 +900,11 @@ describe('SessionSummaryService', () => {
 
       const summary = await service.generateSummary({ messages });
 
-      // Emojis removed (may leave double spaces where emoji was between words)
-      expect(summary).toBe('Add dark mode  to the app');
-      expect(summary).not.toContain('🌙');
-      expect(summary).not.toContain('🎨');
-      expect(summary).not.toContain('✨');
+      // Emojis are preserved
+      expect(summary).toBe('🌙 Add dark mode 🎨 to the app ✨');
+      expect(summary).toContain('🌙');
+      expect(summary).toContain('🎨');
+      expect(summary).toContain('✨');
     });
 
     it('should preserve zero-width characters for language rendering', async () => {
