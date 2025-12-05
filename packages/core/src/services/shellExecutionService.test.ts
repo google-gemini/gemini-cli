@@ -305,6 +305,24 @@ describe('ShellExecutionService', () => {
       );
     });
 
+    it('should not wrap long lines in the final output', async () => {
+      // Set a small width to force wrapping
+      const narrowConfig = { ...shellExecutionConfig, terminalWidth: 10 };
+      const longString = '123456789012345'; // 15 chars, should wrap at 10
+
+      const { result } = await simulateExecution(
+        'long-line-command',
+        (pty) => {
+          pty.onData.mock.calls[0][0](longString);
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        },
+        narrowConfig,
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.output.trim()).toBe(longString);
+    });
+
     it('should not add extra padding but preserve explicit trailing whitespace', async () => {
       const { result } = await simulateExecution('cmd', (pty) => {
         // "value" should not get terminal-width padding
