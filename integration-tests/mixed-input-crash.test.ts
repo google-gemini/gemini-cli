@@ -27,7 +27,7 @@ describe('mixed input crash prevention', () => {
       expect(error).toBeInstanceOf(Error);
       const err = error as Error;
 
-      expect(err.message).toContain('Process exited with code 1');
+      expect(err.message).toContain('Process exited with code 42');
       expect(err.message).toContain(
         '--prompt-interactive flag cannot be used when input is piped',
       );

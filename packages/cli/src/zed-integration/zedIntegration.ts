@@ -34,6 +34,8 @@ import {
   coreEvents,
   writeToStderr,
   writeToStdout,
+  createWorkingStdio,
+  startupProfiler,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -55,14 +57,9 @@ export async function runZedIntegration(
   argv: CliArgs,
 ) {
   initializeOutputListenersAndFlush();
-  const output = Writable.toWeb(process.stdout);
+  const { stdout: workingStdout } = createWorkingStdio();
+  const output = Writable.toWeb(workingStdout) as WritableStream;
   const input = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
-
-  // Stdout is used to send messages to the client, so console.log/console.info
-  // messages to stderr so that they don't interfere with ACP.
-  console.log = console.error;
-  console.info = console.error;
-  console.debug = console.error;
 
   const stream = acp.ndJsonStream(output, input);
   new acp.AgentSideConnection(
@@ -145,8 +142,16 @@ export class GeminiAgent {
 
   async authenticate({ methodId }: acp.AuthenticateRequest): Promise<void> {
     const method = z.nativeEnum(AuthType).parse(methodId);
+    const selectedAuthType = this.settings.merged.security?.auth?.selectedType;
 
-    await clearCachedCredentialFile();
+    // Only clear credentials when switching to a different auth method
+    if (selectedAuthType && selectedAuthType !== method) {
+      await clearCachedCredentialFile();
+    }
+
+    // Refresh auth with the requested method
+    // This will reuse existing credentials if they're valid,
+    // or perform new authentication if needed
     await this.config.refreshAuth(method);
     this.settings.setValue(
       SettingScope.User,
@@ -243,6 +248,7 @@ export class GeminiAgent {
     const config = await loadCliConfig(settings, sessionId, this.argv, cwd);
 
     await config.initialize();
+    startupProfiler.flush(config);
     return config;
   }
 

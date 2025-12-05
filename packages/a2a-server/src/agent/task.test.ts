@@ -151,6 +151,54 @@ describe('Task', () => {
         },
       ]);
     });
+
+    it('should update modelInfo and reflect it in metadata and status updates', async () => {
+      const mockConfig = createMockConfig();
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const modelInfoEvent = {
+        type: GeminiEventType.ModelInfo,
+        value: 'new-model-name',
+      };
+
+      await task.acceptAgentMessage(modelInfoEvent);
+
+      expect(task.modelInfo).toBe('new-model-name');
+
+      // Check getMetadata
+      const metadata = await task.getMetadata();
+      expect(metadata.model).toBe('new-model-name');
+
+      // Check status update
+      task.setTaskStateAndPublishUpdate(
+        'working',
+        { kind: CoderAgentEvent.StateChangeEvent },
+        'Working...',
+      );
+
+      expect(mockEventBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            model: 'new-model-name',
+          }),
+        }),
+      );
+    });
   });
 
   describe('_schedulerToolCallsUpdate', () => {

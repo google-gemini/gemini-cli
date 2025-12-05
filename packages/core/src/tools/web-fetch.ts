@@ -307,7 +307,7 @@ ${textContent}
           this.config,
           new WebFetchFallbackAttemptEvent('primary_failed'),
         );
-        return this.executeFallback(signal);
+        return await this.executeFallback(signal);
       }
 
       const sourceListFormatted: string[] = [];

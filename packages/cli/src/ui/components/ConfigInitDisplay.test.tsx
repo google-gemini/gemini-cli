@@ -6,6 +6,7 @@
 
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { ConfigInitDisplay } from './ConfigInitDisplay.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AppEvent } from '../../utils/events.js';
@@ -63,7 +64,7 @@ describe('ConfigInitDisplay', () => {
     const { lastFrame } = render(<ConfigInitDisplay />);
 
     // Wait for listener to be registered
-    await vi.waitFor(() => {
+    await waitFor(() => {
       if (!listener) throw new Error('Listener not registered yet');
     });
 
@@ -84,7 +85,42 @@ describe('ConfigInitDisplay', () => {
     });
 
     // Wait for the UI to update
-    await vi.waitFor(() => {
+    await waitFor(() => {
+      expect(lastFrame()).toMatchSnapshot();
+    });
+  });
+
+  it('truncates list of waiting servers if too many', async () => {
+    let listener: ((clients?: Map<string, McpClient>) => void) | undefined;
+    mockOn.mockImplementation((event, fn) => {
+      if (event === AppEvent.McpClientUpdate) {
+        listener = fn;
+      }
+    });
+
+    const { lastFrame } = render(<ConfigInitDisplay />);
+
+    await waitFor(() => {
+      if (!listener) throw new Error('Listener not registered yet');
+    });
+
+    const mockClientConnecting = {
+      getStatus: () => MCPServerStatus.CONNECTING,
+    } as McpClient;
+
+    const clients = new Map<string, McpClient>([
+      ['s1', mockClientConnecting],
+      ['s2', mockClientConnecting],
+      ['s3', mockClientConnecting],
+      ['s4', mockClientConnecting],
+      ['s5', mockClientConnecting],
+    ]);
+
+    act(() => {
+      listener!(clients);
+    });
+
+    await waitFor(() => {
       expect(lastFrame()).toMatchSnapshot();
     });
   });
@@ -99,7 +135,7 @@ describe('ConfigInitDisplay', () => {
 
     const { lastFrame } = render(<ConfigInitDisplay />);
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       if (!listener) throw new Error('Listener not registered yet');
     });
 
@@ -110,7 +146,7 @@ describe('ConfigInitDisplay', () => {
       });
     }
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(lastFrame()).toMatchSnapshot();
     });
   });

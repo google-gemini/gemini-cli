@@ -262,7 +262,8 @@ runs:
           --target "${{ steps.release_branch.outputs.BRANCH_NAME }}" \
           --title "Release ${{ inputs.release-tag }}" \
           --notes-start-tag "${{ inputs.previous-tag }}" \
-          --generate-notes
+          --generate-notes \
+          ${{ inputs.npm-tag != 'latest' && '--prerelease' || '' }}
 
     - name: '🧹 Clean up release branch'
       working-directory: '${{ inputs.working-directory }}'

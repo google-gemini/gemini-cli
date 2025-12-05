@@ -307,11 +307,50 @@ describe('retryWithBackoff', () => {
   });
 
   describe('Fetch error retries', () => {
-    const fetchErrorMsg = 'exception TypeError: fetch failed sending request';
-
     it('should retry on specific fetch error when retryFetchErrors is true', async () => {
       const mockFn = vi.fn();
-      mockFn.mockRejectedValueOnce(new Error(fetchErrorMsg));
+      mockFn.mockRejectedValueOnce(new TypeError('fetch failed'));
+      mockFn.mockResolvedValueOnce('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: true,
+        initialDelayMs: 10,
+      });
+
+      await vi.runAllTimersAsync();
+
+      const result = await promise;
+      expect(result).toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on common network error codes (ECONNRESET)', async () => {
+      const mockFn = vi.fn();
+      const error = new Error('read ECONNRESET');
+      (error as any).code = 'ECONNRESET';
+      mockFn.mockRejectedValueOnce(error);
+      mockFn.mockResolvedValueOnce('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: true,
+        initialDelayMs: 10,
+      });
+
+      await vi.runAllTimersAsync();
+
+      const result = await promise;
+      expect(result).toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on common network error codes in cause (ETIMEDOUT)', async () => {
+      const mockFn = vi.fn();
+      const cause = new Error('Connect Timeout');
+      (cause as any).code = 'ETIMEDOUT';
+      const error = new Error('fetch failed');
+      (error as any).cause = cause;
+
+      mockFn.mockRejectedValueOnce(error);
       mockFn.mockResolvedValueOnce('success');
 
       const promise = retryWithBackoff(mockFn, {
@@ -329,13 +368,13 @@ describe('retryWithBackoff', () => {
     it.each([false, undefined])(
       'should not retry on specific fetch error when retryFetchErrors is %s',
       async (retryFetchErrors) => {
-        const mockFn = vi.fn().mockRejectedValue(new Error(fetchErrorMsg));
+        const mockFn = vi.fn().mockRejectedValue(new TypeError('fetch failed'));
 
         const promise = retryWithBackoff(mockFn, {
           retryFetchErrors,
         });
 
-        await expect(promise).rejects.toThrow(fetchErrorMsg);
+        await expect(promise).rejects.toThrow('fetch failed');
         expect(mockFn).toHaveBeenCalledTimes(1);
       },
     );
