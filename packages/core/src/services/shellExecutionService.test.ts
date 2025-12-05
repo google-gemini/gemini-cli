@@ -75,29 +75,6 @@ const shellExecutionConfig: ShellExecutionConfig = {
   disableDynamicLineTrimming: true,
 };
 
-<<<<<<< HEAD
-=======
-const createMockSerializeTerminalToObjectReturnValue = (
-  text: string | string[],
-): AnsiOutput => {
-  const lines = Array.isArray(text) ? text : text.split('\n');
-  const len = (shellExecutionConfig.terminalHeight ?? 24) as number;
-  const expected: AnsiOutput = Array.from({ length: len }, (_, i) => [
-    {
-      text: (lines[i] || '').trim(),
-      bold: false,
-      italic: false,
-      underline: false,
-      dim: false,
-      inverse: false,
-      fg: '#ffffff',
-      bg: '#000000',
-    },
-  ]);
-  return expected;
-};
-
->>>>>>> d284fa66c (Fix bug in the shellExecutionService resulting in both truncation and 3X bloat (#14545))
 const createExpectedAnsiOutput = (text: string | string[]): AnsiOutput => {
   const lines = Array.isArray(text) ? text : text.split('\n');
   const len = (shellExecutionConfig.terminalHeight ?? 24) as number;
