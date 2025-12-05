@@ -14,7 +14,7 @@ on GitHub.
 
 | Release channel       | Notes                                           |
 | :-------------------- | :---------------------------------------------- |
-| [Nightly](nightly.md) | Nightly release with the most recent changes.   |
+| Nightly               | Nightly release with the most recent changes.   |
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
