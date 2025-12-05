@@ -91,7 +91,7 @@ manage your usage limits:
 To learn more about selecting a model and routing, refer to
 [Gemini CLI Model Selection](../cli/model.md).
 
-## How to enable Gemini 3 Pro with Gemini CLI on Code Assisst
+## How to enable Gemini 3 Pro with Gemini CLI on Code Assist
 
 If you're using Code Assist Standard or Code Assist Enterprise, enabling Gemini
 3 Pro on Gemini CLI will require two steps: administrative enablement and user
@@ -118,7 +118,7 @@ then:
 - Use the `/settings` command.
 - Set **Preview Features** to `true`.
 
-Restart Gemini CLI and you shouuld have access to Gemini 3 Pro.
+Restart Gemini CLI and you should have access to Gemini 3 Pro.
 
 ## Need help?
 
