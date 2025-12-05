@@ -18,8 +18,8 @@ import type {
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-  DEFAULT_GEMINI_MODEL,
   DEFAULT_MODEL_CONFIGS,
+  GEMINI_MODEL_ALIAS_PRO,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -1384,7 +1384,7 @@ const SETTINGS_SCHEMA = {
             label: 'Model',
             category: 'Experimental',
             requiresRestart: true,
-            default: DEFAULT_GEMINI_MODEL,
+            default: GEMINI_MODEL_ALIAS_PRO,
             description:
               'The model to use for the Codebase Investigator agent.',
             showInDialog: false,
