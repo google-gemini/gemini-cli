@@ -59,13 +59,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       >
         <Box>
           <Box marginRight={1}>
-            <GeminiRespondingSpinner
-              nonRespondingDisplay={
-                streamingState === StreamingState.WaitingForConfirmation
-                  ? '⠏'
-                  : ''
-              }
-            />
+            <GeminiRespondingSpinner />
           </Box>
           {primaryText && (
             <Text color={theme.text.accent} wrap="truncate-end">
