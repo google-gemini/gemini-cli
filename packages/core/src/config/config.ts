@@ -91,10 +91,18 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 
 import { ApprovalMode } from '../policy/types.js';
+import { CheckerRunner } from '../safety/checker-runner.js';
+import { ContextBuilder } from '../safety/context-builder.js';
+import { CheckerRegistry } from '../safety/registry.js';
+import { ConsecaSafetyChecker } from '../safety/conseca/conseca.js';
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
   screenReader?: boolean;
+}
+
+export interface SafetySettings {
+  enableConseca?: boolean;
 }
 
 export interface BugCommandSettings {
@@ -322,6 +330,7 @@ export interface ConfigParameters {
   previewFeatures?: boolean;
   enableAgents?: boolean;
   enableModelAvailabilityService?: boolean;
+  safety?: SafetySettings;
   experimentalJitContext?: boolean;
 }
 
@@ -343,6 +352,7 @@ export class Config {
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
+  readonly safety: SafetySettings;
 
   private readonly coreTools: string[] | undefined;
   private readonly allowedTools: string[] | undefined;
@@ -584,19 +594,39 @@ export class Config {
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
-    this.policyEngine = new PolicyEngine(params.policyEngineConfig);
+    this.hooks = params.hooks;
+    this.experiments = params.experiments;
+    this.safety = params.safety ?? {};
+
+    if (params.contextFileName) {
+      setGeminiMdFilename(params.contextFileName);
+    }
+
+    // Initialize Safety Infrastructure
+    const contextBuilder = new ContextBuilder(this);
+    const checkerRegistry = new CheckerRegistry(this.targetDir); // Using targetDir as dummy path for now
+    const checkerRunner = new CheckerRunner(contextBuilder, checkerRegistry, {
+      checkersPath: this.targetDir,
+      timeout: 30000, // 30 seconds to allow for LLM-based checkers
+    });
+
+    this.policyEngine = new PolicyEngine(
+      params.policyEngineConfig,
+      checkerRunner,
+    );
+
+    // Register Conseca if enabled
+    if (this.safety.enableConseca) {
+      debugLogger.log('[SAFETY] Registering Conseca Safety Checker');
+      ConsecaSafetyChecker.getInstance().setConfig(this);
+    }
+
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
-    this.hooks = params.hooks;
-    this.experiments = params.experiments;
-
-    if (params.contextFileName) {
-      setGeminiMdFilename(params.contextFileName);
-    }
 
     if (this.telemetrySettings.enabled) {
       initializeTelemetry(this);
