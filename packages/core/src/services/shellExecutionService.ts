@@ -24,6 +24,11 @@ const { Terminal } = pkg;
 const SIGKILL_TIMEOUT_MS = 200;
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
+// We want to allow shell outputs that are close to the context window in size.
+// 300,000 lines is roughly equivalent to a large context window, ensuring
+// we capture significant output from long-running commands.
+export const SCROLLBACK_LIMIT = 300000;
+
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
 
@@ -77,6 +82,7 @@ export interface ShellExecutionConfig {
   defaultBg?: string;
   // Used for testing
   disableDynamicLineTrimming?: boolean;
+  scrollback?: number;
 }
 
 /**
@@ -110,10 +116,16 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
   const lines: string[] = [];
   for (let i = 0; i < buffer.length; i++) {
     const line = buffer.getLine(i);
-    const lineContent = line ? line.translateToString() : '';
+    const lineContent = line ? line.translateToString(true) : '';
     lines.push(lineContent);
   }
-  return lines.join('\n').trimEnd();
+
+  // Remove trailing empty lines
+  while (lines.length > 0 && lines[lines.length - 1] === '') {
+    lines.pop();
+  }
+
+  return lines.join('\n');
 };
 
 /**
@@ -445,6 +457,7 @@ export class ShellExecutionService {
           allowProposedApi: true,
           cols,
           rows,
+          scrollback: shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT,
         });
         headlessTerminal.scrollToTop();
 
