@@ -5,9 +5,9 @@ available** on Gemini CLI for the following subscribers:
 
 - Google AI Ultra (except Google AI Ultra for Business).
 - Google AI Pro.
-- Code Assist Standard (requires
+- Gemini Code Assist Standard (requires
   [administrative enablement](#administrator-instructions)).
-- Code Assist Enterprise (requires
+- Gemini Code Assist Enterprise (requires
   [administrative enablement](#administrator-instructions)).
 - Paid Gemini API key holders.
 - Paid Vertex API key holders.
@@ -91,11 +91,15 @@ manage your usage limits:
 To learn more about selecting a model and routing, refer to
 [Gemini CLI Model Selection](../cli/model.md).
 
-## How to enable Gemini 3 Pro with Gemini CLI on Code Assist
+## How to enable Gemini 3 Pro with Gemini CLI on Gemini Code Assist
 
-If you're using Code Assist Standard or Code Assist Enterprise, enabling Gemini
-3 Pro on Gemini CLI will require two steps: administrative enablement and user
+If you're using Gemini Code Assist Standard or Gemini Code Assist Enterprise,
+enabling Gemini 3 Pro on Gemini CLI requires configuring your release channels.
+Using Gemini 3 Pro will require two steps: administrative enablement and user
 enablement.
+
+To learn more about these settings, refer to
+[Configure Gemini Code Assist release channels](https://developers.google.com/gemini-code-assist/docs/configure-release-channels).
 
 ### Administrator instructions
 
