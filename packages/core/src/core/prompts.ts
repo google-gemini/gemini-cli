@@ -376,8 +376,7 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
     fs.writeFileSync(writePath, basePrompt);
   }
 
-  if (isGemini3) {
-    basePrompt = `
+  basePrompt = `
 <system_instructions>
 <role>
 You are an expert Software Engineering Agent and a very strong reasoner and planner. You operate in a CLI environment directly on the user's system.
@@ -443,7 +442,7 @@ Before taking any action (either tool calls *or* responses to the user), you mus
 </instructions>
 </system_instructions>
 `;
-  }
+
   const memorySuffix =
     userMemory && userMemory.trim().length > 0
       ? `\n\n---\n\n${userMemory.trim()}`
