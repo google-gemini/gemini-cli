@@ -166,6 +166,7 @@ export const permissionOptionKindSchema = z.union([
   z.literal('allow_always'),
   z.literal('reject_once'),
   z.literal('reject_always'),
+  z.literal('allow_and_add_to_allowed'),
 ]);
 
 export const roleSchema = z.union([z.literal('assistant'), z.literal('user')]);

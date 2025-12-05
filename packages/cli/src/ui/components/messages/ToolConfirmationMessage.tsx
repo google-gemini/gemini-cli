@@ -11,17 +11,25 @@ import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import type {
   ToolCallConfirmationDetails,
-  ToolExecuteConfirmationDetails,
-  ToolMcpConfirmationDetails,
   Config,
 } from '@google/gemini-cli-core';
-import { IdeClient, ToolConfirmationOutcome } from '@google/gemini-cli-core';
+import {
+  IdeClient,
+  ToolConfirmationOutcome,
+  SHELL_TOOL_NAME,
+  isToolEditConfirmationDetails,
+  isToolExecuteConfirmationDetails,
+  isToolMcpConfirmationDetails,
+  isToolInfoConfirmationDetails,
+} from '@google/gemini-cli-core';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
+import { addToAllowedTools } from '../../../config/settings.js';
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
@@ -29,6 +37,27 @@ export interface ToolConfirmationMessageProps {
   isFocused?: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
+}
+
+function getToolNameForConfirmation(
+  confirmationDetails: ToolCallConfirmationDetails,
+): string {
+  if (isToolExecuteConfirmationDetails(confirmationDetails)) {
+    return `${SHELL_TOOL_NAME}(${confirmationDetails.rootCommand})`;
+  } else if (isToolEditConfirmationDetails(confirmationDetails)) {
+    return confirmationDetails.fileName;
+  } else if (isToolInfoConfirmationDetails(confirmationDetails)) {
+    return confirmationDetails.prompt;
+  } else if (isToolMcpConfirmationDetails(confirmationDetails)) {
+    return confirmationDetails.toolName;
+  }
+  // This case should ideally be unreachable if the ToolCallConfirmationDetails union is exhaustive
+  // and all cases are handled above. However, as a fallback or for development,
+  // we can log an error or return a generic name.
+  console.error(
+    `Unknown tool confirmation type: ${(confirmationDetails as { type: string }).type}`,
+  );
+  return 'unknown_tool';
 }
 
 export const ToolConfirmationMessage: React.FC<
@@ -43,6 +72,7 @@ export const ToolConfirmationMessage: React.FC<
   const { onConfirm } = confirmationDetails;
 
   const isAlternateBuffer = useAlternateBuffer();
+  const loadedSettings = useSettings();
 
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
   const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
@@ -65,7 +95,16 @@ export const ToolConfirmationMessage: React.FC<
   }, [config]);
 
   const handleConfirm = async (outcome: ToolConfirmationOutcome) => {
-    if (confirmationDetails.type === 'edit') {
+    if (outcome === ToolConfirmationOutcome.ProceedAndAddToAllowed) {
+      const toolNameToAllow = getToolNameForConfirmation(confirmationDetails);
+      if (toolNameToAllow !== 'unknown_tool') {
+        addToAllowedTools(loadedSettings, toolNameToAllow);
+      }
+      onConfirm(ToolConfirmationOutcome.ProceedOnce);
+      return;
+    }
+
+    if (isToolEditConfirmationDetails(confirmationDetails)) {
       if (config.getIdeMode() && isDiffingEnabled) {
         const cliOutcome =
           outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
@@ -111,6 +150,11 @@ export const ToolConfirmationMessage: React.FC<
             value: ToolConfirmationOutcome.ProceedAlways,
             key: 'Yes, allow always',
           });
+          options.push({
+            label: 'Yes, and add to allowed tools',
+            value: ToolConfirmationOutcome.ProceedAndAddToAllowed,
+            key: 'Yes, and add to allowed tools',
+          });
         }
         if (!config.getIdeMode() || !isDiffingEnabled) {
           options.push({
@@ -126,9 +170,8 @@ export const ToolConfirmationMessage: React.FC<
           key: 'No, suggest changes (esc)',
         });
       }
-    } else if (confirmationDetails.type === 'exec') {
-      const executionProps =
-        confirmationDetails as ToolExecuteConfirmationDetails;
+    } else if (isToolExecuteConfirmationDetails(confirmationDetails)) {
+      const executionProps = confirmationDetails;
 
       question = `Allow execution of: '${executionProps.rootCommand}'?`;
       options.push({
@@ -142,13 +185,18 @@ export const ToolConfirmationMessage: React.FC<
           value: ToolConfirmationOutcome.ProceedAlways,
           key: `Yes, allow always ...`,
         });
+        options.push({
+          label: 'Yes, and add to allowed tools',
+          value: ToolConfirmationOutcome.ProceedAndAddToAllowed,
+          key: 'Yes, and add to allowed tools',
+        });
       }
       options.push({
         label: 'No, suggest changes (esc)',
         value: ToolConfirmationOutcome.Cancel,
         key: 'No, suggest changes (esc)',
       });
-    } else if (confirmationDetails.type === 'info') {
+    } else if (isToolInfoConfirmationDetails(confirmationDetails)) {
       question = `Do you want to proceed?`;
       options.push({
         label: 'Yes, allow once',
@@ -161,15 +209,20 @@ export const ToolConfirmationMessage: React.FC<
           value: ToolConfirmationOutcome.ProceedAlways,
           key: 'Yes, allow always',
         });
+        options.push({
+          label: 'Yes, and add to allowed tools',
+          value: ToolConfirmationOutcome.ProceedAndAddToAllowed,
+          key: 'Yes, and add to allowed tools',
+        });
       }
       options.push({
         label: 'No, suggest changes (esc)',
         value: ToolConfirmationOutcome.Cancel,
         key: 'No, suggest changes (esc)',
       });
-    } else {
+    } else if (isToolMcpConfirmationDetails(confirmationDetails)) {
       // mcp tool confirmation
-      const mcpProps = confirmationDetails as ToolMcpConfirmationDetails;
+      const mcpProps = confirmationDetails;
       question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
       options.push({
         label: 'Yes, allow once',
@@ -193,6 +246,9 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.Cancel,
         key: 'No, suggest changes (esc)',
       });
+    } else {
+      const unreachable: never = confirmationDetails;
+      throw new Error(`Unknown confirmation type: ${unreachable}`);
     }
 
     function availableBodyContentHeight() {
@@ -223,7 +279,7 @@ export const ToolConfirmationMessage: React.FC<
       return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
     }
 
-    if (confirmationDetails.type === 'edit') {
+    if (isToolEditConfirmationDetails(confirmationDetails)) {
       if (!confirmationDetails.isModifying) {
         bodyContent = (
           <DiffRenderer
@@ -234,9 +290,8 @@ export const ToolConfirmationMessage: React.FC<
           />
         );
       }
-    } else if (confirmationDetails.type === 'exec') {
-      const executionProps =
-        confirmationDetails as ToolExecuteConfirmationDetails;
+    } else if (isToolExecuteConfirmationDetails(confirmationDetails)) {
+      const executionProps = confirmationDetails;
       let bodyContentHeight = availableBodyContentHeight();
       if (bodyContentHeight !== undefined) {
         bodyContentHeight -= 2; // Account for padding;
@@ -258,7 +313,7 @@ export const ToolConfirmationMessage: React.FC<
           {commandBox}
         </MaxSizedBox>
       );
-    } else if (confirmationDetails.type === 'info') {
+    } else if (isToolInfoConfirmationDetails(confirmationDetails)) {
       const infoProps = confirmationDetails;
       const displayUrls =
         infoProps.urls &&
@@ -287,9 +342,9 @@ export const ToolConfirmationMessage: React.FC<
           )}
         </Box>
       );
-    } else {
+    } else if (isToolMcpConfirmationDetails(confirmationDetails)) {
       // mcp tool confirmation
-      const mcpProps = confirmationDetails as ToolMcpConfirmationDetails;
+      const mcpProps = confirmationDetails;
 
       bodyContent = (
         <Box flexDirection="column">
@@ -297,6 +352,9 @@ export const ToolConfirmationMessage: React.FC<
           <Text color={theme.text.link}>Tool: {mcpProps.toolName}</Text>
         </Box>
       );
+    } else {
+      const unreachable: never = confirmationDetails;
+      throw new Error(`Unknown confirmation type: ${unreachable}`);
     }
 
     return { question, bodyContent, options };

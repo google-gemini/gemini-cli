@@ -681,11 +681,36 @@ export type ToolCallConfirmationDetails =
   | ToolMcpConfirmationDetails
   | ToolInfoConfirmationDetails;
 
+export function isToolEditConfirmationDetails(
+  details: ToolCallConfirmationDetails,
+): details is ToolEditConfirmationDetails {
+  return details.type === 'edit';
+}
+
+export function isToolExecuteConfirmationDetails(
+  details: ToolCallConfirmationDetails,
+): details is ToolExecuteConfirmationDetails {
+  return details.type === 'exec';
+}
+
+export function isToolMcpConfirmationDetails(
+  details: ToolCallConfirmationDetails,
+): details is ToolMcpConfirmationDetails {
+  return details.type === 'mcp';
+}
+
+export function isToolInfoConfirmationDetails(
+  details: ToolCallConfirmationDetails,
+): details is ToolInfoConfirmationDetails {
+  return details.type === 'info';
+}
+
 export enum ToolConfirmationOutcome {
   ProceedOnce = 'proceed_once',
   ProceedAlways = 'proceed_always',
   ProceedAlwaysServer = 'proceed_always_server',
   ProceedAlwaysTool = 'proceed_always_tool',
+  ProceedAndAddToAllowed = 'proceed_and_add_to_allowed',
   ModifyWithEditor = 'modify_with_editor',
   Cancel = 'cancel',
 }
