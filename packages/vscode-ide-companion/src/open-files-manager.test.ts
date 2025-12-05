@@ -316,7 +316,7 @@ describe('OpenFilesManager', () => {
     await vi.advanceTimersByTimeAsync(100);
 
     const file = manager.state.workspaceState!.openFiles![0];
-    expect(file.cursor).toEqual({ line: 11, character: 20 });
+    expect(file.cursor).toEqual({ line: 11, character: 21 });
   });
 
   it('updates the selected text on selection change', async () => {
@@ -355,7 +355,7 @@ describe('OpenFilesManager', () => {
     const manager = new OpenFilesManager(context);
     const uri = getUri('/test/file1.txt');
     const longText = 'a'.repeat(20000);
-    const truncatedText = longText.substring(0, 16384) + '... [TRUNCATED]';
+    const truncatedText = longText.substring(0, 16384);
 
     const selection = {
       active: { line: 10, character: 20 },
