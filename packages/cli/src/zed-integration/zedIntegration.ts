@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { WritableStream, ReadableStream } from 'node:stream/web';
-
 import type {
   Config,
   GeminiChat,
   ToolResult,
   ToolCallConfirmationDetails,
   FilterFilesOptions,
+  OutputPayload,
+  ConsoleLogPayload,
 } from '@google/gemini-cli-core';
 import {
   AuthType,
@@ -30,10 +30,14 @@ import {
   debugLogger,
   ReadManyFilesTool,
   getEffectiveModel,
+  CoreEvent,
+  coreEvents,
+  writeToStderr,
+  writeToStdout,
   createWorkingStdio,
   startupProfiler,
 } from '@google/gemini-cli-core';
-import * as acp from './acp.js';
+import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
 import { Readable, Writable } from 'node:stream';
 import type { Content, Part, FunctionCall } from '@google/genai';
@@ -52,15 +56,36 @@ export async function runZedIntegration(
   settings: LoadedSettings,
   argv: CliArgs,
 ) {
+  initializeOutputListenersAndFlush();
   const { stdout: workingStdout } = createWorkingStdio();
-  const stdout = Writable.toWeb(workingStdout) as WritableStream;
-  const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
+  const output = Writable.toWeb(workingStdout) as WritableStream;
+  const input = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
+  const stream = acp.ndJsonStream(output, input);
   new acp.AgentSideConnection(
-    (client: acp.Client) => new GeminiAgent(config, settings, argv, client),
-    stdout,
-    stdin,
+    (connection) => new GeminiAgent(config, settings, argv, connection),
+    stream,
   );
+}
+
+export function initializeOutputListenersAndFlush() {
+  // If there are no listeners for output, make sure we flush so output is not
+  // lost.
+  if (coreEvents.listenerCount(CoreEvent.Output) === 0) {
+    // In non-interactive mode, ensure we drain any buffered output or logs to stderr
+    coreEvents.on(CoreEvent.Output, (payload: OutputPayload) => {
+      if (payload.isStderr) {
+        writeToStderr(payload.chunk, payload.encoding);
+      } else {
+        writeToStdout(payload.chunk, payload.encoding);
+      }
+    });
+
+    coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
+      writeToStderr(payload.content);
+    });
+  }
+  coreEvents.drainBacklogs();
 }
 
 export class GeminiAgent {
@@ -71,7 +96,7 @@ export class GeminiAgent {
     private config: Config,
     private settings: LoadedSettings,
     private argv: CliArgs,
-    private client: acp.Client,
+    private connection: acp.AgentSideConnection,
   ) {}
 
   async initialize(
@@ -106,6 +131,10 @@ export class GeminiAgent {
           image: true,
           audio: true,
           embeddedContext: true,
+        },
+        mcpCapabilities: {
+          http: true,
+          sse: true,
         },
       },
     };
@@ -156,7 +185,7 @@ export class GeminiAgent {
 
     if (this.clientCapabilities?.fs) {
       const acpFileSystemService = new AcpFileSystemService(
-        this.client,
+        this.connection,
         sessionId,
         this.clientCapabilities.fs,
         config.getFileSystemService(),
@@ -166,7 +195,7 @@ export class GeminiAgent {
 
     const geminiClient = config.getGeminiClient();
     const chat = await geminiClient.startChat();
-    const session = new Session(sessionId, chat, config, this.client);
+    const session = new Session(sessionId, chat, config, this.connection);
     this.sessions.set(sessionId, session);
 
     return {
@@ -181,12 +210,37 @@ export class GeminiAgent {
   ): Promise<Config> {
     const mergedMcpServers = { ...this.settings.merged.mcpServers };
 
-    for (const { command, args, env: rawEnv, name } of mcpServers) {
-      const env: Record<string, string> = {};
-      for (const { name: envName, value } of rawEnv) {
-        env[envName] = value;
+    for (const server of mcpServers) {
+      if (
+        'type' in server &&
+        (server.type === 'sse' || server.type === 'http')
+      ) {
+        // HTTP or SSE MCP server
+        const headers = Object.fromEntries(
+          server.headers.map(({ name, value }) => [name, value]),
+        );
+        mergedMcpServers[server.name] = new MCPServerConfig(
+          undefined, // command
+          undefined, // args
+          undefined, // env
+          undefined, // cwd
+          server.type === 'sse' ? server.url : undefined, // url (sse)
+          server.type === 'http' ? server.url : undefined, // httpUrl
+          headers,
+        );
+      } else if ('command' in server) {
+        // Stdio MCP server
+        const env: Record<string, string> = {};
+        for (const { name: envName, value } of server.env) {
+          env[envName] = value;
+        }
+        mergedMcpServers[server.name] = new MCPServerConfig(
+          server.command,
+          server.args,
+          env,
+          cwd,
+        );
       }
-      mergedMcpServers[name] = new MCPServerConfig(command, args, env, cwd);
     }
 
     const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };
@@ -222,7 +276,7 @@ export class Session {
     private readonly id: string,
     private readonly chat: GeminiChat,
     private readonly config: Config,
-    private readonly client: acp.Client,
+    private readonly connection: acp.AgentSideConnection,
   ) {}
 
   async cancelPendingPrompt(): Promise<void> {
@@ -339,13 +393,15 @@ export class Session {
     return { stopReason: 'end_turn' };
   }
 
-  private async sendUpdate(update: acp.SessionUpdate): Promise<void> {
+  private async sendUpdate(
+    update: acp.SessionNotification['update'],
+  ): Promise<void> {
     const params: acp.SessionNotification = {
       sessionId: this.id,
       update,
     };
 
-    await this.client.sessionUpdate(params);
+    await this.connection.sessionUpdate(params);
   }
 
   private async runTool(
@@ -431,7 +487,7 @@ export class Session {
           },
         };
 
-        const output = await this.client.requestPermission(params);
+        const output = await this.connection.requestPermission(params);
         const outcome =
           output.outcome.outcome === 'cancelled'
             ? ToolConfirmationOutcome.Cancel
