@@ -63,6 +63,7 @@ import {
   SessionEndReason,
   fireSessionStartHook,
   fireSessionEndHook,
+  generateAndSaveSummary,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -312,6 +313,7 @@ export const AppContainer = (props: AppContainerProps) => {
       }
     })();
     registerCleanup(async () => {
+      await generateAndSaveSummary(config);
       // Turn off mouse scroll.
       disableMouseEvents();
       const ideClient = await IdeClient.getInstance();
