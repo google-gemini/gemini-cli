@@ -83,15 +83,15 @@ function defaultShouldRetry(
   error: Error | unknown,
   retryFetchErrors?: boolean,
 ): boolean {
+  // Check for common network error codes
+  const errorCode = getNetworkErrorCode(error);
+  if (errorCode && RETRYABLE_NETWORK_CODES.includes(errorCode)) {
+    return true;
+  }
+
   if (retryFetchErrors && error instanceof Error) {
     // Check for generic fetch failed message (case-insensitive)
     if (error.message.toLowerCase().includes(FETCH_FAILED_MESSAGE)) {
-      return true;
-    }
-
-    // Check for common network error codes
-    const errorCode = getNetworkErrorCode(error);
-    if (errorCode && RETRYABLE_NETWORK_CODES.includes(errorCode)) {
       return true;
     }
   }
