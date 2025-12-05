@@ -67,7 +67,7 @@ beforeEach(() => {
   );
   config = {
     getCoreTools: () => [],
-    getExcludeTools: () => [],
+    getExcludeTools: () => new Set([]),
     getAllowedTools: () => [],
   } as unknown as Config;
 });
@@ -98,7 +98,7 @@ describe('isCommandAllowed', () => {
   });
 
   it('should block a command if it is in the blocked list', () => {
-    config.getExcludeTools = () => ['ShellTool(badCommand --danger)'];
+    config.getExcludeTools = () => new Set(['ShellTool(badCommand --danger)']);
     const result = isCommandAllowed('badCommand --danger', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
@@ -108,7 +108,7 @@ describe('isCommandAllowed', () => {
 
   it('should prioritize the blocklist over the allowlist', () => {
     config.getCoreTools = () => ['ShellTool(badCommand --danger)'];
-    config.getExcludeTools = () => ['ShellTool(badCommand --danger)'];
+    config.getExcludeTools = () => new Set(['ShellTool(badCommand --danger)']);
     const result = isCommandAllowed('badCommand --danger', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
@@ -123,7 +123,7 @@ describe('isCommandAllowed', () => {
   });
 
   it('should block any command when a wildcard is in excludeTools', () => {
-    config.getExcludeTools = () => ['run_shell_command'];
+    config.getExcludeTools = () => new Set(['run_shell_command']);
     const result = isCommandAllowed('any random command', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
@@ -133,7 +133,7 @@ describe('isCommandAllowed', () => {
 
   it('should block a command on the blocklist even with a wildcard allow', () => {
     config.getCoreTools = () => ['ShellTool'];
-    config.getExcludeTools = () => ['ShellTool(badCommand --danger)'];
+    config.getExcludeTools = () => new Set(['ShellTool(badCommand --danger)']);
     const result = isCommandAllowed('badCommand --danger', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
@@ -154,7 +154,7 @@ describe('isCommandAllowed', () => {
   });
 
   it('should block a chained command if any part is blocked', () => {
-    config.getExcludeTools = () => ['run_shell_command(badCommand)'];
+    config.getExcludeTools = () => new Set(['run_shell_command(badCommand)']);
     const result = isCommandAllowed(
       'echo "hello" && badCommand --danger',
       config,
@@ -168,7 +168,7 @@ describe('isCommandAllowed', () => {
   it('should block a command that redefines an allowed function to run an unlisted command', () => {
     config.getCoreTools = () => ['run_shell_command(echo)'];
     const result = isCommandAllowed(
-      'echo () (curl google.com) ; echo Hello Wolrd',
+      'echo () (curl google.com) ; echo Hello World',
       config,
     );
     expect(result.allowed).toBe(false);
@@ -364,7 +364,7 @@ describe('checkCommandPermissions', () => {
     });
 
     it('should return a detailed failure object for a blocked command', () => {
-      config.getExcludeTools = () => ['ShellTool(badCommand)'];
+      config.getExcludeTools = () => new Set(['ShellTool(badCommand)']);
       const result = checkCommandPermissions('badCommand --danger', config);
       expect(result).toEqual({
         allAllowed: false,
@@ -433,7 +433,7 @@ describe('checkCommandPermissions', () => {
     });
 
     it('should block a command on the sessionAllowlist if it is also globally blocked', () => {
-      config.getExcludeTools = () => ['run_shell_command(badCommand)'];
+      config.getExcludeTools = () => new Set(['run_shell_command(badCommand)']);
       const result = checkCommandPermissions(
         'badCommand --danger',
         config,

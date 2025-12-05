@@ -31,6 +31,7 @@ import type { AgentTerminateMode } from '../agents/types.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import type { OTelFinishReason } from './semantic.js';
 import {
   toInputMessages,
   toOutputMessages,
@@ -38,6 +39,7 @@ import {
   toOutputType,
   toSystemInstruction,
 } from './semantic.js';
+import { sanitizeHookName } from './sanitize.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -160,6 +162,19 @@ export class EndSessionEvent implements BaseTelemetryEvent {
     this['event.name'] = 'end_session';
     this['event.timestamp'] = new Date().toISOString();
     this.session_id = config?.getSessionId();
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': this['event.name'],
+      'event.timestamp': this['event.timestamp'],
+      session_id: this.session_id,
+    };
+  }
+
+  toLogBody(): string {
+    return 'Session ended.';
   }
 }
 
@@ -299,7 +314,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
         }
       }
     } else {
-      this.function_name = function_name!;
+      this.function_name = function_name as string;
       this.function_args = function_args!;
       this.duration_ms = duration_ms!;
       this.success = success!;
@@ -349,30 +364,64 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
   'event.name': 'api_request';
   'event.timestamp': string;
   model: string;
-  prompt_id: string;
+  prompt: GenAIPromptDetails;
   request_text?: string;
 
-  constructor(model: string, prompt_id: string, request_text?: string) {
+  constructor(
+    model: string,
+    prompt_details: GenAIPromptDetails,
+    request_text?: string,
+  ) {
     this['event.name'] = 'api_request';
     this['event.timestamp'] = new Date().toISOString();
     this.model = model;
-    this.prompt_id = prompt_id;
+    this.prompt = prompt_details;
     this.request_text = request_text;
   }
 
-  toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
+  toLogRecord(config: Config): LogRecord {
+    const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': EVENT_API_REQUEST,
       'event.timestamp': this['event.timestamp'],
       model: this.model,
-      prompt_id: this.prompt_id,
+      prompt_id: this.prompt.prompt_id,
       request_text: this.request_text,
     };
+    return { body: `API request to ${this.model}.`, attributes };
   }
 
-  toLogBody(): string {
-    return `API request to ${this.model}.`;
+  toSemanticLogRecord(config: Config): LogRecord {
+    const { 'gen_ai.response.model': _, ...requestConventionAttributes } =
+      getConventionAttributes({
+        model: this.model,
+        auth_type: config.getContentGeneratorConfig()?.authType,
+      });
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_GEN_AI_OPERATION_DETAILS,
+      'event.timestamp': this['event.timestamp'],
+      ...toGenerateContentConfigAttributes(this.prompt.generate_content_config),
+      ...requestConventionAttributes,
+    };
+
+    if (this.prompt.server) {
+      attributes['server.address'] = this.prompt.server.address;
+      attributes['server.port'] = this.prompt.server.port;
+    }
+
+    if (config.getTelemetryLogPromptsEnabled() && this.prompt.contents) {
+      attributes['gen_ai.input.messages'] = JSON.stringify(
+        toInputMessages(this.prompt.contents),
+      );
+    }
+
+    const logRecord: LogRecord = {
+      body: `GenAI operation request details from ${this.model}.`,
+      attributes,
+    };
+
+    return logRecord;
   }
 }
 
@@ -531,6 +580,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
   prompt: GenAIPromptDetails;
   response: GenAIResponseDetails;
   usage: GenAIUsageDetails;
+  finish_reasons: OTelFinishReason[];
 
   constructor(
     model: string,
@@ -559,6 +609,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       tool_token_count: usage_data?.toolUsePromptTokenCount ?? 0,
       total_token_count: usage_data?.totalTokenCount ?? 0,
     };
+    this.finish_reasons = toFinishReasons(this.response.candidates);
   }
 
   toLogRecord(config: Config): LogRecord {
@@ -577,6 +628,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       prompt_id: this.prompt.prompt_id,
       auth_type: this.auth_type,
       status_code: this.status_code,
+      finish_reasons: this.finish_reasons,
     };
     if (this.response_text) {
       attributes['response_text'] = this.response_text;
@@ -599,9 +651,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       'event.name': EVENT_GEN_AI_OPERATION_DETAILS,
       'event.timestamp': this['event.timestamp'],
       'gen_ai.response.id': this.response.response_id,
-      'gen_ai.response.finish_reasons': toFinishReasons(
-        this.response.candidates,
-      ),
+      'gen_ai.response.finish_reasons': this.finish_reasons,
       'gen_ai.output.messages': JSON.stringify(
         toOutputMessages(this.response.candidates),
       ),
@@ -695,26 +745,38 @@ export class LoopDetectedEvent implements BaseTelemetryEvent {
   'event.timestamp': string;
   loop_type: LoopType;
   prompt_id: string;
+  confirmed_by_model?: string;
 
-  constructor(loop_type: LoopType, prompt_id: string) {
+  constructor(
+    loop_type: LoopType,
+    prompt_id: string,
+    confirmed_by_model?: string,
+  ) {
     this['event.name'] = 'loop_detected';
     this['event.timestamp'] = new Date().toISOString();
     this.loop_type = loop_type;
     this.prompt_id = prompt_id;
+    this.confirmed_by_model = confirmed_by_model;
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
+    const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': this['event.name'],
       'event.timestamp': this['event.timestamp'],
       loop_type: this.loop_type,
       prompt_id: this.prompt_id,
     };
+
+    if (this.confirmed_by_model) {
+      attributes['confirmed_by_model'] = this.confirmed_by_model;
+    }
+
+    return attributes;
   }
 
   toLogBody(): string {
-    return `Loop detected. Type: ${this.loop_type}.`;
+    return `Loop detected. Type: ${this.loop_type}.${this.confirmed_by_model ? ` Confirmed by: ${this.confirmed_by_model}` : ''}`;
   }
 }
 
@@ -946,34 +1008,6 @@ export class ConversationFinishedEvent {
 
   toLogBody(): string {
     return `Conversation finished.`;
-  }
-}
-
-export class KittySequenceOverflowEvent {
-  'event.name': 'kitty_sequence_overflow';
-  'event.timestamp': string; // ISO 8601
-  sequence_length: number;
-  truncated_sequence: string;
-  constructor(sequence_length: number, truncated_sequence: string) {
-    this['event.name'] = 'kitty_sequence_overflow';
-    this['event.timestamp'] = new Date().toISOString();
-    this.sequence_length = sequence_length;
-    // Truncate to first 20 chars for logging (avoid logging sensitive data)
-    this.truncated_sequence = truncated_sequence.substring(0, 20);
-  }
-
-  toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
-      ...getCommonAttributes(config),
-      'event.name': this['event.name'],
-      'event.timestamp': this['event.timestamp'],
-      sequence_length: this.sequence_length,
-      truncated_sequence: this.truncated_sequence,
-    };
-  }
-
-  toLogBody(): string {
-    return `Kitty sequence buffer overflow: ${this.sequence_length} bytes`;
   }
 }
 
@@ -1432,6 +1466,48 @@ export class ModelSlashCommandEvent implements BaseTelemetryEvent {
   }
 }
 
+export const EVENT_LLM_LOOP_CHECK = 'gemini_cli.llm_loop_check';
+export class LlmLoopCheckEvent implements BaseTelemetryEvent {
+  'event.name': 'llm_loop_check';
+  'event.timestamp': string;
+  prompt_id: string;
+  flash_confidence: number;
+  main_model: string;
+  main_model_confidence: number;
+
+  constructor(
+    prompt_id: string,
+    flash_confidence: number,
+    main_model: string,
+    main_model_confidence: number,
+  ) {
+    this['event.name'] = 'llm_loop_check';
+    this['event.timestamp'] = new Date().toISOString();
+    this.prompt_id = prompt_id;
+    this.flash_confidence = flash_confidence;
+    this.main_model = main_model;
+    this.main_model_confidence = main_model_confidence;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_LLM_LOOP_CHECK,
+      'event.timestamp': this['event.timestamp'],
+      prompt_id: this.prompt_id,
+      flash_confidence: this.flash_confidence,
+      main_model: this.main_model,
+      main_model_confidence: this.main_model_confidence,
+    };
+  }
+
+  toLogBody(): string {
+    return this.main_model_confidence === -1
+      ? `LLM loop check. Flash confidence: ${this.flash_confidence.toFixed(2)}. Main model (${this.main_model}) check skipped`
+      : `LLM loop check. Flash confidence: ${this.flash_confidence.toFixed(2)}. Main model (${this.main_model}) confidence: ${this.main_model_confidence.toFixed(2)}`;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -1444,7 +1520,6 @@ export type TelemetryEvent =
   | LoopDetectedEvent
   | LoopDetectionDisabledEvent
   | NextSpeakerCheckEvent
-  | KittySequenceOverflowEvent
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
   | ConversationFinishedEvent
@@ -1462,6 +1537,7 @@ export type TelemetryEvent =
   | AgentStartEvent
   | AgentFinishEvent
   | RecoveryAttemptEvent
+  | LlmLoopCheckEvent
   | WebFetchFallbackAttemptEvent;
 
 export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
@@ -1696,5 +1772,88 @@ export class WebFetchFallbackAttemptEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Web fetch fallback attempt. Reason: ${this.reason}`;
+  }
+}
+
+export const EVENT_HOOK_CALL = 'gemini_cli.hook_call';
+export class HookCallEvent implements BaseTelemetryEvent {
+  'event.name': string;
+  'event.timestamp': string;
+  hook_event_name: string;
+  hook_type: 'command';
+  hook_name: string;
+  hook_input: Record<string, unknown>;
+  hook_output?: Record<string, unknown>;
+  exit_code?: number;
+  stdout?: string;
+  stderr?: string;
+  duration_ms: number;
+  success: boolean;
+  error?: string;
+
+  constructor(
+    hookEventName: string,
+    hookType: 'command',
+    hookName: string,
+    hookInput: Record<string, unknown>,
+    durationMs: number,
+    success: boolean,
+    hookOutput?: Record<string, unknown>,
+    exitCode?: number,
+    stdout?: string,
+    stderr?: string,
+    error?: string,
+  ) {
+    this['event.name'] = 'hook_call';
+    this['event.timestamp'] = new Date().toISOString();
+    this.hook_event_name = hookEventName;
+    this.hook_type = hookType;
+    this.hook_name = hookName;
+    this.hook_input = hookInput;
+    this.hook_output = hookOutput;
+    this.exit_code = exitCode;
+    this.stdout = stdout;
+    this.stderr = stderr;
+    this.duration_ms = durationMs;
+    this.success = success;
+    this.error = error;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_HOOK_CALL,
+      'event.timestamp': this['event.timestamp'],
+      hook_event_name: this.hook_event_name,
+      hook_type: this.hook_type,
+      // Sanitize hook_name unless full logging is enabled
+      hook_name: config.getTelemetryLogPromptsEnabled()
+        ? this.hook_name
+        : sanitizeHookName(this.hook_name),
+      duration_ms: this.duration_ms,
+      success: this.success,
+      exit_code: this.exit_code,
+    };
+
+    // Only include potentially sensitive data if telemetry logging of prompts is enabled
+    if (config.getTelemetryLogPromptsEnabled()) {
+      attributes['hook_input'] = safeJsonStringify(this.hook_input, 2);
+      attributes['hook_output'] = safeJsonStringify(this.hook_output, 2);
+      attributes['stdout'] = this.stdout;
+      attributes['stderr'] = this.stderr;
+    }
+
+    if (this.error) {
+      // Always log errors
+      attributes['error'] = this.error;
+    }
+
+    return attributes;
+  }
+
+  toLogBody(): string {
+    const hookId = `${this.hook_event_name}.${this.hook_name}`;
+    const status = `${this.success ? 'succeeded' : 'failed'}`;
+    return `Hook call ${hookId} ${status} in ${this.duration_ms}ms`;
   }
 }

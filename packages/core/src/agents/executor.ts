@@ -12,13 +12,13 @@ import type {
   Content,
   Part,
   FunctionCall,
-  GenerateContentConfig,
   FunctionDeclaration,
   Schema,
 } from '@google/genai';
 import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import type { ToolCallRequestInfo } from '../core/turn.js';
+import { type ToolCallRequestInfo, CompressionStatus } from '../core/turn.js';
+import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import {
   GLOB_TOOL_NAME,
@@ -52,6 +52,7 @@ import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
+import { getModelConfigAlias } from './registry.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -84,6 +85,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly toolRegistry: ToolRegistry;
   private readonly runtimeContext: Config;
   private readonly onActivity?: ActivityCallback;
+  private readonly compressionService: ChatCompressionService;
+  private hasFailedCompressionAttempt = false;
 
   /**
    * Creates and validates a new `AgentExecutor` instance.
@@ -125,6 +128,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         // registered; their schemas are passed directly to the model later.
       }
 
+      agentToolRegistry.sortTools();
       // Validate that all registered tools are safe for non-interactive
       // execution.
       await AgentExecutor.validateTools(agentToolRegistry, definition.name);
@@ -159,6 +163,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     this.runtimeContext = runtimeContext;
     this.toolRegistry = toolRegistry;
     this.onActivity = onActivity;
+    this.compressionService = new ChatCompressionService();
 
     const randomIdPart = Math.random().toString(36).slice(2, 8);
     // parentPromptId will be undefined if this agent is invoked directly
@@ -177,15 +182,16 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   private async executeTurn(
     chat: GeminiChat,
     currentMessage: Content,
-    tools: FunctionDeclaration[],
     turnCounter: number,
     combinedSignal: AbortSignal,
     timeoutSignal: AbortSignal, // Pass the timeout controller's signal
   ): Promise<AgentTurnResult> {
     const promptId = `${this.agentId}#${turnCounter}`;
 
+    await this.tryCompressChat(chat, promptId);
+
     const { functionCalls } = await promptIdContext.run(promptId, async () =>
-      this.callModel(chat, currentMessage, tools, combinedSignal, promptId),
+      this.callModel(chat, currentMessage, combinedSignal, promptId),
     );
 
     if (combinedSignal.aborted) {
@@ -265,7 +271,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
    */
   private async executeFinalWarningTurn(
     chat: GeminiChat,
-    tools: FunctionDeclaration[],
     turnCounter: number,
     reason:
       | AgentTerminateMode.TIMEOUT
@@ -302,7 +307,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       const turnResult = await this.executeTurn(
         chat,
         recoveryMessage,
-        tools,
         turnCounter, // This will be the "last" turn number
         combinedSignal,
         graceTimeoutController.signal, // Pass grace signal to identify a *grace* timeout
@@ -380,8 +384,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     let chat: GeminiChat | undefined;
     let tools: FunctionDeclaration[] | undefined;
     try {
-      chat = await this.createChatObject(inputs);
       tools = this.prepareToolsList();
+      chat = await this.createChatObject(inputs, tools);
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, inputs)
         : 'Get Started!';
@@ -407,7 +411,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         const turnResult = await this.executeTurn(
           chat,
           currentMessage,
-          tools,
           turnCounter++,
           combinedSignal,
           timeoutController.signal,
@@ -436,7 +439,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       ) {
         const recoveryResult = await this.executeFinalWarningTurn(
           chat,
-          tools,
           turnCounter, // Use current turnCounter for the recovery attempt
           terminateReason,
           signal, // Pass the external signal
@@ -502,7 +504,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         if (chat && tools) {
           const recoveryResult = await this.executeFinalWarningTurn(
             chat,
-            tools,
             turnCounter, // Use current turnCounter
             AgentTerminateMode.TIMEOUT,
             signal,
@@ -548,6 +549,34 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     }
   }
 
+  private async tryCompressChat(
+    chat: GeminiChat,
+    prompt_id: string,
+  ): Promise<void> {
+    const model = this.definition.modelConfig.model;
+
+    const { newHistory, info } = await this.compressionService.compress(
+      chat,
+      prompt_id,
+      false,
+      model,
+      this.runtimeContext,
+      this.hasFailedCompressionAttempt,
+    );
+
+    if (
+      info.compressionStatus ===
+      CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT
+    ) {
+      this.hasFailedCompressionAttempt = true;
+    } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
+      if (newHistory) {
+        chat.setHistory(newHistory);
+        this.hasFailedCompressionAttempt = false;
+      }
+    }
+  }
+
   /**
    * Calls the generative model with the current context and tools.
    *
@@ -556,22 +585,17 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   private async callModel(
     chat: GeminiChat,
     message: Content,
-    tools: FunctionDeclaration[],
     signal: AbortSignal,
     promptId: string,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
-    const messageParams = {
-      message: message.parts || [],
-      config: {
-        abortSignal: signal,
-        tools: tools.length > 0 ? [{ functionDeclarations: tools }] : undefined,
-      },
-    };
-
     const responseStream = await chat.sendMessageStream(
-      this.definition.modelConfig.model,
-      messageParams,
+      {
+        model: getModelConfigAlias(this.definition),
+        overrideScope: this.definition.name,
+      },
+      message.parts || [],
       promptId,
+      signal,
     );
 
     const functionCalls: FunctionCall[] = [];
@@ -614,8 +638,11 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   }
 
   /** Initializes a `GeminiChat` instance for the agent run. */
-  private async createChatObject(inputs: AgentInputs): Promise<GeminiChat> {
-    const { promptConfig, modelConfig } = this.definition;
+  private async createChatObject(
+    inputs: AgentInputs,
+    tools: FunctionDeclaration[],
+  ): Promise<GeminiChat> {
+    const { promptConfig } = this.definition;
 
     if (!promptConfig.systemPrompt && !promptConfig.initialMessages) {
       throw new Error(
@@ -634,22 +661,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       : undefined;
 
     try {
-      const generationConfig: GenerateContentConfig = {
-        temperature: modelConfig.temp,
-        topP: modelConfig.top_p,
-        thinkingConfig: {
-          includeThoughts: true,
-          thinkingBudget: modelConfig.thinkingBudget ?? -1,
-        },
-      };
-
-      if (systemInstruction) {
-        generationConfig.systemInstruction = systemInstruction;
-      }
-
       return new GeminiChat(
         this.runtimeContext,
-        generationConfig,
+        systemInstruction,
+        [{ functionDeclarations: tools }],
         startHistory,
       );
     } catch (error) {

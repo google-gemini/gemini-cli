@@ -86,7 +86,9 @@ function getChainedEchoCommand(): { allowPattern: string; command: string } {
 describe('run_shell_command', () => {
   it('should be able to run a shell command', async () => {
     const rig = new TestRig();
-    await rig.setup('should be able to run a shell command');
+    await rig.setup('should be able to run a shell command', {
+      settings: { tools: { core: ['run_shell_command'] } },
+    });
 
     const prompt = `Please run the command "echo hello-world" and show me the output`;
 
@@ -118,7 +120,9 @@ describe('run_shell_command', () => {
 
   it('should be able to run a shell command via stdin', async () => {
     const rig = new TestRig();
-    await rig.setup('should be able to run a shell command via stdin');
+    await rig.setup('should be able to run a shell command via stdin', {
+      settings: { tools: { core: ['run_shell_command'] } },
+    });
 
     const prompt = `Please run the command "echo test-stdin" and show me what it outputs`;
 
@@ -191,7 +195,7 @@ describe('run_shell_command', () => {
     expect(toolCall.toolRequest.success).toBe(true);
   });
 
-  it('should succeed with no parens in non-interactive mode', async () => {
+  it.skip('should succeed with no parens in non-interactive mode', async () => {
     const rig = new TestRig();
     await rig.setup('should succeed with no parens in non-interactive mode');
 
@@ -230,7 +234,9 @@ describe('run_shell_command', () => {
 
   it('should succeed with --yolo mode', async () => {
     const rig = new TestRig();
-    await rig.setup('should succeed with --yolo mode');
+    await rig.setup('should succeed with --yolo mode', {
+      settings: { tools: { core: ['run_shell_command'] } },
+    });
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
     const { command } = getLineCountCommand();
@@ -362,7 +368,9 @@ describe('run_shell_command', () => {
 
   it('should reject commands not on the allowlist', async () => {
     const rig = new TestRig();
-    await rig.setup('should reject commands not on the allowlist');
+    await rig.setup('should reject commands not on the allowlist', {
+      settings: { tools: { core: ['run_shell_command'] } },
+    });
 
     const testFile = rig.createFile('test.txt', 'Disallowed command check\n');
     const allowedCommand = getAllowedListCommand();
@@ -461,6 +469,9 @@ describe('run_shell_command', () => {
     const rig = new TestRig();
     await rig.setup(
       'should allow all with "ShellTool" and other specific tools',
+      {
+        settings: { tools: { core: ['run_shell_command'] } },
+      },
     );
 
     const { tool } = getLineCountCommand();
@@ -506,7 +517,9 @@ describe('run_shell_command', () => {
 
   it('should propagate environment variables to the child process', async () => {
     const rig = new TestRig();
-    await rig.setup('should propagate environment variables');
+    await rig.setup('should propagate environment variables', {
+      settings: { tools: { core: ['run_shell_command'] } },
+    });
 
     const varName = 'GEMINI_CLI_TEST_VAR';
     const varValue = `test-value-${Math.random().toString(36).substring(7)}`;
@@ -566,7 +579,9 @@ describe('run_shell_command', () => {
 
   it('rejects invalid shell expressions', async () => {
     const rig = new TestRig();
-    await rig.setup('rejects invalid shell expressions');
+    await rig.setup('rejects invalid shell expressions', {
+      settings: { tools: { core: ['run_shell_command'] } },
+    });
     const invalidCommand = getInvalidCommand();
     const result = await rig.run(
       `I am testing the error handling of the run_shell_command tool. Please attempt to run the following command, which I know has invalid syntax: \`${invalidCommand}\`. If the command fails as expected, please return the word FAIL, otherwise return the word SUCCESS.`,

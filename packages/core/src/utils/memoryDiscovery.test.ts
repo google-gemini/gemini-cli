@@ -13,6 +13,7 @@ import {
   loadGlobalMemory,
   loadEnvironmentMemory,
   loadJitSubdirectoryMemory,
+  refreshServerHierarchicalMemory,
 } from './memoryDiscovery.js';
 import {
   setGeminiMdFilename,
@@ -20,8 +21,11 @@ import {
 } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GEMINI_DIR } from './paths.js';
-import type { GeminiCLIExtension } from '../config/config.js';
+import { Config, type GeminiCLIExtension } from '../config/config.js';
+import { Storage } from '../config/storage.js';
 import { SimpleExtensionLoader } from './extensionLoader.js';
+import { CoreEvent, coreEvents } from './events.js';
+import { debugLogger } from './debugLogger.js';
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -436,7 +440,7 @@ My code memory
 
   it('should respect the maxDirs parameter during downward scan', async () => {
     const consoleDebugSpy = vi
-      .spyOn(console, 'debug')
+      .spyOn(debugLogger, 'debug')
       .mockImplementation(() => {});
 
     // Create directories in parallel for better performance
@@ -466,7 +470,7 @@ My code memory
       expect.stringContaining('Scanning [1/1]:'),
     );
 
-    vi.mocked(console.debug).mockRestore();
+    consoleDebugSpy.mockRestore();
 
     const result = await loadServerHierarchicalMemory(
       cwd,
@@ -875,5 +879,98 @@ included directory memory
       // Ensure outer memory is NOT loaded
       expect(result.files.find((f) => f.path === outerMemory)).toBeUndefined();
     });
+  });
+
+  it('refreshServerHierarchicalMemory should refresh memory and update config', async () => {
+    const extensionLoader = new SimpleExtensionLoader([]);
+    const config = new Config({
+      sessionId: '1',
+      targetDir: cwd,
+      cwd,
+      debugMode: false,
+      model: 'fake-model',
+      extensionLoader,
+    });
+    const result = await loadServerHierarchicalMemory(
+      config.getWorkingDir(),
+      config.shouldLoadMemoryFromIncludeDirectories()
+        ? config.getWorkspaceContext().getDirectories()
+        : [],
+      config.getDebugMode(),
+      config.getFileService(),
+      config.getExtensionLoader(),
+      config.isTrustedFolder(),
+      config.getImportFormat(),
+    );
+    expect(result.fileCount).equals(0);
+
+    // Now add an extension with a memory file
+    const extensionsDir = new Storage(homedir).getExtensionsDir();
+    const extensionPath = path.join(extensionsDir, 'new-extension');
+    const contextFilePath = path.join(extensionPath, 'CustomContext.md');
+    await fsPromises.mkdir(extensionPath, { recursive: true });
+    await fsPromises.writeFile(contextFilePath, 'Really cool custom context!');
+    await extensionLoader.loadExtension({
+      name: 'new-extension',
+      isActive: true,
+      contextFiles: [contextFilePath],
+      version: '1.0.0',
+      id: '1234',
+      path: extensionPath,
+    });
+
+    const mockEventListener = vi.fn();
+    coreEvents.on(CoreEvent.MemoryChanged, mockEventListener);
+    const refreshResult = await refreshServerHierarchicalMemory(config);
+    expect(refreshResult.fileCount).equals(1);
+    expect(config.getGeminiMdFileCount()).equals(refreshResult.fileCount);
+    expect(refreshResult.memoryContent).toContain(
+      'Really cool custom context!',
+    );
+    expect(config.getUserMemory()).equals(refreshResult.memoryContent);
+    expect(refreshResult.filePaths[0]).toContain(
+      path.join(extensionPath, 'CustomContext.md'),
+    );
+    expect(config.getGeminiMdFilePaths()).equals(refreshResult.filePaths);
+    expect(mockEventListener).toHaveBeenCalledExactlyOnceWith(refreshResult);
+  });
+
+  it('should include MCP instructions in user memory', async () => {
+    const mockConfig = {
+      getWorkingDir: vi.fn().mockReturnValue(cwd),
+      shouldLoadMemoryFromIncludeDirectories: vi.fn().mockReturnValue(false),
+      getDebugMode: vi.fn().mockReturnValue(false),
+      getFileService: vi
+        .fn()
+        .mockReturnValue(new FileDiscoveryService(projectRoot)),
+      getExtensionLoader: vi
+        .fn()
+        .mockReturnValue(new SimpleExtensionLoader([])),
+      isTrustedFolder: vi.fn().mockReturnValue(true),
+      getImportFormat: vi.fn().mockReturnValue('tree'),
+      getFileFilteringOptions: vi.fn().mockReturnValue(undefined),
+      getDiscoveryMaxDirs: vi.fn().mockReturnValue(200),
+      setUserMemory: vi.fn(),
+      setGeminiMdFileCount: vi.fn(),
+      setGeminiMdFilePaths: vi.fn(),
+      getMcpClientManager: vi.fn().mockReturnValue({
+        getMcpInstructions: vi
+          .fn()
+          .mockReturnValue(
+            "\n\n# Instructions for MCP Server 'extension-server'\nAlways be polite.",
+          ),
+      }),
+    } as unknown as Config;
+
+    await refreshServerHierarchicalMemory(mockConfig);
+
+    expect(mockConfig.setUserMemory).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "# Instructions for MCP Server 'extension-server'",
+      ),
+    );
+    expect(mockConfig.setUserMemory).toHaveBeenCalledWith(
+      expect.stringContaining('Always be polite.'),
+    );
   });
 });

@@ -14,13 +14,12 @@ import type {
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
-  HookDefinition,
-  HookEventName,
 } from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_MODEL_CONFIGS,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -79,6 +78,11 @@ export interface SettingCollectionDefinition {
    * For example, a JSON schema generator can use this to point to a shared definition.
    */
   ref?: string;
+  /**
+   * Optional merge strategy for dynamically added properties.
+   * Used when this collection definition is referenced via additionalProperties.
+   */
+  mergeStrategy?: MergeStrategy;
 }
 
 export enum MergeStrategy {
@@ -159,6 +163,15 @@ const SETTINGS_SCHEMA = {
     description: 'General application settings.',
     showInDialog: false,
     properties: {
+      previewFeatures: {
+        type: 'boolean',
+        label: 'Preview Features (e.g., models)',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description: 'Enable preview features (e.g., preview models).',
+        showInDialog: true,
+      },
       preferredEditor: {
         type: 'string',
         label: 'Preferred Editor',
@@ -250,6 +263,7 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: undefined as SessionRetentionSettings | undefined,
+        showInDialog: false,
         properties: {
           enabled: {
             type: 'boolean',
@@ -469,7 +483,7 @@ const SETTINGS_SCHEMA = {
         label: 'Show Line Numbers',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description: 'Show line numbers in the chat.',
         showInDialog: true,
       },
@@ -482,12 +496,21 @@ const SETTINGS_SCHEMA = {
         description: 'Show citations for generated text in the chat.',
         showInDialog: true,
       },
+      showModelInfoInChat: {
+        type: 'boolean',
+        label: 'Show Model Info In Chat',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Show the model name in the chat for each model turn.',
+        showInDialog: true,
+      },
       useFullWidth: {
         type: 'boolean',
         label: 'Use Full Width',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description: 'Use the entire width of the terminal for output.',
         showInDialog: true,
       },
@@ -499,6 +522,16 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Use an alternate screen buffer for the UI, preserving shell history.',
+        showInDialog: true,
+      },
+      incrementalRendering: {
+        type: 'boolean',
+        label: 'Incremental Rendering',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description:
+          'Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.',
         showInDialog: true,
       },
       customWittyPhrases: {
@@ -663,7 +696,7 @@ const SETTINGS_SCHEMA = {
         label: 'Compression Threshold',
         category: 'Model',
         requiresRestart: true,
-        default: 0.2 as number,
+        default: 0.5 as number,
         description:
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
@@ -676,6 +709,48 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Skip the next speaker check.',
         showInDialog: true,
+      },
+    },
+  },
+
+  modelConfigs: {
+    type: 'object',
+    label: 'Model Configs',
+    category: 'Model',
+    requiresRestart: false,
+    default: DEFAULT_MODEL_CONFIGS,
+    description: 'Model configurations.',
+    showInDialog: false,
+    properties: {
+      aliases: {
+        type: 'object',
+        label: 'Model Config Aliases',
+        category: 'Model',
+        requiresRestart: false,
+        default: DEFAULT_MODEL_CONFIGS.aliases,
+        description:
+          'Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.',
+        showInDialog: false,
+      },
+      customAliases: {
+        type: 'object',
+        label: 'Custom Model Config Aliases',
+        category: 'Model',
+        requiresRestart: false,
+        default: {},
+        description:
+          'Custom named presets for model configs. These are merged with (and override) the built-in aliases.',
+        showInDialog: false,
+      },
+      overrides: {
+        type: 'array',
+        label: 'Model Config Overrides',
+        category: 'Model',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Apply specific configuration overrides based on matches, with a primary key of model (or alias). The most specific match will be used.',
+        showInDialog: false,
       },
     },
   },
@@ -858,6 +933,16 @@ const SETTINGS_SCHEMA = {
             description: 'Show color in shell output.',
             showInDialog: true,
           },
+          inactivityTimeout: {
+            type: 'number',
+            label: 'Inactivity Timeout',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 300,
+            description:
+              'The maximum time in seconds allowed without output from the shell command. Defaults to 5 minutes.',
+            showInDialog: false,
+          },
         },
       },
       autoAccept: {
@@ -973,7 +1058,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Message Bus Integration',
         category: 'Tools',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: oneLine`
           Enable policy-based tool confirmation via message bus integration.
           When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.
@@ -1044,11 +1129,11 @@ const SETTINGS_SCHEMA = {
   },
   useWriteTodos: {
     type: 'boolean',
-    label: 'Use Write Todos',
+    label: 'Use WriteTodos',
     category: 'Advanced',
     requiresRestart: false,
     default: true,
-    description: 'Enable the write_todos_list tool.',
+    description: 'Enable the write_todos tool.',
     showInDialog: false,
   },
   security: {
@@ -1067,6 +1152,15 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Disable YOLO mode, even if enabled by a flag.',
+        showInDialog: true,
+      },
+      blockGitExtensions: {
+        type: 'boolean',
+        label: 'Blocks extensions from Git',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description: 'Blocks installing and loading extensions from Git.',
         showInDialog: true,
       },
       folderTrust: {
@@ -1191,6 +1285,15 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
+      enableAgents: {
+        type: 'boolean',
+        label: 'Enable Agents',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable local and remote subagents.',
+        showInDialog: false,
+      },
       extensionManagement: {
         type: 'boolean',
         label: 'Extension Management',
@@ -1210,15 +1313,23 @@ const SETTINGS_SCHEMA = {
           'Enables extension loading/unloading within the CLI session.',
         showInDialog: false,
       },
-      useModelRouter: {
+      isModelAvailabilityServiceEnabled: {
         type: 'boolean',
-        label: 'Use Model Router',
+        label: 'Enable Model Availability Service',
         category: 'Experimental',
         requiresRestart: true,
-        default: true,
-        description:
-          'Enable model routing to route requests to the best model based on complexity.',
-        showInDialog: true,
+        default: false,
+        description: 'Enable model routing using new availability service.',
+        showInDialog: false,
+      },
+      jitContext: {
+        type: 'boolean',
+        label: 'JIT Context Loading',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable Just-In-Time (JIT) context loading.',
+        showInDialog: false,
       },
       codebaseInvestigatorSettings: {
         type: 'object',
@@ -1234,7 +1345,7 @@ const SETTINGS_SCHEMA = {
             label: 'Enable Codebase Investigator',
             category: 'Experimental',
             requiresRestart: true,
-            default: false,
+            default: true,
             description: 'Enable the Codebase Investigator agent.',
             showInDialog: true,
           },
@@ -1243,7 +1354,7 @@ const SETTINGS_SCHEMA = {
             label: 'Codebase Investigator Max Num Turns',
             category: 'Experimental',
             requiresRestart: true,
-            default: 15,
+            default: 10,
             description:
               'Maximum number of turns for the Codebase Investigator agent.',
             showInDialog: true,
@@ -1253,7 +1364,7 @@ const SETTINGS_SCHEMA = {
             label: 'Max Time (Minutes)',
             category: 'Experimental',
             requiresRestart: true,
-            default: 5,
+            default: 3,
             description:
               'Maximum time for the Codebase Investigator agent (in minutes).',
             showInDialog: false,
@@ -1323,11 +1434,165 @@ const SETTINGS_SCHEMA = {
     label: 'Hooks',
     category: 'Advanced',
     requiresRestart: false,
-    default: {} as { [K in HookEventName]?: HookDefinition[] },
+    default: {},
     description:
       'Hook configurations for intercepting and customizing agent behavior.',
     showInDialog: false,
-    mergeStrategy: MergeStrategy.SHALLOW_MERGE,
+    properties: {
+      disabled: {
+        type: 'array',
+        label: 'Disabled Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [] as string[],
+        description:
+          'List of hook names (commands) that should be disabled. Hooks in this list will not execute even if configured.',
+        showInDialog: false,
+        items: {
+          type: 'string',
+          description: 'Hook command name',
+        },
+        mergeStrategy: MergeStrategy.UNION,
+      },
+      BeforeTool: {
+        type: 'array',
+        label: 'Before Tool Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute before tool execution. Can intercept, validate, or modify tool calls.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      AfterTool: {
+        type: 'array',
+        label: 'After Tool Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute after tool execution. Can process results, log outputs, or trigger follow-up actions.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      BeforeAgent: {
+        type: 'array',
+        label: 'Before Agent Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute before agent loop starts. Can set up context or initialize resources.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      AfterAgent: {
+        type: 'array',
+        label: 'After Agent Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute after agent loop completes. Can perform cleanup or summarize results.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      Notification: {
+        type: 'array',
+        label: 'Notification Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute on notification events (errors, warnings, info). Can log or alert on specific conditions.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      SessionStart: {
+        type: 'array',
+        label: 'Session Start Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute when a session starts. Can initialize session-specific resources or state.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      SessionEnd: {
+        type: 'array',
+        label: 'Session End Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute when a session ends. Can perform cleanup or persist session data.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      PreCompress: {
+        type: 'array',
+        label: 'Pre-Compress Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute before chat history compression. Can back up or analyze conversation before compression.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      BeforeModel: {
+        type: 'array',
+        label: 'Before Model Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute before LLM requests. Can modify prompts, inject context, or control model parameters.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      AfterModel: {
+        type: 'array',
+        label: 'After Model Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute after LLM responses. Can process outputs, extract information, or log interactions.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      BeforeToolSelection: {
+        type: 'array',
+        label: 'Before Tool Selection Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute before tool selection. Can filter or prioritize available tools dynamically.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+    },
+    additionalProperties: {
+      type: 'array',
+      description:
+        'Custom hook event arrays that contain hook definitions for user-defined events',
+      mergeStrategy: MergeStrategy.CONCAT,
+    },
   },
 } as const satisfies SettingsSchema;
 
@@ -1598,6 +1863,46 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
   BooleanOrString: {
     description: 'Accepts either a boolean flag or a string command name.',
     anyOf: [{ type: 'boolean' }, { type: 'string' }],
+  },
+  HookDefinitionArray: {
+    type: 'array',
+    description: 'Array of hook definition objects for a specific event.',
+    items: {
+      type: 'object',
+      description:
+        'Hook definition specifying matcher pattern and hook configurations.',
+      properties: {
+        matcher: {
+          type: 'string',
+          description:
+            'Pattern to match against the event context (tool name, notification type, etc.). Supports exact match, regex (/pattern/), and wildcards (*).',
+        },
+        hooks: {
+          type: 'array',
+          description: 'Hooks to execute when the matcher matches.',
+          items: {
+            type: 'object',
+            description: 'Individual hook configuration.',
+            properties: {
+              type: {
+                type: 'string',
+                description:
+                  'Type of hook (currently only "command" supported).',
+              },
+              command: {
+                type: 'string',
+                description:
+                  'Shell command to execute. Receives JSON input via stdin and returns JSON output via stdout.',
+              },
+              timeout: {
+                type: 'number',
+                description: 'Timeout in milliseconds for hook execution.',
+              },
+            },
+          },
+        },
+      },
+    },
   },
 };
 

@@ -8,9 +8,9 @@ import { render } from '../../test-utils/render.js';
 import { cleanup } from 'ink-testing-library';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
+  GEMINI_MODEL_ALIAS_FLASH_LITE,
+  GEMINI_MODEL_ALIAS_FLASH,
+  GEMINI_MODEL_ALIAS_PRO,
   DEFAULT_GEMINI_MODEL_AUTO,
 } from '@google/gemini-cli-core';
 import { ModelDialog } from './ModelDialog.js';
@@ -43,6 +43,7 @@ const renderComponent = (
         // --- Functions used by ModelDialog ---
         getModel: vi.fn(() => DEFAULT_GEMINI_MODEL_AUTO),
         setModel: vi.fn(),
+        getPreviewFeatures: vi.fn(() => false),
 
         // --- Functions used by ClearcutLogger ---
         getUsageStatisticsEnabled: vi.fn(() => true),
@@ -50,8 +51,9 @@ const renderComponent = (
         getDebugMode: vi.fn(() => false),
         getContentGeneratorConfig: vi.fn(() => ({ authType: 'mock' })),
         getUseSmartEdit: vi.fn(() => false),
-        getUseModelRouter: vi.fn(() => false),
         getProxy: vi.fn(() => undefined),
+        isInteractive: vi.fn(() => false),
+        getExperiments: () => {},
 
         // --- Spread test-specific overrides ---
         ...contextValue,
@@ -85,7 +87,7 @@ describe('<ModelDialog />', () => {
     expect(lastFrame()).toContain('Select Model');
     expect(lastFrame()).toContain('(Press Esc to close)');
     expect(lastFrame()).toContain(
-      '> To use a specific Gemini model on startup, use the --model flag.',
+      'To use a specific Gemini model on startup, use the --model flag.',
     );
     unmount();
   });
@@ -97,15 +99,15 @@ describe('<ModelDialog />', () => {
     const props = mockedSelect.mock.calls[0][0];
     expect(props.items).toHaveLength(4);
     expect(props.items[0].value).toBe(DEFAULT_GEMINI_MODEL_AUTO);
-    expect(props.items[1].value).toBe(DEFAULT_GEMINI_MODEL);
-    expect(props.items[2].value).toBe(DEFAULT_GEMINI_FLASH_MODEL);
-    expect(props.items[3].value).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+    expect(props.items[1].value).toBe(GEMINI_MODEL_ALIAS_PRO);
+    expect(props.items[2].value).toBe(GEMINI_MODEL_ALIAS_FLASH);
+    expect(props.items[3].value).toBe(GEMINI_MODEL_ALIAS_FLASH_LITE);
     expect(props.showNumbers).toBe(true);
     unmount();
   });
 
   it('initializes with the model from ConfigContext', () => {
-    const mockGetModel = vi.fn(() => DEFAULT_GEMINI_FLASH_MODEL);
+    const mockGetModel = vi.fn(() => GEMINI_MODEL_ALIAS_FLASH);
     const { unmount } = renderComponent({}, { getModel: mockGetModel });
 
     expect(mockGetModel).toHaveBeenCalled();
@@ -156,10 +158,10 @@ describe('<ModelDialog />', () => {
     const childOnSelect = mockedSelect.mock.calls[0][0].onSelect;
     expect(childOnSelect).toBeDefined();
 
-    childOnSelect(DEFAULT_GEMINI_MODEL);
+    childOnSelect(GEMINI_MODEL_ALIAS_PRO);
 
     // Assert against the default mock provided by renderComponent
-    expect(mockConfig?.setModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+    expect(mockConfig?.setModel).toHaveBeenCalledWith(GEMINI_MODEL_ALIAS_PRO);
     expect(props.onClose).toHaveBeenCalledTimes(1);
     unmount();
   });
@@ -188,6 +190,7 @@ describe('<ModelDialog />', () => {
       meta: false,
       shift: false,
       paste: false,
+      insertable: false,
       sequence: '',
     });
     expect(props.onClose).toHaveBeenCalledTimes(1);
@@ -198,6 +201,7 @@ describe('<ModelDialog />', () => {
       meta: false,
       shift: false,
       paste: false,
+      insertable: true,
       sequence: '',
     });
     expect(props.onClose).toHaveBeenCalledTimes(1);
@@ -206,18 +210,23 @@ describe('<ModelDialog />', () => {
 
   it('updates initialIndex when config context changes', () => {
     const mockGetModel = vi.fn(() => DEFAULT_GEMINI_MODEL_AUTO);
+    const oldMockConfig = {
+      getModel: mockGetModel,
+      getPreviewFeatures: vi.fn(() => false),
+    } as unknown as Config;
     const { rerender, unmount } = render(
-      <ConfigContext.Provider
-        value={{ getModel: mockGetModel } as unknown as Config}
-      >
+      <ConfigContext.Provider value={oldMockConfig}>
         <ModelDialog onClose={vi.fn()} />
       </ConfigContext.Provider>,
     );
 
     expect(mockedSelect.mock.calls[0][0].initialIndex).toBe(0);
 
-    mockGetModel.mockReturnValue(DEFAULT_GEMINI_FLASH_LITE_MODEL);
-    const newMockConfig = { getModel: mockGetModel } as unknown as Config;
+    mockGetModel.mockReturnValue(GEMINI_MODEL_ALIAS_FLASH_LITE);
+    const newMockConfig = {
+      getModel: mockGetModel,
+      getPreviewFeatures: vi.fn(() => false),
+    } as unknown as Config;
 
     rerender(
       <ConfigContext.Provider value={newMockConfig}>

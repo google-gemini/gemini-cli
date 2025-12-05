@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ApiError } from '@google/genai';
 import { AuthType } from '../core/contentGenerator.js';
-import type { HttpError } from './retry.js';
+import { type HttpError, ModelNotFoundError } from './httpErrors.js';
 import { retryWithBackoff } from './retry.js';
 import { setSimulate429 } from './testUtils.js';
 import { debugLogger } from './debugLogger.js';
@@ -16,6 +16,7 @@ import {
   TerminalQuotaError,
   RetryableQuotaError,
 } from './googleQuotaErrors.js';
+import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
 
 // Helper to create a mock function that fails a certain number of times
 const createFailingFunction = (
@@ -306,11 +307,9 @@ describe('retryWithBackoff', () => {
   });
 
   describe('Fetch error retries', () => {
-    const fetchErrorMsg = 'exception TypeError: fetch failed sending request';
-
-    it('should retry on specific fetch error when retryFetchErrors is true', async () => {
+    it("should retry on 'fetch failed' when retryFetchErrors is true", async () => {
       const mockFn = vi.fn();
-      mockFn.mockRejectedValueOnce(new Error(fetchErrorMsg));
+      mockFn.mockRejectedValueOnce(new TypeError('fetch failed'));
       mockFn.mockResolvedValueOnce('success');
 
       const promise = retryWithBackoff(mockFn, {
@@ -325,19 +324,89 @@ describe('retryWithBackoff', () => {
       expect(mockFn).toHaveBeenCalledTimes(2);
     });
 
-    it.each([false, undefined])(
-      'should not retry on specific fetch error when retryFetchErrors is %s',
-      async (retryFetchErrors) => {
-        const mockFn = vi.fn().mockRejectedValue(new Error(fetchErrorMsg));
+    it('should retry on common network error codes (ECONNRESET)', async () => {
+      const mockFn = vi.fn();
+      const error = new Error('read ECONNRESET');
+      (error as any).code = 'ECONNRESET';
+      mockFn.mockRejectedValueOnce(error);
+      mockFn.mockResolvedValueOnce('success');
 
-        const promise = retryWithBackoff(mockFn, {
-          retryFetchErrors,
-        });
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: true,
+        initialDelayMs: 10,
+      });
 
-        await expect(promise).rejects.toThrow(fetchErrorMsg);
-        expect(mockFn).toHaveBeenCalledTimes(1);
-      },
-    );
+      await vi.runAllTimersAsync();
+
+      const result = await promise;
+      expect(result).toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on common network error codes in cause (ETIMEDOUT)', async () => {
+      const mockFn = vi.fn();
+      const cause = new Error('Connect Timeout');
+      (cause as any).code = 'ETIMEDOUT';
+      const error = new Error('fetch failed');
+      (error as any).cause = cause;
+
+      mockFn.mockRejectedValueOnce(error);
+      mockFn.mockResolvedValueOnce('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: true,
+        initialDelayMs: 10,
+      });
+
+      await vi.runAllTimersAsync();
+
+      const result = await promise;
+      expect(result).toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it("should retry on 'fetch failed' when retryFetchErrors is true (short delays)", async () => {
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(new TypeError('fetch failed'))
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: true,
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+    });
+
+    it("should not retry on 'fetch failed' when retryFetchErrors is false", async () => {
+      const mockFn = vi.fn().mockRejectedValue(new TypeError('fetch failed'));
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: false,
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await expect(promise).rejects.toThrow('fetch failed');
+      expect(mockFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should retry on network error code (ETIMEDOUT) even when retryFetchErrors is false', async () => {
+      const error = new Error('connect ETIMEDOUT');
+      (error as any).code = 'ETIMEDOUT';
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: false,
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+    });
   });
 
   describe('Flash model fallback for OAuth users', () => {
@@ -432,5 +501,69 @@ describe('retryWithBackoff', () => {
       expect.objectContaining({ name: 'AbortError' }),
     );
     expect(mockFn).toHaveBeenCalledTimes(1);
+  });
+  it('should trigger fallback for OAuth personal users on persistent 500 errors', async () => {
+    const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
+
+    let fallbackOccurred = false;
+    const mockFn = vi.fn().mockImplementation(async () => {
+      if (!fallbackOccurred) {
+        const error: HttpError = new Error('Internal Server Error');
+        error.status = 500;
+        throw error;
+      }
+      return 'success';
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      onPersistent429: async (authType?: string, error?: unknown) => {
+        fallbackOccurred = true;
+        return await fallbackCallback(authType, error);
+      },
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+    });
+
+    await vi.runAllTimersAsync();
+
+    await expect(promise).resolves.toBe('success');
+    expect(fallbackCallback).toHaveBeenCalledWith(
+      AuthType.LOGIN_WITH_GOOGLE,
+      expect.objectContaining({ status: 500 }),
+    );
+    // 3 attempts (initial + 2 retries) fail with 500, then fallback triggers, then 1 success
+    expect(mockFn).toHaveBeenCalledTimes(4);
+  });
+
+  it('should trigger fallback for OAuth personal users on ModelNotFoundError', async () => {
+    const fallbackCallback = vi.fn().mockResolvedValue(PREVIEW_GEMINI_MODEL);
+
+    let fallbackOccurred = false;
+    const mockFn = vi.fn().mockImplementation(async () => {
+      if (!fallbackOccurred) {
+        throw new ModelNotFoundError('Requested entity was not found.', 404);
+      }
+      return 'success';
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      onPersistent429: async (authType?: string, error?: unknown) => {
+        fallbackOccurred = true;
+        return await fallbackCallback(authType, error);
+      },
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+    });
+
+    await vi.runAllTimersAsync();
+
+    await expect(promise).resolves.toBe('success');
+    expect(fallbackCallback).toHaveBeenCalledWith(
+      AuthType.LOGIN_WITH_GOOGLE,
+      expect.any(ModelNotFoundError),
+    );
+    expect(mockFn).toHaveBeenCalledTimes(2);
   });
 });

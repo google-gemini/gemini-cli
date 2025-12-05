@@ -193,4 +193,46 @@ describe('McpClientManager', () => {
       );
     });
   });
+
+  describe('getMcpInstructions', () => {
+    it('should not return instructions for servers that do not have instructions', async () => {
+      vi.mocked(McpClient).mockImplementation(
+        (name, config) =>
+          ({
+            connect: vi.fn(),
+            discover: vi.fn(),
+            disconnect: vi.fn(),
+            getServerConfig: vi.fn().mockReturnValue(config),
+            getInstructions: vi
+              .fn()
+              .mockReturnValue(
+                name === 'server-with-instructions'
+                  ? `Instructions for ${name}`
+                  : '',
+              ),
+          }) as unknown as McpClient,
+      );
+
+      const manager = new McpClientManager({} as ToolRegistry, mockConfig);
+
+      mockConfig.getMcpServers.mockReturnValue({
+        'server-with-instructions': {},
+        'server-without-instructions': {},
+      });
+      await manager.startConfiguredMcpServers();
+
+      const instructions = manager.getMcpInstructions();
+
+      expect(instructions).toContain(
+        "# Instructions for MCP Server 'server-with-instructions'",
+      );
+      expect(instructions).toContain(
+        'Instructions for server-with-instructions',
+      );
+
+      expect(instructions).not.toContain(
+        "# Instructions for MCP Server 'server-without-instructions'",
+      );
+    });
+  });
 });

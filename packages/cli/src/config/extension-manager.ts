@@ -41,6 +41,8 @@ import {
   type MCPServerConfig,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
+  type HookDefinition,
+  type HookEventName,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -128,6 +130,15 @@ export class ExtensionManager extends ExtensionLoader {
     installMetadata: ExtensionInstallMetadata,
     previousExtensionConfig?: ExtensionConfig,
   ): Promise<GeminiCLIExtension> {
+    if (
+      (installMetadata.type === 'git' ||
+        installMetadata.type === 'github-release') &&
+      this.settings.security?.blockGitExtensions
+    ) {
+      throw new Error(
+        'Installing extensions from remote sources is disallowed by your current settings.',
+      );
+    }
     const isUpdate = !!previousExtensionConfig;
     let newExtensionConfig: ExtensionConfig | null = null;
     let localSourcePath: string | undefined;
@@ -244,10 +255,20 @@ export class ExtensionManager extends ExtensionLoader {
           );
         }
 
+        const newHasHooks = fs.existsSync(
+          path.join(localSourcePath, 'hooks', 'hooks.json'),
+        );
+        let previousHasHooks = false;
+        if (isUpdate && previous && previous.hooks) {
+          previousHasHooks = Object.keys(previous.hooks).length > 0;
+        }
+
         await maybeRequestConsentOrFail(
           newExtensionConfig,
           this.requestConsent,
+          newHasHooks,
           previousExtensionConfig,
+          previousHasHooks,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);
         const destinationPath = new ExtensionStorage(
@@ -303,7 +324,7 @@ export class ExtensionManager extends ExtensionLoader {
           throw new Error(`Extension not found`);
         }
         if (isUpdate) {
-          logExtensionUpdateEvent(
+          await logExtensionUpdateEvent(
             this.telemetryConfig,
             new ExtensionUpdateEvent(
               hashValue(newExtensionConfig.name),
@@ -315,7 +336,7 @@ export class ExtensionManager extends ExtensionLoader {
             ),
           );
         } else {
-          logExtensionInstallEvent(
+          await logExtensionInstallEvent(
             this.telemetryConfig,
             new ExtensionInstallEvent(
               hashValue(newExtensionConfig.name),
@@ -348,7 +369,7 @@ export class ExtensionManager extends ExtensionLoader {
         ? getExtensionId(config, installMetadata)
         : undefined;
       if (isUpdate) {
-        logExtensionUpdateEvent(
+        await logExtensionUpdateEvent(
           this.telemetryConfig,
           new ExtensionUpdateEvent(
             hashValue(config?.name ?? ''),
@@ -360,7 +381,7 @@ export class ExtensionManager extends ExtensionLoader {
           ),
         );
       } else {
-        logExtensionInstallEvent(
+        await logExtensionInstallEvent(
           this.telemetryConfig,
           new ExtensionInstallEvent(
             hashValue(newExtensionConfig?.name ?? ''),
@@ -390,7 +411,11 @@ export class ExtensionManager extends ExtensionLoader {
       throw new Error(`Extension not found.`);
     }
     await this.unloadExtension(extension);
-    const storage = new ExtensionStorage(extension.name);
+    const storage = new ExtensionStorage(
+      extension.installMetadata?.type === 'link'
+        ? extension.name
+        : path.basename(extension.path),
+    );
 
     await fs.promises.rm(storage.getExtensionDir(), {
       recursive: true,
@@ -403,7 +428,7 @@ export class ExtensionManager extends ExtensionLoader {
 
     this.extensionEnablementManager.remove(extension.name);
 
-    logExtensionUninstall(
+    await logExtensionUninstall(
       this.telemetryConfig,
       new ExtensionUninstallEvent(
         hashValue(extension.name),
@@ -445,6 +470,13 @@ export class ExtensionManager extends ExtensionLoader {
 
     const installMetadata = loadInstallMetadata(extensionDir);
     let effectiveExtensionPath = extensionDir;
+    if (
+      (installMetadata?.type === 'git' ||
+        installMetadata?.type === 'github-release') &&
+      this.settings.security?.blockGitExtensions
+    ) {
+      return null;
+    }
 
     if (installMetadata?.type === 'link') {
       effectiveExtensionPath = installMetadata.source;
@@ -481,6 +513,11 @@ export class ExtensionManager extends ExtensionLoader {
         )
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
+      const hooks = await this.loadExtensionHooks(effectiveExtensionPath, {
+        extensionPath: effectiveExtensionPath,
+        workspacePath: this.workspaceDir,
+      });
+
       const extension = {
         name: config.name,
         version: config.version,
@@ -489,6 +526,7 @@ export class ExtensionManager extends ExtensionLoader {
         installMetadata,
         mcpServers: config.mcpServers,
         excludeTools: config.excludeTools,
+        hooks,
         isActive: this.extensionEnablementManager.isEnabled(
           config.name,
           this.workspaceDir,
@@ -556,6 +594,53 @@ export class ExtensionManager extends ExtensionLoader {
     }
   }
 
+  private async loadExtensionHooks(
+    extensionDir: string,
+    context: { extensionPath: string; workspacePath: string },
+  ): Promise<{ [K in HookEventName]?: HookDefinition[] } | undefined> {
+    const hooksFilePath = path.join(extensionDir, 'hooks', 'hooks.json');
+
+    try {
+      const hooksContent = await fs.promises.readFile(hooksFilePath, 'utf-8');
+      const rawHooks = JSON.parse(hooksContent);
+
+      if (
+        !rawHooks ||
+        typeof rawHooks !== 'object' ||
+        typeof rawHooks.hooks !== 'object' ||
+        rawHooks.hooks === null ||
+        Array.isArray(rawHooks.hooks)
+      ) {
+        debugLogger.warn(
+          `Invalid hooks configuration in ${hooksFilePath}: "hooks" property must be an object`,
+        );
+        return undefined;
+      }
+
+      // Hydrate variables in the hooks configuration
+      const hydratedHooks = recursivelyHydrateStrings(
+        rawHooks.hooks as unknown as JsonObject,
+        {
+          ...context,
+          '/': path.sep,
+          pathSeparator: path.sep,
+        },
+      ) as { [K in HookEventName]?: HookDefinition[] };
+
+      return hydratedHooks;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
+        return undefined; // File not found is not an error here.
+      }
+      debugLogger.warn(
+        `Failed to load extension hooks from ${hooksFilePath}: ${getErrorMessage(
+          e,
+        )}`,
+      );
+      return undefined;
+    }
+  }
+
   toOutputString(extension: GeminiCLIExtension): string {
     const userEnabled = this.extensionEnablementManager.isEnabled(
       extension.name,
@@ -569,6 +654,8 @@ export class ExtensionManager extends ExtensionLoader {
     const status = workspaceEnabled ? chalk.green('✓') : chalk.red('✗');
     let output = `${status} ${extension.name} (${extension.version})`;
     output += `\n ID: ${extension.id}`;
+    output += `\n name: ${hashValue(extension.name)}`;
+
     output += `\n Path: ${extension.path}`;
     if (extension.installMetadata) {
       output += `\n Source: ${extension.installMetadata.source} (Type: ${extension.installMetadata.type})`;
@@ -616,15 +703,21 @@ export class ExtensionManager extends ExtensionLoader {
       throw new Error(`Extension with name ${name} does not exist.`);
     }
 
-    const scopePath =
-      scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
-    this.extensionEnablementManager.disable(name, true, scopePath);
-    extension.isActive = false;
-    await this.maybeStopExtension(extension);
-    logExtensionDisable(
+    if (scope !== SettingScope.Session) {
+      const scopePath =
+        scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
+      this.extensionEnablementManager.disable(name, true, scopePath);
+    }
+    await logExtensionDisable(
       this.telemetryConfig,
       new ExtensionDisableEvent(hashValue(name), extension.id, scope),
     );
+    if (!this.config || this.config.getEnableExtensionReloading()) {
+      // Only toggle the isActive state if we are actually going to disable it
+      // in the current session, or we haven't been initialized yet.
+      extension.isActive = false;
+    }
+    await this.maybeStopExtension(extension);
   }
 
   /**
@@ -644,14 +737,21 @@ export class ExtensionManager extends ExtensionLoader {
     if (!extension) {
       throw new Error(`Extension with name ${name} does not exist.`);
     }
-    const scopePath =
-      scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
-    this.extensionEnablementManager.enable(name, true, scopePath);
-    logExtensionEnable(
+
+    if (scope !== SettingScope.Session) {
+      const scopePath =
+        scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
+      this.extensionEnablementManager.enable(name, true, scopePath);
+    }
+    await logExtensionEnable(
       this.telemetryConfig,
       new ExtensionEnableEvent(hashValue(name), extension.id, scope),
     );
-    extension.isActive = true;
+    if (!this.config || this.config.getEnableExtensionReloading()) {
+      // Only toggle the isActive state if we are actually going to disable it
+      // in the current session, or we haven't been initialized yet.
+      extension.isActive = true;
+    }
     await this.maybeStartExtension(extension);
   }
 }
