@@ -79,7 +79,7 @@ export class RestoreCommand implements Command {
           data: {
             type: 'message',
             messageType: 'error',
-            content: `Checkpoint file is invalid: ${parseResult.error.message}`,
+            content: 'Checkpoint file is invalid or corrupted.',
           },
         };
       }
