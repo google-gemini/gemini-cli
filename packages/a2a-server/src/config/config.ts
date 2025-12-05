@@ -71,7 +71,7 @@ export async function loadConfig(
     ideMode: false,
     folderTrust: settings.folderTrust === true,
     extensionLoader,
-    previewFeatures: settings.previewFeatures,
+    previewFeatures: settings.general?.previewFeatures,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
