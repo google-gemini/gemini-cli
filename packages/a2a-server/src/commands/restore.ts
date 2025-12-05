@@ -147,7 +147,7 @@ export class ListCheckpointsCommand implements Command {
         data: {
           type: 'message',
           messageType: 'error',
-          content: `Could not read checkpoints. This is the error: ${error}`,
+          content: 'An unexpected error occurred while listing checkpoints.',
         },
       };
     }
