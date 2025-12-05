@@ -1,6 +1,6 @@
 # By default, require reviews from the maintainers for all files
 
-- @google-gemini/gemini-cli-maintainers
+* @google-gemini/gemini-cli-maintainers
 
 # Require reviews from the release approvers for critical files
 
