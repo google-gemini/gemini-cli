@@ -58,7 +58,9 @@ export interface HttpOptions {
   headers?: Record<string, string>;
 }
 
-export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
+// export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
+export const CODE_ASSIST_ENDPOINT =
+  'https://autopush-cloudcode-pa.sandbox.googleapis.com';
 export const CODE_ASSIST_API_VERSION = 'v1internal';
 
 export class CodeAssistServer implements ContentGenerator {
