@@ -69,9 +69,13 @@ const { mockRetryWithBackoff } = vi.hoisted(() => ({
   mockRetryWithBackoff: vi.fn(),
 }));
 
-vi.mock('../utils/retry.js', () => ({
-  retryWithBackoff: mockRetryWithBackoff,
-}));
+vi.mock('../utils/retry.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/retry.js')>();
+  return {
+    ...actual,
+    retryWithBackoff: mockRetryWithBackoff,
+  };
+});
 
 vi.mock('../fallback/handler.js', () => ({
   handleFallback: mockHandleFallback,
