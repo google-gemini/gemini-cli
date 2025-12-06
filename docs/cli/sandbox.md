@@ -73,9 +73,19 @@ gemini -p "run the test suite"
 ### Enable sandboxing (in order of precedence)
 
 1. **Command flag**: `-s` or `--sandbox`
-2. **Environment variable**: `GEMINI_SANDBOX=true|docker|podman|sandbox-exec`
+2. **Environment variable**:
+   `GEMINI_SANDBOX=true|docker|podman|sandbox-exec|...`
 3. **Settings file**: `"sandbox": true` in the `tools` object of your
    `settings.json` file (e.g., `{"tools": {"sandbox": true}}`).
+
+The `GEMINI_SANDBOX` environment variable can be set to either one of:
+
+- `true`: automaticlly detect `docker`, `podman`, or `sandbox-exec`
+- `docker`: Docker
+- `podman`: Podman
+- `sandbox-exec`: macOS Seatbelt
+- Other string: Docker-compatible CLI, such as `nerdctl`, `nerdctl.lima`, and
+  `finch`
 
 ### macOS Seatbelt profiles
 
