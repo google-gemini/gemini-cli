@@ -161,7 +161,7 @@ describe('handleAutoUpdate', () => {
     mockGetInstallationInfo.mockReturnValue({
       updateCommand: 'npm i -g @google/gemini-cli@latest',
       updateMessage: 'This is an additional message.',
-      isGlobal: false,
+      isGlobal: true,
       packageManager: PackageManager.NPM,
     });
 
@@ -172,7 +172,14 @@ describe('handleAutoUpdate', () => {
 
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
 
-    expect(mockSpawn).toHaveBeenCalledOnce();
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'npm uninstall -g @google/gemini-cli && npm i -g @google/gemini-cli@2.0.0',
+      {
+        shell: true,
+        stdio: 'ignore',
+        detached: true,
+      },
+    );
   });
 
   it('should emit "update-failed" when the update process fails', async () => {
@@ -180,7 +187,7 @@ describe('handleAutoUpdate', () => {
       mockGetInstallationInfo.mockReturnValue({
         updateCommand: 'npm i -g @google/gemini-cli@latest',
         updateMessage: 'This is an additional message.',
-        isGlobal: false,
+        isGlobal: true,
         packageManager: PackageManager.NPM,
       });
 
@@ -195,7 +202,7 @@ describe('handleAutoUpdate', () => {
 
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-failed', {
       message:
-        'Automatic update failed. Please try updating manually. (command: npm i -g @google/gemini-cli@2.0.0)',
+        'Automatic update failed. Please try updating manually. (command: npm uninstall -g @google/gemini-cli && npm i -g @google/gemini-cli@2.0.0)',
     });
   });
 
@@ -204,7 +211,7 @@ describe('handleAutoUpdate', () => {
       mockGetInstallationInfo.mockReturnValue({
         updateCommand: 'npm i -g @google/gemini-cli@latest',
         updateMessage: 'This is an additional message.',
-        isGlobal: false,
+        isGlobal: true,
         packageManager: PackageManager.NPM,
       });
 
@@ -234,14 +241,14 @@ describe('handleAutoUpdate', () => {
     mockGetInstallationInfo.mockReturnValue({
       updateCommand: 'npm i -g @google/gemini-cli@latest',
       updateMessage: 'This is an additional message.',
-      isGlobal: false,
+      isGlobal: true,
       packageManager: PackageManager.NPM,
     });
 
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
 
     expect(mockSpawn).toHaveBeenCalledWith(
-      'npm i -g @google/gemini-cli@nightly',
+      'npm uninstall -g @google/gemini-cli && npm i -g @google/gemini-cli@nightly',
       {
         shell: true,
         stdio: 'ignore',
@@ -255,7 +262,7 @@ describe('handleAutoUpdate', () => {
       mockGetInstallationInfo.mockReturnValue({
         updateCommand: 'npm i -g @google/gemini-cli@latest',
         updateMessage: 'This is an additional message.',
-        isGlobal: false,
+        isGlobal: true,
         packageManager: PackageManager.NPM,
       });
 
