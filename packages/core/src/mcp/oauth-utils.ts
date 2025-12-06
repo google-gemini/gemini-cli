@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MCPOAuthConfig } from './oauth-provider.js';
+import type { MCPOAuthConfig } from './oauth-provider.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * OAuth authorization server metadata as per RFC 8414.
@@ -37,24 +38,44 @@ export interface OAuthProtectedResourceMetadata {
   resource_encryption_enc_values_supported?: string[];
 }
 
+export const FIVE_MIN_BUFFER_MS = 5 * 60 * 1000;
+
 /**
  * Utility class for common OAuth operations.
  */
 export class OAuthUtils {
   /**
    * Construct well-known OAuth endpoint URLs.
+   * By default, uses standard root-based well-known URLs.
+   * If includePathSuffix is true, appends any path from the base URL to the well-known endpoints.
    */
-  static buildWellKnownUrls(baseUrl: string) {
+  static buildWellKnownUrls(baseUrl: string, includePathSuffix = false) {
     const serverUrl = new URL(baseUrl);
     const base = `${serverUrl.protocol}//${serverUrl.host}`;
 
+    if (!includePathSuffix) {
+      // Standard discovery: use root-based well-known URLs
+      return {
+        protectedResource: new URL(
+          '/.well-known/oauth-protected-resource',
+          base,
+        ).toString(),
+        authorizationServer: new URL(
+          '/.well-known/oauth-authorization-server',
+          base,
+        ).toString(),
+      };
+    }
+
+    // Path-based discovery: append path suffix to well-known URLs
+    const pathSuffix = serverUrl.pathname.replace(/\/$/, ''); // Remove trailing slash
     return {
       protectedResource: new URL(
-        '/.well-known/oauth-protected-resource',
+        `/.well-known/oauth-protected-resource${pathSuffix}`,
         base,
       ).toString(),
       authorizationServer: new URL(
-        '/.well-known/oauth-authorization-server',
+        `/.well-known/oauth-authorization-server${pathSuffix}`,
         base,
       ).toString(),
     };
@@ -76,7 +97,7 @@ export class OAuthUtils {
       }
       return (await response.json()) as OAuthProtectedResourceMetadata;
     } catch (error) {
-      console.debug(
+      debugLogger.debug(
         `Failed to fetch protected resource metadata from ${resourceMetadataUrl}: ${getErrorMessage(error)}`,
       );
       return null;
@@ -99,7 +120,7 @@ export class OAuthUtils {
       }
       return (await response.json()) as OAuthAuthorizationServerMetadata;
     } catch (error) {
-      console.debug(
+      debugLogger.debug(
         `Failed to fetch authorization server metadata from ${authServerMetadataUrl}: ${getErrorMessage(error)}`,
       );
       return null;
@@ -119,7 +140,78 @@ export class OAuthUtils {
       authorizationUrl: metadata.authorization_endpoint,
       tokenUrl: metadata.token_endpoint,
       scopes: metadata.scopes_supported || [],
+      registrationUrl: metadata.registration_endpoint,
     };
+  }
+
+  /**
+   * Discover Oauth Authorization server metadata given an Auth server URL, by
+   * trying the standard well-known endpoints.
+   *
+   * @param authServerUrl The authorization server URL
+   * @returns The authorization server metadata or null if not found
+   */
+  static async discoverAuthorizationServerMetadata(
+    authServerUrl: string,
+  ): Promise<OAuthAuthorizationServerMetadata | null> {
+    const authServerUrlObj = new URL(authServerUrl);
+    const base = `${authServerUrlObj.protocol}//${authServerUrlObj.host}`;
+
+    const endpointsToTry: string[] = [];
+
+    // With issuer URLs with path components, try the following well-known
+    // endpoints in order:
+    if (authServerUrlObj.pathname !== '/') {
+      // 1. OAuth 2.0 Authorization Server Metadata with path insertion
+      endpointsToTry.push(
+        new URL(
+          `/.well-known/oauth-authorization-server${authServerUrlObj.pathname}`,
+          base,
+        ).toString(),
+      );
+
+      // 2. OpenID Connect Discovery 1.0 with path insertion
+      endpointsToTry.push(
+        new URL(
+          `/.well-known/openid-configuration${authServerUrlObj.pathname}`,
+          base,
+        ).toString(),
+      );
+
+      // 3. OpenID Connect Discovery 1.0 with path appending
+      endpointsToTry.push(
+        new URL(
+          `${authServerUrlObj.pathname}/.well-known/openid-configuration`,
+          base,
+        ).toString(),
+      );
+    }
+
+    // With issuer URLs without path components, and those that failed previous
+    // discoveries, try the following well-known endpoints in order:
+
+    // 1. OAuth 2.0 Authorization Server Metadata
+    endpointsToTry.push(
+      new URL('/.well-known/oauth-authorization-server', base).toString(),
+    );
+
+    // 2. OpenID Connect Discovery 1.0
+    endpointsToTry.push(
+      new URL('/.well-known/openid-configuration', base).toString(),
+    );
+
+    for (const endpoint of endpointsToTry) {
+      const authServerMetadata =
+        await this.fetchAuthorizationServerMetadata(endpoint);
+      if (authServerMetadata) {
+        return authServerMetadata;
+      }
+    }
+
+    debugLogger.debug(
+      `Metadata discovery failed for authorization server ${authServerUrl}`,
+    );
+    return null;
   }
 
   /**
@@ -132,29 +224,35 @@ export class OAuthUtils {
     serverUrl: string,
   ): Promise<MCPOAuthConfig | null> {
     try {
-      const wellKnownUrls = this.buildWellKnownUrls(serverUrl);
+      // First try standard root-based discovery
+      const wellKnownUrls = this.buildWellKnownUrls(serverUrl, false);
 
-      // First, try to get the protected resource metadata
-      const resourceMetadata = await this.fetchProtectedResourceMetadata(
+      // Try to get the protected resource metadata at root
+      let resourceMetadata = await this.fetchProtectedResourceMetadata(
         wellKnownUrls.protectedResource,
       );
+
+      // If root discovery fails and we have a path, try path-based discovery
+      if (!resourceMetadata) {
+        const url = new URL(serverUrl);
+        if (url.pathname && url.pathname !== '/') {
+          const pathBasedUrls = this.buildWellKnownUrls(serverUrl, true);
+          resourceMetadata = await this.fetchProtectedResourceMetadata(
+            pathBasedUrls.protectedResource,
+          );
+        }
+      }
 
       if (resourceMetadata?.authorization_servers?.length) {
         // Use the first authorization server
         const authServerUrl = resourceMetadata.authorization_servers[0];
-        const authServerMetadataUrl = new URL(
-          '/.well-known/oauth-authorization-server',
-          authServerUrl,
-        ).toString();
-
-        const authServerMetadata = await this.fetchAuthorizationServerMetadata(
-          authServerMetadataUrl,
-        );
+        const authServerMetadata =
+          await this.discoverAuthorizationServerMetadata(authServerUrl);
 
         if (authServerMetadata) {
           const config = this.metadataToOAuthConfig(authServerMetadata);
           if (authServerMetadata.registration_endpoint) {
-            console.log(
+            debugLogger.log(
               'Dynamic client registration is supported at:',
               authServerMetadata.registration_endpoint,
             );
@@ -163,18 +261,15 @@ export class OAuthUtils {
         }
       }
 
-      // Fallback: try /.well-known/oauth-authorization-server at the base URL
-      console.debug(
-        `Trying OAuth discovery fallback at ${wellKnownUrls.authorizationServer}`,
-      );
-      const authServerMetadata = await this.fetchAuthorizationServerMetadata(
-        wellKnownUrls.authorizationServer,
-      );
+      // Fallback: try well-known endpoints at the base URL
+      debugLogger.debug(`Trying OAuth discovery fallback at ${serverUrl}`);
+      const authServerMetadata =
+        await this.discoverAuthorizationServerMetadata(serverUrl);
 
       if (authServerMetadata) {
         const config = this.metadataToOAuthConfig(authServerMetadata);
         if (authServerMetadata.registration_endpoint) {
-          console.log(
+          debugLogger.log(
             'Dynamic client registration is supported at:',
             authServerMetadata.registration_endpoint,
           );
@@ -184,7 +279,7 @@ export class OAuthUtils {
 
       return null;
     } catch (error) {
-      console.debug(
+      debugLogger.debug(
         `Failed to discover OAuth configuration: ${getErrorMessage(error)}`,
       );
       return null;
@@ -221,10 +316,6 @@ export class OAuthUtils {
       return null;
     }
 
-    console.log(
-      `Found resource metadata URI from www-authenticate header: ${resourceMetadataUri}`,
-    );
-
     const resourceMetadata =
       await this.fetchProtectedResourceMetadata(resourceMetadataUri);
     if (!resourceMetadata?.authorization_servers?.length) {
@@ -232,19 +323,10 @@ export class OAuthUtils {
     }
 
     const authServerUrl = resourceMetadata.authorization_servers[0];
-    const authServerMetadataUrl = new URL(
-      '/.well-known/oauth-authorization-server',
-      authServerUrl,
-    ).toString();
-
-    const authServerMetadata = await this.fetchAuthorizationServerMetadata(
-      authServerMetadataUrl,
-    );
+    const authServerMetadata =
+      await this.discoverAuthorizationServerMetadata(authServerUrl);
 
     if (authServerMetadata) {
-      console.log(
-        'OAuth configuration discovered successfully from www-authenticate header',
-      );
       return this.metadataToOAuthConfig(authServerMetadata);
     }
 
@@ -280,6 +362,28 @@ export class OAuthUtils {
    */
   static buildResourceParameter(endpointUrl: string): string {
     const url = new URL(endpointUrl);
-    return `${url.protocol}//${url.host}`;
+    return `${url.protocol}//${url.host}${url.pathname}`;
+  }
+
+  /**
+   * Parses a JWT string to extract its expiry time.
+   * @param idToken The JWT ID token.
+   * @returns The expiry time in **milliseconds**, or undefined if parsing fails.
+   */
+  static parseTokenExpiry(idToken: string): number | undefined {
+    try {
+      const payload = JSON.parse(
+        Buffer.from(idToken.split('.')[1], 'base64').toString(),
+      );
+
+      if (payload && typeof payload.exp === 'number') {
+        return payload.exp * 1000; // Convert seconds to milliseconds
+      }
+    } catch (e) {
+      console.error('Failed to parse ID token for expiry time with error:', e);
+    }
+
+    // Return undefined if try block fails or 'exp' is missing/invalid
+    return undefined;
   }
 }

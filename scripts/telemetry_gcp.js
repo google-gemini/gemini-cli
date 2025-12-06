@@ -6,9 +6,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'path';
-import fs from 'fs';
-import { spawn, execSync } from 'child_process';
+import path from 'node:path';
+import * as fs from 'node:fs';
+import { spawn, execSync } from 'node:child_process';
 import {
   OTEL_DIR,
   BIN_DIR,
@@ -132,11 +132,13 @@ async function main() {
   fs.writeFileSync(OTEL_CONFIG_FILE, getOtelConfigContent(projectId));
   console.log(`📄 Wrote OTEL collector config to ${OTEL_CONFIG_FILE}`);
 
+  const spawnEnv = { ...process.env };
+
   console.log(`🚀 Starting OTEL collector for GCP... Logs: ${OTEL_LOG_FILE}`);
   collectorLogFd = fs.openSync(OTEL_LOG_FILE, 'a');
   collectorProcess = spawn(otelcolPath, ['--config', OTEL_CONFIG_FILE], {
     stdio: ['ignore', collectorLogFd, collectorLogFd],
-    env: { ...process.env },
+    env: spawnEnv,
   });
 
   console.log(

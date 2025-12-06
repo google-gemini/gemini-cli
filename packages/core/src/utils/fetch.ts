@@ -5,7 +5,8 @@
  */
 
 import { getErrorMessage, isNodeError } from './errors.js';
-import { URL } from 'url';
+import { URL } from 'node:url';
+import { ProxyAgent, setGlobalDispatcher } from 'undici';
 
 const PRIVATE_IP_RANGES = [
   /^10\./,
@@ -21,8 +22,9 @@ export class FetchError extends Error {
   constructor(
     message: string,
     public code?: string,
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
     this.name = 'FetchError';
   }
 }
@@ -50,8 +52,12 @@ export async function fetchWithTimeout(
     if (isNodeError(error) && error.code === 'ABORT_ERR') {
       throw new FetchError(`Request timed out after ${timeout}ms`, 'ETIMEDOUT');
     }
-    throw new FetchError(getErrorMessage(error));
+    throw new FetchError(getErrorMessage(error), undefined, { cause: error });
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+export function setGlobalProxy(proxy: string) {
+  setGlobalDispatcher(new ProxyAgent(proxy));
 }

@@ -4,17 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { debugLogger } from '@google/gemini-cli-core';
 import { copyToClipboard } from '../utils/commandUtils.js';
-import {
-  CommandKind,
-  SlashCommand,
-  SlashCommandActionReturn,
-} from './types.js';
+import type { SlashCommand, SlashCommandActionReturn } from './types.js';
+import { CommandKind } from './types.js';
 
 export const copyCommand: SlashCommand = {
   name: 'copy',
   description: 'Copy the last result or code snippet to clipboard',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async (context, _args): Promise<SlashCommandActionReturn | void> => {
     const chat = await context.services.config?.getGeminiClient()?.getChat();
     const history = chat?.getHistory();
@@ -48,12 +47,12 @@ export const copyCommand: SlashCommand = {
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.debug(message);
+        debugLogger.debug(message);
 
         return {
           type: 'message',
           messageType: 'error',
-          content: 'Failed to copy to the clipboard.',
+          content: `Failed to copy to the clipboard. ${message}`,
         };
       }
     } else {

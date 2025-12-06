@@ -4,29 +4,84 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
-import { spawn } from 'child_process';
-import { EventEmitter } from 'events';
+import type { Mock } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { EventEmitter } from 'node:events';
+import clipboardy from 'clipboardy';
 import {
   isAtCommand,
   isSlashCommand,
   copyToClipboard,
+  getUrlOpenCommand,
 } from './commandUtils.js';
+
+// Constants used by OSC-52 tests
+const ESC = '\u001B';
+const BEL = '\u0007';
+const ST = '\u001B\\';
+
+// Mock clipboardy
+vi.mock('clipboardy', () => ({
+  default: {
+    write: vi.fn(),
+  },
+}));
 
 // Mock child_process
 vi.mock('child_process');
+
+// fs (for /dev/tty)
+const mockFs = vi.hoisted(() => ({
+  createWriteStream: vi.fn(),
+}));
+vi.mock('node:fs', () => ({
+  default: mockFs,
+}));
 
 // Mock process.platform for platform-specific tests
 const mockProcess = vi.hoisted(() => ({
   platform: 'darwin',
 }));
 
-vi.stubGlobal('process', {
-  ...process,
-  get platform() {
-    return mockProcess.platform;
-  },
-});
+vi.stubGlobal(
+  'process',
+  Object.create(process, {
+    platform: {
+      get: () => mockProcess.platform,
+      configurable: true, // Allows the property to be changed later if needed
+    },
+  }),
+);
+
+const makeWritable = (opts?: { isTTY?: boolean; writeReturn?: boolean }) => {
+  const { isTTY = false, writeReturn = true } = opts ?? {};
+  const stream = Object.assign(new EventEmitter(), {
+    write: vi.fn().mockReturnValue(writeReturn),
+    end: vi.fn(),
+    destroy: vi.fn(),
+    isTTY,
+    once: EventEmitter.prototype.once,
+    on: EventEmitter.prototype.on,
+    off: EventEmitter.prototype.off,
+  }) as unknown as EventEmitter & {
+    write: Mock;
+    end: Mock;
+    isTTY?: boolean;
+  };
+  return stream;
+};
+
+const resetEnv = () => {
+  delete process.env['TMUX'];
+  delete process.env['STY'];
+  delete process.env['SSH_TTY'];
+  delete process.env['SSH_CONNECTION'];
+  delete process.env['SSH_CLIENT'];
+  delete process.env['WSL_DISTRO_NAME'];
+  delete process.env['WSLENV'];
+  delete process.env['WSL_INTEROP'];
+  delete process.env['TERM'];
+};
 
 interface MockChildProcess extends EventEmitter {
   stdin: EventEmitter & {
@@ -39,11 +94,12 @@ interface MockChildProcess extends EventEmitter {
 describe('commandUtils', () => {
   let mockSpawn: Mock;
   let mockChild: MockChildProcess;
+  let mockClipboardyWrite: Mock;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     // Dynamically import and set up spawn mock
-    const { spawn } = await import('child_process');
+    const { spawn } = await import('node:child_process');
     mockSpawn = spawn as Mock;
 
     // Create mock child process with stdout/stderr emitters
@@ -51,11 +107,37 @@ describe('commandUtils', () => {
       stdin: Object.assign(new EventEmitter(), {
         write: vi.fn(),
         end: vi.fn(),
+        destroy: vi.fn(),
       }),
-      stderr: new EventEmitter(),
+      stdout: Object.assign(new EventEmitter(), {
+        destroy: vi.fn(),
+      }),
+      stderr: Object.assign(new EventEmitter(), {
+        destroy: vi.fn(),
+      }),
     }) as MockChildProcess;
 
     mockSpawn.mockReturnValue(mockChild as unknown as ReturnType<typeof spawn>);
+
+    // Setup clipboardy mock
+    mockClipboardyWrite = clipboardy.write as Mock;
+
+    // default: no /dev/tty available
+    mockFs.createWriteStream.mockImplementation(() => {
+      throw new Error('ENOENT');
+    });
+
+    // default: stdio are not TTY for tests unless explicitly set
+    Object.defineProperty(process, 'stderr', {
+      value: makeWritable({ isTTY: false }),
+      configurable: true,
+    });
+    Object.defineProperty(process, 'stdout', {
+      value: makeWritable({ isTTY: false }),
+      configurable: true,
+    });
+
+    resetEnv();
   });
 
   describe('isAtCommand', () => {
@@ -100,61 +182,187 @@ describe('commandUtils', () => {
       expect(isSlashCommand('path/to/file')).toBe(false);
       expect(isSlashCommand(' /help')).toBe(false);
     });
+
+    it('should return false for line comments starting with //', () => {
+      expect(isSlashCommand('// This is a comment')).toBe(false);
+      expect(isSlashCommand('// check if variants base info all filled.')).toBe(
+        false,
+      );
+      expect(isSlashCommand('//comment without space')).toBe(false);
+    });
+
+    it('should return false for block comments starting with /*', () => {
+      expect(isSlashCommand('/* This is a block comment */')).toBe(false);
+      expect(isSlashCommand('/*\n * Multi-line comment\n */')).toBe(false);
+      expect(isSlashCommand('/*comment without space*/')).toBe(false);
+    });
   });
 
   describe('copyToClipboard', () => {
+    it('uses clipboardy when not in SSH/tmux/screen/WSL (even if TTYs exist)', async () => {
+      const testText = 'Hello, world!';
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      // even if stderr/stdout are TTY, without the env signals we fallback
+      Object.defineProperty(process, 'stderr', {
+        value: makeWritable({ isTTY: true }),
+        configurable: true,
+      });
+      Object.defineProperty(process, 'stdout', {
+        value: makeWritable({ isTTY: true }),
+        configurable: true,
+      });
+
+      await copyToClipboard(testText);
+
+      expect(mockClipboardyWrite).toHaveBeenCalledWith(testText);
+    });
+
+    it('writes OSC-52 to /dev/tty when in SSH', async () => {
+      const testText = 'abc';
+      const tty = makeWritable({ isTTY: true });
+      mockFs.createWriteStream.mockReturnValue(tty);
+
+      process.env['SSH_CONNECTION'] = '1';
+
+      await copyToClipboard(testText);
+
+      const b64 = Buffer.from(testText, 'utf8').toString('base64');
+      const expected = `${ESC}]52;c;${b64}${BEL}`;
+
+      expect(tty.write).toHaveBeenCalledTimes(1);
+      expect((tty.write as Mock).mock.calls[0][0]).toBe(expected);
+      expect(tty.end).toHaveBeenCalledTimes(1); // /dev/tty closed after write
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('wraps OSC-52 for tmux', async () => {
+      const testText = 'tmux-copy';
+      const tty = makeWritable({ isTTY: true });
+      mockFs.createWriteStream.mockReturnValue(tty);
+
+      process.env['TMUX'] = '1';
+
+      await copyToClipboard(testText);
+
+      const written = (tty.write as Mock).mock.calls[0][0] as string;
+      // Starts with tmux DCS wrapper and ends with ST
+      expect(written.startsWith(`${ESC}Ptmux;`)).toBe(true);
+      expect(written.endsWith(ST)).toBe(true);
+      // ESC bytes in payload are doubled
+      expect(written).toContain(`${ESC}${ESC}]52;c;`);
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('wraps OSC-52 for GNU screen with chunked DCS', async () => {
+      // ensure payload > chunk size (240) so there are multiple chunks
+      const testText = 'x'.repeat(1200);
+      const tty = makeWritable({ isTTY: true });
+      mockFs.createWriteStream.mockReturnValue(tty);
+
+      process.env['STY'] = 'screen-session';
+
+      await copyToClipboard(testText);
+
+      const written = (tty.write as Mock).mock.calls[0][0] as string;
+      const chunkStarts = (written.match(new RegExp(`${ESC}P`, 'g')) || [])
+        .length;
+      const chunkEnds = written.split(ST).length - 1;
+
+      expect(chunkStarts).toBeGreaterThan(1);
+      expect(chunkStarts).toBe(chunkEnds);
+      expect(written).toContain(']52;c;'); // contains base OSC-52 marker
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('falls back to stderr when /dev/tty unavailable and stderr is a TTY', async () => {
+      const testText = 'stderr-tty';
+      const stderrStream = makeWritable({ isTTY: true });
+      Object.defineProperty(process, 'stderr', {
+        value: stderrStream,
+        configurable: true,
+      });
+
+      process.env['SSH_TTY'] = '/dev/pts/1';
+
+      await copyToClipboard(testText);
+
+      const b64 = Buffer.from(testText, 'utf8').toString('base64');
+      const expected = `${ESC}]52;c;${b64}${BEL}`;
+
+      expect(stderrStream.write).toHaveBeenCalledWith(expected);
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('falls back to clipboardy when no TTY is available', async () => {
+      const testText = 'no-tty';
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      // /dev/tty throws; stderr/stdout are non-TTY by default
+      process.env['SSH_CLIENT'] = 'client';
+
+      await copyToClipboard(testText);
+
+      expect(mockClipboardyWrite).toHaveBeenCalledWith(testText);
+    });
+
+    it('resolves on drain when backpressure occurs', async () => {
+      const tty = makeWritable({ isTTY: true, writeReturn: false });
+      mockFs.createWriteStream.mockReturnValue(tty);
+      process.env['SSH_CONNECTION'] = '1';
+
+      const p = copyToClipboard('drain-test');
+      setTimeout(() => {
+        tty.emit('drain');
+      }, 0);
+      await expect(p).resolves.toBeUndefined();
+    });
+
+    it('propagates errors from OSC-52 write path', async () => {
+      const tty = makeWritable({ isTTY: true, writeReturn: false });
+      mockFs.createWriteStream.mockReturnValue(tty);
+      process.env['SSH_CONNECTION'] = '1';
+
+      const p = copyToClipboard('err-test');
+      setTimeout(() => {
+        tty.emit('error', new Error('tty error'));
+      }, 0);
+
+      await expect(p).rejects.toThrow('tty error');
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('does nothing for empty string', async () => {
+      await copyToClipboard('');
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+      // ensure no accidental writes to stdio either
+      const stderrStream = process.stderr as unknown as { write: Mock };
+      const stdoutStream = process.stdout as unknown as { write: Mock };
+      expect(stderrStream.write).not.toHaveBeenCalled();
+      expect(stdoutStream.write).not.toHaveBeenCalled();
+    });
+
+    it('uses clipboardy when not in eligible env even if /dev/tty exists', async () => {
+      const tty = makeWritable({ isTTY: true });
+      mockFs.createWriteStream.mockReturnValue(tty);
+      const text = 'local-terminal';
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      await copyToClipboard(text);
+
+      expect(mockClipboardyWrite).toHaveBeenCalledWith(text);
+      expect(tty.write).not.toHaveBeenCalled();
+      expect(tty.end).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getUrlOpenCommand', () => {
     describe('on macOS (darwin)', () => {
       beforeEach(() => {
         mockProcess.platform = 'darwin';
       });
-
-      it('should successfully copy text to clipboard using pbcopy', async () => {
-        const testText = 'Hello, world!';
-
-        // Simulate successful execution
-        setTimeout(() => {
-          mockChild.emit('close', 0);
-        }, 0);
-
-        await copyToClipboard(testText);
-
-        expect(mockSpawn).toHaveBeenCalledWith('pbcopy', []);
-        expect(mockChild.stdin.write).toHaveBeenCalledWith(testText);
-        expect(mockChild.stdin.end).toHaveBeenCalled();
-      });
-
-      it('should handle pbcopy command failure', async () => {
-        const testText = 'Hello, world!';
-
-        // Simulate command failure
-        setTimeout(() => {
-          mockChild.stderr.emit('data', 'Command not found');
-          mockChild.emit('close', 1);
-        }, 0);
-
-        await expect(copyToClipboard(testText)).rejects.toThrow(
-          "'pbcopy' exited with code 1: Command not found",
-        );
-      });
-
-      it('should handle spawn error', async () => {
-        const testText = 'Hello, world!';
-
-        setTimeout(() => {
-          mockChild.emit('error', new Error('spawn error'));
-        }, 0);
-
-        await expect(copyToClipboard(testText)).rejects.toThrow('spawn error');
-      });
-
-      it('should handle stdin write error', async () => {
-        const testText = 'Hello, world!';
-
-        setTimeout(() => {
-          mockChild.stdin.emit('error', new Error('stdin error'));
-        }, 0);
-
-        await expect(copyToClipboard(testText)).rejects.toThrow('stdin error');
+      it('should return open', () => {
+        expect(getUrlOpenCommand()).toBe('open');
       });
     });
 
@@ -162,183 +370,26 @@ describe('commandUtils', () => {
       beforeEach(() => {
         mockProcess.platform = 'win32';
       });
-
-      it('should successfully copy text to clipboard using clip', async () => {
-        const testText = 'Hello, world!';
-
-        setTimeout(() => {
-          mockChild.emit('close', 0);
-        }, 0);
-
-        await copyToClipboard(testText);
-
-        expect(mockSpawn).toHaveBeenCalledWith('clip', []);
-        expect(mockChild.stdin.write).toHaveBeenCalledWith(testText);
-        expect(mockChild.stdin.end).toHaveBeenCalled();
+      it('should return start', () => {
+        expect(getUrlOpenCommand()).toBe('start');
       });
     });
 
-    describe('on Linux', () => {
+    describe('on Linux (linux)', () => {
       beforeEach(() => {
         mockProcess.platform = 'linux';
       });
-
-      it('should successfully copy text to clipboard using xclip', async () => {
-        const testText = 'Hello, world!';
-
-        setTimeout(() => {
-          mockChild.emit('close', 0);
-        }, 0);
-
-        await copyToClipboard(testText);
-
-        expect(mockSpawn).toHaveBeenCalledWith('xclip', [
-          '-selection',
-          'clipboard',
-        ]);
-        expect(mockChild.stdin.write).toHaveBeenCalledWith(testText);
-        expect(mockChild.stdin.end).toHaveBeenCalled();
-      });
-
-      it('should fall back to xsel when xclip fails', async () => {
-        const testText = 'Hello, world!';
-        let callCount = 0;
-
-        mockSpawn.mockImplementation(() => {
-          const child = Object.assign(new EventEmitter(), {
-            stdin: Object.assign(new EventEmitter(), {
-              write: vi.fn(),
-              end: vi.fn(),
-            }),
-            stderr: new EventEmitter(),
-          }) as MockChildProcess;
-
-          setTimeout(() => {
-            if (callCount === 0) {
-              // First call (xclip) fails
-              child.stderr.emit('data', 'xclip not found');
-              child.emit('close', 1);
-              callCount++;
-            } else {
-              // Second call (xsel) succeeds
-              child.emit('close', 0);
-            }
-          }, 0);
-
-          return child as unknown as ReturnType<typeof spawn>;
-        });
-
-        await copyToClipboard(testText);
-
-        expect(mockSpawn).toHaveBeenCalledTimes(2);
-        expect(mockSpawn).toHaveBeenNthCalledWith(1, 'xclip', [
-          '-selection',
-          'clipboard',
-        ]);
-        expect(mockSpawn).toHaveBeenNthCalledWith(2, 'xsel', [
-          '--clipboard',
-          '--input',
-        ]);
-      });
-
-      it('should throw error when both xclip and xsel fail', async () => {
-        const testText = 'Hello, world!';
-        let callCount = 0;
-
-        mockSpawn.mockImplementation(() => {
-          const child = Object.assign(new EventEmitter(), {
-            stdin: Object.assign(new EventEmitter(), {
-              write: vi.fn(),
-              end: vi.fn(),
-            }),
-            stderr: new EventEmitter(),
-          });
-
-          setTimeout(() => {
-            if (callCount === 0) {
-              // First call (xclip) fails
-              child.stderr.emit('data', 'xclip command not found');
-              child.emit('close', 1);
-              callCount++;
-            } else {
-              // Second call (xsel) fails
-              child.stderr.emit('data', 'xsel command not found');
-              child.emit('close', 1);
-            }
-          }, 0);
-
-          return child as unknown as ReturnType<typeof spawn>;
-        });
-
-        await expect(copyToClipboard(testText)).rejects.toThrow(
-          /All copy commands failed/,
-        );
-
-        expect(mockSpawn).toHaveBeenCalledTimes(2);
+      it('should return xdg-open', () => {
+        expect(getUrlOpenCommand()).toBe('xdg-open');
       });
     });
 
-    describe('on unsupported platform', () => {
+    describe('on unmatched OS', () => {
       beforeEach(() => {
-        mockProcess.platform = 'unsupported';
+        mockProcess.platform = 'unmatched';
       });
-
-      it('should throw error for unsupported platform', async () => {
-        await expect(copyToClipboard('test')).rejects.toThrow(
-          'Unsupported platform: unsupported',
-        );
-      });
-    });
-
-    describe('error handling', () => {
-      beforeEach(() => {
-        mockProcess.platform = 'darwin';
-      });
-
-      it('should handle command exit without stderr', async () => {
-        const testText = 'Hello, world!';
-
-        setTimeout(() => {
-          mockChild.emit('close', 1);
-        }, 0);
-
-        await expect(copyToClipboard(testText)).rejects.toThrow(
-          "'pbcopy' exited with code 1",
-        );
-      });
-
-      it('should handle empty text', async () => {
-        setTimeout(() => {
-          mockChild.emit('close', 0);
-        }, 0);
-
-        await copyToClipboard('');
-
-        expect(mockChild.stdin.write).toHaveBeenCalledWith('');
-      });
-
-      it('should handle multiline text', async () => {
-        const multilineText = 'Line 1\nLine 2\nLine 3';
-
-        setTimeout(() => {
-          mockChild.emit('close', 0);
-        }, 0);
-
-        await copyToClipboard(multilineText);
-
-        expect(mockChild.stdin.write).toHaveBeenCalledWith(multilineText);
-      });
-
-      it('should handle special characters', async () => {
-        const specialText = 'Special chars: !@#$%^&*()_+-=[]{}|;:,.<>?';
-
-        setTimeout(() => {
-          mockChild.emit('close', 0);
-        }, 0);
-
-        await copyToClipboard(specialText);
-
-        expect(mockChild.stdin.write).toHaveBeenCalledWith(specialText);
+      it('should return xdg-open', () => {
+        expect(getUrlOpenCommand()).toBe('xdg-open');
       });
     });
   });

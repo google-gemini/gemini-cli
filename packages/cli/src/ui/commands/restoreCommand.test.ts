@@ -5,13 +5,17 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as fs from 'fs/promises';
-import * as os from 'os';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { restoreCommand } from './restoreCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { Config, GitService } from '@google/gemini-cli-core';
+import {
+  GEMINI_DIR,
+  type Config,
+  type GitService,
+} from '@google/gemini-cli-core';
 
 describe('restoreCommand', () => {
   let mockContext: CommandContext;
@@ -26,7 +30,7 @@ describe('restoreCommand', () => {
     testRootDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'restore-command-test-'),
     );
-    geminiTempDir = path.join(testRootDir, '.gemini');
+    geminiTempDir = path.join(testRootDir, GEMINI_DIR);
     checkpointsDir = path.join(geminiTempDir, 'checkpoints');
     // The command itself creates this, but for tests it's easier to have it ready.
     // Some tests might remove it to test error paths.
@@ -39,7 +43,10 @@ describe('restoreCommand', () => {
 
     mockConfig = {
       getCheckpointingEnabled: vi.fn().mockReturnValue(true),
-      getProjectTempDir: vi.fn().mockReturnValue(geminiTempDir),
+      storage: {
+        getProjectTempCheckpointsDir: vi.fn().mockReturnValue(checkpointsDir),
+        getProjectTempDir: vi.fn().mockReturnValue(geminiTempDir),
+      },
       getGeminiClient: vi.fn().mockReturnValue({
         setHistory: mockSetHistory,
       }),
@@ -77,7 +84,9 @@ describe('restoreCommand', () => {
 
   describe('action', () => {
     it('should return an error if temp dir is not found', async () => {
-      vi.mocked(mockConfig.getProjectTempDir).mockReturnValue('');
+      vi.mocked(
+        mockConfig.storage.getProjectTempCheckpointsDir,
+      ).mockReturnValue('');
 
       expect(
         await restoreCommand(mockConfig)?.action?.(mockContext, ''),
@@ -146,10 +155,10 @@ describe('restoreCommand', () => {
 
     it('should restore a tool call and project state', async () => {
       const toolCallData = {
-        history: [{ type: 'user', text: 'do a thing' }],
+        history: [{ type: 'user', text: 'do a thing', id: 123 }],
         clientHistory: [{ role: 'user', parts: [{ text: 'do a thing' }] }],
         commitHash: 'abcdef123',
-        toolCall: { name: 'run_shell_command', args: 'ls' },
+        toolCall: { name: 'run_shell_command', args: { command: 'ls' } },
       };
       await fs.writeFile(
         path.join(checkpointsDir, 'my-checkpoint.json'),
@@ -160,7 +169,7 @@ describe('restoreCommand', () => {
       expect(await command?.action?.(mockContext, 'my-checkpoint')).toEqual({
         type: 'tool',
         toolName: 'run_shell_command',
-        toolArgs: 'ls',
+        toolArgs: { command: 'ls' },
       });
       expect(mockContext.ui.loadHistory).toHaveBeenCalledWith(
         toolCallData.history,
@@ -180,7 +189,7 @@ describe('restoreCommand', () => {
 
     it('should restore even if only toolCall is present', async () => {
       const toolCallData = {
-        toolCall: { name: 'run_shell_command', args: 'ls' },
+        toolCall: { name: 'run_shell_command', args: { command: 'ls' } },
       };
       await fs.writeFile(
         path.join(checkpointsDir, 'my-checkpoint.json'),
@@ -192,7 +201,7 @@ describe('restoreCommand', () => {
       expect(await command?.action?.(mockContext, 'my-checkpoint')).toEqual({
         type: 'tool',
         toolName: 'run_shell_command',
-        toolArgs: 'ls',
+        toolArgs: { command: 'ls' },
       });
 
       expect(mockContext.ui.loadHistory).not.toHaveBeenCalled();
@@ -213,13 +222,13 @@ describe('restoreCommand', () => {
       type: 'message',
       messageType: 'error',
       // A more specific error message would be ideal, but for now, we can assert the current behavior.
-      content: expect.stringContaining('Could not read restorable tool calls.'),
+      content: expect.stringContaining('Checkpoint file is invalid'),
     });
   });
 
   describe('completion', () => {
     it('should return an empty array if temp dir is not found', async () => {
-      vi.mocked(mockConfig.getProjectTempDir).mockReturnValue('');
+      vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue('');
       const command = restoreCommand(mockConfig);
 
       expect(await command?.completion?.(mockContext, '')).toEqual([]);

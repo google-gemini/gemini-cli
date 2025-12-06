@@ -4,19 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  Config,
-  getErrorMessage,
-  getMCPServerPrompts,
-} from '@google/gemini-cli-core';
-import {
+import type { Config } from '@google/gemini-cli-core';
+import { getErrorMessage, getMCPServerPrompts } from '@google/gemini-cli-core';
+import type {
   CommandContext,
-  CommandKind,
   SlashCommand,
   SlashCommandActionReturn,
 } from '../ui/commands/types.js';
-import { ICommandLoader } from './types.js';
-import { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
+import { CommandKind } from '../ui/commands/types.js';
+import type { ICommandLoader } from './types.js';
+import type { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
 
 /**
  * Discovers and loads executable slash commands from prompts exposed by
@@ -37,15 +34,17 @@ export class McpPromptLoader implements ICommandLoader {
     if (!this.config) {
       return Promise.resolve([]);
     }
-    const mcpServers = this.config.getMcpServers() || {};
+    const mcpServers = this.config.getMcpClientManager()?.getMcpServers() || {};
     for (const serverName in mcpServers) {
       const prompts = getMCPServerPrompts(this.config, serverName) || [];
       for (const prompt of prompts) {
-        const commandName = `${prompt.name}`;
+        // Sanitize prompt names to ensure they are valid slash commands (e.g. "Prompt Name" -> "Prompt-Name")
+        const commandName = `${prompt.name}`.trim().replace(/\s+/g, '-');
         const newPromptCommand: SlashCommand = {
           name: commandName,
           description: prompt.description || `Invoke prompt ${prompt.name}`,
           kind: CommandKind.MCP_PROMPT,
+          autoExecute: !prompt.arguments || prompt.arguments.length === 0,
           subCommands: [
             {
               name: 'help',
@@ -104,7 +103,8 @@ export class McpPromptLoader implements ICommandLoader {
             }
 
             try {
-              const mcpServers = this.config.getMcpServers() || {};
+              const mcpServers =
+                this.config.getMcpClientManager()?.getMcpServers() || {};
               const mcpServerConfig = mcpServers[serverName];
               if (!mcpServerConfig) {
                 return {
@@ -115,15 +115,16 @@ export class McpPromptLoader implements ICommandLoader {
               }
               const result = await prompt.invoke(promptInputs);
 
-              if (result.error) {
+              if (result['error']) {
                 return {
                   type: 'message',
                   messageType: 'error',
-                  content: `Error invoking prompt: ${result.error}`,
+                  content: `Error invoking prompt: ${result['error']}`,
                 };
               }
 
-              if (!result.messages?.[0]?.content?.text) {
+              const maybeContent = result.messages?.[0]?.content;
+              if (maybeContent.type !== 'text') {
                 return {
                   type: 'message',
                   messageType: 'error',
@@ -134,7 +135,7 @@ export class McpPromptLoader implements ICommandLoader {
 
               return {
                 type: 'submit_prompt',
-                content: JSON.stringify(result.messages[0].content.text),
+                content: JSON.stringify(maybeContent.text),
               };
             } catch (error) {
               return {
@@ -144,23 +145,69 @@ export class McpPromptLoader implements ICommandLoader {
               };
             }
           },
-          completion: async (_: CommandContext, partialArg: string) => {
-            if (!prompt || !prompt.arguments) {
+          completion: async (
+            commandContext: CommandContext,
+            partialArg: string,
+          ) => {
+            const invocation = commandContext.invocation;
+            if (!prompt || !prompt.arguments || !invocation) {
               return [];
             }
-
-            const suggestions: string[] = [];
-            const usedArgNames = new Set(
-              (partialArg.match(/--([^=]+)/g) || []).map((s) => s.substring(2)),
-            );
-
-            for (const arg of prompt.arguments) {
-              if (!usedArgNames.has(arg.name)) {
-                suggestions.push(`--${arg.name}=""`);
-              }
+            const indexOfFirstSpace = invocation.raw.indexOf(' ') + 1;
+            let promptInputs =
+              indexOfFirstSpace === 0
+                ? {}
+                : this.parseArgs(
+                    invocation.raw.substring(indexOfFirstSpace),
+                    prompt.arguments,
+                  );
+            if (promptInputs instanceof Error) {
+              promptInputs = {};
             }
 
-            return suggestions;
+            const providedArgNames = Object.keys(promptInputs);
+            const unusedArguments =
+              prompt.arguments
+                .filter((arg) => {
+                  // If this arguments is not in the prompt inputs
+                  // add it to unusedArguments
+                  if (!providedArgNames.includes(arg.name)) {
+                    return true;
+                  }
+
+                  // The parseArgs method assigns the value
+                  // at the end of the prompt as a final value
+                  // The argument should still be suggested
+                  // Example /add --numberOne="34" --num
+                  // numberTwo would be assigned a value of --num
+                  // numberTwo should still be considered unused
+                  const argValue = promptInputs[arg.name];
+                  return argValue === partialArg;
+                })
+                .map((argument) => `--${argument.name}="`) || [];
+
+            const exactlyMatchingArgumentAtTheEnd = prompt.arguments
+              .map((argument) => `--${argument.name}="`)
+              .filter((flagArgument) => {
+                const regex = new RegExp(`${flagArgument}[^"]*$`);
+                return regex.test(invocation.raw);
+              });
+
+            if (exactlyMatchingArgumentAtTheEnd.length === 1) {
+              if (exactlyMatchingArgumentAtTheEnd[0] === partialArg) {
+                return [`${partialArg}"`];
+              }
+              if (partialArg.endsWith('"')) {
+                return [partialArg];
+              }
+              return [`${partialArg}"`];
+            }
+
+            const matchingArguments = unusedArguments.filter((flagArgument) =>
+              flagArgument.startsWith(partialArg),
+            );
+
+            return matchingArguments;
           },
         };
         promptCommands.push(newPromptCommand);
@@ -169,7 +216,16 @@ export class McpPromptLoader implements ICommandLoader {
     return Promise.resolve(promptCommands);
   }
 
-  private parseArgs(
+  /**
+   * Parses the `userArgs` string representing the prompt arguments (all the text
+   * after the command) into a record matching the shape of the `promptArgs`.
+   *
+   * @param userArgs
+   * @param promptArgs
+   * @returns A record of the parsed arguments
+   * @visibleForTesting
+   */
+  parseArgs(
     userArgs: string,
     promptArgs: PromptArgument[] | undefined,
   ): Record<string, unknown> | Error {
@@ -177,28 +233,36 @@ export class McpPromptLoader implements ICommandLoader {
     const promptInputs: Record<string, unknown> = {};
 
     // arg parsing: --key="value" or --key=value
-    const namedArgRegex = /--([^=]+)=(?:"((?:\\.|[^"\\])*)"|([^ ]*))/g;
+    const namedArgRegex = /--([^=]+)=(?:"((?:\\.|[^"\\])*)"|([^ ]+))/g;
     let match;
-    const remainingArgs: string[] = [];
     let lastIndex = 0;
+    const positionalParts: string[] = [];
 
     while ((match = namedArgRegex.exec(userArgs)) !== null) {
       const key = match[1];
-      const value = match[2] ?? match[3]; // Quoted or unquoted value
+      // Extract the quoted or unquoted argument and remove escape chars.
+      const value = (match[2] ?? match[3]).replace(/\\(.)/g, '$1');
       argValues[key] = value;
       // Capture text between matches as potential positional args
       if (match.index > lastIndex) {
-        remainingArgs.push(userArgs.substring(lastIndex, match.index).trim());
+        positionalParts.push(userArgs.substring(lastIndex, match.index));
       }
       lastIndex = namedArgRegex.lastIndex;
     }
 
     // Capture any remaining text after the last named arg
     if (lastIndex < userArgs.length) {
-      remainingArgs.push(userArgs.substring(lastIndex).trim());
+      positionalParts.push(userArgs.substring(lastIndex));
     }
 
-    const positionalArgs = remainingArgs.join(' ').split(/ +/);
+    const positionalArgsString = positionalParts.join('').trim();
+    // extracts either quoted strings or non-quoted sequences of non-space characters.
+    const positionalArgRegex = /(?:"((?:\\.|[^"\\])*)"|([^ ]+))/g;
+    const positionalArgs: string[] = [];
+    while ((match = positionalArgRegex.exec(positionalArgsString)) !== null) {
+      // Extract the quoted or unquoted argument and remove escape chars.
+      positionalArgs.push((match[1] ?? match[2]).replace(/\\(.)/g, '$1'));
+    }
 
     if (!promptArgs) {
       return promptInputs;
@@ -213,19 +277,27 @@ export class McpPromptLoader implements ICommandLoader {
       (arg) => arg.required && !promptInputs[arg.name],
     );
 
-    const missingArgs: string[] = [];
-    for (let i = 0; i < unfilledArgs.length; i++) {
-      if (positionalArgs.length > i && positionalArgs[i]) {
-        promptInputs[unfilledArgs[i].name] = positionalArgs[i];
-      } else {
-        missingArgs.push(unfilledArgs[i].name);
+    if (unfilledArgs.length === 1) {
+      // If we have only one unfilled arg, we don't require quotes we just
+      // join all the given arguments together as if they were quoted.
+      promptInputs[unfilledArgs[0].name] = positionalArgs.join(' ');
+    } else {
+      const missingArgs: string[] = [];
+      for (let i = 0; i < unfilledArgs.length; i++) {
+        if (positionalArgs.length > i) {
+          promptInputs[unfilledArgs[i].name] = positionalArgs[i];
+        } else {
+          missingArgs.push(unfilledArgs[i].name);
+        }
+      }
+      if (missingArgs.length > 0) {
+        const missingArgNames = missingArgs
+          .map((name) => `--${name}`)
+          .join(', ');
+        return new Error(`Missing required argument(s): ${missingArgNames}`);
       }
     }
 
-    if (missingArgs.length > 0) {
-      const missingArgNames = missingArgs.map((name) => `--${name}`).join(', ');
-      return new Error(`Missing required argument(s): ${missingArgNames}`);
-    }
     return promptInputs;
   }
 }

@@ -5,11 +5,12 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
+import { interpolateColor } from './color-utils.js';
 
 const ayuDarkColors: ColorsTheme = {
   type: 'dark',
   Background: '#0b0e14',
-  Foreground: '#bfbdb6',
+  Foreground: '#aeaca6',
   LightBlue: '#59C2FF',
   AccentBlue: '#39BAE6',
   AccentPurple: '#D2A6FF',
@@ -21,6 +22,7 @@ const ayuDarkColors: ColorsTheme = {
   DiffRemoved: '#3D1215',
   Comment: '#646A71',
   Gray: '#3D4149',
+  DarkGray: interpolateColor('#3D4149', '#0b0e14', 0.5),
   GradientColors: ['#FFB454', '#F26D78'],
 };
 

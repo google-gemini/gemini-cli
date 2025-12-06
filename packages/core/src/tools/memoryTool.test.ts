@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   MemoryTool,
   setGeminiMdFilename,
@@ -12,13 +13,27 @@ import {
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
 } from './memoryTool.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as os from 'os';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import { ToolConfirmationOutcome } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
+import { GEMINI_DIR } from '../utils/paths.js';
 
 // Mock dependencies
-vi.mock('fs/promises');
+vi.mock(import('node:fs/promises'), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    mkdir: vi.fn(),
+    readFile: vi.fn(),
+  };
+});
+
+vi.mock('fs', () => ({
+  mkdirSync: vi.fn(),
+}));
+
 vi.mock('os');
 
 const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
@@ -91,7 +106,7 @@ describe('MemoryTool', () => {
     beforeEach(() => {
       testFilePath = path.join(
         os.homedir(),
-        '.gemini',
+        GEMINI_DIR,
         DEFAULT_CONTEXT_FILENAME,
       );
     });
@@ -197,22 +212,33 @@ describe('MemoryTool', () => {
 
     it('should have correct name, displayName, description, and schema', () => {
       expect(memoryTool.name).toBe('save_memory');
-      expect(memoryTool.displayName).toBe('Save Memory');
+      expect(memoryTool.displayName).toBe('SaveMemory');
       expect(memoryTool.description).toContain(
         'Saves a specific piece of information',
       );
       expect(memoryTool.schema).toBeDefined();
       expect(memoryTool.schema.name).toBe('save_memory');
-      expect(memoryTool.schema.parameters?.properties?.fact).toBeDefined();
+      expect(memoryTool.schema.parametersJsonSchema).toStrictEqual({
+        type: 'object',
+        properties: {
+          fact: {
+            type: 'string',
+            description:
+              'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
+          },
+        },
+        required: ['fact'],
+      });
     });
 
     it('should call performAddMemoryEntry with correct parameters and return success', async () => {
       const params = { fact: 'The sky is blue' };
-      const result = await memoryTool.execute(params, mockAbortSignal);
+      const invocation = memoryTool.build(params);
+      const result = await invocation.execute(mockAbortSignal);
       // Use getCurrentGeminiMdFilename for the default expectation before any setGeminiMdFilename calls in a test
       const expectedFilePath = path.join(
         os.homedir(),
-        '.gemini',
+        GEMINI_DIR,
         getCurrentGeminiMdFilename(), // This will be DEFAULT_CONTEXT_FILENAME unless changed by a test
       );
 
@@ -237,14 +263,12 @@ describe('MemoryTool', () => {
 
     it('should return an error if fact is empty', async () => {
       const params = { fact: ' ' }; // Empty fact
-      const result = await memoryTool.execute(params, mockAbortSignal);
-      const errorMessage = 'Parameter "fact" must be a non-empty string.';
-
-      expect(performAddMemoryEntrySpy).not.toHaveBeenCalled();
-      expect(result.llmContent).toBe(
-        JSON.stringify({ success: false, error: errorMessage }),
+      expect(memoryTool.validateToolParams(params)).toBe(
+        'Parameter "fact" must be a non-empty string.',
       );
-      expect(result.returnDisplay).toBe(`Error: ${errorMessage}`);
+      expect(() => memoryTool.build(params)).toThrow(
+        'Parameter "fact" must be a non-empty string.',
+      );
     });
 
     it('should handle errors from performAddMemoryEntry', async () => {
@@ -254,7 +278,8 @@ describe('MemoryTool', () => {
       );
       performAddMemoryEntrySpy.mockRejectedValue(underlyingError);
 
-      const result = await memoryTool.execute(params, mockAbortSignal);
+      const invocation = memoryTool.build(params);
+      const result = await invocation.execute(mockAbortSignal);
 
       expect(result.llmContent).toBe(
         JSON.stringify({
@@ -265,6 +290,9 @@ describe('MemoryTool', () => {
       expect(result.returnDisplay).toBe(
         `Error saving memory: ${underlyingError.message}`,
       );
+      expect(result.error?.type).toBe(
+        ToolErrorType.MEMORY_TOOL_EXECUTION_ERROR,
+      );
     });
   });
 
@@ -274,25 +302,27 @@ describe('MemoryTool', () => {
     beforeEach(() => {
       memoryTool = new MemoryTool();
       // Clear the allowlist before each test
-      (MemoryTool as unknown as { allowlist: Set<string> }).allowlist.clear();
+      const invocation = memoryTool.build({ fact: 'mock-fact' });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (invocation.constructor as any).allowlist.clear();
       // Mock fs.readFile to return empty string (file doesn't exist)
       vi.mocked(fs.readFile).mockResolvedValue('');
     });
 
     it('should return confirmation details when memory file is not allowlisted', async () => {
       const params = { fact: 'Test fact' };
-      const result = await memoryTool.shouldConfirmExecute(
-        params,
-        mockAbortSignal,
-      );
+      const invocation = memoryTool.build(params);
+      const result = await invocation.shouldConfirmExecute(mockAbortSignal);
 
       expect(result).toBeDefined();
       expect(result).not.toBe(false);
 
       if (result && result.type === 'edit') {
-        const expectedPath = path.join('~', '.gemini', 'GEMINI.md');
+        const expectedPath = path.join('~', GEMINI_DIR, 'GEMINI.md');
         expect(result.title).toBe(`Confirm Memory Save: ${expectedPath}`);
-        expect(result.fileName).toContain(path.join('mock', 'home', '.gemini'));
+        expect(result.fileName).toContain(
+          path.join('mock', 'home', GEMINI_DIR),
+        );
         expect(result.fileName).toContain('GEMINI.md');
         expect(result.fileDiff).toContain('Index: GEMINI.md');
         expect(result.fileDiff).toContain('+## Gemini Added Memories');
@@ -307,19 +337,16 @@ describe('MemoryTool', () => {
       const params = { fact: 'Test fact' };
       const memoryFilePath = path.join(
         os.homedir(),
-        '.gemini',
+        GEMINI_DIR,
         getCurrentGeminiMdFilename(),
       );
 
+      const invocation = memoryTool.build(params);
       // Add the memory file to the allowlist
-      (MemoryTool as unknown as { allowlist: Set<string> }).allowlist.add(
-        memoryFilePath,
-      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (invocation.constructor as any).allowlist.add(memoryFilePath);
 
-      const result = await memoryTool.shouldConfirmExecute(
-        params,
-        mockAbortSignal,
-      );
+      const result = await invocation.shouldConfirmExecute(mockAbortSignal);
 
       expect(result).toBe(false);
     });
@@ -328,14 +355,12 @@ describe('MemoryTool', () => {
       const params = { fact: 'Test fact' };
       const memoryFilePath = path.join(
         os.homedir(),
-        '.gemini',
+        GEMINI_DIR,
         getCurrentGeminiMdFilename(),
       );
 
-      const result = await memoryTool.shouldConfirmExecute(
-        params,
-        mockAbortSignal,
-      );
+      const invocation = memoryTool.build(params);
+      const result = await invocation.shouldConfirmExecute(mockAbortSignal);
 
       expect(result).toBeDefined();
       expect(result).not.toBe(false);
@@ -346,9 +371,8 @@ describe('MemoryTool', () => {
 
         // Check that the memory file was added to the allowlist
         expect(
-          (MemoryTool as unknown as { allowlist: Set<string> }).allowlist.has(
-            memoryFilePath,
-          ),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (invocation.constructor as any).allowlist.has(memoryFilePath),
         ).toBe(true);
       }
     });
@@ -357,14 +381,12 @@ describe('MemoryTool', () => {
       const params = { fact: 'Test fact' };
       const memoryFilePath = path.join(
         os.homedir(),
-        '.gemini',
+        GEMINI_DIR,
         getCurrentGeminiMdFilename(),
       );
 
-      const result = await memoryTool.shouldConfirmExecute(
-        params,
-        mockAbortSignal,
-      );
+      const invocation = memoryTool.build(params);
+      const result = await invocation.shouldConfirmExecute(mockAbortSignal);
 
       expect(result).toBeDefined();
       expect(result).not.toBe(false);
@@ -372,18 +394,12 @@ describe('MemoryTool', () => {
       if (result && result.type === 'edit') {
         // Simulate the onConfirm callback with different outcomes
         await result.onConfirm(ToolConfirmationOutcome.ProceedOnce);
-        expect(
-          (MemoryTool as unknown as { allowlist: Set<string> }).allowlist.has(
-            memoryFilePath,
-          ),
-        ).toBe(false);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const allowlist = (invocation.constructor as any).allowlist;
+        expect(allowlist.has(memoryFilePath)).toBe(false);
 
         await result.onConfirm(ToolConfirmationOutcome.Cancel);
-        expect(
-          (MemoryTool as unknown as { allowlist: Set<string> }).allowlist.has(
-            memoryFilePath,
-          ),
-        ).toBe(false);
+        expect(allowlist.has(memoryFilePath)).toBe(false);
       }
     });
 
@@ -395,16 +411,14 @@ describe('MemoryTool', () => {
       // Mock fs.readFile to return existing content
       vi.mocked(fs.readFile).mockResolvedValue(existingContent);
 
-      const result = await memoryTool.shouldConfirmExecute(
-        params,
-        mockAbortSignal,
-      );
+      const invocation = memoryTool.build(params);
+      const result = await invocation.shouldConfirmExecute(mockAbortSignal);
 
       expect(result).toBeDefined();
       expect(result).not.toBe(false);
 
       if (result && result.type === 'edit') {
-        const expectedPath = path.join('~', '.gemini', 'GEMINI.md');
+        const expectedPath = path.join('~', GEMINI_DIR, 'GEMINI.md');
         expect(result.title).toBe(`Confirm Memory Save: ${expectedPath}`);
         expect(result.fileDiff).toContain('Index: GEMINI.md');
         expect(result.fileDiff).toContain('+- New fact');

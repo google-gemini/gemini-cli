@@ -1,0 +1,116 @@
+name: '📋 Gemini Scheduled Issue Deduplication'
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Runs every hour
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }}'
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash'
+
+jobs:
+  refresh-embeddings:
+    if: |-
+      ${{ vars.TRIAGE_DEDUPLICATE_ISSUES != '' && github.repository == 'google-gemini/gemini-cli' }}
+    permissions:
+      contents: 'read'
+      id-token: 'write' # Required for WIF, see https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-google-cloud-platform#adding-permissions-settings
+      issues: 'read'
+      statuses: 'read'
+      packages: 'read'
+    timeout-minutes: 20
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+
+      - name: 'Log in to GitHub Container Registry'
+        uses: 'docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1' # ratchet:docker/login-action@v3
+        with:
+          registry: 'ghcr.io'
+          username: '${{ github.actor }}'
+          password: '${{ secrets.GITHUB_TOKEN }}'
+
+      - name: 'Run Gemini Issue Deduplication Refresh'
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        id: 'gemini_refresh_embeddings'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ISSUE_TITLE: '${{ github.event.issue.title }}'
+          ISSUE_BODY: '${{ github.event.issue.body }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number }}'
+          REPOSITORY: '${{ github.repository }}'
+          FIRESTORE_PROJECT: '${{ vars.FIRESTORE_PROJECT }}'
+        with:
+          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
+          settings: |-
+            {
+              "mcpServers": {
+                "issue_deduplication": {
+                  "command": "docker",
+                  "args": [
+                    "run",
+                    "-i",
+                    "--rm",
+                    "--network", "host",
+                    "-e", "GITHUB_TOKEN",
+                    "-e", "GEMINI_API_KEY",
+                    "-e", "DATABASE_TYPE",
+                    "-e", "FIRESTORE_DATABASE_ID",
+                    "-e", "GCP_PROJECT",
+                    "-e", "GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json",
+                    "-v", "${GOOGLE_APPLICATION_CREDENTIALS}:/app/gcp-credentials.json",
+                    "ghcr.io/google-gemini/gemini-cli-issue-triage@sha256:e3de1523f6c83aabb3c54b76d08940a2bf42febcb789dd2da6f95169641f94d3"
+                  ],
+                  "env": {
+                    "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+                    "GEMINI_API_KEY": "${{ secrets.GEMINI_API_KEY }}",
+                    "DATABASE_TYPE":"firestore",
+                    "GCP_PROJECT": "${FIRESTORE_PROJECT}",
+                    "FIRESTORE_DATABASE_ID": "(default)",
+                    "GOOGLE_APPLICATION_CREDENTIALS": "${GOOGLE_APPLICATION_CREDENTIALS}"
+                  },
+                  "enabled": true,
+                  "timeout": 600000
+                }
+              },
+              "maxSessionTurns": 25,
+              "coreTools": [
+                "run_shell_command(echo)"
+              ],
+              "telemetry": {
+                "enabled": true,
+                "target": "gcp"
+              }
+            }
+          prompt: |-
+            ## Role
+
+            You are a database maintenance assistant for a GitHub issue deduplication system.
+
+            ## Goal
+
+            Your sole responsibility is to refresh the embeddings for all open issues in the repository to ensure the deduplication database is up-to-date.
+
+            ## Steps
+
+            1.  **Extract Repository Information:** The repository is ${{ github.repository }}.
+            2.  **Refresh Embeddings:** Call the `refresh` tool with the correct `repo`. Do not use the `force` parameter.
+            3.  **Log Output:** Print the JSON output from the `refresh` tool to the logs.
+
+            ## Guidelines
+
+            - Only use the `refresh` tool.
+            - Do not attempt to find duplicates or modify any issues.
+            - Your only task is to call the `refresh` tool and log its output.

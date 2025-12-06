@@ -4,6 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+vi.mock('../ui/commands/profileCommand.js', async () => {
+  const { CommandKind } = await import('../ui/commands/types.js');
+  return {
+    profileCommand: {
+      name: 'profile',
+      description: 'Profile command',
+      kind: CommandKind.BUILT_IN,
+    },
+  };
+});
+
 vi.mock('../ui/commands/aboutCommand.js', async () => {
   const { CommandKind } = await import('../ui/commands/types.js');
   return {
@@ -15,17 +26,35 @@ vi.mock('../ui/commands/aboutCommand.js', async () => {
   };
 });
 
-vi.mock('../ui/commands/ideCommand.js', () => ({ ideCommand: vi.fn() }));
+vi.mock('../ui/commands/ideCommand.js', async () => {
+  const { CommandKind } = await import('../ui/commands/types.js');
+  return {
+    ideCommand: vi.fn().mockResolvedValue({
+      name: 'ide',
+      description: 'IDE command',
+      kind: CommandKind.BUILT_IN,
+    }),
+  };
+});
 vi.mock('../ui/commands/restoreCommand.js', () => ({
   restoreCommand: vi.fn(),
 }));
+vi.mock('../ui/commands/permissionsCommand.js', async () => {
+  const { CommandKind } = await import('../ui/commands/types.js');
+  return {
+    permissionsCommand: {
+      name: 'permissions',
+      description: 'Permissions command',
+      kind: CommandKind.BUILT_IN,
+    },
+  };
+});
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { BuiltinCommandLoader } from './BuiltinCommandLoader.js';
-import { Config } from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
 import { CommandKind } from '../ui/commands/types.js';
 
-import { ideCommand } from '../ui/commands/ideCommand.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
 
 vi.mock('../ui/commands/authCommand.js', () => ({ authCommand: {} }));
@@ -37,12 +66,16 @@ vi.mock('../ui/commands/corgiCommand.js', () => ({ corgiCommand: {} }));
 vi.mock('../ui/commands/docsCommand.js', () => ({ docsCommand: {} }));
 vi.mock('../ui/commands/editorCommand.js', () => ({ editorCommand: {} }));
 vi.mock('../ui/commands/extensionsCommand.js', () => ({
-  extensionsCommand: {},
+  extensionsCommand: () => ({}),
 }));
 vi.mock('../ui/commands/helpCommand.js', () => ({ helpCommand: {} }));
 vi.mock('../ui/commands/memoryCommand.js', () => ({ memoryCommand: {} }));
+vi.mock('../ui/commands/modelCommand.js', () => ({
+  modelCommand: { name: 'model' },
+}));
 vi.mock('../ui/commands/privacyCommand.js', () => ({ privacyCommand: {} }));
 vi.mock('../ui/commands/quitCommand.js', () => ({ quitCommand: {} }));
+vi.mock('../ui/commands/resumeCommand.js', () => ({ resumeCommand: {} }));
 vi.mock('../ui/commands/statsCommand.js', () => ({ statsCommand: {} }));
 vi.mock('../ui/commands/themeCommand.js', () => ({ themeCommand: {} }));
 vi.mock('../ui/commands/toolsCommand.js', () => ({ toolsCommand: {} }));
@@ -57,18 +90,17 @@ vi.mock('../ui/commands/mcpCommand.js', () => ({
 describe('BuiltinCommandLoader', () => {
   let mockConfig: Config;
 
-  const ideCommandMock = ideCommand as Mock;
   const restoreCommandMock = restoreCommand as Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockConfig = { some: 'config' } as unknown as Config;
+    mockConfig = {
+      getFolderTrust: vi.fn().mockReturnValue(true),
+      getEnableMessageBusIntegration: () => false,
+      getEnableExtensionReloading: () => false,
+      getEnableHooks: () => false,
+    } as unknown as Config;
 
-    ideCommandMock.mockReturnValue({
-      name: 'ide',
-      description: 'IDE command',
-      kind: CommandKind.BUILT_IN,
-    });
     restoreCommandMock.mockReturnValue({
       name: 'restore',
       description: 'Restore command',
@@ -76,25 +108,23 @@ describe('BuiltinCommandLoader', () => {
     });
   });
 
-  it('should correctly pass the config object to command factory functions', async () => {
+  it('should correctly pass the config object to restore command factory', async () => {
     const loader = new BuiltinCommandLoader(mockConfig);
     await loader.loadCommands(new AbortController().signal);
 
-    expect(ideCommandMock).toHaveBeenCalledTimes(1);
-    expect(ideCommandMock).toHaveBeenCalledWith(mockConfig);
+    // ideCommand is now a constant, no longer needs config
     expect(restoreCommandMock).toHaveBeenCalledTimes(1);
     expect(restoreCommandMock).toHaveBeenCalledWith(mockConfig);
   });
 
   it('should filter out null command definitions returned by factories', async () => {
-    // Override the mock's behavior for this specific test.
-    ideCommandMock.mockReturnValue(null);
+    // ideCommand is now a constant SlashCommand
     const loader = new BuiltinCommandLoader(mockConfig);
     const commands = await loader.loadCommands(new AbortController().signal);
 
-    // The 'ide' command should be filtered out.
+    // The 'ide' command should be present.
     const ideCmd = commands.find((c) => c.name === 'ide');
-    expect(ideCmd).toBeUndefined();
+    expect(ideCmd).toBeDefined();
 
     // Other commands should still be present.
     const aboutCmd = commands.find((c) => c.name === 'about');
@@ -104,8 +134,7 @@ describe('BuiltinCommandLoader', () => {
   it('should handle a null config gracefully when calling factories', async () => {
     const loader = new BuiltinCommandLoader(null);
     await loader.loadCommands(new AbortController().signal);
-    expect(ideCommandMock).toHaveBeenCalledTimes(1);
-    expect(ideCommandMock).toHaveBeenCalledWith(null);
+    // ideCommand is now a constant, no longer needs config
     expect(restoreCommandMock).toHaveBeenCalledTimes(1);
     expect(restoreCommandMock).toHaveBeenCalledWith(null);
   });
@@ -123,5 +152,77 @@ describe('BuiltinCommandLoader', () => {
 
     const mcpCmd = commands.find((c) => c.name === 'mcp');
     expect(mcpCmd).toBeDefined();
+  });
+
+  it('should include permissions command when folder trust is enabled', async () => {
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const permissionsCmd = commands.find((c) => c.name === 'permissions');
+    expect(permissionsCmd).toBeDefined();
+  });
+
+  it('should exclude permissions command when folder trust is disabled', async () => {
+    (mockConfig.getFolderTrust as Mock).mockReturnValue(false);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const permissionsCmd = commands.find((c) => c.name === 'permissions');
+    expect(permissionsCmd).toBeUndefined();
+  });
+
+  it('should include policies command when message bus integration is enabled', async () => {
+    const mockConfigWithMessageBus = {
+      ...mockConfig,
+      getEnableMessageBusIntegration: () => true,
+      getEnableHooks: () => false,
+    } as unknown as Config;
+    const loader = new BuiltinCommandLoader(mockConfigWithMessageBus);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const policiesCmd = commands.find((c) => c.name === 'policies');
+    expect(policiesCmd).toBeDefined();
+  });
+
+  it('should exclude policies command when message bus integration is disabled', async () => {
+    const mockConfigWithoutMessageBus = {
+      ...mockConfig,
+      getEnableMessageBusIntegration: () => false,
+      getEnableHooks: () => false,
+    } as unknown as Config;
+    const loader = new BuiltinCommandLoader(mockConfigWithoutMessageBus);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const policiesCmd = commands.find((c) => c.name === 'policies');
+    expect(policiesCmd).toBeUndefined();
+  });
+});
+
+describe('BuiltinCommandLoader profile', () => {
+  let mockConfig: Config;
+
+  beforeEach(() => {
+    vi.resetModules();
+    mockConfig = {
+      getFolderTrust: vi.fn().mockReturnValue(false),
+      getCheckpointingEnabled: () => false,
+      getEnableMessageBusIntegration: () => false,
+      getEnableExtensionReloading: () => false,
+      getEnableHooks: () => false,
+    } as unknown as Config;
+  });
+
+  it('should not include profile command when isDevelopment is false', async () => {
+    process.env['NODE_ENV'] = 'production';
+    const { BuiltinCommandLoader } = await import('./BuiltinCommandLoader.js');
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const profileCmd = commands.find((c) => c.name === 'profile');
+    expect(profileCmd).toBeUndefined();
+  });
+
+  it('should include profile command when isDevelopment is true', async () => {
+    process.env['NODE_ENV'] = 'development';
+    const { BuiltinCommandLoader } = await import('./BuiltinCommandLoader.js');
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const profileCmd = commands.find((c) => c.name === 'profile');
+    expect(profileCmd).toBeDefined();
   });
 });

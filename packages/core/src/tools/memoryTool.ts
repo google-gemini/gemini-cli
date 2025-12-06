@@ -4,31 +4,37 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { ToolEditConfirmationDetails, ToolResult } from './tools.js';
 import {
-  BaseTool,
-  ToolResult,
-  ToolEditConfirmationDetails,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
   ToolConfirmationOutcome,
-  Icon,
 } from './tools.js';
-import { FunctionDeclaration, Type } from '@google/genai';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { homedir } from 'os';
+import type { FunctionDeclaration } from '@google/genai';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { Storage } from '../config/storage.js';
 import * as Diff from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { tildeifyPath } from '../utils/paths.js';
-import { ModifiableTool, ModifyContext } from './modifiable-tool.js';
+import type {
+  ModifiableDeclarativeTool,
+  ModifyContext,
+} from './modifiable-tool.js';
+import { ToolErrorType } from './tool-error.js';
+import { MEMORY_TOOL_NAME } from './tool-names.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 const memoryToolSchemaData: FunctionDeclaration = {
-  name: 'save_memory',
+  name: MEMORY_TOOL_NAME,
   description:
     'Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions.',
-  parameters: {
-    type: Type.OBJECT,
+  parametersJsonSchema: {
+    type: 'object',
     properties: {
       fact: {
-        type: Type.STRING,
+        type: 'string',
         description:
           'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
       },
@@ -53,10 +59,8 @@ Do NOT use this tool:
 
 ## Parameters
 
-- \`fact\` (string, required): The specific fact or piece of information to remember. This should be a clear, self-contained statement. For example, if the user says "My favorite color is blue", the fact would be "My favorite color is blue".
-`;
+- \`fact\` (string, required): The specific fact or piece of information to remember. This should be a clear, self-contained statement. For example, if the user says "My favorite color is blue", the fact would be "My favorite color is blue".`;
 
-export const GEMINI_CONFIG_DIR = '.gemini';
 export const DEFAULT_CONTEXT_FILENAME = 'GEMINI.md';
 export const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
 
@@ -94,8 +98,8 @@ interface SaveMemoryParams {
   modified_content?: string;
 }
 
-function getGlobalMemoryFilePath(): string {
-  return path.join(homedir(), GEMINI_CONFIG_DIR, getCurrentGeminiMdFilename());
+export function getGlobalMemoryFilePath(): string {
+  return path.join(Storage.getGlobalGeminiDir(), getCurrentGeminiMdFilename());
 }
 
 /**
@@ -110,101 +114,95 @@ function ensureNewlineSeparation(currentContent: string): string {
   return '\n\n';
 }
 
-export class MemoryTool
-  extends BaseTool<SaveMemoryParams, ToolResult>
-  implements ModifiableTool<SaveMemoryParams>
-{
-  private static readonly allowlist: Set<string> = new Set();
+/**
+ * Reads the current content of the memory file
+ */
+async function readMemoryFileContent(): Promise<string> {
+  try {
+    return await fs.readFile(getGlobalMemoryFilePath(), 'utf-8');
+  } catch (err) {
+    const error = err as Error & { code?: string };
+    if (!(error instanceof Error) || error.code !== 'ENOENT') throw err;
+    return '';
+  }
+}
 
-  static readonly Name: string = memoryToolSchemaData.name!;
-  constructor() {
-    super(
-      MemoryTool.Name,
-      'Save Memory',
-      memoryToolDescription,
-      Icon.LightBulb,
-      memoryToolSchemaData.parameters as Record<string, unknown>,
+/**
+ * Computes the new content that would result from adding a memory entry
+ */
+function computeNewContent(currentContent: string, fact: string): string {
+  let processedText = fact.trim();
+  processedText = processedText.replace(/^(-+\s*)+/, '').trim();
+  const newMemoryItem = `- ${processedText}`;
+
+  const headerIndex = currentContent.indexOf(MEMORY_SECTION_HEADER);
+
+  if (headerIndex === -1) {
+    // Header not found, append header and then the entry
+    const separator = ensureNewlineSeparation(currentContent);
+    return (
+      currentContent +
+      `${separator}${MEMORY_SECTION_HEADER}\n${newMemoryItem}\n`
+    );
+  } else {
+    // Header found, find where to insert the new memory entry
+    const startOfSectionContent = headerIndex + MEMORY_SECTION_HEADER.length;
+    let endOfSectionIndex = currentContent.indexOf(
+      '\n## ',
+      startOfSectionContent,
+    );
+    if (endOfSectionIndex === -1) {
+      endOfSectionIndex = currentContent.length; // End of file
+    }
+
+    const beforeSectionMarker = currentContent
+      .substring(0, startOfSectionContent)
+      .trimEnd();
+    let sectionContent = currentContent
+      .substring(startOfSectionContent, endOfSectionIndex)
+      .trimEnd();
+    const afterSectionMarker = currentContent.substring(endOfSectionIndex);
+
+    sectionContent += `\n${newMemoryItem}`;
+    return (
+      `${beforeSectionMarker}\n${sectionContent.trimStart()}\n${afterSectionMarker}`.trimEnd() +
+      '\n'
     );
   }
+}
 
-  getDescription(_params: SaveMemoryParams): string {
+class MemoryToolInvocation extends BaseToolInvocation<
+  SaveMemoryParams,
+  ToolResult
+> {
+  private static readonly allowlist: Set<string> = new Set();
+
+  constructor(
+    params: SaveMemoryParams,
+    messageBus?: MessageBus,
+    toolName?: string,
+    displayName?: string,
+  ) {
+    super(params, messageBus, toolName, displayName);
+  }
+
+  getDescription(): string {
     const memoryFilePath = getGlobalMemoryFilePath();
     return `in ${tildeifyPath(memoryFilePath)}`;
   }
 
-  /**
-   * Reads the current content of the memory file
-   */
-  private async readMemoryFileContent(): Promise<string> {
-    try {
-      return await fs.readFile(getGlobalMemoryFilePath(), 'utf-8');
-    } catch (err) {
-      const error = err as Error & { code?: string };
-      if (!(error instanceof Error) || error.code !== 'ENOENT') throw err;
-      return '';
-    }
-  }
-
-  /**
-   * Computes the new content that would result from adding a memory entry
-   */
-  private computeNewContent(currentContent: string, fact: string): string {
-    let processedText = fact.trim();
-    processedText = processedText.replace(/^(-+\s*)+/, '').trim();
-    const newMemoryItem = `- ${processedText}`;
-
-    const headerIndex = currentContent.indexOf(MEMORY_SECTION_HEADER);
-
-    if (headerIndex === -1) {
-      // Header not found, append header and then the entry
-      const separator = ensureNewlineSeparation(currentContent);
-      return (
-        currentContent +
-        `${separator}${MEMORY_SECTION_HEADER}\n${newMemoryItem}\n`
-      );
-    } else {
-      // Header found, find where to insert the new memory entry
-      const startOfSectionContent = headerIndex + MEMORY_SECTION_HEADER.length;
-      let endOfSectionIndex = currentContent.indexOf(
-        '\n## ',
-        startOfSectionContent,
-      );
-      if (endOfSectionIndex === -1) {
-        endOfSectionIndex = currentContent.length; // End of file
-      }
-
-      const beforeSectionMarker = currentContent
-        .substring(0, startOfSectionContent)
-        .trimEnd();
-      let sectionContent = currentContent
-        .substring(startOfSectionContent, endOfSectionIndex)
-        .trimEnd();
-      const afterSectionMarker = currentContent.substring(endOfSectionIndex);
-
-      sectionContent += `\n${newMemoryItem}`;
-      return (
-        `${beforeSectionMarker}\n${sectionContent.trimStart()}\n${afterSectionMarker}`.trimEnd() +
-        '\n'
-      );
-    }
-  }
-
-  async shouldConfirmExecute(
-    params: SaveMemoryParams,
+  protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolEditConfirmationDetails | false> {
     const memoryFilePath = getGlobalMemoryFilePath();
     const allowlistKey = memoryFilePath;
 
-    if (MemoryTool.allowlist.has(allowlistKey)) {
+    if (MemoryToolInvocation.allowlist.has(allowlistKey)) {
       return false;
     }
 
-    // Read current content of the memory file
-    const currentContent = await this.readMemoryFileContent();
-
-    // Calculate the new content that will be written to the memory file
-    const newContent = this.computeNewContent(currentContent, params.fact);
+    const currentContent = await readMemoryFileContent();
+    const newContent = computeNewContent(currentContent, this.params.fact);
 
     const fileName = path.basename(memoryFilePath);
     const fileDiff = Diff.createPatch(
@@ -220,101 +218,21 @@ export class MemoryTool
       type: 'edit',
       title: `Confirm Memory Save: ${tildeifyPath(memoryFilePath)}`,
       fileName: memoryFilePath,
+      filePath: memoryFilePath,
       fileDiff,
       originalContent: currentContent,
       newContent,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          MemoryTool.allowlist.add(allowlistKey);
+          MemoryToolInvocation.allowlist.add(allowlistKey);
         }
       },
     };
     return confirmationDetails;
   }
 
-  static async performAddMemoryEntry(
-    text: string,
-    memoryFilePath: string,
-    fsAdapter: {
-      readFile: (path: string, encoding: 'utf-8') => Promise<string>;
-      writeFile: (
-        path: string,
-        data: string,
-        encoding: 'utf-8',
-      ) => Promise<void>;
-      mkdir: (
-        path: string,
-        options: { recursive: boolean },
-      ) => Promise<string | undefined>;
-    },
-  ): Promise<void> {
-    let processedText = text.trim();
-    // Remove leading hyphens and spaces that might be misinterpreted as markdown list items
-    processedText = processedText.replace(/^(-+\s*)+/, '').trim();
-    const newMemoryItem = `- ${processedText}`;
-
-    try {
-      await fsAdapter.mkdir(path.dirname(memoryFilePath), { recursive: true });
-      let content = '';
-      try {
-        content = await fsAdapter.readFile(memoryFilePath, 'utf-8');
-      } catch (_e) {
-        // File doesn't exist, will be created with header and item.
-      }
-
-      const headerIndex = content.indexOf(MEMORY_SECTION_HEADER);
-
-      if (headerIndex === -1) {
-        // Header not found, append header and then the entry
-        const separator = ensureNewlineSeparation(content);
-        content += `${separator}${MEMORY_SECTION_HEADER}\n${newMemoryItem}\n`;
-      } else {
-        // Header found, find where to insert the new memory entry
-        const startOfSectionContent =
-          headerIndex + MEMORY_SECTION_HEADER.length;
-        let endOfSectionIndex = content.indexOf('\n## ', startOfSectionContent);
-        if (endOfSectionIndex === -1) {
-          endOfSectionIndex = content.length; // End of file
-        }
-
-        const beforeSectionMarker = content
-          .substring(0, startOfSectionContent)
-          .trimEnd();
-        let sectionContent = content
-          .substring(startOfSectionContent, endOfSectionIndex)
-          .trimEnd();
-        const afterSectionMarker = content.substring(endOfSectionIndex);
-
-        sectionContent += `\n${newMemoryItem}`;
-        content =
-          `${beforeSectionMarker}\n${sectionContent.trimStart()}\n${afterSectionMarker}`.trimEnd() +
-          '\n';
-      }
-      await fsAdapter.writeFile(memoryFilePath, content, 'utf-8');
-    } catch (error) {
-      console.error(
-        `[MemoryTool] Error adding memory entry to ${memoryFilePath}:`,
-        error,
-      );
-      throw new Error(
-        `[MemoryTool] Failed to add memory entry: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-
-  async execute(
-    params: SaveMemoryParams,
-    _signal: AbortSignal,
-  ): Promise<ToolResult> {
-    const { fact, modified_by_user, modified_content } = params;
-
-    if (!fact || typeof fact !== 'string' || fact.trim() === '') {
-      const errorMessage = 'Parameter "fact" must be a non-empty string.';
-      return {
-        llmContent: JSON.stringify({ success: false, error: errorMessage }),
-        returnDisplay: `Error: ${errorMessage}`,
-      };
-    }
+  async execute(_signal: AbortSignal): Promise<ToolResult> {
+    const { fact, modified_by_user, modified_content } = this.params;
 
     try {
       if (modified_by_user && modified_content !== undefined) {
@@ -358,7 +276,7 @@ export class MemoryTool
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(
+      console.warn(
         `[MemoryTool] Error executing save_memory for fact "${fact}": ${errorMessage}`,
       );
       return {
@@ -367,7 +285,94 @@ export class MemoryTool
           error: `Failed to save memory. Detail: ${errorMessage}`,
         }),
         returnDisplay: `Error saving memory: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.MEMORY_TOOL_EXECUTION_ERROR,
+        },
       };
+    }
+  }
+}
+
+export class MemoryTool
+  extends BaseDeclarativeTool<SaveMemoryParams, ToolResult>
+  implements ModifiableDeclarativeTool<SaveMemoryParams>
+{
+  static readonly Name = MEMORY_TOOL_NAME;
+
+  constructor(messageBus?: MessageBus) {
+    super(
+      MemoryTool.Name,
+      'SaveMemory',
+      memoryToolDescription,
+      Kind.Think,
+      memoryToolSchemaData.parametersJsonSchema as Record<string, unknown>,
+      true,
+      false,
+      messageBus,
+    );
+  }
+
+  protected override validateToolParamValues(
+    params: SaveMemoryParams,
+  ): string | null {
+    if (params.fact.trim() === '') {
+      return 'Parameter "fact" must be a non-empty string.';
+    }
+
+    return null;
+  }
+
+  protected createInvocation(
+    params: SaveMemoryParams,
+    messageBus?: MessageBus,
+    toolName?: string,
+    displayName?: string,
+  ) {
+    return new MemoryToolInvocation(
+      params,
+      messageBus ?? this.messageBus,
+      toolName ?? this.name,
+      displayName ?? this.displayName,
+    );
+  }
+
+  static async performAddMemoryEntry(
+    text: string,
+    memoryFilePath: string,
+    fsAdapter: {
+      readFile: (path: string, encoding: 'utf-8') => Promise<string>;
+      writeFile: (
+        path: string,
+        data: string,
+        encoding: 'utf-8',
+      ) => Promise<void>;
+      mkdir: (
+        path: string,
+        options: { recursive: boolean },
+      ) => Promise<string | undefined>;
+    },
+  ): Promise<void> {
+    try {
+      await fsAdapter.mkdir(path.dirname(memoryFilePath), { recursive: true });
+      let currentContent = '';
+      try {
+        currentContent = await fsAdapter.readFile(memoryFilePath, 'utf-8');
+      } catch (_e) {
+        // File doesn't exist, which is fine. currentContent will be empty.
+      }
+
+      const newContent = computeNewContent(currentContent, text);
+
+      await fsAdapter.writeFile(memoryFilePath, newContent, 'utf-8');
+    } catch (error) {
+      console.error(
+        `[MemoryTool] Error adding memory entry to ${memoryFilePath}:`,
+        error,
+      );
+      throw new Error(
+        `[MemoryTool] Failed to add memory entry: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -375,10 +380,10 @@ export class MemoryTool
     return {
       getFilePath: (_params: SaveMemoryParams) => getGlobalMemoryFilePath(),
       getCurrentContent: async (_params: SaveMemoryParams): Promise<string> =>
-        this.readMemoryFileContent(),
+        readMemoryFileContent(),
       getProposedContent: async (params: SaveMemoryParams): Promise<string> => {
-        const currentContent = await this.readMemoryFileContent();
-        return this.computeNewContent(currentContent, params.fact);
+        const currentContent = await readMemoryFileContent();
+        return computeNewContent(currentContent, params.fact);
       },
       createUpdatedParams: (
         _oldContent: string,

@@ -4,21 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { PartListUnion, PartUnion } from '@google/genai';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import type { PartListUnion, PartUnion } from '@google/genai';
+import type { AnyToolInvocation, Config } from '@google/gemini-cli-core';
 import {
-  Config,
+  debugLogger,
   getErrorMessage,
   isNodeError,
   unescapePath,
+  ReadManyFilesTool,
 } from '@google/gemini-cli-core';
-import {
-  HistoryItem,
-  IndividualToolCallDisplay,
-  ToolCallStatus,
-} from '../types.js';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import type { HistoryItem, IndividualToolCallDisplay } from '../types.js';
+import { ToolCallStatus } from '../types.js';
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 interface HandleAtCommandParams {
   query: string;
@@ -87,9 +86,17 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
         inEscape = false;
       } else if (char === '\\') {
         inEscape = true;
-      } else if (/\s/.test(char)) {
-        // Path ends at first whitespace not escaped
+      } else if (/[,\s;!?()[\]{}]/.test(char)) {
+        // Path ends at first whitespace or punctuation not escaped
         break;
+      } else if (char === '.') {
+        // For . we need to be more careful - only terminate if followed by whitespace or end of string
+        // This allows file extensions like .txt, .js but terminates at sentence endings like "file.txt. Next sentence"
+        const nextChar =
+          pathEndIndex + 1 < query.length ? query[pathEndIndex + 1] : '';
+        if (nextChar === '' || /\s/.test(nextChar)) {
+          break;
+        }
       }
       pathEndIndex++;
     }
@@ -128,11 +135,8 @@ export async function handleAtCommand({
   );
 
   if (atPathCommandParts.length === 0) {
-    addItem({ type: 'user', text: query }, userMessageTimestamp);
     return { processedQuery: [{ text: query }], shouldProceed: true };
   }
-
-  addItem({ type: 'user', text: query }, userMessageTimestamp);
 
   // Get centralized file discovery service
   const fileDiscovery = config.getFileService();
@@ -142,14 +146,15 @@ export async function handleAtCommand({
   const pathSpecsToRead: string[] = [];
   const atPathToResolvedSpecMap = new Map<string, string>();
   const contentLabelsForDisplay: string[] = [];
+  const absoluteToRelativePathMap = new Map<string, string>();
   const ignoredByReason: Record<string, string[]> = {
     git: [],
     gemini: [],
     both: [],
   };
 
-  const toolRegistry = await config.getToolRegistry();
-  const readManyFilesTool = toolRegistry.getTool('read_many_files');
+  const toolRegistry = config.getToolRegistry();
+  const readManyFilesTool = new ReadManyFilesTool(config);
   const globTool = toolRegistry.getTool('glob');
 
   if (!readManyFilesTool) {
@@ -226,17 +231,29 @@ export async function handleAtCommand({
     for (const dir of config.getWorkspaceContext().getDirectories()) {
       let currentPathSpec = pathName;
       let resolvedSuccessfully = false;
+      let relativePath = pathName;
       try {
-        const absolutePath = path.resolve(dir, pathName);
+        const absolutePath = path.isAbsolute(pathName)
+          ? pathName
+          : path.resolve(dir, pathName);
         const stats = await fs.stat(absolutePath);
+
+        // Convert absolute path to relative path
+        relativePath = path.isAbsolute(pathName)
+          ? path.relative(dir, absolutePath)
+          : pathName;
+
         if (stats.isDirectory()) {
-          currentPathSpec =
-            pathName + (pathName.endsWith(path.sep) ? `**` : `/**`);
+          currentPathSpec = path.join(relativePath, '**');
           onDebugMessage(
             `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
           );
         } else {
-          onDebugMessage(`Path ${pathName} resolved to file: ${absolutePath}`);
+          currentPathSpec = relativePath;
+          absoluteToRelativePathMap.set(absolutePath, relativePath);
+          onDebugMessage(
+            `Path ${pathName} resolved to file: ${absolutePath}, using relative path: ${relativePath}`,
+          );
         }
         resolvedSuccessfully = true;
       } catch (error) {
@@ -246,7 +263,7 @@ export async function handleAtCommand({
               `Path ${pathName} not found directly, attempting glob search.`,
             );
             try {
-              const globResult = await globTool.execute(
+              const globResult = await globTool.buildAndExecute(
                 {
                   pattern: `**/*${pathName}*`,
                   path: dir,
@@ -263,6 +280,10 @@ export async function handleAtCommand({
                 if (lines.length > 1 && lines[1]) {
                   const firstMatchAbsolute = lines[1].trim();
                   currentPathSpec = path.relative(dir, firstMatchAbsolute);
+                  absoluteToRelativePathMap.set(
+                    firstMatchAbsolute,
+                    currentPathSpec,
+                  );
                   onDebugMessage(
                     `Glob search for ${pathName} found ${firstMatchAbsolute}, using relative path: ${currentPathSpec}`,
                   );
@@ -278,7 +299,7 @@ export async function handleAtCommand({
                 );
               }
             } catch (globError) {
-              console.error(
+              debugLogger.warn(
                 `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
               );
               onDebugMessage(
@@ -291,7 +312,7 @@ export async function handleAtCommand({
             );
           }
         } else {
-          console.error(
+          debugLogger.warn(
             `Error stating path ${pathName}: ${getErrorMessage(error)}`,
           );
           onDebugMessage(
@@ -302,7 +323,8 @@ export async function handleAtCommand({
       if (resolvedSuccessfully) {
         pathSpecsToRead.push(currentPathSpec);
         atPathToResolvedSpecMap.set(originalAtPath, currentPathSpec);
-        contentLabelsForDisplay.push(pathName);
+        const displayPath = path.isAbsolute(pathName) ? relativePath : pathName;
+        contentLabelsForDisplay.push(displayPath);
         break;
       }
     }
@@ -320,8 +342,7 @@ export async function handleAtCommand({
       if (
         i > 0 &&
         initialQueryText.length > 0 &&
-        !initialQueryText.endsWith(' ') &&
-        resolvedSpec
+        !initialQueryText.endsWith(' ')
       ) {
         // Add space if previous part was text and didn't end with space, or if previous was @path
         const prevPart = commandParts[i - 1];
@@ -354,24 +375,24 @@ export async function handleAtCommand({
 
   // Inform user about ignored paths
   const totalIgnored =
-    ignoredByReason.git.length +
-    ignoredByReason.gemini.length +
-    ignoredByReason.both.length;
+    ignoredByReason['git'].length +
+    ignoredByReason['gemini'].length +
+    ignoredByReason['both'].length;
 
   if (totalIgnored > 0) {
     const messages = [];
-    if (ignoredByReason.git.length) {
-      messages.push(`Git-ignored: ${ignoredByReason.git.join(', ')}`);
+    if (ignoredByReason['git'].length) {
+      messages.push(`Git-ignored: ${ignoredByReason['git'].join(', ')}`);
     }
-    if (ignoredByReason.gemini.length) {
-      messages.push(`Gemini-ignored: ${ignoredByReason.gemini.join(', ')}`);
+    if (ignoredByReason['gemini'].length) {
+      messages.push(`Gemini-ignored: ${ignoredByReason['gemini'].join(', ')}`);
     }
-    if (ignoredByReason.both.length) {
-      messages.push(`Ignored by both: ${ignoredByReason.both.join(', ')}`);
+    if (ignoredByReason['both'].length) {
+      messages.push(`Ignored by both: ${ignoredByReason['both'].join(', ')}`);
     }
 
     const message = `Ignored ${totalIgnored} files:\n${messages.join('\n')}`;
-    console.log(message);
+    debugLogger.log(message);
     onDebugMessage(message);
   }
 
@@ -395,7 +416,7 @@ export async function handleAtCommand({
   const processedQueryParts: PartUnion[] = [{ text: initialQueryText }];
 
   const toolArgs = {
-    paths: pathSpecsToRead,
+    include: pathSpecsToRead,
     file_filtering_options: {
       respect_git_ignore: respectFileIgnore.respectGitIgnore,
       respect_gemini_ignore: respectFileIgnore.respectGeminiIgnore,
@@ -404,12 +425,14 @@ export async function handleAtCommand({
   };
   let toolCallDisplay: IndividualToolCallDisplay;
 
+  let invocation: AnyToolInvocation | undefined = undefined;
   try {
-    const result = await readManyFilesTool.execute(toolArgs, signal);
+    invocation = readManyFilesTool.build(toolArgs);
+    const result = await invocation.execute(signal);
     toolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
-      description: readManyFilesTool.getDescription(toolArgs),
+      description: invocation.getDescription(),
       status: ToolCallStatus.Success,
       resultDisplay:
         result.returnDisplay ||
@@ -426,10 +449,27 @@ export async function handleAtCommand({
         if (typeof part === 'string') {
           const match = fileContentRegex.exec(part);
           if (match) {
-            const filePathSpecInContent = match[1]; // This is a resolved pathSpec
+            const filePathSpecInContent = match[1];
             const fileActualContent = match[2].trim();
+
+            let displayPath = absoluteToRelativePathMap.get(
+              filePathSpecInContent,
+            );
+
+            // Fallback: if no mapping found, try to convert absolute path to relative
+            if (!displayPath) {
+              for (const dir of config.getWorkspaceContext().getDirectories()) {
+                if (filePathSpecInContent.startsWith(dir)) {
+                  displayPath = path.relative(dir, filePathSpecInContent);
+                  break;
+                }
+              }
+            }
+
+            displayPath = displayPath || filePathSpecInContent;
+
             processedQueryParts.push({
-              text: `\nContent from @${filePathSpecInContent}:\n`,
+              text: `\nContent from @${displayPath}:\n`,
             });
             processedQueryParts.push({ text: fileActualContent });
           } else {
@@ -440,7 +480,6 @@ export async function handleAtCommand({
           processedQueryParts.push(part);
         }
       }
-      processedQueryParts.push({ text: '\n--- End of content ---' });
     } else {
       onDebugMessage(
         'read_many_files tool returned no content or empty content.',
@@ -459,7 +498,9 @@ export async function handleAtCommand({
     toolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
-      description: readManyFilesTool.getDescription(toolArgs),
+      description:
+        invocation?.getDescription() ??
+        'Error attempting to execute tool to read files',
       status: ToolCallStatus.Error,
       resultDisplay: `Error reading files (${contentLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
       confirmationDetails: undefined,

@@ -8,6 +8,7 @@ import { useCallback, useReducer, useEffect } from 'react';
 import type { Key } from './useKeypress.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -260,7 +261,8 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         normalizedKey.name === 'tab' ||
         (normalizedKey.name === 'return' && !normalizedKey.ctrl) ||
         normalizedKey.name === 'up' ||
-        normalizedKey.name === 'down'
+        normalizedKey.name === 'down' ||
+        (normalizedKey.ctrl && normalizedKey.name === 'r')
       ) {
         return false; // Let InputPrompt handle completion
       }
@@ -268,6 +270,11 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       // Let InputPrompt handle Ctrl+V for clipboard image pasting
       if (normalizedKey.ctrl && normalizedKey.name === 'v') {
         return false; // Let InputPrompt handle clipboard functionality
+      }
+
+      // Let InputPrompt handle shell commands
+      if (normalizedKey.sequence === '!' && buffer.text.length === 0) {
+        return false;
       }
 
       // Special handling for Enter key to allow command submission (lower priority than completion)
@@ -306,6 +313,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       meta: key.meta || false,
       shift: key.shift || false,
       paste: key.paste || false,
+      insertable: key.insertable || false,
     }),
     [],
   );
@@ -388,7 +396,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         normalizedKey = normalizeKey(key);
       } catch (error) {
         // Handle malformed key inputs gracefully
-        console.warn('Malformed key input in vim mode:', key, error);
+        debugLogger.warn('Malformed key input in vim mode:', key, error);
         return false;
       }
 
@@ -399,10 +407,14 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
       // Handle NORMAL mode
       if (state.mode === 'NORMAL') {
-        // Handle Escape key in NORMAL mode - clear all pending states
+        // If in NORMAL mode, allow escape to pass through to other handlers
+        // if there's no pending operation.
         if (normalizedKey.name === 'escape') {
-          dispatch({ type: 'CLEAR_PENDING_STATES' });
-          return true; // Handled by vim
+          if (state.pendingOperator) {
+            dispatch({ type: 'CLEAR_PENDING_STATES' });
+            return true; // Handled by vim
+          }
+          return false; // Pass through to other handlers
         }
 
         // Handle count input (numbers 1-9, and 0 if count > 0)

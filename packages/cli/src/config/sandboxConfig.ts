@@ -4,19 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SandboxConfig } from '@google/gemini-cli-core';
+import {
+  getPackageJson,
+  type SandboxConfig,
+  FatalSandboxError,
+} from '@google/gemini-cli-core';
 import commandExists from 'command-exists';
 import * as os from 'node:os';
-import { getPackageJson } from '../utils/package.js';
-import { Settings } from './settings.js';
+import type { Settings } from './settings.js';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // This is a stripped-down version of the CliArgs interface from config.ts
 // to avoid circular dependencies.
 interface SandboxCliArgs {
-  sandbox?: boolean | string;
-  sandboxImage?: string;
+  sandbox?: boolean | string | null;
 }
-
 const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
   'docker',
   'podman',
@@ -28,16 +34,16 @@ function isSandboxCommand(value: string): value is SandboxConfig['command'] {
 }
 
 function getSandboxCommand(
-  sandbox?: boolean | string,
+  sandbox?: boolean | string | null,
 ): SandboxConfig['command'] | '' {
   // If the SANDBOX env var is set, we're already inside the sandbox.
-  if (process.env.SANDBOX) {
+  if (process.env['SANDBOX']) {
     return '';
   }
 
   // note environment variable takes precedence over argument (from command line or settings)
   const environmentConfiguredSandbox =
-    process.env.GEMINI_SANDBOX?.toLowerCase().trim() ?? '';
+    process.env['GEMINI_SANDBOX']?.toLowerCase().trim() ?? '';
   sandbox =
     environmentConfiguredSandbox?.length > 0
       ? environmentConfiguredSandbox
@@ -51,21 +57,19 @@ function getSandboxCommand(
 
   if (typeof sandbox === 'string' && sandbox) {
     if (!isSandboxCommand(sandbox)) {
-      console.error(
-        `ERROR: invalid sandbox command '${sandbox}'. Must be one of ${VALID_SANDBOX_COMMANDS.join(
+      throw new FatalSandboxError(
+        `Invalid sandbox command '${sandbox}'. Must be one of ${VALID_SANDBOX_COMMANDS.join(
           ', ',
         )}`,
       );
-      process.exit(1);
     }
     // confirm that specified command exists
     if (commandExists.sync(sandbox)) {
       return sandbox;
     }
-    console.error(
-      `ERROR: missing sandbox command '${sandbox}' (from GEMINI_SANDBOX)`,
+    throw new FatalSandboxError(
+      `Missing sandbox command '${sandbox}' (from GEMINI_SANDBOX)`,
     );
-    process.exit(1);
   }
 
   // look for seatbelt, docker, or podman, in that order
@@ -80,11 +84,10 @@ function getSandboxCommand(
 
   // throw an error if user requested sandbox but no command was found
   if (sandbox === true) {
-    console.error(
-      'ERROR: GEMINI_SANDBOX is true but failed to determine command for sandbox; ' +
+    throw new FatalSandboxError(
+      'GEMINI_SANDBOX is true but failed to determine command for sandbox; ' +
         'install docker or podman or specify command in GEMINI_SANDBOX',
     );
-    process.exit(1);
   }
 
   return '';
@@ -94,14 +97,12 @@ export async function loadSandboxConfig(
   settings: Settings,
   argv: SandboxCliArgs,
 ): Promise<SandboxConfig | undefined> {
-  const sandboxOption = argv.sandbox ?? settings.sandbox;
+  const sandboxOption = argv.sandbox ?? settings.tools?.sandbox;
   const command = getSandboxCommand(sandboxOption);
 
-  const packageJson = await getPackageJson();
+  const packageJson = await getPackageJson(__dirname);
   const image =
-    argv.sandboxImage ??
-    process.env.GEMINI_SANDBOX_IMAGE ??
-    packageJson?.config?.sandboxImageUri;
+    process.env['GEMINI_SANDBOX_IMAGE'] ?? packageJson?.config?.sandboxImageUri;
 
   return command && image ? { command, image } : undefined;
 }

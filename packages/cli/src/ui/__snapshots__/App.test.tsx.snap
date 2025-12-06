@@ -1,18 +1,21 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`App UI > should render correctly with the prompt input box 1`] = `
-"
-
-╭────────────────────────────────────────────────────────────────────────────────────────╮
-│ >   Type your message or @path/to/file                                                 │
-╰────────────────────────────────────────────────────────────────────────────────────────╯
-/test/dir                no sandbox (see /docs)                  model (100% context left)"
+exports[`App > Snapshots > renders default layout correctly 1`] = `
+"MainContent
+Notifications
+Composer"
 `;
 
-exports[`App UI > should render the initial UI correctly 1`] = `
-"
- I'm Feeling Lucky (esc to cancel, 0s)
+exports[`App > Snapshots > renders screen reader layout correctly 1`] = `
+"Notifications
+Footer
+MainContent
+Composer"
+`;
 
-
-/test/dir                no sandbox (see /docs)                  model (100% context left)"
+exports[`App > Snapshots > renders with dialogs visible 1`] = `
+"Notifications
+Footer
+MainContent
+DialogManager"
 `;

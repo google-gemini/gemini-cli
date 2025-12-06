@@ -11,7 +11,10 @@ import {
   calculateErrorRate,
   computeSessionStats,
 } from './computeStats.js';
-import { ModelMetrics, SessionMetrics } from '../contexts/SessionContext.js';
+import type {
+  ModelMetrics,
+  SessionMetrics,
+} from '../contexts/SessionContext.js';
 
 describe('calculateErrorRate', () => {
   it('should return 0 if totalRequests is 0', () => {
@@ -118,8 +121,12 @@ describe('computeSessionStats', () => {
         totalSuccess: 0,
         totalFail: 0,
         totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        totalDecisions: { accept: 0, reject: 0, modify: 0, auto_accept: 0 },
         byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     };
 
@@ -137,6 +144,8 @@ describe('computeSessionStats', () => {
       agreementRate: 0,
       totalPromptTokens: 0,
       totalCachedTokens: 0,
+      totalLinesAdded: 0,
+      totalLinesRemoved: 0,
     });
   });
 
@@ -160,8 +169,12 @@ describe('computeSessionStats', () => {
         totalSuccess: 1,
         totalFail: 0,
         totalDurationMs: 250,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        totalDecisions: { accept: 0, reject: 0, modify: 0, auto_accept: 0 },
         byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     };
 
@@ -194,8 +207,12 @@ describe('computeSessionStats', () => {
         totalSuccess: 0,
         totalFail: 0,
         totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        totalDecisions: { accept: 0, reject: 0, modify: 0, auto_accept: 0 },
         byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     };
 
@@ -212,8 +229,12 @@ describe('computeSessionStats', () => {
         totalSuccess: 8,
         totalFail: 2,
         totalDurationMs: 1000,
-        totalDecisions: { accept: 6, reject: 2, modify: 2 },
+        totalDecisions: { accept: 6, reject: 2, modify: 2, auto_accept: 0 },
         byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     };
 
@@ -231,8 +252,12 @@ describe('computeSessionStats', () => {
         totalSuccess: 0,
         totalFail: 0,
         totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        totalDecisions: { accept: 0, reject: 0, modify: 0, auto_accept: 0 },
         byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     };
 
@@ -243,5 +268,28 @@ describe('computeSessionStats', () => {
     expect(result.cacheEfficiency).toBe(0);
     expect(result.successRate).toBe(0);
     expect(result.agreementRate).toBe(0);
+  });
+
+  it('should correctly include line counts', () => {
+    const metrics: SessionMetrics = {
+      models: {},
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: { accept: 0, reject: 0, modify: 0, auto_accept: 0 },
+        byName: {},
+      },
+      files: {
+        totalLinesAdded: 42,
+        totalLinesRemoved: 18,
+      },
+    };
+
+    const result = computeSessionStats(metrics);
+
+    expect(result.totalLinesAdded).toBe(42);
+    expect(result.totalLinesRemoved).toBe(18);
   });
 });

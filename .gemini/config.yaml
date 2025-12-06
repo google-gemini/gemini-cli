@@ -3,7 +3,7 @@
 have_fun: false
 code_review:
   disable: false
-  comment_severity_threshold: HIGH
+  comment_severity_threshold: 'HIGH'
   max_review_comments: -1
   pull_request_opened:
     help: false

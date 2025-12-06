@@ -1,70 +1,158 @@
-# Gemini CLI: Quotas and Pricing
+# Gemini CLI: Quotas and pricing
 
-Your Gemini CLI quotas and pricing depend on the type of account you use to authenticate with Google. Additionally, both quotas and pricing may be calculated differently based on the model version, requests, and tokens used. A summary of model usage is available through the `/stats` command and presented on exit at the end of a session. See [privacy and terms](./tos-privacy.md) for details on Privacy policy and Terms of Service. Note: published prices are list price; additional negotiated commercial discounting may apply.
+Gemini CLI offers a generous free tier that covers many individual developers'
+use cases. For enterprise or professional usage, or if you need higher limits,
+several options are available depending on your authentication account type.
 
-This article outlines the specific quotas and pricing applicable to the Gemini CLI when using different authentication methods.
+See [privacy and terms](./tos-privacy.md) for details on the Privacy Policy and
+Terms of Service.
 
-## 1. Log in with Google (Gemini Code Assist Free Tier)
+> **Note:** Published prices are list price; additional negotiated commercial
+> discounting may apply.
 
-For users who authenticate by using their Google account to access Gemini Code Assist for individuals:
+This article outlines the specific quotas and pricing applicable to Gemini CLI
+when using different authentication methods.
 
-- **Quota:**
-  - 60 requests per minute
-  - 1000 requests per day
-  - Token usage is not applicable
-- **Cost:** Free
-- **Details:** [Gemini Code Assist Quotas](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli)
-- **Notes:** A specific quota for different models is not specified; model fallback may occur to preserve shared experience quality.
+Generally, there are three categories to choose from:
 
-## 2. Gemini API Key (Unpaid)
+- Free Usage: Ideal for experimentation and light use.
+- Paid Tier (fixed price): For individual developers or enterprises who need
+  more generous daily quotas and predictable costs.
+- Pay-As-You-Go: The most flexible option for professional use, long-running
+  tasks, or when you need full control over your usage.
 
-If you are using a Gemini API key for the free tier:
+## Free usage
 
-- **Quota:**
-  - Flash model only
-  - 10 requests per minute
-  - 250 requests per day
-- **Cost:** Free
-- **Details:** [Gemini API Rate Limits](https://ai.google.dev/gemini-api/docs/rate-limits)
+Your journey begins with a generous free tier, perfect for experimentation and
+light use.
 
-## 3. Gemini API Key (Paid)
+Your free usage limits depend on your authorization type.
 
-If you are using a Gemini API key with a paid plan:
+### Log in with Google (Gemini Code Assist for individuals)
 
-- **Quota:** Varies by pricing tier.
-- **Cost:** Varies by pricing tier and model/token usage.
-- **Details:** [Gemini API Rate Limits](https://ai.google.dev/gemini-api/docs/rate-limits), [Gemini API Pricing](https://ai.google.dev/gemini-api/docs/pricing)
+For users who authenticate by using their Google account to access Gemini Code
+Assist for individuals. This includes:
 
-## 4. Login with Google (for Workspace or Licensed Code Assist users)
+- 1000 model requests / user / day
+- 60 model requests / user / minute
+- Model requests will be made across the Gemini model family as determined by
+  Gemini CLI.
 
-For users of Standard or Enterprise editions of Gemini Code Assist, quotas and pricing are based on a fixed price subscription with assigned license seats:
+Learn more at
+[Gemini Code Assist for Individuals Limits](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli).
 
-- **Standard Tier:**
-  - **Quota:** 120 requests per minute, 1500 per day
-- **Enterprise Tier:**
-  - **Quota:** 120 requests per minute, 2000 per day
-- **Cost:** Fixed price included with your Gemini for Google Workspace or Gemini Code Assist subscription.
-- **Details:** [Gemini Code Assist Quotas](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli), [Gemini Code Assist Pricing](https://cloud.google.com/products/gemini/pricing)
-- **Notes:**
-  - Specific quota for different models is not specified; model fallback may occur to preserve shared experience quality.
-  - Members of the Google Developer Program may have Gemini Code Assist licenses through their membership.
+### Log in with Gemini API Key (unpaid)
 
-## 5. Vertex AI (Express Mode)
+If you are using a Gemini API key, you can also benefit from a free tier. This
+includes:
 
-If you are using Vertex AI in Express Mode:
+- 250 model requests / user / day
+- 10 model requests / user / minute
+- Model requests to Flash model only.
 
-- **Quota:** Quotas are variable and specific to your account. See the source for more details.
-- **Cost:** After your Express Mode usage is consumed and you enable billing for your project, cost is based on standard [Vertex AI Pricing](https://cloud.google.com/vertex-ai/pricing).
-- **Details:** [Vertex AI Express Mode Quotas](https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview#quotas)
+Learn more at
+[Gemini API Rate Limits](https://ai.google.dev/gemini-api/docs/rate-limits).
 
-## 6. Vertex AI (Regular Mode)
+### Log in with Vertex AI (Express Mode)
 
-If you are using the standard Vertex AI service:
+Vertex AI offers an Express Mode without the need to enable billing. This
+includes:
 
-- **Quota:** Governed by a dynamic shared quota system or pre-purchased provisioned throughput.
-- **Cost:** Based on model and token usage. See [Vertex AI Pricing](https://cloud.google.com/vertex-ai/pricing).
-- **Details:** [Vertex AI Dynamic Shared Quota](https://cloud.google.com/vertex-ai/generative-ai/docs/resources/dynamic-shared-quota)
+- 90 days before you need to enable billing.
+- Quotas and models are variable and specific to your account.
 
-## 7. Google One and Ultra plans, Gemini for Workspace plans
+Learn more at
+[Vertex AI Express Mode Limits](https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview#quotas).
 
-These plans currently apply only to the use of Gemini web-based products provided by Google-based experiences (for example, the Gemini web app or the Flow video editor). These plans do not apply to the API usage which powers the Gemini CLI. Supporting these plans is under active consideration for future support.
+## Paid tier: Higher limits for a fixed cost
+
+If you use up your initial number of requests, you can continue to benefit from
+Gemini CLI by upgrading to one of the following subscriptions:
+
+- [Google AI Pro and AI Ultra](https://gemini.google/subscriptions/). This is
+  recommended for individual developers. Quotas and pricing are based on a fixed
+  price subscription.
+
+  For predictable costs, you can log in with Google.
+
+  Learn more at
+  [Gemini Code Assist Quotas and Limits](https://developers.google.com/gemini-code-assist/resources/quotas)
+
+- [Purchase a Gemini Code Assist Subscription through Google Cloud ](https://cloud.google.com/gemini/docs/codeassist/overview)
+  by signing up in the Google Cloud console. Learn more at
+  [Set up Gemini Code Assist](https://cloud.google.com/gemini/docs/discover/set-up-gemini).
+
+  Quotas and pricing are based on a fixed price subscription with assigned
+  license seats. For predictable costs, you can sign in with Google.
+
+  This includes:
+  - Gemini Code Assist Standard edition:
+    - 1500 model requests / user / day
+    - 120 model requests / user / minute
+  - Gemini Code Assist Enterprise edition:
+    - 2000 model requests / user / day
+    - 120 model requests / user / minute
+  - Model requests will be made across the Gemini model family as determined by
+    Gemini CLI.
+
+  [Learn more about Gemini Code Assist Standard and Enterprise license limits](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli).
+
+## Pay as you go
+
+If you hit your daily request limits or exhaust your Gemini Pro quota even after
+upgrading, the most flexible solution is to switch to a pay-as-you-go model,
+where you pay for the specific amount of processing you use. This is the
+recommended path for uninterrupted access.
+
+To do this, log in using a Gemini API key or Vertex AI.
+
+- Vertex AI (Regular Mode):
+  - Quota: Governed by a dynamic shared quota system or pre-purchased
+    provisioned throughput.
+  - Cost: Based on model and token usage.
+
+Learn more at
+[Vertex AI Dynamic Shared Quota](https://cloud.google.com/vertex-ai/generative-ai/docs/resources/dynamic-shared-quota)
+and [Vertex AI Pricing](https://cloud.google.com/vertex-ai/pricing).
+
+- Gemini API key:
+  - Quota: Varies by pricing tier.
+  - Cost: Varies by pricing tier and model/token usage.
+
+Learn more at
+[Gemini API Rate Limits](https://ai.google.dev/gemini-api/docs/rate-limits),
+[Gemini API Pricing](https://ai.google.dev/gemini-api/docs/pricing)
+
+It’s important to highlight that when using an API key, you pay per token/call.
+This can be more expensive for many small calls with few tokens, but it's the
+only way to ensure your workflow isn't interrupted by quota limits.
+
+## Gemini for workspace plans
+
+These plans currently apply only to the use of Gemini web-based products
+provided by Google-based experiences (for example, the Gemini web app or the
+Flow video editor). These plans do not apply to the API usage which powers the
+Gemini CLI. Supporting these plans is under active consideration for future
+support.
+
+## Tips to avoid high costs
+
+When using a Pay as you Go API key, be mindful of your usage to avoid unexpected
+costs.
+
+- Don't blindly accept every suggestion, especially for computationally
+  intensive tasks like refactoring large codebases.
+- Be intentional with your prompts and commands. You are paying per call, so
+  think about the most efficient way to get the job done.
+
+## Gemini API vs. Vertex
+
+- Gemini API (gemini developer api): This is the fastest way to use the Gemini
+  models directly.
+- Vertex AI: This is the enterprise-grade platform for building, deploying, and
+  managing Gemini models with specific security and control requirements.
+
+## Understanding your usage
+
+A summary of model usage is available through the `/stats` command and presented
+on exit at the end of a session.

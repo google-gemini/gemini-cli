@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { HistoryItemCompression, MessageType } from '../types.js';
-import { CommandKind, SlashCommand } from './types.js';
+import type { HistoryItemCompression } from '../types.js';
+import { MessageType } from '../types.js';
+import type { SlashCommand } from './types.js';
+import { CommandKind } from './types.js';
 
 export const compressCommand: SlashCommand = {
   name: 'compress',
   altNames: ['summarize'],
-  description: 'Compresses the context by replacing it with a summary.',
+  description: 'Compresses the context by replacing it with a summary',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async (context) => {
     const { ui } = context;
     if (ui.pendingItem) {
@@ -31,6 +34,7 @@ export const compressCommand: SlashCommand = {
         isPending: true,
         originalTokenCount: null,
         newTokenCount: null,
+        compressionStatus: null,
       },
     };
 
@@ -48,6 +52,7 @@ export const compressCommand: SlashCommand = {
               isPending: false,
               originalTokenCount: compressed.originalTokenCount,
               newTokenCount: compressed.newTokenCount,
+              compressionStatus: compressed.compressionStatus,
             },
           } as HistoryItemCompression,
           Date.now(),

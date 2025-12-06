@@ -17,10 +17,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { spawn, execSync } from 'child_process';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
-import { readFileSync } from 'fs';
+import { spawn, execSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
@@ -55,7 +55,7 @@ if (process.env.DEBUG && !sandboxCommand) {
   }
 }
 
-nodeArgs.push('./packages/cli');
+nodeArgs.push(join(root, 'packages', 'cli'));
 nodeArgs.push(...process.argv.slice(2));
 
 const env = {

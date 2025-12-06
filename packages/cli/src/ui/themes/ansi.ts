@@ -5,6 +5,7 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
+import { darkSemanticColors } from './semantic-tokens.js';
 
 const ansiColors: ColorsTheme = {
   type: 'dark',
@@ -21,6 +22,7 @@ const ansiColors: ColorsTheme = {
   DiffRemoved: '#4D0000',
   Comment: 'gray',
   Gray: 'gray',
+  DarkGray: 'gray',
   GradientColors: ['cyan', 'green'],
 };
 
@@ -154,4 +156,5 @@ export const ANSI: Theme = new Theme(
     },
   },
   ansiColors,
+  darkSemanticColors,
 );

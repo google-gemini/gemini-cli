@@ -1,0 +1,9 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<EnumSelector /> > renders inactive state and matches snapshot 1`] = `"← 中文 (简体) →"`;
+
+exports[`<EnumSelector /> > renders with numeric options and matches snapshot 1`] = `"← Medium →"`;
+
+exports[`<EnumSelector /> > renders with single option and matches snapshot 1`] = `"  Only Option"`;
+
+exports[`<EnumSelector /> > renders with string options and matches snapshot 1`] = `"← English →"`;

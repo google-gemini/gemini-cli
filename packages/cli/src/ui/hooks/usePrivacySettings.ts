@@ -5,7 +5,12 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Config, CodeAssistServer, UserTierId } from '@google/gemini-cli-core';
+import {
+  type Config,
+  type CodeAssistServer,
+  UserTierId,
+  getCodeAssistServer,
+} from '@google/gemini-cli-core';
 
 export interface PrivacyState {
   isLoading: boolean;
@@ -25,8 +30,11 @@ export const usePrivacySettings = (config: Config) => {
         isLoading: true,
       });
       try {
-        const server = getCodeAssistServer(config);
-        const tier = await getTier(server);
+        const server = getCodeAssistServerOrFail(config);
+        const tier = server.userTier;
+        if (tier === undefined) {
+          throw new Error('Could not determine user tier.');
+        }
         if (tier !== UserTierId.FREE) {
           // We don't need to fetch opt-out info since non-free tier
           // data gathering is already worked out some other way.
@@ -50,13 +58,14 @@ export const usePrivacySettings = (config: Config) => {
         });
       }
     };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     fetchInitialState();
   }, [config]);
 
   const updateDataCollectionOptIn = useCallback(
     async (optIn: boolean) => {
       try {
-        const server = getCodeAssistServer(config);
+        const server = getCodeAssistServerOrFail(config);
         const updatedOptIn = await setRemoteDataCollectionOptIn(server, optIn);
         setPrivacyState({
           isLoading: false,
@@ -79,31 +88,14 @@ export const usePrivacySettings = (config: Config) => {
   };
 };
 
-function getCodeAssistServer(config: Config): CodeAssistServer {
-  const server = config.getGeminiClient().getContentGenerator();
-  // Neither of these cases should ever happen.
-  if (!(server instanceof CodeAssistServer)) {
+function getCodeAssistServerOrFail(config: Config): CodeAssistServer {
+  const server = getCodeAssistServer(config);
+  if (server === undefined) {
     throw new Error('Oauth not being used');
-  } else if (!server.projectId) {
-    throw new Error('Oauth not being used');
+  } else if (server.projectId === undefined) {
+    throw new Error('CodeAssist server is missing a project ID');
   }
   return server;
-}
-
-async function getTier(server: CodeAssistServer): Promise<UserTierId> {
-  const loadRes = await server.loadCodeAssist({
-    cloudaicompanionProject: server.projectId,
-    metadata: {
-      ideType: 'IDE_UNSPECIFIED',
-      platform: 'PLATFORM_UNSPECIFIED',
-      pluginType: 'GEMINI',
-      duetProject: server.projectId,
-    },
-  });
-  if (!loadRes.currentTier) {
-    throw new Error('User does not have a current tier');
-  }
-  return loadRes.currentTier.id;
 }
 
 async function getRemoteDataCollectionOptIn(

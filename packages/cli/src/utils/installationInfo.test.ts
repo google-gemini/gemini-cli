@@ -6,14 +6,19 @@
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getInstallationInfo, PackageManager } from './installationInfo.js';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as childProcess from 'child_process';
-import { isGitRepository } from '@google/gemini-cli-core';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as childProcess from 'node:child_process';
+import { isGitRepository, debugLogger } from '@google/gemini-cli-core';
 
-vi.mock('@google/gemini-cli-core', () => ({
-  isGitRepository: vi.fn(),
-}));
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    isGitRepository: vi.fn(),
+  };
+});
 
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof fs>();
@@ -46,6 +51,7 @@ describe('getInstallationInfo', () => {
     originalArgv = [...process.argv];
     // Mock process.cwd() for isGitRepository
     vi.spyOn(process, 'cwd').mockReturnValue(projectRoot);
+    vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -59,7 +65,6 @@ describe('getInstallationInfo', () => {
   });
 
   it('should return UNKNOWN and log error if realpathSync fails', () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     process.argv[1] = '/path/to/cli';
     const error = new Error('realpath failed');
     mockedRealPathSync.mockImplementation(() => {
@@ -69,8 +74,7 @@ describe('getInstallationInfo', () => {
     const info = getInstallationInfo(projectRoot, false);
 
     expect(info.packageManager).toBe(PackageManager.UNKNOWN);
-    expect(consoleSpy).toHaveBeenCalledWith(error);
-    consoleSpy.mockRestore();
+    expect(debugLogger.log).toHaveBeenCalledWith(error);
   });
 
   it('should detect running from a local git clone', () => {
@@ -145,7 +149,9 @@ describe('getInstallationInfo', () => {
     );
     expect(info.packageManager).toBe(PackageManager.HOMEBREW);
     expect(info.isGlobal).toBe(true);
-    expect(info.updateMessage).toContain('brew upgrade');
+    expect(info.updateMessage).toBe(
+      'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
+    );
   });
 
   it('should fall through if brew command fails', () => {

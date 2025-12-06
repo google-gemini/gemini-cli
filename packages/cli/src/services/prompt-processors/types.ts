@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CommandContext } from '../../ui/commands/types.js';
+import type { CommandContext } from '../../ui/commands/types.js';
+import type { PartUnion } from '@google/genai';
+
+/**
+ * Defines the input/output type for prompt processors.
+ */
+export type PromptPipelineContent = PartUnion[];
 
 /**
  * Defines the interface for a prompt processor, a module that can transform
@@ -13,12 +19,8 @@ import { CommandContext } from '../../ui/commands/types.js';
  */
 export interface IPromptProcessor {
   /**
-   * Processes a prompt string, applying a specific transformation as part of a pipeline.
-   *
-   * Each processor in a command's pipeline receives the output of the previous
-   * processor. This method provides the full command context, allowing for
-   * complex transformations that may require access to invocation details,
-   * application services, or UI state.
+   * Processes a prompt input (which may contain text and multi-modal parts),
+   * applying a specific transformation as part of a pipeline.
    *
    * @param prompt The current state of the prompt string. This may have been
    *   modified by previous processors in the pipeline.
@@ -28,11 +30,16 @@ export interface IPromptProcessor {
    * @returns A promise that resolves to the transformed prompt string, which
    *   will be passed to the next processor or, if it's the last one, sent to the model.
    */
-  process(prompt: string, context: CommandContext): Promise<string>;
+  process(
+    prompt: PromptPipelineContent,
+    context: CommandContext,
+  ): Promise<PromptPipelineContent>;
 }
 
 /**
  * The placeholder string for shorthand argument injection in custom commands.
+ * When used outside of !{...}, arguments are injected raw.
+ * When used inside !{...}, arguments are shell-escaped.
  */
 export const SHORTHAND_ARGS_PLACEHOLDER = '{{args}}';
 
@@ -40,3 +47,8 @@ export const SHORTHAND_ARGS_PLACEHOLDER = '{{args}}';
  * The trigger string for shell command injection in custom commands.
  */
 export const SHELL_INJECTION_TRIGGER = '!{';
+
+/**
+ * The trigger string for at file injection in custom commands.
+ */
+export const AT_FILE_INJECTION_TRIGGER = '@{';

@@ -4,11 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
 import { StatsDisplay } from './StatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
-import { SessionMetrics } from '../contexts/SessionContext.js';
+import type { SessionMetrics } from '../contexts/SessionContext.js';
+import {
+  ToolCallDecision,
+  type RetrieveUserQuotaResponse,
+} from '@google/gemini-cli-core';
 
 // Mock the context to provide controlled data for testing
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
@@ -24,6 +28,7 @@ const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 const renderWithMockedStats = (metrics: SessionMetrics) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
+      sessionId: 'test-session-id',
       sessionStartTime: new Date(),
       metrics,
       lastPromptTokenCount: 0,
@@ -37,32 +42,47 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
   return render(<StatsDisplay duration="1s" />);
 };
 
+// Helper to create metrics with default zero values
+const createTestMetrics = (
+  overrides: Partial<SessionMetrics> = {},
+): SessionMetrics => ({
+  models: {},
+  tools: {
+    totalCalls: 0,
+    totalSuccess: 0,
+    totalFail: 0,
+    totalDurationMs: 0,
+    totalDecisions: {
+      accept: 0,
+      reject: 0,
+      modify: 0,
+      [ToolCallDecision.AUTO_ACCEPT]: 0,
+    },
+    byName: {},
+  },
+  files: {
+    totalLinesAdded: 0,
+    totalLinesRemoved: 0,
+  },
+  ...overrides,
+});
+
 describe('<StatsDisplay />', () => {
   it('renders only the Performance section in its zero state', () => {
-    const zeroMetrics: SessionMetrics = {
-      models: {},
-      tools: {
-        totalCalls: 0,
-        totalSuccess: 0,
-        totalFail: 0,
-        totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
-        byName: {},
-      },
-    };
+    const zeroMetrics = createTestMetrics();
 
     const { lastFrame } = renderWithMockedStats(zeroMetrics);
     const output = lastFrame();
 
     expect(output).toContain('Performance');
-    expect(output).not.toContain('Interaction Summary');
+    expect(output).toContain('Interaction Summary');
     expect(output).not.toContain('Efficiency & Optimizations');
     expect(output).not.toContain('Model'); // The table header
     expect(output).toMatchSnapshot();
   });
 
   it('renders a table with two models correctly', () => {
-    const metrics: SessionMetrics = {
+    const metrics = createTestMetrics({
       models: {
         'gemini-2.5-pro': {
           api: { totalRequests: 3, totalErrors: 0, totalLatencyMs: 15000 },
@@ -87,15 +107,7 @@ describe('<StatsDisplay />', () => {
           },
         },
       },
-      tools: {
-        totalCalls: 0,
-        totalSuccess: 0,
-        totalFail: 0,
-        totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
-        byName: {},
-      },
-    };
+    });
 
     const { lastFrame } = renderWithMockedStats(metrics);
     const output = lastFrame();
@@ -108,7 +120,7 @@ describe('<StatsDisplay />', () => {
   });
 
   it('renders all sections when all data is present', () => {
-    const metrics: SessionMetrics = {
+    const metrics = createTestMetrics({
       models: {
         'gemini-2.5-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
@@ -127,18 +139,28 @@ describe('<StatsDisplay />', () => {
         totalSuccess: 1,
         totalFail: 1,
         totalDurationMs: 123,
-        totalDecisions: { accept: 1, reject: 0, modify: 0 },
+        totalDecisions: {
+          accept: 1,
+          reject: 0,
+          modify: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
         byName: {
           'test-tool': {
             count: 2,
             success: 1,
             fail: 1,
             durationMs: 123,
-            decisions: { accept: 1, reject: 0, modify: 0 },
+            decisions: {
+              accept: 1,
+              reject: 0,
+              modify: 0,
+              [ToolCallDecision.AUTO_ACCEPT]: 0,
+            },
           },
         },
       },
-    };
+    });
 
     const { lastFrame } = renderWithMockedStats(metrics);
     const output = lastFrame();
@@ -153,25 +175,34 @@ describe('<StatsDisplay />', () => {
 
   describe('Conditional Rendering Tests', () => {
     it('hides User Agreement when no decisions are made', () => {
-      const metrics: SessionMetrics = {
-        models: {},
+      const metrics = createTestMetrics({
         tools: {
           totalCalls: 2,
           totalSuccess: 1,
           totalFail: 1,
           totalDurationMs: 123,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 }, // No decisions
+          totalDecisions: {
+            accept: 0,
+            reject: 0,
+            modify: 0,
+            [ToolCallDecision.AUTO_ACCEPT]: 0,
+          }, // No decisions
           byName: {
             'test-tool': {
               count: 2,
               success: 1,
               fail: 1,
               durationMs: 123,
-              decisions: { accept: 0, reject: 0, modify: 0 },
+              decisions: {
+                accept: 0,
+                reject: 0,
+                modify: 0,
+                [ToolCallDecision.AUTO_ACCEPT]: 0,
+              },
             },
           },
         },
-      };
+      });
 
       const { lastFrame } = renderWithMockedStats(metrics);
       const output = lastFrame();
@@ -183,7 +214,7 @@ describe('<StatsDisplay />', () => {
     });
 
     it('hides Efficiency section when cache is not used', () => {
-      const metrics: SessionMetrics = {
+      const metrics = createTestMetrics({
         models: {
           'gemini-2.5-pro': {
             api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
@@ -197,15 +228,7 @@ describe('<StatsDisplay />', () => {
             },
           },
         },
-        tools: {
-          totalCalls: 0,
-          totalSuccess: 0,
-          totalFail: 0,
-          totalDurationMs: 0,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
-          byName: {},
-        },
-      };
+      });
 
       const { lastFrame } = renderWithMockedStats(metrics);
       const output = lastFrame();
@@ -217,66 +240,124 @@ describe('<StatsDisplay />', () => {
 
   describe('Conditional Color Tests', () => {
     it('renders success rate in green for high values', () => {
-      const metrics: SessionMetrics = {
-        models: {},
+      const metrics = createTestMetrics({
         tools: {
           totalCalls: 10,
           totalSuccess: 10,
           totalFail: 0,
           totalDurationMs: 0,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          totalDecisions: {
+            accept: 0,
+            reject: 0,
+            modify: 0,
+            [ToolCallDecision.AUTO_ACCEPT]: 0,
+          },
           byName: {},
         },
-      };
+      });
       const { lastFrame } = renderWithMockedStats(metrics);
       expect(lastFrame()).toMatchSnapshot();
     });
 
     it('renders success rate in yellow for medium values', () => {
-      const metrics: SessionMetrics = {
-        models: {},
+      const metrics = createTestMetrics({
         tools: {
           totalCalls: 10,
           totalSuccess: 9,
           totalFail: 1,
           totalDurationMs: 0,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          totalDecisions: {
+            accept: 0,
+            reject: 0,
+            modify: 0,
+            [ToolCallDecision.AUTO_ACCEPT]: 0,
+          },
           byName: {},
         },
-      };
+      });
       const { lastFrame } = renderWithMockedStats(metrics);
       expect(lastFrame()).toMatchSnapshot();
     });
 
     it('renders success rate in red for low values', () => {
-      const metrics: SessionMetrics = {
-        models: {},
+      const metrics = createTestMetrics({
         tools: {
           totalCalls: 10,
           totalSuccess: 5,
           totalFail: 5,
           totalDurationMs: 0,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          totalDecisions: {
+            accept: 0,
+            reject: 0,
+            modify: 0,
+            [ToolCallDecision.AUTO_ACCEPT]: 0,
+          },
           byName: {},
         },
-      };
+      });
       const { lastFrame } = renderWithMockedStats(metrics);
       expect(lastFrame()).toMatchSnapshot();
     });
   });
 
+  describe('Code Changes Display', () => {
+    it('displays Code Changes when line counts are present', () => {
+      const metrics = createTestMetrics({
+        tools: {
+          totalCalls: 1,
+          totalSuccess: 1,
+          totalFail: 0,
+          totalDurationMs: 100,
+          totalDecisions: {
+            accept: 0,
+            reject: 0,
+            modify: 0,
+            [ToolCallDecision.AUTO_ACCEPT]: 0,
+          },
+          byName: {},
+        },
+        files: {
+          totalLinesAdded: 42,
+          totalLinesRemoved: 18,
+        },
+      });
+
+      const { lastFrame } = renderWithMockedStats(metrics);
+      const output = lastFrame();
+
+      expect(output).toContain('Code Changes:');
+      expect(output).toContain('+42');
+      expect(output).toContain('-18');
+      expect(output).toMatchSnapshot();
+    });
+
+    it('hides Code Changes when no lines are added or removed', () => {
+      const metrics = createTestMetrics({
+        tools: {
+          totalCalls: 1,
+          totalSuccess: 1,
+          totalFail: 0,
+          totalDurationMs: 100,
+          totalDecisions: {
+            accept: 0,
+            reject: 0,
+            modify: 0,
+            [ToolCallDecision.AUTO_ACCEPT]: 0,
+          },
+          byName: {},
+        },
+      });
+
+      const { lastFrame } = renderWithMockedStats(metrics);
+      const output = lastFrame();
+
+      expect(output).not.toContain('Code Changes:');
+      expect(output).toMatchSnapshot();
+    });
+  });
+
   describe('Title Rendering', () => {
-    const zeroMetrics: SessionMetrics = {
-      models: {},
-      tools: {
-        totalCalls: 0,
-        totalSuccess: 0,
-        totalFail: 0,
-        totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
-        byName: {},
-      },
-    };
+    const zeroMetrics = createTestMetrics();
 
     it('renders the default title when no title prop is provided', () => {
       const { lastFrame } = renderWithMockedStats(zeroMetrics);
@@ -289,6 +370,7 @@ describe('<StatsDisplay />', () => {
     it('renders the custom title when a title prop is provided', () => {
       useSessionStatsMock.mockReturnValue({
         stats: {
+          sessionId: 'test-session-id',
           sessionStartTime: new Date(),
           metrics: zeroMetrics,
           lastPromptTokenCount: 0,
@@ -306,6 +388,67 @@ describe('<StatsDisplay />', () => {
       expect(output).toContain('Agent powering down. Goodbye!');
       expect(output).not.toContain('Session Stats');
       expect(output).toMatchSnapshot();
+    });
+  });
+
+  describe('Quota Display', () => {
+    it('renders quota information when quotas are provided', () => {
+      const now = new Date('2025-01-01T12:00:00Z');
+      vi.useFakeTimers();
+      vi.setSystemTime(now);
+
+      const metrics = createTestMetrics({
+        models: {
+          'gemini-2.5-pro': {
+            api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
+            tokens: {
+              prompt: 100,
+              candidates: 100,
+              total: 250,
+              cached: 50,
+              thoughts: 0,
+              tool: 0,
+            },
+          },
+        },
+      });
+
+      const resetTime = new Date(now.getTime() + 1000 * 60 * 90).toISOString(); // 1 hour 30 minutes from now
+
+      const quotas: RetrieveUserQuotaResponse = {
+        buckets: [
+          {
+            modelId: 'gemini-2.5-pro',
+            remainingFraction: 0.75,
+            resetTime,
+          },
+        ],
+      };
+
+      useSessionStatsMock.mockReturnValue({
+        stats: {
+          sessionId: 'test-session-id',
+          sessionStartTime: new Date(),
+          metrics,
+          lastPromptTokenCount: 0,
+          promptCount: 5,
+        },
+
+        getPromptCount: () => 5,
+        startNewPrompt: vi.fn(),
+      });
+
+      const { lastFrame } = render(
+        <StatsDisplay duration="1s" quotas={quotas} />,
+      );
+      const output = lastFrame();
+
+      expect(output).toContain('Usage limit remaining');
+      expect(output).toContain('75.0%');
+      expect(output).toContain('(Resets in 1h 30m)');
+      expect(output).toMatchSnapshot();
+
+      vi.useRealTimers();
     });
   });
 });

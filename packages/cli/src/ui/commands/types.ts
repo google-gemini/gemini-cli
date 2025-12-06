@@ -4,13 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Content } from '@google/genai';
-import { HistoryItemWithoutId } from '../types.js';
-import { Config, GitService, Logger } from '@google/gemini-cli-core';
-import { LoadedSettings } from '../../config/settings.js';
-import { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
-import type { HistoryItem } from '../types.js';
-import { SessionStatsState } from '../contexts/SessionContext.js';
+import type { ReactNode } from 'react';
+import type {
+  HistoryItemWithoutId,
+  HistoryItem,
+  ConfirmationRequest,
+} from '../types.js';
+import type {
+  Config,
+  GitService,
+  Logger,
+  CommandActionReturn,
+} from '@google/gemini-cli-core';
+import type { LoadedSettings } from '../../config/settings.js';
+import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+import type { SessionStatsState } from '../contexts/SessionContext.js';
+import type {
+  ExtensionUpdateAction,
+  ExtensionUpdateStatus,
+} from '../state/extensions.js';
 
 // Grouped dependencies for clarity and easier mocking
 export interface CommandContext {
@@ -58,7 +70,13 @@ export interface CommandContext {
     loadHistory: UseHistoryManagerReturn['loadHistory'];
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
+    toggleDebugProfiler: () => void;
     toggleVimEnabled: () => Promise<boolean>;
+    reloadCommands: () => void;
+    extensionsUpdateState: Map<string, ExtensionUpdateStatus>;
+    dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
+    addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
+    removeComponent: () => void;
   };
   // Session-specific data
   session: {
@@ -66,15 +84,8 @@ export interface CommandContext {
     /** A transient list of shell commands the user has approved for this session. */
     sessionShellAllowlist: Set<string>;
   };
-}
-
-/**
- * The return type for a command action that results in scheduling a tool call.
- */
-export interface ToolActionReturn {
-  type: 'tool';
-  toolName: string;
-  toolArgs: Record<string, unknown>;
+  // Flag to indicate if an overwrite has been confirmed
+  overwriteConfirmed?: boolean;
 }
 
 /** The return type for a command action that results in the app quitting. */
@@ -84,40 +95,22 @@ export interface QuitActionReturn {
 }
 
 /**
- * The return type for a command action that results in a simple message
- * being displayed to the user.
- */
-export interface MessageActionReturn {
-  type: 'message';
-  messageType: 'info' | 'error';
-  content: string;
-}
-
-/**
  * The return type for a command action that needs to open a dialog.
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy';
-}
+  props?: Record<string, unknown>;
 
-/**
- * The return type for a command action that results in replacing
- * the entire conversation history.
- */
-export interface LoadHistoryActionReturn {
-  type: 'load_history';
-  history: HistoryItemWithoutId[];
-  clientHistory: Content[]; // The history for the generative client
-}
-
-/**
- * The return type for a command action that should immediately submit
- * content as a prompt to the Gemini model.
- */
-export interface SubmitPromptActionReturn {
-  type: 'submit_prompt';
-  content: string;
+  dialog:
+    | 'help'
+    | 'auth'
+    | 'theme'
+    | 'editor'
+    | 'privacy'
+    | 'settings'
+    | 'sessionBrowser'
+    | 'model'
+    | 'permissions';
 }
 
 /**
@@ -134,14 +127,28 @@ export interface ConfirmShellCommandsActionReturn {
   };
 }
 
+export interface ConfirmActionReturn {
+  type: 'confirm_action';
+  /** The React node to display as the confirmation prompt. */
+  prompt: ReactNode;
+  /** The original invocation context to be re-run after confirmation. */
+  originalInvocation: {
+    raw: string;
+  };
+}
+
+export interface OpenCustomDialogActionReturn {
+  type: 'custom_dialog';
+  component: ReactNode;
+}
+
 export type SlashCommandActionReturn =
-  | ToolActionReturn
-  | MessageActionReturn
+  | CommandActionReturn<HistoryItemWithoutId[]>
   | QuitActionReturn
   | OpenDialogActionReturn
-  | LoadHistoryActionReturn
-  | SubmitPromptActionReturn
-  | ConfirmShellCommandsActionReturn;
+  | ConfirmShellCommandsActionReturn
+  | ConfirmActionReturn
+  | OpenCustomDialogActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
@@ -154,11 +161,21 @@ export interface SlashCommand {
   name: string;
   altNames?: string[];
   description: string;
+  hidden?: boolean;
 
   kind: CommandKind;
 
+  /**
+   * Controls whether the command auto-executes when selected with Enter.
+   *
+   * If true, pressing Enter on the suggestion will execute the command immediately.
+   * If false or undefined, pressing Enter will autocomplete the command into the prompt window.
+   */
+  autoExecute?: boolean;
+
   // Optional metadata for extension commands
   extensionName?: string;
+  extensionId?: string;
 
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (
@@ -173,7 +190,7 @@ export interface SlashCommand {
   completion?: (
     context: CommandContext,
     partialArg: string,
-  ) => Promise<string[]>;
+  ) => Promise<string[]> | string[];
 
   subCommands?: SlashCommand[];
 }

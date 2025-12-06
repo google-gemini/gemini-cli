@@ -5,13 +5,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { marked } from 'marked';
 import { processImports, validateImportPath } from './memoryImportProcessor.js';
+import { debugLogger } from './debugLogger.js';
 
 // Helper function to create platform-agnostic test paths
-const testPath = (...segments: string[]) => {
+function testPath(...segments: string[]): string {
   // Start with the first segment as is (might be an absolute path on Windows)
   let result = segments[0];
 
@@ -27,16 +28,10 @@ const testPath = (...segments: string[]) => {
   }
 
   return path.normalize(result);
-};
+}
 
-// Mock fs/promises
 vi.mock('fs/promises');
 const mockedFs = vi.mocked(fs);
-
-// Mock console methods to capture warnings
-const originalConsoleWarn = console.warn;
-const originalConsoleError = console.error;
-const originalConsoleDebug = console.debug;
 
 // Helper functions using marked for parsing and validation
 const parseMarkdown = (content: string) => marked.lexer(content);
@@ -95,16 +90,13 @@ describe('memoryImportProcessor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Mock console methods
-    console.warn = vi.fn();
-    console.error = vi.fn();
-    console.debug = vi.fn();
+    vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+    vi.spyOn(debugLogger, 'error').mockImplementation(() => {});
+    vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    // Restore console methods
-    console.warn = originalConsoleWarn;
-    console.error = originalConsoleError;
-    console.debug = originalConsoleDebug;
+    vi.resetAllMocks();
   });
 
   describe('processImports', () => {
@@ -174,7 +166,7 @@ describe('memoryImportProcessor', () => {
 
       // Verify the imported content is present
       expect(result.content).toContain(importedContent);
-      expect(console.warn).not.toHaveBeenCalled();
+      expect(debugLogger.warn).not.toHaveBeenCalled();
       expect(mockedFs.readFile).toHaveBeenCalledWith(
         path.resolve(basePath, './instructions.txt'),
         'utf-8',
@@ -216,7 +208,7 @@ describe('memoryImportProcessor', () => {
       expect(result.content).toContain(
         '<!-- Import failed: ./nonexistent.md - File not found -->',
       );
-      expect(console.error).toHaveBeenCalledWith(
+      expect(debugLogger.error).toHaveBeenCalledWith(
         '[ERROR] [ImportProcessor]',
         'Failed to import ./nonexistent.md: File not found',
       );
@@ -238,7 +230,7 @@ describe('memoryImportProcessor', () => {
 
       const result = await processImports(content, basePath, true, importState);
 
-      expect(console.warn).toHaveBeenCalledWith(
+      expect(debugLogger.warn).toHaveBeenCalledWith(
         '[WARN] [ImportProcessor]',
         'Maximum import depth (1) reached. Stopping import processing.',
       );
@@ -424,6 +416,31 @@ describe('memoryImportProcessor', () => {
       );
     });
 
+    it('should not process imports in repeated inline code blocks', async () => {
+      const content = '`@noimport` and `@noimport`';
+      const projectRoot = testPath('test', 'project');
+      const basePath = testPath(projectRoot, 'src');
+
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        projectRoot,
+      );
+
+      expect(result.content).toBe(content);
+    });
+
+    it('should not import when @ is inside an inline code block', async () => {
+      const content =
+        'We should not ` @import` when the symbol is inside an inline code string.';
+      const testRootDir = testPath('test', 'project');
+      const result = await processImports(content, testRootDir);
+      expect(result.content).toBe(content);
+      expect(result.importTree.imports).toBeUndefined();
+    });
+
     it('should allow imports from parent and subdirectories within project root', async () => {
       const content =
         'Parent import: @../parent.md Subdir import: @./components/sub.md';
@@ -509,21 +526,21 @@ describe('memoryImportProcessor', () => {
       expect(result.importTree.imports).toHaveLength(2);
 
       // First import: nested.md
-      // Prefix with underscore to indicate they're intentionally unused
-      const _expectedNestedPath = testPath(projectRoot, 'src', 'nested.md');
-      const _expectedInnerPath = testPath(projectRoot, 'src', 'inner.md');
-      const _expectedSimplePath = testPath(projectRoot, 'src', 'simple.md');
-
       // Check that the paths match using includes to handle potential absolute/relative differences
-      expect(result.importTree.imports![0].path).toContain('nested.md');
+      const expectedNestedPath = testPath(projectRoot, 'src', 'nested.md');
+
+      expect(result.importTree.imports![0].path).toContain(expectedNestedPath);
       expect(result.importTree.imports![0].imports).toHaveLength(1);
+
+      const expectedInnerPath = testPath(projectRoot, 'src', 'inner.md');
       expect(result.importTree.imports![0].imports![0].path).toContain(
-        'inner.md',
+        expectedInnerPath,
       );
       expect(result.importTree.imports![0].imports![0].imports).toBeUndefined();
 
       // Second import: simple.md
-      expect(result.importTree.imports![1].path).toContain('simple.md');
+      const expectedSimplePath = testPath(projectRoot, 'src', 'simple.md');
+      expect(result.importTree.imports![1].path).toContain(expectedSimplePath);
       expect(result.importTree.imports![1].imports).toBeUndefined();
     });
 
@@ -676,202 +693,6 @@ describe('memoryImportProcessor', () => {
       expect(result.content).toContain('A @./b.md');
       expect(result.content).toContain('B content');
     });
-
-    it('should build import tree structure', async () => {
-      const content = 'Main content @./nested.md @./simple.md';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
-      const nestedContent = 'Nested @./inner.md content';
-      const simpleContent = 'Simple content';
-      const innerContent = 'Inner content';
-
-      mockedFs.access.mockResolvedValue(undefined);
-      mockedFs.readFile
-        .mockResolvedValueOnce(nestedContent)
-        .mockResolvedValueOnce(simpleContent)
-        .mockResolvedValueOnce(innerContent);
-
-      const result = await processImports(content, basePath, true);
-
-      // Use marked to find and validate import comments
-      const comments = findMarkdownComments(result.content);
-      const importComments = comments.filter((c) =>
-        c.includes('Imported from:'),
-      );
-
-      expect(importComments.some((c) => c.includes('./nested.md'))).toBe(true);
-      expect(importComments.some((c) => c.includes('./simple.md'))).toBe(true);
-      expect(importComments.some((c) => c.includes('./inner.md'))).toBe(true);
-
-      // Use marked to validate the markdown structure is well-formed
-      const tokens = parseMarkdown(result.content);
-      expect(tokens).toBeDefined();
-      expect(tokens.length).toBeGreaterThan(0);
-
-      // Verify the content contains expected text using marked parsing
-      const textContent = tokens
-        .filter((token) => token.type === 'paragraph')
-        .map((token) => token.raw)
-        .join(' ');
-
-      expect(textContent).toContain('Main content');
-      expect(textContent).toContain('Nested');
-      expect(textContent).toContain('Simple content');
-      expect(textContent).toContain('Inner content');
-
-      // Verify import tree structure
-      expect(result.importTree.path).toBe('unknown'); // No currentFile set in test
-      expect(result.importTree.imports).toHaveLength(2);
-
-      // First import: nested.md
-      // Prefix with underscore to indicate they're intentionally unused
-      const _expectedNestedPath = testPath(projectRoot, 'src', 'nested.md');
-      const _expectedInnerPath = testPath(projectRoot, 'src', 'inner.md');
-      const _expectedSimplePath = testPath(projectRoot, 'src', 'simple.md');
-
-      // Check that the paths match using includes to handle potential absolute/relative differences
-      expect(result.importTree.imports![0].path).toContain('nested.md');
-      expect(result.importTree.imports![0].imports).toHaveLength(1);
-      expect(result.importTree.imports![0].imports![0].path).toContain(
-        'inner.md',
-      );
-      expect(result.importTree.imports![0].imports![0].imports).toBeUndefined();
-
-      // Second import: simple.md
-      expect(result.importTree.imports![1].path).toContain('simple.md');
-      expect(result.importTree.imports![1].imports).toBeUndefined();
-    });
-
-    it('should produce flat output in Claude-style with unique files in order', async () => {
-      const content = 'Main @./nested.md content @./simple.md';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
-      const nestedContent = 'Nested @./inner.md content';
-      const simpleContent = 'Simple content';
-      const innerContent = 'Inner content';
-
-      mockedFs.access.mockResolvedValue(undefined);
-      mockedFs.readFile
-        .mockResolvedValueOnce(nestedContent)
-        .mockResolvedValueOnce(simpleContent)
-        .mockResolvedValueOnce(innerContent);
-
-      const result = await processImports(
-        content,
-        basePath,
-        true,
-        undefined,
-        projectRoot,
-        'flat',
-      );
-
-      // Verify all expected files are present by checking for their basenames
-      expect(result.content).toContain('nested.md');
-      expect(result.content).toContain('simple.md');
-      expect(result.content).toContain('inner.md');
-
-      // Verify content is present
-      expect(result.content).toContain('Nested @./inner.md content');
-      expect(result.content).toContain('Simple content');
-      expect(result.content).toContain('Inner content');
-    });
-
-    it('should not duplicate files in flat output if imported multiple times', async () => {
-      const content = 'Main @./dup.md again @./dup.md';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
-      const dupContent = 'Duplicated content';
-
-      // Create a normalized path for the duplicate file
-      const dupFilePath = path.normalize(path.join(basePath, 'dup.md'));
-
-      // Mock the file system access
-      mockedFs.access.mockImplementation((filePath) => {
-        const pathStr = filePath.toString();
-        if (path.normalize(pathStr) === dupFilePath) {
-          return Promise.resolve();
-        }
-        return Promise.reject(new Error(`File not found: ${pathStr}`));
-      });
-
-      // Mock the file reading
-      mockedFs.readFile.mockImplementation((filePath) => {
-        const pathStr = filePath.toString();
-        if (path.normalize(pathStr) === dupFilePath) {
-          return Promise.resolve(dupContent);
-        }
-        return Promise.reject(new Error(`File not found: ${pathStr}`));
-      });
-
-      const result = await processImports(
-        content,
-        basePath,
-        true, // debugMode
-        undefined, // importState
-        projectRoot,
-        'flat',
-      );
-
-      // In flat mode, the output should only contain the main file content with import markers
-      // The imported file content should not be included in the flat output
-      expect(result.content).toContain('Main @./dup.md again @./dup.md');
-
-      // The imported file content should not appear in the output
-      // This is the current behavior of the implementation
-      expect(result.content).not.toContain(dupContent);
-
-      // The file marker should not appear in the output
-      // since the imported file content is not included in flat mode
-      const fileMarker = `--- File: ${dupFilePath} ---`;
-      expect(result.content).not.toContain(fileMarker);
-      expect(result.content).not.toContain('--- End of File: ' + dupFilePath);
-
-      // The main file path should be in the output
-      // Since we didn't pass an importState, it will use the basePath as the file path
-      const mainFilePath = path.normalize(path.resolve(basePath));
-      expect(result.content).toContain(`--- File: ${mainFilePath} ---`);
-      expect(result.content).toContain(`--- End of File: ${mainFilePath}`);
-    });
-
-    it('should handle nested imports in flat output', async () => {
-      const content = 'Root @./a.md';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
-      const aContent = 'A @./b.md';
-      const bContent = 'B content';
-
-      mockedFs.access.mockResolvedValue(undefined);
-      mockedFs.readFile
-        .mockResolvedValueOnce(aContent)
-        .mockResolvedValueOnce(bContent);
-
-      const result = await processImports(
-        content,
-        basePath,
-        true,
-        undefined,
-        projectRoot,
-        'flat',
-      );
-
-      // Verify all files are present by checking for their basenames
-      expect(result.content).toContain('a.md');
-      expect(result.content).toContain('b.md');
-
-      // Verify content is in the correct order
-      const contentStr = result.content;
-      const aIndex = contentStr.indexOf('a.md');
-      const bIndex = contentStr.indexOf('b.md');
-      const rootIndex = contentStr.indexOf('Root @./a.md');
-
-      expect(rootIndex).toBeLessThan(aIndex);
-      expect(aIndex).toBeLessThan(bIndex);
-
-      // Verify content is present
-      expect(result.content).toContain('Root @./a.md');
-      expect(result.content).toContain('A @./b.md');
-      expect(result.content).toContain('B content');
-    });
   });
 
   describe('validateImportPath', () => {
@@ -899,7 +720,7 @@ describe('memoryImportProcessor', () => {
 
       // Test relative paths - resolve them against basePath
       const relativePath = './file.md';
-      const _resolvedRelativePath = path.resolve(basePath, relativePath);
+      path.resolve(basePath, relativePath);
       expect(validateImportPath(relativePath, basePath, [basePath])).toBe(true);
 
       // Test parent directory access (should be allowed if parent is in allowed paths)
@@ -907,12 +728,12 @@ describe('memoryImportProcessor', () => {
       if (parentPath !== basePath) {
         // Only test if parent is different
         const parentRelativePath = '../file.md';
-        const _resolvedParentPath = path.resolve(basePath, parentRelativePath);
+        path.resolve(basePath, parentRelativePath);
         expect(
           validateImportPath(parentRelativePath, basePath, [parentPath]),
         ).toBe(true);
 
-        const _resolvedSubPath = path.resolve(basePath, 'sub');
+        path.resolve(basePath, 'sub');
         const resultSub = validateImportPath('sub', basePath, [basePath]);
         expect(resultSub).toBe(true);
       }

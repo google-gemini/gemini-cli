@@ -8,8 +8,79 @@ import { describe, it, expect } from 'vitest';
 import * as themeModule from './theme.js';
 import { themeManager } from './theme-manager.js';
 
-const { validateCustomTheme } = themeModule;
+const { validateCustomTheme, createCustomTheme } = themeModule;
 type CustomTheme = themeModule.CustomTheme;
+
+describe('createCustomTheme', () => {
+  const baseTheme: CustomTheme = {
+    type: 'custom',
+    name: 'Test Theme',
+    Background: '#000000',
+    Foreground: '#ffffff',
+    LightBlue: '#ADD8E6',
+    AccentBlue: '#0000FF',
+    AccentPurple: '#800080',
+    AccentCyan: '#00FFFF',
+    AccentGreen: '#008000',
+    AccentYellow: '#FFFF00',
+    AccentRed: '#FF0000',
+    DiffAdded: '#00FF00',
+    DiffRemoved: '#FF0000',
+    Comment: '#808080',
+    Gray: '#cccccc',
+    // DarkGray intentionally omitted to test fallback
+  };
+
+  it('should interpolate DarkGray when not provided', () => {
+    const theme = createCustomTheme(baseTheme);
+    // Interpolate between Gray (#cccccc) and Background (#000000) at 0.5
+    // #cccccc is RGB(204, 204, 204)
+    // #000000 is RGB(0, 0, 0)
+    // Midpoint is RGB(102, 102, 102) which is #666666
+    expect(theme.colors.DarkGray).toBe('#666666');
+  });
+
+  it('should use provided DarkGray', () => {
+    const theme = createCustomTheme({
+      ...baseTheme,
+      DarkGray: '#123456',
+    });
+    expect(theme.colors.DarkGray).toBe('#123456');
+  });
+
+  it('should interpolate DarkGray when text.secondary is provided but DarkGray is not', () => {
+    const customTheme: CustomTheme = {
+      type: 'custom',
+      name: 'Test',
+      text: {
+        secondary: '#cccccc', // Gray source
+      },
+      background: {
+        primary: '#000000', // Background source
+      },
+    };
+    const theme = createCustomTheme(customTheme);
+    // Should be interpolated between #cccccc and #000000 at 0.5 -> #666666
+    expect(theme.colors.DarkGray).toBe('#666666');
+  });
+
+  it('should prefer text.secondary over Gray for interpolation', () => {
+    const customTheme: CustomTheme = {
+      type: 'custom',
+      name: 'Test',
+      text: {
+        secondary: '#cccccc', // Should be used
+      },
+      Gray: '#aaaaaa', // Should be ignored
+      background: {
+        primary: '#000000',
+      },
+    };
+    const theme = createCustomTheme(customTheme);
+    // Interpolate between #cccccc and #000000 -> #666666
+    expect(theme.colors.DarkGray).toBe('#666666');
+  });
+});
 
 describe('validateCustomTheme', () => {
   const validTheme: CustomTheme = {
@@ -36,25 +107,6 @@ describe('validateCustomTheme', () => {
     expect(result.error).toBeUndefined();
   });
 
-  it('should return isValid: false for a theme with a missing required field', () => {
-    const invalidTheme = {
-      ...validTheme,
-      name: undefined as unknown as string,
-    };
-    const result = validateCustomTheme(invalidTheme);
-    expect(result.isValid).toBe(false);
-    expect(result.error).toBe('Missing required field: name');
-  });
-
-  it('should return isValid: false for a theme with an invalid color format', () => {
-    const invalidTheme = { ...validTheme, Background: 'not-a-color' };
-    const result = validateCustomTheme(invalidTheme);
-    expect(result.isValid).toBe(false);
-    expect(result.error).toBe(
-      'Invalid color format for Background: not-a-color',
-    );
-  });
-
   it('should return isValid: false for a theme with an invalid name', () => {
     const invalidTheme = { ...validTheme, name: ' ' };
     const result = validateCustomTheme(invalidTheme);
@@ -69,37 +121,6 @@ describe('validateCustomTheme', () => {
     const result = validateCustomTheme(legacyTheme);
     expect(result.isValid).toBe(true);
     expect(result.error).toBeUndefined();
-  });
-
-  it('should return a warning if DiffAdded and DiffRemoved are missing', () => {
-    const legacyTheme: Partial<CustomTheme> = { ...validTheme };
-    delete legacyTheme.DiffAdded;
-    delete legacyTheme.DiffRemoved;
-    const result = validateCustomTheme(legacyTheme);
-    expect(result.isValid).toBe(true);
-    expect(result.warning).toBe('Missing field(s) DiffAdded, DiffRemoved');
-  });
-
-  it('should return a warning if only DiffRemoved is missing', () => {
-    const legacyTheme: Partial<CustomTheme> = { ...validTheme };
-    delete legacyTheme.DiffRemoved;
-    const result = validateCustomTheme(legacyTheme);
-    expect(result.isValid).toBe(true);
-    expect(result.warning).toBe('Missing field(s) DiffRemoved');
-  });
-
-  it('should return isValid: false for a theme with an invalid DiffAdded color', () => {
-    const invalidTheme = { ...validTheme, DiffAdded: 'invalid' };
-    const result = validateCustomTheme(invalidTheme);
-    expect(result.isValid).toBe(false);
-    expect(result.error).toBe('Invalid color format for DiffAdded: invalid');
-  });
-
-  it('should return isValid: false for a theme with an invalid DiffRemoved color', () => {
-    const invalidTheme = { ...validTheme, DiffRemoved: 'invalid' };
-    const result = validateCustomTheme(invalidTheme);
-    expect(result.isValid).toBe(false);
-    expect(result.error).toBe('Invalid color format for DiffRemoved: invalid');
   });
 
   it('should return isValid: false for a theme with a very long name', () => {
@@ -136,7 +157,9 @@ describe('themeManager.loadCustomThemes', () => {
     delete legacyTheme.DiffAdded;
     delete legacyTheme.DiffRemoved;
 
-    themeManager.loadCustomThemes({ 'Legacy Custom Theme': legacyTheme });
+    themeManager.loadCustomThemes({
+      'Legacy Custom Theme': legacyTheme as CustomTheme,
+    });
     const result = themeManager.getTheme('Legacy Custom Theme')!;
 
     expect(result.colors.DiffAdded).toBe(darkTheme.DiffAdded);

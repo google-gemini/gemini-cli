@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import util from 'util';
-import { ConsoleMessageItem } from '../types.js';
+import util from 'node:util';
+import type { ConsoleMessageItem } from '../types.js';
 
 interface ConsolePatcherParams {
-  onNewMessage: (message: Omit<ConsoleMessageItem, 'id'>) => void;
+  onNewMessage?: (message: Omit<ConsoleMessageItem, 'id'>) => void;
   debugMode: boolean;
+  stderr?: boolean;
 }
 
 export class ConsolePatcher {
@@ -17,6 +18,7 @@ export class ConsolePatcher {
   private originalConsoleWarn = console.warn;
   private originalConsoleError = console.error;
   private originalConsoleDebug = console.debug;
+  private originalConsoleInfo = console.info;
 
   private params: ConsolePatcherParams;
 
@@ -25,10 +27,11 @@ export class ConsolePatcher {
   }
 
   patch() {
-    console.log = this.patchConsoleMethod('log', this.originalConsoleLog);
-    console.warn = this.patchConsoleMethod('warn', this.originalConsoleWarn);
-    console.error = this.patchConsoleMethod('error', this.originalConsoleError);
-    console.debug = this.patchConsoleMethod('debug', this.originalConsoleDebug);
+    console.log = this.patchConsoleMethod('log');
+    console.warn = this.patchConsoleMethod('warn');
+    console.error = this.patchConsoleMethod('error');
+    console.debug = this.patchConsoleMethod('debug');
+    console.info = this.patchConsoleMethod('info');
   }
 
   cleanup = () => {
@@ -36,26 +39,26 @@ export class ConsolePatcher {
     console.warn = this.originalConsoleWarn;
     console.error = this.originalConsoleError;
     console.debug = this.originalConsoleDebug;
+    console.info = this.originalConsoleInfo;
   };
 
   private formatArgs = (args: unknown[]): string => util.format(...args);
 
   private patchConsoleMethod =
-    (
-      type: 'log' | 'warn' | 'error' | 'debug',
-      originalMethod: (...args: unknown[]) => void,
-    ) =>
+    (type: 'log' | 'warn' | 'error' | 'debug' | 'info') =>
     (...args: unknown[]) => {
-      if (this.params.debugMode) {
-        originalMethod.apply(console, args);
-      }
-
-      if (type !== 'debug' || this.params.debugMode) {
-        this.params.onNewMessage({
-          type,
-          content: this.formatArgs(args),
-          count: 1,
-        });
+      if (this.params.stderr) {
+        if (type !== 'debug' || this.params.debugMode) {
+          this.originalConsoleError(this.formatArgs(args));
+        }
+      } else {
+        if (type !== 'debug' || this.params.debugMode) {
+          this.params.onNewMessage?.({
+            type,
+            content: this.formatArgs(args),
+            count: 1,
+          });
+        }
       }
     };
 }
