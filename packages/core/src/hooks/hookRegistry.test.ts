@@ -502,4 +502,179 @@ describe('HookRegistry', () => {
       );
     });
   });
+
+  describe('addHookEntry', () => {
+    beforeEach(async () => {
+      await hookRegistry.initialize();
+    });
+
+    it('should add a hook entry to the registry and return true', () => {
+      const hookEntry = {
+        config: {
+          type: HookType.Command,
+          command: './custom-hook.sh',
+        },
+        source: ConfigSource.Extensions,
+        eventName: HookEventName.BeforeTool,
+        matcher: 'write_file',
+        enabled: true,
+      };
+
+      const result = hookRegistry.addHookEntry(hookEntry);
+
+      expect(result).toBe(true);
+      const hooks = hookRegistry.getAllHooks();
+      expect(hooks).toContainEqual(hookEntry);
+    });
+
+    it('should add multiple hook entries', () => {
+      const entry1 = {
+        config: {
+          type: HookType.Command,
+          command: './hook1.sh',
+        },
+        source: ConfigSource.Extensions,
+        eventName: HookEventName.BeforeTool,
+        enabled: true,
+      };
+
+      const entry2 = {
+        config: {
+          type: HookType.Command,
+          command: './hook2.sh',
+        },
+        source: ConfigSource.Extensions,
+        eventName: HookEventName.AfterTool,
+        enabled: true,
+      };
+
+      expect(hookRegistry.addHookEntry(entry1)).toBe(true);
+      expect(hookRegistry.addHookEntry(entry2)).toBe(true);
+
+      const hooks = hookRegistry.getAllHooks();
+      expect(hooks.length).toBeGreaterThanOrEqual(2);
+      expect(hooks).toContainEqual(entry1);
+      expect(hooks).toContainEqual(entry2);
+    });
+
+    it('should throw error if registry is not initialized', () => {
+      const uninitializedRegistry = new HookRegistry(mockConfig);
+      const hookEntry = {
+        config: {
+          type: HookType.Command,
+          command: './hook.sh',
+        },
+        source: ConfigSource.Extensions,
+        eventName: HookEventName.BeforeTool,
+        enabled: true,
+      };
+
+      expect(() => {
+        uninitializedRegistry.addHookEntry(hookEntry);
+      }).toThrow(HookRegistryNotInitializedError);
+    });
+
+    it('should allow adding hooks with different sources', () => {
+      const extensionHook = {
+        config: {
+          type: HookType.Command,
+          command: './extension-hook.sh',
+        },
+        source: ConfigSource.Extensions,
+        eventName: HookEventName.BeforeTool,
+        enabled: true,
+      };
+
+      const result = hookRegistry.addHookEntry(extensionHook);
+
+      expect(result).toBe(true);
+      const hooks = hookRegistry.getAllHooks();
+      expect(hooks).toContainEqual(extensionHook);
+    });
+
+    it('should allow adding disabled hooks', () => {
+      const disabledHook = {
+        config: {
+          type: HookType.Command,
+          command: './disabled-hook.sh',
+        },
+        source: ConfigSource.Extensions,
+        eventName: HookEventName.BeforeTool,
+        enabled: false,
+      };
+
+      const result = hookRegistry.addHookEntry(disabledHook);
+
+      expect(result).toBe(true);
+      const hooks = hookRegistry.getAllHooks();
+      expect(hooks).toContainEqual(disabledHook);
+
+      // Disabled hooks should not appear in getHooksForEvent
+      const eventHooks = hookRegistry.getHooksForEvent(
+        HookEventName.BeforeTool,
+      );
+      expect(eventHooks).not.toContainEqual(disabledHook);
+    });
+
+    it('should allow adding hooks with matchers', () => {
+      const hookWithMatcher = {
+        config: {
+          type: HookType.Command,
+          command: './matcher-hook.sh',
+        },
+        source: ConfigSource.Extensions,
+        eventName: HookEventName.BeforeTool,
+        matcher: 'write_file|replace',
+        enabled: true,
+      };
+
+      const result = hookRegistry.addHookEntry(hookWithMatcher);
+
+      expect(result).toBe(true);
+      const hooks = hookRegistry.getAllHooks();
+      expect(hooks).toContainEqual(hookWithMatcher);
+    });
+
+    it('should reject hooks with invalid type and return false', () => {
+      const invalidHook = {
+        config: {
+          type: 'invalid-type' as HookType,
+          command: './invalid-hook.sh',
+        },
+        source: ConfigSource.Extensions,
+        eventName: HookEventName.BeforeTool,
+        enabled: true,
+      };
+
+      const result = hookRegistry.addHookEntry(invalidHook);
+
+      expect(result).toBe(false);
+      const hooks = hookRegistry.getAllHooks();
+      expect(hooks).not.toContainEqual(invalidHook);
+      expect(mockDebugLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid hook'),
+      );
+    });
+
+    it('should reject command hooks without command field and return false', () => {
+      const hookWithoutCommand = {
+        config: {
+          type: HookType.Command,
+          // command field is missing
+        } as { type: HookType; command?: string },
+        source: ConfigSource.Extensions,
+        eventName: HookEventName.BeforeTool,
+        enabled: true,
+      };
+
+      const result = hookRegistry.addHookEntry(hookWithoutCommand);
+
+      expect(result).toBe(false);
+      const hooks = hookRegistry.getAllHooks();
+      expect(hooks).not.toContainEqual(hookWithoutCommand);
+      expect(mockDebugLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('missing command field'),
+      );
+    });
+  });
 });

@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Config } from '../config/config.js';
 import type { HookRegistry } from '../hooks/hookRegistry.js';
 import { HookEventName, HookType } from '../hooks/types.js';
 import { ConfigSource } from '../hooks/hookRegistry.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { spawn } from 'node:child_process';
+import { execSync } from 'node:child_process';
 
 /**
  * Service for integrating git-ai hooks into the hook system.
@@ -19,7 +20,7 @@ export class GitAiIntegrationService {
   private readonly commandPath: string;
   private registered = false;
 
-  constructor(enabled: boolean = true) {
+  constructor(_config: Config, enabled: boolean = true) {
     this.enabled = enabled;
     this.commandPath = 'git-ai';
   }
@@ -55,35 +56,17 @@ export class GitAiIntegrationService {
   }
 
   /**
-   * Check if git-ai command is available in PATH.
-   * Uses spawn for non-blocking async check, consistent with hookRunner.
+   * Check if git-ai command is available in PATH
    */
-  private isGitAiAvailable(): Promise<boolean> {
-    return new Promise((resolve) => {
+  private async isGitAiAvailable(): Promise<boolean> {
+    try {
       const checkCommand =
-        process.platform === 'win32' ? 'where.exe' : 'command';
-      const checkArgs =
-        process.platform === 'win32'
-          ? [this.commandPath]
-          : ['-v', this.commandPath];
-
-      try {
-        const child = spawn(checkCommand, checkArgs, {
-          stdio: 'ignore',
-          shell: true,
-        });
-
-        child.on('close', (code) => {
-          resolve(code === 0);
-        });
-
-        child.on('error', () => {
-          resolve(false);
-        });
-      } catch {
-        resolve(false);
-      }
-    });
+        process.platform === 'win32' ? 'where.exe' : 'command -v';
+      execSync(`${checkCommand} ${this.commandPath}`, { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -128,10 +111,12 @@ export class GitAiIntegrationService {
   getStatus(): {
     enabled: boolean;
     registered: boolean;
+    available: boolean;
   } {
     return {
       enabled: this.enabled,
       registered: this.registered,
+      available: false, // Will be checked async if needed
     };
   }
 }

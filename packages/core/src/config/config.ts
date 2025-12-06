@@ -686,7 +686,6 @@ export class Config {
           '../services/gitAiIntegrationService.js'
         );
         const gitAiIntegration = new GitAiIntegrationService(
-          this,
           this.enableGitAiIntegration,
         );
         await gitAiIntegration.initialize(this.hookSystem.getRegistry());
