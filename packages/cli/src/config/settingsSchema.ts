@@ -363,6 +363,7 @@ const SETTINGS_SCHEMA = {
         additionalProperties: {
           type: 'object',
           ref: 'CustomTheme',
+          mergeStrategy: MergeStrategy.REPLACE,
         },
       },
       hideWindowTitle: {
@@ -1776,6 +1777,10 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         type: 'string',
         enum: ['custom'],
         default: 'custom',
+      },
+      path: {
+        type: 'string',
+        description: 'Path to the theme JSON file.',
       },
       name: {
         type: 'string',

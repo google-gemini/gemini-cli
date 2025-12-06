@@ -1645,6 +1645,10 @@
           "enum": ["custom"],
           "default": "custom"
         },
+        "path": {
+          "type": "string",
+          "description": "Path to the theme JSON file."
+        },
         "name": {
           "type": "string",
           "description": "Theme display name."

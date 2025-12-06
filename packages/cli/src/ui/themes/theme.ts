@@ -31,7 +31,12 @@ export interface ColorsTheme {
 
 export interface CustomTheme {
   type: 'custom';
-  name: string;
+  // Name is optional because it can be inferred from:
+  // 1. The 'name' property in settings.json
+  // 2. The 'name' property in the theme file itself
+  // 3. The settings.json key as a fallback
+  name?: string;
+  path?: string;
 
   text?: {
     primary?: string;
@@ -459,7 +464,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
   };
 
   return new Theme(
-    customTheme.name,
+    customTheme.name ?? 'Unnamed Theme',
     'custom',
     rawMappings,
     colors,

@@ -128,10 +128,20 @@ describe('ThemeManager', () => {
     });
 
     it('should load a theme from a valid file path', () => {
+      const themePath = '/home/user/my-theme.json';
       vi.spyOn(fs, 'existsSync').mockReturnValue(true);
       vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(mockTheme));
 
-      const result = themeManager.setActiveTheme('/home/user/my-theme.json');
+      // Load theme using new API
+      themeManager.loadCustomThemes({
+        MyFileTheme: {
+          path: themePath,
+          type: 'custom',
+        },
+      });
+
+      // Set it as active
+      const result = themeManager.setActiveTheme('My File Theme');
 
       expect(result).toBe(true);
       const activeTheme = themeManager.getActiveTheme();
@@ -145,7 +155,15 @@ describe('ThemeManager', () => {
     it('should not load a theme if the file does not exist', () => {
       vi.spyOn(fs, 'existsSync').mockReturnValue(false);
 
-      const result = themeManager.setActiveTheme(mockThemePath);
+      // Try to load non-existent file
+      themeManager.loadCustomThemes({
+        NonExistentFileTheme: {
+          path: mockThemePath,
+          type: 'custom',
+        },
+      });
+
+      const result = themeManager.setActiveTheme('NonExistentFileTheme');
 
       expect(result).toBe(false);
       expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
@@ -155,23 +173,40 @@ describe('ThemeManager', () => {
       vi.spyOn(fs, 'existsSync').mockReturnValue(true);
       vi.spyOn(fs, 'readFileSync').mockReturnValue('invalid json');
 
-      const result = themeManager.setActiveTheme(mockThemePath);
+      // Try to load invalid JSON file
+      themeManager.loadCustomThemes({
+        InvalidJsonFileTheme: {
+          path: mockThemePath,
+          type: 'custom',
+        },
+      });
+
+      const result = themeManager.setActiveTheme('InvalidJsonFileTheme');
 
       expect(result).toBe(false);
       expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
     });
 
     it('should not load a theme from an untrusted file path and log a message', () => {
+      const untrustedPath = '/untrusted/my-theme.json';
       vi.spyOn(fs, 'existsSync').mockReturnValue(true);
       vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(mockTheme));
+      vi.spyOn(fs, 'realpathSync').mockReturnValue(untrustedPath);
       const consoleWarnSpy = vi
         .spyOn(debugLogger, 'warn')
         .mockImplementation(() => {});
 
-      const result = themeManager.setActiveTheme('/untrusted/my-theme.json');
+      // Use loadCustomThemes instead of setActiveTheme, as that's the new API
+      themeManager.loadCustomThemes({
+        UntrustedTheme: {
+          path: untrustedPath,
+          type: 'custom',
+          name: 'My File Theme',
+        },
+      });
 
-      expect(result).toBe(false);
-      expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
+      // The theme should not be loaded due to security check
+      expect(themeManager.getTheme('My File Theme')).toBeUndefined();
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('is outside your home directory'),
       );

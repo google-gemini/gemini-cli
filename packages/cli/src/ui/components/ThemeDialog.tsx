@@ -58,14 +58,20 @@ export function ThemeDialog({
   );
 
   // Generate theme items filtered by selected scope
-  const customThemes =
+  const customThemesInScope =
     selectedScope === SettingScope.User
       ? settings.user.settings.ui?.customThemes || {}
       : settings.merged.ui?.customThemes || {};
+
   const builtInThemes = themeManager
     .getAvailableThemes()
     .filter((theme) => theme.type !== 'custom');
-  const customThemeNames = Object.keys(customThemes);
+
+  // Map the keys from settings to their resolved theme names from themeManager
+  const customThemeNames = Object.keys(customThemesInScope)
+    .map((key) => themeManager.getTheme(key)?.name) // Get the resolved name from the loaded theme
+    .filter((name): name is string => !!name); // Filter out any undefineds
+
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   // Generate theme items
   const themeItems = [

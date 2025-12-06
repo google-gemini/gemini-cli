@@ -36,6 +36,11 @@ function mergeRecursively(
     const objValue = target[key];
     const mergeStrategy = getMergeStrategyForPath(newPath);
 
+    if (mergeStrategy === MergeStrategy.REPLACE) {
+      target[key] = srcValue;
+      continue;
+    }
+
     if (mergeStrategy === MergeStrategy.SHALLOW_MERGE && objValue && srcValue) {
       const obj1 =
         typeof objValue === 'object' && objValue !== null ? objValue : {};
