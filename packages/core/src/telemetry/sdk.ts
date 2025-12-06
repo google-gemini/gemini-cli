@@ -80,6 +80,8 @@ class DiagLoggerAdapter {
 diag.setLogger(new DiagLoggerAdapter(), DiagLogLevel.INFO);
 
 let sdk: NodeSDK | undefined;
+let spanProcessor: BatchSpanProcessor | undefined;
+let logRecordProcessor: BatchLogRecordProcessor | undefined;
 let telemetryInitialized = false;
 let callbackRegistered = false;
 let authListener: ((newCredentials: JWTInput) => Promise<void>) | undefined =
@@ -92,6 +94,7 @@ export function isTelemetrySdkInitialized(): boolean {
 
 export function bufferTelemetryEvent(fn: () => void | Promise<void>): void {
   if (telemetryInitialized) {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     fn();
   } else {
     telemetryBuffer.push(fn);
@@ -273,10 +276,14 @@ export async function initializeTelemetry(
     });
   }
 
+  // Store processor references for manual flushing
+  spanProcessor = new BatchSpanProcessor(spanExporter);
+  logRecordProcessor = new BatchLogRecordProcessor(logExporter);
+
   sdk = new NodeSDK({
     resource,
-    spanProcessors: [new BatchSpanProcessor(spanExporter)],
-    logRecordProcessors: [new BatchLogRecordProcessor(logExporter)],
+    spanProcessors: [spanProcessor],
+    logRecordProcessors: [logRecordProcessor],
     metricReader,
     instrumentations: [new HttpInstrumentation()],
   });
@@ -293,15 +300,39 @@ export async function initializeTelemetry(
     console.error('Error starting OpenTelemetry SDK:', error);
   }
 
+  // Note: We don't use process.on('exit') here because that callback is synchronous
+  // and won't wait for the async shutdownTelemetry() to complete.
+  // Instead, telemetry shutdown is handled in runExitCleanup() in cleanup.ts
   process.on('SIGTERM', () => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     shutdownTelemetry(config);
   });
   process.on('SIGINT', () => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     shutdownTelemetry(config);
   });
-  process.on('exit', () => {
-    shutdownTelemetry(config);
-  });
+}
+
+/**
+ * Force flush all pending telemetry data to disk.
+ * This is useful for ensuring telemetry is written before critical operations like /clear.
+ */
+export async function flushTelemetry(config: Config): Promise<void> {
+  if (!telemetryInitialized || !spanProcessor || !logRecordProcessor) {
+    return;
+  }
+  try {
+    // Force flush all pending telemetry to disk
+    await Promise.all([
+      spanProcessor.forceFlush(),
+      logRecordProcessor.forceFlush(),
+    ]);
+    if (config.getDebugMode()) {
+      debugLogger.log('OpenTelemetry SDK flushed successfully.');
+    }
+  } catch (error) {
+    console.error('Error flushing SDK:', error);
+  }
 }
 
 export async function shutdownTelemetry(
