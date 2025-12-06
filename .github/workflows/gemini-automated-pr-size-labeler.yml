@@ -26,6 +26,7 @@ jobs:
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
 
       - name: Run Gemini PR size and complexity labeller
         uses: google-github-actions/run-gemini-cli@e4b071635b36562c88d9af4746884501fda9344a # Use the specific commit SHA
