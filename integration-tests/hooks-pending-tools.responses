@@ -1,0 +1,3 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"functionCall":{"name":"write_file","args":{"content":"Approved content","file_path":"approved.txt"}}}],"role":"model"},"finishReason":"STOP","index":0}]}]}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"Done."}],"role":"model"},"finishReason":"STOP","index":0}]}]}
+{"method":"generateContent","response":{"candidates":[{"content":{"parts":[{"text":"user"}],"role":"model"}}]}}

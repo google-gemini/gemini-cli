@@ -454,6 +454,7 @@ export interface AfterAgentInput extends HookInput {
   prompt: string;
   prompt_response: string;
   stop_hook_active: boolean;
+  has_pending_tool_calls: boolean;
 }
 
 /**
