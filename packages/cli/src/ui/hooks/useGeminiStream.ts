@@ -69,6 +69,7 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import { useVimMode } from '../contexts/VimModeContext.js';
 
 enum StreamProcessingStatus {
   Completed,
@@ -130,6 +131,7 @@ export const useGeminiStream = (
     }
     return new GitService(config.getProjectRoot(), storage);
   }, [config, storage]);
+  const { vimEnabled, vimMode } = useVimMode();
 
   const [
     toolCalls,
@@ -389,6 +391,10 @@ export const useGeminiStream = (
   useKeypress(
     (key) => {
       if (key.name === 'escape' && !isShellFocused) {
+        if (vimEnabled && vimMode !== 'NORMAL') {
+          return;
+        }
+
         cancelOngoingRequest();
       }
     },
