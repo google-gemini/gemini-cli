@@ -94,6 +94,7 @@ export function isTelemetrySdkInitialized(): boolean {
 
 export function bufferTelemetryEvent(fn: () => void | Promise<void>): void {
   if (telemetryInitialized) {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     fn();
   } else {
     telemetryBuffer.push(fn);
@@ -303,9 +304,11 @@ export async function initializeTelemetry(
   // and won't wait for the async shutdownTelemetry() to complete.
   // Instead, telemetry shutdown is handled in runExitCleanup() in cleanup.ts
   process.on('SIGTERM', () => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     shutdownTelemetry(config);
   });
   process.on('SIGINT', () => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     shutdownTelemetry(config);
   });
 }

@@ -1285,6 +1285,15 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
+      enableAgents: {
+        type: 'boolean',
+        label: 'Enable Agents',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable local and remote subagents.',
+        showInDialog: false,
+      },
       extensionManagement: {
         type: 'boolean',
         label: 'Extension Management',
