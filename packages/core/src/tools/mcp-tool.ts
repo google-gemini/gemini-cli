@@ -10,6 +10,8 @@ import type {
   ToolInvocation,
   ToolMcpConfirmationDetails,
   ToolResult,
+  ToolResultDisplay,
+  ImageResult,
 } from './tools.js';
 import {
   BaseDeclarativeTool,
@@ -374,13 +376,15 @@ function transformMcpContentToParts(sdkResponse: Part[]): Part[] {
 
 /**
  * Processes the raw response from the MCP tool to generate a clean,
- * human-readable string for display in the CLI. It summarizes non-text
- * content and presents text directly.
+ * human-readable display for the CLI. It returns an ImageResult for image
+ * content to enable terminal image display, or a string for other content.
  *
  * @param rawResponse The raw Part[] array from the GenAI SDK.
- * @returns A formatted string representing the tool's output.
+ * @returns A ToolResultDisplay - either an ImageResult for images or a formatted string.
  */
-function getStringifiedResultForDisplay(rawResponse: Part[]): string {
+function getStringifiedResultForDisplay(
+  rawResponse: Part[],
+): ToolResultDisplay {
   const mcpContent = rawResponse?.[0]?.functionResponse?.response?.[
     'content'
   ] as McpContentBlock[];
@@ -389,6 +393,38 @@ function getStringifiedResultForDisplay(rawResponse: Part[]): string {
     return '```json\n' + JSON.stringify(rawResponse, null, 2) + '\n```';
   }
 
+  // Check if there's an image in the response - if so, return ImageResult
+  const imageBlock = mcpContent.find(
+    (block): block is McpMediaBlock =>
+      block.type === 'image' && 'data' in block && 'mimeType' in block,
+  );
+
+  if (imageBlock) {
+    // Collect any text content
+    const textParts = mcpContent
+      .filter((block): block is McpTextBlock => block.type === 'text')
+      .map((block) => block.text)
+      .join('\n');
+
+    // Try to extract file path from text content (e.g., "• /path/to/image.png")
+    const filePathMatch = textParts.match(
+      /[•\-*]\s*([^\n]+\.(png|jpg|jpeg|gif|webp))/i,
+    );
+    const filePath = filePathMatch ? filePathMatch[1].trim() : undefined;
+
+    const imageResult: ImageResult = {
+      image: {
+        // Prefer file path over base64 for better compatibility with ink-picture
+        filePath,
+        base64: filePath ? undefined : imageBlock.data,
+        mimeType: imageBlock.mimeType,
+        alt: textParts || undefined,
+      },
+    };
+    return imageResult;
+  }
+
+  // No image - return text display
   const displayParts = mcpContent.map((block: McpContentBlock): string => {
     switch (block.type) {
       case 'text':
