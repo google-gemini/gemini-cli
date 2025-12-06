@@ -118,8 +118,8 @@
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "vsce package --no-dependencies",
-    "test": "vitest run",
-    "test:ci": "vitest run --coverage",
+    "test": "cross-env LC_ALL=C vitest run",
+    "test:ci": "cross-env LC_ALL=C vitest run --coverage",
     "validate:notices": "node ./scripts/validate-notices.js"
   },
   "devDependencies": {
