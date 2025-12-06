@@ -120,6 +120,20 @@ export class HookRegistry {
   }
 
   /**
+   * Add a hook entry to the registry.
+   * This method allows programmatic registration of hooks after initialization,
+   * useful for integration hooks that should run last.
+   */
+  addHookEntry(entry: HookRegistryEntry): void {
+    if (!this.initialized) {
+      throw new HookRegistryNotInitializedError(
+        'Cannot add hook entries before registry initialization',
+      );
+    }
+    this.entries.push(entry);
+  }
+
+  /**
    * Get hook name for display purposes
    */
   private getHookName(entry: HookRegistryEntry): string {
