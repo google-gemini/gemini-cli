@@ -165,6 +165,13 @@ describe('getGitHubRepoInfo', async () => {
       getGitHubRepoInfo();
     }).toThrowError(/Owner & repo could not be extracted from remote URL/);
   });
+
+  it('handles repo names containing .git substring', async () => {
+    vi.mocked(child_process.execSync).mockReturnValueOnce(
+      'https://github.com/owner/my.git.repo.git',
+    );
+    expect(getGitHubRepoInfo()).toEqual({ owner: 'owner', repo: 'my.git.repo' });
+  });
 });
 
 describe('getGitRepoRoot', async () => {

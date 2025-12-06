@@ -137,5 +137,5 @@ export function getGitHubRepoInfo(): { owner: string; repo: string } {
     );
   }
 
-  return { owner: parts[0], repo: parts[1].replace('.git', '') };
+  return { owner: parts[0], repo: parts[1].replace(/\.git$/, '') };
 }
