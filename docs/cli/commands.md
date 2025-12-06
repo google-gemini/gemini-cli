@@ -230,7 +230,8 @@ Slash commands provide meta-level control over the CLI itself.
     purposes.
 
 - **`/quit`** (or **`/exit`**)
-  - **Description:** Exit Gemini CLI.
+  - **Description:** Exit Gemini CLI. You can also type `quit` or `exit` without
+    the leading slash.
 
 - **`/vim`**
   - **Description:** Toggle vim mode on or off. When vim mode is enabled, the
