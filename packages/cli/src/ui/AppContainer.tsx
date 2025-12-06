@@ -1564,7 +1564,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingGeminiHistoryItems,
       thought,
       shellModeActive,
-      inputHistory,
+
       buffer,
       inputWidth,
       suggestionsWidth,

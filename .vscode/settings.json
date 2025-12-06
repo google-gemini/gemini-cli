@@ -16,5 +16,7 @@
   "[markdown]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "vitest.disableWorkspaceWarning": true
+  "vitest.disableWorkspaceWarning": true,
+  "githubPullRequests.ignoredPullRequestBranches": ["main"],
+  "github.copilot.nextEditSuggestions.enabled": true
 }

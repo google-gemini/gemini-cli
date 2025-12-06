@@ -166,6 +166,7 @@ import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
+import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import {
   ShellExecutionService,
   writeToStdout,
