@@ -4,9 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ChatRecordingService } from '@google/gemini-cli-core';
-import path from 'node:path';
-import { SessionSelector } from '../../utils/sessionUtils.js';
 import {
   CommandKind,
   type SlashCommand,
@@ -27,31 +24,11 @@ export const renameCommand: SlashCommand = {
       };
     }
 
-    if (!context.services.config) {
+    if (!context.services.chatRecordingService) {
       return;
     }
 
-    const sessionSelector = new SessionSelector(context.services.config);
-    const sessions = await sessionSelector.listSessions();
-    const currentSession = sessions.find((s) => s.isCurrentSession);
-
-    if (!currentSession) {
-      return;
-    }
-
-    const chatsDir = path.join(
-      context.services.config.storage.getProjectTempDir(),
-      'chats',
-    );
-    const filePath = path.join(chatsDir, currentSession.fileName);
-
-    const recordingService = new ChatRecordingService(context.services.config);
-    recordingService.initialize({
-      sessionId: currentSession.id,
-      filePath,
-    });
-
-    recordingService.setDisplayName(newName);
+    context.services.chatRecordingService.setDisplayName(newName);
 
     return {
       type: 'message',

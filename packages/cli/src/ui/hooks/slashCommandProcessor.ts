@@ -196,6 +196,9 @@ export const useSlashCommandProcessor = (
         settings,
         git: gitService,
         logger,
+        chatRecordingService: config
+          ?.getGeminiClient()
+          ?.getChatRecordingService(),
       },
       ui: {
         addItem,

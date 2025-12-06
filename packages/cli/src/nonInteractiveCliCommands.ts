@@ -66,6 +66,7 @@ export const handleSlashCommand = async (
           settings,
           git: undefined,
           logger,
+          chatRecordingService: undefined,
         },
         ui: createNonInteractiveUI(),
         session: {

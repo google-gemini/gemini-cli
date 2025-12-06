@@ -6,52 +6,26 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renameCommand } from './renameCommand.js';
-import { ChatRecordingService, type Config } from '@google/gemini-cli-core';
-import { SessionSelector } from '../../utils/sessionUtils.js';
+import type { ChatRecordingService } from '@google/gemini-cli-core';
 import type { CommandContext } from './types.js';
-import path from 'node:path';
-
-vi.mock('@google/gemini-cli-core');
-vi.mock('../../utils/sessionUtils.js');
 
 describe('renameCommand', () => {
-  let mockConfig: Config;
   let mockContext: CommandContext;
   let mockChatRecordingService: {
-    initialize: ReturnType<typeof vi.fn>;
     setDisplayName: ReturnType<typeof vi.fn>;
-  };
-  let mockSessionSelector: {
-    listSessions: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
-    mockConfig = {
-      storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini'),
-      },
-    } as unknown as Config;
+    mockChatRecordingService = {
+      setDisplayName: vi.fn(),
+    };
 
     mockContext = {
       services: {
-        config: mockConfig,
+        chatRecordingService:
+          mockChatRecordingService as unknown as ChatRecordingService,
       },
     } as unknown as CommandContext;
-
-    mockChatRecordingService = {
-      initialize: vi.fn(),
-      setDisplayName: vi.fn(),
-    };
-    vi.mocked(ChatRecordingService).mockImplementation(
-      () => mockChatRecordingService as unknown as ChatRecordingService,
-    );
-
-    mockSessionSelector = {
-      listSessions: vi.fn(),
-    };
-    vi.mocked(SessionSelector).mockImplementation(
-      () => mockSessionSelector as unknown as SessionSelector,
-    );
   });
 
   it('should require a name argument', async () => {
@@ -72,36 +46,25 @@ describe('renameCommand', () => {
     });
   });
 
-  it('should silently ignore if no active session is found', async () => {
-    mockSessionSelector.listSessions.mockResolvedValue([
-      { id: 'other-session', isCurrentSession: false },
-    ]);
+  it('should return error if chatRecordingService is not available', async () => {
+    mockContext = {
+      services: {
+        chatRecordingService: undefined,
+      },
+    } as unknown as CommandContext;
 
     const result = await renameCommand.action!(mockContext, 'New Name');
 
-    expect(result).toBeUndefined();
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'Chat recording service is not available.',
+    });
   });
 
   it('should rename the current session', async () => {
-    const currentSession = {
-      id: 'current-session-id',
-      fileName: 'session-file.json',
-      isCurrentSession: true,
-    };
-    mockSessionSelector.listSessions.mockResolvedValue([currentSession]);
-
     const result = await renameCommand.action!(mockContext, 'New Name');
 
-    const expectedFilePath = path.join(
-      '/tmp/gemini',
-      'chats',
-      'session-file.json',
-    );
-
-    expect(mockChatRecordingService.initialize).toHaveBeenCalledWith({
-      sessionId: 'current-session-id',
-      filePath: expectedFilePath,
-    });
     expect(mockChatRecordingService.setDisplayName).toHaveBeenCalledWith(
       'New Name',
     );
