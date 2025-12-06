@@ -742,6 +742,16 @@ const SETTINGS_SCHEMA = {
           'Custom named presets for model configs. These are merged with (and override) the built-in aliases.',
         showInDialog: false,
       },
+      customOverrides: {
+        type: 'array',
+        label: 'Custom Model Config Overrides',
+        category: 'Model',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Custom model config overrides. These are merged with (and added to) the built-in overrides.',
+        showInDialog: false,
+      },
       overrides: {
         type: 'array',
         label: 'Model Config Overrides',

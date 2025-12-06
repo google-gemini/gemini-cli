@@ -524,6 +524,11 @@ their corresponding top-level category object in your `settings.json` file.
     with (and override) the built-in aliases.
   - **Default:** `{}`
 
+- **`modelConfigs.customOverrides`** (array):
+  - **Description:** Custom model config overrides. These are merged with (and
+    added to) the built-in overrides.
+  - **Default:** `[]`
+
 - **`modelConfigs.overrides`** (array):
   - **Description:** Apply specific configuration overrides based on matches,
     with a primary key of model (or alias). The most specific match will be
