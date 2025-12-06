@@ -249,8 +249,7 @@ const filterSessions = (
   return sessions.filter((session) => {
     const titleMatch =
       session.displayName.toLowerCase().includes(lowerQuery) ||
-      session.id.toLowerCase().includes(lowerQuery) ||
-      session.firstUserMessage.toLowerCase().includes(lowerQuery);
+      session.id.toLowerCase().includes(lowerQuery);
 
     const contentMatch = session.fullContent
       ?.toLowerCase()

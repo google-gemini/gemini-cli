@@ -90,7 +90,7 @@ export async function deleteSession(
 
     const time = formatRelativeTime(sessionToDelete.lastUpdated);
     console.log(
-      `Deleted session ${sessionToDelete.index}: ${sessionToDelete.firstUserMessage} (${time})`,
+      `Deleted session ${sessionToDelete.index}: ${sessionToDelete.displayName} (${time})`,
     );
   } catch (error) {
     console.error(

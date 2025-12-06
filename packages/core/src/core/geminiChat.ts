@@ -219,7 +219,14 @@ export class GeminiChat {
   ) {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(config);
-    this.chatRecordingService.initialize(resumedSessionData);
+    if (resumedSessionData) {
+      this.chatRecordingService.initialize({
+        sessionId: resumedSessionData.conversation.sessionId,
+        filePath: resumedSessionData.filePath,
+      });
+    } else {
+      this.chatRecordingService.initialize();
+    }
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.history.flatMap((c) => c.parts || []),
     );

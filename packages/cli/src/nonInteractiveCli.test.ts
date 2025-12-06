@@ -1598,7 +1598,6 @@ describe('runNonInteractive', () => {
         ] as any, // eslint-disable-line @typescript-eslint/no-explicit-any
         startTime: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
-        firstUserMessage: 'Previous message',
         projectHash: 'test-hash',
       },
       filePath: '/path/to/session.json',
