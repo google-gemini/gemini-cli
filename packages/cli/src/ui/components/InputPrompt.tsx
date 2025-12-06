@@ -104,6 +104,15 @@ export const calculatePromptWidths = (mainContentWidth: number) => {
   } as const;
 };
 
+const CLIPBOARD_IMAGE_TOKEN_REGEX =
+  /^@\.gemini-clipboard[\\/](?:clipboard|image)-(\d+)\.(?:png|jpe?g|gif|bmp|webp|tiff)$/i;
+
+const getClipboardImageLabel = (tokenText: string): string | null => {
+  const match = CLIPBOARD_IMAGE_TOKEN_REGEX.exec(tokenText);
+  if (!match) return null;
+  return `[image #${match[1]}]`;
+};
+
 export const InputPrompt: React.FC<InputPromptProps> = ({
   buffer,
   onSubmit,
@@ -218,10 +227,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (shellModeActive) {
         shellHistory.addCommandToHistory(submittedValue);
       }
+
+      // Transform [image #N] to @.gemini-clipboard/image-N.png before submission
+      // Most clipboard images are PNG format
+      const transformedValue = submittedValue.replace(
+        /\[image #(\d+)\]/g,
+        '@.gemini-clipboard/image-$1.png',
+      );
+
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
-      onSubmit(submittedValue);
+      onSubmit(transformedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
     },
@@ -323,15 +340,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             // Ignore cleanup errors
           });
 
-          // Get relative path from current directory
-          const relativePath = path.relative(config.getTargetDir(), imagePath);
+          // Extract image number from filename (e.g., "image-1.png" -> 1)
+          const filename = path.basename(imagePath);
+          const imageNumberMatch = filename.match(/image-(\d+)\./);
+          const imageNumber = imageNumberMatch ? imageNumberMatch[1] : '?';
 
-          // Insert @path reference at cursor position
-          const insertText = `@${relativePath}`;
+          // Insert friendly label only: [image #1]
+          // The actual path will be resolved at submit time
+          const insertText = `[image #${imageNumber}]`;
           const currentText = buffer.text;
           const offset = buffer.getOffset();
 
-          // Add spaces around the path if needed
+          // Add spaces around the text if needed
           let textToInsert = insertText;
           const charBefore = offset > 0 ? currentText[offset - 1] : '';
           const charAfter =
@@ -354,7 +374,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       const offset = buffer.getOffset();
       buffer.replaceRangeByOffset(offset, offset, textToInsert);
     } catch (error) {
-      console.error('Error handling clipboard image:', error);
+      console.error('Error handling clipboard paste:', error);
     }
   }, [buffer, config]);
 
@@ -1089,17 +1109,25 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 let charCount = 0;
                 segments.forEach((seg, segIdx) => {
                   const segLen = cpLen(seg.text);
-                  let display = seg.text;
+                  const clipboardLabel = getClipboardImageLabel(seg.text);
+                  let display = clipboardLabel ?? seg.text;
 
                   if (isOnCursorLine) {
                     const relativeVisualColForHighlight =
                       cursorVisualColAbsolute;
                     const segStart = charCount;
                     const segEnd = segStart + segLen;
-                    if (
+
+                    const cursorInSegment =
                       relativeVisualColForHighlight >= segStart &&
-                      relativeVisualColForHighlight < segEnd
-                    ) {
+                      relativeVisualColForHighlight < segEnd;
+
+                    if (clipboardLabel) {
+                      display =
+                        cursorInSegment && showCursor
+                          ? chalk.inverse(clipboardLabel)
+                          : clipboardLabel;
+                    } else if (cursorInSegment) {
                       const charToHighlight = cpSlice(
                         seg.text,
                         relativeVisualColForHighlight - segStart,
