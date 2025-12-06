@@ -18,19 +18,26 @@ import {
 const mockPlatform = vi.hoisted(() => vi.fn());
 
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
+const mockOsHomdir = vi.hoisted(() => vi.fn());
+const mockOsPlatform = vi.hoisted(() => vi.fn());
+const mockOsTmpdir = vi.hoisted(() => vi.fn());
 vi.mock('../services/shellExecutionService.js', () => ({
   ShellExecutionService: { execute: mockShellExecutionService },
 }));
 
-vi.mock('node:os', async (importOriginal) => {
-  const actualOs = await importOriginal<typeof os>();
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
   return {
-    ...actualOs,
-    default: {
-      ...actualOs,
-      platform: mockPlatform,
-    },
-    platform: mockPlatform,
+    ...actual,
+  };
+});
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>();
+  return {
+    ...actual,
+    homedir: mockOsHomdir,
+    platform: mockOsPlatform,
+    tmpdir: mockOsTmpdir,
   };
 });
 vi.mock('crypto');
@@ -72,7 +79,8 @@ describe('ShellTool', () => {
   let resolveExecutionPromise: (result: ShellExecutionResult) => void;
   let tempRootDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    mockOsTmpdir.mockReturnValue('/tmp'); // Ensure tmpdir always returns a valid string
     vi.clearAllMocks();
 
     tempRootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shell-test-'));
@@ -97,7 +105,10 @@ describe('ShellTool', () => {
 
     shellTool = new ShellTool(mockConfig);
 
-    mockPlatform.mockReturnValue('linux');
+    mockOsPlatform.mockReturnValue('linux');
+    mockOsHomdir.mockReturnValue('/home/user');
+    const realOs = await vi.importActual<typeof import('os')>('os');
+    mockOsTmpdir.mockReturnValue(realOs.tmpdir());
     (vi.mocked(crypto.randomBytes) as Mock).mockReturnValue(
       Buffer.from('abcdef', 'hex'),
     );
@@ -565,12 +576,14 @@ describe('ShellTool', () => {
       mockPlatform.mockReturnValue('win32');
       const shellTool = new ShellTool(mockConfig);
       expect(shellTool.description).toMatchSnapshot();
+      expect(shellTool.description).toContain('powershell.exe');
     });
 
-    it('should return the non-windows description when not on windows', () => {
+    it('should return the linux description when on linux', () => {
       mockPlatform.mockReturnValue('linux');
       const shellTool = new ShellTool(mockConfig);
       expect(shellTool.description).toMatchSnapshot();
+      expect(shellTool.description).toContain('bash -c');
     });
   });
 });
