@@ -33,6 +33,7 @@ import {
   fileExists,
   readWasmBinaryFromDisk,
 } from './fileUtils.js';
+import { UNSUPPORTED_MIME_TYPE_ERROR } from './mimeUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 
 vi.mock('mime/lite', () => ({
@@ -994,6 +995,33 @@ describe('fileUtils', () => {
       } finally {
         statSpy.mockRestore();
       }
+    });
+
+    describe('MIME type validation', () => {
+      it('should return an error for unsupported MIME types', async () => {
+        const unsupportedImageFilePath = path.join(
+          tempRootDir,
+          'unsupported.tiff',
+        );
+        const fakeTiffData = Buffer.from('fake tiff data');
+        actualNodeFs.writeFileSync(unsupportedImageFilePath, fakeTiffData);
+        mockMimeGetType.mockReturnValue('image/tiff');
+
+        const result = await processSingleFileContent(
+          unsupportedImageFilePath,
+          tempRootDir,
+          new StandardFileSystemService(),
+        );
+
+        expect(result.error).toContain(UNSUPPORTED_MIME_TYPE_ERROR);
+        expect(result.returnDisplay).toContain(
+          '[Skipped file with unsupported MIME type',
+        );
+        expect(result.llmContent).toContain(
+          `Cannot read file: ${UNSUPPORTED_MIME_TYPE_ERROR}`,
+        );
+        expect(result.errorType).toBe('read_content_failure');
+      });
     });
   });
 });
