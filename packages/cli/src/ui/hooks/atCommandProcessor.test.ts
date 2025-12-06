@@ -1241,4 +1241,337 @@ describe('handleAtCommand', () => {
     );
     expect(userTurnCalls).toHaveLength(0);
   });
+
+  describe('false positive prevention (greedy parser bug)', () => {
+    it('should NOT treat npm scoped packages as file paths', async () => {
+      const query = 'install @angular/core and @babel/preset-env';
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 500,
+        signal: abortController.signal,
+      });
+
+      // Should pass through as regular text, not trigger file reading
+      expect(result).toEqual({
+        processedQuery: [{ text: query }],
+        shouldProceed: true,
+      });
+
+      // Should NOT have called ReadManyFiles tool
+      expect(mockAddItem).not.toHaveBeenCalled();
+    });
+
+    it('should NOT treat Bazel targets as file paths', async () => {
+      const query = 'build @rules_nodejs//nodejs:nodejs target';
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 501,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [{ text: query }],
+        shouldProceed: true,
+      });
+
+      expect(mockAddItem).not.toHaveBeenCalled();
+    });
+
+    it('should allow files without extensions like README', async () => {
+      const fileContent = '# Project README';
+      await createTestFile(path.join(testRootDir, 'README'), fileContent);
+
+      const query = 'check @README please';
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 502,
+        signal: abortController.signal,
+      });
+
+      // Should read the file, not treat as user mention
+      expect(result.shouldProceed).toBe(true);
+      const content = result.processedQuery as Array<{ text?: string }>;
+      expect(
+        content.some((part) => part.text && part.text.includes(fileContent)),
+      ).toBe(true);
+    });
+
+    it('should handle mixed: real file paths AND npm packages', async () => {
+      const fileContent = 'package.json content';
+      const filePath = await createTestFile(
+        path.join(testRootDir, 'package.json'),
+        fileContent,
+      );
+
+      const query = `review @${getRelativePath(filePath)} and install @angular/core`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 503,
+        signal: abortController.signal,
+      });
+
+      // Should read the actual file but NOT treat @angular/core as a path
+      expect(result.shouldProceed).toBe(true);
+      expect(result.processedQuery).toEqual([
+        {
+          text: `review @${getRelativePath(filePath)} and install @angular/core`,
+        },
+        { text: '\n--- Content from referenced files ---' },
+        { text: `\nContent from @${getRelativePath(filePath)}:\n` },
+        { text: fileContent },
+        { text: '\n--- End of content ---' },
+      ]);
+
+      // Should have called addItem for the tool (ReadManyFiles for package.json)
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'tool_group' }),
+        503,
+      );
+    });
+
+    it('should NOT trigger glob search for common npm package patterns', async () => {
+      const query = 'use @types/node for TypeScript definitions';
+
+      // Spy on debug messages to ensure no glob search was attempted
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 504,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [{ text: query }],
+        shouldProceed: true,
+      });
+
+      // Verify no glob search was attempted for this pattern
+      expect(mockOnDebugMessage).not.toHaveBeenCalledWith(
+        expect.stringContaining('attempting glob search'),
+      );
+    });
+
+    it('should handle pasted code containing multiple npm packages', async () => {
+      const query = `Here's my package.json:
+{
+  "dependencies": {
+    "@angular/core": "^15.0.0",
+    "@babel/preset-env": "^7.20.0",
+    "@types/node": "^18.0.0"
+  }
+}
+What should I update?`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 505,
+        signal: abortController.signal,
+      });
+
+      // Should pass through as regular text
+      expect(result).toEqual({
+        processedQuery: [{ text: query }],
+        shouldProceed: true,
+      });
+
+      // Should NOT have triggered any file reads
+      expect(mockAddItem).not.toHaveBeenCalled();
+    });
+
+    it('should NOT treat npm package subpaths as file paths', async () => {
+      const query = 'import from @types/node/fs and @babel/core/package.json';
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 506,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [{ text: query }],
+        shouldProceed: true,
+      });
+
+      expect(mockAddItem).not.toHaveBeenCalled();
+    });
+
+    it('should allow relative paths with @./ prefix', async () => {
+      const fileContent = 'Relative file content';
+      await createTestFile(
+        path.join(testRootDir, 'subdir', 'relative.txt'),
+        fileContent,
+      );
+
+      // Note: @./ should work if the path exists
+      const query = `check @./subdir/relative.txt`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 507,
+        signal: abortController.signal,
+      });
+
+      // Should read the file
+      expect(result.shouldProceed).toBe(true);
+      // Check that file was actually read
+      const content = result.processedQuery as Array<{ text?: string }>;
+      expect(
+        content.some((part) => part.text && part.text.includes(fileContent)),
+      ).toBe(true);
+    });
+
+    it('should treat @org/tool/config.json as file path if it exists', async () => {
+      // Create a monorepo-style structure
+      const fileContent = '{"setting": "value"}';
+      await createTestFile(
+        path.join(testRootDir, 'myorg', 'internal-tool', 'config.json'),
+        fileContent,
+      );
+
+      const query = `@myorg/internal-tool/config.json`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 508,
+        signal: abortController.signal,
+      });
+
+      // Should read the file because it has a file extension
+      expect(result.shouldProceed).toBe(true);
+      const content = result.processedQuery as Array<{ text?: string }>;
+      expect(
+        content.some((part) => part.text && part.text.includes('config.json')),
+      ).toBe(true);
+    });
+
+    it('should treat @src/Dockerfile as file path (uppercase exception)', async () => {
+      const fileContent = 'FROM node:18';
+      await createTestFile(
+        path.join(testRootDir, 'src', 'Dockerfile'),
+        fileContent,
+      );
+
+      const query = `@src/Dockerfile`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 510,
+        signal: abortController.signal,
+      });
+
+      // Should read the file because it contains uppercase letters
+      expect(result.shouldProceed).toBe(true);
+      const content = result.processedQuery as Array<{ text?: string }>;
+      expect(
+        content.some((part) => part.text && part.text.includes('FROM node:18')),
+      ).toBe(true);
+    });
+
+    it('should NOT treat @scope/package-name without extension as file path', async () => {
+      // Even if a directory exists with this name, treat it as npm package
+      const query = 'install @custom/my-package for features';
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 509,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [{ text: query }],
+        shouldProceed: true,
+      });
+
+      expect(mockAddItem).not.toHaveBeenCalled();
+    });
+
+    it('should NOT implicit-read a directory found via glob (Safety Layer)', async () => {
+      // Scenario: User types @Hidden-Lib
+      // fs.stat(@Hidden-Lib) -> Fail (it's nested in src/).
+      // isLikelyFalsePositive -> False (has uppercase).
+      // Glob -> Finds "src/Hidden-Lib" (Directory).
+      // Result -> Should IGNORE it.
+
+      // Setup: Create a nested directory that would be found by glob but not direct stat
+      const dirName = 'Hidden-Lib-Dir';
+      const absoluteDirPath = path.join(testRootDir, 'src', dirName);
+      await fsPromises.mkdir(absoluteDirPath, { recursive: true });
+
+      // We must Mock GlobTool to force it to return a directory path
+      // (Real GlobTool might skip directories or behave differently)
+      const mockGlobTool = {
+        buildAndExecute: vi.fn().mockResolvedValue({
+          llmContent: `Files found:\n${absoluteDirPath}\n`,
+        }),
+      } as unknown as GlobTool;
+
+      // Replace the tool in the registry
+      const toolRegistry = mockConfig.getToolRegistry();
+      // @ts-expect-error - accessing private map or just re-registering might not work if API doesn't support replace
+      // So we spy on the getTool method
+      vi.spyOn(toolRegistry, 'getTool').mockImplementation((name) => {
+        if (name === 'glob') return mockGlobTool;
+        return undefined;
+      });
+
+      // Use a query that bypasses the "lowercase npm" heuristic check
+      const query = `check @${dirName}`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 511,
+        signal: abortController.signal,
+      });
+
+      // Should treat as text, NOT read the directory
+      expect(result).toEqual({
+        processedQuery: [{ text: query }],
+        shouldProceed: true,
+      });
+
+      expect(mockAddItem).not.toHaveBeenCalled();
+      expect(mockOnDebugMessage).toHaveBeenCalledWith(
+        expect.stringContaining('Implicit recursive read disabled for safety'),
+      );
+    });
+  });
 });
