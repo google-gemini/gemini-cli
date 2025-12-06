@@ -62,9 +62,11 @@ export class DiffManager {
   ) {
     this.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor((editor) => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.onActiveEditorChange(editor);
       }),
     );
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.onActiveEditorChange(vscode.window.activeTextEditor);
   }
 

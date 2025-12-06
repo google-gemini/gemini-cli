@@ -64,6 +64,7 @@ export function useSessionResume({
       refreshStaticRef.current(); // Force Static component to re-render with the updated history.
 
       // Give the history to the Gemini client.
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
     },
     [config, isGeminiClientInitialized, setQuittingMessages],

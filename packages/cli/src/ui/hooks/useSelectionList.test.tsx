@@ -584,11 +584,13 @@ describe('useSelectionList', () => {
       });
 
       pressNumber('0');
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       act(() => vi.advanceTimersByTime(1000)); // Timeout the '0' input
 
       pressNumber('1');
       expect(mockOnSelect).not.toHaveBeenCalled(); // Should be waiting for second digit
 
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       act(() => vi.advanceTimersByTime(1000)); // Timeout '1'
       expect(mockOnSelect).toHaveBeenCalledWith('Item 1');
     });

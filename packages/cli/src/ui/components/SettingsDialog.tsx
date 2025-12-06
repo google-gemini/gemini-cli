@@ -139,6 +139,7 @@ export function SettingsDialog({
       setScrollOffset(0);
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     doSearch();
 
     return () => {

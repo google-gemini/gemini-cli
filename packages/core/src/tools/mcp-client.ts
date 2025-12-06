@@ -739,6 +739,7 @@ export async function connectAndDiscover(
     toolRegistry.sortTools();
   } catch (error) {
     if (mcpClient) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       mcpClient.close();
     }
     coreEvents.emitFeedback(

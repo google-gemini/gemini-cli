@@ -977,6 +977,7 @@ describe('useGeminiStream', () => {
 
       // Start a query
       await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         result.current.submitQuery('test query');
       });
 
@@ -1036,6 +1037,7 @@ describe('useGeminiStream', () => {
 
       // Start a query
       await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         result.current.submitQuery('test query');
       });
 
@@ -1076,6 +1078,7 @@ describe('useGeminiStream', () => {
 
       // Start a query
       await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         result.current.submitQuery('test query');
       });
 
@@ -1117,6 +1120,7 @@ describe('useGeminiStream', () => {
       const { result } = renderTestHook();
 
       await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         result.current.submitQuery('long running query');
       });
 

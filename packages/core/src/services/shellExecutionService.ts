@@ -685,6 +685,7 @@ export class ShellExecutionService {
               });
             });
 
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
             Promise.race([processingComplete, abortFired]).then(() => {
               finalize();
             });

@@ -30,6 +30,7 @@ describe('statsCommand', () => {
   it('should display general session stats when run with no subcommand', () => {
     if (!statsCommand.action) throw new Error('Command has no action');
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     statsCommand.action(mockContext, '');
 
     const expectedDuration = formatDuration(
@@ -50,6 +51,7 @@ describe('statsCommand', () => {
     );
     if (!modelSubCommand?.action) throw new Error('Subcommand has no action');
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     modelSubCommand.action(mockContext, '');
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -66,6 +68,7 @@ describe('statsCommand', () => {
     );
     if (!toolsSubCommand?.action) throw new Error('Subcommand has no action');
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     toolsSubCommand.action(mockContext, '');
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
