@@ -43,6 +43,7 @@ import {
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { LocalFileDeclarativeTool } from './local-file-tool.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -418,11 +419,12 @@ function getCommandDescription(): string {
   }
 }
 
-export class ShellTool extends BaseDeclarativeTool<
-  ShellToolParams,
-  ToolResult
-> {
+export class ShellTool
+  extends BaseDeclarativeTool<ShellToolParams, ToolResult>
+  implements LocalFileDeclarativeTool<ShellToolParams>
+{
   static readonly Name = SHELL_TOOL_NAME;
+  readonly accessesLocalFiles = true;
 
   private allowlist: Set<string> = new Set();
 
