@@ -63,6 +63,7 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
 
       - name: 'Install Dependencies'
         run: 'npm ci'
@@ -185,6 +186,7 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
+          cache-dependency-path: './release/package-lock.json'
 
       - name: 'Install Dependencies'
         working-directory: './release'
@@ -224,6 +226,7 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
+          cache-dependency-path: './release/package-lock.json'
 
       - name: 'Install Dependencies'
         working-directory: './release'
@@ -290,6 +293,7 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
+          cache-dependency-path: './release/package-lock.json'
 
       - name: 'Install Dependencies'
         working-directory: './release'
