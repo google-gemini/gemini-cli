@@ -51,6 +51,8 @@ export interface UseCommandCompletionReturn {
     getCommandFromSuggestion: (
       suggestion: Suggestion,
     ) => SlashCommand | undefined;
+    isArgumentCompletion: boolean;
+    leafCommand: SlashCommand | null;
   };
   getCompletedText: (suggestion: Suggestion) => string | null;
 }
