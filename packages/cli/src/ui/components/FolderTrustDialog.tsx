@@ -41,6 +41,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
         }, 250);
       }
     };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     doRelaunch();
   }, [isRestarting]);
 

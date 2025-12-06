@@ -776,6 +776,7 @@ export class HookEventHandler {
 
       // Publish response through MessageBus
       if (this.messageBus) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.messageBus.publish({
           type: MessageBusType.HOOK_EXECUTION_RESPONSE,
           correlationId: request.correlationId,
@@ -786,6 +787,7 @@ export class HookEventHandler {
     } catch (error) {
       // Publish error response
       if (this.messageBus) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.messageBus.publish({
           type: MessageBusType.HOOK_EXECUTION_RESPONSE,
           correlationId: request.correlationId,

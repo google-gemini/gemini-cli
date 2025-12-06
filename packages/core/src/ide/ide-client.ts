@@ -278,6 +278,7 @@ export class IdeClient {
     });
 
     // Ensure the mutex is released only after the diff interaction is complete.
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     promise.finally(release);
 
     return promise;
@@ -406,6 +407,7 @@ export class IdeClient {
       IDEConnectionStatus.Disconnected,
       'IDE integration disabled. To enable it again, run /ide enable.',
     );
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.client?.close();
   }
 

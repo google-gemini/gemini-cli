@@ -49,6 +49,7 @@ export const Notifications = () => {
     };
 
     if (isScreenReaderEnabled) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       checkScreenReader();
     }
   }, [isScreenReaderEnabled]);
@@ -69,6 +70,7 @@ export const Notifications = () => {
         }
       }
     };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     writeScreenReaderNudgeFile();
   }, [showScreenReaderNudge]);
 
