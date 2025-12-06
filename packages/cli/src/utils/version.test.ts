@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getCliVersion } from './version.js';
-import * as core from '@google/gemini-cli-core';
+import { getPackageJson } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', () => ({
   getPackageJson: vi.fn(),
@@ -18,7 +18,7 @@ describe('version', () => {
   beforeEach(() => {
     vi.resetModules();
     process.env = { ...originalEnv };
-    vi.mocked(core.getPackageJson).mockResolvedValue({ version: '1.0.0' });
+    vi.mocked(getPackageJson).mockResolvedValue({ version: '1.0.0' });
   });
 
   afterEach(() => {
@@ -39,7 +39,7 @@ describe('version', () => {
 
   it('should return "unknown" if package.json is not found and CLI_VERSION is not set', async () => {
     delete process.env['CLI_VERSION'];
-    vi.mocked(core.getPackageJson).mockResolvedValue(undefined);
+    vi.mocked(getPackageJson).mockResolvedValue(undefined);
     const version = await getCliVersion();
     expect(version).toBe('unknown');
   });
