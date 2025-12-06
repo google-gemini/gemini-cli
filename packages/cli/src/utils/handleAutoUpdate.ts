@@ -64,6 +64,7 @@ export function handleAutoUpdate(
   }
   const isNightly = info.update.latest.includes('nightly');
 
+  const packageName = info.update?.name ?? '@google/gemini-cli';
   const resolvedUpdateCommand = installationInfo.updateCommand.replace(
     '@latest',
     isNightly ? '@nightly' : `@${info.update.latest}`,
@@ -71,7 +72,7 @@ export function handleAutoUpdate(
   const updateCommand =
     installationInfo.packageManager === PackageManager.NPM &&
     installationInfo.isGlobal
-      ? `npm uninstall -g ${info.update.name} && ${resolvedUpdateCommand}`
+      ? `npm uninstall -g ${packageName} && ${resolvedUpdateCommand}`
       : resolvedUpdateCommand;
   const updateProcess = spawnFn(updateCommand, {
     stdio: 'ignore',

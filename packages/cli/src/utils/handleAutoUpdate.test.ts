@@ -256,6 +256,33 @@ describe('handleAutoUpdate', () => {
     );
   });
 
+  it('should fallback to default package name when update name is missing', () => {
+    mockUpdateInfo = {
+      ...mockUpdateInfo,
+      update: {
+        ...mockUpdateInfo.update,
+        name: undefined as unknown as string,
+      },
+    };
+    mockGetInstallationInfo.mockReturnValue({
+      updateCommand: 'npm i -g @google/gemini-cli@latest',
+      updateMessage: 'This is an additional message.',
+      isGlobal: true,
+      packageManager: PackageManager.NPM,
+    });
+
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'npm uninstall -g @google/gemini-cli && npm i -g @google/gemini-cli@2.0.0',
+      {
+        shell: true,
+        stdio: 'ignore',
+        detached: true,
+      },
+    );
+  });
+
   it('should emit "update-success" when the update process succeeds', async () => {
     await new Promise<void>((resolve) => {
       mockGetInstallationInfo.mockReturnValue({
