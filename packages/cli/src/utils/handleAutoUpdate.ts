@@ -71,7 +71,7 @@ export function handleAutoUpdate(
   const updateCommand =
     installationInfo.packageManager === PackageManager.NPM &&
     installationInfo.isGlobal
-      ? `npm uninstall -g @google/gemini-cli && ${resolvedUpdateCommand}`
+      ? `npm uninstall -g ${info.update.name} && ${resolvedUpdateCommand}`
       : resolvedUpdateCommand;
   const updateProcess = spawnFn(updateCommand, {
     stdio: 'ignore',

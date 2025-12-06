@@ -173,7 +173,7 @@ describe('handleAutoUpdate', () => {
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
 
     expect(mockSpawn).toHaveBeenCalledWith(
-      'npm uninstall -g @google/gemini-cli && npm i -g @google/gemini-cli@2.0.0',
+      `npm uninstall -g ${mockUpdateInfo.update.name} && npm i -g ${mockUpdateInfo.update.name}@2.0.0`,
       {
         shell: true,
         stdio: 'ignore',
@@ -201,8 +201,7 @@ describe('handleAutoUpdate', () => {
     });
 
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-failed', {
-      message:
-        'Automatic update failed. Please try updating manually. (command: npm uninstall -g @google/gemini-cli && npm i -g @google/gemini-cli@2.0.0)',
+      message: `Automatic update failed. Please try updating manually. (command: npm uninstall -g ${mockUpdateInfo.update.name} && npm i -g ${mockUpdateInfo.update.name}@2.0.0)`,
     });
   });
 
@@ -248,7 +247,7 @@ describe('handleAutoUpdate', () => {
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
 
     expect(mockSpawn).toHaveBeenCalledWith(
-      'npm uninstall -g @google/gemini-cli && npm i -g @google/gemini-cli@nightly',
+      `npm uninstall -g ${mockUpdateInfo.update.name} && npm i -g ${mockUpdateInfo.update.name}@nightly`,
       {
         shell: true,
         stdio: 'ignore',
