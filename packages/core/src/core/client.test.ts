@@ -2007,7 +2007,7 @@ ${JSON.stringify(
         );
       });
 
-      it('should select first available model, set active, and consume sticky attempt', async () => {
+      it('should select first available model, set active, and not consume sticky attempt (done lower in chain)', async () => {
         vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue(
           {
             selectedModel: 'model-a',
@@ -2029,7 +2029,7 @@ ${JSON.stringify(
         expect(mockConfig.setActiveModel).toHaveBeenCalledWith('model-a');
         expect(
           mockAvailabilityService.consumeStickyAttempt,
-        ).toHaveBeenCalledWith('model-a');
+        ).not.toHaveBeenCalled();
         // Ensure turn.run used the selected model
         expect(mockTurnRunFn).toHaveBeenCalledWith(
           expect.objectContaining({ model: 'model-a' }),

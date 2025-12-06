@@ -751,6 +751,10 @@ describe('BaseLlmClient', () => {
       expect(mockAvailabilityService.consumeStickyAttempt).toHaveBeenCalledWith(
         stickyModel,
       );
+      expect(retryWithBackoff).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({ maxAttempts: 1 }),
+      );
     });
 
     it('should mark healthy and honor availability selection when using generateJson', async () => {

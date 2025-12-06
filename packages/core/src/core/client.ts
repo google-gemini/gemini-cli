@@ -58,8 +58,8 @@ import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
 import {
+  applyModelSelection,
   createAvailabilityContextProvider,
-  selectModelForAvailability,
 } from '../availability/policyHelpers.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 
@@ -546,22 +546,14 @@ export class GeminiClient {
     }
 
     // availability logic
-    const availabilitySelection = selectModelForAvailability(
+    const { model: finalModel } = applyModelSelection(
       this.config,
       modelToUse,
+      undefined,
+      undefined,
+      { consumeAttempt: false },
     );
-    if (availabilitySelection) {
-      const finalModel = availabilitySelection.selectedModel;
-      if (finalModel) {
-        modelToUse = finalModel;
-        this.config.setActiveModel(modelToUse);
-        if (availabilitySelection.attempts) {
-          this.config
-            .getModelAvailabilityService()
-            .consumeStickyAttempt(modelToUse);
-        }
-      }
-    }
+    modelToUse = finalModel;
 
     this.currentSequenceModel = modelToUse;
     yield { type: GeminiEventType.ModelInfo, value: modelToUse };
@@ -692,25 +684,19 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
-      const availabilitySelection = selectModelForAvailability(
+      const {
+        model,
+        config: newConfig,
+        maxAttempts: availabilityMaxAttempts,
+      } = applyModelSelection(
         this.config,
         currentAttemptModel,
+        undefined,
+        modelConfigKey.overrideScope,
       );
-      if (availabilitySelection?.selectedModel) {
-        currentAttemptModel = availabilitySelection.selectedModel;
-        this.config.setActiveModel(currentAttemptModel);
-        if (availabilitySelection.attempts) {
-          this.config
-            .getModelAvailabilityService()
-            .consumeStickyAttempt(currentAttemptModel);
-        }
-        if (currentAttemptModel !== desiredModelConfig.model) {
-          const newConfig = this.config.modelConfigService.getResolvedConfig({
-            ...modelConfigKey,
-            model: currentAttemptModel,
-          });
-          currentAttemptGenerateContentConfig = newConfig.generateContentConfig;
-        }
+      currentAttemptModel = model;
+      if (newConfig) {
+        currentAttemptGenerateContentConfig = newConfig;
       }
 
       // Define callback to refresh context based on currentAttemptModel which might be updated by fallback handler
@@ -770,6 +756,7 @@ export class GeminiClient {
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: onPersistent429Callback,
         authType: this.config.getContentGeneratorConfig()?.authType,
+        maxAttempts: availabilityMaxAttempts,
         getAvailabilityContext,
       });
 

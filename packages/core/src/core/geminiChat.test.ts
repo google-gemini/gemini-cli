@@ -2447,6 +2447,45 @@ describe('GeminiChat', () => {
       );
     });
 
+    it('caps retries to a single attempt when selection is sticky', async () => {
+      vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
+        selectedModel: 'model-a',
+        attempts: 1,
+        skipped: [],
+      });
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Response' }], role: 'model' },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'test',
+        'prompt-sticky-once',
+        new AbortController().signal,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(mockRetryWithBackoff).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({ maxAttempts: 1 }),
+      );
+      expect(mockAvailabilityService.consumeStickyAttempt).toHaveBeenCalledWith(
+        'model-a',
+      );
+    });
+
     it('should pass attempted model to onPersistent429 callback which calls handleFallback', async () => {
       vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
         selectedModel: 'model-a',

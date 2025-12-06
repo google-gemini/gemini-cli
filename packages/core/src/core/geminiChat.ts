@@ -49,8 +49,8 @@ import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import {
+  applyModelSelection,
   createAvailabilityContextProvider,
-  selectModelForAvailability,
 } from '../availability/policyHelpers.js';
 import {
   fireAfterModelHook,
@@ -410,38 +410,17 @@ export class GeminiChat {
       this.ensureActiveLoopHasThoughtSignatures(requestContents);
 
     // Track final request parameters for AfterModel hooks
-    const availabilitySelection = selectModelForAvailability(
-      this.config,
-      model,
-    );
-    const availabilityFinalModel =
-      availabilitySelection?.selectedModel ?? model;
+    const {
+      model: availabilityFinalModel,
+      config: newAvailabilityConfig,
+      maxAttempts: availabilityMaxAttempts,
+    } = applyModelSelection(this.config, model, generateContentConfig);
+
     let lastModelToUse = availabilityFinalModel;
     let currentGenerateContentConfig: GenerateContentConfig =
-      generateContentConfig;
+      newAvailabilityConfig ?? generateContentConfig;
     let lastConfig: GenerateContentConfig = generateContentConfig;
     let lastContentsToUse: Content[] = requestContents;
-
-    if (availabilitySelection?.selectedModel) {
-      if (availabilityFinalModel !== model) {
-        const { generateContentConfig: newConfig } =
-          this.config.modelConfigService.getResolvedConfig({
-            model: availabilityFinalModel,
-          });
-        const { abortSignal } = currentGenerateContentConfig;
-        currentGenerateContentConfig = {
-          ...currentGenerateContentConfig,
-          ...newConfig,
-          abortSignal,
-        };
-      }
-      this.config.setActiveModel(availabilityFinalModel);
-      if (availabilitySelection.attempts) {
-        this.config
-          .getModelAvailabilityService()
-          .consumeStickyAttempt(availabilityFinalModel);
-      }
-    }
 
     const getAvailabilityContext = createAvailabilityContextProvider(
       this.config,
@@ -599,10 +578,11 @@ export class GeminiChat {
       retryFetchErrors: this.config.getRetryFetchErrors(),
       signal: generateContentConfig.abortSignal,
       maxAttempts:
-        this.config.isPreviewModelFallbackMode() &&
+        availabilityMaxAttempts ??
+        (this.config.isPreviewModelFallbackMode() &&
         model === PREVIEW_GEMINI_MODEL
           ? 1
-          : undefined,
+          : undefined),
       getAvailabilityContext,
     });
 

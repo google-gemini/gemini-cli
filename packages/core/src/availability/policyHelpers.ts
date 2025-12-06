@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { GenerateContentConfig } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type {
   FailureKind,
@@ -123,16 +124,64 @@ export function selectModelForAvailability(
   const selection = config
     .getModelAvailabilityService()
     .selectFirstAvailable(chain.map((p) => p.model));
-  const finalModel =
-    selection.selectedModel ??
-    chain.find((p) => p.isLastResort)?.model ??
-    DEFAULT_GEMINI_MODEL;
 
-  const normalizedSelection: ModelSelectionResult = selection.selectedModel
-    ? selection
-    : { selectedModel: finalModel, skipped: [] };
+  if (selection.selectedModel) return selection;
 
-  return normalizedSelection;
+  const backupModel =
+    chain.find((p) => p.isLastResort)?.model ?? DEFAULT_GEMINI_MODEL;
+
+  return { selectedModel: backupModel, skipped: [] };
+}
+
+/**
+ * Applies the model availability selection logic, including side effects
+ * (setting active model, consuming sticky attempts) and config updates.
+ */
+export function applyModelSelection(
+  config: Config,
+  requestedModel: string,
+  currentConfig?: GenerateContentConfig,
+  overrideScope?: string,
+  options: { consumeAttempt?: boolean } = {},
+): { model: string; config?: GenerateContentConfig; maxAttempts?: number } {
+  const selection = selectModelForAvailability(config, requestedModel);
+
+  if (!selection?.selectedModel) {
+    return { model: requestedModel, config: currentConfig };
+  }
+
+  const finalModel = selection.selectedModel;
+  let finalConfig = currentConfig;
+
+  // If model changed, re-resolve config
+  if (finalModel !== requestedModel) {
+    const { generateContentConfig } =
+      config.modelConfigService.getResolvedConfig({
+        overrideScope,
+        model: finalModel,
+      });
+
+    finalConfig = currentConfig
+      ? { ...currentConfig, ...generateContentConfig }
+      : generateContentConfig;
+
+    // Preserve abortSignal if it existed in the original config
+    if (currentConfig?.abortSignal) {
+      finalConfig.abortSignal = currentConfig.abortSignal;
+    }
+  }
+
+  config.setActiveModel(finalModel);
+
+  if (selection.attempts && options.consumeAttempt !== false) {
+    config.getModelAvailabilityService().consumeStickyAttempt(finalModel);
+  }
+
+  return {
+    model: finalModel,
+    config: finalConfig,
+    maxAttempts: selection.attempts,
+  };
 }
 
 export function applyAvailabilityTransition(

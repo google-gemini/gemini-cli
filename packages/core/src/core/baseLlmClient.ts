@@ -21,8 +21,8 @@ import { MalformedJsonResponseEvent } from '../telemetry/types.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import {
+  applyModelSelection,
   createAvailabilityContextProvider,
-  selectModelForAvailability,
 } from '../availability/policyHelpers.js';
 
 const DEFAULT_MAX_ATTEMPTS = 5;
@@ -242,30 +242,18 @@ export class BaseLlmClient {
       () => requestParams.model,
     );
 
-    const availabilitySelection = selectModelForAvailability(
+    const {
+      model,
+      config: newConfig,
+      maxAttempts: availabilityMaxAttempts,
+    } = applyModelSelection(
       this.config,
       requestParams.model,
+      requestParams.config,
     );
-    if (availabilitySelection?.selectedModel) {
-      const finalModel = availabilitySelection.selectedModel;
-      if (finalModel !== requestParams.model) {
-        requestParams.model = finalModel;
-        const { generateContentConfig } =
-          this.config.modelConfigService.getResolvedConfig({
-            model: finalModel,
-          });
-        requestParams.config = {
-          ...requestParams.config,
-          ...generateContentConfig,
-        };
-      }
-      this.config.setActiveModel(finalModel);
-
-      if (availabilitySelection.attempts) {
-        this.config
-          .getModelAvailabilityService()
-          .consumeStickyAttempt(finalModel);
-      }
+    requestParams.model = model;
+    if (newConfig) {
+      requestParams.config = newConfig;
     }
 
     try {
@@ -292,7 +280,8 @@ export class BaseLlmClient {
 
       const result = await retryWithBackoff(apiCall, {
         shouldRetryOnContent,
-        maxAttempts: maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+        maxAttempts:
+          availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
         getAvailabilityContext,
       });
 
