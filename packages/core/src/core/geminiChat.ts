@@ -54,6 +54,30 @@ import {
   fireBeforeToolSelectionHook,
 } from './geminiChatHookTriggers.js';
 
+import fs from 'node:fs';
+import path from 'node:path';
+let i = 0;
+const uuid = crypto.randomUUID();
+const lgp = `/tmp/evals/${uuid}/log.json`;
+const clearOnStart = true;
+function log(...args: object[]): void {
+  if (i === 0 && clearOnStart) {
+    fs.rmSync(lgp, { recursive: true, force: true });
+    fs.mkdirSync(path.dirname(lgp), { recursive: true });
+  }
+  const text =
+    args
+      .map((arg) => {
+        try {
+          return JSON.stringify(arg, null, 2);
+        } catch (_) {
+          return arg;
+        }
+      })
+      .join('\n') + '\n';
+  fs.appendFileSync(lgp, `T${i++}: ${text}`);
+}
+
 export enum StreamEventType {
   /** A regular content chunk from the API. */
   CHUNK = 'chunk',
@@ -437,13 +461,18 @@ export class GeminiChat {
       }
 
       effectiveModel = modelToUse;
-      const config = {
+      const config: GenerateContentConfig = {
         ...generateContentConfig,
         // TODO(12622): Ensure we don't overrwrite these when they are
         // passed via config.
         systemInstruction: this.systemInstruction,
         tools: this.tools,
+        // TODO(hack),
+        temperature: 0.5,
       };
+
+      // TODO(hack): Hardcode model.
+      modelToUse = 'gemini-2.5-pro';
 
       // TODO(joshualitt): Clean this up with model configs.
       if (modelToUse.startsWith('gemini-3')) {
@@ -550,11 +579,8 @@ export class GeminiChat {
       authType: this.config.getContentGeneratorConfig()?.authType,
       retryFetchErrors: this.config.getRetryFetchErrors(),
       signal: generateContentConfig.abortSignal,
-      maxAttempts:
-        this.config.isPreviewModelFallbackMode() &&
-        model === PREVIEW_GEMINI_MODEL
-          ? 1
-          : undefined,
+      maxAttempts: Number.MAX_SAFE_INTEGER,
+      shouldRetryOnError: () => true,
     });
 
     // Store the original request for AfterModel hooks
@@ -729,7 +755,9 @@ export class GeminiChat {
     let hasToolCall = false;
     let finishReason: FinishReason | undefined;
 
+    const rawChunks = [];
     for await (const chunk of streamResponse) {
+      rawChunks.push(chunk);
       const candidateWithReason = chunk?.candidates?.find(
         (candidate) => candidate.finishReason,
       );
@@ -823,6 +851,11 @@ export class GeminiChat {
         );
       }
       if (finishReason === FinishReason.MALFORMED_FUNCTION_CALL) {
+        log({
+          type: 'NO_FINISH_REASON',
+          request: originalRequest,
+          chunks: rawChunks,
+        });
         throw new InvalidStreamError(
           'Model stream ended with malformed function call.',
           'MALFORMED_FUNCTION_CALL',
