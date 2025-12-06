@@ -518,6 +518,7 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
+        {} as Config,
         false,
       );
       await client.connect();
@@ -548,7 +549,9 @@ describe('mcp-client', () => {
         setNotificationHandler: vi.fn((_, handler) => {
           resourceListHandler = handler;
         }),
-        getServerCapabilities: vi.fn().mockReturnValue({ resources: {} }),
+        getServerCapabilities: vi
+          .fn()
+          .mockReturnValue({ resources: { listChanged: true } }),
         request: vi.fn().mockImplementation(({ method }) => {
           if (method === 'resources/list') {
             listCallCount += 1;
@@ -598,6 +601,7 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
+        {} as Config,
         false,
       );
       await client.connect();
@@ -613,6 +617,11 @@ describe('mcp-client', () => {
       expect(resourceRegistry.setResourcesForServer).toHaveBeenLastCalledWith(
         'test-server',
         [expect.objectContaining({ uri: 'file:///tmp/two.txt' })],
+      );
+
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        'Resources updated for server: test-server',
       );
     });
 
@@ -719,6 +728,7 @@ describe('mcp-client', () => {
         { command: 'test-command' },
         {} as ToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
         {} as Config,
         false,
@@ -754,6 +764,7 @@ describe('mcp-client', () => {
         { command: 'test-command' },
         {} as ToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
         {} as Config,
         false,
@@ -808,6 +819,7 @@ describe('mcp-client', () => {
         { command: 'test-command' },
         mockedToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
         {} as Config,
         false,
@@ -877,6 +889,7 @@ describe('mcp-client', () => {
         { command: 'test-command' },
         mockedToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
         {} as Config,
         false,
@@ -946,6 +959,7 @@ describe('mcp-client', () => {
         { command: 'cmd-a' },
         mockedToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
         {} as Config,
         false,
@@ -957,6 +971,7 @@ describe('mcp-client', () => {
         { command: 'cmd-b' },
         mockedToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
         {} as Config,
         false,
@@ -1038,6 +1053,7 @@ describe('mcp-client', () => {
         { command: 'test-command', timeout: 100 },
         mockedToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
         {} as Config,
         false,
@@ -1101,6 +1117,7 @@ describe('mcp-client', () => {
         { command: 'test-command' },
         mockedToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
         {} as Config,
         false,

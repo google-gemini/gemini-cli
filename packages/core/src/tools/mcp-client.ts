@@ -104,8 +104,10 @@ export class McpClient {
   private client: Client | undefined;
   private transport: Transport | undefined;
   private status: MCPServerStatus = MCPServerStatus.DISCONNECTED;
-  private isRefreshing: boolean = false;
-  private pendingRefresh: boolean = false;
+  private isRefreshingTools: boolean = false;
+  private pendingToolRefresh: boolean = false;
+  private isRefreshingResources: boolean = false;
+  private pendingResourceRefresh: boolean = false;
 
   constructor(
     private readonly serverName: string,
@@ -137,25 +139,8 @@ export class McpClient {
         this.workspaceContext,
       );
 
-      // setup dynamic tool listener
-      const capabilities = this.client.getServerCapabilities();
-
-      if (capabilities?.tools?.listChanged) {
-        debugLogger.log(
-          `Server '${this.serverName}' supports tool updates. Listening for changes...`,
-        );
-
-        this.client.setNotificationHandler(
-          ToolListChangedNotificationSchema,
-          async () => {
-            debugLogger.log(
-              `🔔 Received tool update notification from '${this.serverName}'`,
-            );
-            await this.refreshTools();
-          },
-        );
-      }
       this.registerNotificationHandlers();
+
       const originalOnError = this.client.onerror;
       this.client.onerror = (error) => {
         if (this.status !== MCPServerStatus.CONNECTED) {
@@ -281,30 +266,105 @@ export class McpClient {
     );
   }
 
+  /**
+   * Registers notification handlers for dynamic updates from the MCP server.
+   * This includes handlers for tool list changes and resource list changes.
+   */
   private registerNotificationHandlers(): void {
     if (!this.client) {
       return;
     }
-    this.client.setNotificationHandler(
-      ResourceListChangedNotificationSchema,
-      async () => {
-        await this.handleResourceListChanged();
-      },
-    );
+
+    const capabilities = this.client.getServerCapabilities();
+
+    if (capabilities?.tools?.listChanged) {
+      debugLogger.log(
+        `Server '${this.serverName}' supports tool updates. Listening for changes...`,
+      );
+
+      this.client.setNotificationHandler(
+        ToolListChangedNotificationSchema,
+        async () => {
+          debugLogger.log(
+            `🔔 Received tool update notification from '${this.serverName}'`,
+          );
+          await this.refreshTools();
+        },
+      );
+    }
+
+    if (capabilities?.resources?.listChanged) {
+      debugLogger.log(
+        `Server '${this.serverName}' supports resource updates. Listening for changes...`,
+      );
+
+      this.client.setNotificationHandler(
+        ResourceListChangedNotificationSchema,
+        async () => {
+          debugLogger.log(
+            `🔔 Received resource update notification from '${this.serverName}'`,
+          );
+          await this.refreshResources();
+        },
+      );
+    }
   }
 
-  private async handleResourceListChanged(): Promise<void> {
-    try {
-      const resources = await this.discoverResources();
-      this.updateResourceRegistry(resources);
-    } catch (error) {
-      coreEvents.emitFeedback(
-        'error',
-        `Error refreshing resources from ${this.serverName}: ${getErrorMessage(
-          error,
-        )}`,
-        error,
+  /**
+   * Refreshes the resources for this server by re-querying the MCP `resources/list` endpoint.
+   *
+   * This method implements a **Coalescing Pattern** to handle rapid bursts of notifications
+   * (e.g., during server startup or bulk updates) without overwhelming the server or
+   * creating race conditions in the ResourceRegistry.
+   */
+  private async refreshResources(): Promise<void> {
+    if (this.isRefreshingResources) {
+      debugLogger.log(
+        `Resource refresh for '${this.serverName}' is already in progress. Pending update.`,
       );
+      this.pendingResourceRefresh = true;
+      return;
+    }
+
+    this.isRefreshingResources = true;
+
+    try {
+      do {
+        this.pendingResourceRefresh = false;
+
+        if (this.status !== MCPServerStatus.CONNECTED || !this.client) break;
+
+        const timeoutMs = this.serverConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC;
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+
+        let newResources;
+        try {
+          newResources = await this.discoverResources();
+        } catch (err) {
+          debugLogger.error(
+            `Resource discovery failed during refresh: ${getErrorMessage(err)}`,
+          );
+          clearTimeout(timeoutId);
+          break;
+        }
+
+        this.updateResourceRegistry(newResources);
+
+        clearTimeout(timeoutId);
+
+        coreEvents.emitFeedback(
+          'info',
+          `Resources updated for server: ${this.serverName}`,
+        );
+      } while (this.pendingResourceRefresh);
+    } catch (error) {
+      debugLogger.error(
+        `Critical error in resource refresh loop for ${this.serverName}: ${getErrorMessage(error)}`,
+      );
+    } finally {
+      this.isRefreshingResources = false;
+      this.pendingResourceRefresh = false;
     }
   }
 
@@ -324,19 +384,19 @@ export class McpClient {
    * creating race conditions in the global ToolRegistry.
    */
   private async refreshTools(): Promise<void> {
-    if (this.isRefreshing) {
+    if (this.isRefreshingTools) {
       debugLogger.log(
         `Tool refresh for '${this.serverName}' is already in progress. Pending update.`,
       );
-      this.pendingRefresh = true;
+      this.pendingToolRefresh = true;
       return;
     }
 
-    this.isRefreshing = true;
+    this.isRefreshingTools = true;
 
     try {
       do {
-        this.pendingRefresh = false;
+        this.pendingToolRefresh = false;
 
         if (this.status !== MCPServerStatus.CONNECTED || !this.client) break;
 
@@ -374,14 +434,14 @@ export class McpClient {
           'info',
           `Tools updated for server: ${this.serverName}`,
         );
-      } while (this.pendingRefresh);
+      } while (this.pendingToolRefresh);
     } catch (error) {
       debugLogger.error(
         `Critical error in refresh loop for ${this.serverName}: ${getErrorMessage(error)}`,
       );
     } finally {
-      this.isRefreshing = false;
-      this.pendingRefresh = false;
+      this.isRefreshingTools = false;
+      this.pendingToolRefresh = false;
     }
   }
 }
