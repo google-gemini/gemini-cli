@@ -27,10 +27,10 @@ jobs:
         with:
           repo-token: '${{ secrets.GITHUB_TOKEN }}'
           stale-issue-message: >-
-            This issue has been automatically marked as stale due to 60 days of inactivity.
+            This issue has been automatically marked as stale due to 14 days of inactivity.
             It will be closed in 14 days if no further activity occurs.
           stale-pr-message: >-
-            This pull request has been automatically marked as stale due to 60 days of inactivity.
+            This pull request has been automatically marked as stale due to 14 days of inactivity.
             It will be closed in 14 days if no further activity occurs.
           close-issue-message: >-
             This issue has been closed due to 14 additional days of inactivity after being marked as stale.
@@ -38,7 +38,7 @@ jobs:
           close-pr-message: >-
             This pull request has been closed due to 14 additional days of inactivity after being marked as stale.
             If this is still relevant, you are welcome to reopen or leave a comment. Thanks for contributing!
-          days-before-stale: 60
+          days-before-stale: 14
           days-before-close: 14
           exempt-issue-labels: 'pinned,security'
           exempt-pr-labels: 'pinned,security'
