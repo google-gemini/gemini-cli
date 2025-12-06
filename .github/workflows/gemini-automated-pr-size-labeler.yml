@@ -24,8 +24,8 @@ jobs:
         id: generate_token
         uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2
         with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
 
       - name: Run Gemini PR size and complexity labeller
         uses: google-github-actions/run-gemini-cli@e4b071635b36562c88d9af4746884501fda9344a # Use the specific commit SHA
