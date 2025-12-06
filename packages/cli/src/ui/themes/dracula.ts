@@ -10,7 +10,7 @@ import { interpolateColor } from './color-utils.js';
 const draculaColors: ColorsTheme = {
   type: 'dark',
   Background: '#282a36',
-  Foreground: '#a3afb7',
+  Foreground: '',
   LightBlue: '#8be9fd',
   AccentBlue: '#8be9fd',
   AccentPurple: '#ff79c6',

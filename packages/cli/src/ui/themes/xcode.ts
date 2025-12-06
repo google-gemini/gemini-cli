@@ -10,7 +10,7 @@ import { interpolateColor } from './color-utils.js';
 const xcodeColors: ColorsTheme = {
   type: 'light',
   Background: '#fff',
-  Foreground: '#444',
+  Foreground: '',
   LightBlue: '#0E0EFF',
   AccentBlue: '#1c00cf',
   AccentPurple: '#aa0d91',

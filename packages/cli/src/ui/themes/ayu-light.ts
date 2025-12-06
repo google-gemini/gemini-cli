@@ -10,7 +10,7 @@ import { interpolateColor } from './color-utils.js';
 const ayuLightColors: ColorsTheme = {
   type: 'light',
   Background: '#f8f9fa',
-  Foreground: '#5c6166',
+  Foreground: '',
   LightBlue: '#55b4d4',
   AccentBlue: '#399ee6',
   AccentPurple: '#a37acc',

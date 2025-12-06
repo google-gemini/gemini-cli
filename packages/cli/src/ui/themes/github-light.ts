@@ -10,7 +10,7 @@ import { interpolateColor } from './color-utils.js';
 const githubLightColors: ColorsTheme = {
   type: 'light',
   Background: '#f8f8f8',
-  Foreground: '#24292E',
+  Foreground: '',
   LightBlue: '#0086b3',
   AccentBlue: '#458',
   AccentPurple: '#900',

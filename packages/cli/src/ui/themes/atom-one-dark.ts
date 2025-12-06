@@ -10,7 +10,7 @@ import { interpolateColor } from './color-utils.js';
 const atomOneDarkColors: ColorsTheme = {
   type: 'dark',
   Background: '#282c34',
-  Foreground: '#abb2bf',
+  Foreground: '',
   LightBlue: '#61aeee',
   AccentBlue: '#61aeee',
   AccentPurple: '#c678dd',

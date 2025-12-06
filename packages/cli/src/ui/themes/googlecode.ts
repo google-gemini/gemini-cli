@@ -10,7 +10,7 @@ import { interpolateColor } from './color-utils.js';
 const googleCodeColors: ColorsTheme = {
   type: 'light',
   Background: 'white',
-  Foreground: '#444',
+  Foreground: '',
   LightBlue: '#066',
   AccentBlue: '#008',
   AccentPurple: '#606',
