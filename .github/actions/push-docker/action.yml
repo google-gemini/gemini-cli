@@ -33,6 +33,8 @@ runs:
       run: 'npm install'
     - name: 'Set up Docker Buildx'
       uses: 'docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435' # ratchet:docker/setup-buildx-action@v3
+    - name: 'Set up QEMU'
+      uses: 'docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130' # ratchet:docker/setup-qemu-action@v3
     - name: 'build'
       shell: 'bash'
       run: 'npm run build'
@@ -61,6 +63,7 @@ runs:
         file: './Dockerfile'
         push: true
         provenance: false # avoid pushing 3 images to Aritfact Registry
+        platforms: 'linux/amd64,linux/arm64'
         tags: |
           ghcr.io/${{ github.repository }}/cli:${{ steps.branch_name.outputs.name }}
           ghcr.io/${{ github.repository }}/cli:${{ inputs.github-sha }}
