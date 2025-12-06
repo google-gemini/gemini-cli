@@ -300,6 +300,7 @@ export interface ConfigParameters {
   output?: OutputSettings;
   enableMessageBusIntegration?: boolean;
   disableModelRouterForAuth?: AuthType[];
+  geminiApiKey?: string;
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
