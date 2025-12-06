@@ -158,6 +158,7 @@ export function AuthDialog({
         ?.selectedType
         ? SettingScope.Workspace
         : SettingScope.User;
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       onSelect(authMethod, targetScope);
     }
   };
@@ -177,6 +178,7 @@ export function AuthDialog({
           );
           return;
         }
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         onSelect(undefined, SettingScope.User);
       }
     },

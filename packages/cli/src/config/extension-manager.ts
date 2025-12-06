@@ -346,6 +346,7 @@ export class ExtensionManager extends ExtensionLoader {
               'success',
             ),
           );
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           this.enableExtension(newExtensionConfig.name, SettingScope.User);
         }
       } finally {

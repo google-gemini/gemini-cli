@@ -58,6 +58,7 @@ export const usePrivacySettings = (config: Config) => {
         });
       }
     };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     fetchInitialState();
   }, [config]);
 
