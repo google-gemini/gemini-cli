@@ -125,7 +125,8 @@ A test server
   - tool-1
     A test tool
   Resources:
-  - resource-1 (file:///tmp/resource-1.txt)  A test resource
+  - resource-1 (file:///tmp/resource-1.txt)
+    A test resource
 "
 `;
 

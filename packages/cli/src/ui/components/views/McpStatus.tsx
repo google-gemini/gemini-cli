@@ -254,7 +254,10 @@ export const McpStatus: React.FC<McpStatusProps> = ({
                 {serverResources.map((resource, index) => {
                   const label = resource.name || resource.uri || 'resource';
                   return (
-                    <Box key={`${resource.serverName}-resource-${index}`}>
+                    <Box
+                      key={`${resource.serverName}-resource-${index}`}
+                      flexDirection="column"
+                    >
                       <Text>
                         - <Text color={theme.text.primary}>{label}</Text>
                         {resource.uri ? ` (${resource.uri})` : ''}
