@@ -10,6 +10,7 @@ import {
   HookRegistry,
   ConfigSource,
   HookRegistryNotInitializedError,
+  type HookRegistryEntry,
 } from './hookRegistry.js';
 import type { Storage } from '../config/storage.js';
 import { HookEventName, HookType } from './types.js';
@@ -657,15 +658,16 @@ describe('HookRegistry', () => {
     });
 
     it('should reject command hooks without command field and return false', () => {
+      // Intentionally create an invalid hook config without command field
       const hookWithoutCommand = {
         config: {
           type: HookType.Command,
           // command field is missing
-        } as { type: HookType; command?: string },
+        },
         source: ConfigSource.Extensions,
         eventName: HookEventName.BeforeTool,
         enabled: true,
-      };
+      } as HookRegistryEntry;
 
       const result = hookRegistry.addHookEntry(hookWithoutCommand);
 
