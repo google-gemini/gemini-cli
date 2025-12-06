@@ -134,3 +134,103 @@ describe('parseInputForHighlighting', () => {
     ]);
   });
 });
+
+describe('parseInputForHighlighting with Transformations', () => {
+  const transformations = [
+    {
+      logStart: 10,
+      logEnd: 19,
+      logicalText: '@test.png',
+      collapsedText: '[Image test.png]',
+    },
+  ];
+
+  it('should show collapsed transformation when cursor is not on it', () => {
+    const line = 'Check out @test.png';
+    const result = parseInputForHighlighting(
+      line,
+      0, // line index
+      transformations,
+      0, // cursor not on transformation
+    );
+
+    expect(result).toEqual([
+      { text: 'Check out ', type: 'default' },
+      { text: '[Image test.png]', type: 'file' },
+    ]);
+  });
+
+  it('should show expanded transformation when cursor is on it', () => {
+    const line = 'Check out @test.png';
+    const result = parseInputForHighlighting(
+      line,
+      0, // line index
+      transformations,
+      11, // cursor on transformation
+    );
+
+    expect(result).toEqual([
+      { text: 'Check out ', type: 'default' },
+      { text: '@test.png', type: 'file' },
+    ]);
+  });
+
+  it('should handle multiple transformations in a line', () => {
+    const line = 'Images: @test1.png and @test2.png';
+    const multiTransformations = [
+      {
+        logStart: 8,
+        logEnd: 18,
+        logicalText: '@test1.png',
+        collapsedText: '[Image test1.png]',
+      },
+      {
+        logStart: 23,
+        logEnd: 33,
+        logicalText: '@test2.png',
+        collapsedText: '[Image test2.png]',
+      },
+    ];
+
+    // Cursor not on any transformation
+    let result = parseInputForHighlighting(line, 0, multiTransformations, 0);
+    expect(result).toEqual([
+      { text: 'Images: ', type: 'default' },
+      { text: '[Image test1.png]', type: 'file' },
+      { text: ' and ', type: 'default' },
+      { text: '[Image test2.png]', type: 'file' },
+    ]);
+
+    // Cursor on first transformation
+    result = parseInputForHighlighting(line, 0, multiTransformations, 10);
+    expect(result).toEqual([
+      { text: 'Images: ', type: 'default' },
+      { text: '@test1.png', type: 'file' },
+      { text: ' and ', type: 'default' },
+      { text: '[Image test2.png]', type: 'file' },
+    ]);
+  });
+
+  it('should handle empty transformations array', () => {
+    const line = 'Check out @test.png';
+    const result = parseInputForHighlighting(line, 0, [], 0);
+
+    // Should fall back to default highlighting
+    expect(result).toEqual([
+      { text: 'Check out ', type: 'default' },
+      { text: '@test.png', type: 'file' },
+    ]);
+  });
+
+  it('should handle cursor at transformation boundaries', () => {
+    const line = 'Check out @test.png';
+    const result = parseInputForHighlighting(
+      line,
+      0,
+      transformations,
+      10, // cursor at start of transformation
+    );
+
+    expect(result[1]).toEqual({ text: '@test.png', type: 'file' });
+  });
+});
