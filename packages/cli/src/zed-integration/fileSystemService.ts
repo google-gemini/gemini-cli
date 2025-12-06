@@ -6,6 +6,8 @@
 
 import type { FileSystemService } from '@google/gemini-cli-core';
 import type * as acp from './acp.js';
+import { RequestError } from './connection.js';
+import type { ErrorResponse } from './schema.js';
 
 /**
  * ACP client-based implementation of FileSystemService
@@ -14,7 +16,7 @@ export class AcpFileSystemService implements FileSystemService {
   constructor(
     private readonly client: acp.Client,
     private readonly sessionId: string,
-    private readonly capabilities: acp.FileSystemCapability,
+    readonly capabilities: acp.FileSystemCapability,
     private readonly fallback: FileSystemService,
   ) {}
 
@@ -23,14 +25,29 @@ export class AcpFileSystemService implements FileSystemService {
       return this.fallback.readTextFile(filePath);
     }
 
-    const response = await this.client.readTextFile({
-      path: filePath,
-      sessionId: this.sessionId,
-      line: null,
-      limit: null,
-    });
+    try {
+      const response = await this.client.readTextFile({
+        path: filePath,
+        sessionId: this.sessionId,
+        line: null,
+        limit: null,
+      });
 
-    return response.content;
+      return response.content;
+    } catch (err) {
+      // Convert ACP error to Node.js ENOENT for file not found
+      const errorResponse = err as ErrorResponse;
+      if (errorResponse.code === RequestError.RESOURCE_NOT_FOUND) {
+        const nodeErr = new Error(
+          `ENOENT: open '${filePath}'`,
+        ) as NodeJS.ErrnoException;
+        nodeErr.code = 'ENOENT';
+        nodeErr.syscall = 'open';
+        nodeErr.path = filePath;
+        throw nodeErr;
+      }
+      throw err;
+    }
   }
 
   async writeTextFile(filePath: string, content: string): Promise<void> {

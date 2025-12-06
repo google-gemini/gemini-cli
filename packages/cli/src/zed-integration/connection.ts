@@ -48,6 +48,9 @@ export class RequestError extends Error {
     return new RequestError(-32000, 'Authentication required', details);
   }
 
+  /** Resource not found error code for fs operations */
+  static readonly RESOURCE_NOT_FOUND = -32002;
+
   toResult<T>(): Result<T> {
     return {
       error: {
