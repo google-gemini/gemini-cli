@@ -952,7 +952,7 @@ of v0.3.0:
 {
   "general": {
     "vimMode": true,
-    "preferredEditor": "code",
+    "preferredEditor": "vscode",
     "sessionRetention": {
       "enabled": true,
       "maxAge": "30d",
