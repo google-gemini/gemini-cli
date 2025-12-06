@@ -23,6 +23,7 @@ describe('useLoadingIndicator', () => {
 
   afterEach(() => {
     vi.useRealTimers(); // Restore real timers after each test
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     act(() => vi.runOnlyPendingTimers);
     vi.restoreAllMocks();
   });

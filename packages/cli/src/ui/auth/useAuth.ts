@@ -64,11 +64,13 @@ export const useAuthCommand = (settings: LoadedSettings, config: Config) => {
 
   useEffect(() => {
     if (authState === AuthState.AwaitingApiKeyInput) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       reloadApiKey();
     }
   }, [authState, reloadApiKey]);
 
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
       if (authState !== AuthState.Unauthenticated) {
         return;
