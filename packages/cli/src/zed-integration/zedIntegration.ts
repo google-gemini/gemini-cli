@@ -32,6 +32,7 @@ import {
   getEffectiveModel,
   createWorkingStdio,
   startupProfiler,
+  InvalidStreamError,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -252,6 +253,11 @@ export class Session {
         return { stopReason: 'cancelled' };
       }
 
+      // Track if we're sending a function response (for empty response handling)
+      const isSendingFunctionResponse = nextMessage.parts?.some(
+        (p) => 'functionResponse' in p,
+      );
+
       const functionCalls: FunctionCall[] = [];
 
       try {
@@ -320,6 +326,17 @@ export class Session {
           (error instanceof Error && error.name === 'AbortError')
         ) {
           return { stopReason: 'cancelled' };
+        }
+
+        // The Gemini model sometimes returns no text after a tool executes.
+        // Since the tool already completed, treat this as a successful end of turn.
+        // See: https://github.com/google-gemini/gemini-cli/issues/7851
+        if (
+          error instanceof InvalidStreamError &&
+          error.type === 'NO_RESPONSE_TEXT' &&
+          isSendingFunctionResponse
+        ) {
+          return { stopReason: 'end_turn' };
         }
 
         throw error;
