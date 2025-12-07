@@ -518,8 +518,12 @@ export async function loadCliConfig(
     approvalMode,
   );
 
-  const enableMessageBusIntegration =
-    settings.tools?.enableMessageBusIntegration ?? true;
+  // ACP mode uses requestPermission() JSON-RPC for tool confirmation,
+  // not the internal MessageBus/PolicyEngine/CoreToolScheduler pattern.
+  // Disabling MessageBus avoids a 30s timeout waiting for no subscriber.
+  const enableMessageBusIntegration = argv.experimentalAcp
+    ? false
+    : (settings.tools?.enableMessageBusIntegration ?? true);
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
