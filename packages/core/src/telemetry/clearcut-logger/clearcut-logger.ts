@@ -1428,7 +1428,7 @@ export class ClearcutLogger {
   }
 
   getProxyAgent() {
-    const proxyUrl = this.config?.getProxy();
+    const proxyUrl = this.config?.getProxy(true);
     if (!proxyUrl) return undefined;
     // undici which is widely used in the repo can only support http & https proxy protocol,
     // https://github.com/nodejs/undici/issues/2224

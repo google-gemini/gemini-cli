@@ -1151,8 +1151,22 @@ export class Config {
     return this.checkpointing;
   }
 
-  getProxy(): string | undefined {
-    return this.proxy;
+  getProxy(redact = false): string | undefined {
+    if (!this.proxy) {
+      return undefined;
+    }
+    if (!redact) {
+      return this.proxy;
+    }
+    let redactedProxy = this.proxy;
+    if (this.geminiApiKey && this.geminiApiKey.trim()) {
+      const escapedKey = this.geminiApiKey.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        '\\$&',
+      );
+      redactedProxy = redactedProxy.replace(new RegExp(escapedKey, 'g'), '***');
+    }
+    return redactedProxy;
   }
 
   getWorkingDir(): string {

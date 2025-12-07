@@ -18,6 +18,8 @@ interface ShellRunner {
   (command: string, description: string): Promise<ShellCommandOutput>;
 }
 
+import { run_shell_command } from '../core/shell.js';
+
 const defaultShellRunner: ShellRunner = async (command, description) =>
   run_shell_command({ command, description });
 

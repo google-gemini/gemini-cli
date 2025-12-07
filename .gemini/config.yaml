@@ -3,13 +3,13 @@
 have_fun: false
 code_review:
   disable: false
-  comment_severity_threshold: 'MEDIUM'  # Changed from HIGH to MEDIUM
-  max_review_comments: 20               # Changed from -1 to 20
+  comment_severity_threshold: 'MEDIUM' # Changed from HIGH to MEDIUM
+  max_review_comments: 20 # Changed from -1 to 20
   pull_request_opened:
     help: false
     summary: true
     code_review: true
 ignore_patterns:
-  - "**/*.md"
-  - "**/package-lock.json"
-  - "**/dist/"
+  - '**/*.md'
+  - '**/package-lock.json'
+  - '**/dist/'

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthType , Config } from '@google/gemini-cli-core';
+import { AuthType, Config } from '@google/gemini-cli-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createContentGeneratorConfig } from '@google/gemini-cli-core/core/contentGenerator';
 import { GoogleGenAI } from '@google/genai';
