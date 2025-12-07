@@ -80,8 +80,12 @@ async function writePortAndWorkspace({
 
   log(`Writing port file to: ${portFile}`);
   log(`Writing ppid port file to: ${ppidPortFile}`);
-
+  
   try {
+    fs.promises.mkdir(
+      path.dirname(this.portFile),
+      { recursive: true }
+    )
     await Promise.all([
       fs.writeFile(portFile, content).then(() => fs.chmod(portFile, 0o600)),
       fs
