@@ -1156,7 +1156,7 @@ for that specific session.
   - The prompt is processed within the interactive session, not before it.
   - Cannot be used when piping input from stdin.
   - Example: `gemini -i "Explain the architecture of this codebase"`
-- **`--output-format <format>`**:
+- **`--output-format <format>`** (**`-o <format>`**):
   - **Description:** Specifies the format of the CLI output for non-interactive
     mode.
   - **Values:**
