@@ -27,6 +27,22 @@ vi.mock('../core/baseLlmClient.js', () => ({
   BaseLlmClient: vi.fn(),
 }));
 
+// Helper to create a session with N user messages
+function createSessionWithUserMessages(
+  count: number,
+  options: { summary?: string; sessionId?: string } = {},
+) {
+  return JSON.stringify({
+    sessionId: options.sessionId ?? 'session-id',
+    summary: options.summary,
+    messages: Array.from({ length: count }, (_, i) => ({
+      id: String(i + 1),
+      type: 'user',
+      content: [{ text: `Message ${i + 1}` }],
+    })),
+  });
+}
+
 describe('sessionSummaryUtils', () => {
   let mockConfig: Config;
   let mockContentGenerator: ContentGenerator;
@@ -86,11 +102,7 @@ describe('sessionSummaryUtils', () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
       vi.mocked(fs.readFile).mockResolvedValue(
-        JSON.stringify({
-          sessionId: 'session-id',
-          summary: 'Existing summary',
-          messages: [{ id: '1', type: 'user', content: [{ text: 'Hello' }] }],
-        }),
+        createSessionWithUserMessages(5, { summary: 'Existing summary' }),
       );
 
       const result = await getPreviousSession(mockConfig);
@@ -98,14 +110,11 @@ describe('sessionSummaryUtils', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null if most recent session has no messages', async () => {
+    it('should return null if most recent session has fewer than 5 user messages', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
       vi.mocked(fs.readFile).mockResolvedValue(
-        JSON.stringify({
-          sessionId: 'session-id',
-          messages: [],
-        }),
+        createSessionWithUserMessages(4),
       );
 
       const result = await getPreviousSession(mockConfig);
@@ -113,14 +122,11 @@ describe('sessionSummaryUtils', () => {
       expect(result).toBeNull();
     });
 
-    it('should return path if most recent session needs summary', async () => {
+    it('should return path if most recent session has 5+ user messages and no summary', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
       vi.mocked(fs.readFile).mockResolvedValue(
-        JSON.stringify({
-          sessionId: 'session-id',
-          messages: [{ id: '1', type: 'user', content: [{ text: 'Hello' }] }],
-        }),
+        createSessionWithUserMessages(5),
       );
 
       const result = await getPreviousSession(mockConfig);
@@ -141,10 +147,7 @@ describe('sessionSummaryUtils', () => {
         'session-2024-01-02T10-00-newer000.json',
       ]);
       vi.mocked(fs.readFile).mockResolvedValue(
-        JSON.stringify({
-          sessionId: 'newer-session',
-          messages: [{ id: '1', type: 'user', content: [{ text: 'Hello' }] }],
-        }),
+        createSessionWithUserMessages(5),
       );
 
       const result = await getPreviousSession(mockConfig);
@@ -186,10 +189,7 @@ describe('sessionSummaryUtils', () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
       vi.mocked(fs.readFile).mockResolvedValue(
-        JSON.stringify({
-          sessionId: 'session-id',
-          messages: [{ id: '1', type: 'user', content: [{ text: 'Hello' }] }],
-        }),
+        createSessionWithUserMessages(5),
       );
       vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
@@ -207,10 +207,7 @@ describe('sessionSummaryUtils', () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
       vi.mocked(fs.readFile).mockResolvedValue(
-        JSON.stringify({
-          sessionId: 'session-id',
-          messages: [{ id: '1', type: 'user', content: [{ text: 'Hello' }] }],
-        }),
+        createSessionWithUserMessages(5),
       );
       mockGenerateSummary.mockRejectedValue(new Error('API Error'));
 

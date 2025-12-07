@@ -128,9 +128,13 @@ export async function getPreviousSession(
         return null;
       }
 
-      if (conversation.messages.length === 0) {
+      // Only generate summaries for sessions with 5+ user messages
+      const userMessageCount = conversation.messages.filter(
+        (m) => m.type === 'user',
+      ).length;
+      if (userMessageCount < 5) {
         debugLogger.debug(
-          '[SessionSummary] Most recent session has no messages',
+          `[SessionSummary] Most recent session has ${userMessageCount} user messages, skipping (minimum 5)`,
         );
         return null;
       }
