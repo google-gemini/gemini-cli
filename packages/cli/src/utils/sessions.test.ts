@@ -85,6 +85,8 @@ describe('listSessions', () => {
         fileName: 'session-2025-01-18T12-00-00-session-1.json',
         startTime: twoDaysAgo.toISOString(),
         lastUpdated: twoDaysAgo.toISOString(),
+        messageCount: 5,
+        displayName: 'First user message',
         firstUserMessage: 'First user message',
         isCurrentSession: false,
         index: 1,
@@ -95,6 +97,8 @@ describe('listSessions', () => {
         fileName: 'session-2025-01-20T11-00-00-session-2.json',
         startTime: oneHourAgo.toISOString(),
         lastUpdated: oneHourAgo.toISOString(),
+        messageCount: 10,
+        displayName: 'Second user message',
         firstUserMessage: 'Second user message',
         isCurrentSession: false,
         index: 2,
@@ -105,6 +109,8 @@ describe('listSessions', () => {
         fileName: 'session-2025-01-20T12-00-00-current-s.json',
         startTime: now.toISOString(),
         lastUpdated: now.toISOString(),
+        messageCount: 3,
+        displayName: 'Current session',
         firstUserMessage: 'Current session',
         isCurrentSession: true,
         index: 3,
@@ -163,6 +169,8 @@ describe('listSessions', () => {
         fileName: 'session-2.json',
         startTime: session2Time.toISOString(), // Middle
         lastUpdated: session2Time.toISOString(),
+        messageCount: 5,
+        displayName: 'Middle session',
         firstUserMessage: 'Middle session',
         isCurrentSession: false,
         index: 2,
@@ -173,6 +181,8 @@ describe('listSessions', () => {
         fileName: 'session-1.json',
         startTime: session1Time.toISOString(), // Oldest
         lastUpdated: session1Time.toISOString(),
+        messageCount: 5,
+        displayName: 'Oldest session',
         firstUserMessage: 'Oldest session',
         isCurrentSession: false,
         index: 1,
@@ -183,6 +193,8 @@ describe('listSessions', () => {
         fileName: 'session-3.json',
         startTime: session3Time.toISOString(), // Newest
         lastUpdated: session3Time.toISOString(),
+        messageCount: 5,
+        displayName: 'Newest session',
         firstUserMessage: 'Newest session',
         isCurrentSession: false,
         index: 3,
@@ -219,6 +231,8 @@ describe('listSessions', () => {
         fileName: 'session-file.json',
         startTime: now.toISOString(),
         lastUpdated: now.toISOString(),
+        messageCount: 5,
+        displayName: 'Test message',
         firstUserMessage: 'Test message',
         isCurrentSession: false,
         index: 1,
@@ -252,6 +266,8 @@ describe('listSessions', () => {
         fileName: 'session-file.json',
         startTime: now.toISOString(),
         lastUpdated: now.toISOString(),
+        messageCount: 5,
+        displayName: 'Only session',
         firstUserMessage: 'Only session',
         isCurrentSession: true,
         index: 1,
@@ -272,6 +288,40 @@ describe('listSessions', () => {
     );
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining(', current)'),
+    );
+  });
+
+  it('should display summary as title when available instead of first user message', async () => {
+    // Arrange
+    const now = new Date('2025-01-20T12:00:00.000Z');
+    const mockSessions: SessionInfo[] = [
+      {
+        id: 'session-with-summary',
+        file: 'session-file',
+        fileName: 'session-file.json',
+        startTime: now.toISOString(),
+        lastUpdated: now.toISOString(),
+        messageCount: 10,
+        displayName: 'Add dark mode to the app', // Summary
+        firstUserMessage:
+          'How do I add dark mode to my React application with CSS variables?',
+        isCurrentSession: false,
+        index: 1,
+        summary: 'Add dark mode to the app',
+      },
+    ];
+
+    mockListSessions.mockResolvedValue(mockSessions);
+
+    // Act
+    await listSessions(mockConfig);
+
+    // Assert: Should show the summary (displayName), not the first user message
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining('1. Add dark mode to the app'),
+    );
+    expect(consoleLogSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('How do I add dark mode to my React application'),
     );
   });
 });
@@ -348,6 +398,8 @@ describe('deleteSession', () => {
         fileName: 'session-file-123.json',
         startTime: now.toISOString(),
         lastUpdated: now.toISOString(),
+        messageCount: 5,
+        displayName: 'Test session',
         firstUserMessage: 'Test session',
         isCurrentSession: false,
         index: 1,
@@ -381,6 +433,8 @@ describe('deleteSession', () => {
         fileName: 'session-file-1.json',
         startTime: oneHourAgo.toISOString(),
         lastUpdated: oneHourAgo.toISOString(),
+        messageCount: 5,
+        displayName: 'First session',
         firstUserMessage: 'First session',
         isCurrentSession: false,
         index: 1,
@@ -391,6 +445,8 @@ describe('deleteSession', () => {
         fileName: 'session-file-2.json',
         startTime: now.toISOString(),
         lastUpdated: now.toISOString(),
+        messageCount: 10,
+        displayName: 'Second session',
         firstUserMessage: 'Second session',
         isCurrentSession: false,
         index: 2,
@@ -421,6 +477,8 @@ describe('deleteSession', () => {
         fileName: 'session-file-1.json',
         startTime: now.toISOString(),
         lastUpdated: now.toISOString(),
+        messageCount: 5,
+        displayName: 'Test session',
         firstUserMessage: 'Test session',
         isCurrentSession: false,
         index: 1,
@@ -449,6 +507,8 @@ describe('deleteSession', () => {
         fileName: 'session-file-1.json',
         startTime: now.toISOString(),
         lastUpdated: now.toISOString(),
+        messageCount: 5,
+        displayName: 'Test session',
         firstUserMessage: 'Test session',
         isCurrentSession: false,
         index: 1,
@@ -477,6 +537,8 @@ describe('deleteSession', () => {
         fileName: 'session-file-1.json',
         startTime: now.toISOString(),
         lastUpdated: now.toISOString(),
+        messageCount: 5,
+        displayName: 'Test session',
         firstUserMessage: 'Test session',
         isCurrentSession: false,
         index: 1,
@@ -505,6 +567,8 @@ describe('deleteSession', () => {
         fileName: 'current-session-file.json',
         startTime: now.toISOString(),
         lastUpdated: now.toISOString(),
+        messageCount: 5,
+        displayName: 'Current session',
         firstUserMessage: 'Current session',
         isCurrentSession: true,
         index: 1,
@@ -533,6 +597,8 @@ describe('deleteSession', () => {
         fileName: 'current-session-file.json',
         startTime: now.toISOString(),
         lastUpdated: now.toISOString(),
+        messageCount: 5,
+        displayName: 'Current session',
         firstUserMessage: 'Current session',
         isCurrentSession: true,
         index: 1,
@@ -561,6 +627,8 @@ describe('deleteSession', () => {
         fileName: 'session-file-1.json',
         startTime: now.toISOString(),
         lastUpdated: now.toISOString(),
+        messageCount: 5,
+        displayName: 'Test session',
         firstUserMessage: 'Test session',
         isCurrentSession: false,
         index: 1,
@@ -592,6 +660,8 @@ describe('deleteSession', () => {
         fileName: 'session-file-1.json',
         startTime: now.toISOString(),
         lastUpdated: now.toISOString(),
+        messageCount: 5,
+        displayName: 'Test session',
         firstUserMessage: 'Test session',
         isCurrentSession: false,
         index: 1,
@@ -626,6 +696,8 @@ describe('deleteSession', () => {
         fileName: 'session-file-3.json',
         startTime: session3Time.toISOString(), // Newest
         lastUpdated: session3Time.toISOString(),
+        messageCount: 5,
+        displayName: 'Newest session',
         firstUserMessage: 'Newest session',
         isCurrentSession: false,
         index: 3,
@@ -636,6 +708,8 @@ describe('deleteSession', () => {
         fileName: 'session-file-1.json',
         startTime: session1Time.toISOString(), // Oldest
         lastUpdated: session1Time.toISOString(),
+        messageCount: 5,
+        displayName: 'Oldest session',
         firstUserMessage: 'Oldest session',
         isCurrentSession: false,
         index: 1,
@@ -646,6 +720,8 @@ describe('deleteSession', () => {
         fileName: 'session-file-2.json',
         startTime: session2Time.toISOString(), // Middle
         lastUpdated: session2Time.toISOString(),
+        messageCount: 5,
+        displayName: 'Middle session',
         firstUserMessage: 'Middle session',
         isCurrentSession: false,
         index: 2,

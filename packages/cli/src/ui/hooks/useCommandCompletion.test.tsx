@@ -14,7 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import { act, useEffect } from 'react';
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useCommandCompletion } from './useCommandCompletion.js';
 import type { CommandContext } from '../commands/types.js';
@@ -94,7 +94,6 @@ describe('useCommandCompletion', () => {
     getEnablePromptCompletion: () => false,
     getGeminiClient: vi.fn(),
   } as unknown as Config;
-  const testDirs: string[] = [];
   const testRootDir = '/';
 
   // Helper to create real TextBuffer objects within renderHook
@@ -121,7 +120,6 @@ describe('useCommandCompletion', () => {
       const textBuffer = useTextBufferForTest(initialText, cursorOffset);
       const completion = useCommandCompletion(
         textBuffer,
-        testDirs,
         testRootDir,
         [],
         mockCommandContext,
@@ -132,7 +130,7 @@ describe('useCommandCompletion', () => {
       hookResult = { ...completion, textBuffer };
       return null;
     }
-    render(<TestComponent />);
+    renderWithProviders(<TestComponent />);
     return {
       result: {
         get current() {
@@ -505,7 +503,6 @@ describe('useCommandCompletion', () => {
         const textBuffer = useTextBufferForTest('// This is a line comment');
         const completion = useCommandCompletion(
           textBuffer,
-          testDirs,
           testRootDir,
           [],
           mockCommandContext,
@@ -516,7 +513,7 @@ describe('useCommandCompletion', () => {
         hookResult = { ...completion, textBuffer };
         return null;
       }
-      render(<TestComponent />);
+      renderWithProviders(<TestComponent />);
 
       // Should not trigger prompt completion for comments
       expect(hookResult!.suggestions.length).toBe(0);
@@ -538,7 +535,6 @@ describe('useCommandCompletion', () => {
         );
         const completion = useCommandCompletion(
           textBuffer,
-          testDirs,
           testRootDir,
           [],
           mockCommandContext,
@@ -549,7 +545,7 @@ describe('useCommandCompletion', () => {
         hookResult = { ...completion, textBuffer };
         return null;
       }
-      render(<TestComponent />);
+      renderWithProviders(<TestComponent />);
 
       // Should not trigger prompt completion for comments
       expect(hookResult!.suggestions.length).toBe(0);
@@ -571,7 +567,6 @@ describe('useCommandCompletion', () => {
         );
         const completion = useCommandCompletion(
           textBuffer,
-          testDirs,
           testRootDir,
           [],
           mockCommandContext,
@@ -582,7 +577,7 @@ describe('useCommandCompletion', () => {
         hookResult = { ...completion, textBuffer };
         return null;
       }
-      render(<TestComponent />);
+      renderWithProviders(<TestComponent />);
 
       // This test verifies that comments are filtered out while regular text is not
       expect(hookResult!.textBuffer.text).toBe(

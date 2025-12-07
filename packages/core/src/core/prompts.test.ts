@@ -13,6 +13,12 @@ import path from 'node:path';
 import type { Config } from '../config/config.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import { GEMINI_DIR } from '../utils/paths.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  getEffectiveModel,
+  PREVIEW_GEMINI_MODEL,
+} from '../config/models.js';
 
 // Mock tool names if they are dynamically generated or complex
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
@@ -36,6 +42,13 @@ vi.mock('../utils/gitUtils', () => ({
   isGitRepository: vi.fn(),
 }));
 vi.mock('node:fs');
+vi.mock('../config/models.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../config/models.js')>();
+  return {
+    ...actual,
+    getEffectiveModel: vi.fn(),
+  };
+});
 
 describe('Core System Prompt (prompts.ts)', () => {
   let mockConfig: Config;
@@ -53,7 +66,19 @@ describe('Core System Prompt (prompts.ts)', () => {
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
+      getModel: vi.fn().mockReturnValue('auto'),
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
+      isInFallbackMode: vi.fn().mockReturnValue(false),
     } as unknown as Config;
+    vi.mocked(getEffectiveModel).mockReturnValue(DEFAULT_GEMINI_MODEL);
+  });
+
+  it('should use chatty system prompt for preview model', () => {
+    vi.mocked(getEffectiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
+    expect(prompt).not.toContain('No Chitchat:');
+    expect(prompt).toMatchSnapshot();
   });
 
   it.each([
@@ -64,6 +89,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     const prompt = getCoreSystemPrompt(mockConfig, userMemory);
     expect(prompt).not.toContain('---\n\n'); // Separator should not be present
     expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
+    expect(prompt).toContain('No Chitchat:');
     expect(prompt).toMatchSnapshot(); // Use snapshot for base prompt structure
   });
 
@@ -133,6 +159,9 @@ describe('Core System Prompt (prompts.ts)', () => {
         },
         isInteractive: vi.fn().mockReturnValue(false),
         isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
+        getModel: vi.fn().mockReturnValue('auto'),
+        getPreviewFeatures: vi.fn().mockReturnValue(false),
+        isInFallbackMode: vi.fn().mockReturnValue(false),
       } as unknown as Config;
 
       const prompt = getCoreSystemPrompt(testConfig);
@@ -346,7 +375,9 @@ describe('resolvePathFromEnv helper function', () => {
       vi.spyOn(os, 'homedir').mockImplementation(() => {
         throw new Error('Cannot resolve home directory');
       });
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
 
       const result = resolvePathFromEnv('~/documents/file.txt');
       expect(result).toEqual({
