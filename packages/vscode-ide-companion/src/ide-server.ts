@@ -340,11 +340,11 @@ export class IDEServer {
         if (address && typeof address !== 'string') {
           this.port = address.port;
           this.portFile = path.join(
-            os.tmpdir(),
+            os.tmpdir(), 'gemini', 'ide',
             `gemini-ide-server-${this.port}.json`,
           );
           this.ppidPortFile = path.join(
-            os.tmpdir(),
+            os.tmpdir(), 'gemini', 'ide',
             `gemini-ide-server-${process.ppid}.json`,
           );
           this.log(`IDE server listening on http://127.0.0.1:${this.port}`);
