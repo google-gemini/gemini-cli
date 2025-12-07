@@ -8,7 +8,7 @@ import type { HookRegistry } from '../hooks/hookRegistry.js';
 import { HookEventName, HookType } from '../hooks/types.js';
 import { ConfigSource } from '../hooks/hookRegistry.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { spawn } from 'node:child_process';
+import { exec } from 'node:child_process';
 
 /**
  * Service for integrating git-ai hooks into the hook system.
@@ -55,34 +55,16 @@ export class GitAiIntegrationService {
   }
 
   /**
-   * Check if git-ai command is available in PATH.
-   * Uses spawn for non-blocking async check, consistent with hookRunner.
+   * Check if git-ai is installed
    */
-  private isGitAiAvailable(): Promise<boolean> {
+  private async isGitAiAvailable(): Promise<boolean> {
     return new Promise((resolve) => {
-      const checkCommand =
-        process.platform === 'win32' ? 'where.exe' : 'command';
-      const checkArgs =
-        process.platform === 'win32'
-          ? [this.commandPath]
-          : ['-v', this.commandPath];
-
-      try {
-        const child = spawn(checkCommand, checkArgs, {
-          stdio: 'ignore',
-          shell: true,
-        });
-
-        child.on('close', (code) => {
-          resolve(code === 0);
-        });
-
-        child.on('error', () => {
+      exec('git-ai version', (error) => {
+        if (error) {
           resolve(false);
-        });
-      } catch {
-        resolve(false);
-      }
+        }
+        resolve(true);
+      });
     });
   }
 
