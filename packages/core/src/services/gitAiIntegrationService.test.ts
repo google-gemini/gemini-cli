@@ -5,9 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { spawn } from 'node:child_process';
-import type { ChildProcess } from 'node:child_process';
-import { EventEmitter } from 'node:events';
+import { exec } from 'node:child_process';
 import { GitAiIntegrationService } from './gitAiIntegrationService.js';
 import type { HookRegistry } from '../hooks/hookRegistry.js';
 import { HookEventName, HookType } from '../hooks/types.js';
@@ -15,32 +13,8 @@ import { ConfigSource } from '../hooks/hookRegistry.js';
 
 // Mock child_process
 vi.mock('node:child_process', () => ({
-  spawn: vi.fn(),
+  exec: vi.fn(),
 }));
-
-/**
- * Helper to create a mock child process that emits events
- */
-function createMockChildProcess(exitCode: number): ChildProcess {
-  const emitter = new EventEmitter();
-  // Simulate async close event
-  setTimeout(() => {
-    emitter.emit('close', exitCode);
-  }, 0);
-  return emitter as unknown as ChildProcess;
-}
-
-/**
- * Helper to create a mock child process that emits an error
- */
-function createMockChildProcessWithError(): ChildProcess {
-  const emitter = new EventEmitter();
-  // Simulate async error event
-  setTimeout(() => {
-    emitter.emit('error', new Error('spawn error'));
-  }, 0);
-  return emitter as unknown as ChildProcess;
-}
 
 // Mock debugLogger using vi.hoisted
 const mockDebugLogger = vi.hoisted(() => ({
@@ -54,14 +28,46 @@ vi.mock('../utils/debugLogger.js', () => ({
   debugLogger: mockDebugLogger,
 }));
 
+/**
+ * Helper to mock exec for successful git-ai version check
+ */
+function mockExecSuccess() {
+  vi.mocked(exec).mockImplementation(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (_command: string, callback: any) => {
+      // exec callback signature: (error, stdout, stderr)
+      if (typeof callback === 'function') {
+        callback(null, 'git-ai version 1.0.0', '');
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return {} as any;
+    },
+  );
+}
+
+/**
+ * Helper to mock exec for failed git-ai version check (command not found)
+ */
+function mockExecFailure() {
+  vi.mocked(exec).mockImplementation(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (_command: string, callback: any) => {
+      if (typeof callback === 'function') {
+        const error = new Error('Command not found: git-ai');
+        callback(error, '', '');
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return {} as any;
+    },
+  );
+}
+
 describe('GitAiIntegrationService', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockHookRegistry: any;
-  let originalPlatform: NodeJS.Platform;
 
   beforeEach(() => {
     vi.resetAllMocks();
-    originalPlatform = process.platform;
 
     mockHookRegistry = {
       addHookEntry: vi.fn().mockReturnValue(true),
@@ -70,10 +76,6 @@ describe('GitAiIntegrationService', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    Object.defineProperty(process, 'platform', {
-      value: originalPlatform,
-      configurable: true,
-    });
   });
 
   describe('constructor', () => {
@@ -112,7 +114,7 @@ describe('GitAiIntegrationService', () => {
 
         await service.initialize(mockHookRegistry);
 
-        expect(spawn).not.toHaveBeenCalled();
+        expect(exec).not.toHaveBeenCalled();
       });
     });
 
@@ -120,7 +122,7 @@ describe('GitAiIntegrationService', () => {
       describe('git-ai not available', () => {
         it('should not register hooks when git-ai command is not found', async () => {
           const service = new GitAiIntegrationService(true);
-          vi.mocked(spawn).mockReturnValue(createMockChildProcess(1)); // Exit code 1 = not found
+          mockExecFailure();
 
           await service.initialize(mockHookRegistry);
 
@@ -131,36 +133,22 @@ describe('GitAiIntegrationService', () => {
           expect(service.getStatus().registered).toBe(false);
         });
 
-        it('should use correct command for non-Windows platforms', async () => {
-          Object.defineProperty(process, 'platform', { value: 'linux' });
+        it('should call git-ai version to check availability', async () => {
           const service = new GitAiIntegrationService(true);
-          vi.mocked(spawn).mockReturnValue(createMockChildProcess(1));
+          mockExecFailure();
 
           await service.initialize(mockHookRegistry);
 
-          expect(spawn).toHaveBeenCalledWith('command', ['-v', 'git-ai'], {
-            stdio: 'ignore',
-            shell: true,
-          });
-        });
-
-        it('should use correct command for Windows platforms', async () => {
-          Object.defineProperty(process, 'platform', { value: 'win32' });
-          const service = new GitAiIntegrationService(true);
-          vi.mocked(spawn).mockReturnValue(createMockChildProcess(1));
-
-          await service.initialize(mockHookRegistry);
-
-          expect(spawn).toHaveBeenCalledWith('where.exe', ['git-ai'], {
-            stdio: 'ignore',
-            shell: true,
-          });
+          expect(exec).toHaveBeenCalledWith(
+            'git-ai version',
+            expect.any(Function),
+          );
         });
       });
 
       describe('git-ai available', () => {
         beforeEach(() => {
-          vi.mocked(spawn).mockReturnValue(createMockChildProcess(0)); // Exit code 0 = found
+          mockExecSuccess();
           mockHookRegistry.addHookEntry.mockReturnValue(true);
         });
 
@@ -287,7 +275,7 @@ describe('GitAiIntegrationService', () => {
 
     it('should return correct status after successful initialization', async () => {
       const service = new GitAiIntegrationService(true);
-      vi.mocked(spawn).mockReturnValue(createMockChildProcess(0));
+      mockExecSuccess();
       mockHookRegistry.addHookEntry.mockReturnValue(true);
 
       await service.initialize(mockHookRegistry as unknown as HookRegistry);
@@ -302,7 +290,7 @@ describe('GitAiIntegrationService', () => {
 
     it('should return correct status after failed initialization (git-ai not found)', async () => {
       const service = new GitAiIntegrationService(true);
-      vi.mocked(spawn).mockReturnValue(createMockChildProcess(1));
+      mockExecFailure();
 
       await service.initialize(mockHookRegistry);
 
@@ -316,9 +304,9 @@ describe('GitAiIntegrationService', () => {
   });
 
   describe('error handling', () => {
-    it('should handle spawn errors gracefully', async () => {
+    it('should handle exec errors gracefully', async () => {
       const service = new GitAiIntegrationService(true);
-      vi.mocked(spawn).mockReturnValue(createMockChildProcessWithError());
+      mockExecFailure();
 
       await expect(
         service.initialize(mockHookRegistry),
@@ -328,10 +316,10 @@ describe('GitAiIntegrationService', () => {
       expect(service.getStatus().registered).toBe(false);
     });
 
-    it('should handle spawn throwing synchronously', async () => {
+    it('should handle exec throwing synchronously', async () => {
       const service = new GitAiIntegrationService(true);
-      vi.mocked(spawn).mockImplementation(() => {
-        throw new Error('Spawn failed');
+      vi.mocked(exec).mockImplementation(() => {
+        throw new Error('exec failed');
       });
 
       await expect(
@@ -343,32 +331,31 @@ describe('GitAiIntegrationService', () => {
     });
   });
 
-  describe('platform-specific behavior', () => {
-    const platforms: Array<{
-      platform: NodeJS.Platform;
-      command: string;
-      args: string[];
-    }> = [
-      { platform: 'linux', command: 'command', args: ['-v', 'git-ai'] },
-      { platform: 'darwin', command: 'command', args: ['-v', 'git-ai'] },
-      { platform: 'win32', command: 'where.exe', args: ['git-ai'] },
-    ];
+  describe('isGitAiAvailable', () => {
+    it('should return true when git-ai version succeeds', async () => {
+      const service = new GitAiIntegrationService(true);
+      mockExecSuccess();
 
-    for (const { platform, command, args } of platforms) {
-      it(`should use correct command check for ${platform}`, async () => {
-        Object.defineProperty(process, 'platform', { value: platform });
-        const service = new GitAiIntegrationService(true);
-        vi.mocked(spawn).mockReturnValue(createMockChildProcess(0));
-        mockHookRegistry.addHookEntry.mockReturnValue(true);
+      await service.initialize(mockHookRegistry);
 
-        await service.initialize(mockHookRegistry as unknown as HookRegistry);
+      expect(exec).toHaveBeenCalledWith(
+        'git-ai version',
+        expect.any(Function),
+      );
+      expect(service.getStatus().registered).toBe(true);
+    });
 
-        expect(spawn).toHaveBeenCalledWith(command, args, {
-          stdio: 'ignore',
-          shell: true,
-        });
-      });
-    }
+    it('should return false when git-ai version fails', async () => {
+      const service = new GitAiIntegrationService(true);
+      mockExecFailure();
+
+      await service.initialize(mockHookRegistry);
+
+      expect(exec).toHaveBeenCalledWith(
+        'git-ai version',
+        expect.any(Function),
+      );
+      expect(service.getStatus().registered).toBe(false);
+    });
   });
 });
-

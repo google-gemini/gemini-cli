@@ -55,16 +55,22 @@ export class GitAiIntegrationService {
   }
 
   /**
-   * Check if git-ai is installed
+   * Check if git-ai is installed by running 'git-ai version'
    */
   private async isGitAiAvailable(): Promise<boolean> {
     return new Promise((resolve) => {
-      exec('git-ai version', (error) => {
-        if (error) {
-          resolve(false);
-        }
-        resolve(true);
-      });
+      try {
+        exec('git-ai version', (error) => {
+          if (error) {
+            resolve(false);
+            return;
+          }
+          resolve(true);
+        });
+      } catch {
+        // Handle edge case where exec throws synchronously
+        resolve(false);
+      }
     });
   }
 
