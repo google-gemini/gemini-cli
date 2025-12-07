@@ -15,6 +15,7 @@ import {
   isNodeError,
   parseAndFormatApiError,
   safeLiteralReplace,
+  DEFAULT_GUI_EDITOR,
   type AnyDeclarativeTool,
   type ToolCall,
   type ToolConfirmationPayload,
@@ -66,6 +67,7 @@ export class Task {
   eventBus?: ExecutionEventBus;
   completedToolCalls: CompletedToolCall[];
   skipFinalTrueAfterInlineEdit = false;
+  modelInfo?: string;
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
@@ -135,7 +137,7 @@ export class Task {
       id: this.id,
       contextId: this.contextId,
       taskState: this.taskState,
-      model: this.config.getModel(),
+      model: this.modelInfo || this.config.getModel(),
       mcpServers: servers,
       availableTools,
     };
@@ -230,7 +232,7 @@ export class Task {
       traceId?: string;
     } = {
       coderAgent: coderAgentMessage,
-      model: this.config.getModel(),
+      model: this.modelInfo || this.config.getModel(),
       userTier: this.config.getUserTier(),
     };
 
@@ -393,6 +395,7 @@ export class Task {
       logger.info('[Task] YOLO mode enabled. Auto-approving all tool calls.');
       toolCalls.forEach((tc: ToolCall) => {
         if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           tc.confirmationDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
           this.pendingToolConfirmationDetails.delete(tc.request.callId);
         }
@@ -434,7 +437,7 @@ export class Task {
       outputUpdateHandler: this._schedulerOutputUpdate.bind(this),
       onAllToolCallsComplete: this._schedulerAllToolCallsComplete.bind(this),
       onToolCallsUpdate: this._schedulerToolCallsUpdate.bind(this),
-      getPreferredEditor: () => 'vscode',
+      getPreferredEditor: () => DEFAULT_GUI_EDITOR,
       config: this.config,
     });
     return scheduler;
@@ -647,6 +650,9 @@ export class Task {
       case GeminiEventType.Finished:
         logger.info(`[Task ${this.id}] Agent finished its turn.`);
         break;
+      case GeminiEventType.ModelInfo:
+        this.modelInfo = event.value;
+        break;
       case GeminiEventType.Error:
       default: {
         // Block scope for lexical declaration
@@ -658,7 +664,7 @@ export class Task {
           errorMessage,
         );
 
-        let errMessage = 'Unknown error from LLM stream';
+        let errMessage = `Unknown error from LLM stream: ${JSON.stringify(event)}`;
         if (errorEvent.value) {
           errMessage = parseAndFormatApiError(errorEvent.value);
         }
@@ -814,6 +820,7 @@ export class Task {
       } else {
         parts = [response];
       }
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       this.geminiClient.addHistory({
         role: 'user',
         parts,

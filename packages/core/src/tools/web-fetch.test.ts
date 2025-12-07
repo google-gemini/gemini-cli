@@ -134,6 +134,7 @@ describe('WebFetchTool', () => {
       setApprovalMode: vi.fn(),
       getProxy: vi.fn(),
       getGeminiClient: mockGetGeminiClient,
+      getRetryFetchErrors: vi.fn().mockReturnValue(false),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
           model,
