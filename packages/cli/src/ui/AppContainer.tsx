@@ -294,6 +294,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const staticExtraHeight = 3;
 
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
       // Note: the program will not work if this fails so let errors be
       // handled by the global catch.
@@ -388,6 +389,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Initialize input history from logger (past sessions)
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     initializeFromLogger(logger);
   }, [logger, initializeFromLogger]);
 
@@ -988,6 +990,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       const currentIde = ideClient.getCurrentIde();
       setCurrentIDE(currentIde || null);
     };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     getIde();
   }, []);
   const shouldShowIdePrompt = Boolean(
@@ -1113,6 +1116,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       recordExitFail(config);
     }
     if (ctrlCPressCount > 1) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       handleSlashCommand('/quit', undefined, undefined, false);
     } else {
       ctrlCTimerRef.current = setTimeout(() => {
@@ -1131,6 +1135,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       recordExitFail(config);
     }
     if (ctrlDPressCount > 1) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       handleSlashCommand('/quit', undefined, undefined, false);
     } else {
       ctrlDTimerRef.current = setTimeout(() => {
@@ -1147,6 +1152,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const handleIdePromptComplete = useCallback(
     (result: IdeIntegrationNudgeResult) => {
       if (result.userSelection === 'yes') {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleSlashCommand('/ide install');
         settings.setValue(
           SettingScope.User,
@@ -1229,6 +1235,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         config.getIdeMode() &&
         ideContextState
       ) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleSlashCommand('/ide status');
       } else if (
         keyMatchers[Command.SHOW_MORE_LINES](key) &&
@@ -1429,6 +1436,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       }
     };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     fetchBannerTexts();
 
     return () => {
