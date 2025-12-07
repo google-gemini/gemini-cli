@@ -82,7 +82,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .locale('en')
     .scriptName('gemini')
     .usage(
-      'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
+      'Usage: gemini [options] [query|command]\n\nGemini CLI - Launch an interactive CLI. Provide a query for non-interactive mode.',
     )
 
     .option('debug', {
@@ -265,7 +265,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
       }
       if (argv['yolo'] && argv['approvalMode']) {
-        return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
+        return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode yolo instead.';
       }
       if (
         argv['outputFormat'] &&
