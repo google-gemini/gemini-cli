@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { glob } from 'glob';
 import type { CommandModule } from 'yargs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import toml from '@iarna/toml';
+import { spawn } from 'node:child_process';
 
 async function findGeminiDir(): Promise<string | null> {
   let currentDir = process.cwd();
@@ -28,31 +30,44 @@ async function findGeminiDir(): Promise<string | null> {
   return null;
 }
 
-// Basic handler for all custom commands.
-const customCommandHandler = (argv: { [key: string]: unknown }) => {
-  // The actual command execution is handled by a different part of the system
-  // that interprets the prompt from the .toml file.
-  // For the purpose of `yargs` parsing and autocompletion, we just need a valid handler.
-  // We can also log this for debugging if needed.
-  console.log(`Executing custom command: ${argv['$0']}`);
-};
-
 async function createCommandFromFile(
   filePath: string,
+  baseDir: string,
 ): Promise<CommandModule | null> {
   try {
     const content = await fs.readFile(filePath, 'utf-8');
     const parsed = toml.parse(content);
-    const commandName = path.basename(filePath, '.toml');
+    const commandName = path
+      .relative(baseDir, filePath)
+      .replace(/\\/g, '/')
+      .replace(/\.toml$/, '');
     const description = (parsed as { description?: unknown }).description;
+    const prompt = (parsed as { prompt?: unknown }).prompt;
+
     if (typeof description !== 'string' || !description) {
+      console.error(`Description is missing or not a string in ${filePath}`);
       return null;
     }
+
+    if (typeof prompt !== 'string' || !prompt) {
+      console.error(`Prompt is missing or not a string in ${filePath}`);
+      return null;
+    }
+
+    const handler = () => {
+      const child = spawn(process.execPath, [process.argv[1], '-p', prompt], {
+        stdio: 'inherit',
+      });
+
+      child.on('close', (code) => {
+        process.exit(code ?? 0);
+      });
+    };
 
     return {
       command: commandName,
       describe: description,
-      handler: customCommandHandler,
+      handler,
     };
   } catch (_error) {
     // Log error for debugging, but don't crash
@@ -71,16 +86,12 @@ export async function loadCustomCommands(): Promise<CommandModule[]> {
   const commandsDir = path.join(geminiDir, 'commands');
 
   try {
-    const dirents = await fs.readdir(commandsDir, { withFileTypes: true });
+    const files = await glob('**/*.toml', { cwd: commandsDir, nodir: true });
     const commandPromises: Array<Promise<CommandModule | null>> = [];
 
-    for (const dirent of dirents) {
-      if (dirent.isFile() && dirent.name.endsWith('.toml')) {
-        const fullPath = path.join(commandsDir, dirent.name);
-        commandPromises.push(createCommandFromFile(fullPath));
-      }
-      // Note: This implementation does not handle subdirectories for now,
-      // but it can be extended here if needed.
+    for (const file of files) {
+      const fullPath = path.join(commandsDir, file);
+      commandPromises.push(createCommandFromFile(fullPath, commandsDir));
     }
 
     const commands = (await Promise.all(commandPromises)).filter(

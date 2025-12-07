@@ -48,7 +48,7 @@ import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
-import { loadCustomCommands } from './custom.js';
+import { loadCustomCommands } from '../commands/custom.js';
 
 export interface CliArgs {
   query: string | undefined;
