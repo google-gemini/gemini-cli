@@ -164,11 +164,6 @@ export function applyModelSelection(
     finalConfig = currentConfig
       ? { ...currentConfig, ...generateContentConfig }
       : generateContentConfig;
-
-    // Preserve abortSignal if it existed in the original config
-    if (currentConfig?.abortSignal) {
-      finalConfig.abortSignal = currentConfig.abortSignal;
-    }
   }
 
   config.setActiveModel(finalModel);

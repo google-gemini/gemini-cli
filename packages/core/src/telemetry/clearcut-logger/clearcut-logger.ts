@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createHash } from 'node:crypto';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import type {
   StartSessionEvent,
@@ -156,6 +157,13 @@ function determineGHWorkflowName(): string | undefined {
 }
 
 /**
+ * Determines the GitHub repository name if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHRepositoryName(): string | undefined {
+  return process.env['GITHUB_REPOSITORY'];
+}
+
+/**
  * Clearcut URL to send logging events to.
  */
 const CLEARCUT_URL = 'https://play.googleapis.com/log?format=json&hasfast=true';
@@ -186,6 +194,7 @@ export class ClearcutLogger {
   private promptId: string = '';
   private readonly installationManager: InstallationManager;
   private readonly userAccountManager: UserAccountManager;
+  private readonly hashedGHRepositoryName?: string;
 
   /**
    * Queue of pending events that need to be flushed to the server.  New events
@@ -215,6 +224,13 @@ export class ClearcutLogger {
     this.promptId = config?.getSessionId() ?? '';
     this.installationManager = new InstallationManager();
     this.userAccountManager = new UserAccountManager();
+
+    const ghRepositoryName = determineGHRepositoryName();
+    if (ghRepositoryName) {
+      this.hashedGHRepositoryName = createHash('sha256')
+        .update(ghRepositoryName)
+        .digest('hex');
+    }
   }
 
   static getInstance(config?: Config): ClearcutLogger | undefined {
@@ -268,6 +284,7 @@ export class ClearcutLogger {
     event: LogEvent,
   ): Promise<void> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       this.config?.getExperimentsAsync().then((experiments) => {
         if (experiments) {
           const exp_id_data: EventValue[] = [
@@ -320,6 +337,13 @@ export class ClearcutLogger {
       baseMetadata.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
         value: ghWorkflowName,
+      });
+    }
+
+    if (this.hashedGHRepositoryName) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
+        value: this.hashedGHRepositoryName,
       });
     }
 
@@ -534,6 +558,7 @@ export class ClearcutLogger {
     this.sessionData = data;
 
     // Flush after experiments finish loading from CCPA server
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.enqueueLogEventAfterExperimentsLoadAsync(
       this.createLogEvent(EventNames.START_SESSION, data),
     ).then(() => {
@@ -877,6 +902,7 @@ export class ClearcutLogger {
     ];
 
     // Flush after experiments finish loading from CCPA server
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.enqueueLogEventAfterExperimentsLoadAsync(
       this.createLogEvent(EventNames.START_SESSION, data),
     ).then(() => {

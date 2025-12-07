@@ -255,6 +255,9 @@ export class BaseLlmClient {
     if (newConfig) {
       requestParams.config = newConfig;
     }
+    if (abortSignal) {
+      requestParams.config = { ...requestParams.config, abortSignal };
+    }
 
     try {
       const apiCall = () => {
@@ -278,14 +281,12 @@ export class BaseLlmClient {
         return this.contentGenerator.generateContent(requestParams, promptId);
       };
 
-      const result = await retryWithBackoff(apiCall, {
+      return await retryWithBackoff(apiCall, {
         shouldRetryOnContent,
         maxAttempts:
           availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
         getAvailabilityContext,
       });
-
-      return result;
     } catch (error) {
       if (abortSignal?.aborted) {
         throw error;

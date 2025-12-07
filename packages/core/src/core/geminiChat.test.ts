@@ -52,6 +52,10 @@ vi.mock('node:fs', () => {
       });
     }),
     existsSync: vi.fn((path: string) => mockFileSystem.has(path)),
+    createWriteStream: vi.fn(() => ({
+      write: vi.fn(),
+      on: vi.fn(),
+    })),
   };
 
   return {
@@ -69,9 +73,13 @@ const { mockRetryWithBackoff } = vi.hoisted(() => ({
   mockRetryWithBackoff: vi.fn(),
 }));
 
-vi.mock('../utils/retry.js', () => ({
-  retryWithBackoff: mockRetryWithBackoff,
-}));
+vi.mock('../utils/retry.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/retry.js')>();
+  return {
+    ...actual,
+    retryWithBackoff: mockRetryWithBackoff,
+  };
+});
 
 vi.mock('../fallback/handler.js', () => ({
   handleFallback: mockHandleFallback,

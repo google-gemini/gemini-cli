@@ -20,6 +20,8 @@ export * from './confirmation-bus/message-bus.js';
 
 // Export Commands logic
 export * from './commands/extensions.js';
+export * from './commands/restore.js';
+export * from './commands/types.js';
 
 // Export Core Logic
 export * from './core/client.js';
@@ -82,6 +84,8 @@ export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
 export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
+export * from './services/sessionSummaryUtils.js';
+export * from './services/contextManager.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';

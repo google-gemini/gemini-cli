@@ -19,7 +19,7 @@ import type {
 import { ThinkingLevel } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
 import { createUserContent, FinishReason } from '@google/genai';
-import { retryWithBackoff } from '../utils/retry.js';
+import { retryWithBackoff, isRetryableError } from '../utils/retry.js';
 import type { Config } from '../config/config.js';
 import {
   DEFAULT_GEMINI_MODEL,
@@ -314,6 +314,7 @@ export class GeminiChat {
         }
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          let isConnectionPhase = true;
           try {
             if (attempt > 0) {
               yield { type: StreamEventType.RETRY };
@@ -324,13 +325,14 @@ export class GeminiChat {
               generateContentConfig.temperature = 1;
             }
 
+            isConnectionPhase = true;
             const stream = await this.makeApiCallAndProcessStream(
               model,
               generateContentConfig,
               requestContents,
               prompt_id,
             );
-
+            isConnectionPhase = false;
             for await (const chunk of stream) {
               yield { type: StreamEventType.CHUNK, value: chunk };
             }
@@ -338,27 +340,33 @@ export class GeminiChat {
             lastError = null;
             break;
           } catch (error) {
+            if (isConnectionPhase) {
+              throw error;
+            }
             lastError = error;
             const isContentError = error instanceof InvalidStreamError;
+            const isRetryable = isRetryableError(
+              error,
+              this.config.getRetryFetchErrors(),
+            );
 
-            if (isContentError && isGemini2Model(model)) {
+            if (
+              (isContentError && isGemini2Model(model)) ||
+              (isRetryable && !signal.aborted)
+            ) {
               // Check if we have more attempts left.
               if (attempt < maxAttempts - 1) {
+                const delayMs = INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs;
+                const retryType = isContentError
+                  ? (error as InvalidStreamError).type
+                  : 'NETWORK_ERROR';
+
                 logContentRetry(
                   this.config,
-                  new ContentRetryEvent(
-                    attempt,
-                    (error as InvalidStreamError).type,
-                    INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs,
-                    model,
-                  ),
+                  new ContentRetryEvent(attempt, retryType, delayMs, model),
                 );
                 await new Promise((res) =>
-                  setTimeout(
-                    res,
-                    INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs *
-                      (attempt + 1),
-                  ),
+                  setTimeout(res, delayMs * (attempt + 1)),
                 );
                 continue;
               }
@@ -416,10 +424,17 @@ export class GeminiChat {
       maxAttempts: availabilityMaxAttempts,
     } = applyModelSelection(this.config, model, generateContentConfig);
 
+    const abortSignal = generateContentConfig.abortSignal;
     let lastModelToUse = availabilityFinalModel;
     let currentGenerateContentConfig: GenerateContentConfig =
       newAvailabilityConfig ?? generateContentConfig;
-    let lastConfig: GenerateContentConfig = generateContentConfig;
+    if (abortSignal) {
+      currentGenerateContentConfig = {
+        ...currentGenerateContentConfig,
+        abortSignal,
+      };
+    }
+    let lastConfig: GenerateContentConfig = currentGenerateContentConfig;
     let lastContentsToUse: Content[] = requestContents;
 
     const getAvailabilityContext = createAvailabilityContextProvider(
@@ -436,12 +451,13 @@ export class GeminiChat {
             this.config.modelConfigService.getResolvedConfig({
               model: modelToUse,
             });
-          const { abortSignal } = currentGenerateContentConfig;
           currentGenerateContentConfig = {
             ...currentGenerateContentConfig,
             ...newConfig,
-            abortSignal,
           };
+          if (abortSignal) {
+            currentGenerateContentConfig.abortSignal = abortSignal;
+          }
         }
       } else {
         modelToUse = getEffectiveModel(

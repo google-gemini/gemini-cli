@@ -20,15 +20,15 @@ const USER_SETTINGS_DIR = join(
 const USER_SETTINGS_PATH = join(USER_SETTINGS_DIR, 'settings.json');
 const WORKSPACE_SETTINGS_PATH = join(projectRoot, GEMINI_DIR, 'settings.json');
 
-let settingsTarget = undefined;
+let telemetrySettings = undefined;
 
-function loadSettingsValue(filePath) {
+function loadSettings(filePath) {
   try {
     if (existsSync(filePath)) {
       const content = readFileSync(filePath, 'utf-8');
       const jsonContent = content.replace(/\/\/[^\n]*/g, '');
       const settings = JSON.parse(jsonContent);
-      return settings.telemetry?.target;
+      return settings.telemetry;
     }
   } catch (e) {
     console.warn(
@@ -38,13 +38,13 @@ function loadSettingsValue(filePath) {
   return undefined;
 }
 
-settingsTarget = loadSettingsValue(WORKSPACE_SETTINGS_PATH);
+telemetrySettings = loadSettings(WORKSPACE_SETTINGS_PATH);
 
-if (!settingsTarget) {
-  settingsTarget = loadSettingsValue(USER_SETTINGS_PATH);
+if (!telemetrySettings) {
+  telemetrySettings = loadSettings(USER_SETTINGS_PATH);
 }
 
-let target = settingsTarget || 'local';
+let target = telemetrySettings?.target || 'local';
 const allowedTargets = ['local', 'gcp', 'genkit'];
 
 const targetArg = process.argv.find((arg) => arg.startsWith('--target='));
@@ -55,13 +55,15 @@ if (targetArg) {
     console.log(`⚙️  Using command-line target: ${target}`);
   } else {
     console.error(
-      `🛑 Error: Invalid target '${potentialTarget}'. Allowed targets are: ${allowedTargets.join(', ')}.`,
+      `🛑 Error: Invalid target '${potentialTarget}'. Allowed targets are: ${allowedTargets.join(
+        ', ',
+      )}.`,
     );
     process.exit(1);
   }
-} else if (settingsTarget) {
+} else if (telemetrySettings?.target) {
   console.log(
-    `⚙️ Using telemetry target from settings.json: ${settingsTarget}`,
+    `⚙️ Using telemetry target from settings.json: ${telemetrySettings.target}`,
   );
 }
 
@@ -75,7 +77,13 @@ const scriptPath = join(projectRoot, 'scripts', targetScripts[target]);
 
 try {
   console.log(`🚀 Running telemetry script for target: ${target}.`);
-  execSync(`node ${scriptPath}`, { stdio: 'inherit', cwd: projectRoot });
+  const env = { ...process.env };
+
+  execSync(`node ${scriptPath}`, {
+    stdio: 'inherit',
+    cwd: projectRoot,
+    env,
+  });
 } catch (error) {
   console.error(`🛑 Failed to run telemetry script for target: ${target}`);
   console.error(error);
