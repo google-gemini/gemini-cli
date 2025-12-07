@@ -1,23 +1,23 @@
-name: Gemini Automated PR Labeler
+name: 'Gemini Automated PR Labeler'
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize]
+    types: ['opened', 'reopened', 'synchronize']
 
 jobs:
   label-pr:
     timeout-minutes: 5
-    if: ${{ github.repository == 'google-gemini/gemini-cli' }} # Adapt to your repo
+    if: '${{ github.repository == google-gemini/gemini-cli }}' # Adapt to your repo
     permissions:
-      pull-requests: write
-      contents: read
-      id-token: write
+      pull-requests: 'write'
+      contents: 'read'
+      id-token: 'write'
 
     concurrency:
-      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+      group: '${{ github.workflow }}-${{ github.event.pull_request.number }}'
       cancel-in-progress: true
 
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
 
     steps:
       - name: Generate GitHub App Token
