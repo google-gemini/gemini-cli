@@ -8,7 +8,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { homedir } from 'node:os';
 
-import type { MCPServerConfig } from '@google/gemini-cli-core';
+import type {
+  MCPServerConfig,
+  ModelConfigServiceConfig,
+} from '@google/gemini-cli-core';
 import {
   debugLogger,
   GEMINI_DIR,
@@ -38,8 +41,11 @@ export interface Settings {
   // Git-aware file filtering settings
   fileFiltering?: {
     respectGitIgnore?: boolean;
+    geminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
+    disableFuzzySearch?: boolean;
   };
+  modelConfigs?: ModelConfigServiceConfig;
 }
 
 export interface SettingsError {

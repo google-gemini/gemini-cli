@@ -65,13 +65,16 @@ export async function loadConfig(
     // Git-aware file filtering settings
     fileFiltering: {
       respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
+      respectGeminiIgnore: settings.fileFiltering?.geminiIgnore,
       enableRecursiveFileSearch:
         settings.fileFiltering?.enableRecursiveFileSearch,
+      disableFuzzySearch: settings.fileFiltering?.disableFuzzySearch,
     },
     ideMode: false,
     folderTrust: settings.folderTrust === true,
     extensionLoader,
     previewFeatures: settings.general?.previewFeatures,
+    modelConfigServiceConfig: settings.modelConfigs,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
