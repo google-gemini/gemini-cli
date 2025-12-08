@@ -242,7 +242,7 @@ export const setupGithubCommand: SlashCommand = {
     if (repoInfo) {
       const safeOwner = repoInfo.owner.replace(/[^a-zA-Z0-9-_.]/g, '');
       const safeRepo = repoInfo.repo.replace(/[^a-zA-Z0-9-_.]/g, '');
-      if (safeOwner && safeRepo) {
+      if (safeOwner && safeRepo && !['.', '..'].includes(safeOwner) && !['.', '..'].includes(safeRepo)) {
         secretsUrl = `https://github.com/${safeOwner}/${safeRepo}/settings/secrets/actions`;
       }
     }
