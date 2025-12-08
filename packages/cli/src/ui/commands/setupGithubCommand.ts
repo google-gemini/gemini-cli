@@ -19,7 +19,6 @@ import {
 
 import type { SlashCommand, SlashCommandActionReturn } from './types.js';
 import { CommandKind } from './types.js';
-import { getUrlOpenCommand } from '../../ui/utils/commandUtils.js';
 import { debugLogger } from '@google/gemini-cli-core';
 
 export const GITHUB_WORKFLOW_PATHS = [
@@ -40,25 +39,6 @@ export const GITHUB_COMMANDS_PATHS = [
 const REPO_DOWNLOAD_URL =
   'https://raw.githubusercontent.com/google-github-actions/run-gemini-cli';
 const SOURCE_DIR = 'examples/workflows';
-// Generate OS-specific commands to open the GitHub pages needed for setup.
-function getOpenUrlsCommands(readmeUrl: string): string[] {
-  // Determine the OS-specific command to open URLs, ex: 'open', 'xdg-open', etc
-  const openCmd = getUrlOpenCommand();
-
-  // Build a list of URLs to open
-  const urlsToOpen = [readmeUrl];
-
-  const repoInfo = getGitHubRepoInfo();
-  if (repoInfo) {
-    urlsToOpen.push(
-      `https://github.com/${repoInfo.owner}/${repoInfo.repo}/settings/secrets/actions`,
-    );
-  }
-
-  // Create and join the individual commands
-  const commands = urlsToOpen.map((url) => `${openCmd} "${url}"`);
-  return commands;
-}
 
 // Add Gemini CLI specific entries to .gitignore file
 export async function updateGitignore(gitRepoRoot: string): Promise<void> {
@@ -254,10 +234,32 @@ export const setupGithubCommand: SlashCommand = {
     if (process.platform !== 'win32') {
       commands.push('set -eEuo pipefail');
     }
+    // Customize output with clickable links
+    // Sanitize owner/repo to prevent command injection via malicious git remote
+    let secretsUrl =
+      'https://github.com/<owner>/<repo>/settings/secrets/actions';
+    const repoInfo = getGitHubRepoInfo();
+    if (repoInfo) {
+      const safeOwner = repoInfo.owner.replace(/[^a-zA-Z0-9-_.]/g, '');
+      const safeRepo = repoInfo.repo.replace(/[^a-zA-Z0-9-_.]/g, '');
+      if (safeOwner && safeRepo) {
+        secretsUrl = `https://github.com/${safeOwner}/${safeRepo}/settings/secrets/actions`;
+      }
+    }
+
     commands.push(
-      `echo "Successfully downloaded ${GITHUB_WORKFLOW_PATHS.length} workflows , ${GITHUB_COMMANDS_PATHS.length} commands and updated .gitignore. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup."`,
+      `echo "Successfully downloaded ${GITHUB_WORKFLOW_PATHS.length} workflows and ${GITHUB_COMMANDS_PATHS.length} commands."`,
     );
-    commands.push(...getOpenUrlsCommands(readmeUrl));
+    commands.push(`echo ""`);
+    commands.push(`echo "Next steps:"`);
+    commands.push(
+      `echo "  1. Get a Gemini API Key from https://aistudio.google.com/apikey"`,
+    );
+    commands.push(
+      `echo "  2. Add it as a GitHub Secret named GEMINI_API_KEY: ${secretsUrl}"`,
+    );
+    commands.push(`echo ""`);
+    commands.push(`echo "For more details, see: ${readmeUrl}"`);
 
     const command = `(${commands.join(' && ')})`;
     return {

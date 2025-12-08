@@ -16,7 +16,6 @@ import {
   GITHUB_WORKFLOW_PATHS,
 } from './setupGithubCommand.js';
 import type { CommandContext } from './types.js';
-import * as commandUtils from '../utils/commandUtils.js';
 import type { ToolActionReturn } from '@google/gemini-cli-core';
 import { debugLogger } from '@google/gemini-cli-core';
 
@@ -32,11 +31,26 @@ vi.mock('../../utils/gitUtils.js', () => ({
   getGitHubRepoInfo: vi.fn(),
 }));
 
-vi.mock('../utils/commandUtils.js', () => ({
-  getUrlOpenCommand: vi.fn(),
-}));
-
 describe('setupGithubCommand', async () => {
+  /*
+   * Testing strategy
+   *
+   * partition on OS environment:
+   *    - Windows (special handling for pipefail)
+   *    - Non-Windows (Linux/Mac)
+   *
+   * partition on network conditions:
+   *    - Success (200 OK)
+   *    - Failure (404 Not Found, etc.)
+   *
+   * partition on file system:
+   *    - .gitignore already exists
+   *       - contains entries
+   *       - contains partial entries
+   *       - contains conflicting entries
+   *    - .gitignore does not exist
+   *    - File system errors (permission denied)
+   */
   let scratchDir = '';
 
   beforeEach(async () => {
@@ -78,9 +92,6 @@ describe('setupGithubCommand', async () => {
       owner: fakeRepoOwner,
       repo: fakeRepoName,
     });
-    vi.mocked(commandUtils.getUrlOpenCommand).mockReturnValueOnce(
-      'fakeOpenCommand',
-    );
 
     const result = (await setupGithubCommand.action?.(
       {} as CommandContext,
@@ -93,7 +104,12 @@ describe('setupGithubCommand', async () => {
     expect(command).toContain('set -eEuo pipefail');
 
     // Check that the other commands are still present
-    expect(command).toContain('fakeOpenCommand');
+    // Check for new instructions
+    expect(command).toContain('Next steps:');
+    expect(command).toContain('https://aistudio.google.com/apikey');
+    expect(command).toContain(
+      `https://github.com/${fakeRepoOwner}/${fakeRepoName}/settings/secrets/actions`,
+    );
 
     // Verify that the workflows were downloaded
     for (const workflow of workflows) {
@@ -115,11 +131,9 @@ describe('setupGithubCommand', async () => {
       .catch(() => false);
     expect(gitignoreExists).toBe(true);
 
-    if (gitignoreExists) {
-      const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
-      expect(gitignoreContent).toContain('.gemini/');
-      expect(gitignoreContent).toContain('gha-creds-*.json');
-    }
+    const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
+    expect(gitignoreContent).toContain('.gemini/');
+    expect(gitignoreContent).toContain('gha-creds-*.json');
   });
 
   it('downloads workflows, updates gitignore, and does not include pipefail on windows', async () => {
@@ -148,9 +162,6 @@ describe('setupGithubCommand', async () => {
       owner: fakeRepoOwner,
       repo: fakeRepoName,
     });
-    vi.mocked(commandUtils.getUrlOpenCommand).mockReturnValueOnce(
-      'fakeOpenCommand',
-    );
 
     const result = (await setupGithubCommand.action?.(
       {} as CommandContext,
@@ -163,7 +174,12 @@ describe('setupGithubCommand', async () => {
     expect(command).not.toContain('set -eEuo pipefail');
 
     // Check that the other commands are still present
-    expect(command).toContain('fakeOpenCommand');
+    // Check for new instructions
+    expect(command).toContain('Next steps:');
+    expect(command).toContain('https://aistudio.google.com/apikey');
+    expect(command).toContain(
+      `https://github.com/${fakeRepoOwner}/${fakeRepoName}/settings/secrets/actions`,
+    );
 
     // Verify that the workflows were downloaded
     for (const workflow of workflows) {
@@ -185,11 +201,9 @@ describe('setupGithubCommand', async () => {
       .catch(() => false);
     expect(gitignoreExists).toBe(true);
 
-    if (gitignoreExists) {
-      const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
-      expect(gitignoreContent).toContain('.gemini/');
-      expect(gitignoreContent).toContain('gha-creds-*.json');
-    }
+    const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
+    expect(gitignoreContent).toContain('.gemini/');
+    expect(gitignoreContent).toContain('gha-creds-*.json');
   });
 
   it('throws an error when download fails', async () => {
