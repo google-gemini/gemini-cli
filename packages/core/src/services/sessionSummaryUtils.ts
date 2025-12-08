@@ -15,6 +15,8 @@ import {
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+const MIN_MESSAGES_FOR_SUMMARY = 1;
+
 /**
  * Generates and saves a summary for a session file.
  */
@@ -128,13 +130,13 @@ export async function getPreviousSession(
         return null;
       }
 
-      // Only generate summaries for sessions with 5+ user messages
+      // Only generate summaries for sessions with more than 1 user message
       const userMessageCount = conversation.messages.filter(
         (m) => m.type === 'user',
       ).length;
-      if (userMessageCount < 5) {
+      if (userMessageCount <= MIN_MESSAGES_FOR_SUMMARY) {
         debugLogger.debug(
-          `[SessionSummary] Most recent session has ${userMessageCount} user messages, skipping (minimum 5)`,
+          `[SessionSummary] Most recent session has ${userMessageCount} user message(s), skipping (need more than ${MIN_MESSAGES_FOR_SUMMARY})`,
         );
         return null;
       }

@@ -110,11 +110,11 @@ describe('sessionSummaryUtils', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null if most recent session has fewer than 5 user messages', async () => {
+    it('should return null if most recent session has 1 or fewer user messages', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
       vi.mocked(fs.readFile).mockResolvedValue(
-        createSessionWithUserMessages(4),
+        createSessionWithUserMessages(1),
       );
 
       const result = await getPreviousSession(mockConfig);
@@ -122,11 +122,11 @@ describe('sessionSummaryUtils', () => {
       expect(result).toBeNull();
     });
 
-    it('should return path if most recent session has 5+ user messages and no summary', async () => {
+    it('should return path if most recent session has more than 1 user message and no summary', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
       vi.mocked(fs.readFile).mockResolvedValue(
-        createSessionWithUserMessages(5),
+        createSessionWithUserMessages(2),
       );
 
       const result = await getPreviousSession(mockConfig);
@@ -147,7 +147,7 @@ describe('sessionSummaryUtils', () => {
         'session-2024-01-02T10-00-newer000.json',
       ]);
       vi.mocked(fs.readFile).mockResolvedValue(
-        createSessionWithUserMessages(5),
+        createSessionWithUserMessages(2),
       );
 
       const result = await getPreviousSession(mockConfig);
@@ -189,7 +189,7 @@ describe('sessionSummaryUtils', () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
       vi.mocked(fs.readFile).mockResolvedValue(
-        createSessionWithUserMessages(5),
+        createSessionWithUserMessages(2),
       );
       vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
@@ -207,7 +207,7 @@ describe('sessionSummaryUtils', () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
       vi.mocked(fs.readFile).mockResolvedValue(
-        createSessionWithUserMessages(5),
+        createSessionWithUserMessages(2),
       );
       mockGenerateSummary.mockRejectedValue(new Error('API Error'));
 
