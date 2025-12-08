@@ -11,6 +11,9 @@ import {
   cleanupOldClipboardImages,
   getImagePathFromText,
   looksLikeImagePath,
+  splitEscapedPaths,
+  looksLikeMultipleImagePaths,
+  getMultipleImagePathsFromText,
 } from './clipboardUtils.js';
 
 describe('clipboardUtils', () => {
@@ -217,6 +220,184 @@ describe('clipboardUtils', () => {
       const duration = performance.now() - start;
       // Should complete 3000 calls in well under 100ms
       expect(duration).toBeLessThan(100);
+    });
+  });
+
+  describe('splitEscapedPaths', () => {
+    it('should return single path when no spaces', () => {
+      expect(splitEscapedPaths('/path/to/image.png')).toEqual([
+        '/path/to/image.png',
+      ]);
+    });
+
+    it('should split simple space-separated paths', () => {
+      expect(splitEscapedPaths('/img1.png /img2.png')).toEqual([
+        '/img1.png',
+        '/img2.png',
+      ]);
+    });
+
+    it('should split three paths', () => {
+      expect(splitEscapedPaths('/a.png /b.jpg /c.gif')).toEqual([
+        '/a.png',
+        '/b.jpg',
+        '/c.gif',
+      ]);
+    });
+
+    it('should preserve escaped spaces within filenames', () => {
+      expect(splitEscapedPaths('/my\\ image.png')).toEqual(['/my\\ image.png']);
+    });
+
+    it('should handle multiple paths with escaped spaces', () => {
+      expect(splitEscapedPaths('/my\\ img1.png /my\\ img2.png')).toEqual([
+        '/my\\ img1.png',
+        '/my\\ img2.png',
+      ]);
+    });
+
+    it('should handle path with multiple escaped spaces', () => {
+      expect(splitEscapedPaths('/path/to/my\\ cool\\ image.png')).toEqual([
+        '/path/to/my\\ cool\\ image.png',
+      ]);
+    });
+
+    it('should handle multiple consecutive spaces between paths', () => {
+      expect(splitEscapedPaths('/img1.png   /img2.png')).toEqual([
+        '/img1.png',
+        '/img2.png',
+      ]);
+    });
+
+    it('should handle trailing and leading whitespace', () => {
+      expect(splitEscapedPaths('  /img1.png /img2.png  ')).toEqual([
+        '/img1.png',
+        '/img2.png',
+      ]);
+    });
+
+    it('should return empty array for empty string', () => {
+      expect(splitEscapedPaths('')).toEqual([]);
+    });
+
+    it('should return empty array for whitespace only', () => {
+      expect(splitEscapedPaths('   ')).toEqual([]);
+    });
+  });
+
+  describe('looksLikeMultipleImagePaths', () => {
+    it('should return true for single image path', () => {
+      expect(looksLikeMultipleImagePaths('/path/image.png')).toBe(true);
+    });
+
+    it('should return true for multiple image paths', () => {
+      expect(looksLikeMultipleImagePaths('/img1.png /img2.jpg')).toBe(true);
+    });
+
+    it('should return true for @ prefixed paths', () => {
+      expect(looksLikeMultipleImagePaths('@/img1.png /img2.png')).toBe(true);
+    });
+
+    it('should return true if any path has image extension', () => {
+      // Mixed image and non-image - should return true because .png is present
+      expect(looksLikeMultipleImagePaths('/img.png /file.txt')).toBe(true);
+    });
+
+    it('should return false for non-path text', () => {
+      expect(looksLikeMultipleImagePaths('hello world')).toBe(false);
+    });
+
+    it('should return false for paths without image extensions', () => {
+      expect(looksLikeMultipleImagePaths('/file.txt /doc.pdf')).toBe(false);
+    });
+
+    it('should return false for empty string', () => {
+      expect(looksLikeMultipleImagePaths('')).toBe(false);
+    });
+
+    it('should handle paths with escaped spaces', () => {
+      expect(
+        looksLikeMultipleImagePaths('/my\\ image.png /other\\ pic.jpg'),
+      ).toBe(true);
+    });
+
+    it('should be fast for normal text', () => {
+      const start = performance.now();
+      for (let i = 0; i < 1000; i++) {
+        looksLikeMultipleImagePaths('hello world this is normal text');
+        looksLikeMultipleImagePaths('const x = 5; function foo() {}');
+      }
+      const duration = performance.now() - start;
+      expect(duration).toBeLessThan(100);
+    });
+  });
+
+  describe('getMultipleImagePathsFromText', () => {
+    it('should return empty arrays for non-path text', async () => {
+      const result = await getMultipleImagePathsFromText('hello world');
+      expect(result.validPaths).toEqual([]);
+      expect(result.invalidSegments).toEqual([]);
+    });
+
+    it('should put non-existent image paths in invalidSegments', async () => {
+      const result = await getMultipleImagePathsFromText(
+        '/nonexistent/image.png',
+      );
+      expect(result.validPaths).toEqual([]);
+      expect(result.invalidSegments).toEqual(['/nonexistent/image.png']);
+    });
+
+    it('should put non-image extensions in invalidSegments', async () => {
+      const result = await getMultipleImagePathsFromText('/path/to/file.txt');
+      expect(result.validPaths).toEqual([]);
+      expect(result.invalidSegments).toEqual(['/path/to/file.txt']);
+    });
+
+    it('should handle multiple non-existent paths', async () => {
+      const result = await getMultipleImagePathsFromText(
+        '/fake1.png /fake2.jpg',
+      );
+      expect(result.validPaths).toEqual([]);
+      expect(result.invalidSegments).toEqual(['/fake1.png', '/fake2.jpg']);
+    });
+
+    it('should handle mix of image and non-image paths', async () => {
+      const result = await getMultipleImagePathsFromText(
+        '/fake.png /file.txt /another.jpg',
+      );
+      expect(result.validPaths).toEqual([]);
+      // .png and .jpg are images (but don't exist), .txt is not an image
+      expect(result.invalidSegments).toContain('/file.txt');
+      expect(result.invalidSegments).toContain('/fake.png');
+      expect(result.invalidSegments).toContain('/another.jpg');
+    });
+
+    it('should strip @ prefix from first path', async () => {
+      const result = await getMultipleImagePathsFromText(
+        '@/fake1.png /fake2.png',
+      );
+      // Both should fail because files don't exist
+      expect(result.validPaths).toEqual([]);
+      // The @ should be stripped from the first segment
+      expect(result.invalidSegments).toEqual(['/fake1.png', '/fake2.png']);
+    });
+
+    it('should handle paths with escaped spaces', async () => {
+      const result = await getMultipleImagePathsFromText(
+        '/my\\ image.png /other\\ pic.jpg',
+      );
+      expect(result.validPaths).toEqual([]);
+      // Original escaped segments should be preserved in invalidSegments
+      expect(result.invalidSegments).toEqual([
+        '/my\\ image.png',
+        '/other\\ pic.jpg',
+      ]);
+    });
+
+    it('should return empty for empty string', async () => {
+      const result = await getMultipleImagePathsFromText('');
+      expect(result.validPaths).toEqual([]);
+      expect(result.invalidSegments).toEqual([]);
     });
   });
 });

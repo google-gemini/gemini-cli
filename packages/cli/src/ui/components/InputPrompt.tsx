@@ -34,8 +34,8 @@ import {
   clipboardHasImage,
   saveClipboardImage,
   cleanupOldClipboardImages,
-  getImagePathFromText,
-  looksLikeImagePath,
+  looksLikeMultipleImagePaths,
+  getMultipleImagePathsFromText,
 } from '../utils/clipboardUtils.js';
 import type { UseClipboardImagesReturn } from '../hooks/useClipboardImages.js';
 import {
@@ -428,24 +428,37 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }, 40);
         }
 
-        // Check if pasted content could be an image file path (drag and drop)
+        // Check if pasted content could be image file path(s) (drag and drop)
         // Use synchronous check first to avoid async handling for normal text
         if (
           clipboardImages &&
           key.sequence &&
-          looksLikeImagePath(key.sequence)
+          looksLikeMultipleImagePaths(key.sequence)
         ) {
           // Only go async for potential image paths to verify file existence
           void (async () => {
-            const imagePath = await getImagePathFromText(key.sequence!);
-            if (imagePath) {
-              // Register the image and insert [Image #N] instead of the path
-              const displayText = clipboardImages.registerImage(imagePath);
-              const offset = buffer.getOffset();
+            const { validPaths, invalidSegments } =
+              await getMultipleImagePathsFromText(key.sequence!);
 
-              // Add spacing if needed
-              let textToInsert = displayText;
+            if (validPaths.length > 0) {
+              // Register each valid image and collect placeholders
+              const placeholders = validPaths.map((p) =>
+                clipboardImages.registerImage(p),
+              );
+
+              // Build insertion text: placeholders + invalid segments with @ prefix
+              // Non-image files should use @path syntax for file references
+              let insertText = placeholders.join(' ');
+              if (invalidSegments.length > 0) {
+                const atPrefixedSegments = invalidSegments.map((s) => `@${s}`);
+                insertText += ' ' + atPrefixedSegments.join(' ');
+              }
+
+              // Insert at cursor position with proper spacing
+              const offset = buffer.getOffset();
               const currentText = buffer.text;
+              let textToInsert = insertText;
+
               const charBefore = offset > 0 ? currentText[offset - 1] : '';
               const charAfter =
                 offset < currentText.length ? currentText[offset] : '';
@@ -459,7 +472,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
               buffer.replaceRangeByOffset(offset, offset, textToInsert);
             } else {
-              // File doesn't exist, treat as normal paste
+              // No valid images found, treat as normal paste
               buffer.handleInput(key);
             }
           })();
