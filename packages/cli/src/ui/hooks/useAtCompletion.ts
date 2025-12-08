@@ -223,8 +223,10 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     };
 
     if (state.status === AtCompletionStatus.INITIALIZING) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       initialize();
     } else if (state.status === AtCompletionStatus.SEARCHING) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       search();
     }
 
