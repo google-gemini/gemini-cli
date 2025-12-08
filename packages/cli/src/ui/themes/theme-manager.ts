@@ -41,8 +41,8 @@ export class ThemeManager {
   private readonly availableThemes: Theme[];
   private activeTheme: Theme;
   private customThemes: Map<string, Theme> = new Map();
-  private resolvedNameToTheme: Map<string, Theme> = new Map(); // Key: resolved theme name, Value: Theme object
-  readonly themeFilePaths: Map<string, string> = new Map(); // Key: canonicalPath, Value: settings.json key
+  private resolvedNameToTheme: Map<string, Theme> = new Map();
+  readonly themeFilePaths: Map<string, string> = new Map();
 
   constructor() {
     this.availableThemes = [
