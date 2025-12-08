@@ -107,6 +107,10 @@ export class GeminiAgent {
           audio: true,
           embeddedContext: true,
         },
+        mcpCapabilities: {
+          http: true,
+          sse: true,
+        },
       },
     };
   }
@@ -181,12 +185,37 @@ export class GeminiAgent {
   ): Promise<Config> {
     const mergedMcpServers = { ...this.settings.merged.mcpServers };
 
-    for (const { command, args, env: rawEnv, name } of mcpServers) {
-      const env: Record<string, string> = {};
-      for (const { name: envName, value } of rawEnv) {
-        env[envName] = value;
+    for (const server of mcpServers) {
+      if (
+        'type' in server &&
+        (server.type === 'sse' || server.type === 'http')
+      ) {
+        // HTTP or SSE MCP server
+        const headers = Object.fromEntries(
+          server.headers.map(({ name, value }) => [name, value]),
+        );
+        mergedMcpServers[server.name] = new MCPServerConfig(
+          undefined, // command
+          undefined, // args
+          undefined, // env
+          undefined, // cwd
+          server.type === 'sse' ? server.url : undefined, // url (sse)
+          server.type === 'http' ? server.url : undefined, // httpUrl
+          headers,
+        );
+      } else if ('command' in server) {
+        // Stdio MCP server
+        const env: Record<string, string> = {};
+        for (const { name: envName, value } of server.env) {
+          env[envName] = value;
+        }
+        mergedMcpServers[server.name] = new MCPServerConfig(
+          server.command,
+          server.args,
+          env,
+          cwd,
+        );
       }
-      mergedMcpServers[name] = new MCPServerConfig(command, args, env, cwd);
     }
 
     const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };
