@@ -302,10 +302,10 @@ export function createPolicyUpdater(
           }
 
           if (message.commandPrefix) {
-            content += `commandPrefix = "${message.commandPrefix}"\n`;
+            content += `commandPrefix = "${message.commandPrefix.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n`;
           } else if (message.argsPattern) {
-            // Escape backslashes for TOML string
-            const escapedPattern = message.argsPattern.replace(/\\/g, '\\\\');
+            // Escape backslashes and double quotes for TOML string
+            const escapedPattern = message.argsPattern.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
             content += `argsPattern = "${escapedPattern}"\n`;
           }
 
