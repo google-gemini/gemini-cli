@@ -118,6 +118,7 @@ export const useGeminiStream = (
   isShellFocused?: boolean,
   clipboardImages?: {
     getImageParts: () => Promise<PartUnion[]>;
+    getImagePartsForText: (text: string) => Promise<PartUnion[]>;
     clear: () => void;
   },
 ) => {
@@ -519,8 +520,27 @@ export const useGeminiStream = (
       }
 
       // Inject clipboard images into the query
+      // Only include images whose [Image #N] tags are still present in the text
       if (clipboardImages) {
-        const imageParts = await clipboardImages.getImageParts();
+        // Extract query text to check which image tags are present
+        const queryText =
+          typeof localQueryToSendToGemini === 'string'
+            ? localQueryToSendToGemini
+            : Array.isArray(localQueryToSendToGemini)
+              ? localQueryToSendToGemini
+                  .filter(
+                    (p): p is { text: string } =>
+                      p !== null &&
+                      typeof p === 'object' &&
+                      'text' in p &&
+                      typeof p.text === 'string',
+                  )
+                  .map((p) => p.text)
+                  .join(' ')
+              : '';
+
+        const imageParts =
+          await clipboardImages.getImagePartsForText(queryText);
         if (imageParts.length > 0) {
           onDebugMessage(`Injecting ${imageParts.length} clipboard image(s)`);
 

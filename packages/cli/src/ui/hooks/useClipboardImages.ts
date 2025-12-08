@@ -34,6 +34,8 @@ export interface UseClipboardImagesReturn {
   clear: () => void;
   /** Get all images as base64-encoded PartUnion objects for injection into the prompt */
   getImageParts: () => Promise<PartUnion[]>;
+  /** Get image parts only for images whose [Image #N] tags are present in the text */
+  getImagePartsForText: (text: string) => Promise<PartUnion[]>;
 }
 
 /**
@@ -57,9 +59,7 @@ function getMimeType(filePath: string): string {
  * Hook to manage clipboard images pasted into the input.
  *
  * This hook provides a registry for tracking pasted images and converting them
- * to base64-encoded parts for injection into the Gemini prompt. Images are
- * always injected regardless of whether the display text (e.g., "[Image #1]")
- * is edited or deleted by the user.
+ * to base64-encoded parts for injection into the Gemini prompt.
  *
  * The image counter resets after each message submission.
  */
@@ -114,10 +114,52 @@ export function useClipboardImages(): UseClipboardImagesReturn {
     return parts;
   }, [images]);
 
+  /**
+   * Get image parts only for images whose [Image #N] tags are present in the text.
+   * This prevents sending images the user has deleted from their prompt.
+   */
+  const getImagePartsForText = useCallback(
+    async (text: string): Promise<PartUnion[]> => {
+      const parts: PartUnion[] = [];
+
+      for (const image of images) {
+        // Check if this image's tag exists in the text
+        const tagPattern = new RegExp(`\\[Image #${image.id}\\]`);
+        if (!tagPattern.test(text)) {
+          // Tag was deleted - skip this image
+          continue;
+        }
+
+        try {
+          const fileContent = await fs.readFile(image.path);
+          const mimeType = getMimeType(image.path);
+
+          parts.push({
+            inlineData: {
+              data: fileContent.toString('base64'),
+              mimeType,
+            },
+          });
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          debugLogger.warn(
+            `Failed to load clipboard image ${image.displayText} from ${image.path}: ${message}`,
+          );
+          // Continue with remaining images - don't fail the whole submission
+        }
+      }
+
+      return parts;
+    },
+    [images],
+  );
+
   return {
     images,
     registerImage,
     clear,
     getImageParts,
+    getImagePartsForText,
   };
 }
