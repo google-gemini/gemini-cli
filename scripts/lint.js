@@ -44,10 +44,20 @@ function getPlatformArch() {
       shellcheck: 'darwin.aarch64',
     };
   }
+  // Do not throw here — caller will handle unsupported platforms.
   throw new Error(`Unsupported platform/architecture: ${platform}/${arch}`);
 }
 
-const platformArch = getPlatformArch();
+let platformArch;
+try {
+  platformArch = getPlatformArch();
+} catch (e) {
+  // Warn and continue — we'll skip actionlint/shellcheck on unsupported platforms.
+  console.warn(
+    `Warning: ${e.message}. actionlint and shellcheck will be skipped on this platform.`,
+  );
+  platformArch = null;
+}
 
 const PYTHON_VENV_PATH = join(TEMP_DIR, 'python_venv');
 
@@ -70,28 +80,35 @@ const yamllintCheck =
 const LINTERS = {
   actionlint: {
     check: 'command -v actionlint',
-    installer: `
+    installer: platformArch
+      ? `
       mkdir -p "${TEMP_DIR}/actionlint"
       curl -sSLo "${TEMP_DIR}/.actionlint.tgz" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_${platformArch.actionlint}.tar.gz"
       tar -xzf "${TEMP_DIR}/.actionlint.tgz" -C "${TEMP_DIR}/actionlint"
-    `,
-    run: `
+    `
+      : 'echo "Skipping actionlint installer on this platform"',
+    run: platformArch
+      ? `
       actionlint \
         -color \
         -ignore 'SC2002:' \
         -ignore 'SC2016:' \
         -ignore 'SC2129:' \
         -ignore 'label ".+" is unknown'
-    `,
+    `
+      : 'echo "Skipping actionlint run on this platform"',
   },
   shellcheck: {
     check: 'command -v shellcheck',
-    installer: `
+    installer: platformArch
+      ? `
       mkdir -p "${TEMP_DIR}/shellcheck"
       curl -sSLo "${TEMP_DIR}/.shellcheck.txz" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.${platformArch.shellcheck}.tar.xz"
       tar -xf "${TEMP_DIR}/.shellcheck.txz" -C "${TEMP_DIR}/shellcheck" --strip-components=1
-    `,
-    run: `
+    `
+      : 'echo "Skipping shellcheck installer on this platform"',
+    run: platformArch
+      ? `
       git ls-files | grep -E '^([^.]+|.*\\.(sh|zsh|bash))' | xargs file --mime-type \
         | grep "text/x-shellscript" | awk '{ print substr($1, 1, length($1)-1) }' \
         | xargs shellcheck \
@@ -101,7 +118,8 @@ const LINTERS = {
           --severity=style \
           --format=gcc \
           --color=never | sed -e 's/note:/warning:/g' -e 's/style:/warning:/g'
-    `,
+    `
+      : 'echo "Skipping shellcheck run on this platform"',
   },
   yamllint: {
     check: yamllintCheck,
@@ -131,6 +149,12 @@ export function setupLinters() {
   mkdirSync(TEMP_DIR, { recursive: true });
 
   for (const linter in LINTERS) {
+    // Skip installing actionlint/shellcheck if platformArch is null:
+    if (!platformArch && (linter === 'actionlint' || linter === 'shellcheck')) {
+      console.log(`Skipping ${linter} installation on this platform.`);
+      continue;
+    }
+
     const { check, installer } = LINTERS[linter];
     if (!runCommand(check, 'ignore')) {
       console.log(`Installing ${linter}...`);
@@ -153,6 +177,10 @@ export function runESLint() {
 }
 
 export function runActionlint() {
+  if (!platformArch) {
+    console.log('\nSkipping actionlint on this platform.');
+    return;
+  }
   console.log('\nRunning actionlint...');
   if (!runCommand(LINTERS.actionlint.run)) {
     process.exit(1);
@@ -160,6 +188,10 @@ export function runActionlint() {
 }
 
 export function runShellcheck() {
+  if (!platformArch) {
+    console.log('\nSkipping shellcheck on this platform.');
+    return;
+  }
   console.log('\nRunning shellcheck...');
   if (!runCommand(LINTERS.shellcheck.run)) {
     process.exit(1);
