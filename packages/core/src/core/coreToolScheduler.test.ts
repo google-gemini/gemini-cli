@@ -642,7 +642,7 @@ describe('CoreToolScheduler', () => {
     // @ts-expect-error - accessing internal structure of FunctionResponsePart
     const errorMessage = errorParts[0].functionResponse.response.error;
     expect(errorMessage).toContain(
-      'Tool execution for "mockTool" denied by policy.',
+      'Tool execution for "mockTool" requires user confirmation, which is not supported in non-interactive mode.',
     );
   });
 
