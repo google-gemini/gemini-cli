@@ -12,12 +12,13 @@ if (process.env['NO_COLOR'] !== undefined) {
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { themeManager, DEFAULT_THEME } from './theme-manager.js';
 import type { CustomTheme } from './theme.js';
-import * as fs from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
 import * as os from 'node:os';
 import type * as osActual from 'node:os';
 import { debugLogger } from '@google/gemini-cli-core';
 
 vi.mock('node:fs');
+vi.mock('node:fs/promises');
 vi.mock('node:os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof osActual>();
   return {
@@ -46,9 +47,9 @@ const validCustomTheme: CustomTheme = {
 };
 
 describe('ThemeManager', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     // Reset themeManager state
-    themeManager.loadCustomThemes({});
+    await themeManager.loadCustomThemes({});
     themeManager.setActiveTheme(DEFAULT_THEME.name);
   });
 
@@ -56,8 +57,8 @@ describe('ThemeManager', () => {
     vi.restoreAllMocks();
   });
 
-  it('should load valid custom themes', () => {
-    themeManager.loadCustomThemes({ MyCustomTheme: validCustomTheme });
+  it('should load valid custom themes', async () => {
+    await themeManager.loadCustomThemes({ MyCustomTheme: validCustomTheme });
     expect(themeManager.getCustomThemeNames()).toContain('MyCustomTheme');
     expect(themeManager.isCustomTheme('MyCustomTheme')).toBe(true);
   });
@@ -68,8 +69,8 @@ describe('ThemeManager', () => {
     expect(themeManager.getActiveTheme().name).toBe('Ayu');
   });
 
-  it('should set and get a custom active theme', () => {
-    themeManager.loadCustomThemes({ MyCustomTheme: validCustomTheme });
+  it('should set and get a custom active theme', async () => {
+    await themeManager.loadCustomThemes({ MyCustomTheme: validCustomTheme });
     themeManager.setActiveTheme('MyCustomTheme');
     expect(themeManager.getActiveTheme().name).toBe('MyCustomTheme');
   });
@@ -79,8 +80,8 @@ describe('ThemeManager', () => {
     expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
   });
 
-  it('should list available themes including custom themes', () => {
-    themeManager.loadCustomThemes({ MyCustomTheme: validCustomTheme });
+  it('should list available themes including custom themes', async () => {
+    await themeManager.loadCustomThemes({ MyCustomTheme: validCustomTheme });
     const available = themeManager.getAvailableThemes();
     expect(
       available.some(
@@ -90,9 +91,9 @@ describe('ThemeManager', () => {
     ).toBe(true);
   });
 
-  it('should get a theme by name', () => {
+  it('should get a theme by name', async () => {
     expect(themeManager.getTheme('Ayu')).toBeDefined();
-    themeManager.loadCustomThemes({ MyCustomTheme: validCustomTheme });
+    await themeManager.loadCustomThemes({ MyCustomTheme: validCustomTheme });
     expect(themeManager.getTheme('MyCustomTheme')).toBeDefined();
   });
 
@@ -124,16 +125,19 @@ describe('ThemeManager', () => {
 
     beforeEach(() => {
       vi.mocked(os.homedir).mockReturnValue('/home/user');
-      vi.spyOn(fs, 'realpathSync').mockImplementation((p) => p as string);
+      vi.spyOn(fsPromises, 'realpath').mockImplementation(
+        async (p) => p as string,
+      );
     });
 
-    it('should load a theme from a valid file path', () => {
+    it('should load a theme from a valid file path', async () => {
       const themePath = '/home/user/my-theme.json';
-      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(mockTheme));
+      vi.spyOn(fsPromises, 'access').mockResolvedValue(undefined);
+      vi.spyOn(fsPromises, 'readFile').mockResolvedValue(
+        JSON.stringify(mockTheme),
+      );
 
-      // Load theme using new API
-      themeManager.loadCustomThemes({
+      await themeManager.loadCustomThemes({
         MyFileTheme: {
           path: themePath,
           type: 'custom',
@@ -146,17 +150,17 @@ describe('ThemeManager', () => {
       expect(result).toBe(true);
       const activeTheme = themeManager.getActiveTheme();
       expect(activeTheme.name).toBe('My File Theme');
-      expect(fs.readFileSync).toHaveBeenCalledWith(
+      expect(fsPromises.readFile).toHaveBeenCalledWith(
         expect.stringContaining('my-theme.json'),
         'utf-8',
       );
     });
 
-    it('should not load a theme if the file does not exist', () => {
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+    it('should not load a theme if the file does not exist', async () => {
+      vi.spyOn(fsPromises, 'access').mockRejectedValue(new Error('ENOENT'));
 
       // Try to load non-existent file
-      themeManager.loadCustomThemes({
+      await themeManager.loadCustomThemes({
         NonExistentFileTheme: {
           path: mockThemePath,
           type: 'custom',
@@ -169,12 +173,12 @@ describe('ThemeManager', () => {
       expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
     });
 
-    it('should not load a theme from a file with invalid JSON', () => {
-      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-      vi.spyOn(fs, 'readFileSync').mockReturnValue('invalid json');
+    it('should not load a theme from a file with invalid JSON', async () => {
+      vi.spyOn(fsPromises, 'access').mockResolvedValue(undefined);
+      vi.spyOn(fsPromises, 'readFile').mockResolvedValue('invalid json');
 
       // Try to load invalid JSON file
-      themeManager.loadCustomThemes({
+      await themeManager.loadCustomThemes({
         InvalidJsonFileTheme: {
           path: mockThemePath,
           type: 'custom',
@@ -187,17 +191,19 @@ describe('ThemeManager', () => {
       expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
     });
 
-    it('should not load a theme from an untrusted file path and log a message', () => {
+    it('should not load a theme from an untrusted file path and log a message', async () => {
       const untrustedPath = '/untrusted/my-theme.json';
-      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(mockTheme));
-      vi.spyOn(fs, 'realpathSync').mockReturnValue(untrustedPath);
+      vi.spyOn(fsPromises, 'access').mockResolvedValue(undefined);
+      vi.spyOn(fsPromises, 'readFile').mockResolvedValue(
+        JSON.stringify(mockTheme),
+      );
+      vi.spyOn(fsPromises, 'realpath').mockResolvedValue(untrustedPath);
       const consoleWarnSpy = vi
         .spyOn(debugLogger, 'warn')
         .mockImplementation(() => {});
 
       // Use loadCustomThemes instead of setActiveTheme, as that's the new API
-      themeManager.loadCustomThemes({
+      await themeManager.loadCustomThemes({
         UntrustedTheme: {
           path: untrustedPath,
           type: 'custom',

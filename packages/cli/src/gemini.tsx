@@ -361,7 +361,7 @@ export async function main() {
   }
 
   // Load custom themes from settings
-  themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
+  await themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
 
   if (settings.merged.ui?.theme) {
     if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {

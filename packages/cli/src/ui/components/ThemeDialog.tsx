@@ -69,7 +69,7 @@ export function ThemeDialog({
 
   // Map the keys from settings to their resolved theme names from themeManager
   const customThemeNames = Object.keys(customThemesInScope)
-    .map((key) => themeManager.getTheme(key)?.name) // Get the resolved name from the loaded theme
+    .map((key) => themeManager.getTheme(key)?.name || key) // Get the resolved name
     .filter((name): name is string => !!name); // Filter out any undefineds
 
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

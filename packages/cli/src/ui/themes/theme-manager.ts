@@ -17,6 +17,7 @@ import { DefaultDark } from './default.js';
 import { ShadesOfPurple } from './shades-of-purple.js';
 import { XCode } from './xcode.js';
 import * as fs from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import type { Theme, ThemeType, CustomTheme } from './theme.js';
@@ -64,10 +65,12 @@ export class ThemeManager {
   }
 
   /**
-   * Loads custom themes from settings.
-   * @param customThemesSettings Custom themes from settings.
+   * Loads custom themes from settings.json.
+   * @param customThemesSettings Custom themes from settings.json.
    */
-  loadCustomThemes(customThemesSettings?: Record<string, CustomTheme>): void {
+  async loadCustomThemes(
+    customThemesSettings?: Record<string, CustomTheme>,
+  ): Promise<void> {
     this.customThemes.clear();
     this.resolvedNameToTheme.clear();
     this.themeFilePaths.clear();
@@ -89,7 +92,7 @@ export class ThemeManager {
             `Theme "${key}": File-based themes (with "path") must not have other properties specified in settings.json. Ignoring: ${invalidProperties.join(', ')}.`,
           );
         }
-        this.loadThemeFromFileWithKey(
+        await this.loadThemeFromFileWithKey(
           key,
           customThemeConfig.path,
           customThemeConfig,
@@ -131,22 +134,24 @@ export class ThemeManager {
     }
   }
 
-  private loadThemeFromFileWithKey(
+  private async loadThemeFromFileWithKey(
     key: string,
     themePath: string,
     config: CustomTheme,
-  ): void {
+  ): Promise<void> {
     try {
       const resolvedPath = path.resolve(themePath);
       // Check if file exists before trying to read
-      if (!fs.existsSync(resolvedPath)) {
+      try {
+        await fsPromises.access(resolvedPath);
+      } catch {
         debugLogger.warn(
           `Custom theme file not found for "${key}": "${themePath}" (resolved: "${resolvedPath}")`,
         );
         return;
       }
 
-      const canonicalPath = fs.realpathSync(resolvedPath);
+      const canonicalPath = await fsPromises.realpath(resolvedPath);
 
       // Security check
       const homeDir = path.resolve(os.homedir());
@@ -158,7 +163,7 @@ export class ThemeManager {
         return;
       }
 
-      const themeContent = fs.readFileSync(canonicalPath, 'utf-8');
+      const themeContent = await fsPromises.readFile(canonicalPath, 'utf-8');
       let fileThemeConfig: CustomTheme;
       try {
         fileThemeConfig = JSON.parse(themeContent) as CustomTheme;

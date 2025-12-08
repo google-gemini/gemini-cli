@@ -27,6 +27,7 @@ export const useThemeCommand = (
   setThemeError: (error: string | null) => void,
   addItem: UseHistoryManagerReturn['addItem'],
   initialThemeError: string | null,
+  onThemeChanged?: () => void,
 ): UseThemeCommandReturn => {
   const [isThemeDialogOpen, setIsThemeDialogOpen] =
     useState(!!initialThemeError);
@@ -72,7 +73,7 @@ export const useThemeCommand = (
   }, [applyTheme, loadedSettings]);
 
   const handleThemeSelect = useCallback(
-    (themeName: string, scope: LoadableSettingScope) => {
+    async (themeName: string, scope: LoadableSettingScope) => {
       try {
         // Merge user and workspace custom themes (workspace takes precedence)
         const mergedCustomThemes = {
@@ -89,15 +90,18 @@ export const useThemeCommand = (
         }
         loadedSettings.setValue(scope, 'ui.theme', themeName); // Update the merged settings
         if (loadedSettings.merged.ui?.customThemes) {
-          themeManager.loadCustomThemes(loadedSettings.merged.ui?.customThemes);
+          await themeManager.loadCustomThemes(
+            loadedSettings.merged.ui?.customThemes,
+          );
         }
         applyTheme(loadedSettings.merged.ui?.theme); // Apply the current theme
         setThemeError(null);
+        onThemeChanged?.();
       } finally {
         setIsThemeDialogOpen(false); // Close the dialog
       }
     },
-    [applyTheme, loadedSettings, setThemeError],
+    [applyTheme, loadedSettings, setThemeError, onThemeChanged],
   );
 
   return {

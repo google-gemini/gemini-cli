@@ -151,13 +151,13 @@ describe('themeManager.loadCustomThemes', () => {
     Gray: '#888',
   };
 
-  it('should use values from DEFAULT_THEME when DiffAdded and DiffRemoved are not provided', () => {
+  it('should use values from DEFAULT_THEME when DiffAdded and DiffRemoved are not provided', async () => {
     const { darkTheme } = themeModule;
     const legacyTheme: Partial<CustomTheme> = { ...baseTheme };
     delete legacyTheme.DiffAdded;
     delete legacyTheme.DiffRemoved;
 
-    themeManager.loadCustomThemes({
+    await themeManager.loadCustomThemes({
       'Legacy Custom Theme': legacyTheme as CustomTheme,
     });
     const result = themeManager.getTheme('Legacy Custom Theme')!;
