@@ -21,19 +21,19 @@ jobs:
     runs-on: 'ubuntu-latest'
 
     steps:
-      - name: Generate GitHub App Token
-        id: generate_token
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
         uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2
         with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
           permission-issues: 'write'
 
-      - name: Run Gemini PR size and complexity labeller
+      - name: 'Run Gemini PR size and complexity labeller'
         uses: google-github-actions/run-gemini-cli@635ea06c806bdd9d252334d92222e72674a653e8 # Use the specific commit SHA
         env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          PR_NUMBER: '${{ github.event.pull_request.number }}'
           REPOSITORY: '${{ github.repository }}'
         with:
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
