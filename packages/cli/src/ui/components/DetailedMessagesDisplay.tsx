@@ -21,6 +21,8 @@ interface DetailedMessagesDisplayProps {
   hasFocus: boolean;
 }
 
+const iconBoxWidth = 3;
+
 export const DetailedMessagesDisplay: React.FC<
   DetailedMessagesDisplayProps
 > = ({ messages, maxHeight, width, hasFocus }) => {
@@ -34,8 +36,7 @@ export const DetailedMessagesDisplay: React.FC<
       if (!msg) {
         return 1;
       }
-      const iconAndSpace = 2;
-      const textWidth = width - borderAndPadding - iconAndSpace;
+      const textWidth = width - borderAndPadding - iconBoxWidth;
       if (textWidth <= 0) {
         return 1;
       }
@@ -96,7 +97,9 @@ export const DetailedMessagesDisplay: React.FC<
 
             return (
               <Box flexDirection="row">
-                <Text color={textColor}>{icon} </Text>
+                <Box minWidth={iconBoxWidth} flexShrink={0}>
+                  <Text color={textColor}>{icon}</Text>
+                </Box>
                 <Text color={textColor} wrap="wrap">
                   {msg.content}
                   {msg.count && msg.count > 1 && (

@@ -373,6 +373,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   useMouse(
     (event: MouseEvent) => {
       if (event.name === 'right-release') {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleClipboardPaste();
       }
     },
@@ -779,12 +780,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // External editor
       if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         buffer.openInExternalEditor();
         return;
       }
 
       // Ctrl+V for clipboard paste
       if (keyMatchers[Command.PASTE_CLIPBOARD](key)) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleClipboardPaste();
         return;
       }

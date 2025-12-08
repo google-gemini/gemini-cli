@@ -37,6 +37,7 @@ export function useGitBranchName(cwd: string): string | undefined {
   }, [cwd, setBranchName]);
 
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     fetchBranchName(); // Initial fetch
 
     const gitLogsHeadPath = path.join(cwd, '.git', 'logs', 'HEAD');
@@ -52,6 +53,7 @@ export function useGitBranchName(cwd: string): string | undefined {
           // Changes to .git/logs/HEAD (appends) indicate HEAD has likely changed
           if (eventType === 'change' || eventType === 'rename') {
             // Handle rename just in case
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
             fetchBranchName();
           }
         });
@@ -62,6 +64,7 @@ export function useGitBranchName(cwd: string): string | undefined {
       }
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     setupWatcher();
 
     return () => {

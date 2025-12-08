@@ -160,6 +160,7 @@ export class McpClientManager {
     }
 
     const currentDiscoveryPromise = new Promise<void>((resolve, _reject) => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       (async () => {
         try {
           if (existing) {
@@ -174,7 +175,15 @@ export class McpClientManager {
               this.toolRegistry,
               this.cliConfig.getPromptRegistry(),
               this.cliConfig.getWorkspaceContext(),
+              this.cliConfig,
               this.cliConfig.getDebugMode(),
+              async () => {
+                debugLogger.log('Tools changed, updating Gemini context...');
+                const geminiClient = this.cliConfig.getGeminiClient();
+                if (geminiClient.isInitialized()) {
+                  await geminiClient.setTools();
+                }
+              },
             );
           if (!existing) {
             this.clients.set(name, client);
@@ -220,6 +229,7 @@ export class McpClientManager {
     }
     this.eventEmitter?.emit('mcp-client-update', this.clients);
     const currentPromise = this.discoveryPromise;
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     currentPromise.then((_) => {
       // If we are the last recorded discoveryPromise, then we are done, reset
       // the world.
