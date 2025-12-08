@@ -68,6 +68,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       getMetrics: vi.fn(),
     },
     coreEvents: mockCoreEvents,
+    createWorkingStdio: vi.fn(() => ({
+      stdout: process.stdout,
+      stderr: process.stderr,
+    })),
   };
 });
 
