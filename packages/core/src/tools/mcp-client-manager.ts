@@ -174,7 +174,15 @@ export class McpClientManager {
               this.toolRegistry,
               this.cliConfig.getPromptRegistry(),
               this.cliConfig.getWorkspaceContext(),
+              this.cliConfig,
               this.cliConfig.getDebugMode(),
+              async () => {
+                debugLogger.log('Tools changed, updating Gemini context...');
+                const geminiClient = this.cliConfig.getGeminiClient();
+                if (geminiClient.isInitialized()) {
+                  await geminiClient.setTools();
+                }
+              },
             );
           if (!existing) {
             this.clients.set(name, client);
