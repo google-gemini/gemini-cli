@@ -34,6 +34,7 @@ import {
   clipboardHasImage,
   saveClipboardImage,
   cleanupOldClipboardImages,
+  getImagePathFromText,
 } from '../utils/clipboardUtils.js';
 import type { UseClipboardImagesReturn } from '../hooks/useClipboardImages.js';
 import {
@@ -402,31 +403,62 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (key.paste) {
-        // Record paste time to prevent accidental auto-submission
-        if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
-          setRecentUnsafePasteTime(Date.now());
+        // Handle paste asynchronously to check for drag-and-drop image paths
+        void (async () => {
+          // Record paste time to prevent accidental auto-submission
+          if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
+            setRecentUnsafePasteTime(Date.now());
 
-          // Clear any existing paste timeout
-          if (pasteTimeoutRef.current) {
-            clearTimeout(pasteTimeoutRef.current);
+            // Clear any existing paste timeout
+            if (pasteTimeoutRef.current) {
+              clearTimeout(pasteTimeoutRef.current);
+            }
+
+            // Clear the paste protection after a very short delay to prevent
+            // false positives.
+            // Due to how we use a reducer for text buffer state updates, it is
+            // reasonable to expect that key events that are really part of the
+            // same paste will be processed in the same event loop tick. 40ms
+            // is chosen arbitrarily as it is faster than a typical human
+            // could go from pressing paste to pressing enter. The fastest typists
+            // can type at 200 words per minute which roughly translates to 50ms
+            // per letter.
+            pasteTimeoutRef.current = setTimeout(() => {
+              setRecentUnsafePasteTime(null);
+              pasteTimeoutRef.current = null;
+            }, 40);
           }
 
-          // Clear the paste protection after a very short delay to prevent
-          // false positives.
-          // Due to how we use a reducer for text buffer state updates, it is
-          // reasonable to expect that key events that are really part of the
-          // same paste will be processed in the same event loop tick. 40ms
-          // is chosen arbitrarily as it is faster than a typical human
-          // could go from pressing paste to pressing enter. The fastest typists
-          // can type at 200 words per minute which roughly translates to 50ms
-          // per letter.
-          pasteTimeoutRef.current = setTimeout(() => {
-            setRecentUnsafePasteTime(null);
-            pasteTimeoutRef.current = null;
-          }, 40);
-        }
-        // Ensure we never accidentally interpret paste as regular input.
-        buffer.handleInput(key);
+          // Check if pasted content is an image file path (drag and drop)
+          if (clipboardImages && key.sequence) {
+            const imagePath = await getImagePathFromText(key.sequence);
+            if (imagePath) {
+              // Register the image and insert [Image #N] instead of the path
+              const displayText = clipboardImages.registerImage(imagePath);
+              const offset = buffer.getOffset();
+
+              // Add spacing if needed
+              let textToInsert = displayText;
+              const currentText = buffer.text;
+              const charBefore = offset > 0 ? currentText[offset - 1] : '';
+              const charAfter =
+                offset < currentText.length ? currentText[offset] : '';
+
+              if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
+                textToInsert = ' ' + textToInsert;
+              }
+              if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
+                textToInsert = textToInsert + ' ';
+              }
+
+              buffer.replaceRangeByOffset(offset, offset, textToInsert);
+              return;
+            }
+          }
+
+          // Ensure we never accidentally interpret paste as regular input.
+          buffer.handleInput(key);
+        })();
         return;
       }
 
@@ -844,6 +876,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       tryLoadQueuedMessages,
       setBannerVisible,
+      clipboardImages,
     ],
   );
 

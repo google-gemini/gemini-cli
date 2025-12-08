@@ -5,8 +5,19 @@
  */
 
 import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
+
+const IMAGE_EXTENSIONS = [
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.tiff',
+  '.bmp',
+];
 
 /**
  * Checks if the system clipboard contains an image (macOS only for now)
@@ -141,5 +152,56 @@ export async function cleanupOldClipboardImages(
     }
   } catch {
     // Ignore errors in cleanup
+  }
+}
+
+/**
+ * Checks if a string looks like an image file path and the file exists.
+ * Used for detecting drag-and-drop image files in the terminal.
+ * Handles paths with @ prefix and escaped spaces (e.g., @/path/to/file\ name.png)
+ * @param text The text to check (typically pasted content)
+ * @returns The absolute path if valid image file, null otherwise
+ */
+export async function getImagePathFromText(
+  text: string,
+): Promise<string | null> {
+  let trimmed = text.trim();
+
+  // Remove @ prefix if present (drag-and-drop in Gemini CLI adds @)
+  if (trimmed.startsWith('@')) {
+    trimmed = trimmed.slice(1);
+  }
+
+  // Check if it looks like a file path (starts with / or ~ or .)
+  if (!trimmed.match(/^[/~.]/)) {
+    return null;
+  }
+
+  // Unescape spaces (drag-and-drop escapes spaces as "\ ")
+  const unescapedPath = trimmed.replace(/\\ /g, ' ');
+
+  // Check if it has an image extension
+  const lowerPath = unescapedPath.toLowerCase();
+  const hasImageExtension = IMAGE_EXTENSIONS.some((ext) =>
+    lowerPath.endsWith(ext),
+  );
+  if (!hasImageExtension) {
+    return null;
+  }
+
+  // Resolve the path (handle ~ for home directory)
+  let absolutePath = unescapedPath;
+  if (unescapedPath.startsWith('~')) {
+    absolutePath = path.join(os.homedir(), unescapedPath.slice(1));
+  } else if (!path.isAbsolute(unescapedPath)) {
+    absolutePath = path.resolve(unescapedPath);
+  }
+
+  // Check if file exists
+  try {
+    await fs.access(absolutePath);
+    return absolutePath;
+  } catch {
+    return null;
   }
 }

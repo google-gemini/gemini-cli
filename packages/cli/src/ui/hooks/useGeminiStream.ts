@@ -523,16 +523,40 @@ export const useGeminiStream = (
         const imageParts = await clipboardImages.getImageParts();
         if (imageParts.length > 0) {
           onDebugMessage(`Injecting ${imageParts.length} clipboard image(s)`);
+
+          // Strip [Image #N] references from the text since we're injecting the actual images
+          const stripImageReferences = (text: string): string =>
+            text.replace(/\[Image #\d+\]\s*/g, '').trim();
+
           if (typeof localQueryToSendToGemini === 'string') {
+            const cleanedText = stripImageReferences(localQueryToSendToGemini);
             localQueryToSendToGemini = [
               ...imageParts,
-              { text: localQueryToSendToGemini },
+              ...(cleanedText ? [{ text: cleanedText }] : []),
             ];
           } else if (Array.isArray(localQueryToSendToGemini)) {
-            localQueryToSendToGemini = [
-              ...imageParts,
-              ...localQueryToSendToGemini,
-            ];
+            // Clean text parts in the array
+            const cleanedParts = localQueryToSendToGemini
+              .map((part) => {
+                if (typeof part === 'string') {
+                  const cleaned = stripImageReferences(part);
+                  return cleaned ? cleaned : null;
+                }
+                if (
+                  part &&
+                  typeof part === 'object' &&
+                  'text' in part &&
+                  typeof part.text === 'string'
+                ) {
+                  const cleaned = stripImageReferences(part.text);
+                  return cleaned ? { ...part, text: cleaned } : null;
+                }
+                return part;
+              })
+              .filter(
+                (part): part is NonNullable<typeof part> => part !== null,
+              );
+            localQueryToSendToGemini = [...imageParts, ...cleanedParts];
           }
         }
       }
