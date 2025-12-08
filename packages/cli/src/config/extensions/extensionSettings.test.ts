@@ -75,7 +75,7 @@ describe('extensionSettings', () => {
             .fn()
             .mockImplementation(async () => Object.keys(keychainData)),
           isAvailable: vi.fn().mockResolvedValue(true),
-        };
+        } as unknown as KeychainTokenStorage;
       },
     );
     tempHomeDir = os.tmpdir() + path.sep + `gemini-cli-test-home-${Date.now()}`;
