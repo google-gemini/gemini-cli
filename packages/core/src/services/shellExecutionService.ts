@@ -151,7 +151,7 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
 function getSanitizedEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const key in process.env) {
-    if (key.startsWith('GEMINI_CLI_')) {
+    if (key.startsWith('GEMINI_CLI_TEST')) {
       env[key] = process.env[key];
     }
   }
