@@ -159,8 +159,8 @@ export class McpClientManager {
       return;
     }
 
-    const currentDiscoveryPromise = new Promise<void>((resolve, _reject) => {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    const currentDiscoveryPromise = new Promise<void>((resolve, reject) => {
+       
       (async () => {
         try {
           if (existing) {
@@ -207,6 +207,13 @@ export class McpClientManager {
               );
             }
           }
+        } catch (error) {
+          const errorMessage = getErrorMessage(error);
+          coreEvents.emitFeedback(
+            'error',
+            `Error initializing MCP server '${name}': ${errorMessage}`,
+            error,
+          );
         } finally {
           // This is required to update the content generator configuration with the
           // new tool configuration.
@@ -216,7 +223,7 @@ export class McpClientManager {
           }
           resolve();
         }
-      })();
+      })().catch(reject);
     });
 
     if (this.discoveryPromise) {
