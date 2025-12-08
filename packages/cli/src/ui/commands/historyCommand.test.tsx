@@ -127,33 +127,16 @@ describe('historyCommand', () => {
 
     async function* streamGenerator() {
       yield { type: GeminiEventType.Content, value: 'New ' };
-
       yield { type: GeminiEventType.Content, value: 'Response' };
-
       yield { type: GeminiEventType.Finished };
     }
 
     mockSendMessageStream.mockReturnValue(streamGenerator());
-
-    // 3. Trigger onRewind
-
     await onRewind('msg-id-123', 'New Prompt');
-
-    // 4. Verify Rewind Logic
-
     expect(mockRewindTo).toHaveBeenCalledWith('msg-id-123');
-
-    // 5. Verify UI/Client History Update
-
     expect(mockSetHistory).toHaveBeenCalled();
-
     expect(mockLoadHistory).toHaveBeenCalled();
-
-    // 6. Verify Component Removal
-
     expect(mockRemoveComponent).toHaveBeenCalled();
-
-    // 7. Verify User Message Addition (UI & Disk)
 
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -165,18 +148,12 @@ describe('historyCommand', () => {
       expect.any(Number),
     );
 
-    // expect(mockRecordMessage).toHaveBeenCalledWith( ... ) - Removed
-
-    // 8. Verify Streaming (Pending Items)
-
     expect(mockSetPendingItem).toHaveBeenCalledWith(
       expect.objectContaining({ type: MessageType.GEMINI, text: '' }),
     );
-
     expect(mockSetPendingItem).toHaveBeenCalledWith(
       expect.objectContaining({ type: MessageType.GEMINI, text: 'New ' }),
     );
-
     expect(mockSetPendingItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: MessageType.GEMINI,
@@ -185,8 +162,6 @@ describe('historyCommand', () => {
     );
 
     expect(mockSetPendingItem).toHaveBeenCalledWith(null);
-
-    // 9. Verify Final Gemini Message Addition (UI & Disk)
 
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -233,18 +208,14 @@ describe('historyCommand', () => {
     );
 
     // Should still save the partial response if any?
-
     // Implementation: "if (fullResponseText)" -> adds Gemini message.
-
     // In this case "Partial" was received.
 
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: MessageType.GEMINI,
-
         text: 'Partial',
       }),
-
       expect.any(Number),
     );
   });
