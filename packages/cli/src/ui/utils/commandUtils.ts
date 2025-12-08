@@ -225,7 +225,7 @@ export const getUrlOpenCommand = (): string => {
  * @returns true if the command should auto-execute on Enter
  */
 export function isAutoExecutableCommand(
-  command: SlashCommand | undefined,
+  command: SlashCommand | undefined | null,
 ): boolean {
   if (!command) {
     return false;
