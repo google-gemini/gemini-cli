@@ -149,17 +149,18 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
 };
 
 function getSanitizedEnv(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {};
+  const env: NodeJS.ProcessEnv =
+    process.env['GITHUB_SHA'] || process.env['SURFACE'] === 'Github'
+      ? {}
+      : { ...process.env };
+
   for (const key in process.env) {
     if (key.startsWith('GEMINI_CLI_TEST')) {
       env[key] = process.env[key];
     }
   }
 
-  if (process.env['GITHUB_SHA'] || process.env['SURFACE'] === 'Github') {
-    return env;
-  }
-  return { ...process.env, ...env };
+  return env;
 }
 
 /**
