@@ -232,8 +232,11 @@ gemini extensions settings list <extension name>
 and you can update a given setting using:
 
 ```
-gemini extensions settings set <extension name> <setting name>
+gemini extensions settings set <extension name> <setting name> [--scope <scope>]
 ```
+
+- `--scope`: The scope to set the setting in (`user` or `workspace`). This is
+  optional and will default to `user`.
 
 ### Custom commands
 
