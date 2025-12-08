@@ -148,6 +148,20 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
   return lines.join('\n');
 };
 
+function getSanitizedEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const key in process.env) {
+    if (key.startsWith('GEMINI_CLI_')) {
+      env[key] = process.env[key];
+    }
+  }
+
+  if (process.env['GITHUB_SHA'] || process.env['SURFACE'] === 'Github') {
+    return env;
+  }
+  return { ...process.env, ...env };
+}
+
 /**
  * A centralized service for executing shell commands with robust process
  * management, cross-platform compatibility, and streaming output capabilities.
@@ -249,9 +263,7 @@ export class ShellExecutionService {
         shell: false,
         detached: !isWindows,
         env: {
-          ...(process.env['GITHUB_SHA'] || process.env['SURFACE'] === 'Github'
-            ? {}
-            : process.env),
+          ...getSanitizedEnv(),
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: 'cat',
@@ -465,9 +477,7 @@ export class ShellExecutionService {
         cols,
         rows,
         env: {
-          ...(process.env['GITHUB_SHA'] || process.env['SURFACE'] === 'Github'
-            ? {}
-            : process.env),
+          ...getSanitizedEnv(),
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: shellExecutionConfig.pager ?? 'cat',
