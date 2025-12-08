@@ -50,6 +50,7 @@ import type {
   ExtensionUpdateEvent,
   LlmLoopCheckEvent,
   HookCallEvent,
+  StartupStatsEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -686,5 +687,19 @@ export function logHookCall(config: Config, event: HookCallEvent): void {
       event.duration_ms,
       event.success,
     );
+  });
+}
+
+export function logStartupStats(
+  config: Config,
+  event: StartupStatsEvent,
+): void {
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
   });
 }
