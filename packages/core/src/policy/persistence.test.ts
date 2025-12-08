@@ -50,7 +50,7 @@ describe('createPolicyUpdater', () => {
     (fs.appendFile as unknown as Mock).mockResolvedValue(undefined);
 
     const toolName = 'test_tool';
-    messageBus.publish({
+    await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
       toolName,
       persist: true,
@@ -76,7 +76,7 @@ describe('createPolicyUpdater', () => {
   it('should not persist policy when persist flag is false or undefined', async () => {
     createPolicyUpdater(policyEngine, messageBus);
 
-    messageBus.publish({
+    await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
       toolName: 'test_tool',
     });
@@ -99,7 +99,7 @@ describe('createPolicyUpdater', () => {
     const toolName = 'run_shell_command';
     const commandPrefix = 'git status';
 
-    messageBus.publish({
+    await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
       toolName,
       persist: true,
@@ -138,7 +138,7 @@ describe('createPolicyUpdater', () => {
     const simpleToolName = 'search';
     const toolName = `${mcpName}__${simpleToolName}`;
 
-    messageBus.publish({
+    await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
       toolName,
       persist: true,

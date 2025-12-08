@@ -136,7 +136,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
               commandPrefix = this.params.command;
             }
 
-            this.messageBus.publish({
+            await this.messageBus.publish({
               type: MessageBusType.UPDATE_POLICY,
               toolName: this._toolName,
               persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,

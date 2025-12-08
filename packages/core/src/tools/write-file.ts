@@ -230,7 +230,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
           outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
         ) {
           if (this.messageBus && this._toolName) {
-            this.messageBus.publish({
+            await this.messageBus.publish({
               type: MessageBusType.UPDATE_POLICY,
               toolName: this._toolName,
               persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,

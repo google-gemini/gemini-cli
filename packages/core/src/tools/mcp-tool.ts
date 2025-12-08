@@ -119,7 +119,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
         } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
           if (this.messageBus && this._toolName) {
-            this.messageBus.publish({
+            await this.messageBus.publish({
               type: MessageBusType.UPDATE_POLICY,
               toolName: this._toolName,
               persist: true,
