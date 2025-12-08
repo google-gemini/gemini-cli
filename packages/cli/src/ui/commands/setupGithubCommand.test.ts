@@ -15,8 +15,9 @@ import {
   updateGitignore,
   GITHUB_WORKFLOW_PATHS,
 } from './setupGithubCommand.js';
-import type { CommandContext, ToolActionReturn } from './types.js';
+import type { CommandContext } from './types.js';
 import * as commandUtils from '../utils/commandUtils.js';
+import type { ToolActionReturn } from '@google/gemini-cli-core';
 import { debugLogger } from '@google/gemini-cli-core';
 
 vi.mock('child_process');

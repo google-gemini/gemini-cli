@@ -124,8 +124,7 @@ This is especially useful for scripting and automation.
 ## Debugging tips
 
 - **CLI debugging:**
-  - Use the `--verbose` flag (if available) with CLI commands for more detailed
-    output.
+  - Use the `--debug` flag for more detailed output.
   - Check the CLI logs, often found in a user-specific configuration or cache
     directory.
 

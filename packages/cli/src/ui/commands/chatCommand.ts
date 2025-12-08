@@ -11,11 +11,13 @@ import { theme } from '../semantic-colors.js';
 import type {
   CommandContext,
   SlashCommand,
-  MessageActionReturn,
   SlashCommandActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
-import { decodeTagName } from '@google/gemini-cli-core';
+import {
+  decodeTagName,
+  type MessageActionReturn,
+} from '@google/gemini-cli-core';
 import path from 'node:path';
 import type {
   HistoryItemWithoutId,
@@ -303,7 +305,7 @@ export function serializeHistoryToMarkdown(history: Content[]): string {
           })
           .join('') || '';
       const roleIcon = item.role === 'user' ? '🧑‍💻' : '✨';
-      return `${roleIcon} ## ${(item.role || 'model').toUpperCase()}\n\n${text}`;
+      return `## ${(item.role || 'model').toUpperCase()} ${roleIcon}\n\n${text}`;
     })
     .join('\n\n---\n\n');
 }
