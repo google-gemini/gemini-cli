@@ -49,6 +49,10 @@ import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import {
+  applyModelSelection,
+  createAvailabilityContextProvider,
+} from '../availability/policyHelpers.js';
+import {
   fireAfterModelHook,
   fireBeforeModelHook,
   fireBeforeToolSelectionHook,
@@ -410,35 +414,74 @@ export class GeminiChat {
     requestContents: Content[],
     prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    let effectiveModel = model;
     const contentsForPreviewModel =
       this.ensureActiveLoopHasThoughtSignatures(requestContents);
 
     // Track final request parameters for AfterModel hooks
-    let lastModelToUse = model;
-    let lastConfig: GenerateContentConfig = generateContentConfig;
+    const {
+      model: availabilityFinalModel,
+      config: newAvailabilityConfig,
+      maxAttempts: availabilityMaxAttempts,
+    } = applyModelSelection(this.config, model, generateContentConfig);
+
+    const abortSignal = generateContentConfig.abortSignal;
+    let lastModelToUse = availabilityFinalModel;
+    let currentGenerateContentConfig: GenerateContentConfig =
+      newAvailabilityConfig ?? generateContentConfig;
+    if (abortSignal) {
+      currentGenerateContentConfig = {
+        ...currentGenerateContentConfig,
+        abortSignal,
+      };
+    }
+    let lastConfig: GenerateContentConfig = currentGenerateContentConfig;
     let lastContentsToUse: Content[] = requestContents;
 
+    const getAvailabilityContext = createAvailabilityContextProvider(
+      this.config,
+      () => lastModelToUse,
+    );
     const apiCall = async () => {
-      let modelToUse = getEffectiveModel(
-        this.config.isInFallbackMode(),
-        model,
-        this.config.getPreviewFeatures(),
-      );
+      let modelToUse: string;
 
-      // Preview Model Bypass Logic:
-      // If we are in "Preview Model Bypass Mode" (transient failure), we force downgrade to 2.5 Pro
-      // IF the effective model is currently Preview Model.
-      if (
-        this.config.isPreviewModelBypassMode() &&
-        modelToUse === PREVIEW_GEMINI_MODEL
-      ) {
-        modelToUse = DEFAULT_GEMINI_MODEL;
+      if (this.config.isModelAvailabilityServiceEnabled()) {
+        modelToUse = this.config.getActiveModel();
+        if (modelToUse !== lastModelToUse) {
+          const { generateContentConfig: newConfig } =
+            this.config.modelConfigService.getResolvedConfig({
+              model: modelToUse,
+            });
+          currentGenerateContentConfig = {
+            ...currentGenerateContentConfig,
+            ...newConfig,
+          };
+          if (abortSignal) {
+            currentGenerateContentConfig.abortSignal = abortSignal;
+          }
+        }
+      } else {
+        modelToUse = getEffectiveModel(
+          this.config.isInFallbackMode(),
+          model,
+          this.config.getPreviewFeatures(),
+        );
+
+        // Preview Model Bypass Logic:
+        // If we are in "Preview Model Bypass Mode" (transient failure), we force downgrade to 2.5 Pro
+        // IF the effective model is currently Preview Model.
+        // Note: In availability mode, this should ideally be handled by policy, but preserving
+        // bypass logic for now as it handles specific transient behavior.
+        if (
+          this.config.isPreviewModelBypassMode() &&
+          modelToUse === PREVIEW_GEMINI_MODEL
+        ) {
+          modelToUse = DEFAULT_GEMINI_MODEL;
+        }
       }
 
-      effectiveModel = modelToUse;
+      lastModelToUse = modelToUse;
       const config = {
-        ...generateContentConfig,
+        ...currentGenerateContentConfig,
         // TODO(12622): Ensure we don't overrwrite these when they are
         // passed via config.
         systemInstruction: this.systemInstruction,
@@ -543,7 +586,7 @@ export class GeminiChat {
     const onPersistent429Callback = async (
       authType?: string,
       error?: unknown,
-    ) => handleFallback(this.config, effectiveModel, authType, error);
+    ) => handleFallback(this.config, lastModelToUse, authType, error);
 
     const streamResponse = await retryWithBackoff(apiCall, {
       onPersistent429: onPersistent429Callback,
@@ -551,10 +594,12 @@ export class GeminiChat {
       retryFetchErrors: this.config.getRetryFetchErrors(),
       signal: generateContentConfig.abortSignal,
       maxAttempts:
-        this.config.isPreviewModelFallbackMode() &&
+        availabilityMaxAttempts ??
+        (this.config.isPreviewModelFallbackMode() &&
         model === PREVIEW_GEMINI_MODEL
           ? 1
-          : undefined,
+          : undefined),
+      getAvailabilityContext,
     });
 
     // Store the original request for AfterModel hooks
@@ -565,7 +610,7 @@ export class GeminiChat {
     };
 
     return this.processStreamResponse(
-      effectiveModel,
+      lastModelToUse,
       streamResponse,
       originalRequest,
     );
