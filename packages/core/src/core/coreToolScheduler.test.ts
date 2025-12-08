@@ -6,11 +6,15 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type { ToolCall, WaitingToolCall } from './coreToolScheduler.js';
 import {
   CoreToolScheduler,
   convertToFunctionResponse,
   truncateAndSaveToFile,
+} from './coreToolScheduler.js';
+import type {
+  ToolCall,
+  WaitingToolCall,
+  ErroredToolCall,
 } from './coreToolScheduler.js';
 import type {
   ToolCallConfirmationDetails,
@@ -232,6 +236,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getSessionId: () => 'test-session-id',
     getUsageStatisticsEnabled: () => true,
     getDebugMode: () => false,
+    isInteractive: () => true,
     getApprovalMode: () => ApprovalMode.DEFAULT,
     setApprovalMode: () => {},
     getAllowedTools: () => [],
@@ -353,7 +358,6 @@ describe('CoreToolScheduler', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      isInteractive: () => false,
       getHookSystem: () => undefined,
     });
 
@@ -455,7 +459,6 @@ describe('CoreToolScheduler', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      isInteractive: () => false,
       getHookSystem: () => undefined,
     });
 
@@ -582,6 +585,67 @@ describe('CoreToolScheduler', () => {
     expect(statuses).not.toContain('error');
   });
 
+  it('should error when tool requires confirmation in non-interactive mode', async () => {
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
+    const declarativeTool = mockTool;
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByName: () => declarativeTool,
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+      isInteractive: () => false,
+    });
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: 'mockTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-1',
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls[0].status).toBe('error');
+
+    const erroredCall = completedCalls[0] as ErroredToolCall;
+    const errorResponse = erroredCall.response;
+    const errorParts = errorResponse.responseParts;
+    // @ts-expect-error - accessing internal structure of FunctionResponsePart
+    const errorMessage = errorParts[0].functionResponse.response.error;
+    expect(errorMessage).toContain(
+      'Tool execution for "mockTool" denied by policy.',
+    );
+  });
+
   describe('getToolSuggestion', () => {
     it('should suggest the top N closest tool names for a typo', () => {
       // Create mocked tool registry
@@ -643,7 +707,6 @@ describe('CoreToolScheduler with payload', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      isInteractive: () => false,
     });
     const mockMessageBus = createMockMessageBus();
     mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
@@ -950,7 +1013,6 @@ describe('CoreToolScheduler edit cancellation', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      isInteractive: () => false,
     });
     const mockMessageBus = createMockMessageBus();
     mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
@@ -1366,7 +1428,6 @@ describe('CoreToolScheduler request queueing', () => {
         terminalHeight: 24,
       }),
       getToolRegistry: () => toolRegistry,
-      isInteractive: () => false,
       getHookSystem: () => undefined,
     });
 
@@ -1423,7 +1484,6 @@ describe('CoreToolScheduler request queueing', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO,
-      isInteractive: () => false,
     });
     const mockMessageBus = createMockMessageBus();
     mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
@@ -1484,7 +1544,6 @@ describe('CoreToolScheduler request queueing', () => {
       setApprovalMode: (mode: ApprovalMode) => {
         approvalMode = mode;
       },
-      isInteractive: () => false,
     });
     const mockMessageBus = createMockMessageBus();
     mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
