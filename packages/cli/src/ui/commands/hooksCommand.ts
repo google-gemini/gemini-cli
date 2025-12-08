@@ -228,6 +228,7 @@ const enableCommand: SlashCommand = {
   name: 'enable',
   description: 'Enable a hook by name',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: enableAction,
   completion: completeHookNames,
 };
@@ -236,6 +237,7 @@ const disableCommand: SlashCommand = {
   name: 'disable',
   description: 'Disable a hook by name',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: disableAction,
   completion: completeHookNames,
 };
