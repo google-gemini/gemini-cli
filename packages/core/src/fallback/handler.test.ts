@@ -17,6 +17,7 @@ import {
 import { handleFallback } from './handler.js';
 import type { Config } from '../config/config.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
+import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import { AuthType } from '../core/contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -45,24 +46,19 @@ vi.mock('../utils/secure-browser-launcher.js', () => ({
   openBrowserSecurely: vi.fn(),
 }));
 
+// Mock debugLogger to prevent console pollution and allow spying
+vi.mock('../utils/debugLogger.js', () => ({
+  debugLogger: {
+    warn: vi.fn(),
+    error: vi.fn(),
+    log: vi.fn(),
+  },
+}));
+
 const MOCK_PRO_MODEL = DEFAULT_GEMINI_MODEL;
 const FALLBACK_MODEL = DEFAULT_GEMINI_FLASH_MODEL;
 const AUTH_OAUTH = AuthType.LOGIN_WITH_GOOGLE;
 const AUTH_API_KEY = AuthType.USE_GEMINI;
-
-function createAvailabilityMock(
-  result: ReturnType<ModelAvailabilityService['selectFirstAvailable']>,
-): ModelAvailabilityService {
-  return {
-    markTerminal: vi.fn(),
-    markHealthy: vi.fn(),
-    markRetryOncePerTurn: vi.fn(),
-    consumeStickyAttempt: vi.fn(),
-    snapshot: vi.fn(),
-    selectFirstAvailable: vi.fn().mockReturnValue(result),
-    resetTurn: vi.fn(),
-  } as unknown as ModelAvailabilityService;
-}
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
@@ -75,8 +71,12 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     setPreviewModelBypassMode: vi.fn(),
     fallbackHandler: undefined,
     getFallbackModelHandler: vi.fn(),
+    setActiveModel: vi.fn(),
     getModelAvailabilityService: vi.fn(() =>
-      createAvailabilityMock({ selectedModel: FALLBACK_MODEL, skipped: [] }),
+      createAvailabilityServiceMock({
+        selectedModel: FALLBACK_MODEL,
+        skipped: [],
+      }),
     ),
     getModel: vi.fn(() => MOCK_PRO_MODEL),
     getPreviewFeatures: vi.fn(() => false),
@@ -98,6 +98,12 @@ describe('handleFallback', () => {
     mockConfig = createMockConfig({
       fallbackModelHandler: mockHandler,
     });
+    // Explicitly set the property to ensure it's present for legacy checks
+    mockConfig.fallbackModelHandler = mockHandler;
+
+    // We mocked debugLogger, so we don't need to spy on console.error for handler failures
+    // But tests might check console.error usage in legacy code if any?
+    // The handler uses console.error in legacyHandleFallback.
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     fallbackEventSpy = vi.spyOn(coreEvents, 'emitFallbackModeChanged');
   });
@@ -538,7 +544,7 @@ describe('handleFallback', () => {
 
     beforeEach(() => {
       vi.clearAllMocks();
-      availability = createAvailabilityMock({
+      availability = createAvailabilityServiceMock({
         selectedModel: DEFAULT_GEMINI_FLASH_MODEL,
         skipped: [],
       });
@@ -612,7 +618,17 @@ describe('handleFallback', () => {
 
         expect(result).toBe(true);
         expect(policyConfig.getFallbackModelHandler).not.toHaveBeenCalled();
-        expect(policyConfig.setFallbackMode).toHaveBeenCalledWith(true);
+        expect(policyConfig.setActiveModel).toHaveBeenCalledWith(
+          DEFAULT_GEMINI_FLASH_MODEL,
+        );
+        // Silent actions should not trigger the legacy fallback mode (via activateFallbackMode),
+        // but setActiveModel might trigger it via legacy sync if it switches to Flash.
+        // However, the test requirement is "doesn't emit fallback mode".
+        // Since we are mocking setActiveModel, we can verify setFallbackMode isn't called *independently*.
+        // But setActiveModel is mocked, so it won't trigger side effects unless the implementation does.
+        // We verified setActiveModel is called.
+        // We verify setFallbackMode is NOT called (which would happen if activateFallbackMode was called).
+        expect(policyConfig.setFallbackMode).not.toHaveBeenCalled();
       } finally {
         chainSpy.mockRestore();
       }
@@ -706,6 +722,35 @@ describe('handleFallback', () => {
       // Service called to check upstream; no UI handler since nothing selected.
       expect(policyConfig.getModelAvailabilityService).toHaveBeenCalled();
       expect(policyConfig.getFallbackModelHandler).not.toHaveBeenCalled();
+    });
+
+    it('calls setActiveModel and logs telemetry when handler returns "retry_always"', async () => {
+      policyHandler.mockResolvedValue('retry_always');
+
+      const result = await handleFallback(
+        policyConfig,
+        MOCK_PRO_MODEL,
+        AUTH_OAUTH,
+      );
+
+      expect(result).toBe(true);
+      expect(policyConfig.setActiveModel).toHaveBeenCalledWith(FALLBACK_MODEL);
+      expect(policyConfig.setFallbackMode).not.toHaveBeenCalled();
+      // TODO: add logging expect statement
+    });
+
+    it('calls setActiveModel when handler returns "stop"', async () => {
+      policyHandler.mockResolvedValue('stop');
+
+      const result = await handleFallback(
+        policyConfig,
+        MOCK_PRO_MODEL,
+        AUTH_OAUTH,
+      );
+
+      expect(result).toBe(false);
+      expect(policyConfig.setActiveModel).toHaveBeenCalledWith(FALLBACK_MODEL);
+      // TODO: add logging expect statement
     });
   });
 });
