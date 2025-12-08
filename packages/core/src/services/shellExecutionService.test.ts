@@ -1406,9 +1406,10 @@ describe('ShellExecutionService environment variables', () => {
     mockChildProcess.emit('close', 0, null);
     await new Promise(process.nextTick);
   });
-
   it('should include process.env when GITHUB_SHA is not set (pty and child_process)', async () => {
     vi.stubEnv('MY_TEST_VAR', 'test-value');
+    vi.stubEnv('GITHUB_SHA', '');
+    vi.stubEnv('SURFACE', '');
     vi.resetModules();
     const { ShellExecutionService } = await import(
       './shellExecutionService.js'
