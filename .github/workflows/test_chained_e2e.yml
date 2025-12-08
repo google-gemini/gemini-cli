@@ -298,7 +298,7 @@ jobs:
   set_workflow_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
     permissions: 'write-all'
-    if: "${{github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'}}"
+    if: "${{always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run')}}"
     needs:
       - 'parse_run_context'
       - 'e2e'
@@ -311,5 +311,5 @@ jobs:
           repo: '${{ github.repository }}'
           sha: '${{ needs.parse_run_context.outputs.sha }}'
           token: '${{ secrets.GITHUB_TOKEN }}'
-          status: '${{ job.status }}'
+          status: '${{ needs.e2e.result }}'
           context: 'E2E (Chained)'
