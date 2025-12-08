@@ -8,10 +8,11 @@ import { cpLen, cpSlice } from './textUtils.js';
 
 export type HighlightToken = {
   text: string;
-  type: 'default' | 'command' | 'file';
+  type: 'default' | 'command' | 'file' | 'image';
 };
 
-const HIGHLIGHT_REGEX = /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[a-zA-Z0-9_./-])+)/g;
+const HIGHLIGHT_REGEX =
+  /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[a-zA-Z0-9_./-])+|\[Image #\d+\])/g;
 
 export function parseInputForHighlighting(
   text: string,
@@ -38,7 +39,14 @@ export function parseInputForHighlighting(
     }
 
     // Add the matched token
-    const type = fullMatch.startsWith('/') ? 'command' : 'file';
+    let type: HighlightToken['type'];
+    if (fullMatch.startsWith('/')) {
+      type = 'command';
+    } else if (fullMatch.startsWith('[Image')) {
+      type = 'image';
+    } else {
+      type = 'file';
+    }
     // Only highlight slash commands if the index is 0.
     if (type === 'command' && index !== 0) {
       tokens.push({

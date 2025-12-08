@@ -35,6 +35,7 @@ import {
   saveClipboardImage,
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
+import type { UseClipboardImagesReturn } from '../hooks/useClipboardImages.js';
 import {
   isAutoExecutableCommand,
   isSlashCommand,
@@ -86,6 +87,7 @@ export interface InputPromptProps {
   popAllMessages?: () => string | undefined;
   suggestionsPosition?: 'above' | 'below';
   setBannerVisible: (visible: boolean) => void;
+  clipboardImages?: UseClipboardImagesReturn;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -128,6 +130,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   popAllMessages,
   suggestionsPosition = 'below',
   setBannerVisible,
+  clipboardImages,
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
@@ -323,15 +326,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             // Ignore cleanup errors
           });
 
-          // Get relative path from current directory
-          const relativePath = path.relative(config.getTargetDir(), imagePath);
+          // Register image and get display text (e.g., "[Image #1]")
+          // If clipboardImages is not provided, fall back to the old @path behavior
+          let insertText: string;
+          if (clipboardImages) {
+            insertText = clipboardImages.registerImage(imagePath);
+          } else {
+            const relativePath = path.relative(
+              config.getTargetDir(),
+              imagePath,
+            );
+            insertText = `@${relativePath}`;
+          }
 
-          // Insert @path reference at cursor position
-          const insertText = `@${relativePath}`;
           const currentText = buffer.text;
           const offset = buffer.getOffset();
 
-          // Add spaces around the path if needed
+          // Add spaces around the display text if needed
           let textToInsert = insertText;
           const charBefore = offset > 0 ? currentText[offset - 1] : '';
           const charAfter =
@@ -356,7 +367,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     } catch (error) {
       console.error('Error handling clipboard image:', error);
     }
-  }, [buffer, config]);
+  }, [buffer, config, clipboardImages]);
 
   useMouseClick(
     innerBoxRef,
@@ -1124,7 +1135,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   }
 
                   const color =
-                    seg.type === 'command' || seg.type === 'file'
+                    seg.type === 'command' ||
+                    seg.type === 'file' ||
+                    seg.type === 'image'
                       ? theme.text.accent
                       : theme.text.primary;
 

@@ -133,4 +133,40 @@ describe('parseInputForHighlighting', () => {
       { text: '@/my\\ path/file.txt', type: 'file' },
     ]);
   });
+
+  it('should highlight [Image #1] as image type', () => {
+    const text = 'Check this [Image #1] please';
+    expect(parseInputForHighlighting(text, 0)).toEqual([
+      { text: 'Check this ', type: 'default' },
+      { text: '[Image #1]', type: 'image' },
+      { text: ' please', type: 'default' },
+    ]);
+  });
+
+  it('should highlight multiple [Image #N] references', () => {
+    const text = '[Image #1] and [Image #2] are here';
+    expect(parseInputForHighlighting(text, 0)).toEqual([
+      { text: '[Image #1]', type: 'image' },
+      { text: ' and ', type: 'default' },
+      { text: '[Image #2]', type: 'image' },
+      { text: ' are here', type: 'default' },
+    ]);
+  });
+
+  it('should handle [Image #N] with large numbers', () => {
+    const text = 'See [Image #123]';
+    expect(parseInputForHighlighting(text, 0)).toEqual([
+      { text: 'See ', type: 'default' },
+      { text: '[Image #123]', type: 'image' },
+    ]);
+  });
+
+  it('should handle [Image #N] mixed with file paths', () => {
+    const text = '[Image #1] @path/to/file.txt';
+    expect(parseInputForHighlighting(text, 0)).toEqual([
+      { text: '[Image #1]', type: 'image' },
+      { text: ' ', type: 'default' },
+      { text: '@path/to/file.txt', type: 'file' },
+    ]);
+  });
 });
