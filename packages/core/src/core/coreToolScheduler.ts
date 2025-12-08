@@ -870,6 +870,17 @@ export class CoreToolScheduler {
             );
             this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
           } else {
+            // Following the similar logic of policy-engine defined in
+            // shouldConfirmExecute() method of packages/core/src/tools/tools.ts
+            // i.e. throw error in case of requiring confirmation for
+            // non-interactive mode.
+            if (!this.config.isInteractive()) {
+              throw new Error(
+                `Tool execution for "${
+                  toolCall.tool.displayName || toolCall.tool.name
+                }" denied by policy.`,
+              );
+            }
             // Fire Notification hook before showing confirmation to user
             const messageBus = this.config.getMessageBus();
             const hooksEnabled = this.config.getEnableHooks();
