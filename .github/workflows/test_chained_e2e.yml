@@ -109,7 +109,6 @@ jobs:
   set_pending_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
     permissions: 'write-all'
-    if: "${{github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'}}"
     needs:
       - 'parse_run_context'
     steps:
@@ -298,7 +297,7 @@ jobs:
   set_workflow_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
     permissions: 'write-all'
-    if: "${{always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run')}}"
+    if: 'always()'
     needs:
       - 'parse_run_context'
       - 'e2e'
