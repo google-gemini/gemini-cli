@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { WritableStream, ReadableStream } from 'node:stream/web';
-
 import type {
   Config,
   GeminiChat,
@@ -33,7 +31,7 @@ import {
   createWorkingStdio,
   startupProfiler,
 } from '@google/gemini-cli-core';
-import * as acp from './acp.js';
+import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
 import { Readable, Writable } from 'node:stream';
 import type { Content, Part, FunctionCall } from '@google/genai';
@@ -53,13 +51,13 @@ export async function runZedIntegration(
   argv: CliArgs,
 ) {
   const { stdout: workingStdout } = createWorkingStdio();
-  const stdout = Writable.toWeb(workingStdout) as WritableStream;
-  const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
+  const output = Writable.toWeb(workingStdout) as WritableStream;
+  const input = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
+  const stream = acp.ndJsonStream(output, input);
   new acp.AgentSideConnection(
-    (client: acp.Client) => new GeminiAgent(config, settings, argv, client),
-    stdout,
-    stdin,
+    (connection) => new GeminiAgent(config, settings, argv, connection),
+    stream,
   );
 }
 
@@ -71,7 +69,7 @@ export class GeminiAgent {
     private config: Config,
     private settings: LoadedSettings,
     private argv: CliArgs,
-    private client: acp.Client,
+    private connection: acp.AgentSideConnection,
   ) {}
 
   async initialize(
@@ -156,7 +154,7 @@ export class GeminiAgent {
 
     if (this.clientCapabilities?.fs) {
       const acpFileSystemService = new AcpFileSystemService(
-        this.client,
+        this.connection,
         sessionId,
         this.clientCapabilities.fs,
         config.getFileSystemService(),
@@ -166,7 +164,7 @@ export class GeminiAgent {
 
     const geminiClient = config.getGeminiClient();
     const chat = await geminiClient.startChat();
-    const session = new Session(sessionId, chat, config, this.client);
+    const session = new Session(sessionId, chat, config, this.connection);
     this.sessions.set(sessionId, session);
 
     return {
@@ -222,7 +220,7 @@ export class Session {
     private readonly id: string,
     private readonly chat: GeminiChat,
     private readonly config: Config,
-    private readonly client: acp.Client,
+    private readonly connection: acp.AgentSideConnection,
   ) {}
 
   async cancelPendingPrompt(): Promise<void> {
@@ -340,13 +338,15 @@ export class Session {
     return { stopReason: 'end_turn' };
   }
 
-  private async sendUpdate(update: acp.SessionUpdate): Promise<void> {
+  private async sendUpdate(
+    update: acp.SessionNotification['update'],
+  ): Promise<void> {
     const params: acp.SessionNotification = {
       sessionId: this.id,
       update,
     };
 
-    await this.client.sessionUpdate(params);
+    await this.connection.sessionUpdate(params);
   }
 
   private async runTool(
@@ -432,7 +432,7 @@ export class Session {
           },
         };
 
-        const output = await this.client.requestPermission(params);
+        const output = await this.connection.requestPermission(params);
         const outcome =
           output.outcome.outcome === 'cancelled'
             ? ToolConfirmationOutcome.Cancel
