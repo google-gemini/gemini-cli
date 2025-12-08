@@ -750,11 +750,14 @@ export class Task {
               } as ToolConfirmationPayload)
             : undefined;
           this.skipFinalTrueAfterInlineEdit = !!payload;
-          await confirmationDetails.onConfirm(confirmationOutcome, payload);
-          // Once confirmationDetails.onConfirm finishes with a payload, reset
-          // skipFinalTrueAfterInlineEdit so that external callers receive
-          // their call has been completed.
-          this.skipFinalTrueAfterInlineEdit = false;
+          try {
+            await confirmationDetails.onConfirm(confirmationOutcome, payload);
+          } finally {
+            // Once confirmationDetails.onConfirm finishes (or fails) with a payload,
+            // reset skipFinalTrueAfterInlineEdit so that external callers receive
+            // their call has been completed.
+            this.skipFinalTrueAfterInlineEdit = false;
+          }
         } else {
           await confirmationDetails.onConfirm(confirmationOutcome);
         }
