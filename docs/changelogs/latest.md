@@ -1,4 +1,4 @@
-# Latest stable release: v0.19.0 - v0.19.1
+# Latest stable release: v0.19.0 - v0.19.4
 
 Released: December 1, 2025
 

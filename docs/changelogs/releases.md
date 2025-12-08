@@ -16,9 +16,9 @@ on GitHub.
 | :----------------------------------------- | :---------------------------------------------- |
 | Nightly                                    | Nightly release with the most recent changes.   |
 | [Preview](#release-v0190-preview0-preview) | Experimental features ready for early feedback. |
-| [Latest](#release-v0190---v0191-latest)    | Stable, recommended for general use.            |
+| [Latest](#release-v0190---v0194-latest)    | Stable, recommended for general use.            |
 
-## Release v0.19.0 - v0.19.1 (Latest)
+## Release v0.19.0 - v0.19.4 (Latest)
 
 ## Highlights
 
