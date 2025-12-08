@@ -249,7 +249,9 @@ export class ShellExecutionService {
         shell: false,
         detached: !isWindows,
         env: {
-          ...process.env,
+          ...(process.env['GITHUB_SHA'] || process.env['SURFACE'] === 'Github'
+            ? {}
+            : process.env),
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: 'cat',
@@ -463,7 +465,9 @@ export class ShellExecutionService {
         cols,
         rows,
         env: {
-          ...process.env,
+          ...(process.env['GITHUB_SHA'] || process.env['SURFACE'] === 'Github'
+            ? {}
+            : process.env),
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: shellExecutionConfig.pager ?? 'cat',
