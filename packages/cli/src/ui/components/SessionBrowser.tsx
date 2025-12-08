@@ -664,6 +664,7 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
       }
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     loadSessions();
   }, [config, setSessions, setLoading, setError]);
 
@@ -692,6 +693,7 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
       }
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     loadFullContent();
   }, [
     isSearchMode,
