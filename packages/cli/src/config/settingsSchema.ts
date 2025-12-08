@@ -1738,6 +1738,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         type: 'boolean',
         description: 'Whether to forward telemetry to an OTLP collector.',
       },
+      useCliAuth: {
+        type: 'boolean',
+        description:
+          'Whether to use CLI authentication for telemetry (only for in-process exporters).',
+      },
     },
   },
   BugCommandSettings: {
