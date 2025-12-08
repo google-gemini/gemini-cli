@@ -46,7 +46,7 @@ describe('renameCommand', () => {
     });
   });
 
-  it('should return error if chatRecordingService is not available', async () => {
+  it('should return undefined if chatRecordingService is not available', async () => {
     mockContext = {
       services: {
         chatRecordingService: undefined,
@@ -54,12 +54,7 @@ describe('renameCommand', () => {
     } as unknown as CommandContext;
 
     const result = await renameCommand.action!(mockContext, 'New Name');
-
-    expect(result).toEqual({
-      type: 'message',
-      messageType: 'error',
-      content: 'Chat recording service is not available.',
-    });
+    expect(result).toEqual(undefined);
   });
 
   it('should rename the current session', async () => {
