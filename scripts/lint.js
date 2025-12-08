@@ -107,7 +107,8 @@ const LINTERS = {
     check: yamllintCheck,
     installer: `
     python3 -m venv "${PYTHON_VENV_PATH}" && \
-    "${PYTHON_VENV_PATH}/bin/pip" install "yamllint==${YAMLLINT_VERSION}"
+    "${PYTHON_VENV_PATH}/bin/pip" install --upgrade pip && \
+    "${PYTHON_VENV_PATH}/bin/pip" install "yamllint==${YAMLLINT_VERSION}" --index-url https://pypi.org/simple
   `,
     run: "git ls-files | grep -E '\\.(yaml|yml)' | xargs yamllint --format github",
   },
