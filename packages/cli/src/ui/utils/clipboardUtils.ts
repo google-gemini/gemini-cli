@@ -156,15 +156,12 @@ export async function cleanupOldClipboardImages(
 }
 
 /**
- * Checks if a string looks like an image file path and the file exists.
- * Used for detecting drag-and-drop image files in the terminal.
+ * Parses text that might be an image file path.
  * Handles paths with @ prefix and escaped spaces (e.g., @/path/to/file\ name.png)
  * @param text The text to check (typically pasted content)
- * @returns The absolute path if valid image file, null otherwise
+ * @returns The resolved absolute path if it looks like an image path, null otherwise
  */
-export async function getImagePathFromText(
-  text: string,
-): Promise<string | null> {
+function parseImagePath(text: string): string | null {
   let trimmed = text.trim();
 
   // Remove @ prefix if present (drag-and-drop in Gemini CLI adds @)
@@ -195,6 +192,34 @@ export async function getImagePathFromText(
     absolutePath = path.join(os.homedir(), unescapedPath.slice(1));
   } else if (!path.isAbsolute(unescapedPath)) {
     absolutePath = path.resolve(unescapedPath);
+  }
+
+  return absolutePath;
+}
+
+/**
+ * Synchronously checks if text looks like an image file path (without verifying existence).
+ * Use this for fast rejection of non-image text before doing async file checks.
+ * @param text The text to check
+ * @returns true if the text could be an image path based on format and extension
+ */
+export function looksLikeImagePath(text: string): boolean {
+  return parseImagePath(text) !== null;
+}
+
+/**
+ * Checks if a string looks like an image file path and the file exists.
+ * Used for detecting drag-and-drop image files in the terminal.
+ * Handles paths with @ prefix and escaped spaces (e.g., @/path/to/file\ name.png)
+ * @param text The text to check (typically pasted content)
+ * @returns The absolute path if valid image file, null otherwise
+ */
+export async function getImagePathFromText(
+  text: string,
+): Promise<string | null> {
+  const absolutePath = parseImagePath(text);
+  if (!absolutePath) {
+    return null;
   }
 
   // Check if file exists

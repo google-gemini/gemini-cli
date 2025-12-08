@@ -10,6 +10,7 @@ import {
   saveClipboardImage,
   cleanupOldClipboardImages,
   getImagePathFromText,
+  looksLikeImagePath,
 } from './clipboardUtils.js';
 
 describe('clipboardUtils', () => {
@@ -164,6 +165,58 @@ describe('clipboardUtils', () => {
     it('should reject non-image files even with @ prefix', async () => {
       expect(await getImagePathFromText('@/path/to/file.txt')).toBe(null);
       expect(await getImagePathFromText('@./script.js')).toBe(null);
+    });
+  });
+
+  describe('looksLikeImagePath', () => {
+    it('should return false for non-path strings', () => {
+      expect(looksLikeImagePath('hello world')).toBe(false);
+      expect(looksLikeImagePath('not a path')).toBe(false);
+      expect(looksLikeImagePath('')).toBe(false);
+    });
+
+    it('should return false for non-image file paths', () => {
+      expect(looksLikeImagePath('/path/to/file.txt')).toBe(false);
+      expect(looksLikeImagePath('./script.js')).toBe(false);
+      expect(looksLikeImagePath('~/document.pdf')).toBe(false);
+    });
+
+    it('should return true for paths with image extensions', () => {
+      expect(looksLikeImagePath('/path/to/image.png')).toBe(true);
+      expect(looksLikeImagePath('./photo.jpg')).toBe(true);
+      expect(looksLikeImagePath('~/screenshot.gif')).toBe(true);
+      expect(looksLikeImagePath('/file.bmp')).toBe(true);
+      expect(looksLikeImagePath('/file.webp')).toBe(true);
+      expect(looksLikeImagePath('/file.tiff')).toBe(true);
+      expect(looksLikeImagePath('/file.jpeg')).toBe(true);
+    });
+
+    it('should return true for @ prefixed image paths', () => {
+      expect(looksLikeImagePath('@/path/to/image.png')).toBe(true);
+      expect(looksLikeImagePath('@./photo.jpg')).toBe(true);
+      expect(looksLikeImagePath('@~/screenshot.gif')).toBe(true);
+    });
+
+    it('should return true for paths with escaped spaces', () => {
+      expect(looksLikeImagePath('@/path/to/my\\ image.png')).toBe(true);
+      expect(
+        looksLikeImagePath(
+          '@/Users/test/Screenshot\\ 2025-12-06\\ at\\ 6.31.06\\ PM.png',
+        ),
+      ).toBe(true);
+    });
+
+    it('should be synchronous and fast for normal text', () => {
+      // This test ensures the function is suitable for use in synchronous code paths
+      const start = performance.now();
+      for (let i = 0; i < 1000; i++) {
+        looksLikeImagePath('hello world this is normal text');
+        looksLikeImagePath('const x = 5; function foo() {}');
+        looksLikeImagePath('https://example.com/image.png');
+      }
+      const duration = performance.now() - start;
+      // Should complete 3000 calls in well under 100ms
+      expect(duration).toBeLessThan(100);
     });
   });
 });

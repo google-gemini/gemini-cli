@@ -35,6 +35,7 @@ import {
   saveClipboardImage,
   cleanupOldClipboardImages,
   getImagePathFromText,
+  looksLikeImagePath,
 } from '../utils/clipboardUtils.js';
 import type { UseClipboardImagesReturn } from '../hooks/useClipboardImages.js';
 import {
@@ -403,35 +404,40 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (key.paste) {
-        // Handle paste asynchronously to check for drag-and-drop image paths
-        void (async () => {
-          // Record paste time to prevent accidental auto-submission
-          if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
-            setRecentUnsafePasteTime(Date.now());
+        // Record paste time to prevent accidental auto-submission
+        if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
+          setRecentUnsafePasteTime(Date.now());
 
-            // Clear any existing paste timeout
-            if (pasteTimeoutRef.current) {
-              clearTimeout(pasteTimeoutRef.current);
-            }
-
-            // Clear the paste protection after a very short delay to prevent
-            // false positives.
-            // Due to how we use a reducer for text buffer state updates, it is
-            // reasonable to expect that key events that are really part of the
-            // same paste will be processed in the same event loop tick. 40ms
-            // is chosen arbitrarily as it is faster than a typical human
-            // could go from pressing paste to pressing enter. The fastest typists
-            // can type at 200 words per minute which roughly translates to 50ms
-            // per letter.
-            pasteTimeoutRef.current = setTimeout(() => {
-              setRecentUnsafePasteTime(null);
-              pasteTimeoutRef.current = null;
-            }, 40);
+          // Clear any existing paste timeout
+          if (pasteTimeoutRef.current) {
+            clearTimeout(pasteTimeoutRef.current);
           }
 
-          // Check if pasted content is an image file path (drag and drop)
-          if (clipboardImages && key.sequence) {
-            const imagePath = await getImagePathFromText(key.sequence);
+          // Clear the paste protection after a very short delay to prevent
+          // false positives.
+          // Due to how we use a reducer for text buffer state updates, it is
+          // reasonable to expect that key events that are really part of the
+          // same paste will be processed in the same event loop tick. 40ms
+          // is chosen arbitrarily as it is faster than a typical human
+          // could go from pressing paste to pressing enter. The fastest typists
+          // can type at 200 words per minute which roughly translates to 50ms
+          // per letter.
+          pasteTimeoutRef.current = setTimeout(() => {
+            setRecentUnsafePasteTime(null);
+            pasteTimeoutRef.current = null;
+          }, 40);
+        }
+
+        // Check if pasted content could be an image file path (drag and drop)
+        // Use synchronous check first to avoid async handling for normal text
+        if (
+          clipboardImages &&
+          key.sequence &&
+          looksLikeImagePath(key.sequence)
+        ) {
+          // Only go async for potential image paths to verify file existence
+          void (async () => {
+            const imagePath = await getImagePathFromText(key.sequence!);
             if (imagePath) {
               // Register the image and insert [Image #N] instead of the path
               const displayText = clipboardImages.registerImage(imagePath);
@@ -452,13 +458,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               }
 
               buffer.replaceRangeByOffset(offset, offset, textToInsert);
-              return;
+            } else {
+              // File doesn't exist, treat as normal paste
+              buffer.handleInput(key);
             }
-          }
+          })();
+          return;
+        }
 
-          // Ensure we never accidentally interpret paste as regular input.
-          buffer.handleInput(key);
-        })();
+        // Ensure we never accidentally interpret paste as regular input.
+        buffer.handleInput(key);
         return;
       }
 

@@ -48,8 +48,9 @@ function getMimeType(filePath: string): string {
     '.gif': 'image/gif',
     '.tiff': 'image/tiff',
     '.webp': 'image/webp',
+    '.bmp': 'image/bmp',
   };
-  return mimeTypes[ext] || 'image/png';
+  return mimeTypes[ext] || 'application/octet-stream';
 }
 
 /**
