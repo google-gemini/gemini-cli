@@ -285,9 +285,22 @@ export function createPolicyUpdater(
           }
 
           content += `[[rule]]\n`;
-          content += `toolName = "${toolName}"\n`;
-          content += `decision = "allow"\n`;
-          content += `priority = 100\n`;
+          if (message.mcpName) {
+            content += `mcpName = "${message.mcpName}"\n`;
+            // Extract simple tool name from composite name (server__tool)
+            // We assume the format is `${serverName}__${toolName}`
+            const simpleToolName = toolName.startsWith(`${message.mcpName}__`)
+              ? toolName.slice(message.mcpName.length + 2)
+              : toolName;
+            content += `toolName = "${simpleToolName}"\n`;
+            content += `decision = "allow"\n`;
+            content += `priority = 200\n`;
+          } else {
+            content += `toolName = "${toolName}"\n`;
+            content += `decision = "allow"\n`;
+            content += `priority = 100\n`;
+          }
+
           if (message.commandPrefix) {
             content += `commandPrefix = "${message.commandPrefix}"\n`;
           } else if (message.argsPattern) {

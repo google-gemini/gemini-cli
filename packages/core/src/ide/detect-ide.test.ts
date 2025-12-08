@@ -4,8 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { detectIde, IDE_DEFINITIONS } from './detect-ide.js';
+
+beforeEach(() => {
+  // Ensure Antigravity detection doesn't interfere with other tests
+  vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+});
 
 describe('detectIde', () => {
   const ideProcessInfo = { pid: 123, command: 'some/path/to/code' };

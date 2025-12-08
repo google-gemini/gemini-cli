@@ -123,6 +123,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
               type: MessageBusType.UPDATE_POLICY,
               toolName: this._toolName,
               persist: true,
+              mcpName: this.serverName,
             });
           }
         }

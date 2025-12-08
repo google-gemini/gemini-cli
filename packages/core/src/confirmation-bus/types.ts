@@ -42,6 +42,7 @@ export interface UpdatePolicy {
   persist?: boolean;
   argsPattern?: string;
   commandPrefix?: string;
+  mcpName?: string;
 }
 
 export interface ToolPolicyRejection {

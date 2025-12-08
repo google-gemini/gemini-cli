@@ -122,4 +122,43 @@ describe('createPolicyUpdater', () => {
       expect.stringContaining(`commandPrefix = "git status"`),
     );
   });
+
+  it('should persist policy with mcpName and toolName when provided', async () => {
+    createPolicyUpdater(policyEngine, messageBus);
+
+    const userPoliciesDir = '/mock/user/policies';
+    vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(userPoliciesDir);
+    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
+    (fs.readFile as unknown as Mock).mockRejectedValue(
+      new Error('File not found'),
+    );
+    (fs.appendFile as unknown as Mock).mockResolvedValue(undefined);
+
+    const mcpName = 'my-jira-server';
+    const simpleToolName = 'search';
+    const toolName = `${mcpName}__${simpleToolName}`;
+
+    messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName,
+      persist: true,
+      mcpName,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Verify file written
+    expect(fs.appendFile).toHaveBeenCalledWith(
+      path.join(userPoliciesDir, 'auto-saved.toml'),
+      expect.stringContaining(`mcpName = "${mcpName}"`),
+    );
+    expect(fs.appendFile).toHaveBeenCalledWith(
+      path.join(userPoliciesDir, 'auto-saved.toml'),
+      expect.stringContaining(`toolName = "${simpleToolName}"`),
+    );
+    expect(fs.appendFile).toHaveBeenCalledWith(
+      path.join(userPoliciesDir, 'auto-saved.toml'),
+      expect.stringContaining(`priority = 200`),
+    );
+  });
 });

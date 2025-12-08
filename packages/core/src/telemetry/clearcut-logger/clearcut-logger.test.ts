@@ -13,6 +13,7 @@ import {
   afterEach,
   beforeAll,
   afterAll,
+  beforeEach,
 } from 'vitest';
 import type { LogEvent, LogEventEntry } from './clearcut-logger.js';
 import { ClearcutLogger, EventNames, TEST_ONLY } from './clearcut-logger.js';
@@ -98,6 +99,11 @@ vi.mock('../../utils/installationManager.js');
 
 const mockUserAccount = vi.mocked(UserAccountManager.prototype);
 const mockInstallMgr = vi.mocked(InstallationManager.prototype);
+
+beforeEach(() => {
+  // Ensure Antigravity detection doesn't interfere with other tests
+  vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+});
 
 // TODO(richieforeman): Consider moving this to test setup globally.
 beforeAll(() => {
