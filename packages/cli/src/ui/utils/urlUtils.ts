@@ -10,7 +10,7 @@
  * It explicitly excludes <, >, and control characters (security).
  */
 export const URL_REGEX =
-  /(https?:\/\/[a-zA-Z0-9-._~:/?#[\]@!$&'()*+,;=%]+[a-zA-Z0-9-_~/?#[\]@!$&'(*+=%])/i;
+  /(https?:\/\/[a-zA-Z0-9-._~:/?#[\]@!$&'()*+,;=%]+[a-zA-Z0-9-_~/?#[\]@!$&'()*+=%])/i;
 
 // Pre-compiled regex for checking if a string is a complete URL
 const URL_MATCH_PATTERN = new RegExp(`^${URL_REGEX.source}$`, 'i');
