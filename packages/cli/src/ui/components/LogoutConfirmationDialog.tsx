@@ -9,6 +9,7 @@ import type React from 'react';
 import { theme } from '../semantic-colors.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 export enum LogoutChoice {
   LOGIN = 'login',
@@ -22,6 +23,16 @@ interface LogoutConfirmationDialogProps {
 export const LogoutConfirmationDialog: React.FC<
   LogoutConfirmationDialogProps
 > = ({ onSelect }) => {
+  // Handle escape key to exit (consistent with other dialogs)
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape') {
+        onSelect(LogoutChoice.EXIT);
+      }
+    },
+    { isActive: true },
+  );
+
   const options: Array<RadioSelectItem<LogoutChoice>> = [
     {
       label: 'Login',
@@ -40,9 +51,8 @@ export const LogoutConfirmationDialog: React.FC<
       <Box
         flexDirection="column"
         borderStyle="round"
-        borderColor={theme.status.success}
+        borderColor={theme.border.focused}
         padding={1}
-        width="100%"
         marginLeft={1}
       >
         <Box flexDirection="column" marginBottom={1}>
@@ -55,6 +65,12 @@ export const LogoutConfirmationDialog: React.FC<
         </Box>
 
         <RadioButtonSelect items={options} onSelect={onSelect} isFocused />
+
+        <Box marginTop={1}>
+          <Text color={theme.text.secondary}>
+            (Use Enter to select, Esc to close)
+          </Text>
+        </Box>
       </Box>
     </Box>
   );

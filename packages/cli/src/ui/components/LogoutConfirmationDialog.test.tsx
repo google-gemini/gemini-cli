@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
+import { act } from 'react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import {
   LogoutConfirmationDialog,
@@ -21,8 +22,8 @@ describe('LogoutConfirmationDialog', () => {
     vi.clearAllMocks();
   });
 
-  it('should render the dialog with title and description', () => {
-    const { lastFrame } = render(
+  it('should render the dialog with title, description, and hint', () => {
+    const { lastFrame } = renderWithProviders(
       <LogoutConfirmationDialog onSelect={vi.fn()} />,
     );
 
@@ -30,10 +31,11 @@ describe('LogoutConfirmationDialog', () => {
     expect(lastFrame()).toContain(
       'Login again to continue using Gemini CLI, or exit the application.',
     );
+    expect(lastFrame()).toContain('(Use Enter to select, Esc to close)');
   });
 
   it('should render RadioButtonSelect with Login and Exit options', () => {
-    render(<LogoutConfirmationDialog onSelect={vi.fn()} />);
+    renderWithProviders(<LogoutConfirmationDialog onSelect={vi.fn()} />);
 
     expect(RadioButtonSelect).toHaveBeenCalled();
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
@@ -46,7 +48,7 @@ describe('LogoutConfirmationDialog', () => {
 
   it('should call onSelect with LOGIN when Login is selected', () => {
     const onSelect = vi.fn();
-    render(<LogoutConfirmationDialog onSelect={onSelect} />);
+    renderWithProviders(<LogoutConfirmationDialog onSelect={onSelect} />);
 
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
     mockCall.onSelect(LogoutChoice.LOGIN);
@@ -56,10 +58,24 @@ describe('LogoutConfirmationDialog', () => {
 
   it('should call onSelect with EXIT when Exit is selected', () => {
     const onSelect = vi.fn();
-    render(<LogoutConfirmationDialog onSelect={onSelect} />);
+    renderWithProviders(<LogoutConfirmationDialog onSelect={onSelect} />);
 
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
     mockCall.onSelect(LogoutChoice.EXIT);
+
+    expect(onSelect).toHaveBeenCalledWith(LogoutChoice.EXIT);
+  });
+
+  it('should call onSelect with EXIT when escape key is pressed', () => {
+    const onSelect = vi.fn();
+    const { stdin } = renderWithProviders(
+      <LogoutConfirmationDialog onSelect={onSelect} />,
+    );
+
+    act(() => {
+      // Send kitty escape key sequence
+      stdin.write('\u001b[27u');
+    });
 
     expect(onSelect).toHaveBeenCalledWith(LogoutChoice.EXIT);
   });
