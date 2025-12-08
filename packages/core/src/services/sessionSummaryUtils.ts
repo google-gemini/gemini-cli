@@ -37,6 +37,14 @@ export async function generateAndSaveSummary(config: Config): Promise<void> {
       return;
     }
 
+    // Skip if display name is already set (user renamed session)
+    if (conversation.displayName) {
+      debugLogger.debug(
+        '[SessionSummary] Display name exists, skipping summary generation',
+      );
+      return;
+    }
+
     // Skip if no messages
     if (conversation.messages.length === 0) {
       debugLogger.debug('[SessionSummary] No messages to summarize');

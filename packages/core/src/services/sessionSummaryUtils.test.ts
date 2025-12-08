@@ -165,6 +165,34 @@ describe('sessionSummaryUtils', () => {
       expect(mockChatRecordingService.saveSummary).not.toHaveBeenCalled();
     });
 
+    it('should skip if display name already exists', async () => {
+      const mockConversation = {
+        sessionId: 'test-session',
+        projectHash: 'test-hash',
+        startTime: '2025-12-03T00:00:00Z',
+        lastUpdated: '2025-12-03T00:10:00Z',
+        displayName: 'User Defined Name',
+        messages: [
+          {
+            id: '1',
+            timestamp: '2025-12-03T00:00:00Z',
+            type: 'user' as const,
+            content: [{ text: 'Hello' }],
+          },
+        ],
+      };
+
+      (
+        mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
+      ).mockReturnValue(mockConversation);
+
+      await generateAndSaveSummary(mockConfig);
+
+      expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
+      expect(mockGenerateSummary).not.toHaveBeenCalled();
+      expect(mockChatRecordingService.saveSummary).not.toHaveBeenCalled();
+    });
+
     it('should skip if no messages present', async () => {
       const mockConversation = {
         sessionId: 'test-session',
