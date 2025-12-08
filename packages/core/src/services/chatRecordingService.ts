@@ -484,4 +484,28 @@ export class ChatRecordingService {
       throw error;
     }
   }
+
+  /**
+   * Rewinds the conversation to the state just before the specified message ID.
+   * All messages from (and including) the specified ID onwards are removed.
+   */
+  rewindTo(messageId: string): ConversationRecord {
+    try {
+      const conversation = this.readConversation();
+      const messageIndex = conversation.messages.findIndex(
+        (m) => m.id === messageId,
+      );
+
+      if (messageIndex === -1) {
+        return conversation;
+      }
+
+      conversation.messages = conversation.messages.slice(0, messageIndex);
+      this.writeConversation(conversation);
+      return conversation;
+    } catch (error) {
+      debugLogger.error('Error rewinding conversation.', error);
+      throw error;
+    }
+  }
 }
