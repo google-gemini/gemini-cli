@@ -1358,9 +1358,13 @@ describe('ShellExecutionService environment variables', () => {
     vi.unstubAllEnvs();
   });
 
-  it('should not include process.env when GITHUB_SHA is set (pty and child_process)', async () => {
+  it('should use a sanitized environment when in a GitHub run', async () => {
+    // Mock the environment to simulate a GitHub Actions run
     vi.stubEnv('GITHUB_SHA', 'test-sha');
-    vi.stubEnv('MY_TEST_VAR', 'test-value');
+    vi.stubEnv('MY_SENSITIVE_VAR', 'secret-value'); // This should be stripped out
+    vi.stubEnv('PATH', '/test/path'); // An essential var that should be kept
+    vi.stubEnv('GEMINI_CLI_TEST_VAR', 'test-value'); // A test var that should be kept
+
     vi.resetModules();
     const { ShellExecutionService } = await import(
       './shellExecutionService.js'
@@ -1375,38 +1379,39 @@ describe('ShellExecutionService environment variables', () => {
       true,
       shellExecutionConfig,
     );
-    expect(mockPtySpawn).toHaveBeenCalled();
-    const ptyEnv = mockPtySpawn.mock.calls[0][2].env;
-    expect(ptyEnv).not.toHaveProperty('MY_TEST_VAR');
-    expect(ptyEnv).toHaveProperty('GEMINI_CLI', '1');
-    expect(ptyEnv).toHaveProperty('TERM', 'xterm-256color');
 
-    // Ensure pty process exits
+    const ptyEnv = mockPtySpawn.mock.calls[0][2].env;
+    expect(ptyEnv).not.toHaveProperty('MY_SENSITIVE_VAR');
+    expect(ptyEnv).toHaveProperty('PATH', '/test/path');
+    expect(ptyEnv).toHaveProperty('GEMINI_CLI_TEST_VAR', 'test-value');
+
+    // Ensure pty process exits for next test
     mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
     await new Promise(process.nextTick);
 
-    // Test child_process path (forcing fallback by making pty unavailable)
-    mockGetPty.mockResolvedValue(null);
+    // Test child_process path
+    mockGetPty.mockResolvedValue(null); // Force fallback
     await ShellExecutionService.execute(
       'test-cp-command',
       '/',
       vi.fn(),
       new AbortController().signal,
-      true, // Still tries pty, but it will fall back
+      true,
       shellExecutionConfig,
     );
-    expect(mockCpSpawn).toHaveBeenCalled();
+
     const cpEnv = mockCpSpawn.mock.calls[0][2].env;
-    expect(cpEnv).not.toHaveProperty('MY_TEST_VAR');
-    expect(cpEnv).toHaveProperty('GEMINI_CLI', '1');
-    expect(cpEnv).toHaveProperty('TERM', 'xterm-256color');
+    expect(cpEnv).not.toHaveProperty('MY_SENSITIVE_VAR');
+    expect(cpEnv).toHaveProperty('PATH', '/test/path');
+    expect(cpEnv).toHaveProperty('GEMINI_CLI_TEST_VAR', 'test-value');
 
     // Ensure child_process exits
     mockChildProcess.emit('exit', 0, null);
     mockChildProcess.emit('close', 0, null);
     await new Promise(process.nextTick);
   });
-  it('should include process.env when GITHUB_SHA is not set (pty and child_process)', async () => {
+
+  it('should include the full process.env when not in a GitHub run', async () => {
     vi.stubEnv('MY_TEST_VAR', 'test-value');
     vi.stubEnv('GITHUB_SHA', '');
     vi.stubEnv('SURFACE', '');

@@ -149,11 +149,48 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
 };
 
 function getSanitizedEnv(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv =
-    process.env['GITHUB_SHA'] || process.env['SURFACE'] === 'Github'
-      ? {}
-      : { ...process.env };
+  const isRunningInGithub =
+    process.env['GITHUB_SHA'] || process.env['SURFACE'] === 'Github';
 
+  if (!isRunningInGithub) {
+    // For local runs, we want to preserve the user's full environment.
+    return { ...process.env };
+  }
+
+  // For CI runs (GitHub), we sanitize the environment for security.
+  const env: NodeJS.ProcessEnv = {};
+  const essentialVars = [
+    // Cross-platform
+    'PATH',
+    // Windows specific
+    'Path',
+    'SYSTEMROOT',
+    'SystemRoot',
+    'COMSPEC',
+    'ComSpec',
+    'PATHEXT',
+    'WINDIR',
+    'TEMP',
+    'TMP',
+    'USERPROFILE',
+    'SYSTEMDRIVE',
+    'SystemDrive',
+    // Unix/Linux/macOS specific
+    'HOME',
+    'LANG',
+    'SHELL',
+    'TMPDIR',
+    'USER',
+    'LOGNAME',
+  ];
+
+  for (const key of essentialVars) {
+    if (process.env[key] !== undefined) {
+      env[key] = process.env[key];
+    }
+  }
+
+  // Always carry over test-specific variables for our own integration tests.
   for (const key in process.env) {
     if (key.startsWith('GEMINI_CLI_TEST')) {
       env[key] = process.env[key];
