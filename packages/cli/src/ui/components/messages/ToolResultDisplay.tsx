@@ -82,7 +82,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           // Approximate visual height accounting for wrapping.
           // Empty line takes 1 row.
           const lineVisualHeight = Math.ceil(
-            Math.max(1, line.length) / childWidth,
+            Math.max(1, stringWidth(line)) / childWidth,
           );
 
           if (currentHeight + lineVisualHeight > availableHeight) {
