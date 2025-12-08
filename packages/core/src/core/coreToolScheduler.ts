@@ -878,7 +878,7 @@ export class CoreToolScheduler {
               throw new Error(
                 `Tool execution for "${
                   toolCall.tool.displayName || toolCall.tool.name
-                }" denied by policy.`,
+                }" requires user confirmation, which is not supported in non-interactive mode.`
               );
             }
             // Fire Notification hook before showing confirmation to user
