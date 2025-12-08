@@ -261,7 +261,7 @@ jobs:
           gh issue create \
             --title 'Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
             --body 'The promote-release workflow failed during preview publish. See the full run for details: ${DETAILS_URL}' \
-            --label 'kind/bug,release-failure,priority/p0'
+            --label 'release-failure,priority/p0'
 
   publish-stable:
     name: 'Publish stable'
@@ -327,7 +327,7 @@ jobs:
           gh issue create \
             --title 'Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
             --body 'The promote-release workflow failed during stable publish. See the full run for details: ${DETAILS_URL}' \
-            --label 'kind/bug,release-failure,priority/p0'
+            --label 'release-failure,priority/p0'
 
   nightly-pr:
     name: 'Create Nightly PR'
@@ -403,4 +403,4 @@ jobs:
           gh issue create \
             --title 'Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
             --body 'The promote-release workflow failed during nightly PR creation. See the full run for details: ${DETAILS_URL}' \
-            --label 'kind/bug,release-failure,priority/p0'
+            --label 'release-failure,priority/p0'

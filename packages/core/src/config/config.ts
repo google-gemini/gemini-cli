@@ -48,7 +48,6 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_THINKING_MODE,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
@@ -60,11 +59,13 @@ import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import type { FallbackModelHandler } from '../fallback/types.js';
+import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
 import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
+import { ContextManager } from '../services/contextManager.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
@@ -77,6 +78,7 @@ import type { EventEmitter } from 'node:events';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import type { PolicyEngineConfig } from '../policy/types.js';
+import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
@@ -86,6 +88,7 @@ import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { startupProfiler } from '../telemetry/startupProfiler.js';
 
 import { ApprovalMode } from '../policy/types.js';
 
@@ -110,6 +113,7 @@ export interface TelemetrySettings {
   logPrompts?: boolean;
   outfile?: string;
   useCollector?: boolean;
+  useCliAuth?: boolean;
 }
 
 export interface OutputSettings {
@@ -187,6 +191,12 @@ export class MCPServerConfig {
     readonly headers?: Record<string, string>,
     // For websocket transport
     readonly tcp?: string,
+    // Transport type (optional, for use with 'url' field)
+    // When set to 'http', uses StreamableHTTPClientTransport
+    // When set to 'sse', uses SSEClientTransport
+    // When omitted, auto-detects transport type
+    // Note: 'httpUrl' is deprecated in favor of 'url' + 'type'
+    readonly type?: 'sse' | 'http',
     // Common
     readonly timeout?: number,
     readonly trust?: boolean,
@@ -288,13 +298,13 @@ export interface ConfigParameters {
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
-  useModelRouter?: boolean;
   enableMessageBusIntegration?: boolean;
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
+  shellToolInactivityTimeout?: number;
   fakeResponses?: string;
   recordResponses?: string;
   ptyInfo?: string;
@@ -302,10 +312,17 @@ export interface ConfigParameters {
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   experiments?: Experiments;
-  hooks?: {
-    [K in HookEventName]?: HookDefinition[];
-  };
+  hooks?:
+    | {
+        [K in HookEventName]?: HookDefinition[];
+      }
+    | ({
+        [K in HookEventName]?: HookDefinition[];
+      } & { disabled?: string[] });
   previewFeatures?: boolean;
+  enableAgents?: boolean;
+  enableModelAvailabilityService?: boolean;
+  experimentalJitContext?: boolean;
 }
 
 export class Config {
@@ -345,6 +362,7 @@ export class Config {
   private geminiClient!: GeminiClient;
   private baseLlmClient!: BaseLlmClient;
   private modelRouterService: ModelRouterService;
+  private readonly modelAvailabilityService: ModelAvailabilityService;
   private readonly fileFiltering: {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
@@ -402,14 +420,12 @@ export class Config {
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
-  private useModelRouter: boolean;
-  private readonly initialUseModelRouter: boolean;
-  private readonly disableModelRouterForAuth?: AuthType[];
   private readonly enableMessageBusIntegration: boolean;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
+  private readonly shellToolInactivityTimeout: number;
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
@@ -418,11 +434,18 @@ export class Config {
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
+  private readonly disabledHooks: string[];
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
+  private hookSystem?: HookSystem;
 
   private previewModelFallbackMode = false;
   private previewModelBypassMode = false;
+  private readonly enableModelAvailabilityService: boolean;
+  private readonly enableAgents: boolean;
+
+  private readonly experimentalJitContext: boolean;
+  private contextManager?: ContextManager;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -460,6 +483,7 @@ export class Config {
       logPrompts: params.telemetry?.logPrompts ?? true,
       outfile: params.telemetry?.outfile,
       useCollector: params.telemetry?.useCollector,
+      useCliAuth: params.telemetry?.useCliAuth,
     };
     this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
 
@@ -480,6 +504,11 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.enableModelAvailabilityService =
+      params.enableModelAvailabilityService ?? false;
+    this.enableAgents = params.enableAgents ?? false;
+    this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalZedIntegration =
@@ -519,10 +548,11 @@ export class Config {
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? true;
-    this.initialUseModelRouter = params.useModelRouter ?? false;
-    this.useModelRouter = this.initialUseModelRouter;
-    this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
     this.enableHooks = params.enableHooks ?? false;
+    this.disabledHooks =
+      (params.hooks && 'disabled' in params.hooks
+        ? params.hooks.disabled
+        : undefined) ?? [];
 
     // Enable MessageBus integration if:
     // 1. Explicitly enabled via setting, OR
@@ -544,6 +574,8 @@ export class Config {
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
+    this.shellToolInactivityTimeout =
+      (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir);
@@ -567,6 +599,7 @@ export class Config {
     }
 
     if (this.telemetrySettings.enabled) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       initializeTelemetry(this);
     }
 
@@ -615,6 +648,7 @@ export class Config {
     this.initialized = true;
 
     // Initialize centralized FileDiscoveryService
+    const discoverToolsHandle = startupProfiler.start('discover_tools');
     this.getFileService();
     if (this.getCheckpointingEnabled()) {
       await this.getGitService();
@@ -625,15 +659,28 @@ export class Config {
     await this.agentRegistry.initialize();
 
     this.toolRegistry = await this.createToolRegistry();
+    discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
       this.toolRegistry,
       this,
       this.eventEmitter,
     );
+    const initMcpHandle = startupProfiler.start('initialize_mcp_clients');
     await Promise.all([
       await this.mcpClientManager.startConfiguredMcpServers(),
       await this.getExtensionLoader().start(this),
     ]);
+    initMcpHandle?.end();
+
+    // Initialize hook system if enabled
+    if (this.enableHooks) {
+      this.hookSystem = new HookSystem(this);
+      await this.hookSystem.initialize();
+    }
+
+    if (this.experimentalJitContext) {
+      this.contextManager = new ContextManager(this);
+    }
 
     await this.geminiClient.initialize();
   }
@@ -643,14 +690,6 @@ export class Config {
   }
 
   async refreshAuth(authMethod: AuthType) {
-    this.useModelRouter = this.initialUseModelRouter;
-    if (this.disableModelRouterForAuth?.includes(authMethod)) {
-      this.useModelRouter = false;
-      if (this.model === DEFAULT_GEMINI_MODEL_AUTO) {
-        this.model = DEFAULT_GEMINI_MODEL;
-      }
-    }
-
     // Vertex and Genai have incompatible encryption and sending history with
     // thoughtSignature from Genai to Vertex will fail, we need to strip them
     if (
@@ -703,6 +742,17 @@ export class Config {
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.inFallbackMode = false;
+  }
+
+  async getExperimentsAsync(): Promise<Experiments | undefined> {
+    if (this.experiments) {
+      return this.experiments;
+    }
+    const codeAssistServer = getCodeAssistServer(this);
+    if (codeAssistServer) {
+      return getExperiments(codeAssistServer);
+    }
+    return undefined;
   }
 
   getUserTier(): UserTierId | undefined {
@@ -939,6 +989,22 @@ export class Config {
     this.userMemory = newUserMemory;
   }
 
+  getGlobalMemory(): string {
+    return this.contextManager?.getGlobalMemory() ?? '';
+  }
+
+  getEnvironmentMemory(): string {
+    return this.contextManager?.getEnvironmentMemory() ?? '';
+  }
+
+  getContextManager(): ContextManager | undefined {
+    return this.contextManager;
+  }
+
+  isJitContextEnabled(): boolean {
+    return this.experimentalJitContext;
+  }
+
   getGeminiMdFileCount(): number {
     return this.geminiMdFileCount;
   }
@@ -1016,12 +1082,31 @@ export class Config {
     return this.telemetrySettings.useCollector ?? false;
   }
 
+  getTelemetryUseCliAuth(): boolean {
+    return this.telemetrySettings.useCliAuth ?? false;
+  }
+
   getGeminiClient(): GeminiClient {
     return this.geminiClient;
   }
 
+  /**
+   * Updates the system instruction with the latest user memory.
+   * Whenever the user memory (GEMINI.md files) is updated.
+   */
+  async updateSystemInstructionIfInitialized(): Promise<void> {
+    const geminiClient = this.getGeminiClient();
+    if (geminiClient?.isInitialized()) {
+      await geminiClient.updateSystemInstruction();
+    }
+  }
+
   getModelRouterService(): ModelRouterService {
     return this.modelRouterService;
+  }
+
+  getModelAvailabilityService(): ModelAvailabilityService {
+    return this.modelAvailabilityService;
   }
 
   getEnableRecursiveFileSearch(): boolean {
@@ -1124,6 +1209,14 @@ export class Config {
 
   getEnableExtensionReloading(): boolean {
     return this.enableExtensionReloading;
+  }
+
+  isModelAvailabilityServiceEnabled(): boolean {
+    return this.enableModelAvailabilityService;
+  }
+
+  isAgentsEnabled(): boolean {
+    return this.enableAgents;
   }
 
   getNoBrowser(): boolean {
@@ -1277,6 +1370,10 @@ export class Config {
     return this.enableShellOutputEfficiency;
   }
 
+  getShellToolInactivityTimeout(): number {
+    return this.shellToolInactivityTimeout;
+  }
+
   getShellExecutionConfig(): ShellExecutionConfig {
     return this.shellExecutionConfig;
   }
@@ -1328,10 +1425,6 @@ export class Config {
     return this.outputSettings?.format
       ? this.outputSettings.format
       : OutputFormat.TEXT;
-  }
-
-  getUseModelRouter(): boolean {
-    return this.useModelRouter;
   }
 
   async getGitService(): Promise<GitService> {
@@ -1474,10 +1567,24 @@ export class Config {
   }
 
   /**
+   * Get the hook system instance
+   */
+  getHookSystem(): HookSystem | undefined {
+    return this.hookSystem;
+  }
+
+  /**
    * Get hooks configuration
    */
   getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.hooks;
+  }
+
+  /**
+   * Get disabled hooks list
+   */
+  getDisabledHooks(): string[] {
+    return this.disabledHooks;
   }
 
   /**

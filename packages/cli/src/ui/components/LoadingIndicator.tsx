@@ -14,6 +14,7 @@ import { GeminiRespondingSpinner } from './GeminiRespondingSpinner.js';
 import { formatDuration } from '../utils/formatters.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
@@ -36,7 +37,12 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
     return null;
   }
 
-  const primaryText = thought?.subject || currentLoadingPhrase;
+  // Prioritize the interactive shell waiting phrase over the thought subject
+  // because it conveys an actionable state for the user (waiting for input).
+  const primaryText =
+    currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
+      ? currentLoadingPhrase
+      : thought?.subject || currentLoadingPhrase;
 
   const cancelAndTimerContent =
     streamingState !== StreamingState.WaitingForConfirmation

@@ -15,8 +15,6 @@ import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
 import {
   executeToolCall,
-  shutdownTelemetry,
-  isTelemetrySdkInitialized,
   GeminiEventType,
   FatalInputError,
   promptIdContext,
@@ -28,6 +26,7 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
+  createWorkingStdio,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -66,8 +65,12 @@ export async function runNonInteractive({
     const consolePatcher = new ConsolePatcher({
       stderr: true,
       debugMode: config.getDebugMode(),
+      onNewMessage: (msg) => {
+        coreEvents.emitConsoleLog(msg.type, msg.content);
+      },
     });
-    const textOutput = new TextOutput();
+    const { stdout: workingStdout } = createWorkingStdio();
+    const textOutput = new TextOutput(workingStdout);
 
     const handleUserFeedback = (payload: UserFeedbackPayload) => {
       const prefix = payload.severity.toUpperCase();
@@ -177,7 +180,7 @@ export async function runNonInteractive({
       setupStdinCancellation();
 
       coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
-      coreEvents.drainFeedbackBacklog();
+      coreEvents.drainBacklogs();
 
       // Handle EPIPE errors when the output is piped to a command that closes early.
       process.stdout.on('error', (err: NodeJS.ErrnoException) => {
@@ -425,7 +428,9 @@ export async function runNonInteractive({
           } else if (config.getOutputFormat() === OutputFormat.JSON) {
             const formatter = new JsonFormatter();
             const stats = uiTelemetryService.getMetrics();
-            textOutput.write(formatter.format(responseText, stats));
+            textOutput.write(
+              formatter.format(config.getSessionId(), responseText, stats),
+            );
           } else {
             textOutput.ensureTrailingNewline(); // Ensure a final newline
           }
@@ -440,9 +445,6 @@ export async function runNonInteractive({
 
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
-      if (isTelemetrySdkInitialized()) {
-        await shutdownTelemetry(config);
-      }
     }
 
     if (errorToHandle) {

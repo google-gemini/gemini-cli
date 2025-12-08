@@ -10,6 +10,7 @@ export const modelCommand: SlashCommand = {
   name: 'model',
   description: 'Open a dialog to configure the model',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async () => ({
     type: 'dialog',
     dialog: 'model',

@@ -29,6 +29,7 @@ import type { Content } from '@google/genai';
 import crypto from 'node:crypto';
 import os from 'node:os';
 import { GEMINI_DIR } from '../utils/paths.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const TMP_DIR_NAME = 'tmp';
 const LOG_FILE_NAME = 'logs.json';
@@ -193,7 +194,7 @@ describe('Logger', () => {
     it('should handle invalid JSON in log file by backing it up and starting fresh', async () => {
       await fs.writeFile(TEST_LOG_FILE_PATH, 'invalid json');
       const consoleDebugSpy = vi
-        .spyOn(console, 'debug')
+        .spyOn(debugLogger, 'debug')
         .mockImplementation(() => {});
 
       const newLogger = new Logger(testSessionId, new Storage(process.cwd()));
@@ -221,7 +222,7 @@ describe('Logger', () => {
         JSON.stringify({ not: 'an array' }),
       );
       const consoleDebugSpy = vi
-        .spyOn(console, 'debug')
+        .spyOn(debugLogger, 'debug')
         .mockImplementation(() => {});
 
       const newLogger = new Logger(testSessionId, new Storage(process.cwd()));
@@ -280,7 +281,7 @@ describe('Logger', () => {
       );
       uninitializedLogger.close(); // Ensure it's treated as uninitialized
       const consoleDebugSpy = vi
-        .spyOn(console, 'debug')
+        .spyOn(debugLogger, 'debug')
         .mockImplementation(() => {});
       await uninitializedLogger.logMessage(MessageSenderType.USER, 'test');
       expect(consoleDebugSpy).toHaveBeenCalledWith(
@@ -336,7 +337,7 @@ describe('Logger', () => {
     it('should not throw, not increment messageId, and log error if writing to file fails', async () => {
       vi.spyOn(fs, 'writeFile').mockRejectedValueOnce(new Error('Disk full'));
       const consoleDebugSpy = vi
-        .spyOn(console, 'debug')
+        .spyOn(debugLogger, 'debug')
         .mockImplementation(() => {});
       const initialMessageId = logger['messageId'];
       const initialLogCount = logger['logs'].length;
@@ -455,7 +456,7 @@ describe('Logger', () => {
       );
       uninitializedLogger.close();
       const consoleErrorSpy = vi
-        .spyOn(console, 'error')
+        .spyOn(debugLogger, 'error')
         .mockImplementation(() => {});
 
       await expect(
@@ -554,7 +555,7 @@ describe('Logger', () => {
       );
       await fs.writeFile(taggedFilePath, 'invalid json');
       const consoleErrorSpy = vi
-        .spyOn(console, 'error')
+        .spyOn(debugLogger, 'error')
         .mockImplementation(() => {});
       const loadedCheckpoint = await logger.loadCheckpoint(tag);
       expect(loadedCheckpoint).toEqual({ history: [] });
@@ -571,7 +572,7 @@ describe('Logger', () => {
       );
       uninitializedLogger.close();
       const consoleErrorSpy = vi
-        .spyOn(console, 'error')
+        .spyOn(debugLogger, 'error')
         .mockImplementation(() => {});
       const loadedCheckpoint = await uninitializedLogger.loadCheckpoint('tag');
       expect(loadedCheckpoint).toEqual({ history: [] });
@@ -643,7 +644,7 @@ describe('Logger', () => {
         }),
       );
       const consoleErrorSpy = vi
-        .spyOn(console, 'error')
+        .spyOn(debugLogger, 'error')
         .mockImplementation(() => {});
 
       await expect(logger.deleteCheckpoint(tag)).rejects.toThrow(
@@ -662,7 +663,7 @@ describe('Logger', () => {
       );
       uninitializedLogger.close();
       const consoleErrorSpy = vi
-        .spyOn(console, 'error')
+        .spyOn(debugLogger, 'error')
         .mockImplementation(() => {});
 
       const result = await uninitializedLogger.deleteCheckpoint(tag);
@@ -715,7 +716,7 @@ describe('Logger', () => {
         }),
       );
       const consoleErrorSpy = vi
-        .spyOn(console, 'error')
+        .spyOn(debugLogger, 'error')
         .mockImplementation(() => {});
 
       await expect(logger.checkpointExists(tag)).rejects.toThrow(
@@ -758,7 +759,7 @@ describe('Logger', () => {
       await logger.logMessage(MessageSenderType.USER, 'A message');
       logger.close();
       const consoleDebugSpy = vi
-        .spyOn(console, 'debug')
+        .spyOn(debugLogger, 'debug')
         .mockImplementation(() => {});
       await logger.logMessage(MessageSenderType.USER, 'Another message');
       expect(consoleDebugSpy).toHaveBeenCalledWith(
