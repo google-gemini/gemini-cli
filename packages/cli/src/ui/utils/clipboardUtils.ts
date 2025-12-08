@@ -9,14 +9,18 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { debugLogger, spawnAsync, unescapePath } from '@google/gemini-cli-core';
 
-const IMAGE_EXTENSIONS = [
+/**
+ * Supported image file extensions for clipboard/drag-and-drop operations.
+ * Based on Gemini API supported MIME types: PNG, JPEG, WEBP, HEIC, HEIF.
+ * See: https://ai.google.dev/gemini-api/docs/image-understanding
+ */
+export const IMAGE_EXTENSIONS = [
   '.png',
   '.jpg',
   '.jpeg',
-  '.gif',
   '.webp',
-  '.tiff',
-  '.bmp',
+  '.heic',
+  '.heif',
 ];
 
 /**
@@ -136,13 +140,8 @@ export async function cleanupOldClipboardImages(
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
     for (const file of files) {
-      if (
-        file.startsWith('clipboard-') &&
-        (file.endsWith('.png') ||
-          file.endsWith('.jpg') ||
-          file.endsWith('.tiff') ||
-          file.endsWith('.gif'))
-      ) {
+      const ext = path.extname(file).toLowerCase();
+      if (file.startsWith('clipboard-') && IMAGE_EXTENSIONS.includes(ext)) {
         const filePath = path.join(tempDir, file);
         const stats = await fs.stat(filePath);
         if (stats.mtimeMs < oneHourAgo) {

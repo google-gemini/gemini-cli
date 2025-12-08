@@ -117,7 +117,6 @@ export const useGeminiStream = (
   terminalHeight: number,
   isShellFocused?: boolean,
   clipboardImages?: {
-    getImageParts: () => Promise<PartUnion[]>;
     getImagePartsForText: (text: string) => Promise<PartUnion[]>;
     clear: () => void;
   },

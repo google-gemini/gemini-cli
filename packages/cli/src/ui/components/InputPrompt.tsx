@@ -437,42 +437,49 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         ) {
           // Only go async for potential image paths to verify file existence
           void (async () => {
-            const { validPaths, invalidSegments } =
-              await getMultipleImagePathsFromText(key.sequence!);
+            try {
+              const { validPaths, invalidSegments } =
+                await getMultipleImagePathsFromText(key.sequence!);
 
-            if (validPaths.length > 0) {
-              // Register each valid image and collect placeholders
-              const placeholders = validPaths.map((p) =>
-                clipboardImages.registerImage(p),
-              );
+              if (validPaths.length > 0) {
+                // Register each valid image and collect placeholders
+                const placeholders = validPaths.map((p) =>
+                  clipboardImages.registerImage(p),
+                );
 
-              // Build insertion text: placeholders + invalid segments with @ prefix
-              // Non-image files should use @path syntax for file references
-              let insertText = placeholders.join(' ');
-              if (invalidSegments.length > 0) {
-                const atPrefixedSegments = invalidSegments.map((s) => `@${s}`);
-                insertText += ' ' + atPrefixedSegments.join(' ');
+                // Build insertion text: placeholders + invalid segments with @ prefix
+                // Non-image files should use @path syntax for file references
+                let insertText = placeholders.join(' ');
+                if (invalidSegments.length > 0) {
+                  const atPrefixedSegments = invalidSegments.map(
+                    (s) => `@${s}`,
+                  );
+                  insertText += ' ' + atPrefixedSegments.join(' ');
+                }
+
+                // Insert at cursor position with proper spacing
+                const offset = buffer.getOffset();
+                const currentText = buffer.text;
+                let textToInsert = insertText;
+
+                const charBefore = offset > 0 ? currentText[offset - 1] : '';
+                const charAfter =
+                  offset < currentText.length ? currentText[offset] : '';
+
+                if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
+                  textToInsert = ' ' + textToInsert;
+                }
+                if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
+                  textToInsert = textToInsert + ' ';
+                }
+
+                buffer.replaceRangeByOffset(offset, offset, textToInsert);
+              } else {
+                // No valid images found, treat as normal paste
+                buffer.handleInput(key);
               }
-
-              // Insert at cursor position with proper spacing
-              const offset = buffer.getOffset();
-              const currentText = buffer.text;
-              let textToInsert = insertText;
-
-              const charBefore = offset > 0 ? currentText[offset - 1] : '';
-              const charAfter =
-                offset < currentText.length ? currentText[offset] : '';
-
-              if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
-                textToInsert = ' ' + textToInsert;
-              }
-              if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
-                textToInsert = textToInsert + ' ';
-              }
-
-              buffer.replaceRangeByOffset(offset, offset, textToInsert);
-            } else {
-              // No valid images found, treat as normal paste
+            } catch {
+              // On error, fall back to normal paste behavior
               buffer.handleInput(key);
             }
           })();

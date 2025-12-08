@@ -9,6 +9,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { PartUnion } from '@google/genai';
 import { debugLogger } from '@google/gemini-cli-core';
+import { IMAGE_EXTENSIONS } from '../utils/clipboardUtils.js';
 
 /**
  * Represents a clipboard image that has been pasted into the input.
@@ -32,27 +33,60 @@ export interface UseClipboardImagesReturn {
   registerImage: (absolutePath: string) => string;
   /** Clear all images (called after message submission) */
   clear: () => void;
-  /** Get all images as base64-encoded PartUnion objects for injection into the prompt */
-  getImageParts: () => Promise<PartUnion[]>;
   /** Get image parts only for images whose [Image #N] tags are present in the text */
   getImagePartsForText: (text: string) => Promise<PartUnion[]>;
 }
 
 /**
- * Gets the MIME type for an image file based on its extension.
+ * MIME types supported by Gemini API for image inputs.
+ * See: https://ai.google.dev/gemini-api/docs/image-understanding
  */
-function getMimeType(filePath: string): string {
+const MIME_TYPES: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.heic': 'image/heic',
+  '.heif': 'image/heif',
+};
+
+function getMimeType(filePath: string): string | null {
   const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes: Record<string, string> = {
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.gif': 'image/gif',
-    '.tiff': 'image/tiff',
-    '.webp': 'image/webp',
-    '.bmp': 'image/bmp',
-  };
-  return mimeTypes[ext] || 'application/octet-stream';
+  return MIME_TYPES[ext] ?? null;
+}
+
+/**
+ * Reads an image file and returns it as a base64-encoded PartUnion.
+ * Returns null if the file cannot be read or has an unsupported format.
+ */
+async function readImageAsPart(
+  imagePath: string,
+  displayText: string,
+): Promise<PartUnion | null> {
+  const mimeType = getMimeType(imagePath);
+  if (!mimeType) {
+    const ext = path.extname(imagePath);
+    debugLogger.warn(
+      `Unsupported image format ${ext} for ${displayText}, skipping. Supported: ${IMAGE_EXTENSIONS.join(', ')}`,
+    );
+    return null;
+  }
+
+  try {
+    const fileContent = await fs.readFile(imagePath);
+    return {
+      inlineData: {
+        data: fileContent.toString('base64'),
+        mimeType,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    debugLogger.warn(
+      `Failed to load clipboard image ${displayText} from ${imagePath}: ${message}`,
+    );
+    return null;
+  }
 }
 
 /**
@@ -68,17 +102,25 @@ export function useClipboardImages(): UseClipboardImagesReturn {
   const nextIdRef = useRef(1);
 
   const registerImage = useCallback((absolutePath: string): string => {
+    // Generate ID atomically with state update to prevent race conditions
+    // when multiple images are registered rapidly (e.g., multi-file drag-and-drop)
     const id = nextIdRef.current++;
     const displayText = `[Image #${id}]`;
 
-    setImages((prev) => [
-      ...prev,
-      {
-        id,
-        path: absolutePath,
-        displayText,
-      },
-    ]);
+    setImages((prev) => {
+      // Check if this path is already registered to prevent duplicates
+      if (prev.some((img) => img.path === absolutePath)) {
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          id,
+          path: absolutePath,
+          displayText,
+        },
+      ];
+    });
 
     return displayText;
   }, []);
@@ -87,32 +129,6 @@ export function useClipboardImages(): UseClipboardImagesReturn {
     setImages([]);
     nextIdRef.current = 1;
   }, []);
-
-  const getImageParts = useCallback(async (): Promise<PartUnion[]> => {
-    const parts: PartUnion[] = [];
-
-    for (const image of images) {
-      try {
-        const fileContent = await fs.readFile(image.path);
-        const mimeType = getMimeType(image.path);
-
-        parts.push({
-          inlineData: {
-            data: fileContent.toString('base64'),
-            mimeType,
-          },
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        debugLogger.warn(
-          `Failed to load clipboard image ${image.displayText} from ${image.path}: ${message}`,
-        );
-        // Continue with remaining images - don't fail the whole submission
-      }
-    }
-
-    return parts;
-  }, [images]);
 
   /**
    * Get image parts only for images whose [Image #N] tags are present in the text.
@@ -123,30 +139,15 @@ export function useClipboardImages(): UseClipboardImagesReturn {
       const parts: PartUnion[] = [];
 
       for (const image of images) {
-        // Check if this image's tag exists in the text
-        const tagPattern = new RegExp(`\\[Image #${image.id}\\]`);
-        if (!tagPattern.test(text)) {
+        // Use String.includes for faster tag checking (no regex compilation)
+        if (!text.includes(`[Image #${image.id}]`)) {
           // Tag was deleted - skip this image
           continue;
         }
 
-        try {
-          const fileContent = await fs.readFile(image.path);
-          const mimeType = getMimeType(image.path);
-
-          parts.push({
-            inlineData: {
-              data: fileContent.toString('base64'),
-              mimeType,
-            },
-          });
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          debugLogger.warn(
-            `Failed to load clipboard image ${image.displayText} from ${image.path}: ${message}`,
-          );
-          // Continue with remaining images - don't fail the whole submission
+        const part = await readImageAsPart(image.path, image.displayText);
+        if (part) {
+          parts.push(part);
         }
       }
 
@@ -159,7 +160,6 @@ export function useClipboardImages(): UseClipboardImagesReturn {
     images,
     registerImage,
     clear,
-    getImageParts,
     getImagePartsForText,
   };
 }

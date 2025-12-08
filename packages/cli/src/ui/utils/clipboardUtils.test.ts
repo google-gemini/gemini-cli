@@ -95,21 +95,14 @@ describe('clipboardUtils', () => {
     it('should return null for non-existent image paths', async () => {
       expect(await getImagePathFromText('/nonexistent/image.png')).toBe(null);
       expect(await getImagePathFromText('./fake/photo.jpg')).toBe(null);
-      expect(await getImagePathFromText('~/missing/image.gif')).toBe(null);
+      expect(await getImagePathFromText('~/missing/image.heic')).toBe(null);
     });
 
     it('should recognize various image extensions', async () => {
       // These should return null because files don't exist,
       // but they should pass the extension check
-      const extensions = [
-        '.png',
-        '.jpg',
-        '.jpeg',
-        '.gif',
-        '.webp',
-        '.tiff',
-        '.bmp',
-      ];
+      // Based on Gemini API supported formats: PNG, JPEG, WEBP, HEIC, HEIF
+      const extensions = ['.png', '.jpg', '.jpeg', '.webp', '.heic', '.heif'];
       for (const ext of extensions) {
         const result = await getImagePathFromText(`/fake/image${ext}`);
         // Should return null because file doesn't exist, not because extension is wrong
@@ -185,19 +178,26 @@ describe('clipboardUtils', () => {
     });
 
     it('should return true for paths with image extensions', () => {
+      // Based on Gemini API supported formats: PNG, JPEG, WEBP, HEIC, HEIF
       expect(looksLikeImagePath('/path/to/image.png')).toBe(true);
       expect(looksLikeImagePath('./photo.jpg')).toBe(true);
-      expect(looksLikeImagePath('~/screenshot.gif')).toBe(true);
-      expect(looksLikeImagePath('/file.bmp')).toBe(true);
       expect(looksLikeImagePath('/file.webp')).toBe(true);
-      expect(looksLikeImagePath('/file.tiff')).toBe(true);
       expect(looksLikeImagePath('/file.jpeg')).toBe(true);
+      expect(looksLikeImagePath('/file.heic')).toBe(true);
+      expect(looksLikeImagePath('/file.heif')).toBe(true);
+    });
+
+    it('should return false for unsupported image formats', () => {
+      // GIF, TIFF, BMP are NOT supported by Gemini API
+      expect(looksLikeImagePath('~/screenshot.gif')).toBe(false);
+      expect(looksLikeImagePath('/file.bmp')).toBe(false);
+      expect(looksLikeImagePath('/file.tiff')).toBe(false);
     });
 
     it('should return true for @ prefixed image paths', () => {
       expect(looksLikeImagePath('@/path/to/image.png')).toBe(true);
       expect(looksLikeImagePath('@./photo.jpg')).toBe(true);
-      expect(looksLikeImagePath('@~/screenshot.gif')).toBe(true);
+      expect(looksLikeImagePath('@~/screenshot.heic')).toBe(true);
     });
 
     it('should return true for paths with escaped spaces', () => {
