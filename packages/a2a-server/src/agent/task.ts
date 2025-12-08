@@ -68,6 +68,8 @@ export class Task {
   completedToolCalls: CompletedToolCall[];
   skipFinalTrueAfterInlineEdit = false;
   modelInfo?: string;
+  currentPromptId: string | undefined;
+  promptCount = 0;
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
@@ -395,6 +397,7 @@ export class Task {
       logger.info('[Task] YOLO mode enabled. Auto-approving all tool calls.');
       toolCalls.forEach((tc: ToolCall) => {
         if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           tc.confirmationDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
           this.pendingToolConfirmationDetails.delete(tc.request.callId);
         }
@@ -819,6 +822,7 @@ export class Task {
       } else {
         parts = [response];
       }
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       this.geminiClient.addHistory({
         role: 'user',
         parts,
@@ -857,11 +861,10 @@ export class Task {
     };
     // Set task state to working as we are about to call LLM
     this.setTaskStateAndPublishUpdate('working', stateChange);
-    // TODO: Determine what it mean to have, then add a prompt ID.
     yield* this.geminiClient.sendMessageStream(
       llmParts,
       aborted,
-      /*prompt_id*/ '',
+      completedToolCalls[0]?.request.prompt_id ?? '',
     );
   }
 
@@ -891,17 +894,18 @@ export class Task {
     }
 
     if (hasContentForLlm) {
+      this.currentPromptId =
+        this.config.getSessionId() + '########' + this.promptCount++;
       logger.info('[Task] Sending new parts to LLM.');
       const stateChange: StateChange = {
         kind: CoderAgentEvent.StateChangeEvent,
       };
       // Set task state to working as we are about to call LLM
       this.setTaskStateAndPublishUpdate('working', stateChange);
-      // TODO: Determine what it mean to have, then add a prompt ID.
       yield* this.geminiClient.sendMessageStream(
         llmParts,
         aborted,
-        /*prompt_id*/ '',
+        this.currentPromptId,
       );
     } else if (anyConfirmationHandled) {
       logger.info(
