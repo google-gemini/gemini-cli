@@ -7,7 +7,8 @@ on:
 jobs:
   label-pr:
     timeout-minutes: 5
-    if: '${{ github.repository == google-gemini/gemini-cli }}' # Adapt to your repo
+    if: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' }}
     permissions:
       pull-requests: 'write'
       contents: 'read'
