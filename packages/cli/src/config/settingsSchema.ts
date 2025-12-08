@@ -1077,13 +1077,13 @@ const SETTINGS_SCHEMA = {
       },
       enableGitAiIntegration: {
         type: 'boolean',
-        label: 'Enable Git-AI Integration',
+        label: 'Enable Git AI Integration',
         category: 'Advanced',
         requiresRestart: true,
         default: true,
         description:
-          'Enable automatic git-ai checkpoint hooks that run last for file write operations. When enabled, git-ai checkpoint hooks are automatically registered for BeforeTool and AfterTool events matching write_file|replace tools.',
-        showInDialog: false,
+          'Automatically track code authored by Gemini CLI if git-ai is available in your PATH. When enabled, git-ai checkpoint hooks are automatically registered for BeforeTool and AfterTool events matching write_file|replace tools.',
+        showInDialog: true,
       },
     },
   },
