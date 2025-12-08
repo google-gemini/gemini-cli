@@ -20,6 +20,10 @@ import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { MalformedJsonResponseEvent } from '../telemetry/types.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import {
+  applyModelSelection,
+  createAvailabilityContextProvider,
+} from '../availability/policyHelpers.js';
 
 const DEFAULT_MAX_ATTEMPTS = 5;
 
@@ -232,13 +236,56 @@ export class BaseLlmClient {
   ): Promise<GenerateContentResponse> {
     const abortSignal = requestParams.config?.abortSignal;
 
+    // Define callback to fetch context dynamically since active model may get updated during retry loop
+    const getAvailabilityContext = createAvailabilityContextProvider(
+      this.config,
+      () => requestParams.model,
+    );
+
+    const {
+      model,
+      config: newConfig,
+      maxAttempts: availabilityMaxAttempts,
+    } = applyModelSelection(
+      this.config,
+      requestParams.model,
+      requestParams.config,
+    );
+    requestParams.model = model;
+    if (newConfig) {
+      requestParams.config = newConfig;
+    }
+    if (abortSignal) {
+      requestParams.config = { ...requestParams.config, abortSignal };
+    }
+
     try {
-      const apiCall = () =>
-        this.contentGenerator.generateContent(requestParams, promptId);
+      const apiCall = () => {
+        // If availability is enabled, ensure we use the current active model
+        // in case a fallback occurred in a previous attempt.
+        if (this.config.isModelAvailabilityServiceEnabled()) {
+          const activeModel = this.config.getActiveModel();
+          if (activeModel !== requestParams.model) {
+            requestParams.model = activeModel;
+            // Re-resolve config if model changed during retry
+            const { generateContentConfig } =
+              this.config.modelConfigService.getResolvedConfig({
+                model: activeModel,
+              });
+            requestParams.config = {
+              ...requestParams.config,
+              ...generateContentConfig,
+            };
+          }
+        }
+        return this.contentGenerator.generateContent(requestParams, promptId);
+      };
 
       return await retryWithBackoff(apiCall, {
         shouldRetryOnContent,
-        maxAttempts: maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+        maxAttempts:
+          availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+        getAvailabilityContext,
       });
     } catch (error) {
       if (abortSignal?.aborted) {

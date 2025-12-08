@@ -8,13 +8,18 @@ import type { GenerateContentResponse } from '@google/genai';
 import { ApiError } from '@google/genai';
 import { AuthType } from '../core/contentGenerator.js';
 import {
-  classifyGoogleError,
-  RetryableQuotaError,
   TerminalQuotaError,
+  RetryableQuotaError,
+  classifyGoogleError,
 } from './googleQuotaErrors.js';
 import { delay, createAbortError } from './delay.js';
 import { debugLogger } from './debugLogger.js';
 import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
+import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
+import { classifyFailureKind } from '../availability/errorClassification.js';
+import { applyAvailabilityTransition } from '../availability/policyHelpers.js';
+
+export type { RetryAvailabilityContext };
 
 export interface RetryOptions {
   maxAttempts: number;
@@ -29,6 +34,7 @@ export interface RetryOptions {
   authType?: string;
   retryFetchErrors?: boolean;
   signal?: AbortSignal;
+  getAvailabilityContext?: () => RetryAvailabilityContext | undefined;
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
@@ -145,6 +151,7 @@ export async function retryWithBackoff<T>(
     shouldRetryOnContent,
     retryFetchErrors,
     signal,
+    getAvailabilityContext,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
     shouldRetryOnError: isRetryableError,
@@ -173,6 +180,11 @@ export async function retryWithBackoff<T>(
         continue;
       }
 
+      const successContext = getAvailabilityContext?.();
+      if (successContext) {
+        successContext.service.markHealthy(successContext.policy.model);
+      }
+
       return result;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
@@ -180,6 +192,13 @@ export async function retryWithBackoff<T>(
       }
 
       const classifiedError = classifyGoogleError(error);
+      const failureKind = classifyFailureKind(classifiedError);
+      const appliedImmediate =
+        failureKind === 'terminal' || failureKind === 'not_found';
+      if (appliedImmediate) {
+        applyAvailabilityTransition(getAvailabilityContext, failureKind);
+      }
+
       const errorCode = getErrorStatus(error);
 
       if (
@@ -201,6 +220,7 @@ export async function retryWithBackoff<T>(
             debugLogger.warn('Fallback to Flash model failed:', fallbackError);
           }
         }
+        // Terminal/not_found already recorded; nothing else to mark here.
         throw classifiedError; // Throw if no fallback or fallback failed.
       }
 
@@ -223,6 +243,9 @@ export async function retryWithBackoff<T>(
             } catch (fallbackError) {
               console.warn('Model fallback failed:', fallbackError);
             }
+          }
+          if (!appliedImmediate) {
+            applyAvailabilityTransition(getAvailabilityContext, failureKind);
           }
           throw classifiedError instanceof RetryableQuotaError
             ? classifiedError
@@ -253,6 +276,9 @@ export async function retryWithBackoff<T>(
         attempt >= maxAttempts ||
         !shouldRetryOnError(error as Error, retryFetchErrors)
       ) {
+        if (!appliedImmediate) {
+          applyAvailabilityTransition(getAvailabilityContext, failureKind);
+        }
         throw error;
       }
 
