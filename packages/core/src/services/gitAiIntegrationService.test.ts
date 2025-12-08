@@ -308,9 +308,7 @@ describe('GitAiIntegrationService', () => {
       const service = new GitAiIntegrationService(true);
       mockExecFailure();
 
-      await expect(
-        service.initialize(mockHookRegistry),
-      ).resolves.not.toThrow();
+      await expect(service.initialize(mockHookRegistry)).resolves.not.toThrow();
 
       expect(mockHookRegistry.addHookEntry).not.toHaveBeenCalled();
       expect(service.getStatus().registered).toBe(false);
@@ -322,9 +320,7 @@ describe('GitAiIntegrationService', () => {
         throw new Error('exec failed');
       });
 
-      await expect(
-        service.initialize(mockHookRegistry),
-      ).resolves.not.toThrow();
+      await expect(service.initialize(mockHookRegistry)).resolves.not.toThrow();
 
       expect(mockHookRegistry.addHookEntry).not.toHaveBeenCalled();
       expect(service.getStatus().registered).toBe(false);
@@ -338,10 +334,7 @@ describe('GitAiIntegrationService', () => {
 
       await service.initialize(mockHookRegistry);
 
-      expect(exec).toHaveBeenCalledWith(
-        'git-ai version',
-        expect.any(Function),
-      );
+      expect(exec).toHaveBeenCalledWith('git-ai version', expect.any(Function));
       expect(service.getStatus().registered).toBe(true);
     });
 
@@ -351,10 +344,7 @@ describe('GitAiIntegrationService', () => {
 
       await service.initialize(mockHookRegistry);
 
-      expect(exec).toHaveBeenCalledWith(
-        'git-ai version',
-        expect.any(Function),
-      );
+      expect(exec).toHaveBeenCalledWith('git-ai version', expect.any(Function));
       expect(service.getStatus().registered).toBe(false);
     });
   });

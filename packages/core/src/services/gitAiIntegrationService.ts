@@ -85,11 +85,11 @@ export class GitAiIntegrationService {
     hookRegistry.addHookEntry({
       config: {
         type: HookType.Command,
-        command: command,
+        command,
       },
       source: ConfigSource.Extensions,
       eventName: HookEventName.BeforeTool,
-      matcher: matcher,
+      matcher,
       enabled: true,
     });
 
@@ -97,11 +97,11 @@ export class GitAiIntegrationService {
     hookRegistry.addHookEntry({
       config: {
         type: HookType.Command,
-        command: command,
+        command,
       },
       source: ConfigSource.Extensions,
       eventName: HookEventName.AfterTool,
-      matcher: matcher,
+      matcher,
       enabled: true,
     });
 
@@ -123,4 +123,3 @@ export class GitAiIntegrationService {
     };
   }
 }
-
