@@ -222,32 +222,30 @@ export async function updateSetting(
     return;
   }
 
-  // For non-sensitive settings, we need to read the existing .env file for the given scope,
-  // update the value, and write it back.
-  const allSettings = await getScopedEnvContents(
-    extensionConfig,
-    extensionId,
-    scope,
-  );
-  allSettings[settingToUpdate.envVar] = newValue;
-
+  // For non-sensitive settings, we need to read the existing .env file,
+  // update the value, and write it back, preserving any other values.
   const envFilePath = getEnvFilePath(extensionName, scope);
+  let envContent = '';
+  if (fsSync.existsSync(envFilePath)) {
+    envContent = await fs.readFile(envFilePath, 'utf-8');
+  }
 
+  const parsedEnv = dotenv.parse(envContent);
+  parsedEnv[settingToUpdate.envVar] = newValue;
+
+  // We only want to write back the variables that are not sensitive.
   const nonSensitiveSettings: Record<string, string> = {};
-  for (const setting of settings) {
-    // We only care about non-sensitive settings for the .env file.
-    if (setting.sensitive) {
-      continue;
-    }
-    const value = allSettings[setting.envVar];
-    if (value !== undefined) {
-      nonSensitiveSettings[setting.envVar] = value;
+  const sensitiveEnvVars = new Set(
+    settings.filter((s) => s.sensitive).map((s) => s.envVar),
+  );
+  for (const [key, value] of Object.entries(parsedEnv)) {
+    if (!sensitiveEnvVars.has(key)) {
+      nonSensitiveSettings[key] = value;
     }
   }
 
-  const envContent = formatEnvContent(nonSensitiveSettings);
-
-  await fs.writeFile(envFilePath, envContent);
+  const newEnvContent = formatEnvContent(nonSensitiveSettings);
+  await fs.writeFile(envFilePath, newEnvContent);
 }
 
 interface settingsChanges {

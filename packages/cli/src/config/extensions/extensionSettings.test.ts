@@ -38,55 +38,46 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    KeychainTokenStorage: vi.fn().mockImplementation(() => ({
-      getSecret: vi.fn(),
-      setSecret: vi.fn(),
-      deleteSecret: vi.fn(),
-      listSecrets: vi.fn(),
-      isAvailable: vi.fn().mockResolvedValue(true),
-    })),
+    KeychainTokenStorage: vi.fn(),
   };
 });
-
-interface MockKeychainStorage {
-  getSecret: ReturnType<typeof vi.fn>;
-  setSecret: ReturnType<typeof vi.fn>;
-  deleteSecret: ReturnType<typeof vi.fn>;
-  listSecrets: ReturnType<typeof vi.fn>;
-  isAvailable: ReturnType<typeof vi.fn>;
-}
 
 describe('extensionSettings', () => {
   let tempHomeDir: string;
   let tempWorkspaceDir: string;
   let extensionDir: string;
-  let mockKeychainStorage: MockKeychainStorage;
-  let keychainData: Record<string, string>;
+  let mockKeychainData: Record<string, Record<string, string>>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    keychainData = {};
-    mockKeychainStorage = {
-      getSecret: vi
-        .fn()
-        .mockImplementation(async (key: string) => keychainData[key] || null),
-      setSecret: vi
-        .fn()
-        .mockImplementation(async (key: string, value: string) => {
-          keychainData[key] = value;
-        }),
-      deleteSecret: vi.fn().mockImplementation(async (key: string) => {
-        delete keychainData[key];
-      }),
-      listSecrets: vi
-        .fn()
-        .mockImplementation(async () => Object.keys(keychainData)),
-      isAvailable: vi.fn().mockResolvedValue(true),
-    };
-    (
-      KeychainTokenStorage as unknown as ReturnType<typeof vi.fn>
-    ).mockImplementation(() => mockKeychainStorage);
-
+    mockKeychainData = {};
+    vi.mocked(KeychainTokenStorage).mockImplementation(
+      (serviceName: string) => {
+        if (!mockKeychainData[serviceName]) {
+          mockKeychainData[serviceName] = {};
+        }
+        const keychainData = mockKeychainData[serviceName];
+        return {
+          getSecret: vi
+            .fn()
+            .mockImplementation(
+              async (key: string) => keychainData[key] || null,
+            ),
+          setSecret: vi
+            .fn()
+            .mockImplementation(async (key: string, value: string) => {
+              keychainData[key] = value;
+            }),
+          deleteSecret: vi.fn().mockImplementation(async (key: string) => {
+            delete keychainData[key];
+          }),
+          listSecrets: vi
+            .fn()
+            .mockImplementation(async () => Object.keys(keychainData)),
+          isAvailable: vi.fn().mockResolvedValue(true),
+        };
+      },
+    );
     tempHomeDir = os.tmpdir() + path.sep + `gemini-cli-test-home-${Date.now()}`;
     tempWorkspaceDir = path.join(
       os.tmpdir(),
@@ -224,7 +215,10 @@ describe('extensionSettings', () => {
         VAR1: 'previous-VAR1',
         SENSITIVE_VAR: 'secret',
       };
-      keychainData['SENSITIVE_VAR'] = 'secret';
+      const userKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext 12345`,
+      );
+      await userKeychain.setSecret('SENSITIVE_VAR', 'secret');
       const envPath = path.join(extensionDir, '.env');
       await fsPromises.writeFile(envPath, 'VAR1=previous-VAR1');
 
@@ -239,9 +233,7 @@ describe('extensionSettings', () => {
       expect(mockRequestSetting).not.toHaveBeenCalled();
       const actualContent = await fsPromises.readFile(envPath, 'utf-8');
       expect(actualContent).toBe('');
-      expect(mockKeychainStorage.deleteSecret).toHaveBeenCalledWith(
-        'SENSITIVE_VAR',
-      );
+      expect(await userKeychain.getSecret('SENSITIVE_VAR')).toBeNull();
     });
 
     it('should remove sensitive settings from keychain', async () => {
@@ -263,7 +255,10 @@ describe('extensionSettings', () => {
         settings: [],
       };
       const previousSettings = { SENSITIVE_VAR: 'secret' };
-      keychainData['SENSITIVE_VAR'] = 'secret';
+      const userKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext 12345`,
+      );
+      await userKeychain.setSecret('SENSITIVE_VAR', 'secret');
 
       await maybePromptForSettings(
         newConfig,
@@ -273,9 +268,7 @@ describe('extensionSettings', () => {
         previousSettings,
       );
 
-      expect(mockKeychainStorage.deleteSecret).toHaveBeenCalledWith(
-        'SENSITIVE_VAR',
-      );
+      expect(await userKeychain.getSecret('SENSITIVE_VAR')).toBeNull();
     });
 
     it('should remove settings that are no longer in the config', async () => {
@@ -485,7 +478,10 @@ describe('extensionSettings', () => {
     it('should return combined contents from user .env and keychain for USER scope', async () => {
       const userEnvPath = path.join(extensionDir, EXTENSION_SETTINGS_FILENAME);
       await fsPromises.writeFile(userEnvPath, 'VAR1=user-value1');
-      await mockKeychainStorage.setSecret('SENSITIVE_VAR', 'user-secret');
+      const userKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext 12345`,
+      );
+      await userKeychain.setSecret('SENSITIVE_VAR', 'user-secret');
 
       const contents = await getScopedEnvContents(
         config,
@@ -505,7 +501,10 @@ describe('extensionSettings', () => {
         EXTENSION_SETTINGS_FILENAME,
       );
       await fsPromises.writeFile(workspaceEnvPath, 'VAR1=workspace-value1');
-      await mockKeychainStorage.setSecret('SENSITIVE_VAR', 'workspace-secret');
+      const workspaceKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext 12345 ${tempWorkspaceDir}`,
+      );
+      await workspaceKeychain.setSecret('SENSITIVE_VAR', 'workspace-secret');
 
       const contents = await getScopedEnvContents(
         config,
