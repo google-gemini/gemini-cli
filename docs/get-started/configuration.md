@@ -687,14 +687,22 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`mcp.allowed`** (array):
-  - **Description:** A list of MCP servers to allow.
+  - **Description:** A list of allowed MCP servers. If set, only servers in this
+    list can run (allowlist). Non-matching servers are blocked.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
 - **`mcp.excluded`** (array):
-  - **Description:** A list of MCP servers to exclude.
+  - **Description:** A list of excluded MCP servers. Servers in this list are
+    blocked even if allowed by other rules (blocklist).
   - **Default:** `undefined`
   - **Requires restart:** Yes
+
+- **`mcp.disabled`** (array):
+  - **Description:** List of MCP server names that are disabled by the user
+    (e.g. via /mcp disable). Disabled servers are not blocked, just turned off,
+    and can be re-enabled.
+  - **Default:** `[]`
 
 #### `useSmartEdit`
 

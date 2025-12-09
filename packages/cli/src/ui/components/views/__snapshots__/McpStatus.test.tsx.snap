@@ -71,6 +71,21 @@ A test server
 "
 `;
 
+exports[`McpStatus > renders correctly with disabled servers 1`] = `
+"Configured MCP servers:
+
+🟢 server-1 - Ready (1 tool)
+A test server
+  Tools:
+  - tool-1
+    A test tool
+
+
+Disabled servers (use /mcp enable to re-enable):
+⏸️ disabled-server - Disabled
+"
+`;
+
 exports[`McpStatus > renders correctly with expired OAuth status 1`] = `
 "Configured MCP servers:
 
@@ -147,6 +162,21 @@ A test server
           }
         }
       }
+"
+`;
+
+exports[`McpStatus > renders correctly with session unmounted servers 1`] = `
+"Configured MCP servers:
+
+🟢 server-1 - Ready (1 tool)
+A test server
+  Tools:
+  - tool-1
+    A test tool
+
+
+Session unmounted servers (use /mcp mount to reconnect):
+⏸️ unmounted-server - Unmounted (this session)
 "
 `;
 

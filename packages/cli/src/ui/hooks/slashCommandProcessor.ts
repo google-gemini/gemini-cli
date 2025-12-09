@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useEffect, useState } from 'react';
+import { useCallback, useMemo, useEffect, useState, useRef } from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -263,16 +263,28 @@ export const useSlashCommandProcessor = (
     ],
   );
 
+  const sessionMountedMcpServersRef = useRef(sessionMountedMcpServers);
+  const sessionUnmountedMcpServersRef = useRef(sessionUnmountedMcpServers);
+
+  useEffect(() => {
+    sessionMountedMcpServersRef.current = sessionMountedMcpServers;
+  }, [sessionMountedMcpServers]);
+
+  useEffect(() => {
+    sessionUnmountedMcpServersRef.current = sessionUnmountedMcpServers;
+  }, [sessionUnmountedMcpServers]);
+
   // Wire up session MCP callbacks so McpClientManager can check session state
   useEffect(() => {
     if (!config) {
       return;
     }
     config.setSessionMcpCallbacks({
-      getSessionMounted: () => Array.from(sessionMountedMcpServers),
-      getSessionUnmounted: () => Array.from(sessionUnmountedMcpServers),
+      getSessionMounted: () => Array.from(sessionMountedMcpServersRef.current),
+      getSessionUnmounted: () =>
+        Array.from(sessionUnmountedMcpServersRef.current),
     });
-  }, [config, sessionMountedMcpServers, sessionUnmountedMcpServers]);
+  }, [config]);
 
   useEffect(() => {
     if (!config) {

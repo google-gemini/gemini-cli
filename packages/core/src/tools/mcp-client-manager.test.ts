@@ -53,6 +53,9 @@ describe('McpClientManager', () => {
       getGeminiClient: vi.fn().mockReturnValue({
         isInitialized: vi.fn(),
       }),
+      getDisabledMcpServers: vi.fn().mockReturnValue([]),
+      getSessionMountedMcpServers: vi.fn().mockReturnValue([]),
+      getSessionUnmountedMcpServers: vi.fn().mockReturnValue([]),
     } as unknown as Config);
     toolRegistry = {} as ToolRegistry;
   });

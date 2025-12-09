@@ -1102,7 +1102,8 @@ const SETTINGS_SCHEMA = {
         category: 'MCP',
         requiresRestart: true,
         default: undefined as string[] | undefined,
-        description: 'A list of MCP servers to allow.',
+        description:
+          'A list of allowed MCP servers. If set, only servers in this list can run (allowlist). Non-matching servers are blocked.',
         showInDialog: false,
         items: { type: 'string' },
       },
@@ -1112,7 +1113,8 @@ const SETTINGS_SCHEMA = {
         category: 'MCP',
         requiresRestart: true,
         default: undefined as string[] | undefined,
-        description: 'A list of MCP servers to exclude.',
+        description:
+          'A list of excluded MCP servers. Servers in this list are blocked even if allowed by other rules (blocklist).',
         showInDialog: false,
         items: { type: 'string' },
       },
@@ -1121,9 +1123,9 @@ const SETTINGS_SCHEMA = {
         label: 'Disabled MCP Servers',
         category: 'MCP',
         requiresRestart: false,
-        default: [] as string[],
+        default: [],
         description:
-          'List of MCP server names that are disabled. Disabled servers will not connect until re-enabled.',
+          'List of MCP server names that are disabled by the user (e.g. via /mcp disable). Disabled servers are not blocked, just turned off, and can be re-enabled.',
         showInDialog: false,
         items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,

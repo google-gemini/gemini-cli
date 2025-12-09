@@ -1110,8 +1110,8 @@
         },
         "allowed": {
           "title": "Allow MCP Servers",
-          "description": "A list of MCP servers to allow.",
-          "markdownDescription": "A list of MCP servers to allow.\n\n- Category: `MCP`\n- Requires restart: `yes`",
+          "description": "A list of allowed MCP servers. If set, only servers in this list can run (allowlist). Non-matching servers are blocked.",
+          "markdownDescription": "A list of allowed MCP servers. If set, only servers in this list can run (allowlist). Non-matching servers are blocked.\n\n- Category: `MCP`\n- Requires restart: `yes`",
           "type": "array",
           "items": {
             "type": "string"
@@ -1119,8 +1119,18 @@
         },
         "excluded": {
           "title": "Exclude MCP Servers",
-          "description": "A list of MCP servers to exclude.",
-          "markdownDescription": "A list of MCP servers to exclude.\n\n- Category: `MCP`\n- Requires restart: `yes`",
+          "description": "A list of excluded MCP servers. Servers in this list are blocked even if allowed by other rules (blocklist).",
+          "markdownDescription": "A list of excluded MCP servers. Servers in this list are blocked even if allowed by other rules (blocklist).\n\n- Category: `MCP`\n- Requires restart: `yes`",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "disabled": {
+          "title": "Disabled MCP Servers",
+          "description": "List of MCP server names that are disabled by the user (e.g. via /mcp disable). Disabled servers are not blocked, just turned off, and can be re-enabled.",
+          "markdownDescription": "List of MCP server names that are disabled by the user (e.g. via /mcp disable). Disabled servers are not blocked, just turned off, and can be re-enabled.\n\n- Category: `MCP`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
           "type": "array",
           "items": {
             "type": "string"

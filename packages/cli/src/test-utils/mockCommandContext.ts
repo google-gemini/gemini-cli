@@ -56,12 +56,15 @@ export const createMockCommandContext = (
       toggleVimEnabled: vi.fn(),
       extensionsUpdateState: new Map(),
       setExtensionsUpdateState: vi.fn(),
+      reloadCommands: vi.fn(),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any,
     session: {
       sessionShellAllowlist: new Set<string>(),
       sessionMountedMcpServers: new Set<string>(),
       sessionUnmountedMcpServers: new Set<string>(),
+      setSessionMountedMcpServers: vi.fn(),
+      setSessionUnmountedMcpServers: vi.fn(),
       stats: {
         sessionStartTime: new Date(),
         lastPromptTokenCount: 0,

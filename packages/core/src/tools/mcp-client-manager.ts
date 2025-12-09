@@ -152,6 +152,23 @@ export class McpClientManager {
     return this.knownServerConfigs;
   }
 
+  /**
+   * Returns all known MCP server names from configured, connected, and previously discovered sources.
+   */
+  getAllMcpServerNames(): string[] {
+    const configuredServers = this.cliConfig.getMcpServers() || {};
+    const connectedServers = this.getMcpServers(); // Note: This only returns *connected* server configs
+    const knownServers = this.getAllKnownServerConfigs();
+
+    const allServerNames = new Set([
+      ...Object.keys(configuredServers),
+      ...Object.keys(connectedServers),
+      ...knownServers.keys(),
+    ]);
+
+    return Array.from(allServerNames);
+  }
+
   private async disconnectClient(name: string) {
     const existing = this.clients.get(name);
     if (existing) {

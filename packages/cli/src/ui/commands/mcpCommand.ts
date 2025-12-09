@@ -395,19 +395,9 @@ function completeMcpServerNames(
   const mcpClientManager = config.getMcpClientManager();
   if (!mcpClientManager) return [];
 
-  // Get all servers: user-configured, connected, and previously discovered
-  const configuredServers = config.getMcpServers() || {};
-  const connectedServers = mcpClientManager.getMcpServers();
-  const knownServers = mcpClientManager.getAllKnownServerConfigs();
-  const allServerNames = new Set([
-    ...Object.keys(configuredServers),
-    ...Object.keys(connectedServers),
-    ...knownServers.keys(),
-  ]);
+  const allServerNames = mcpClientManager.getAllMcpServerNames();
 
-  return Array.from(allServerNames).filter((name) =>
-    name.startsWith(partialArg),
-  );
+  return allServerNames.filter((name) => name.startsWith(partialArg));
 }
 
 /**
@@ -446,7 +436,7 @@ async function enableAction(
 
   // Get current disabled servers from settings
   const settings = context.services.settings;
-  const disabledServers = settings.merged.mcp?.disabled || ([] as string[]);
+  const disabledServers: string[] = settings.merged.mcp?.disabled || [];
 
   // Check if it's actually disabled
   if (!disabledServers.includes(serverName)) {
@@ -470,6 +460,10 @@ async function enableAction(
     const serverConfig =
       mcpClientManager.getServerConfig(serverName) ||
       config.getMcpServers()?.[serverName];
+
+    // Check if server is blocked
+    const blockedServers = mcpClientManager.getBlockedMcpServers();
+    const isBlocked = blockedServers.some((s) => s.name === serverName);
 
     if (serverConfig) {
       context.ui.addItem(
@@ -495,10 +489,14 @@ async function enableAction(
       context.ui.reloadCommands();
     }
 
+    const blockedWarning = isBlocked
+      ? '\n\n⚠️  Warning: This server appears to be blocked by your configuration (mcp.allowed/mcp.excluded). It may not function until unblocked.'
+      : '';
+
     return {
       type: 'message',
       messageType: 'info',
-      content: `MCP server "${serverName}" enabled successfully.`,
+      content: `MCP server "${serverName}" enabled successfully.${blockedWarning}`,
     };
   } catch (error) {
     return {
@@ -545,7 +543,7 @@ async function disableAction(
 
   // Get current disabled servers from settings
   const settings = context.services.settings;
-  const disabledServers = settings.merged.mcp?.disabled || ([] as string[]);
+  const disabledServers: string[] = settings.merged.mcp?.disabled || [];
 
   // Check if already disabled
   if (disabledServers.includes(serverName)) {
@@ -650,8 +648,12 @@ async function mountAction(
   const isSessionUnmounted =
     context.session.sessionUnmountedMcpServers.has(serverName);
   const settings = context.services.settings;
-  const disabledServers = settings.merged.mcp?.disabled || [];
+  const disabledServers: string[] = settings.merged.mcp?.disabled || [];
   const isDisabled = disabledServers.includes(serverName);
+
+  // Check if server is blocked
+  const blockedServers = mcpClientManager.getBlockedMcpServers();
+  const isBlocked = blockedServers.some((s) => s.name === serverName);
 
   if (isConnected && !isSessionUnmounted) {
     return {
@@ -704,9 +706,14 @@ async function mountAction(
     // Reload the slash commands to reflect the changes
     context.ui.reloadCommands();
 
-    const resultText = isDisabled
+    let resultText = isDisabled
       ? `MCP server "${serverName}" mounted for this session (will return to disabled on restart).`
       : `MCP server "${serverName}" mounted for this session.`;
+
+    if (isBlocked) {
+      resultText +=
+        '\n\n⚠️  Warning: This server is blocked by your configuration (mcp.allowed/mcp.excluded), but is being forcefully mounted for this session.';
+    }
 
     return {
       type: 'message',

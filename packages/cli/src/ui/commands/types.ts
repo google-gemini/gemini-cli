@@ -88,11 +88,11 @@ export interface CommandContext {
     /** MCP servers temporarily unmounted for this session (overrides enabled state). */
     sessionUnmountedMcpServers: Set<string>;
     /** Updates the set of mounted MCP servers for this session. */
-    setSessionMountedMcpServers?: (
+    setSessionMountedMcpServers: (
       updater: (prev: Set<string>) => Set<string>,
     ) => void;
     /** Updates the set of unmounted MCP servers for this session. */
-    setSessionUnmountedMcpServers?: (
+    setSessionUnmountedMcpServers: (
       updater: (prev: Set<string>) => Set<string>,
     ) => void;
   };
