@@ -65,6 +65,24 @@ describe('ResourceRegistry', () => {
     expect(registry.findResourceByUri('nonexistent')).toBeUndefined();
   });
 
+  it('allows bare URIs when they uniquely match', () => {
+    const foo = createResource({ uri: 'file:///tmp/foo.txt' });
+    const bar = createResource({ uri: 'file:///tmp/bar.txt' });
+    registry.setResourcesForServer('a', [foo]);
+    registry.setResourcesForServer('b', [bar]);
+
+    expect(registry.findResourceByUri('file:///tmp/foo.txt')?.serverName).toBe(
+      'a',
+    );
+    expect(registry.findResourceByUri('file:///tmp/bar.txt')?.serverName).toBe(
+      'b',
+    );
+
+    // Ambiguous bare URI should return undefined
+    registry.setResourcesForServer('c', [createResource({ uri: foo.uri })]);
+    expect(registry.findResourceByUri('file:///tmp/foo.txt')).toBeUndefined();
+  });
+
   it('clears resources for a server', () => {
     registry.setResourcesForServer('a', [createResource()]);
     registry.removeResourcesByServer('a');

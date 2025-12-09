@@ -49,13 +49,19 @@ export class ResourceRegistry {
    * Format: serverName:uri (e.g., "myserver:file:///data.txt")
    */
   findResourceByUri(identifier: string): MCPResource | undefined {
-    const colonIndex = identifier.indexOf(':');
-    if (colonIndex <= 0) {
-      return undefined;
+    const prefixedMatch = identifier.match(
+      /^(?<server>[^:]+):(?<uri>[a-zA-Z][a-zA-Z0-9+.-]*:\/\/.+)$/,
+    );
+    if (prefixedMatch?.groups) {
+      const { server, uri } = prefixedMatch.groups;
+      return this.resources.get(resourceKey(server, uri));
     }
-    const serverName = identifier.substring(0, colonIndex);
-    const uri = identifier.substring(colonIndex + 1);
-    return this.resources.get(resourceKey(serverName, uri));
+
+    // Allow bare URIs if they uniquely match a single resource across servers.
+    const matches = Array.from(this.resources.values()).filter(
+      (resource) => resource.uri === identifier,
+    );
+    return matches.length === 1 ? matches[0] : undefined;
   }
 
   removeResourcesByServer(serverName: string): void {
