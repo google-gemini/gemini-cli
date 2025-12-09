@@ -3487,5 +3487,58 @@ describe('useGeminiStream', () => {
 
       expect(stdoutWriteSpy).not.toHaveBeenCalledWith('\x07');
     });
+
+    it('should play terminal bell when response completes and setting is enabled', async () => {
+      const settingsWithBell: LoadedSettings = {
+        ...mockLoadedSettings,
+        merged: { ...mockLoadedSettings.merged, general: { terminalBell: true } },
+      } as LoadedSettings;
+
+      // Mock a stream that yields content and completes
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Test response',
+          };
+        })(),
+      );
+
+      mockUseReactToolScheduler.mockReturnValue([
+        [],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+      ]);
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          settingsWithBell,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          vi.fn(),
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      expect(stdoutWriteSpy).toHaveBeenCalledWith('\x07');
+    });
   });
 });
