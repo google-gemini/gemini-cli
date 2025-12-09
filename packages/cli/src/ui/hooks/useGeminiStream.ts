@@ -101,8 +101,12 @@ function playTerminalBell(
   settings: LoadedSettings,
   stdout: NodeJS.WriteStream,
 ): void {
-  if (settings?.merged?.general?.terminalBell && stdout.isTTY) {
-    stdout.write('\x07');
+  try {
+    if (settings?.merged?.general?.terminalBell && stdout.isTTY) {
+      stdout.write('\x07');
+    }
+  } catch {
+    // Ignore errors if the stream is closed during shutdown.
   }
 }
 
