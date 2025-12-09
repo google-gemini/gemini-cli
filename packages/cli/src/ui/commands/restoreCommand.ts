@@ -9,6 +9,9 @@ import path from 'node:path';
 import { z } from 'zod';
 import {
   type Config,
+  formatCheckpointDisplayList,
+  getToolCallDataSchema,
+  getTruncatedCheckpointNames,
   performRestore,
   type ToolCallData,
 } from '@google/gemini-cli-core';
@@ -28,23 +31,7 @@ const HistoryItemSchema = z
   })
   .passthrough();
 
-const ContentSchema = z
-  .object({
-    role: z.string().optional(),
-    parts: z.array(z.record(z.unknown())),
-  })
-  .passthrough();
-
-const ToolCallDataSchema = z.object({
-  history: z.array(HistoryItemSchema).optional(),
-  clientHistory: z.array(ContentSchema).optional(),
-  commitHash: z.string().optional(),
-  toolCall: z.object({
-    name: z.string(),
-    args: z.record(z.unknown()),
-  }),
-  messageId: z.string().optional(),
-});
+const ToolCallDataSchema = getToolCallDataSchema(HistoryItemSchema);
 
 async function restoreAction(
   context: CommandContext,
@@ -78,15 +65,7 @@ async function restoreAction(
           content: 'No restorable tool calls found.',
         };
       }
-      const truncatedFiles = jsonFiles.map((file) => {
-        const components = file.split('.');
-        if (components.length <= 1) {
-          return file;
-        }
-        components.pop();
-        return components.join('.');
-      });
-      const fileList = truncatedFiles.join('\n');
+      const fileList = formatCheckpointDisplayList(jsonFiles);
       return {
         type: 'message',
         messageType: 'info',
@@ -171,9 +150,8 @@ async function completion(
   }
   try {
     const files = await fs.readdir(checkpointDir);
-    return files
-      .filter((file) => file.endsWith('.json'))
-      .map((file) => file.replace('.json', ''));
+    const jsonFiles = files.filter((file) => file.endsWith('.json'));
+    return getTruncatedCheckpointNames(jsonFiles);
   } catch (_err) {
     return [];
   }

@@ -107,6 +107,7 @@ export interface ToolCallRequestInfo {
   args: Record<string, unknown>;
   isClientInitiated: boolean;
   prompt_id: string;
+  checkpoint?: string;
 }
 
 export interface ToolCallResponseInfo {
