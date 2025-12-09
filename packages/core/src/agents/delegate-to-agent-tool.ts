@@ -48,6 +48,12 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
         };
 
         for (const [key, inputDef] of Object.entries(def.inputConfig.inputs)) {
+          if (key === 'agentName') {
+            throw new Error(
+              `Agent '${def.name}' cannot have an input parameter named 'agentName' as it is a reserved parameter for delegation.`,
+            );
+          }
+
           let validator: z.ZodTypeAny = z.unknown();
 
           // Map input types to Zod
