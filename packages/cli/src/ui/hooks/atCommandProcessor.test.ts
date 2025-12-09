@@ -7,7 +7,7 @@
 import type { Mock } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handleAtCommand } from './atCommandProcessor.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { Config, DiscoveredMCPResource } from '@google/gemini-cli-core';
 import {
   FileDiscoveryService,
   GlobTool,
@@ -86,6 +86,13 @@ describe('handleAtCommand', () => {
       }),
       getUsageStatisticsEnabled: () => false,
       getEnableExtensionReloading: () => false,
+      getResourceRegistry: () => ({
+        findResourceByUri: () => undefined,
+        getAllResources: () => [],
+      }),
+      getMcpClientManager: () => ({
+        getClient: () => undefined,
+      }),
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig);
@@ -1240,5 +1247,99 @@ describe('handleAtCommand', () => {
       (call) => call[0].type === 'user',
     );
     expect(userTurnCalls).toHaveLength(0);
+  });
+
+  describe('MCP resource attachments', () => {
+    it('attaches MCP resource content when @serverName:uri matches registry', async () => {
+      const serverName = 'server-1';
+      const resourceUri = 'resource://server-1/logs';
+      const prefixedUri = `${serverName}:${resourceUri}`;
+      const resource = {
+        serverName,
+        uri: resourceUri,
+        name: 'logs',
+        discoveredAt: Date.now(),
+      } as DiscoveredMCPResource;
+
+      vi.spyOn(mockConfig, 'getResourceRegistry').mockReturnValue({
+        findResourceByUri: (identifier: string) =>
+          identifier === prefixedUri ? resource : undefined,
+        getAllResources: () => [],
+      } as never);
+
+      const readResource = vi.fn().mockResolvedValue({
+        contents: [{ text: 'mcp resource body' }],
+      });
+      vi.spyOn(mockConfig, 'getMcpClientManager').mockReturnValue({
+        getClient: () => ({ readResource }),
+      } as never);
+
+      const result = await handleAtCommand({
+        query: `@${prefixedUri}`,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 42,
+        signal: abortController.signal,
+      });
+
+      expect(readResource).toHaveBeenCalledWith(resourceUri);
+      const processedParts = Array.isArray(result.processedQuery)
+        ? result.processedQuery
+        : [];
+      const containsResourceText = processedParts.some((part) => {
+        const text = typeof part === 'string' ? part : part?.text;
+        return typeof text === 'string' && text.includes('mcp resource body');
+      });
+      expect(containsResourceText).toBe(true);
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'tool_group' }),
+        expect.any(Number),
+      );
+    });
+
+    it('returns an error if MCP client is unavailable', async () => {
+      const serverName = 'server-1';
+      const resourceUri = 'resource://server-1/logs';
+      const prefixedUri = `${serverName}:${resourceUri}`;
+      vi.spyOn(mockConfig, 'getResourceRegistry').mockReturnValue({
+        findResourceByUri: (identifier: string) =>
+          identifier === prefixedUri
+            ? ({
+                serverName,
+                uri: resourceUri,
+                discoveredAt: Date.now(),
+              } as DiscoveredMCPResource)
+            : undefined,
+        getAllResources: () => [],
+      } as never);
+      vi.spyOn(mockConfig, 'getMcpClientManager').mockReturnValue({
+        getClient: () => undefined,
+      } as never);
+
+      const result = await handleAtCommand({
+        query: `@${prefixedUri}`,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 42,
+        signal: abortController.signal,
+      });
+
+      expect(result.shouldProceed).toBe(false);
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'tool_group',
+          tools: expect.arrayContaining([
+            expect.objectContaining({
+              resultDisplay: expect.stringContaining(
+                "MCP client for server 'server-1' is not available or not connected.",
+              ),
+            }),
+          ]),
+        }),
+        expect.any(Number),
+      );
+    });
   });
 });
