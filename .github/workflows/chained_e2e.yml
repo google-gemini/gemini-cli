@@ -111,6 +111,7 @@ jobs:
     permissions: 'write-all'
     needs:
       - 'parse_run_context'
+    if: 'always()'
     steps:
       - name: 'Set pending status'
         uses: 'myrotvorets/set-commit-status-action@16037e056d73b2d3c88e37e393ff369047f70886' # ratchet:myrotvorets/set-commit-status-action@master
