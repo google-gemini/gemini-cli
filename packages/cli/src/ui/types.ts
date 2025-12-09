@@ -224,11 +224,20 @@ export interface JsonMcpPrompt {
   description?: string;
 }
 
+export interface JsonMcpResource {
+  serverName: string;
+  name?: string;
+  uri?: string;
+  mimeType?: string;
+  description?: string;
+}
+
 export type HistoryItemMcpStatus = HistoryItemBase & {
   type: 'mcp_status';
   servers: Record<string, MCPServerConfig>;
   tools: JsonMcpTool[];
   prompts: JsonMcpPrompt[];
+  resources: JsonMcpResource[];
   authStatus: Record<
     string,
     'authenticated' | 'expired' | 'unauthenticated' | 'not-configured'

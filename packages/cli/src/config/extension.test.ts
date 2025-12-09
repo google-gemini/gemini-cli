@@ -749,6 +749,17 @@ describe('extension tests', () => {
           JSON.stringify(hooksConfig),
         );
 
+        const settings = loadSettings(tempWorkspaceDir).merged;
+        if (!settings.tools) settings.tools = {};
+        settings.tools.enableHooks = true;
+
+        extensionManager = new ExtensionManager({
+          workspaceDir: tempWorkspaceDir,
+          requestConsent: mockRequestConsent,
+          requestSetting: mockPromptForSettings,
+          settings,
+        });
+
         const extensions = await extensionManager.loadExtensions();
         expect(extensions).toHaveLength(1);
         const extension = extensions[0];
@@ -758,6 +769,36 @@ describe('extension tests', () => {
         expect(extension.hooks?.BeforeTool?.[0].hooks[0].command).toBe(
           `echo ${extDir}`,
         );
+      });
+
+      it('should not load hooks if enableHooks is false', async () => {
+        const extDir = createExtension({
+          extensionsDir: userExtensionsDir,
+          name: 'hook-extension-disabled',
+          version: '1.0.0',
+        });
+
+        const hooksDir = path.join(extDir, 'hooks');
+        fs.mkdirSync(hooksDir);
+        fs.writeFileSync(
+          path.join(hooksDir, 'hooks.json'),
+          JSON.stringify({ hooks: { BeforeTool: [] } }),
+        );
+
+        const settings = loadSettings(tempWorkspaceDir).merged;
+        if (!settings.tools) settings.tools = {};
+        settings.tools.enableHooks = false;
+
+        extensionManager = new ExtensionManager({
+          workspaceDir: tempWorkspaceDir,
+          requestConsent: mockRequestConsent,
+          requestSetting: mockPromptForSettings,
+          settings,
+        });
+
+        const extensions = await extensionManager.loadExtensions();
+        expect(extensions).toHaveLength(1);
+        expect(extensions[0].hooks).toBeUndefined();
       });
 
       it('should warn about hooks during installation', async () => {
