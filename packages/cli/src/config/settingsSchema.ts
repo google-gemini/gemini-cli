@@ -1116,6 +1116,18 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         items: { type: 'string' },
       },
+      disabled: {
+        type: 'array',
+        label: 'Disabled MCP Servers',
+        category: 'MCP',
+        requiresRestart: false,
+        default: [] as string[],
+        description:
+          'List of MCP server names that are disabled. Disabled servers will not connect until re-enabled.',
+        showInDialog: false,
+        items: { type: 'string' },
+        mergeStrategy: MergeStrategy.UNION,
+      },
     },
   },
   useSmartEdit: {

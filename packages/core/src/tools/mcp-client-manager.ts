@@ -37,6 +37,8 @@ export class McpClientManager {
     name: string;
     extensionName: string;
   }> = [];
+  // Store all known server configs, even when disconnected (for mount/unmount)
+  private readonly knownServerConfigs: Map<string, MCPServerConfig> = new Map();
 
   constructor(
     toolRegistry: ToolRegistry,
@@ -111,6 +113,45 @@ export class McpClientManager {
     return true;
   }
 
+  /**
+   * Checks if an MCP server is disabled (via persistent settings).
+   * Disabled servers are different from blocked servers:
+   * - Blocked servers are configured at startup and can't be unblocked at runtime
+   * - Disabled servers can be re-enabled at runtime via /mcp enable
+   */
+  isDisabledMcpServer(name: string): boolean {
+    const disabledNames = this.cliConfig.getDisabledMcpServers();
+    return disabledNames.includes(name);
+  }
+
+  /**
+   * Disconnects and removes an MCP server by name.
+   * Used by /mcp disable and /mcp unmount commands.
+   */
+  async disconnectServer(name: string): Promise<void> {
+    await this.disconnectClient(name);
+  }
+
+  /**
+   * Gets the server config for a server (connected or previously seen).
+   * Returns undefined if the server has never been discovered.
+   */
+  getServerConfig(name: string): MCPServerConfig | undefined {
+    // First check connected clients, then fall back to known configs
+    return (
+      this.clients.get(name)?.getServerConfig() ??
+      this.knownServerConfigs.get(name)
+    );
+  }
+
+  /**
+   * Returns all known server configs (both connected and disconnected).
+   * This includes servers from extensions that have been seen during this session.
+   */
+  getAllKnownServerConfigs(): Map<string, MCPServerConfig> {
+    return this.knownServerConfigs;
+  }
+
   private async disconnectClient(name: string) {
     const existing = this.clients.get(name);
     if (existing) {
@@ -136,15 +177,45 @@ export class McpClientManager {
   maybeDiscoverMcpServer(
     name: string,
     config: MCPServerConfig,
+    options?: { forceConnect?: boolean },
   ): Promise<void> | void {
-    if (!this.isAllowedMcpServer(name)) {
-      if (!this.blockedMcpServers.find((s) => s.name === name)) {
-        this.blockedMcpServers?.push({
-          name,
-          extensionName: config.extension?.name ?? '',
-        });
+    // Store config for later retrieval (for mount/unmount to work after disable)
+    this.knownServerConfigs.set(name, config);
+
+    // If forceConnect is true, skip all session/disabled/blocked checks
+    // This is used by /mcp mount to explicitly connect a server
+    if (!options?.forceConnect) {
+      // Session-mounted servers override all other checks (user explicitly mounted this session)
+      const sessionMounted = this.cliConfig
+        .getSessionMountedMcpServers()
+        .includes(name);
+
+      // Session-unmounted servers are skipped (user explicitly unmounted this session)
+      const sessionUnmounted = this.cliConfig
+        .getSessionUnmountedMcpServers()
+        .includes(name);
+      if (sessionUnmounted) {
+        debugLogger.log(`Skipping session-unmounted MCP server: ${name}`);
+        return;
       }
-      return;
+
+      // Only check allowed/blocked/disabled if not session-mounted
+      if (!sessionMounted) {
+        if (!this.isAllowedMcpServer(name)) {
+          if (!this.blockedMcpServers.find((s) => s.name === name)) {
+            this.blockedMcpServers?.push({
+              name,
+              extensionName: config.extension?.name ?? '',
+            });
+          }
+          return;
+        }
+        // Check if the server is disabled (different from blocked - disabled can be re-enabled)
+        if (this.isDisabledMcpServer(name)) {
+          debugLogger.log(`Skipping disabled MCP server: ${name}`);
+          return;
+        }
+      }
     }
     if (!this.cliConfig.isTrustedFolder()) {
       return;

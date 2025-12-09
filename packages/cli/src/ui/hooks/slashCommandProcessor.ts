@@ -107,6 +107,12 @@ export const useSlashCommandProcessor = (
   const [sessionShellAllowlist, setSessionShellAllowlist] = useState(
     new Set<string>(),
   );
+  const [sessionMountedMcpServers, setSessionMountedMcpServers] = useState(
+    new Set<string>(),
+  );
+  const [sessionUnmountedMcpServers, setSessionUnmountedMcpServers] = useState(
+    new Set<string>(),
+  );
   const gitService = useMemo(() => {
     if (!config?.getProjectRoot()) {
       return;
@@ -224,6 +230,10 @@ export const useSlashCommandProcessor = (
       session: {
         stats: session.stats,
         sessionShellAllowlist,
+        sessionMountedMcpServers,
+        sessionUnmountedMcpServers,
+        setSessionMountedMcpServers,
+        setSessionUnmountedMcpServers,
       },
     }),
     [
@@ -242,12 +252,27 @@ export const useSlashCommandProcessor = (
       setPendingItem,
       toggleVimEnabled,
       sessionShellAllowlist,
+      sessionMountedMcpServers,
+      sessionUnmountedMcpServers,
+      setSessionMountedMcpServers,
+      setSessionUnmountedMcpServers,
       reloadCommands,
       extensionsUpdateState,
       setBannerVisible,
       setCustomDialog,
     ],
   );
+
+  // Wire up session MCP callbacks so McpClientManager can check session state
+  useEffect(() => {
+    if (!config) {
+      return;
+    }
+    config.setSessionMcpCallbacks({
+      getSessionMounted: () => Array.from(sessionMountedMcpServers),
+      getSessionUnmounted: () => Array.from(sessionUnmountedMcpServers),
+    });
+  }, [config, sessionMountedMcpServers, sessionUnmountedMcpServers]);
 
   useEffect(() => {
     if (!config) {

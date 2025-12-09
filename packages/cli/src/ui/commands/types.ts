@@ -83,6 +83,18 @@ export interface CommandContext {
     stats: SessionStatsState;
     /** A transient list of shell commands the user has approved for this session. */
     sessionShellAllowlist: Set<string>;
+    /** MCP servers temporarily mounted for this session (overrides disabled state). */
+    sessionMountedMcpServers: Set<string>;
+    /** MCP servers temporarily unmounted for this session (overrides enabled state). */
+    sessionUnmountedMcpServers: Set<string>;
+    /** Updates the set of mounted MCP servers for this session. */
+    setSessionMountedMcpServers?: (
+      updater: (prev: Set<string>) => Set<string>,
+    ) => void;
+    /** Updates the set of unmounted MCP servers for this session. */
+    setSessionUnmountedMcpServers?: (
+      updater: (prev: Set<string>) => Set<string>,
+    ) => void;
   };
   // Flag to indicate if an overwrite has been confirmed
   overwriteConfirmed?: boolean;

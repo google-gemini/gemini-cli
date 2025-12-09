@@ -60,6 +60,8 @@ export const createMockCommandContext = (
     } as any,
     session: {
       sessionShellAllowlist: new Set<string>(),
+      sessionMountedMcpServers: new Set<string>(),
+      sessionUnmountedMcpServers: new Set<string>(),
       stats: {
         sessionStartTime: new Date(),
         lastPromptTokenCount: 0,
