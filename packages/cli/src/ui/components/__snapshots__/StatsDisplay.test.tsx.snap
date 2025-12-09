@@ -151,6 +151,36 @@ exports[`<StatsDisplay /> > Conditional Rendering Tests > hides User Agreement w
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
+exports[`<StatsDisplay /> > Quota Display > renders quota information for unused models 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  Session Stats                                                                                   │
+│                                                                                                  │
+│  Interaction Summary                                                                             │
+│  Session ID:                 test-session-id                                                     │
+│  Tool Calls:                 0 ( ✓ 0 x 0 )                                                       │
+│  Success Rate:               0.0%                                                                │
+│                                                                                                  │
+│  Performance                                                                                     │
+│  Wall Time:                  1s                                                                  │
+│  Agent Active:               0s                                                                  │
+│    » API Time:               0s (0.0%)                                                           │
+│    » Tool Time:              0s (0.0%)                                                           │
+│                                                                                                  │
+│                                                                                                  │
+│  Model Usage                  Reqs   Input Tokens  Output Tokens         Usage limit remaining   │
+│  ─────────────────────────────────────────────────────────────────────────────────────────────   │
+│  gemini-2.5-flash                -              -              -          50.0% (Resets in 2h)   │
+│                                                                                                  │
+│  Usage limits span all sessions and reset daily.                                                 │
+│  /auth to upgrade or switch to API key.                                                          │
+│                                                                                                  │
+│                                                                                                  │
+│  » Tip: For a full token breakdown, run \`/stats model\`.                                          │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
 exports[`<StatsDisplay /> > Quota Display > renders quota information when quotas are provided 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
