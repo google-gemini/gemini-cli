@@ -84,7 +84,7 @@ export function resolvePolicyAction(
 
 /**
  * Creates a context provider for retry logic that returns the availability
- * sevice and resolves the current model's policy.
+ * service and resolves the current model's policy.
  *
  * @param modelGetter A function that returns the model ID currently being attempted.
  *        (Allows handling dynamic model changes during retries).

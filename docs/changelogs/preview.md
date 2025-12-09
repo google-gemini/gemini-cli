@@ -38,7 +38,7 @@ npm install -g @google/gemini-cli@preview
   https://github.com/google-gemini/gemini-cli/pull/13577
 - Improved code coverage for cli/src/zed-integration by @megha1188 in
   https://github.com/google-gemini/gemini-cli/pull/13570
-- feat(ui): build interactive session browser component by @bl-ue in
+- feat(ui): build interactive session browser component by @bl-use in
   https://github.com/google-gemini/gemini-cli/pull/13351
 - Fix multiple bugs with auth flow including using the implemented but unused
   restart support. by @jacob314 in
@@ -121,11 +121,11 @@ npm install -g @google/gemini-cli@preview
 - fix(cli): allow non-GitHub SCP-styled URLs for extension installation by @m0ps
   in https://github.com/google-gemini/gemini-cli/pull/13800
 - fix(resume): allow passing a prompt via stdin while resuming using --resume by
-  @bl-ue in https://github.com/google-gemini/gemini-cli/pull/13520
+  @bl-use in https://github.com/google-gemini/gemini-cli/pull/13520
 - feat(sessions): add /resume slash command to open the session browser by
-  @bl-ue in https://github.com/google-gemini/gemini-cli/pull/13621
+  @bl-use in https://github.com/google-gemini/gemini-cli/pull/13621
 - docs(sessions): add documentation for chat recording and session management by
-  @bl-ue in https://github.com/google-gemini/gemini-cli/pull/13667
+  @bl-use in https://github.com/google-gemini/gemini-cli/pull/13667
 - Fix TypeError: "URL.parse is not a function" for Node.js < v22 by @macarronesc
   in https://github.com/google-gemini/gemini-cli/pull/13698
 - fallback to flash for TerminalQuota errors by @sehoon38 in

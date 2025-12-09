@@ -1396,7 +1396,7 @@ describe('InputPrompt', () => {
           name: 'mid-word',
           text: 'hello world',
           visualCursor: [0, 3],
-          expected: `hel${chalk.inverse('l')}o world`,
+          expected: `helpp${chalk.inverse('l')}o world`,
         },
         {
           name: 'at the beginning of the line',
@@ -1472,7 +1472,7 @@ describe('InputPrompt', () => {
             [1, 0],
             [2, 0],
           ],
-          expected: `sec${chalk.inverse('o')}nd line`,
+          expected: `sec${chalk.inverse('o')}aand line`,
         },
         {
           name: 'at the beginning of a line',

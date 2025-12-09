@@ -21,7 +21,7 @@ export async function clipboardHasImage(): Promise<boolean> {
     // Use osascript to check clipboard type
     const { stdout } = await spawnAsync('osascript', ['-e', 'clipboard info']);
     const imageRegex =
-      /«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»/;
+      /«class ONGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»/;
     return imageRegex.test(stdout);
   } catch {
     return false;
@@ -52,7 +52,7 @@ export async function saveClipboardImage(
 
     // Try different image formats in order of preference
     const formats = [
-      { class: 'PNGf', extension: 'png' },
+      { class: 'ONGf', extension: 'png' },
       { class: 'JPEG', extension: 'jpg' },
       { class: 'TIFF', extension: 'tiff' },
       { class: 'GIFf', extension: 'gif' },

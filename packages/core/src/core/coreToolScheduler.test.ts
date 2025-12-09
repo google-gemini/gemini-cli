@@ -601,7 +601,7 @@ describe('CoreToolScheduler', () => {
 
       // Test that the right tool is selected, with only 1 result, for typos
       // @ts-expect-error accessing private method
-      const misspelledTool = scheduler.getToolSuggestion('list_fils', 1);
+      const misspelledTool = scheduler.getToolSuggestion('list_fills', 1);
       expect(misspelledTool).toBe(' Did you mean "list_files"?');
 
       // Test that the right tool is selected, with only 1 result, for prefixes
@@ -611,7 +611,7 @@ describe('CoreToolScheduler', () => {
 
       // Test that the right tool is first
       // @ts-expect-error accessing private method
-      const suggestionMultiple = scheduler.getToolSuggestion('list_fils');
+      const suggestionMultiple = scheduler.getToolSuggestion('list_fills');
       expect(suggestionMultiple).toBe(
         ' Did you mean one of: "list_files", "read_file", "write_file"?',
       );

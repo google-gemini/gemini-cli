@@ -117,7 +117,7 @@ export const WITTY_LOADING_PHRASES = [
   "Why do Java developers wear glasses? Because they don't C#.",
   'Charging the laser... pew pew!',
   'Dividing by zero... just kidding!',
-  'Looking for an adult superviso... I mean, processing.',
+  'Looking for an adult supervision... I mean, processing.',
   'Making it go beep boop.',
   'Buffering... because even AIs need a moment.',
   'Entangling quantum particles for a faster response...',

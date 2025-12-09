@@ -20,8 +20,8 @@ vi.mock('../tools/memoryTool.js', () => ({
 describe('FileExclusions', () => {
   describe('getCoreIgnorePatterns', () => {
     it('should return basic ignore patterns', () => {
-      const excluder = new FileExclusions();
-      const patterns = excluder.getCoreIgnorePatterns();
+      const excluded = new FileExclusions();
+      const patterns = excluded.getCoreIgnorePatterns();
 
       expect(patterns).toContain('**/node_modules/**');
       expect(patterns).toContain('**/.git/**');
@@ -34,8 +34,8 @@ describe('FileExclusions', () => {
 
   describe('getDefaultExcludePatterns', () => {
     it('should return comprehensive patterns by default', () => {
-      const excluder = new FileExclusions();
-      const patterns = excluder.getDefaultExcludePatterns();
+      const excluded = new FileExclusions();
+      const patterns = excluded.getDefaultExcludePatterns();
 
       // Should include core patterns
       expect(patterns).toContain('**/node_modules/**');
@@ -59,8 +59,8 @@ describe('FileExclusions', () => {
     });
 
     it('should respect includeDefaults option', () => {
-      const excluder = new FileExclusions();
-      const patterns = excluder.getDefaultExcludePatterns({
+      const excluded = new FileExclusions();
+      const patterns = excluded.getDefaultExcludePatterns({
         includeDefaults: false,
         includeDynamicPatterns: false,
       });
@@ -72,8 +72,8 @@ describe('FileExclusions', () => {
     });
 
     it('should include custom patterns', () => {
-      const excluder = new FileExclusions();
-      const patterns = excluder.getDefaultExcludePatterns({
+      const excluded = new FileExclusions();
+      const patterns = excluded.getDefaultExcludePatterns({
         customPatterns: ['**/custom/**', '**/*.custom'],
       });
 
@@ -82,8 +82,8 @@ describe('FileExclusions', () => {
     });
 
     it('should include runtime patterns', () => {
-      const excluder = new FileExclusions();
-      const patterns = excluder.getDefaultExcludePatterns({
+      const excluded = new FileExclusions();
+      const patterns = excluded.getDefaultExcludePatterns({
         runtimePatterns: ['**/temp/**', '**/*.tmp'],
       });
 
@@ -92,11 +92,11 @@ describe('FileExclusions', () => {
     });
 
     it('should respect includeDynamicPatterns option', () => {
-      const excluder = new FileExclusions();
-      const patternsWithDynamic = excluder.getDefaultExcludePatterns({
+      const excluded = new FileExclusions();
+      const patternsWithDynamic = excluded.getDefaultExcludePatterns({
         includeDynamicPatterns: true,
       });
-      const patternsWithoutDynamic = excluder.getDefaultExcludePatterns({
+      const patternsWithoutDynamic = excluded.getDefaultExcludePatterns({
         includeDynamicPatterns: false,
       });
 
@@ -107,8 +107,8 @@ describe('FileExclusions', () => {
 
   describe('getReadManyFilesExcludes', () => {
     it('should provide legacy compatibility', () => {
-      const excluder = new FileExclusions();
-      const patterns = excluder.getReadManyFilesExcludes(['**/*.log']);
+      const excluded = new FileExclusions();
+      const patterns = excluded.getReadManyFilesExcludes(['**/*.log']);
 
       // Should include all default patterns
       expect(patterns).toContain('**/node_modules/**');
@@ -122,8 +122,8 @@ describe('FileExclusions', () => {
 
   describe('getGlobExcludes', () => {
     it('should return core patterns for glob operations', () => {
-      const excluder = new FileExclusions();
-      const patterns = excluder.getGlobExcludes();
+      const excluded = new FileExclusions();
+      const patterns = excluded.getGlobExcludes();
 
       expect(patterns).toContain('**/node_modules/**');
       expect(patterns).toContain('**/.git/**');
@@ -136,8 +136,8 @@ describe('FileExclusions', () => {
     });
 
     it('should include additional excludes', () => {
-      const excluder = new FileExclusions();
-      const patterns = excluder.getGlobExcludes(['**/temp/**']);
+      const excluded = new FileExclusions();
+      const patterns = excluded.getGlobExcludes(['**/temp/**']);
 
       expect(patterns).toContain('**/node_modules/**');
       expect(patterns).toContain('**/.git/**');
@@ -151,8 +151,8 @@ describe('FileExclusions', () => {
         getCustomExcludes: vi.fn(() => ['**/config-exclude/**']),
       } as unknown as Config;
 
-      const excluder = new FileExclusions(mockConfig);
-      const patterns = excluder.getDefaultExcludePatterns();
+      const excluded = new FileExclusions(mockConfig);
+      const patterns = excluded.getDefaultExcludePatterns();
 
       expect(patterns).toContain('**/config-exclude/**');
       expect(mockConfig.getCustomExcludes).toHaveBeenCalled();
@@ -161,8 +161,8 @@ describe('FileExclusions', () => {
     it('should handle config without getCustomExcludes method', () => {
       const mockConfig = {} as Config;
 
-      const excluder = new FileExclusions(mockConfig);
-      const patterns = excluder.getDefaultExcludePatterns();
+      const excluded = new FileExclusions(mockConfig);
+      const patterns = excluded.getDefaultExcludePatterns();
 
       // Should not throw and should include default patterns
       expect(patterns).toContain('**/node_modules/**');
@@ -174,8 +174,8 @@ describe('FileExclusions', () => {
         getCustomExcludes: vi.fn(() => ['**/config-glob/**']),
       } as unknown as Config;
 
-      const excluder = new FileExclusions(mockConfig);
-      const patterns = excluder.getGlobExcludes();
+      const excluded = new FileExclusions(mockConfig);
+      const patterns = excluded.getGlobExcludes();
 
       expect(patterns).toContain('**/node_modules/**');
       expect(patterns).toContain('**/.git/**');
@@ -185,15 +185,15 @@ describe('FileExclusions', () => {
 
   describe('buildExcludePatterns', () => {
     it('should be an alias for getDefaultExcludePatterns', () => {
-      const excluder = new FileExclusions();
+      const excluded = new FileExclusions();
       const options = {
         includeDefaults: true,
         customPatterns: ['**/test/**'],
         runtimePatterns: ['**/runtime/**'],
       };
 
-      const defaultPatterns = excluder.getDefaultExcludePatterns(options);
-      const buildPatterns = excluder.buildExcludePatterns(options);
+      const defaultPatterns = excluded.getDefaultExcludePatterns(options);
+      const buildPatterns = excluded.buildExcludePatterns(options);
 
       expect(buildPatterns).toEqual(defaultPatterns);
     });

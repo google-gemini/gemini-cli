@@ -780,7 +780,7 @@ describe('useTextBuffer', () => {
       expect(result.current.allVisualLines).toEqual([
         'line',
         'one',
-        'secon',
+        'secondd',
         'd',
         'line',
       ]);

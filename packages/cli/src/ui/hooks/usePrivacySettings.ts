@@ -103,7 +103,7 @@ async function getRemoteDataCollectionOptIn(
 ): Promise<boolean> {
   try {
     const resp = await server.getCodeAssistGlobalUserSetting();
-    return resp.freeTierDataCollectionOptin;
+    return resp.freeTierDataCollectionOption;
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
       const gaxiosError = error as {
@@ -125,7 +125,7 @@ async function setRemoteDataCollectionOptIn(
 ): Promise<boolean> {
   const resp = await server.setCodeAssistGlobalUserSetting({
     cloudaicompanionProject: server.projectId,
-    freeTierDataCollectionOptin: optIn,
+    freeTierDataCollectionOption: optIn,
   });
-  return resp.freeTierDataCollectionOptin;
+  return resp.freeTierDataCollectionOption;
 }

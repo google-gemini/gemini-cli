@@ -95,10 +95,10 @@ describe('usePrivacySettings', () => {
     const mockCodeAssistServer = {
       projectId: 'test-project-id',
       getCodeAssistGlobalUserSetting: vi.fn().mockResolvedValue({
-        freeTierDataCollectionOptin: true,
+        freeTierDataCollectionOption: true,
       }),
       setCodeAssistGlobalUserSetting: vi.fn().mockResolvedValue({
-        freeTierDataCollectionOptin: false,
+        freeTierDataCollectionOption: false,
       }),
       userTier: UserTierId.FREE,
     } as unknown as CodeAssistServer;
@@ -125,7 +125,7 @@ describe('usePrivacySettings', () => {
       mockCodeAssistServer.setCodeAssistGlobalUserSetting,
     ).toHaveBeenCalledWith({
       cloudaicompanionProject: 'test-project-id',
-      freeTierDataCollectionOptin: false,
+      freeTierDataCollectionOption: false,
     });
   });
 });

@@ -522,7 +522,7 @@ describe('vim-buffer-actions', () => {
 
         const result = handleVimAction(state, action);
         expect(result).toHaveOnlyValidCharacters();
-        expect(result.lines[0]).toBe('hel');
+        expect(result.lines[0]).toBe('helpp');
         expect(result.cursorCol).toBe(3);
       });
 
@@ -827,7 +827,7 @@ describe('vim-buffer-actions', () => {
 
         const result = handleVimAction(state, action);
         expect(result).toHaveOnlyValidCharacters();
-        expect(result.lines[0]).toBe('hel world');
+        expect(result.lines[0]).toBe('helpp world');
         expect(result.cursorCol).toBe(3);
       });
 

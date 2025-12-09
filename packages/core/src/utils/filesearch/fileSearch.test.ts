@@ -350,7 +350,7 @@ describe('FileSearch', () => {
     });
 
     await fileSearch.initialize();
-    const results = await fileSearch.search('fle');
+    const results = await fileSearch.search('file');
 
     expect(results).toEqual(['src/flexible.js']);
   });
@@ -376,7 +376,7 @@ describe('FileSearch', () => {
     });
 
     await fileSearch.initialize();
-    const results = await fileSearch.search('fle');
+    const results = await fileSearch.search('file');
 
     expect(results).toEqual(
       expect.arrayContaining(['src/file1.js', 'src/flexible.js']),

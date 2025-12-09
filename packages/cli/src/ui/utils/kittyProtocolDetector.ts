@@ -91,7 +91,7 @@ export async function detectAndEnableKittyProtocol(): Promise<void> {
     fs.writeSync(process.stdout.fd, '\x1b[?u\x1b[c');
 
     // Timeout after 200ms
-    // When a iterm2 terminal does not have focus this can take over 90s on a
+    // When a term2 terminal does not have focus this can take over 90s on a
     // fast macbook so we need a somewhat longer threshold than would be ideal.
     timeoutId = setTimeout(finish, 200);
   });
