@@ -159,6 +159,26 @@ export class AgentRegistry {
   }
 
   /**
+   * Generates a description for the delegate_to_agent tool.
+   * Unlike getDirectoryContext() which is for system prompts,
+   * this is formatted for tool descriptions.
+   */
+  getToolDescription(): string {
+    if (this.agents.size === 0) {
+      return 'Delegates a task to a specialized sub-agent. No agents are currently available.';
+    }
+
+    const agentDescriptions = Array.from(this.agents.entries())
+      .map(([name, def]) => `- **${name}**: ${def.description}`)
+      .join('\n');
+
+    return `Delegates a task to a specialized sub-agent.
+
+Available agents:
+${agentDescriptions}`;
+  }
+
+  /**
    * Generates a markdown "Phone Book" of available agents and their schemas.
    * This MUST be injected into the System Prompt of the parent agent.
    */
