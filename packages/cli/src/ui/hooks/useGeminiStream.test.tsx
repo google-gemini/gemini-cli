@@ -100,6 +100,20 @@ vi.mock('./useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
+const mockStdoutWrite = vi.fn(() => true);
+const mockStdout = {
+  write: mockStdoutWrite,
+  isTTY: true,
+} as unknown as NodeJS.WriteStream;
+
+vi.mock('ink', async (importOriginal) => {
+  const actualInk = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actualInk,
+    useStdout: () => ({ stdout: mockStdout }),
+  };
+});
+
 vi.mock('./shellCommandProcessor.js', () => ({
   useShellCommandProcessor: vi.fn().mockReturnValue({
     handleShellCommand: vi.fn(),
@@ -3247,20 +3261,10 @@ describe('useGeminiStream', () => {
   });
 
   describe('Terminal Bell', () => {
-    let stdoutWriteSpy: MockInstance;
-
     beforeEach(() => {
-      stdoutWriteSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-      // Mock process.stdout.isTTY
-      Object.defineProperty(process.stdout, 'isTTY', {
-        value: true,
-        writable: true,
-        configurable: true,
-      });
-    });
-
-    afterEach(() => {
-      stdoutWriteSpy.mockRestore();
+      mockStdoutWrite.mockClear();
+      // Ensure isTTY is true for these tests
+      (mockStdout as { isTTY: boolean }).isTTY = true;
     });
 
     it('should play terminal bell when waiting for tool approval and setting is enabled', () => {
@@ -3333,7 +3337,7 @@ describe('useGeminiStream', () => {
         ),
       );
 
-      expect(stdoutWriteSpy).toHaveBeenCalledWith('\x07');
+      expect(mockStdoutWrite).toHaveBeenCalledWith('\x07');
     });
 
     it('should not play terminal bell when setting is disabled', () => {
@@ -3406,15 +3410,11 @@ describe('useGeminiStream', () => {
         ),
       );
 
-      expect(stdoutWriteSpy).not.toHaveBeenCalledWith('\x07');
+      expect(mockStdoutWrite).not.toHaveBeenCalledWith('\x07');
     });
 
     it('should not play terminal bell when not in a TTY', () => {
-      Object.defineProperty(process.stdout, 'isTTY', {
-        value: false,
-        writable: true,
-        configurable: true,
-      });
+      (mockStdout as { isTTY: boolean }).isTTY = false;
 
       const settingsWithBell: LoadedSettings = {
         ...mockLoadedSettings,
@@ -3485,7 +3485,7 @@ describe('useGeminiStream', () => {
         ),
       );
 
-      expect(stdoutWriteSpy).not.toHaveBeenCalledWith('\x07');
+      expect(mockStdoutWrite).not.toHaveBeenCalledWith('\x07');
     });
 
     it('should play terminal bell when response completes and setting is enabled', async () => {
@@ -3538,7 +3538,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('test query');
       });
 
-      expect(stdoutWriteSpy).toHaveBeenCalledWith('\x07');
+      expect(mockStdoutWrite).toHaveBeenCalledWith('\x07');
     });
   });
 });
