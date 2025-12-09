@@ -1258,6 +1258,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "enableAgents": {
+          "title": "Enable Agents",
+          "description": "Enable local and remote subagents.",
+          "markdownDescription": "Enable local and remote subagents.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "extensionManagement": {
           "title": "Extension Management",
           "description": "Enable extension management features.",
@@ -1602,6 +1609,10 @@
         "useCollector": {
           "type": "boolean",
           "description": "Whether to forward telemetry to an OTLP collector."
+        },
+        "useCliAuth": {
+          "type": "boolean",
+          "description": "Whether to use CLI authentication for telemetry (only for in-process exporters)."
         }
       }
     },

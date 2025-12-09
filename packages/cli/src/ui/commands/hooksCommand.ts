@@ -4,14 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  SlashCommand,
-  CommandContext,
-  MessageActionReturn,
-} from './types.js';
+import type { SlashCommand, CommandContext } from './types.js';
 import { CommandKind } from './types.js';
 import { MessageType, type HistoryItemHooksList } from '../types.js';
-import type { HookRegistryEntry } from '@google/gemini-cli-core';
+import type {
+  HookRegistryEntry,
+  MessageActionReturn,
+} from '@google/gemini-cli-core';
 import { getErrorMessage } from '@google/gemini-cli-core';
 import { SettingScope } from '../../config/settings.js';
 
@@ -229,6 +228,7 @@ const enableCommand: SlashCommand = {
   name: 'enable',
   description: 'Enable a hook by name',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: enableAction,
   completion: completeHookNames,
 };
@@ -237,6 +237,7 @@ const disableCommand: SlashCommand = {
   name: 'disable',
   description: 'Disable a hook by name',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: disableAction,
   completion: completeHookNames,
 };

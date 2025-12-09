@@ -1285,6 +1285,15 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
+      enableAgents: {
+        type: 'boolean',
+        label: 'Enable Agents',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable local and remote subagents.',
+        showInDialog: false,
+      },
       extensionManagement: {
         type: 'boolean',
         label: 'Extension Management',
@@ -1728,6 +1737,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       useCollector: {
         type: 'boolean',
         description: 'Whether to forward telemetry to an OTLP collector.',
+      },
+      useCliAuth: {
+        type: 'boolean',
+        description:
+          'Whether to use CLI authentication for telemetry (only for in-process exporters).',
       },
     },
   },
