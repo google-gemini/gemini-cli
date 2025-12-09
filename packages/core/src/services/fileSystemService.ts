@@ -7,6 +7,7 @@
 import fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { globSync } from 'glob';
+import { getEncodingForBuffer } from '../utils/systemEncoding.js';
 
 /**
  * Interface for file system operations that may be delegated to different implementations
@@ -47,7 +48,19 @@ export class StandardFileSystemService implements FileSystemService {
   }
 
   async writeTextFile(filePath: string, content: string): Promise<void> {
-    await fs.writeFile(filePath, content, 'utf-8');
+    let encoding: BufferEncoding = 'utf-8';
+    try {
+      const buffer = await fs.readFile(filePath);
+      encoding = getEncodingForBuffer(buffer);
+    } catch (error) {
+      // If the file doesn't exist, we'll create it with the default UTF-8 encoding.
+      // For any other error (e.g., permissions), we should not silently ignore it,
+      // as that could lead to overwriting a file with the wrong encoding.
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
+    await fs.writeFile(filePath, content, encoding);
   }
 
   findFiles(fileName: string, searchPaths: readonly string[]): string[] {
