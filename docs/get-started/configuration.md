@@ -367,6 +367,12 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3-pro-preview"
         }
       },
+      "gemini-3-flash-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "skyhawk"
+        }
+      },
       "gemini-2.5-pro": {
         "extends": "chat-base-2.5",
         "modelConfig": {
@@ -494,6 +500,11 @@ their corresponding top-level category object in your `settings.json` file.
       "chat-compression-3-pro": {
         "modelConfig": {
           "model": "gemini-3-pro-preview"
+        }
+      },
+      "chat-compression-3-flash": {
+        "modelConfig": {
+          "model": "skyhawk"
         }
       },
       "chat-compression-2.5-pro": {
