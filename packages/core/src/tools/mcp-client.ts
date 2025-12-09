@@ -29,6 +29,7 @@ import {
   ReadResourceResultSchema,
   ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
+  PromptListChangedNotificationSchema,
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
@@ -108,6 +109,8 @@ export class McpClient {
   private pendingToolRefresh: boolean = false;
   private isRefreshingResources: boolean = false;
   private pendingResourceRefresh: boolean = false;
+  private isRefreshingPrompts: boolean = false;
+  private pendingPromptRefresh: boolean = false;
 
   constructor(
     private readonly serverName: string,
@@ -241,9 +244,16 @@ export class McpClient {
     );
   }
 
-  private async discoverPrompts(): Promise<Prompt[]> {
+  private async discoverPrompts(options?: {
+    signal?: AbortSignal;
+  }): Promise<Prompt[]> {
     this.assertConnected();
-    return discoverPrompts(this.serverName, this.client!, this.promptRegistry);
+    return discoverPrompts(
+      this.serverName,
+      this.client!,
+      this.promptRegistry,
+      options,
+    );
   }
 
   private async discoverResources(): Promise<Resource[]> {
@@ -308,6 +318,22 @@ export class McpClient {
         },
       );
     }
+
+    if (capabilities?.prompts?.listChanged) {
+      debugLogger.log(
+        `Server '${this.serverName}' supports prompt updates. Listening for changes...`,
+      );
+
+      this.client.setNotificationHandler(
+        PromptListChangedNotificationSchema,
+        async () => {
+          debugLogger.log(
+            `🔔 Received prompt update notification from '${this.serverName}'`,
+          );
+          await this.refreshPrompts();
+        },
+      );
+    }
   }
 
   /**
@@ -365,6 +391,65 @@ export class McpClient {
     } finally {
       this.isRefreshingResources = false;
       this.pendingResourceRefresh = false;
+    }
+  }
+
+  /**
+   * Refreshes prompts for this server by re-querying the MCP `prompts/list` endpoint.
+   */
+  private async refreshPrompts(): Promise<void> {
+    if (this.isRefreshingPrompts) {
+      debugLogger.log(
+        `Prompt refresh for '${this.serverName}' is already in progress. Pending update.`,
+      );
+      this.pendingPromptRefresh = true;
+      return;
+    }
+
+    this.isRefreshingPrompts = true;
+
+    try {
+      do {
+        this.pendingPromptRefresh = false;
+
+        if (this.status !== MCPServerStatus.CONNECTED || !this.client) break;
+
+        const timeoutMs = this.serverConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC;
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+
+        let newPrompts;
+        try {
+          newPrompts = await this.discoverPrompts({
+            signal: abortController.signal,
+          });
+        } catch (err) {
+          debugLogger.error(
+            `Prompt discovery failed during refresh: ${getErrorMessage(err)}`,
+          );
+          clearTimeout(timeoutId);
+          break;
+        }
+
+        this.promptRegistry.removePromptsByServer(this.serverName);
+        for (const prompt of newPrompts) {
+          this.promptRegistry.registerPrompt(prompt);
+        }
+
+        clearTimeout(timeoutId);
+
+        coreEvents.emitFeedback(
+          'info',
+          `Prompts updated for server: ${this.serverName}`,
+        );
+      } while (this.pendingPromptRefresh);
+    } catch (error) {
+      debugLogger.error(
+        `Critical error in prompt refresh loop for ${this.serverName}: ${getErrorMessage(error)}`,
+      );
+    } finally {
+      this.isRefreshingPrompts = false;
+      this.pendingPromptRefresh = false;
     }
   }
 
@@ -1027,12 +1112,13 @@ export async function discoverPrompts(
   mcpServerName: string,
   mcpClient: Client,
   promptRegistry: PromptRegistry,
+  options?: { signal?: AbortSignal },
 ): Promise<Prompt[]> {
   try {
     // Only request prompts if the server supports them.
     if (mcpClient.getServerCapabilities()?.prompts == null) return [];
 
-    const response = await mcpClient.listPrompts({});
+    const response = await mcpClient.listPrompts({}, options);
 
     for (const prompt of response.prompts) {
       promptRegistry.registerPrompt({
