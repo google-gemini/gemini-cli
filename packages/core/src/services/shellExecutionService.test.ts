@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import EventEmitter from 'node:events';
 import type { Readable } from 'node:stream';
 import { type ChildProcess } from 'node:child_process';
@@ -1282,5 +1290,172 @@ describe('ShellExecutionService execution method selection', () => {
     expect(mockPtySpawn).not.toHaveBeenCalled();
     expect(mockCpSpawn).toHaveBeenCalled();
     expect(result.executionMethod).toBe('child_process');
+  });
+});
+
+describe('ShellExecutionService environment variables', () => {
+  let mockPtyProcess: EventEmitter & {
+    pid: number;
+    kill: Mock;
+    onData: Mock;
+    onExit: Mock;
+    write: Mock;
+    resize: Mock;
+  };
+  let mockChildProcess: EventEmitter & Partial<ChildProcess>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules(); // Reset modules to ensure process.env changes are fresh
+
+    // Mock for pty
+    mockPtyProcess = new EventEmitter() as EventEmitter & {
+      pid: number;
+      kill: Mock;
+      onData: Mock;
+      onExit: Mock;
+      write: Mock;
+      resize: Mock;
+    };
+    mockPtyProcess.pid = 12345;
+    mockPtyProcess.kill = vi.fn();
+    mockPtyProcess.onData = vi.fn();
+    mockPtyProcess.onExit = vi.fn();
+    mockPtyProcess.write = vi.fn();
+    mockPtyProcess.resize = vi.fn();
+
+    mockPtySpawn.mockReturnValue(mockPtyProcess);
+    mockGetPty.mockResolvedValue({
+      module: { spawn: mockPtySpawn },
+      name: 'mock-pty',
+    });
+
+    // Mock for child_process
+    mockChildProcess = new EventEmitter() as EventEmitter &
+      Partial<ChildProcess>;
+    mockChildProcess.stdout = new EventEmitter() as Readable;
+    mockChildProcess.stderr = new EventEmitter() as Readable;
+    mockChildProcess.kill = vi.fn();
+    Object.defineProperty(mockChildProcess, 'pid', {
+      value: 54321,
+      configurable: true,
+    });
+    mockCpSpawn.mockReturnValue(mockChildProcess);
+
+    // Default exit behavior for mocks
+    mockPtyProcess.onExit.mockImplementationOnce(({ exitCode, signal }) => {
+      // Small delay to allow async ops to complete
+      setTimeout(() => mockPtyProcess.emit('exit', { exitCode, signal }), 0);
+    });
+    mockChildProcess.on('exit', (code, signal) => {
+      // Small delay to allow async ops to complete
+      setTimeout(() => mockChildProcess.emit('close', code, signal), 0);
+    });
+  });
+
+  afterEach(() => {
+    // Clean up process.env after each test
+    vi.unstubAllEnvs();
+  });
+
+  it('should use a sanitized environment when in a GitHub run', async () => {
+    // Mock the environment to simulate a GitHub Actions run
+    vi.stubEnv('GITHUB_SHA', 'test-sha');
+    vi.stubEnv('MY_SENSITIVE_VAR', 'secret-value'); // This should be stripped out
+    vi.stubEnv('PATH', '/test/path'); // An essential var that should be kept
+    vi.stubEnv('GEMINI_CLI_TEST_VAR', 'test-value'); // A test var that should be kept
+
+    vi.resetModules();
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+
+    // Test pty path
+    await ShellExecutionService.execute(
+      'test-pty-command',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      true,
+      shellExecutionConfig,
+    );
+
+    const ptyEnv = mockPtySpawn.mock.calls[0][2].env;
+    expect(ptyEnv).not.toHaveProperty('MY_SENSITIVE_VAR');
+    expect(ptyEnv).toHaveProperty('PATH', '/test/path');
+    expect(ptyEnv).toHaveProperty('GEMINI_CLI_TEST_VAR', 'test-value');
+
+    // Ensure pty process exits for next test
+    mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+    await new Promise(process.nextTick);
+
+    // Test child_process path
+    mockGetPty.mockResolvedValue(null); // Force fallback
+    await ShellExecutionService.execute(
+      'test-cp-command',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      true,
+      shellExecutionConfig,
+    );
+
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+    expect(cpEnv).not.toHaveProperty('MY_SENSITIVE_VAR');
+    expect(cpEnv).toHaveProperty('PATH', '/test/path');
+    expect(cpEnv).toHaveProperty('GEMINI_CLI_TEST_VAR', 'test-value');
+
+    // Ensure child_process exits
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+  });
+
+  it('should include the full process.env when not in a GitHub run', async () => {
+    vi.stubEnv('MY_TEST_VAR', 'test-value');
+    vi.stubEnv('GITHUB_SHA', '');
+    vi.stubEnv('SURFACE', '');
+    vi.resetModules();
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+
+    // Test pty path
+    await ShellExecutionService.execute(
+      'test-pty-command-no-github',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      true,
+      shellExecutionConfig,
+    );
+    expect(mockPtySpawn).toHaveBeenCalled();
+    const ptyEnv = mockPtySpawn.mock.calls[0][2].env;
+    expect(ptyEnv).toHaveProperty('MY_TEST_VAR', 'test-value');
+    expect(ptyEnv).toHaveProperty('GEMINI_CLI', '1');
+
+    // Ensure pty process exits
+    mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+    await new Promise(process.nextTick);
+
+    // Test child_process path (forcing fallback by making pty unavailable)
+    mockGetPty.mockResolvedValue(null);
+    await ShellExecutionService.execute(
+      'test-cp-command-no-github',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      true, // Still tries pty, but it will fall back
+      shellExecutionConfig,
+    );
+    expect(mockCpSpawn).toHaveBeenCalled();
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+    expect(cpEnv).toHaveProperty('MY_TEST_VAR', 'test-value');
+    expect(cpEnv).toHaveProperty('GEMINI_CLI', '1');
+
+    // Ensure child_process exits
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
   });
 });
