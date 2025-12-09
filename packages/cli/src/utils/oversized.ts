@@ -1,6 +1,12 @@
-import * as GenerativeAI from '@google/genai';
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
-import type { Config } from '../config/config.js';
+import type * as GenerativeAI from '@google/genai';
+
+import type { Config } from '@google/gemini-cli-core';
 
 // This is a rough estimate of the token size.
 // A better approach would be to use a tokenizer.
@@ -8,10 +14,10 @@ const AVG_CHARS_PER_TOKEN = 4;
 
 export function getMimeType(file: GenerativeAI.FileData | GenerativeAI.Part) {
   if ('fileData' in file) {
-    return file.fileData.mimeType;
+    return file.fileData?.mimeType;
   }
   if ('inlineData' in file) {
-    return file.inlineData.mimeType;
+    return file.inlineData?.mimeType;
   }
   return '';
 }
@@ -24,20 +30,18 @@ export function getMimeType(file: GenerativeAI.FileData | GenerativeAI.Part) {
  * @returns True if the content is oversized.
  */
 export function isOversized(
-  content: GenerativeAI.ModelContent,
+  content: GenerativeAI.Part[],
   config: Config,
 ): boolean {
-  if (config.get('request_size_limit') === 0) {
+  if (config.getTruncateToolOutputThreshold() === 0) {
     return false;
   }
 
   const requestSize = getRequestSize(content);
 
-  if (requestSize > config.get('request_size_limit')) {
+  if (requestSize > config.getTruncateToolOutputThreshold()) {
     console.warn(
-      `Warning: Request size of ${requestSize} is larger than the limit of ${config.get(
-        'request_size_limit',
-      )}. Please consider increasing the limit.`,
+      `Warning: Request size of ${requestSize} is larger than the limit of ${config.getTruncateToolOutputThreshold()}. Please consider increasing the limit.`,
     );
     return true;
   }
@@ -50,33 +54,30 @@ export function isOversized(
  * @param content The content to get the request size of.
  * @returns The request size of the content.
  */
-export function getRequestSize(content: GenerativeAI.ModelContent): number {
+export function getRequestSize(
+  content: string | GenerativeAI.Part | GenerativeAI.Part[],
+): number {
   if (Array.isArray(content)) {
-    return content.reduce((acc, part) => {
-      return acc + getRequestSize(part);
-    }, 0);
+    return content.reduce((acc, part) => acc + getRequestSize(part), 0);
   }
 
   if (typeof content === 'string') {
     return content.length;
   }
 
-  if ('parts' in content) {
-    return getRequestSize(content.parts);
-  }
+  if (typeof content === 'object' && content !== null) {
+    if ('text' in content && typeof content.text === 'string') {
+      return (content.text as string).length;
+    }
 
-  if ('text' in content) {
-    return (content['text'] as string).length;
-  }
+    if ('functionCall' in content && content.functionCall) {
+      return getRequestSizeOfFunctionCall(content.functionCall);
+    }
 
-  if ('functionCall' in content) {
-    return getRequestSizeOfFunctionCall(content.functionCall);
+    if ('functionResponse' in content && content.functionResponse) {
+      return getRequestSizeOfFunctionResponse(content.functionResponse);
+    }
   }
-
-  if ('functionResponse' in content) {
-    return getRequestSizeOfFunctionResponse(content.functionResponse);
-  }
-
   return 0;
 }
 
@@ -90,16 +91,16 @@ function getRequestSizeOfFunctionResponse(
   return JSON.stringify(functionResponse.response).length;
 }
 
-export function getTokens(content: GenerativeAI.ModelContent, config: Config) {
+export function getTokens(content: GenerativeAI.Part[]) {
   return Math.floor(getRequestSize(content) / AVG_CHARS_PER_TOKEN);
 }
 
 export function printRequestSize(
-  content: GenerativeAI.ModelContent,
+  content: GenerativeAI.Part[],
   _config: Config,
 ) {
   const requestSize = getRequestSize(content);
-  const tokens = getTokens(content, _config);
+  const tokens = getTokens(content);
 
   console.log(`Request size: ${requestSize} characters, ~${tokens} tokens`);
 }
@@ -121,13 +122,13 @@ export function printRequestSize(
  * @returns The truncated content.
  */
 export function truncateOversizedContent(
-  content: GenerativeAI.ModelContent,
+  content: GenerativeAI.Part[],
   config: Config,
-): GenerativeAI.ModelContent {
-  const parts = content as GenerativeAI.Part[];
+): GenerativeAI.Part[] {
+  const parts = content;
 
   const functionResponse = parts.find(
-    (part) => 'functionResponse' in part,
+    (part: GenerativeAI.Part) => 'functionResponse' in part,
   ) as FunctionResponsePart;
 
   if (!functionResponse) {
@@ -139,7 +140,8 @@ export function truncateOversizedContent(
     parts.filter((part) => !('functionResponse' in part)),
   );
 
-  const availableSize = config.get('request_size_limit') - otherPartsSize - 500; // Some buffer
+  const availableSize =
+    config.getTruncateToolOutputThreshold() - otherPartsSize - 500; // Some buffer
 
   if (functionResponseSize < availableSize) {
     return content;
@@ -150,26 +152,30 @@ export function truncateOversizedContent(
   );
 
   const response = functionResponse.functionResponse.response;
-  const stdout = response.stdout as string;
-  const stderr = response.stderr as string;
+  if (response === undefined || response === null) {
+    return content;
+  }
+  const typedResponse = response as Record<string, unknown>;
+  const stdout = typedResponse['stdout'] as string;
+  const stderr = typedResponse['stderr'] as string;
 
   if (stdout.length + stderr.length > availableSize) {
     const half = Math.floor(availableSize / 2);
     if (stdout.length > half && stderr.length > half) {
-      response.stdout = `... (truncated) ${stdout.slice(-half)}`;
-      response.stderr = `... (truncated) ${stderr.slice(-half)}`;
+      typedResponse['stdout'] = `... (truncated) ${stdout.slice(-half)}`;
+      typedResponse['stderr'] = `... (truncated) ${stderr.slice(-half)}`;
     } else if (stdout.length > half) {
       const remaining = availableSize - stderr.length;
-      response.stdout = `... (truncated) ${stdout.slice(-remaining)}`;
+      typedResponse['stdout'] = `... (truncated) ${stdout.slice(-remaining)}`;
     } else {
       const remaining = availableSize - stdout.length;
-      response.stderr = `... (truncated) ${stderr.slice(-remaining)}`;
+      typedResponse['stderr'] = `... (truncated) ${stderr.slice(-remaining)}`;
     }
   }
 
   return parts;
 }
 
-interface FunctionResponsePart extends GenerativeAI.Part {
+interface FunctionResponsePart {
   functionResponse: GenerativeAI.FunctionResponse;
 }

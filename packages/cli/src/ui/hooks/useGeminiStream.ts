@@ -993,7 +993,7 @@ export const useGeminiStream = (
                       );
 
                       if (lastQueryRef.current && lastPromptIdRef.current) {
-                        submitQuery(
+                        void submitQuery(
                           lastQueryRef.current,
                           { isContinuation: true },
                           lastPromptIdRef.current,
@@ -1176,7 +1176,7 @@ export const useGeminiStream = (
           const combinedParts = geminiTools.flatMap(
             (toolCall) => toolCall.response.responseParts,
           );
-          geminiClient.addHistory({
+          void geminiClient.addHistory({
             role: 'user',
             parts: combinedParts,
           });
@@ -1193,9 +1193,9 @@ export const useGeminiStream = (
         const responseParts = toolCall.response.responseParts;
         if (
           toolCall.request.name === 'run_shell_command' &&
-          config.get('request_size_limit') > 0 &&
-          getRequestSize(responseParts, config) >
-            config.get('request_size_limit')
+          config.getTruncateToolOutputThreshold() > 0 &&
+          getRequestSize(responseParts) >
+            config.getTruncateToolOutputThreshold()
         ) {
           const originalCommand = toolCall.request.args['command'] as string;
           const tmpDir = config.storage.getProjectTempDir();
@@ -1230,7 +1230,7 @@ export const useGeminiStream = (
         return;
       }
 
-      submitQuery(
+      void submitQuery(
         responsesToSend,
         {
           isContinuation: true,
@@ -1365,7 +1365,7 @@ export const useGeminiStream = (
         }
       }
     };
-    saveRestorableToolCalls();
+    void saveRestorableToolCalls();
   }, [
     toolCalls,
     config,
