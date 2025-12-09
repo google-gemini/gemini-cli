@@ -91,6 +91,19 @@ export class SubagentInvocation<
           typeof activity.data['text'] === 'string'
         ) {
           updateOutput(`🤖💭 ${activity.data['text']}`);
+        } else if (
+          activity.type === 'TOOL_CALL_START' &&
+          typeof activity.data['name'] === 'string'
+        ) {
+          const args = activity.data['args']
+            ? JSON.stringify(activity.data['args'])
+            : '';
+          updateOutput(`\nRunning tool: ${activity.data['name']}(${args})...`);
+        } else if (
+          activity.type === 'TOOL_CALL_END' &&
+          typeof activity.data['name'] === 'string'
+        ) {
+          updateOutput(`\nTool ${activity.data['name']} finished.`);
         }
       };
 
@@ -98,6 +111,7 @@ export class SubagentInvocation<
         this.definition,
         this.config,
         onActivity,
+        this.messageBus,
       );
 
       const output = await executor.run(this.params, signal);

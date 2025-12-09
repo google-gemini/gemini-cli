@@ -127,6 +127,7 @@ import { enableSupportedProtocol } from './utils/kittyProtocolDetector.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { enableBracketedPaste } from './utils/bracketedPaste.js';
 import { useBanner } from './hooks/useBanner.js';
+import { useToolConfirmationListener } from './hooks/useToolConfirmationListener.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -655,7 +656,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     pendingHistoryItems: pendingSlashCommandHistoryItems,
     commandContext,
     shellConfirmationRequest,
-    confirmationRequest,
+    confirmationRequest: slashCommandConfirmationRequest,
   } = useSlashCommandProcessor(
     config,
     settings,
@@ -671,6 +672,24 @@ Logging in with Google... Restarting Gemini CLI to continue.
     setBannerVisible,
     setCustomDialog,
   );
+
+  const { request: toolConfirmationRequest, onConfirm: onToolConfirm } =
+    useToolConfirmationListener(config);
+
+  const confirmationRequest = useMemo(() => {
+    if (slashCommandConfirmationRequest) {
+      return slashCommandConfirmationRequest;
+    }
+    if (toolConfirmationRequest) {
+      return {
+        prompt: `Allow tool execution: ${toolConfirmationRequest.toolCall.name}(${JSON.stringify(
+          toolConfirmationRequest.toolCall.args,
+        )})?`,
+        onConfirm: onToolConfirm,
+      };
+    }
+    return null;
+  }, [slashCommandConfirmationRequest, toolConfirmationRequest, onToolConfirm]);
 
   const performMemoryRefresh = useCallback(async () => {
     historyManager.addItem(

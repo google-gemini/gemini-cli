@@ -333,14 +333,14 @@ interface CoreToolSchedulerOptions {
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
   getPreferredEditor: () => EditorType | undefined;
+  ignoreToolConfirmationRequests?: boolean;
 }
 
 export class CoreToolScheduler {
-  // Static WeakMap to track which MessageBus instances already have a handler subscribed
-  // This prevents duplicate subscriptions when multiple CoreToolScheduler instances are created
-  private static subscribedMessageBuses = new WeakMap<
+  // Static WeakMap to track active schedulers for each MessageBus
+  private static activeSchedulers = new WeakMap<
     MessageBus,
-    (request: ToolConfirmationRequest) => void
+    Set<WeakRef<CoreToolScheduler>>
   >();
 
   private toolCalls: ToolCall[] = [];
@@ -369,36 +369,60 @@ export class CoreToolScheduler {
     this.getPreferredEditor = options.getPreferredEditor;
 
     // Subscribe to message bus for ASK_USER policy decisions
-    // Use a static WeakMap to ensure we only subscribe ONCE per MessageBus instance
-    // This prevents memory leaks when multiple CoreToolScheduler instances are created
-    // (e.g., on every React render, or for each non-interactive tool call)
     if (this.config.getEnableMessageBusIntegration()) {
       const messageBus = this.config.getMessageBus();
 
-      // Check if we've already subscribed a handler to this message bus
-      if (!CoreToolScheduler.subscribedMessageBuses.has(messageBus)) {
+      if (!CoreToolScheduler.activeSchedulers.has(messageBus)) {
+        CoreToolScheduler.activeSchedulers.set(messageBus, new Set());
+
         // Create a shared handler that will be used for this message bus
         const sharedHandler = (request: ToolConfirmationRequest) => {
-          // When ASK_USER policy decision is made, respond with requiresUserConfirmation=true
-          // to tell tools to use their legacy confirmation flow
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          messageBus.publish({
-            type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-            correlationId: request.correlationId,
-            confirmed: false,
-            requiresUserConfirmation: true,
-          });
+          const schedulers = CoreToolScheduler.activeSchedulers.get(messageBus);
+          if (!schedulers) return;
+
+          for (const schedulerRef of schedulers) {
+            const scheduler = schedulerRef.deref();
+            if (!scheduler) {
+              schedulers.delete(schedulerRef);
+              continue;
+            }
+
+            if (scheduler.isToolCallPending(request)) {
+              // When ASK_USER policy decision is made, respond with requiresUserConfirmation=true
+              // to tell tools to use their legacy confirmation flow
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
+              messageBus.publish({
+                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+                correlationId: request.correlationId,
+                confirmed: false,
+                requiresUserConfirmation: true,
+              });
+              break; // Only one scheduler needs to handle it
+            }
+          }
         };
 
         messageBus.subscribe(
           MessageBusType.TOOL_CONFIRMATION_REQUEST,
           sharedHandler,
         );
+      }
 
-        // Store the handler in the WeakMap so we don't subscribe again
-        CoreToolScheduler.subscribedMessageBuses.set(messageBus, sharedHandler);
+      if (!options.ignoreToolConfirmationRequests) {
+        CoreToolScheduler.activeSchedulers
+          .get(messageBus)
+          ?.add(new WeakRef(this));
       }
     }
+  }
+
+  private isToolCallPending(request: ToolConfirmationRequest): boolean {
+    return this.toolCalls.some(
+      (tc) =>
+        tc.status === 'validating' &&
+        tc.request.name === request.toolCall.name &&
+        tc.request.args === request.toolCall.args,
+    );
   }
 
   private setStatusInternal(

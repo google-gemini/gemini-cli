@@ -1580,6 +1580,27 @@ export class Config {
       }
     }
 
+    // Register ConfirmationTestAgent
+    const confirmationAgentDef = this.agentRegistry.getDefinition(
+      'confirmation_test_agent',
+    );
+    if (confirmationAgentDef) {
+      // We must respect the main allowed/exclude lists for agents too.
+      const allowedTools = this.getAllowedTools();
+      const isAllowed =
+        !allowedTools || allowedTools.includes(confirmationAgentDef.name);
+
+      if (isAllowed) {
+        const messageBusEnabled = this.getEnableMessageBusIntegration();
+        const wrapper = new SubagentToolWrapper(
+          confirmationAgentDef,
+          this,
+          messageBusEnabled ? this.getMessageBus() : undefined,
+        );
+        registry.registerTool(wrapper);
+      }
+    }
+
     await registry.discoverAllTools();
     registry.sortTools();
     return registry;

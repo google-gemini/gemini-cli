@@ -7,6 +7,7 @@
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
+import { ConfirmationTestAgent } from './confirmation-test-agent.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigAlias } from '../services/modelConfigService.js';
@@ -44,6 +45,9 @@ export class AgentRegistry {
   }
 
   private loadBuiltInAgents(): void {
+    // Register ConfirmationTestAgent (always available for testing purposes, or check debugMode if preferred)
+    this.registerAgent(ConfirmationTestAgent);
+
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
 
     // Only register the agent if it's enabled in the settings.

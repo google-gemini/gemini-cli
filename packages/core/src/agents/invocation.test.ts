@@ -155,6 +155,7 @@ describe('SubagentInvocation', () => {
         testDefinition,
         mockConfig,
         expect.any(Function),
+        undefined,
       );
       expect(updateOutput).toHaveBeenCalledWith('Subagent starting...\n');
 
