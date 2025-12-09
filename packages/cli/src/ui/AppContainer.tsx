@@ -201,19 +201,11 @@ export const AppContainer = (props: AppContainerProps) => {
     null,
   );
 
-  const [defaultBannerText, setDefaultBannerText] = useState('');
-  const [warningBannerText, setWarningBannerText] = useState('');
+  const [banner, setBanner] = useState<BannerData>({
+    bannerText: '',
+    isWarning: false,
+  });
   const [bannerVisible, setBannerVisible] = useState(true);
-
-  const bannerData = useMemo(
-    () => ({
-      defaultText: defaultBannerText,
-      warningText: warningBannerText,
-    }),
-    [defaultBannerText, warningBannerText],
-  );
-
-  const { bannerText } = useBanner(bannerData, config);
 
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
@@ -452,13 +444,13 @@ export const AppContainer = (props: AppContainerProps) => {
     if (
       !(settings.merged.ui?.hideBanner || config.getScreenReader()) &&
       bannerVisible &&
-      bannerText
+      banner.bannerText
     ) {
       // The header should show a banner but the Header is rendered in static
       // so we must trigger a static refresh for it to be visible.
       refreshStatic();
     }
-  }, [bannerVisible, bannerText, settings, config, refreshStatic]);
+  }, [bannerVisible, banner.bannerText, settings, config, refreshStatic]);
 
   const {
     isThemeDialogOpen,
@@ -1440,23 +1432,27 @@ Logging in with Google... Restarting Gemini CLI to continue.
     let isMounted = true;
 
     const fetchBannerTexts = async () => {
-      const [defaultBanner, warningBanner] = await Promise.all([
-        config.getBannerTextNoCapacityIssues(),
-        config.getBannerTextCapacityIssues(),
-      ]);
+      const [bannerTextUI] = await Promise.all([config.getEvent('CLI_BANNER')]);
 
       if (isMounted) {
-        setDefaultBannerText(defaultBanner);
-        setWarningBannerText(warningBanner);
+        const bannerText =
+          bannerTextUI !== undefined
+            ? bannerTextUI.campaignNotification.body
+            : '';
+        const isWarning =
+          bannerTextUI?.campaignNotification.title === 'WARNING';
+        setBanner({ bannerText, isWarning });
         setBannerVisible(true);
         const authType = config.getContentGeneratorConfig()?.authType;
         if (
           authType === AuthType.USE_GEMINI ||
           authType === AuthType.USE_VERTEX_AI
         ) {
-          setDefaultBannerText(
-            'Gemini 3 Flash and Pro are now available. \nEnable "Preview features" in /settings. \nLearn more at https://goo.gle/enable-preview-features',
-          );
+          setBanner({
+            bannerText:
+              'Gemini 3 is now available.\nTo use Gemini 3, enable "Preview features" in /settings\nLearn more at https://goo.gle/enable-preview-features',
+            isWarning: false,
+          });
         }
       }
     };
@@ -1559,7 +1555,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       customDialog,
       copyModeEnabled,
       warningMessage,
-      bannerData,
+      banner,
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
       settingsNonce,
@@ -1653,7 +1649,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       authState,
       copyModeEnabled,
       warningMessage,
-      bannerData,
+      banner,
       bannerVisible,
       config,
       settingsNonce,

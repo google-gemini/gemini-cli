@@ -52,15 +52,15 @@ import {
   recordConversationOffered,
 } from './telemetry.js';
 import { getClientMetadata } from './experiments/client_metadata.js';
+import type { ReceiveEventsResponse } from './events/types.js';
+
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
   /** Additional HTTP headers to be sent with the request. */
   headers?: Record<string, string>;
 }
 
-// export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
-export const CODE_ASSIST_ENDPOINT =
-  'https://autopush-cloudcode-pa.sandbox.googleapis.com';
+export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
 export const CODE_ASSIST_API_VERSION = 'v1internal';
 
 export class CodeAssistServer implements ContentGenerator {

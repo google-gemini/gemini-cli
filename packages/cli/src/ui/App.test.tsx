@@ -72,9 +72,9 @@ describe('App', () => {
     },
     history: [],
     pendingHistoryItems: [],
-    bannerData: {
-      defaultText: 'Mock Banner Text',
-      warningText: '',
+    banner: {
+      bannerText: 'Mock Banner Text',
+      isWarning: false,
     },
   };
 
