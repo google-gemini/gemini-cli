@@ -31,6 +31,8 @@ import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
+import { ListResourcesTool } from '../tools/mcp-list-resources-tool.js';
+import { ReadResourceTool } from '../tools/mcp-read-resource-tool.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
@@ -1761,6 +1763,8 @@ export class Config {
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
+    registerCoreTool(ListResourcesTool, this);
+    registerCoreTool(ReadResourceTool, this);
     if (this.getUseWriteTodos()) {
       registerCoreTool(WriteTodosTool);
     }
