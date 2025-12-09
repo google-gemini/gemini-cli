@@ -259,6 +259,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable debug logging of keystrokes to the console.',
         showInDialog: true,
       },
+      terminalBell: {
+        type: 'boolean',
+        label: 'Terminal Bell on Completion',
+        category: 'General',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Play terminal bell sound when response completes or needs approval.',
+        showInDialog: true,
+      },
       sessionRetention: {
         type: 'object',
         label: 'Session Retention',
