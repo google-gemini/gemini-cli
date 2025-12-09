@@ -17,6 +17,7 @@ import {
   stripUnsafeCharacters,
   getCachedStringWidth,
 } from '../../utils/textUtils.js';
+import { splitEscapedPaths } from '../../utils/clipboardUtils.js';
 import type { Key } from '../../contexts/KeypressContext.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
@@ -1675,7 +1676,24 @@ export function useTextBuffer({
         }
 
         potentialPath = potentialPath.trim();
-        if (isValidPath(unescapePath(potentialPath))) {
+
+        // Check for multiple space-separated paths
+        const segments = splitEscapedPaths(potentialPath);
+        if (segments.length > 1) {
+          // Multiple paths - validate each and add @ prefix to valid ones
+          let anyValidPath = false;
+          const processedPaths = segments.map((segment) => {
+            const unescaped = unescapePath(segment);
+            if (isValidPath(unescaped)) {
+              anyValidPath = true;
+              return `@${segment}`;
+            }
+            return segment;
+          });
+          if (anyValidPath) {
+            ch = processedPaths.join(' ') + ' ';
+          }
+        } else if (isValidPath(unescapePath(potentialPath))) {
           ch = `@${potentialPath} `;
         }
       }

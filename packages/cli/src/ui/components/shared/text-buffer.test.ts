@@ -637,6 +637,42 @@ describe('useTextBuffer', () => {
       act(() => result.current.insert(shortText, { paste: true }));
       expect(getBufferState(result).text).toBe(shortText);
     });
+
+    it('should prepend @ to multiple valid file paths on insert', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => true }),
+      );
+      const filePaths = '/path/to/file1.txt /path/to/file2.txt';
+      act(() => result.current.insert(filePaths, { paste: true }));
+      expect(getBufferState(result).text).toBe(
+        '@/path/to/file1.txt @/path/to/file2.txt ',
+      );
+    });
+
+    it('should handle multiple paths with escaped spaces', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => true }),
+      );
+      const filePaths = '/path/to/my\\ file.txt /other/path.txt';
+      act(() => result.current.insert(filePaths, { paste: true }));
+      expect(getBufferState(result).text).toBe(
+        '@/path/to/my\\ file.txt @/other/path.txt ',
+      );
+    });
+
+    it('should only prepend @ to valid paths in multi-path paste', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: (p) => p.endsWith('.txt'),
+        }),
+      );
+      const filePaths = '/valid/file.txt /invalid/file.jpg';
+      act(() => result.current.insert(filePaths, { paste: true }));
+      expect(getBufferState(result).text).toBe(
+        '@/valid/file.txt /invalid/file.jpg ',
+      );
+    });
   });
 
   describe('Shell Mode Behavior', () => {
