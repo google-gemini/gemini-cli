@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import type { PartListUnion, PartUnion } from '@google/genai';
 import type {
   AnyToolInvocation,
@@ -652,28 +653,16 @@ export async function handleAtCommand({
   }
 }
 
-function convertResourceContentsToParts(response: {
-  contents?: Array<{
-    text?: string;
-    blob?: string;
-    mimeType?: string;
-    resource?: {
-      text?: string;
-      blob?: string;
-      mimeType?: string;
-    };
-  }>;
-}): PartUnion[] {
+function convertResourceContentsToParts(
+  response: ReadResourceResult,
+): PartUnion[] {
   const parts: PartUnion[] = [];
-  for (const content of response.contents ?? []) {
-    const candidate = content.resource ?? content;
-    if (candidate.text) {
-      parts.push({ text: candidate.text });
-      continue;
-    }
-    if (candidate.blob) {
-      const sizeBytes = Buffer.from(candidate.blob, 'base64').length;
-      const mimeType = candidate.mimeType ?? 'application/octet-stream';
+  for (const content of response.contents) {
+    if ('text' in content) {
+      parts.push({ text: content.text });
+    } else if ('blob' in content) {
+      const sizeBytes = Buffer.from(content.blob, 'base64').length;
+      const mimeType = content.mimeType ?? 'application/octet-stream';
       parts.push({
         text: `[Binary resource content ${mimeType}, ${sizeBytes} bytes]`,
       });
