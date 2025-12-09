@@ -63,8 +63,8 @@ export async function saveClipboardImage(
     // Generate a unique filename with timestamp
     const timestamp = new Date().getTime();
 
-    // Try different image formats in order of preference
-    // Only formats supported by Gemini API: PNG, JPEG, WEBP, HEIC, HEIF
+    // AppleScript clipboard classes to try, in order of preference.
+    // macOS converts clipboard images to these formats (WEBP/HEIC/HEIF not supported by osascript).
     const formats = [
       { class: 'PNGf', extension: 'png' },
       { class: 'JPEG', extension: 'jpg' },
