@@ -12,6 +12,8 @@
 !.gemini/config.yaml
 !.gemini/commands/
 
+.claude/
+
 # Note: .gemini-clipboard/ is NOT in gitignore so Gemini can access pasted images
 
 # Dependency directory
