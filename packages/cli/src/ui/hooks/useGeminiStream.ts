@@ -16,7 +16,6 @@ import type {
   ThoughtSummary,
   ToolCallRequestInfo,
   GeminiErrorEventValue,
-  ToolCallData,
 } from '@google/gemini-cli-core';
 import {
   GeminiEventType as ServerGeminiEventType,
@@ -994,7 +993,6 @@ export const useGeminiStream = (
                       );
 
                       if (lastQueryRef.current && lastPromptIdRef.current) {
-                        // eslint-disable-next-line @typescript-eslint/no-floating-promises
                         submitQuery(
                           lastQueryRef.current,
                           { isContinuation: true },
@@ -1178,7 +1176,6 @@ export const useGeminiStream = (
           const combinedParts = geminiTools.flatMap(
             (toolCall) => toolCall.response.responseParts,
           );
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           geminiClient.addHistory({
             role: 'user',
             parts: combinedParts,
@@ -1233,7 +1230,6 @@ export const useGeminiStream = (
         return;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       submitQuery(
         responsesToSend,
         {
@@ -1342,23 +1338,22 @@ export const useGeminiStream = (
               toolCallWithSnapshotFileName,
             );
 
-            const checkpointData: ToolCallData<
-              HistoryItem[],
-              Record<string, unknown>
-            > & { filePath: string } = {
-              history,
-              clientHistory,
-              toolCall: {
-                name: toolCall.request.name,
-                args: toolCall.request.args,
-              },
-              commitHash,
-              filePath,
-            };
-
             await fs.writeFile(
               toolCallWithSnapshotFilePath,
-              JSON.stringify(checkpointData, null, 2),
+              JSON.stringify(
+                {
+                  history,
+                  clientHistory,
+                  toolCall: {
+                    name: toolCall.request.name,
+                    args: toolCall.request.args,
+                  },
+                  commitHash,
+                  filePath,
+                },
+                null,
+                2,
+              ),
             );
           } catch (error) {
             onDebugMessage(
@@ -1370,7 +1365,6 @@ export const useGeminiStream = (
         }
       }
     };
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     saveRestorableToolCalls();
   }, [
     toolCalls,
