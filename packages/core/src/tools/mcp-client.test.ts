@@ -625,6 +625,88 @@ describe('mcp-client', () => {
       );
     });
 
+    it('refreshes prompts when prompt list change notification is received', async () => {
+      let listCallCount = 0;
+      let promptListHandler:
+        | ((notification: unknown) => Promise<void> | void)
+        | undefined;
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn((_, handler) => {
+          promptListHandler = handler;
+        }),
+        getServerCapabilities: vi
+          .fn()
+          .mockReturnValue({ prompts: { listChanged: true } }),
+        listPrompts: vi.fn().mockImplementation(() => {
+          listCallCount += 1;
+          if (listCallCount === 1) {
+            return Promise.resolve({
+              prompts: [{ name: 'one', description: 'first' }],
+            });
+          }
+          return Promise.resolve({
+            prompts: [{ name: 'two', description: 'second' }],
+          });
+        }),
+        request: vi.fn().mockResolvedValue({ prompts: [] }),
+      } as unknown as ClientLib.Client;
+      vi.mocked(ClientLib.Client).mockReturnValue(mockedClient);
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+      } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+        workspaceContext,
+        {} as Config,
+        false,
+      );
+      await client.connect();
+      await client.discover({} as Config);
+
+      expect(mockedClient.setNotificationHandler).toHaveBeenCalledOnce();
+      expect(promptListHandler).toBeDefined();
+
+      await promptListHandler?.({
+        method: 'notifications/prompts/list_changed',
+      });
+
+      expect(promptRegistry.removePromptsByServer).toHaveBeenCalledWith(
+        'test-server',
+      );
+      expect(promptRegistry.registerPrompt).toHaveBeenLastCalledWith(
+        expect.objectContaining({ name: 'two' }),
+      );
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        'Prompts updated for server: test-server',
+      );
+    });
+
     it('should remove tools and prompts on disconnect', async () => {
       const mockedClient = {
         connect: vi.fn(),
