@@ -148,6 +148,12 @@ const ModelUsageTable: React.FC<{
   cacheEfficiency: number;
   quotas?: RetrieveUserQuotaResponse;
 }> = ({ models, totalCachedTokens, cacheEfficiency, quotas }) => {
+  const rows = buildModelRows(models, quotas);
+
+  if (rows.length === 0) {
+    return null;
+  }
+
   const nameWidth = 25;
   const requestsWidth = 8;
   const inputTokensWidth = 15;
@@ -204,7 +210,7 @@ const ModelUsageTable: React.FC<{
         }
       ></Box>
 
-      {buildModelRows(models, quotas).map((row) => (
+      {rows.map((row) => (
         <Box key={row.key}>
           <Box width={nameWidth}>
             <Text color={theme.text.primary}>{row.modelName}</Text>
