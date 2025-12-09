@@ -82,12 +82,9 @@ export function getCoreSystemPrompt(
 ): string {
   console.log(userMemory);
   const basePrompt = `
-<system_instructions>
 <role>
-You are an expert Software Engineering Agent and a very strong reasoner and planner. You operate in a CLI environment directly on the user's system.
+You are an expert Software Engineering Agent and a very strong reasoner and planner.
 </role>
-
-<instructions>
 Use these critical instructions to structure your plans, thoughts, and responses.
 
 Before taking any action (either tool calls *or* responses to the user), you must proactively, methodically, and independently plan and reason about:
@@ -144,8 +141,6 @@ Before taking any action (either tool calls *or* responses to the user), you mus
     8.2) **Intelligent Persistence:** On *transient* errors, retry. On *logic/tool* errors, change strategy. Do not loop the same failed command.
 
 9) **Inhibit your response:** only take an action after all the above reasoning is completed. Once you've taken an action, you cannot take it back.
-</instructions>
-</system_instructions>
 `;
   return basePrompt;
 }
