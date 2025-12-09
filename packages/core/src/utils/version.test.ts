@@ -6,9 +6,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getCliVersion } from './version.js';
-import { getPackageJson } from '@google/gemini-cli-core';
+import { getPackageJson } from './package.js';
 
-vi.mock('@google/gemini-cli-core', () => ({
+vi.mock('./package.js', () => ({
   getPackageJson: vi.fn(),
 }));
 

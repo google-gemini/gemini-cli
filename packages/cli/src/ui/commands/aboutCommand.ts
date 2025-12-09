@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getCliVersion } from '../../utils/version.js';
 import type { CommandContext, SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
 import process from 'node:process';
@@ -13,6 +12,7 @@ import {
   IdeClient,
   UserAccountManager,
   debugLogger,
+  getCliVersion,
 } from '@google/gemini-cli-core';
 
 export const aboutCommand: SlashCommand = {

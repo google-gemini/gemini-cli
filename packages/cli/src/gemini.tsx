@@ -33,7 +33,6 @@ import {
   runExitCleanup,
   registerTelemetryConfig,
 } from './utils/cleanup.js';
-import { getCliVersion } from './utils/version.js';
 import {
   type Config,
   type ResumedSessionData,
@@ -63,6 +62,7 @@ import {
   SessionEndReason,
   fireSessionStartHook,
   fireSessionEndHook,
+  getCliVersion,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,

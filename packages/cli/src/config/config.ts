@@ -31,10 +31,10 @@ import {
   debugLogger,
   loadServerHierarchicalMemory,
   WEB_FETCH_TOOL_NAME,
+  getCliVersion,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
-import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
 import { appEvents } from '../utils/events.js';
