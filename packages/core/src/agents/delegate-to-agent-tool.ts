@@ -54,17 +54,35 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
             );
           }
 
-          let validator: z.ZodTypeAny = z.unknown();
+          let validator: z.ZodTypeAny;
 
           // Map input types to Zod
-          if (inputDef.type === 'string') validator = z.string();
-          else if (inputDef.type === 'number') validator = z.number();
-          else if (inputDef.type === 'boolean') validator = z.boolean();
-          else if (inputDef.type === 'integer') validator = z.number().int();
-          else if (inputDef.type === 'string[]')
-            validator = z.array(z.string());
-          else if (inputDef.type === 'number[]')
-            validator = z.array(z.number());
+          switch (inputDef.type) {
+            case 'string':
+              validator = z.string();
+              break;
+            case 'number':
+              validator = z.number();
+              break;
+            case 'boolean':
+              validator = z.boolean();
+              break;
+            case 'integer':
+              validator = z.number().int();
+              break;
+            case 'string[]':
+              validator = z.array(z.string());
+              break;
+            case 'number[]':
+              validator = z.array(z.number());
+              break;
+            default: {
+              // This provides compile-time exhaustiveness checking.
+              const _exhaustiveCheck: never = inputDef.type;
+              void _exhaustiveCheck;
+              throw new Error(`Unhandled agent input type: '${inputDef.type}'`);
+            }
+          }
 
           if (!inputDef.required) validator = validator.optional();
 
