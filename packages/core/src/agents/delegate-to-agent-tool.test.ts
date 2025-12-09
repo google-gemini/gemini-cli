@@ -55,19 +55,29 @@ describe('DelegateToAgentTool', () => {
     tool = new DelegateToAgentTool(registry, config);
   });
 
-  it('should validate agentName exists in registry', async () => {
+  it('should use dynamic description from registry', () => {
+    // registry has mockAgentDef registered in beforeEach
+    expect(tool.description).toContain(
+      'Delegates a task to a specialized sub-agent',
+    );
+    expect(tool.description).toContain(
+      `- **${mockAgentDef.name}**: ${mockAgentDef.description}`,
+    );
+  });
+
+  it('should validate agent_name exists in registry', async () => {
     // Zod validation happens at build time now (or rather, build validates the schema)
-    // Since we use discriminated union, an invalid agentName won't match any option.
+    // Since we use discriminated union, an invalid agent_name won't match any option.
     expect(() =>
       tool.build({
-        agentName: 'non_existent_agent',
+        agent_name: 'non_existent_agent',
       }),
     ).toThrow();
   });
 
   it('should validate correct arguments', async () => {
     const invocation = tool.build({
-      agentName: 'test_agent',
+      agent_name: 'test_agent',
       arg1: 'valid',
     });
 
@@ -85,7 +95,7 @@ describe('DelegateToAgentTool', () => {
     // Missing arg1 should fail Zod validation
     expect(() =>
       tool.build({
-        agentName: 'test_agent',
+        agent_name: 'test_agent',
         arg2: 123,
       }),
     ).toThrow();
@@ -95,7 +105,7 @@ describe('DelegateToAgentTool', () => {
     // arg1 should be string, passing number
     expect(() =>
       tool.build({
-        agentName: 'test_agent',
+        agent_name: 'test_agent',
         arg1: 123,
       }),
     ).toThrow();
@@ -103,7 +113,7 @@ describe('DelegateToAgentTool', () => {
 
   it('should allow optional arguments to be omitted', async () => {
     const invocation = tool.build({
-      agentName: 'test_agent',
+      agent_name: 'test_agent',
       arg1: 'valid',
       // arg2 is optional
     });
@@ -113,13 +123,13 @@ describe('DelegateToAgentTool', () => {
     ).resolves.toBeDefined();
   });
 
-  it('should throw error if an agent has an input named "agentName"', () => {
+  it('should throw error if an agent has an input named "agent_name"', () => {
     const invalidAgentDef: AgentDefinition = {
       ...mockAgentDef,
       name: 'invalid_agent',
       inputConfig: {
         inputs: {
-          agentName: {
+          agent_name: {
             type: 'string',
             description: 'Conflict',
             required: true,
@@ -132,7 +142,7 @@ describe('DelegateToAgentTool', () => {
     (registry as any).agents.set(invalidAgentDef.name, invalidAgentDef);
 
     expect(() => new DelegateToAgentTool(registry, config)).toThrow(
-      "Agent 'invalid_agent' cannot have an input parameter named 'agentName' as it is a reserved parameter for delegation.",
+      "Agent 'invalid_agent' cannot have an input parameter named 'agent_name' as it is a reserved parameter for delegation.",
     );
   });
 });

@@ -21,7 +21,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { SubagentInvocation } from './invocation.js';
 import type { AgentInputs } from './types.js';
 
-type DelegateParams = { agentName: string } & Record<string, unknown>;
+type DelegateParams = { agent_name: string } & Record<string, unknown>;
 
 export class DelegateToAgentTool extends BaseDeclarativeTool<
   DelegateParams,
@@ -39,18 +39,18 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
     if (definitions.length === 0) {
       // Fallback if no agents are registered (mostly for testing/safety)
       schema = z.object({
-        agentName: z.string().describe('No agents are currently available.'),
+        agent_name: z.string().describe('No agents are currently available.'),
       });
     } else {
       const agentSchemas = definitions.map((def) => {
         const inputShape: Record<string, z.ZodTypeAny> = {
-          agentName: z.literal(def.name).describe(def.description),
+          agent_name: z.literal(def.name).describe(def.description),
         };
 
         for (const [key, inputDef] of Object.entries(def.inputConfig.inputs)) {
-          if (key === 'agentName') {
+          if (key === 'agent_name') {
             throw new Error(
-              `Agent '${def.name}' cannot have an input parameter named 'agentName' as it is a reserved parameter for delegation.`,
+              `Agent '${def.name}' cannot have an input parameter named 'agent_name' as it is a reserved parameter for delegation.`,
             );
           }
 
@@ -84,7 +84,9 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
             }
           }
 
-          if (!inputDef.required) validator = validator.optional();
+          if (!inputDef.required) {
+            validator = validator.optional();
+          }
 
           inputShape[key] = validator.describe(inputDef.description);
         }
@@ -92,7 +94,7 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
         // Cast required because Zod can't infer the discriminator from dynamic keys
         return z.object(
           inputShape,
-        ) as z.ZodDiscriminatedUnionOption<'agentName'>;
+        ) as z.ZodDiscriminatedUnionOption<'agent_name'>;
       });
 
       // Create the discriminated union
@@ -101,25 +103,20 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
         schema = agentSchemas[0];
       } else {
         schema = z.discriminatedUnion(
-          'agentName',
+          'agent_name',
           agentSchemas as [
-            z.ZodDiscriminatedUnionOption<'agentName'>,
-            z.ZodDiscriminatedUnionOption<'agentName'>,
-            ...Array<z.ZodDiscriminatedUnionOption<'agentName'>>,
+            z.ZodDiscriminatedUnionOption<'agent_name'>,
+            z.ZodDiscriminatedUnionOption<'agent_name'>,
+            ...Array<z.ZodDiscriminatedUnionOption<'agent_name'>>,
           ],
         );
       }
     }
 
-    const agentList =
-      definitions.length > 0
-        ? definitions.map((d) => d.name).join(', ')
-        : 'none';
-
     super(
       DELEGATE_TO_AGENT_TOOL_NAME,
       'Delegate to Agent',
-      `Delegates to a specialized sub-agent (available: ${agentList}). Use for deep analysis tasks like bug investigation or refactoring scope.`,
+      registry.getToolDescription(),
       Kind.Think,
       zodToJsonSchema(schema),
       /* isOutputMarkdown */ true,
@@ -154,23 +151,23 @@ class DelegateInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return `Delegating to agent '${this.params.agentName}'`;
+    return `Delegating to agent '${this.params.agent_name}'`;
   }
 
   async execute(
     signal: AbortSignal,
     updateOutput?: (output: string | AnsiOutput) => void,
   ): Promise<ToolResult> {
-    const definition = this.registry.getDefinition(this.params.agentName);
+    const definition = this.registry.getDefinition(this.params.agent_name);
     if (!definition) {
       throw new Error(
-        `Agent '${this.params.agentName}' exists in the tool definition but could not be found in the registry.`,
+        `Agent '${this.params.agent_name}' exists in the tool definition but could not be found in the registry.`,
       );
     }
 
-    // Extract arguments (everything except agentName)
+    // Extract arguments (everything except agent_name)
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { agentName, ...agentArgs } = this.params;
+    const { agent_name, ...agentArgs } = this.params;
 
     // Instantiate the Subagent Loop
     const subagentInvocation = new SubagentInvocation(
