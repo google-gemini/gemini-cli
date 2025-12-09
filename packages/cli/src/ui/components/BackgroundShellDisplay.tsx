@@ -73,6 +73,17 @@ export const BackgroundShellDisplay = ({
     }
   }, [isListOpenProp, activeShell, shells]);
 
+  // Auto-open list if multiple shells exist on mount, or auto-focus single shell
+  useEffect(() => {
+    if (shells.size === 1) {
+      setIsBackgroundShellListOpen(false);
+    } else if (shells.size > 1) {
+      setIsBackgroundShellListOpen(true);
+    }
+    // We only want this to run on mount (when the component becomes visible)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useKeypress(
     (key) => {
       if (!activeShell) return;
@@ -99,6 +110,15 @@ export const BackgroundShellDisplay = ({
           return;
         }
         if (key.name === 'escape') {
+          setIsBackgroundShellListOpen(false);
+          return;
+        }
+        // Handle Ctrl+O to select current and close list (toggle behavior)
+        if (key.ctrl && key.name === 'o') {
+          const selectedPid = shellPids[listSelectionIndex];
+          if (selectedPid) {
+            setActiveBackgroundShellPid(selectedPid);
+          }
           setIsBackgroundShellListOpen(false);
           return;
         }

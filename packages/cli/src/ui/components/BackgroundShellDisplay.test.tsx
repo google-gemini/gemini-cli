@@ -9,6 +9,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BackgroundShellDisplay } from './BackgroundShellDisplay.js';
 import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
+import { act } from 'react';
+import { useKeypress } from '../hooks/useKeypress.js';
+import { type Key, type KeypressHandler } from '../contexts/KeypressContext.js';
 
 // Mock dependencies
 const mockKillBackgroundShell = vi.fn();
@@ -51,6 +54,17 @@ vi.mock('../hooks/useKeypress.js', () => ({
 vi.mock('../contexts/MouseContext.js', () => ({
   useMouse: vi.fn(),
 }));
+
+const createMockKey = (overrides: Partial<Key>): Key => ({
+  name: '',
+  ctrl: false,
+  meta: false,
+  shift: false,
+  paste: false,
+  insertable: false,
+  sequence: '',
+  ...overrides,
+});
 
 describe('<BackgroundShellDisplay />', () => {
   const mockShells = new Map<number, BackgroundShell>();
@@ -179,5 +193,72 @@ describe('<BackgroundShellDisplay />', () => {
     expect(lastFrame()).toContain('Select Process');
     expect(lastFrame()).toContain('>  1: npm start (PID: 1001)');
     expect(lastFrame()).toContain('   2: tail -f log.txt (PID: 1002)');
+  });
+
+  it('auto-opens to process view if only one shell exists on mount', () => {
+    const singleShellMap = new Map();
+    singleShellMap.set(shell1.pid, shell1);
+
+    render(
+      <BackgroundShellDisplay
+        shells={singleShellMap}
+        activePid={shell1.pid}
+        width={80}
+        height={24}
+        isFocused={true}
+        isListOpenProp={false} // Should be overridden by useEffect
+      />,
+    );
+
+    expect(mockSetIsBackgroundShellListOpen).toHaveBeenCalledWith(false);
+  });
+
+  it('auto-opens to list view if multiple shells exist on mount', () => {
+    render(
+      <BackgroundShellDisplay
+        shells={mockShells}
+        activePid={shell1.pid}
+        width={80}
+        height={24}
+        isFocused={true}
+        isListOpenProp={false} // Should be overridden by useEffect
+      />,
+    );
+
+    expect(mockSetIsBackgroundShellListOpen).toHaveBeenCalledWith(true);
+  });
+
+  it('selects the current process and closes the list when Ctrl+O is pressed in list view', () => {
+    const useKeypressMock = vi.mocked(useKeypress);
+    let keypressHandler: KeypressHandler | undefined;
+    useKeypressMock.mockImplementation((handler, { isActive }) => {
+      if (isActive) {
+        keypressHandler = handler;
+      }
+    });
+
+    render(
+      <BackgroundShellDisplay
+        shells={mockShells}
+        activePid={shell1.pid}
+        width={80}
+        height={24}
+        isFocused={true}
+        isListOpenProp={true}
+      />,
+    );
+
+    // Simulate down arrow to select the second process
+    act(() => {
+      keypressHandler!(createMockKey({ name: 'down' }));
+    });
+
+    // Simulate Ctrl+O
+    act(() => {
+      keypressHandler!(createMockKey({ name: 'o', ctrl: true }));
+    });
+
+    expect(mockSetActiveBackgroundShellPid).toHaveBeenCalledWith(shell2.pid);
+    expect(mockSetIsBackgroundShellListOpen).toHaveBeenCalledWith(false);
   });
 });
