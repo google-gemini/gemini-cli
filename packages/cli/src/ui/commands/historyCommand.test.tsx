@@ -169,11 +169,8 @@ describe('historyCommand', () => {
 
         text: 'New Response',
       }),
-
       expect.any(Number),
     );
-
-    // expect(mockRecordMessage).toHaveBeenCalledWith( ... ) - Removed
   });
 
   it('should handle stream error correctly', async () => {
