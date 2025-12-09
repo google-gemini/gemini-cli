@@ -13,6 +13,7 @@ import {
   type PendingValue,
 } from './settingsDialogReducer.js';
 import { SettingScope } from '../../config/settings.js';
+import { getDialogSettingKeys } from '../../utils/settingsUtils.js';
 
 describe('settingsDialogReducer', () => {
   let initialState: SettingsDialogState;
@@ -28,7 +29,7 @@ describe('settingsDialogReducer', () => {
       expect(initialState.activeSettingIndex).toBe(0);
       expect(initialState.scrollOffset).toBe(0);
       expect(initialState.searchQuery).toBe('');
-      expect(initialState.filteredKeys).toEqual([]);
+      expect(initialState.filteredKeys).toEqual(getDialogSettingKeys());
       expect(initialState.globalPendingChanges).toEqual(new Map());
     });
   });
@@ -276,7 +277,7 @@ describe('settingsDialogReducer', () => {
     it('should update existing pending change', () => {
       const state = {
         ...initialState,
-        unsavedRestartChanges: new Map<string, PendingValue>([
+        globalPendingChanges: new Map<string, PendingValue>([
           ['test.setting', false],
         ]),
       };
@@ -327,7 +328,7 @@ describe('settingsDialogReducer', () => {
     it('should remove existing pending change', () => {
       const state = {
         ...initialState,
-        unsavedRestartChanges: new Map<string, PendingValue>([
+        globalPendingChanges: new Map<string, PendingValue>([
           ['setting1', true],
           ['setting2', false],
         ]),
@@ -345,7 +346,7 @@ describe('settingsDialogReducer', () => {
     it('should handle non-existent key', () => {
       const state = {
         ...initialState,
-        unsavedRestartChanges: new Map<string, PendingValue>([
+        globalPendingChanges: new Map<string, PendingValue>([
           ['setting1', true],
         ]),
       };
@@ -372,7 +373,7 @@ describe('settingsDialogReducer', () => {
     it('should remove specified keys from pending changes', () => {
       const state = {
         ...initialState,
-        unsavedRestartChanges: new Map<string, PendingValue>([
+        globalPendingChanges: new Map<string, PendingValue>([
           ['setting1', true],
           ['setting2', false],
           ['setting3', 'value'],
@@ -403,7 +404,7 @@ describe('settingsDialogReducer', () => {
     it('should handle empty keys set', () => {
       const state = {
         ...initialState,
-        unsavedRestartChanges: new Map<string, PendingValue>([
+        globalPendingChanges: new Map<string, PendingValue>([
           ['setting1', true],
         ]),
       };
@@ -422,7 +423,7 @@ describe('settingsDialogReducer', () => {
     it('should clear all pending changes', () => {
       const state = {
         ...initialState,
-        unsavedRestartChanges: new Map<string, PendingValue>([
+        globalPendingChanges: new Map<string, PendingValue>([
           ['setting1', true],
           ['setting2', false],
         ]),
@@ -463,7 +464,7 @@ describe('settingsDialogReducer', () => {
     it('should create new state objects for nested updates', () => {
       const state = {
         ...initialState,
-        unsavedRestartChanges: new Map<string, PendingValue>([
+        globalPendingChanges: new Map<string, PendingValue>([
           ['setting1', true],
         ]),
       };
@@ -473,8 +474,8 @@ describe('settingsDialogReducer', () => {
         value: false,
       };
       const result = settingsDialogReducer(state, action);
-      expect(result.globalPendingChanges).not.toBe(state.unsavedRestartChanges);
-      expect(state.unsavedRestartChanges.size).toBe(1);
+      expect(result.globalPendingChanges).not.toBe(state.globalPendingChanges);
+      expect(state.globalPendingChanges.size).toBe(1);
       expect(result.globalPendingChanges.size).toBe(2);
     });
   });
