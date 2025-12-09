@@ -154,6 +154,10 @@ export class IdeClient {
     if (this.connectionConfig?.authToken) {
       this.authToken = this.connectionConfig.authToken;
     }
+    this.authToken =
+      this.connectionConfig?.authToken ??
+      process.env['GEMINI_CLI_IDE_AUTH_TOKEN'];
+
     const workspacePath =
       this.connectionConfig?.workspacePath ??
       process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
