@@ -78,13 +78,12 @@ const buildModelRows = (
   models: Record<string, ModelMetrics>,
   quotas?: RetrieveUserQuotaResponse,
 ) => {
-  const usedModelNames = new Set(
-    Object.keys(models).map((name) => name.replace('-001', '')),
-  );
+  const getBaseModelName = (name: string) => name.replace('-001', '');
+  const usedModelNames = new Set(Object.keys(models).map(getBaseModelName));
 
   // 1. Models with active usage
   const activeRows = Object.entries(models).map(([name, metrics]) => {
-    const modelName = name.replace('-001', '');
+    const modelName = getBaseModelName(name);
     return {
       key: name,
       modelName,
