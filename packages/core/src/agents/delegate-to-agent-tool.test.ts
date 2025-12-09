@@ -112,4 +112,27 @@ describe('DelegateToAgentTool', () => {
       invocation.execute(new AbortController().signal),
     ).resolves.toBeDefined();
   });
+
+  it('should throw error if an agent has an input named "agentName"', () => {
+    const invalidAgentDef: AgentDefinition = {
+      ...mockAgentDef,
+      name: 'invalid_agent',
+      inputConfig: {
+        inputs: {
+          agentName: {
+            type: 'string',
+            description: 'Conflict',
+            required: true,
+          },
+        },
+      },
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (registry as any).agents.set(invalidAgentDef.name, invalidAgentDef);
+
+    expect(() => new DelegateToAgentTool(registry, config)).toThrow(
+      "Agent 'invalid_agent' cannot have an input parameter named 'agentName' as it is a reserved parameter for delegation.",
+    );
+  });
 });
