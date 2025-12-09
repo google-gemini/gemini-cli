@@ -31,9 +31,9 @@ export async function listSessions(config: Config): Promise<void> {
       const current = session.isCurrentSession ? ', current' : '';
       const time = formatRelativeTime(session.lastUpdated);
       const title =
-        session.firstUserMessage.length > 100
-          ? session.firstUserMessage.slice(0, 97) + '...'
-          : session.firstUserMessage;
+        session.displayName.length > 100
+          ? session.displayName.slice(0, 97) + '...'
+          : session.displayName;
       console.log(
         `  ${index + 1}. ${title} (${time}${current}) [${session.id}]`,
       );
