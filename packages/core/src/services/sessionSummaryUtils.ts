@@ -46,6 +46,12 @@ async function generateAndSaveSummary(
 
   // Create summary service
   const contentGenerator = config.getContentGenerator();
+  if (!contentGenerator) {
+    debugLogger.debug(
+      '[SessionSummary] Content generator not available, skipping summary generation',
+    );
+    return;
+  }
   const baseLlmClient = new BaseLlmClient(contentGenerator, config);
   const summaryService = new SessionSummaryService(baseLlmClient);
 
