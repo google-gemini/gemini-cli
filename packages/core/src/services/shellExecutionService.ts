@@ -37,7 +37,7 @@ function createShellEnvironment(
   overrides: NodeJS.ProcessEnv,
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
-    ...process.env,
+    ...getSanitizedEnv(),
     ...overrides,
   };
 
@@ -324,13 +324,7 @@ export class ShellExecutionService {
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
         detached: !isWindows,
-        env: {
-          ...getSanitizedEnv(),
-          GEMINI_CLI: '1',
-          TERM: 'xterm-256color',
-          PAGER: 'cat',
-          GIT_PAGER: 'cat',
-        },
+        env,
       });
 
       const result = new Promise<ShellExecutionResult>((resolve) => {
@@ -545,13 +539,7 @@ export class ShellExecutionService {
         name: 'xterm',
         cols,
         rows,
-        env: {
-          ...getSanitizedEnv(),
-          GEMINI_CLI: '1',
-          TERM: 'xterm-256color',
-          PAGER: shellExecutionConfig.pager ?? 'cat',
-          GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
-        },
+        env,
         handleFlowControl: true,
       });
 
