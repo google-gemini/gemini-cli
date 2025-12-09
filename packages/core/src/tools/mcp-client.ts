@@ -418,9 +418,9 @@ export class McpClient {
         const abortController = new AbortController();
         const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
-        let newPrompts;
         try {
-          newPrompts = await this.discoverPrompts({
+          this.promptRegistry.removePromptsByServer(this.serverName);
+          await this.discoverPrompts({
             signal: abortController.signal,
           });
         } catch (err) {
@@ -429,11 +429,6 @@ export class McpClient {
           );
           clearTimeout(timeoutId);
           break;
-        }
-
-        this.promptRegistry.removePromptsByServer(this.serverName);
-        for (const prompt of newPrompts) {
-          this.promptRegistry.registerPrompt(prompt);
         }
 
         clearTimeout(timeoutId);
