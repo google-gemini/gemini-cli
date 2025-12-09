@@ -36,8 +36,9 @@ glob patterns.
 ## 2. `read_file` (ReadFile)
 
 `read_file` reads and returns the content of a specified file. This tool handles
-text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it
-can read specific line ranges. Other binary file types are generally skipped.
+text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC,
+OGG, FLAC), and PDF files. For text files, it can read specific line ranges.
+Other binary file types are generally skipped.
 
 - **Tool name:** `read_file`
 - **Display name:** ReadFile
@@ -53,16 +54,16 @@ can read specific line ranges. Other binary file types are generally skipped.
   - For text files: Returns the content. If `offset` and `limit` are used,
     returns only that slice of lines. Indicates if content was truncated due to
     line limits or line length limits.
-  - For image and PDF files: Returns the file content as a base64-encoded data
-    structure suitable for model consumption.
+  - For image, audio, and PDF files: Returns the file content as a
+    base64-encoded data structure suitable for model consumption.
   - For other binary files: Attempts to identify and skip them, returning a
     message indicating it's a generic binary file.
 - **Output:** (`llmContent`):
   - For text files: The file content, potentially prefixed with a truncation
     message (e.g.,
     `[File content truncated: showing lines 1-100 of 500 total lines...]\nActual file content...`).
-  - For image/PDF files: An object containing `inlineData` with `mimeType` and
-    base64 `data` (e.g.,
+  - For image/audio/PDF files: An object containing `inlineData` with `mimeType`
+    and base64 `data` (e.g.,
     `{ inlineData: { mimeType: 'image/png', data: 'base64encodedstring' } }`).
   - For other binary files: A message like
     `Cannot display content of binary file: /path/to/data.bin`.
@@ -184,7 +185,7 @@ context around the `old_string` to ensure it modifies the correct location.
   - If `old_string` is provided, it reads the `file_path` and attempts to find
     exactly one occurrence of `old_string`.
   - If one occurrence is found, it replaces it with `new_string`.
-  - **Enhanced Reliability (Multi-Stage Edit Correction):** To significantly
+  - **Enhanced reliability (multi-stage edit correction):** To significantly
     improve the success rate of edits, especially when the model-provided
     `old_string` might not be perfectly precise, the tool incorporates a
     multi-stage edit correction mechanism.

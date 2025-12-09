@@ -364,30 +364,64 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
   'event.name': 'api_request';
   'event.timestamp': string;
   model: string;
-  prompt_id: string;
+  prompt: GenAIPromptDetails;
   request_text?: string;
 
-  constructor(model: string, prompt_id: string, request_text?: string) {
+  constructor(
+    model: string,
+    prompt_details: GenAIPromptDetails,
+    request_text?: string,
+  ) {
     this['event.name'] = 'api_request';
     this['event.timestamp'] = new Date().toISOString();
     this.model = model;
-    this.prompt_id = prompt_id;
+    this.prompt = prompt_details;
     this.request_text = request_text;
   }
 
-  toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
+  toLogRecord(config: Config): LogRecord {
+    const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': EVENT_API_REQUEST,
       'event.timestamp': this['event.timestamp'],
       model: this.model,
-      prompt_id: this.prompt_id,
+      prompt_id: this.prompt.prompt_id,
       request_text: this.request_text,
     };
+    return { body: `API request to ${this.model}.`, attributes };
   }
 
-  toLogBody(): string {
-    return `API request to ${this.model}.`;
+  toSemanticLogRecord(config: Config): LogRecord {
+    const { 'gen_ai.response.model': _, ...requestConventionAttributes } =
+      getConventionAttributes({
+        model: this.model,
+        auth_type: config.getContentGeneratorConfig()?.authType,
+      });
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_GEN_AI_OPERATION_DETAILS,
+      'event.timestamp': this['event.timestamp'],
+      ...toGenerateContentConfigAttributes(this.prompt.generate_content_config),
+      ...requestConventionAttributes,
+    };
+
+    if (this.prompt.server) {
+      attributes['server.address'] = this.prompt.server.address;
+      attributes['server.port'] = this.prompt.server.port;
+    }
+
+    if (config.getTelemetryLogPromptsEnabled() && this.prompt.contents) {
+      attributes['gen_ai.input.messages'] = JSON.stringify(
+        toInputMessages(this.prompt.contents),
+      );
+    }
+
+    const logRecord: LogRecord = {
+      body: `GenAI operation request details from ${this.model}.`,
+      attributes,
+    };
+
+    return logRecord;
   }
 }
 
@@ -1504,6 +1538,7 @@ export type TelemetryEvent =
   | AgentFinishEvent
   | RecoveryAttemptEvent
   | LlmLoopCheckEvent
+  | StartupStatsEvent
   | WebFetchFallbackAttemptEvent;
 
 export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
@@ -1590,6 +1625,55 @@ export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Smart Edit Tool Correction: ${this.correction}`;
+  }
+}
+
+export interface StartupPhaseStats {
+  name: string;
+  duration_ms: number;
+  cpu_usage_user_usec: number;
+  cpu_usage_system_usec: number;
+  start_time_usec: number;
+  end_time_usec: number;
+}
+
+export const EVENT_STARTUP_STATS = 'gemini_cli.startup_stats';
+export class StartupStatsEvent implements BaseTelemetryEvent {
+  'event.name': 'startup_stats';
+  'event.timestamp': string;
+  phases: StartupPhaseStats[];
+  os_platform: string;
+  os_release: string;
+  is_docker: boolean;
+
+  constructor(
+    phases: StartupPhaseStats[],
+    os_platform: string,
+    os_release: string,
+    is_docker: boolean,
+  ) {
+    this['event.name'] = 'startup_stats';
+    this['event.timestamp'] = new Date().toISOString();
+    this.phases = phases;
+    this.os_platform = os_platform;
+    this.os_release = os_release;
+    this.is_docker = is_docker;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_STARTUP_STATS,
+      'event.timestamp': this['event.timestamp'],
+      phases: JSON.stringify(this.phases),
+      os_platform: this.os_platform,
+      os_release: this.os_release,
+      is_docker: this.is_docker,
+    };
+  }
+
+  toLogBody(): string {
+    return `Startup stats: ${this.phases.length} phases recorded.`;
   }
 }
 

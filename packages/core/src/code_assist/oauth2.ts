@@ -15,6 +15,7 @@ import * as http from 'node:http';
 import url from 'node:url';
 import crypto from 'node:crypto';
 import * as net from 'node:net';
+import { EventEmitter } from 'node:events';
 import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
@@ -33,7 +34,7 @@ import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   writeToStdout,
-  createInkStdio,
+  createWorkingStdio,
   writeToStderr,
 } from '../utils/stdio.js';
 import {
@@ -44,6 +45,23 @@ import {
   exitAlternateScreen,
 } from '../utils/terminal.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+
+export const authEvents = new EventEmitter();
+
+async function triggerPostAuthCallbacks(tokens: Credentials) {
+  // Construct a JWTInput object to pass to callbacks, as this is the
+  // type expected by the downstream Google Cloud client libraries.
+  const jwtInput: JWTInput = {
+    client_id: OAUTH_CLIENT_ID,
+    client_secret: OAUTH_CLIENT_SECRET,
+    refresh_token: tokens.refresh_token ?? undefined, // Ensure null is not passed
+    type: 'authorized_user',
+    client_email: userAccountManager.getCachedGoogleAccount() ?? undefined,
+  };
+
+  // Execute all registered post-authentication callbacks.
+  authEvents.emit('post_auth', jwtInput);
+}
 
 const userAccountManager = new UserAccountManager();
 
@@ -139,6 +157,8 @@ async function initOauthClient(
     } else {
       await cacheCredentials(tokens);
     }
+
+    await triggerPostAuthCallbacks(tokens);
   });
 
   if (credentials) {
@@ -162,6 +182,8 @@ async function initOauthClient(
           }
         }
         debugLogger.log('Loaded cached credentials.');
+        await triggerPostAuthCallbacks(credentials as Credentials);
+
         return client;
       }
     } catch (error) {
@@ -234,6 +256,18 @@ async function initOauthClient(
         'Failed to authenticate with user code.',
       );
     }
+
+    // Retrieve and cache Google Account ID after successful user code auth
+    try {
+      await fetchAndCacheUserInfo(client);
+    } catch (error) {
+      debugLogger.warn(
+        'Failed to retrieve Google Account ID during authentication:',
+        getErrorMessage(error),
+      );
+    }
+
+    await triggerPostAuthCallbacks(client.credentials);
   } else {
     const webLogin = await authWithWeb(client);
 
@@ -297,6 +331,8 @@ async function initOauthClient(
       severity: 'info',
       message: 'Authentication succeeded\n',
     });
+
+    await triggerPostAuthCallbacks(client.credentials);
   }
 
   return client;
@@ -334,7 +370,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
     const code = await new Promise<string>((resolve, _) => {
       const rl = readline.createInterface({
         input: process.stdin,
-        output: createInkStdio().stdout,
+        output: createWorkingStdio().stdout,
         terminal: true,
       });
 
@@ -546,7 +582,7 @@ async function fetchCachedCredentials(): Promise<
 > {
   const useEncryptedStorage = getUseEncryptedStorageFlag();
   if (useEncryptedStorage) {
-    return await OAuthCredentialStorage.loadCredentials();
+    return OAuthCredentialStorage.loadCredentials();
   }
 
   const pathsToTry = [
@@ -568,19 +604,6 @@ async function fetchCachedCredentials(): Promise<
   }
 
   return null;
-}
-
-async function cacheCredentials(credentials: Credentials) {
-  const filePath = Storage.getOAuthCredsPath();
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-
-  const credString = JSON.stringify(credentials, null, 2);
-  await fs.writeFile(filePath, credString, { mode: 0o600 });
-  try {
-    await fs.chmod(filePath, 0o600);
-  } catch {
-    /* empty */
-  }
 }
 
 export function clearOauthClientCache() {
@@ -639,4 +662,17 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
 // Helper to ensure test isolation
 export function resetOauthClientForTesting() {
   oauthClientPromises.clear();
+}
+
+async function cacheCredentials(credentials: Credentials) {
+  const filePath = Storage.getOAuthCredsPath();
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+
+  const credString = JSON.stringify(credentials, null, 2);
+  await fs.writeFile(filePath, credString, { mode: 0o600 });
+  try {
+    await fs.chmod(filePath, 0o600);
+  } catch {
+    /* empty */
+  }
 }
