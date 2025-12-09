@@ -451,10 +451,11 @@ async function enableAction(
     let wasRemoved = false;
 
     // Check and remove from Workspace scope
-    const workspaceDisabled = settings.workspace.settings.mcp?.disabled || [];
+    const workspaceDisabled: string[] =
+      settings.workspace.settings.mcp?.disabled || [];
     if (workspaceDisabled.includes(serverName)) {
       const newWorkspaceDisabled = workspaceDisabled.filter(
-        (name: string) => name !== serverName,
+        (name) => name !== serverName,
       );
       settings.setValue(
         SettingScope.Workspace,
@@ -465,10 +466,10 @@ async function enableAction(
     }
 
     // Check and remove from User scope
-    const userDisabled = settings.user.settings.mcp?.disabled || [];
+    const userDisabled: string[] = settings.user.settings.mcp?.disabled || [];
     if (userDisabled.includes(serverName)) {
       const newUserDisabled = userDisabled.filter(
-        (name: string) => name !== serverName,
+        (name) => name !== serverName,
       );
       settings.setValue(SettingScope.User, 'mcp.disabled', newUserDisabled);
       wasRemoved = true;

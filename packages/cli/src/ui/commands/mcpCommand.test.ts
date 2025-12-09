@@ -21,9 +21,9 @@ import { MessageType } from '../types.js';
 
 // Define a type for the mocked parts of McpClientManager
 type MockMcpClientManager = {
-  getMcpServers: ReturnType<typeof vi.fn<[], Record<string, unknown>>>;
-  getAllMcpServerNames: ReturnType<typeof vi.fn<[], string[]>>;
-  getBlockedMcpServers: ReturnType<typeof vi.fn<[], Array<{ name: string }>>>;
+  getMcpServers: ReturnType<typeof vi.fn>;
+  getAllMcpServerNames: ReturnType<typeof vi.fn>;
+  getBlockedMcpServers: ReturnType<typeof vi.fn>;
   getServerConfig: ReturnType<typeof vi.fn>;
   disconnectServer: ReturnType<typeof vi.fn>;
   maybeDiscoverMcpServer: ReturnType<typeof vi.fn>;
@@ -214,7 +214,8 @@ describe('mcpCommand', () => {
         },
         setValue: vi.fn(),
       };
-      mockContext.services.settings = mockSettings;
+      mockContext.services.settings =
+        mockSettings as unknown as typeof mockContext.services.settings;
     });
 
     describe('enableAction', () => {
