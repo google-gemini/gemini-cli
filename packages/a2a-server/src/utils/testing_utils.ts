@@ -37,8 +37,10 @@ export function createMockConfig(
       isPathWithinWorkspace: () => true,
     }),
     getTargetDir: () => '/test',
+    getCheckpointingEnabled: vi.fn().mockReturnValue(false),
     storage: {
       getProjectTempDir: () => '/tmp',
+      getProjectTempCheckpointsDir: () => '/tmp/checkpoints',
     } as Storage,
     getTruncateToolOutputThreshold: () =>
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
@@ -62,6 +64,7 @@ export function createMockConfig(
     getMcpClientManager: vi.fn().mockReturnValue({
       getMcpServers: vi.fn().mockReturnValue({}),
     }),
+    getGitService: vi.fn(),
     ...overrides,
   } as unknown as Config;
   mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
