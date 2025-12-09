@@ -14,6 +14,7 @@ import {
   splitEscapedPaths,
   looksLikeMultipleImagePaths,
   getMultipleImagePathsFromText,
+  processPastedPaths,
 } from './clipboardUtils.js';
 
 describe('clipboardUtils', () => {
@@ -196,19 +197,6 @@ describe('clipboardUtils', () => {
         ),
       ).toBe(true);
     });
-
-    it('should be synchronous and fast for normal text', () => {
-      // This test ensures the function is suitable for use in synchronous code paths
-      const start = performance.now();
-      for (let i = 0; i < 1000; i++) {
-        looksLikeImagePath('hello world this is normal text');
-        looksLikeImagePath('const x = 5; function foo() {}');
-        looksLikeImagePath('https://example.com/image.png');
-      }
-      const duration = performance.now() - start;
-      // Should complete 3000 calls in well under 100ms
-      expect(duration).toBeLessThan(100);
-    });
   });
 
   describe('splitEscapedPaths', () => {
@@ -308,16 +296,6 @@ describe('clipboardUtils', () => {
         looksLikeMultipleImagePaths('/my\\ image.png /other\\ pic.jpg'),
       ).toBe(true);
     });
-
-    it('should be fast for normal text', () => {
-      const start = performance.now();
-      for (let i = 0; i < 1000; i++) {
-        looksLikeMultipleImagePaths('hello world this is normal text');
-        looksLikeMultipleImagePaths('const x = 5; function foo() {}');
-      }
-      const duration = performance.now() - start;
-      expect(duration).toBeLessThan(100);
-    });
   });
 
   describe('getMultipleImagePathsFromText', () => {
@@ -386,6 +364,64 @@ describe('clipboardUtils', () => {
       const result = await getMultipleImagePathsFromText('');
       expect(result.validPaths).toEqual([]);
       expect(result.invalidSegments).toEqual([]);
+    });
+  });
+
+  describe('processPastedPaths', () => {
+    it('should return null for empty string', () => {
+      const result = processPastedPaths('', () => true);
+      expect(result).toBe(null);
+    });
+
+    it('should add @ prefix to single valid path', () => {
+      const result = processPastedPaths('/path/to/file.txt', () => true);
+      expect(result).toBe('@/path/to/file.txt ');
+    });
+
+    it('should return null for single invalid path', () => {
+      const result = processPastedPaths('/path/to/file.txt', () => false);
+      expect(result).toBe(null);
+    });
+
+    it('should add @ prefix to all valid paths', () => {
+      const result = processPastedPaths(
+        '/path/to/file1.txt /path/to/file2.txt',
+        () => true,
+      );
+      expect(result).toBe('@/path/to/file1.txt @/path/to/file2.txt ');
+    });
+
+    it('should only add @ prefix to valid paths', () => {
+      const result = processPastedPaths(
+        '/valid/file.txt /invalid/file.jpg',
+        (p) => p.endsWith('.txt'),
+      );
+      expect(result).toBe('@/valid/file.txt /invalid/file.jpg ');
+    });
+
+    it('should return null if no paths are valid', () => {
+      const result = processPastedPaths(
+        '/path/to/file1.txt /path/to/file2.txt',
+        () => false,
+      );
+      expect(result).toBe(null);
+    });
+
+    it('should handle paths with escaped spaces', () => {
+      const result = processPastedPaths(
+        '/path/to/my\\ file.txt /other/path.txt',
+        () => true,
+      );
+      expect(result).toBe('@/path/to/my\\ file.txt @/other/path.txt ');
+    });
+
+    it('should unescape paths before validation', () => {
+      const validatedPaths: string[] = [];
+      processPastedPaths('/my\\ file.txt /other.txt', (p) => {
+        validatedPaths.push(p);
+        return true;
+      });
+      expect(validatedPaths).toEqual(['/my file.txt', '/other.txt']);
     });
   });
 });

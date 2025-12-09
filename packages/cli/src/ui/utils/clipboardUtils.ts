@@ -22,6 +22,9 @@ export const IMAGE_EXTENSIONS = [
   '.heif',
 ];
 
+/** Matches strings that start with a path prefix (/, ~, or .) */
+const PATH_PREFIX_PATTERN = /^[/~.]/;
+
 /**
  * Checks if the system clipboard contains an image (macOS only for now)
  * @returns true if clipboard contains an image
@@ -102,16 +105,18 @@ export async function saveClipboardImage(
           if (stats.size > 0) {
             return tempFilePath;
           }
-        } catch {
+        } catch (e) {
           // File doesn't exist, continue to next format
+          debugLogger.debug('Clipboard image file not found:', tempFilePath, e);
         }
       }
 
       // Clean up failed attempt
       try {
         await fs.unlink(tempFilePath);
-      } catch {
+      } catch (e) {
         // Ignore cleanup errors
+        debugLogger.debug('Failed to clean up temp file:', tempFilePath, e);
       }
     }
 
@@ -147,8 +152,9 @@ export async function cleanupOldClipboardImages(
         }
       }
     }
-  } catch {
+  } catch (e) {
     // Ignore errors in cleanup
+    debugLogger.debug('Failed to clean up old clipboard images:', e);
   }
 }
 
@@ -166,13 +172,12 @@ function parseImagePath(text: string): string | null {
     trimmed = trimmed.slice(1);
   }
 
-  // Check if it looks like a file path (starts with / or ~ or .)
-  if (!trimmed.match(/^[/~.]/)) {
+  // Must start with a path prefix
+  if (!PATH_PREFIX_PATTERN.test(trimmed)) {
     return null;
   }
 
-  // Unescape spaces (drag-and-drop escapes spaces as "\ ")
-  const unescapedPath = trimmed.replace(/\\ /g, ' ');
+  const unescapedPath = unescapePath(trimmed);
 
   // Check if it has an image extension
   const lowerPath = unescapedPath.toLowerCase();
@@ -287,7 +292,7 @@ export function looksLikeMultipleImagePaths(text: string): boolean {
   }
 
   // Must start with a path prefix
-  if (!trimmed.match(/^[/~.]/)) {
+  if (!PATH_PREFIX_PATTERN.test(trimmed)) {
     return false;
   }
 
@@ -316,7 +321,7 @@ export async function getMultipleImagePathsFromText(text: string): Promise<{
   }
 
   // Quick check: if text doesn't look like path(s), return empty
-  if (!trimmed.match(/^[/~.]/)) {
+  if (!PATH_PREFIX_PATTERN.test(trimmed)) {
     return { validPaths: [], invalidSegments: [] };
   }
 
@@ -364,4 +369,34 @@ export async function getMultipleImagePathsFromText(text: string): Promise<{
   }
 
   return { validPaths, invalidSegments };
+}
+
+/**
+ * Processes pasted text containing file paths, adding @ prefix to valid paths.
+ * Handles both single and multiple space-separated paths.
+ *
+ * @param text The pasted text (potentially space-separated paths)
+ * @param isValidPath Function to validate if a path exists/is valid
+ * @returns Processed string with @ prefixes on valid paths, or null if no valid paths
+ */
+export function processPastedPaths(
+  text: string,
+  isValidPath: (path: string) => boolean,
+): string | null {
+  const segments = splitEscapedPaths(text);
+  if (segments.length === 0) {
+    return null;
+  }
+
+  let anyValidPath = false;
+  const processedPaths = segments.map((segment) => {
+    const unescaped = unescapePath(segment);
+    if (isValidPath(unescaped)) {
+      anyValidPath = true;
+      return `@${segment}`;
+    }
+    return segment;
+  });
+
+  return anyValidPath ? processedPaths.join(' ') + ' ' : null;
 }
