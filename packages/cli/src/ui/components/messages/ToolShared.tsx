@@ -15,6 +15,7 @@ import {
 } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
 import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
+import { LinkifiedText } from '../shared/LinkifiedText.js';
 
 export const STATUS_INDICATOR_WIDTH = 3;
 
@@ -103,7 +104,9 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
         <Text color={nameColor} bold>
           {name}
         </Text>{' '}
-        <Text color={theme.text.secondary}>{description}</Text>
+        <LinkifiedText color={theme.text.secondary}>
+          {description}
+        </LinkifiedText>
       </Text>
     </Box>
   );

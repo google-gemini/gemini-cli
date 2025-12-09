@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.21.0-nightly.20251207.025e450ac",
+  "version": "0.21.0-nightly.20251204.3da4fd5f7",
   "description": "Gemini CLI",
   "repository": {
     "type": "git",
@@ -25,7 +25,7 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.21.0-nightly.20251207.025e450ac"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.21.0-nightly.20251204.3da4fd5f7"
   },
   "dependencies": {
     "@google/gemini-cli-core": "file:../core",
@@ -45,6 +45,7 @@
     "highlight.js": "^11.11.1",
     "ink": "npm:@jrichman/ink@6.4.6",
     "ink-gradient": "^3.0.0",
+    "ink-link": "^5.0.0",
     "ink-spinner": "^5.0.0",
     "latest-version": "^9.0.0",
     "lowlight": "^3.3.0",
