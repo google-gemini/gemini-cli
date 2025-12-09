@@ -11,7 +11,7 @@ import path from 'node:path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export async function getCliVersion(): Promise<string> {
+export async function getVersion(): Promise<string> {
   const pkgJson = await getPackageJson(__dirname);
   return process.env['CLI_VERSION'] || pkgJson?.version || 'unknown';
 }

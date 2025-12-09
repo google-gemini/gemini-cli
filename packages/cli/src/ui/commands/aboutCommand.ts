@@ -12,7 +12,7 @@ import {
   IdeClient,
   UserAccountManager,
   debugLogger,
-  getCliVersion,
+  getVersion,
 } from '@google/gemini-cli-core';
 
 export const aboutCommand: SlashCommand = {
@@ -31,7 +31,7 @@ export const aboutCommand: SlashCommand = {
       })`;
     }
     const modelVersion = context.services.config?.getModel() || 'Unknown';
-    const cliVersion = await getCliVersion();
+    const cliVersion = await getVersion();
     const selectedAuthType =
       context.services.settings.merged.security?.auth?.selectedType || '';
     const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'] || '';

@@ -31,7 +31,7 @@ import {
   debugLogger,
   loadServerHierarchicalMemory,
   WEB_FETCH_TOOL_NAME,
-  getCliVersion,
+  getVersion,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -288,7 +288,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
   }
 
   yargsInstance
-    .version(await getCliVersion()) // This will enable the --version flag based on package.json
+    .version(await getVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
     .alias('h', 'help')

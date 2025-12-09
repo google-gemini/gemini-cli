@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ReleaseChannel, getReleaseChannel } from '../../utils/channel.js';
-import { getCliVersion } from '../../utils/version.js';
+import { getVersion } from '../../utils/version.js';
 
 // Mock dependencies before importing the module under test
 vi.mock('../../utils/channel.js', async () => {
@@ -18,7 +18,7 @@ vi.mock('../../utils/channel.js', async () => {
 });
 
 vi.mock('../../utils/version.js', async () => ({
-  getCliVersion: vi.fn(),
+  getVersion: vi.fn(),
 }));
 
 describe('client_metadata', () => {
@@ -34,7 +34,7 @@ describe('client_metadata', () => {
     await import('./client_metadata.js');
     // Provide a default mock implementation for each test
     vi.mocked(getReleaseChannel).mockResolvedValue(ReleaseChannel.STABLE);
-    vi.mocked(getCliVersion).mockResolvedValue('0.0.0');
+    vi.mocked(getVersion).mockResolvedValue('0.0.0');
   });
 
   afterEach(() => {
@@ -71,7 +71,7 @@ describe('client_metadata', () => {
 
   describe('getClientMetadata', () => {
     it('should use version from getCliVersion for ideVersion', async () => {
-      vi.mocked(getCliVersion).mockResolvedValue('1.2.3');
+      vi.mocked(getVersion).mockResolvedValue('1.2.3');
       const { getClientMetadata } = await import('./client_metadata.js');
 
       const metadata = await getClientMetadata();

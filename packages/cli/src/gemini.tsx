@@ -62,7 +62,7 @@ import {
   SessionEndReason,
   fireSessionStartHook,
   fireSessionEndHook,
-  getCliVersion,
+  getVersion,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -196,7 +196,7 @@ export async function startInteractiveUI(
     });
   }
 
-  const version = await getCliVersion();
+  const version = await getVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
   const consolePatcher = new ConsolePatcher({

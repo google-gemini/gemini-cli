@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getCliVersion } from './version.js';
+import { getVersion } from './version.js';
 import { getPackageJson } from './package.js';
 
 vi.mock('./package.js', () => ({
@@ -27,20 +27,20 @@ describe('version', () => {
 
   it('should return CLI_VERSION from env if set', async () => {
     process.env['CLI_VERSION'] = '2.0.0';
-    const version = await getCliVersion();
+    const version = await getVersion();
     expect(version).toBe('2.0.0');
   });
 
   it('should return version from package.json if CLI_VERSION is not set', async () => {
     delete process.env['CLI_VERSION'];
-    const version = await getCliVersion();
+    const version = await getVersion();
     expect(version).toBe('1.0.0');
   });
 
   it('should return "unknown" if package.json is not found and CLI_VERSION is not set', async () => {
     delete process.env['CLI_VERSION'];
     vi.mocked(getPackageJson).mockResolvedValue(undefined);
-    const version = await getCliVersion();
+    const version = await getVersion();
     expect(version).toBe('unknown');
   });
 });

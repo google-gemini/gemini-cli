@@ -124,6 +124,9 @@ describe('createContentGenerator', () => {
       getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
+    // Set a fixed version for testing
+    vi.stubEnv('CLI_VERSION', '1.2.3');
+
     const mockGenerator = {
       models: {},
     } as unknown as GoogleGenAI;
@@ -140,7 +143,7 @@ describe('createContentGenerator', () => {
       vertexai: undefined,
       httpOptions: {
         headers: {
-          'User-Agent': expect.any(String),
+          'User-Agent': expect.stringContaining('GeminiCLI/1.2.3/gemini-pro'),
           'x-gemini-api-privileged-user-id': expect.any(String),
         },
       },
