@@ -1,0 +1,115 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { DelegateToAgentTool } from './delegate-to-agent-tool.js';
+import { AgentRegistry } from './registry.js';
+import type { Config } from '../config/config.js';
+import type { AgentDefinition } from './types.js';
+import { SubagentInvocation } from './invocation.js';
+
+vi.mock('./invocation.js', () => ({
+  SubagentInvocation: vi.fn().mockImplementation(() => ({
+    execute: vi
+      .fn()
+      .mockResolvedValue({ content: [{ type: 'text', text: 'Success' }] }),
+  })),
+}));
+
+describe('DelegateToAgentTool', () => {
+  let registry: AgentRegistry;
+  let config: Config;
+  let tool: DelegateToAgentTool;
+
+  const mockAgentDef: AgentDefinition = {
+    name: 'test_agent',
+    description: 'A test agent',
+    promptConfig: {},
+    modelConfig: { model: 'test-model', temp: 0, top_p: 0 },
+    inputConfig: {
+      inputs: {
+        arg1: { type: 'string', description: 'Argument 1', required: true },
+        arg2: { type: 'number', description: 'Argument 2', required: false },
+      },
+    },
+    runConfig: { max_turns: 1, max_time_minutes: 1 },
+    toolConfig: { tools: [] },
+  };
+
+  beforeEach(() => {
+    config = {
+      getDebugMode: () => false,
+      modelConfigService: {
+        registerRuntimeModelConfig: vi.fn(),
+      },
+    } as unknown as Config;
+
+    registry = new AgentRegistry(config);
+    // Manually register the mock agent (bypassing protected method for testing)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (registry as any).agents.set(mockAgentDef.name, mockAgentDef);
+
+    tool = new DelegateToAgentTool(registry, config);
+  });
+
+  it('should validate agentName exists in registry', async () => {
+    // Zod validation happens at build time now (or rather, build validates the schema)
+    // Since we use discriminated union, an invalid agentName won't match any option.
+    expect(() =>
+      tool.build({
+        agentName: 'non_existent_agent',
+      }),
+    ).toThrow();
+  });
+
+  it('should validate correct arguments', async () => {
+    const invocation = tool.build({
+      agentName: 'test_agent',
+      arg1: 'valid',
+    });
+
+    const result = await invocation.execute(new AbortController().signal);
+    expect(result).toEqual({ content: [{ type: 'text', text: 'Success' }] });
+    expect(SubagentInvocation).toHaveBeenCalledWith(
+      { arg1: 'valid' },
+      mockAgentDef,
+      config,
+      undefined,
+    );
+  });
+
+  it('should throw error for missing required argument', async () => {
+    // Missing arg1 should fail Zod validation
+    expect(() =>
+      tool.build({
+        agentName: 'test_agent',
+        arg2: 123,
+      }),
+    ).toThrow();
+  });
+
+  it('should throw error for invalid argument type', async () => {
+    // arg1 should be string, passing number
+    expect(() =>
+      tool.build({
+        agentName: 'test_agent',
+        arg1: 123,
+      }),
+    ).toThrow();
+  });
+
+  it('should allow optional arguments to be omitted', async () => {
+    const invocation = tool.build({
+      agentName: 'test_agent',
+      arg1: 'valid',
+      // arg2 is optional
+    });
+
+    await expect(
+      invocation.execute(new AbortController().signal),
+    ).resolves.toBeDefined();
+  });
+});
