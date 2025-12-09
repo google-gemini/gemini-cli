@@ -188,7 +188,7 @@ describe('useInlineEdit', () => {
       expect(result.current.editState).toEqual({
         key: 'test.setting',
         buffer: 'completely new text',
-        cursorPos: 0, // cursor position is reset to 0 when buffer changes
+        cursorPos: cpLen('initial text'), // cursor position should be preserved when replacing the buffer
         cursorVisible: true,
       });
     });
