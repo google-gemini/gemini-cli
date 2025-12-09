@@ -241,7 +241,35 @@ describe('ShellExecutionService', () => {
     };
 
     mockPtySpawn.mockReturnValue(mockPtyProcess);
-    mockTerminalConstructor.mockReturnValue(mockHeadlessTerminal);
+    mockTerminalConstructor.mockImplementation((options) => {
+      const scrollback = options?.scrollback ?? 0;
+      const rows = options?.rows ?? 24;
+
+      mockHeadlessTerminal.write.mockImplementation(
+        (data: string, cb?: () => void) => {
+          const cleanData = stripAnsi(data);
+          if (mockHeadlessTerminal._lines.length === 0) {
+            mockHeadlessTerminal._lines.push('');
+          }
+          const currentLineIndex = mockHeadlessTerminal._lines.length - 1;
+          const parts = cleanData.split('\n');
+          mockHeadlessTerminal._lines[currentLineIndex] += parts[0];
+          for (let i = 1; i < parts.length; i++) {
+            mockHeadlessTerminal._lines.push(parts[i]);
+          }
+
+          // Simulate scrollback truncation
+          const totalBufferLines = rows + scrollback;
+          if (mockHeadlessTerminal._lines.length > totalBufferLines) {
+            mockHeadlessTerminal._lines = mockHeadlessTerminal._lines.slice(
+              mockHeadlessTerminal._lines.length - totalBufferLines,
+            );
+          }
+          if (cb) cb();
+        },
+      );
+      return mockHeadlessTerminal;
+    });
   });
 
   // Helper function to run a standard execution simulation
@@ -398,7 +426,7 @@ describe('ShellExecutionService', () => {
       const { result } = await simulateExecution('cmd', (pty) => {
         // "value" should not get terminal-width padding
         // "value2    " should keep its spaces
-        pty.onData.mock.calls[0][0]('value\r\nvalue2    ');
+        pty.onData.mock.calls[0][0]('value\nvalue2    ');
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 
@@ -808,9 +836,7 @@ describe('ShellExecutionService', () => {
       );
 
       expect(mockSerializeTerminalToObject).toHaveBeenCalledWith(
-        expect.anything(), // The terminal object
-        expect.anything(),
-        expect.anything(),
+        mockHeadlessTerminal,
       );
 
       expect(onOutputEventMock).toHaveBeenCalledWith(
