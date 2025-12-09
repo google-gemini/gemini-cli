@@ -212,7 +212,7 @@ export class DefaultHookOutput implements HookOutput {
 }
 
 /**
- * Specific hook output class for BeforeTool events with compatibility support
+ * Specific hook output class for BeforeTool events.
  */
 export class BeforeToolHookOutput extends DefaultHookOutput {}
 
