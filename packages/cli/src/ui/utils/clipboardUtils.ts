@@ -22,8 +22,8 @@ export const IMAGE_EXTENSIONS = [
   '.heif',
 ];
 
-/** Matches strings that start with a path prefix (/, ~, or .) */
-const PATH_PREFIX_PATTERN = /^[/~.]/;
+/** Matches strings that start with a path prefix (/, ~, ., or Windows drive letter) */
+const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:)/;
 
 /**
  * Checks if the system clipboard contains an image (macOS only for now)
@@ -390,6 +390,10 @@ export function processPastedPaths(
 
   let anyValidPath = false;
   const processedPaths = segments.map((segment) => {
+    // Quick rejection: skip segments that can't be paths
+    if (!PATH_PREFIX_PATTERN.test(segment)) {
+      return segment;
+    }
     const unescaped = unescapePath(segment);
     if (isValidPath(unescaped)) {
       anyValidPath = true;
