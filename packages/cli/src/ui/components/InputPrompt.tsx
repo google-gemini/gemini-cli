@@ -34,7 +34,10 @@ import {
   clipboardHasImage,
   saveClipboardImage,
   cleanupOldClipboardImages,
+  looksLikeMultipleImagePaths,
+  getMultipleImagePathsFromText,
 } from '../utils/clipboardUtils.js';
+import type { UseClipboardImagesReturn } from '../hooks/useClipboardImages.js';
 import {
   isAutoExecutableCommand,
   isSlashCommand,
@@ -86,6 +89,7 @@ export interface InputPromptProps {
   popAllMessages?: () => string | undefined;
   suggestionsPosition?: 'above' | 'below';
   setBannerVisible: (visible: boolean) => void;
+  clipboardImages?: UseClipboardImagesReturn;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -128,6 +132,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   popAllMessages,
   suggestionsPosition = 'below',
   setBannerVisible,
+  clipboardImages,
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
@@ -323,15 +328,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             // Ignore cleanup errors
           });
 
-          // Get relative path from current directory
-          const relativePath = path.relative(config.getTargetDir(), imagePath);
+          // Register image and get display text (e.g., "[Image #1]")
+          // If clipboardImages is not provided, fall back to the old @path behavior
+          let insertText: string;
+          if (clipboardImages) {
+            insertText = clipboardImages.registerImage(imagePath);
+          } else {
+            const relativePath = path.relative(
+              config.getTargetDir(),
+              imagePath,
+            );
+            insertText = `@${relativePath}`;
+          }
 
-          // Insert @path reference at cursor position
-          const insertText = `@${relativePath}`;
           const currentText = buffer.text;
           const offset = buffer.getOffset();
 
-          // Add spaces around the path if needed
+          // Add spaces around the display text if needed
           let textToInsert = insertText;
           const charBefore = offset > 0 ? currentText[offset - 1] : '';
           const charAfter =
@@ -356,7 +369,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     } catch (error) {
       console.error('Error handling clipboard image:', error);
     }
-  }, [buffer, config]);
+  }, [buffer, config, clipboardImages]);
 
   useMouseClick(
     innerBoxRef,
@@ -414,6 +427,65 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             pasteTimeoutRef.current = null;
           }, 40);
         }
+
+        // Check if pasted content could be image file path(s) (drag and drop)
+        // Use synchronous check first to avoid async handling for normal text
+        if (
+          clipboardImages &&
+          key.sequence &&
+          looksLikeMultipleImagePaths(key.sequence)
+        ) {
+          // Only go async for potential image paths to verify file existence
+          void (async () => {
+            try {
+              const { validPaths, invalidSegments } =
+                await getMultipleImagePathsFromText(key.sequence!);
+
+              if (validPaths.length > 0) {
+                // Register each valid image and collect placeholders
+                const placeholders = validPaths.map((p) =>
+                  clipboardImages.registerImage(p),
+                );
+
+                // Build insertion text: placeholders + invalid segments with @ prefix
+                // Non-image files should use @path syntax for file references
+                let insertText = placeholders.join(' ');
+                if (invalidSegments.length > 0) {
+                  const atPrefixedSegments = invalidSegments.map(
+                    (s) => `@${s}`,
+                  );
+                  insertText += ' ' + atPrefixedSegments.join(' ');
+                }
+
+                // Insert at cursor position with proper spacing
+                const offset = buffer.getOffset();
+                const currentText = buffer.text;
+                let textToInsert = insertText;
+
+                const charBefore = offset > 0 ? currentText[offset - 1] : '';
+                const charAfter =
+                  offset < currentText.length ? currentText[offset] : '';
+
+                if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
+                  textToInsert = ' ' + textToInsert;
+                }
+                if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
+                  textToInsert = textToInsert + ' ';
+                }
+
+                buffer.replaceRangeByOffset(offset, offset, textToInsert);
+              } else {
+                // No valid images found, treat as normal paste
+                buffer.handleInput(key);
+              }
+            } catch {
+              // On error, fall back to normal paste behavior
+              buffer.handleInput(key);
+            }
+          })();
+          return;
+        }
+
         // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
         return;
@@ -858,6 +930,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       tryLoadQueuedMessages,
       setBannerVisible,
+      clipboardImages,
     ],
   );
 
@@ -1149,7 +1222,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   }
 
                   const color =
-                    seg.type === 'command' || seg.type === 'file'
+                    seg.type === 'command' ||
+                    seg.type === 'file' ||
+                    seg.type === 'image'
                       ? theme.text.accent
                       : theme.text.primary;
 

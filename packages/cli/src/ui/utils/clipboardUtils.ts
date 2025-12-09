@@ -8,6 +8,18 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
 
+// Re-export image utilities for backwards compatibility
+export {
+  IMAGE_EXTENSIONS,
+  looksLikeImagePath,
+  getImagePathFromText,
+  splitEscapedPaths,
+  looksLikeMultipleImagePaths,
+  getMultipleImagePathsFromText,
+} from './imageUtils.js';
+
+import { IMAGE_EXTENSIONS } from './imageUtils.js';
+
 /**
  * Checks if the system clipboard contains an image (macOS only for now)
  * @returns true if clipboard contains an image
@@ -125,13 +137,8 @@ export async function cleanupOldClipboardImages(
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
     for (const file of files) {
-      if (
-        file.startsWith('clipboard-') &&
-        (file.endsWith('.png') ||
-          file.endsWith('.jpg') ||
-          file.endsWith('.tiff') ||
-          file.endsWith('.gif'))
-      ) {
+      const ext = path.extname(file).toLowerCase();
+      if (file.startsWith('clipboard-') && IMAGE_EXTENSIONS.includes(ext)) {
         const filePath = path.join(tempDir, file);
         const stats = await fs.stat(filePath);
         if (stats.mtimeMs < oneHourAgo) {
