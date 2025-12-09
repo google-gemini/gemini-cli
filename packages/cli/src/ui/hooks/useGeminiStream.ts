@@ -68,6 +68,7 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import { getRequestSize } from '../../utils/oversized.js';
 
 enum StreamProcessingStatus {
   Completed,
@@ -1188,9 +1189,32 @@ export const useGeminiStream = (
         return;
       }
 
-      const responsesToSend: Part[] = geminiTools.flatMap(
-        (toolCall) => toolCall.response.responseParts,
-      );
+      const responsesToSend: Part[] = geminiTools.flatMap((toolCall) => {
+        const responseParts = toolCall.response.responseParts;
+        if (
+          toolCall.request.name === 'run_shell_command' &&
+          config.get('request_size_limit') > 0 &&
+          getRequestSize(responseParts, config) >
+            config.get('request_size_limit')
+        ) {
+          const originalCommand = toolCall.request.args['command'] as string;
+          const tmpDir = config.storage.getProjectTempDir();
+          const instructionalPart: Part = {
+            functionResponse: {
+              name: 'run_shell_command',
+              response: {
+                stdout: `[INFO] The output of the previous 'run_shell_command' ('${originalCommand}') was too large to be displayed. Please run the command again and redirect the output to a temporary file. For example: \`${originalCommand} > ${path.join(
+                  tmpDir,
+                  'output.txt',
+                )}\`. Then use the \`read_file\` tool to read the contents of the file.`,
+                stderr: '',
+              },
+            },
+          };
+          return [instructionalPart];
+        }
+        return responseParts;
+      });
       const callIdsToMarkAsSubmitted = geminiTools.map(
         (toolCall) => toolCall.request.callId,
       );
@@ -1221,6 +1245,7 @@ export const useGeminiStream = (
       performMemoryRefresh,
       modelSwitchedFromQuotaError,
       addItem,
+      config,
     ],
   );
 
