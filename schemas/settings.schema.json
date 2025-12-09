@@ -1331,8 +1331,8 @@
             "model": {
               "title": "Model",
               "description": "The model to use for the Codebase Investigator agent.",
-              "markdownDescription": "The model to use for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemini-2.5-pro`",
-              "default": "gemini-2.5-pro",
+              "markdownDescription": "The model to use for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `pro`",
+              "default": "pro",
               "type": "string"
             }
           },
