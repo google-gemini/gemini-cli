@@ -122,27 +122,19 @@ class ReadResourceToolInvocation extends BaseToolInvocation<
           }
 
           const onAbort = () => {
-            cleanup();
             const error = new Error('Resource read aborted');
             error.name = 'AbortError';
             reject(error);
-          };
-
-          const cleanup = () => {
-            signal.removeEventListener('abort', onAbort);
           };
 
           signal.addEventListener('abort', onAbort, { once: true });
 
           client
             .readResource(resourceUri)
-            .then((res) => {
-              cleanup();
-              resolve(res);
-            })
-            .catch((err) => {
-              cleanup();
-              reject(err);
+            .then(resolve)
+            .catch(reject)
+            .finally(() => {
+              signal.removeEventListener('abort', onAbort);
             });
         },
       );
