@@ -245,11 +245,11 @@
     ]
   },
   {
-    "label": "Release notes",
+    "label": "Releases",
     "items": [
       {
         "label": "Release notes",
-        "slug": "docs/changelogs/index"
+        "slug": "docs/changelogs/"
       },
       {
         "label": "Latest release",
@@ -261,7 +261,7 @@
       },
       {
         "label": "Changelog",
-        "slug": "docs/changelog/releases"
+        "slug": "docs/changelogs/releases"
       }
     ]
   },
