@@ -85,6 +85,15 @@ function showCitations(settings: LoadedSettings): boolean {
 }
 
 /**
+ * Play terminal bell if setting is enabled and we're in an interactive terminal.
+ */
+function playTerminalBell(settings: LoadedSettings): void {
+  if (settings?.merged?.general?.terminalBell && process.stdout.isTTY) {
+    process.stdout.write('\x07');
+  }
+}
+
+/**
  * Manages the Gemini stream, including user input, command processing,
  * API interaction, and tool call lifecycle.
  */
@@ -270,6 +279,13 @@ export const useGeminiStream = (
     }
     return StreamingState.Idle;
   }, [isResponding, toolCalls]);
+
+  // Play terminal bell when waiting for tool approval
+  useEffect(() => {
+    if (streamingState === StreamingState.WaitingForConfirmation) {
+      playTerminalBell(settings);
+    }
+  }, [streamingState, settings]);
 
   useEffect(() => {
     if (
@@ -1030,6 +1046,7 @@ export const useGeminiStream = (
             } finally {
               if (activeQueryIdRef.current === queryId) {
                 setIsResponding(false);
+                playTerminalBell(settings);
               }
             }
           });
@@ -1049,6 +1066,7 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
+      settings,
     ],
   );
 
