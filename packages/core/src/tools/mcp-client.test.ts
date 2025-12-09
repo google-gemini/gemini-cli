@@ -214,7 +214,7 @@ describe('mcp-client', () => {
       consoleWarnSpy.mockRestore();
     });
 
-    it('should handle errors when discovering prompts', async () => {
+    it('should propagate errors when discovering prompts', async () => {
       const mockedClient = {
         connect: vi.fn(),
         discover: vi.fn(),
@@ -259,9 +259,7 @@ describe('mcp-client', () => {
         false,
       );
       await client.connect();
-      await expect(client.discover({} as Config)).rejects.toThrow(
-        'No prompts, tools, or resources found on the server.',
-      );
+      await expect(client.discover({} as Config)).rejects.toThrow('Test error');
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'error',
         `Error discovering prompts from test-server: Test error`,

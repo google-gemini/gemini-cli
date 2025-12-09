@@ -170,7 +170,7 @@ export class McpClient {
   async discover(cliConfig: Config): Promise<void> {
     this.assertConnected();
 
-    const prompts = await this.discoverPrompts();
+    const prompts = await this.fetchPrompts();
     const tools = await this.discoverTools(cliConfig);
     const resources = await this.discoverResources();
     this.updateResourceRegistry(resources);
@@ -179,6 +179,9 @@ export class McpClient {
       throw new Error('No prompts, tools, or resources found on the server.');
     }
 
+    for (const prompt of prompts) {
+      this.promptRegistry.registerPrompt(prompt);
+    }
     for (const tool of tools) {
       this.toolRegistry.registerTool(tool);
     }
@@ -244,16 +247,11 @@ export class McpClient {
     );
   }
 
-  private async discoverPrompts(options?: {
+  private async fetchPrompts(options?: {
     signal?: AbortSignal;
-  }): Promise<Prompt[]> {
+  }): Promise<DiscoveredMCPPrompt[]> {
     this.assertConnected();
-    return discoverPrompts(
-      this.serverName,
-      this.client!,
-      this.promptRegistry,
-      options,
-    );
+    return discoverPrompts(this.serverName, this.client!, options);
   }
 
   private async discoverResources(): Promise<Resource[]> {
@@ -419,10 +417,13 @@ export class McpClient {
         const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
         try {
-          this.promptRegistry.removePromptsByServer(this.serverName);
-          await this.discoverPrompts({
+          const newPrompts = await this.fetchPrompts({
             signal: abortController.signal,
           });
+          this.promptRegistry.removePromptsByServer(this.serverName);
+          for (const prompt of newPrompts) {
+            this.promptRegistry.registerPrompt(prompt);
+          }
         } catch (err) {
           debugLogger.error(
             `Prompt discovery failed during refresh: ${getErrorMessage(err)}`,
@@ -908,11 +909,7 @@ export async function connectAndDiscover(
     };
 
     // Attempt to discover both prompts and tools
-    const prompts = await discoverPrompts(
-      mcpServerName,
-      mcpClient,
-      promptRegistry,
-    );
+    const prompts = await discoverPrompts(mcpServerName, mcpClient);
     const tools = await discoverTools(
       mcpServerName,
       mcpServerConfig,
@@ -930,7 +927,10 @@ export async function connectAndDiscover(
     // If we found anything, the server is connected
     updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTED);
 
-    // Register any discovered tools
+    // Register any discovered prompts and tools
+    for (const prompt of prompts) {
+      promptRegistry.registerPrompt(prompt);
+    }
     for (const tool of tools) {
       toolRegistry.registerTool(tool);
     }
@@ -1106,40 +1106,32 @@ class McpCallableTool implements CallableTool {
 export async function discoverPrompts(
   mcpServerName: string,
   mcpClient: Client,
-  promptRegistry: PromptRegistry,
   options?: { signal?: AbortSignal },
-): Promise<Prompt[]> {
+): Promise<DiscoveredMCPPrompt[]> {
+  // Only request prompts if the server supports them.
+  if (mcpClient.getServerCapabilities()?.prompts == null) return [];
+
   try {
-    // Only request prompts if the server supports them.
-    if (mcpClient.getServerCapabilities()?.prompts == null) return [];
-
     const response = await mcpClient.listPrompts({}, options);
-
-    for (const prompt of response.prompts) {
-      promptRegistry.registerPrompt({
-        ...prompt,
-        serverName: mcpServerName,
-        invoke: (params: Record<string, unknown>) =>
-          invokeMcpPrompt(mcpServerName, mcpClient, prompt.name, params),
-      });
-    }
-    return response.prompts;
+    return response.prompts.map((prompt) => ({
+      ...prompt,
+      serverName: mcpServerName,
+      invoke: (params: Record<string, unknown>) =>
+        invokeMcpPrompt(mcpServerName, mcpClient, prompt.name, params),
+    }));
   } catch (error) {
-    // It's okay if this fails, not all servers will have prompts.
-    // Don't log an error if the method is not found, which is a common case.
-    if (
-      error instanceof Error &&
-      !error.message?.includes('Method not found')
-    ) {
-      coreEvents.emitFeedback(
-        'error',
-        `Error discovering prompts from ${mcpServerName}: ${getErrorMessage(
-          error,
-        )}`,
-        error,
-      );
+    // It's okay if the method is not found, which is a common case.
+    if (error instanceof Error && error.message?.includes('Method not found')) {
+      return [];
     }
-    return [];
+    coreEvents.emitFeedback(
+      'error',
+      `Error discovering prompts from ${mcpServerName}: ${getErrorMessage(
+        error,
+      )}`,
+      error,
+    );
+    throw error;
   }
 }
 
