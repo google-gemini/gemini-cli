@@ -613,7 +613,10 @@ export async function loadCliConfig(
     geminiMdFilePaths: filePaths,
     approvalMode,
     disableYoloMode: settings.security?.disableYoloMode,
-    showMemoryUsage: settings.ui?.showMemoryUsage || false,
+    showMemoryUsage:
+      settings.ui?.footer?.hideMemoryUsage === false ||
+      (settings.ui as { showMemoryUsage?: boolean } | undefined)
+        ?.showMemoryUsage === true,
     accessibility: {
       ...settings.ui?.accessibility,
       screenReader,

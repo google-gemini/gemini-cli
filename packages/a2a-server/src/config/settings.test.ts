@@ -143,7 +143,11 @@ describe('loadSettings', () => {
 
   it('should load other top-level settings correctly', () => {
     const settings = {
-      showMemoryUsage: true,
+      ui: {
+        footer: {
+          hideMemoryUsage: false,
+        },
+      },
       coreTools: ['tool1', 'tool2'],
       mcpServers: {
         server1: {
@@ -158,7 +162,7 @@ describe('loadSettings', () => {
     fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
 
     const result = loadSettings(mockWorkspaceDir);
-    expect(result.showMemoryUsage).toBe(true);
+    expect(result.ui?.footer?.hideMemoryUsage).toBe(false);
     expect(result.coreTools).toEqual(['tool1', 'tool2']);
     expect(result.mcpServers).toHaveProperty('server1');
     expect(result.fileFiltering?.respectGitIgnore).toBe(true);
@@ -166,7 +170,11 @@ describe('loadSettings', () => {
 
   it('should overwrite top-level settings from workspace (shallow merge)', () => {
     const userSettings = {
-      showMemoryUsage: false,
+      ui: {
+        footer: {
+          hideMemoryUsage: true,
+        },
+      },
       fileFiltering: {
         respectGitIgnore: true,
         enableRecursiveFileSearch: true,
@@ -175,7 +183,11 @@ describe('loadSettings', () => {
     fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
 
     const workspaceSettings = {
-      showMemoryUsage: true,
+      ui: {
+        footer: {
+          hideMemoryUsage: false,
+        },
+      },
       fileFiltering: {
         respectGitIgnore: false,
       },
@@ -188,7 +200,7 @@ describe('loadSettings', () => {
 
     const result = loadSettings(mockWorkspaceDir);
     // Primitive value overwritten
-    expect(result.showMemoryUsage).toBe(true);
+    expect(result.ui?.footer?.hideMemoryUsage).toBe(false);
 
     // Object value completely replaced (shallow merge behavior)
     expect(result.fileFiltering?.respectGitIgnore).toBe(false);

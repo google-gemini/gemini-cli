@@ -103,7 +103,7 @@ const MIGRATION_MAP: Record<string, string> = {
   hideSandboxStatus: 'ui.footer.hideSandboxStatus',
   hideModelInfo: 'ui.footer.hideModelInfo',
   hideContextSummary: 'ui.hideContextSummary',
-  showMemoryUsage: 'ui.showMemoryUsage',
+  showMemoryUsage: 'ui.footer.hideMemoryUsage',
   showLineNumbers: 'ui.showLineNumbers',
   showCitations: 'ui.showCitations',
   ideMode: 'ide.enabled',
@@ -298,7 +298,12 @@ function migrateSettingsToV2(
 
   for (const [oldKey, newPath] of Object.entries(MIGRATION_MAP)) {
     if (flatKeys.has(oldKey)) {
-      setNestedProperty(v2Settings, newPath, flatSettings[oldKey]);
+      if (oldKey === 'showMemoryUsage') {
+        const hideMemoryUsage = !(flatSettings[oldKey] as boolean);
+        setNestedProperty(v2Settings, newPath, hideMemoryUsage);
+      } else {
+        setNestedProperty(v2Settings, newPath, flatSettings[oldKey]);
+      }
       flatKeys.delete(oldKey);
     }
   }
@@ -371,7 +376,11 @@ export function migrateSettingsToV1(
   for (const [newPath, oldKey] of Object.entries(REVERSE_MIGRATION_MAP)) {
     const value = getNestedProperty(v2Settings, newPath);
     if (value !== undefined) {
-      v1Settings[oldKey] = value;
+      if (newPath === 'ui.footer.hideMemoryUsage') {
+        v1Settings[oldKey] = !(value as boolean);
+      } else {
+        v1Settings[oldKey] = value;
+      }
       v2Keys.delete(newPath.split('.')[0]);
     }
   }
