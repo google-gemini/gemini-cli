@@ -447,14 +447,41 @@ async function enableAction(
     };
   }
 
-  // Remove from disabled list
-  const newDisabledServers = disabledServers.filter(
-    (name: string) => name !== serverName,
-  );
-
   try {
-    // Update settings (persists to file)
-    settings.setValue(SettingScope.User, 'mcp.disabled', newDisabledServers);
+    let wasRemoved = false;
+
+    // Check and remove from Workspace scope
+    const workspaceDisabled = settings.workspace.settings.mcp?.disabled || [];
+    if (workspaceDisabled.includes(serverName)) {
+      const newWorkspaceDisabled = workspaceDisabled.filter(
+        (name: string) => name !== serverName,
+      );
+      settings.setValue(
+        SettingScope.Workspace,
+        'mcp.disabled',
+        newWorkspaceDisabled,
+      );
+      wasRemoved = true;
+    }
+
+    // Check and remove from User scope
+    const userDisabled = settings.user.settings.mcp?.disabled || [];
+    if (userDisabled.includes(serverName)) {
+      const newUserDisabled = userDisabled.filter(
+        (name: string) => name !== serverName,
+      );
+      settings.setValue(SettingScope.User, 'mcp.disabled', newUserDisabled);
+      wasRemoved = true;
+    }
+
+    if (!wasRemoved) {
+      // It must be in System or SystemDefaults, which we probably can't/shouldn't modify here
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `MCP server "${serverName}" is disabled in System settings and cannot be enabled via this command.`,
+      };
+    }
 
     // Get the server config (check both user config and known configs from extensions)
     const serverConfig =
