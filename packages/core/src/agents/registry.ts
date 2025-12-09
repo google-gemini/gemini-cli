@@ -150,4 +150,30 @@ export class AgentRegistry {
   getAllDefinitions(): AgentDefinition[] {
     return Array.from(this.agents.values());
   }
+
+  /**
+   * Returns a list of all registered agent names.
+   */
+  getAllAgentNames(): string[] {
+    return Array.from(this.agents.keys());
+  }
+
+  /**
+   * Generates a markdown "Phone Book" of available agents and their schemas.
+   * This MUST be injected into the System Prompt of the parent agent.
+   */
+  getDirectoryContext(): string {
+    if (this.agents.size === 0) {
+      return 'No sub-agents are currently available.';
+    }
+
+    let context = '## Available Sub-Agents\n';
+    context +=
+      'Use `delegate_to_agent` for complex tasks requiring specialized analysis.\n\n';
+
+    for (const [name, def] of this.agents.entries()) {
+      context += `- **${name}**: ${def.description}\n`;
+    }
+    return context;
+  }
 }
