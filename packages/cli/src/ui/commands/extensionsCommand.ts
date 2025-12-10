@@ -7,7 +7,12 @@
 import { debugLogger, listExtensions } from '@google/gemini-cli-core';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
-import { MessageType, type HistoryItemExtensionsList } from '../types.js';
+import {
+  emptyIcon,
+  MessageType,
+  type HistoryItemExtensionsList,
+  type HistoryItemInfo,
+} from '../types.js';
 import {
   type CommandContext,
   type SlashCommand,
@@ -17,13 +22,37 @@ import open from 'open';
 import process from 'node:process';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
+import { theme } from '../semantic-colors.js';
+
+function showMessageIfNoExtensions(
+  context: CommandContext,
+  extensions: unknown[],
+): boolean {
+  if (extensions.length === 0) {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
+      },
+      Date.now(),
+    );
+    return true;
+  }
+  return false;
+}
 
 async function listAction(context: CommandContext) {
+  const extensions = context.services.config
+    ? listExtensions(context.services.config)
+    : [];
+
+  if (showMessageIfNoExtensions(context, extensions)) {
+    return;
+  }
+
   const historyItem: HistoryItemExtensionsList = {
     type: MessageType.EXTENSIONS_LIST,
-    extensions: context.services.config
-      ? listExtensions(context.services.config)
-      : [],
+    extensions,
   };
 
   context.ui.addItem(historyItem, Date.now());
@@ -50,13 +79,20 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
     (resolve) => (resolveUpdateComplete = resolve),
   );
 
+  const extensions = context.services.config
+    ? listExtensions(context.services.config)
+    : [];
+
+  if (showMessageIfNoExtensions(context, extensions)) {
+    return Promise.resolve();
+  }
+
   const historyItem: HistoryItemExtensionsList = {
     type: MessageType.EXTENSIONS_LIST,
-    extensions: context.services.config
-      ? listExtensions(context.services.config)
-      : [],
+    extensions,
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
   updateComplete.then((updateInfos) => {
     if (updateInfos.length === 0) {
       context.ui.addItem(
@@ -114,6 +150,123 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
     );
   }
   return updateComplete.then((_) => {});
+}
+
+async function restartAction(
+  context: CommandContext,
+  args: string,
+): Promise<void> {
+  const extensionLoader = context.services.config?.getExtensionLoader();
+  if (!extensionLoader) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: "Extensions are not yet loaded, can't restart yet",
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  const extensions = extensionLoader.getExtensions();
+  if (showMessageIfNoExtensions(context, extensions)) {
+    return;
+  }
+
+  const restartArgs = args.split(' ').filter((value) => value.length > 0);
+  const all = restartArgs.length === 1 && restartArgs[0] === '--all';
+  const names = all ? null : restartArgs;
+  if (!all && names?.length === 0) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: 'Usage: /extensions restart <extension-names>|--all',
+      },
+      Date.now(),
+    );
+    return Promise.resolve();
+  }
+
+  let extensionsToRestart = extensionLoader
+    .getExtensions()
+    .filter((extension) => extension.isActive);
+  if (names) {
+    extensionsToRestart = extensionsToRestart.filter((extension) =>
+      names.includes(extension.name),
+    );
+    if (names.length !== extensionsToRestart.length) {
+      const notFound = names.filter(
+        (name) =>
+          !extensionsToRestart.some((extension) => extension.name === name),
+      );
+      if (notFound.length > 0) {
+        context.ui.addItem(
+          {
+            type: MessageType.WARNING,
+            text: `Extension(s) not found or not active: ${notFound.join(
+              ', ',
+            )}`,
+          },
+          Date.now(),
+        );
+      }
+    }
+  }
+  if (extensionsToRestart.length === 0) {
+    // We will have logged a different message above already.
+    return;
+  }
+
+  const s = extensionsToRestart.length > 1 ? 's' : '';
+
+  const restartingMessage = {
+    type: MessageType.INFO,
+    text: `Restarting ${extensionsToRestart.length} extension${s}...`,
+    color: theme.text.primary,
+  };
+  context.ui.addItem(restartingMessage, Date.now());
+
+  const results = await Promise.allSettled(
+    extensionsToRestart.map(async (extension) => {
+      if (extension.isActive) {
+        await extensionLoader.restartExtension(extension);
+        context.ui.dispatchExtensionStateUpdate({
+          type: 'RESTARTED',
+          payload: {
+            name: extension.name,
+          },
+        });
+      }
+    }),
+  );
+
+  const failures = results.filter(
+    (result): result is PromiseRejectedResult => result.status === 'rejected',
+  );
+
+  if (failures.length > 0) {
+    const errorMessages = failures
+      .map((failure, index) => {
+        const extensionName = extensionsToRestart[index].name;
+        return `${extensionName}: ${getErrorMessage(failure.reason)}`;
+      })
+      .join('\n  ');
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Failed to restart some extensions:\n  ${errorMessages}`,
+      },
+      Date.now(),
+    );
+  } else {
+    const infoItem: HistoryItemInfo = {
+      type: MessageType.INFO,
+      text: `${extensionsToRestart.length} extension${s} restarted successfully.`,
+      icon: emptyIcon,
+      color: theme.text.primary,
+    };
+    context.ui.addItem(infoItem, Date.now());
+  }
 }
 
 async function exploreAction(context: CommandContext) {
@@ -284,10 +437,14 @@ export function completeExtensions(
   partialArg: string,
 ) {
   let extensions = context.services.config?.getExtensions() ?? [];
+
   if (context.invocation?.name === 'enable') {
     extensions = extensions.filter((ext) => !ext.isActive);
   }
-  if (context.invocation?.name === 'disable') {
+  if (
+    context.invocation?.name === 'disable' ||
+    context.invocation?.name === 'restart'
+  ) {
     extensions = extensions.filter((ext) => ext.isActive);
   }
   const extensionNames = extensions.map((ext) => ext.name);
@@ -317,6 +474,7 @@ const listExtensionsCommand: SlashCommand = {
   name: 'list',
   description: 'List active extensions',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: listAction,
 };
 
@@ -324,6 +482,7 @@ const updateExtensionsCommand: SlashCommand = {
   name: 'update',
   description: 'Update extensions. Usage: update <extension-names>|--all',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: updateAction,
   completion: completeExtensions,
 };
@@ -332,6 +491,7 @@ const disableCommand: SlashCommand = {
   name: 'disable',
   description: 'Disable an extension',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: disableAction,
   completion: completeExtensionsAndScopes,
 };
@@ -340,6 +500,7 @@ const enableCommand: SlashCommand = {
   name: 'enable',
   description: 'Enable an extension',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: enableAction,
   completion: completeExtensionsAndScopes,
 };
@@ -348,7 +509,17 @@ const exploreExtensionsCommand: SlashCommand = {
   name: 'explore',
   description: 'Open extensions page in your browser',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: exploreAction,
+};
+
+const restartCommand: SlashCommand = {
+  name: 'restart',
+  description: 'Restart all extensions',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: restartAction,
+  completion: completeExtensions,
 };
 
 export function extensionsCommand(
@@ -361,10 +532,12 @@ export function extensionsCommand(
     name: 'extensions',
     description: 'Manage extensions',
     kind: CommandKind.BUILT_IN,
+    autoExecute: false,
     subCommands: [
       listExtensionsCommand,
       updateExtensionsCommand,
       exploreExtensionsCommand,
+      restartCommand,
       ...conditionalCommands,
     ],
     action: (context, args) =>

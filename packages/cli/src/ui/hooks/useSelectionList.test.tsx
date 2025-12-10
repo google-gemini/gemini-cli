@@ -62,6 +62,7 @@ describe('useSelectionList', () => {
           meta: false,
           shift: options.shift ?? false,
           paste: false,
+          insertable: false,
         };
         activeKeypressHandler(key);
       } else {
@@ -331,6 +332,7 @@ describe('useSelectionList', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
         };
         handler(key);
       };
@@ -380,6 +382,7 @@ describe('useSelectionList', () => {
             meta: false,
             shift: false,
             paste: false,
+            insertable: false,
           };
           handler(key);
         };
@@ -581,11 +584,13 @@ describe('useSelectionList', () => {
       });
 
       pressNumber('0');
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       act(() => vi.advanceTimersByTime(1000)); // Timeout the '0' input
 
       pressNumber('1');
       expect(mockOnSelect).not.toHaveBeenCalled(); // Should be waiting for second digit
 
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       act(() => vi.advanceTimersByTime(1000)); // Timeout '1'
       expect(mockOnSelect).toHaveBeenCalledWith('Item 1');
     });

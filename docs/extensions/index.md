@@ -1,4 +1,4 @@
-# Gemini CLI Extensions
+# Gemini CLI extensions
 
 _This documentation is up-to-date with the v0.4.0 release._
 
@@ -54,10 +54,11 @@ gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release]
 
 ### Uninstalling an extension
 
-To uninstall, run `gemini extensions uninstall <name>`:
+To uninstall one or more extensions, run
+`gemini extensions uninstall <name...>`:
 
 ```
-gemini extensions uninstall gemini-cli-security
+gemini extensions uninstall gemini-cli-security gemini-cli-another-extension
 ```
 
 ### Disabling an extension
@@ -162,11 +163,11 @@ The file has the following structure:
   your extension in the CLI. Note that we expect this name to match the
   extension directory name.
 - `version`: The version of the extension.
-- `mcpServers`: A map of MCP servers to configure. The key is the name of the
+- `mcpServers`: A map of MCP servers to settings. The key is the name of the
   server, and the value is the server configuration. These servers will be
-  loaded on startup just like MCP servers configured in a
+  loaded on startup just like MCP servers settingsd in a
   [`settings.json` file](../get-started/configuration.md). If both an extension
-  and a `settings.json` file configure an MCP server with the same name, the
+  and a `settings.json` file settings an MCP server with the same name, the
   server defined in the `settings.json` file takes precedence.
   - Note that all MCP server configuration options are supported except for
     `trust`.
@@ -186,6 +187,9 @@ configurations. If there are any conflicts, the workspace configuration takes
 precedence.
 
 ### Settings
+
+_Note: This is an experimental feature. We do not yet recommend extension
+authors introduce settings as part of their core flows._
 
 Extensions can define settings that the user will be prompted to provide upon
 installation. This is useful for things like API keys, URLs, or other
@@ -218,6 +222,21 @@ Each object in the array should have the following properties:
 When a user installs this extension, they will be prompted to enter their API
 key. The value will be saved to a `.env` file in the extension's directory
 (e.g., `<home>/.gemini/extensions/my-api-extension/.env`).
+
+You can view a list of an extension's settings by running:
+
+```
+gemini extensions settings list <extension name>
+```
+
+and you can update a given setting using:
+
+```
+gemini extensions settings set <extension name> <setting name> [--scope <scope>]
+```
+
+- `--scope`: The scope to set the setting in (`user` or `workspace`). This is
+  optional and will default to `user`.
 
 ### Custom commands
 

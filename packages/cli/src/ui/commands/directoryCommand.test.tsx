@@ -4,13 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { directoryCommand, expandHomeDir } from './directoryCommand.js';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import type { Mock } from 'vitest';
+import { directoryCommand } from './directoryCommand.js';
+import { expandHomeDir } from '../utils/directoryUtils.js';
 import type { Config, WorkspaceContext } from '@google/gemini-cli-core';
-import type { CommandContext } from './types.js';
+import type { MultiFolderTrustDialogProps } from '../components/MultiFolderTrustDialog.js';
+import type { CommandContext, OpenCustomDialogActionReturn } from './types.js';
 import { MessageType } from '../types.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import * as trustedFolders from '../../config/trustedFolders.js';
+import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
 
 describe('directoryCommand', () => {
   let mockContext: CommandContext;
@@ -67,6 +72,7 @@ describe('directoryCommand', () => {
   describe('show', () => {
     it('should display the list of directories', () => {
       if (!showCommand?.action) throw new Error('No action');
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       showCommand.action(mockContext, '');
       expect(mockWorkspaceContext.getDirectories).toHaveBeenCalled();
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -82,8 +88,21 @@ describe('directoryCommand', () => {
   });
 
   describe('add', () => {
+    it('should show an error in a restrictive sandbox', async () => {
+      if (!addCommand?.action) throw new Error('No action');
+      vi.mocked(mockConfig.isRestrictiveSandbox).mockReturnValue(true);
+      const result = await addCommand.action(mockContext, '/some/path');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content:
+          'The /directory add command is not supported in restrictive sandbox profiles. Please use --include-directories when starting the session instead.',
+      });
+    });
+
     it('should show an error if no path is provided', () => {
       if (!addCommand?.action) throw new Error('No action');
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       addCommand.action(mockContext, '');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -141,6 +160,32 @@ describe('directoryCommand', () => {
       );
     });
 
+    it('should add directory directly when folder trust is disabled', async () => {
+      if (!addCommand?.action) throw new Error('No action');
+      vi.spyOn(trustedFolders, 'isFolderTrustEnabled').mockReturnValue(false);
+      const newPath = path.normalize('/home/user/new-project');
+
+      await addCommand.action(mockContext, newPath);
+
+      expect(mockWorkspaceContext.addDirectory).toHaveBeenCalledWith(newPath);
+    });
+
+    it('should show an info message for an already added directory', async () => {
+      const existingPath = path.normalize('/home/user/project1');
+      if (!addCommand?.action) throw new Error('No action');
+      await addCommand.action(mockContext, existingPath);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `The following directories are already in the workspace:\n- ${existingPath}`,
+        }),
+        expect.any(Number),
+      );
+      expect(mockWorkspaceContext.addDirectory).not.toHaveBeenCalledWith(
+        existingPath,
+      );
+    });
+
     it('should handle a mix of successful and failed additions', async () => {
       const validPath = path.normalize('/home/user/valid-project');
       const invalidPath = path.normalize('/home/user/invalid-project');
@@ -173,6 +218,80 @@ describe('directoryCommand', () => {
       );
     });
   });
+
+  describe('add with folder trust enabled', () => {
+    let mockIsPathTrusted: Mock;
+
+    beforeEach(() => {
+      vi.spyOn(trustedFolders, 'isFolderTrustEnabled').mockReturnValue(true);
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+      mockIsPathTrusted = vi.fn();
+      const mockLoadedFolders = {
+        isPathTrusted: mockIsPathTrusted,
+      } as unknown as LoadedTrustedFolders;
+      vi.spyOn(trustedFolders, 'loadTrustedFolders').mockReturnValue(
+        mockLoadedFolders,
+      );
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should add a trusted directory', async () => {
+      if (!addCommand?.action) throw new Error('No action');
+      mockIsPathTrusted.mockReturnValue(true);
+      const newPath = path.normalize('/home/user/trusted-project');
+
+      await addCommand.action(mockContext, newPath);
+
+      expect(mockWorkspaceContext.addDirectory).toHaveBeenCalledWith(newPath);
+    });
+
+    it('should show an error for an untrusted directory', async () => {
+      if (!addCommand?.action) throw new Error('No action');
+      mockIsPathTrusted.mockReturnValue(false);
+      const newPath = path.normalize('/home/user/untrusted-project');
+
+      await addCommand.action(mockContext, newPath);
+
+      expect(mockWorkspaceContext.addDirectory).not.toHaveBeenCalled();
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: expect.stringContaining('explicitly untrusted'),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should return a custom dialog for a directory with undefined trust', async () => {
+      if (!addCommand?.action) throw new Error('No action');
+      mockIsPathTrusted.mockReturnValue(undefined);
+      const newPath = path.normalize('/home/user/undefined-trust-project');
+
+      const result = await addCommand.action(mockContext, newPath);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          type: 'custom_dialog',
+          component: expect.objectContaining({
+            type: expect.any(Function), // React component for MultiFolderTrustDialog
+          }),
+        }),
+      );
+      if (!result) {
+        throw new Error('Command did not return a result');
+      }
+      const component = (result as OpenCustomDialogActionReturn)
+        .component as React.ReactElement<MultiFolderTrustDialogProps>;
+      expect(component.props.folders.includes(newPath)).toBeTruthy();
+    });
+  });
+
   it('should correctly expand a Windows-style home directory path', () => {
     const windowsPath = '%userprofile%\\Documents';
     const expectedPath = path.win32.join(os.homedir(), 'Documents');

@@ -19,6 +19,7 @@ import * as path from 'node:path';
 import * as tar from 'tar';
 import extract from 'extract-zip';
 import { fetchJson, getGitHubToken } from './github_fetch.js';
+import type { ExtensionConfig } from '../extension.js';
 import type { ExtensionManager } from '../extension-manager.js';
 import { EXTENSIONS_CONFIG_FILENAME } from './variables.js';
 
@@ -84,12 +85,27 @@ export interface GithubRepoInfo {
 }
 
 export function tryParseGithubUrl(source: string): GithubRepoInfo | null {
-  // First step in normalizing a github ssh URI to the https form.
-  if (source.startsWith('git@github.com:')) {
-    source = source.replace('git@github.com:', '');
+  // Handle SCP-style SSH URLs.
+  if (source.startsWith('git@')) {
+    if (source.startsWith('git@github.com:')) {
+      // It's a GitHub SSH URL, so normalize it for the URL parser.
+      source = source.replace('git@github.com:', '');
+    } else {
+      // It's another provider's SSH URL (e.g., gitlab), so not a GitHub repo.
+      return null;
+    }
   }
   // Default to a github repo path, so `source` can be just an org/repo
-  const parsedUrl = URL.parse(source, 'https://github.com');
+  let parsedUrl: URL;
+  try {
+    // Use the standard URL constructor for backward compatibility.
+    parsedUrl = new URL(source, 'https://github.com');
+  } catch (e) {
+    // Throw a TypeError to maintain a consistent error contract for invalid URLs.
+    // This avoids a breaking change for consumers who might expect a TypeError.
+    throw new TypeError(`Invalid repo URL: ${source}`, { cause: e });
+  }
+
   if (!parsedUrl) {
     throw new Error(`Invalid repo URL: ${source}`);
   }
@@ -123,7 +139,7 @@ export async function fetchReleaseFromGithub(
   allowPreRelease?: boolean,
 ): Promise<GithubReleaseData | null> {
   if (ref) {
-    return await fetchJson(
+    return fetchJson(
       `https://api.github.com/repos/${owner}/${repo}/releases/tags/${ref}`,
     );
   }
@@ -157,14 +173,23 @@ export async function checkForExtensionUpdate(
 ): Promise<ExtensionUpdateState> {
   const installMetadata = extension.installMetadata;
   if (installMetadata?.type === 'local') {
-    const latestConfig = extensionManager.loadExtensionConfig(
-      installMetadata.source,
-    );
+    let latestConfig: ExtensionConfig | undefined;
+    try {
+      latestConfig = extensionManager.loadExtensionConfig(
+        installMetadata.source,
+      );
+    } catch (e) {
+      debugLogger.warn(
+        `Failed to check for update for local extension "${extension.name}". Could not load extension from source path: ${installMetadata.source}. Error: ${getErrorMessage(e)}`,
+      );
+      return ExtensionUpdateState.NOT_UPDATABLE;
+    }
+
     if (!latestConfig) {
-      debugLogger.error(
+      debugLogger.warn(
         `Failed to check for update for local extension "${extension.name}". Could not load extension from source path: ${installMetadata.source}`,
       );
-      return ExtensionUpdateState.ERROR;
+      return ExtensionUpdateState.NOT_UPDATABLE;
     }
     if (latestConfig.version !== extension.version) {
       return ExtensionUpdateState.UPDATE_AVAILABLE;
@@ -306,8 +331,11 @@ export async function downloadFromGitHubRelease(
     let archiveUrl: string | undefined;
     let isTar = false;
     let isZip = false;
+    let fileName: string | undefined;
+
     if (asset) {
-      archiveUrl = asset.browser_download_url;
+      archiveUrl = asset.url;
+      fileName = asset.name;
     } else {
       if (releaseData.tarball_url) {
         archiveUrl = releaseData.tarball_url;
@@ -326,10 +354,10 @@ export async function downloadFromGitHubRelease(
         errorMessage: `No assets found for release with tag ${releaseData.tag_name}`,
       };
     }
-    let downloadedAssetPath = path.join(
-      destination,
-      path.basename(new URL(archiveUrl).pathname),
-    );
+    if (!fileName) {
+      fileName = path.basename(new URL(archiveUrl).pathname);
+    }
+    let downloadedAssetPath = path.join(destination, fileName);
     if (isTar && !downloadedAssetPath.endsWith('.tar.gz')) {
       downloadedAssetPath += '.tar.gz';
     } else if (isZip && !downloadedAssetPath.endsWith('.zip')) {
@@ -337,7 +365,17 @@ export async function downloadFromGitHubRelease(
     }
 
     try {
-      await downloadFile(archiveUrl, downloadedAssetPath);
+      // GitHub API requires different Accept headers for different types of downloads:
+      // 1. Binary Assets (e.g. release artifacts): Require 'application/octet-stream' to return the raw content.
+      // 2. Source Tarballs (e.g. /tarball/{ref}): Require 'application/vnd.github+json' (or similar) to return
+      //    a 302 Redirect to the actual download location (codeload.github.com).
+      //    Sending 'application/octet-stream' for tarballs results in a 415 Unsupported Media Type error.
+      const headers = {
+        ...(asset
+          ? { Accept: 'application/octet-stream' }
+          : { Accept: 'application/vnd.github+json' }),
+      };
+      await downloadFile(archiveUrl, downloadedAssetPath, { headers });
     } catch (error) {
       return {
         failureReason: 'failed to download asset',
@@ -414,7 +452,7 @@ interface GithubReleaseData {
 
 interface Asset {
   name: string;
-  browser_download_url: string;
+  url: string;
 }
 
 export function findReleaseAsset(assets: Asset[]): Asset | undefined {
@@ -454,19 +492,42 @@ export function findReleaseAsset(assets: Asset[]): Asset | undefined {
   return undefined;
 }
 
-async function downloadFile(url: string, dest: string): Promise<void> {
-  const headers: { 'User-agent': string; Authorization?: string } = {
+export interface DownloadOptions {
+  headers?: Record<string, string>;
+}
+
+export async function downloadFile(
+  url: string,
+  dest: string,
+  options?: DownloadOptions,
+  redirectCount: number = 0,
+): Promise<void> {
+  const headers: Record<string, string> = {
     'User-agent': 'gemini-cli',
+    Accept: 'application/octet-stream',
+    ...options?.headers,
   };
   const token = getGitHubToken();
   if (token) {
-    headers.Authorization = `token ${token}`;
+    headers['Authorization'] = `token ${token}`;
   }
+
   return new Promise((resolve, reject) => {
     https
       .get(url, { headers }, (res) => {
         if (res.statusCode === 302 || res.statusCode === 301) {
-          downloadFile(res.headers.location!, dest).then(resolve).catch(reject);
+          if (redirectCount >= 10) {
+            return reject(new Error('Too many redirects'));
+          }
+
+          if (!res.headers.location) {
+            return reject(
+              new Error('Redirect response missing Location header'),
+            );
+          }
+          downloadFile(res.headers.location, dest, options, redirectCount + 1)
+            .then(resolve)
+            .catch(reject);
           return;
         }
         if (res.statusCode !== 200) {

@@ -21,6 +21,15 @@ import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { commandRegistry } from '../commands/command-registry.js';
 import { SimpleExtensionLoader } from '@google/gemini-cli-core';
+import type { Command, CommandArgument } from '../commands/types.js';
+import { GitService } from '@google/gemini-cli-core';
+
+type CommandResponse = {
+  name: string;
+  description: string;
+  arguments: CommandArgument[];
+  subCommands: CommandResponse[];
+};
 
 const coderAgentCard: AgentCard = {
   name: 'Gemini SDLC Agent',
@@ -76,6 +85,14 @@ export async function createApp() {
       new SimpleExtensionLoader(extensions),
       'a2a-server',
     );
+
+    let git: GitService | undefined;
+    if (config.getCheckpointingEnabled()) {
+      git = new GitService(config.getTargetDir(), config.storage);
+      await git.initialize();
+    }
+
+    const context = { config, git };
 
     // loadEnvironment() is called within getConfig now
     const bucketName = process.env['GCS_BUCKET_NAME'];
@@ -136,6 +153,7 @@ export async function createApp() {
     });
 
     expressApp.post('/executeCommand', async (req, res) => {
+      logger.info('[CoreAgent] Received /executeCommand request: ', req.body);
       try {
         const { command, args } = req.body;
 
@@ -151,18 +169,69 @@ export async function createApp() {
 
         const commandToExecute = commandRegistry.get(command);
 
+        if (commandToExecute?.requiresWorkspace) {
+          if (!process.env['CODER_AGENT_WORKSPACE_PATH']) {
+            return res.status(400).json({
+              error: `Command "${command}" requires a workspace, but CODER_AGENT_WORKSPACE_PATH is not set.`,
+            });
+          }
+        }
+
         if (!commandToExecute) {
           return res
             .status(404)
             .json({ error: `Command not found: ${command}` });
         }
 
-        const result = await commandToExecute.execute(config, args ?? []);
+        const result = await commandToExecute.execute(context, args ?? []);
+        logger.info('[CoreAgent] Sending /executeCommand response: ', result);
         return res.status(200).json(result);
       } catch (e) {
         logger.error('Error executing /executeCommand:', e);
         const errorMessage =
           e instanceof Error ? e.message : 'Unknown error executing command';
+        return res.status(500).json({ error: errorMessage });
+      }
+    });
+
+    expressApp.get('/listCommands', (req, res) => {
+      try {
+        const transformCommand = (
+          command: Command,
+          visited: string[],
+        ): CommandResponse | undefined => {
+          const commandName = command.name;
+          if (visited.includes(commandName)) {
+            console.warn(
+              `Command ${commandName} already inserted in the response, skipping`,
+            );
+            return undefined;
+          }
+
+          return {
+            name: command.name,
+            description: command.description,
+            arguments: command.arguments ?? [],
+            subCommands: (command.subCommands ?? [])
+              .map((subCommand) =>
+                transformCommand(subCommand, visited.concat(commandName)),
+              )
+              .filter(
+                (subCommand): subCommand is CommandResponse => !!subCommand,
+              ),
+          };
+        };
+
+        const commands = commandRegistry
+          .getAllCommands()
+          .filter((command) => command.topLevel)
+          .map((command) => transformCommand(command, []));
+
+        return res.status(200).json({ commands });
+      } catch (e) {
+        logger.error('Error executing /listCommands:', e);
+        const errorMessage =
+          e instanceof Error ? e.message : 'Unknown error listing commands';
         return res.status(500).json({ error: errorMessage });
       }
     });

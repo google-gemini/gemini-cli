@@ -271,7 +271,7 @@ function hasPromptCommandTransform(root: Node): boolean {
         const transformNode = current.child(i + 1);
 
         if (
-          operatorNode?.type === '@' &&
+          operatorNode?.text === '@' &&
           transformNode?.text?.toLowerCase() === 'p'
         ) {
           return true;
@@ -605,9 +605,9 @@ export function checkCommandPermissions(
   } as AnyToolInvocation & { params: { command: string } };
 
   // 1. Blocklist Check (Highest Priority)
-  const excludeTools = config.getExcludeTools() || [];
+  const excludeTools = config.getExcludeTools() || new Set([]);
   const isWildcardBlocked = SHELL_TOOL_NAMES.some((name) =>
-    excludeTools.includes(name),
+    excludeTools.has(name),
   );
 
   if (isWildcardBlocked) {
@@ -622,7 +622,9 @@ export function checkCommandPermissions(
   for (const cmd of commandsToValidate) {
     invocation.params['command'] = cmd;
     if (
-      doesToolInvocationMatch('run_shell_command', invocation, excludeTools)
+      doesToolInvocationMatch('run_shell_command', invocation, [
+        ...excludeTools,
+      ])
     ) {
       return {
         allAllowed: false,

@@ -3,34 +3,37 @@
 exports[`SettingsDialog > Initial Rendering > should render settings list with visual indicators 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             false                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                             false                                    │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│    Disable Auto Update                                  false                                    │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
+│    Enable Prompt Completion                             false                                    │
 │                                                                                                  │
-│   Enable Session Cleanup                               false                                     │
+│    Debug Keystroke Logging                              false                                    │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Session Cleanup                               false                                    │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│    Output Format                                        Text                                     │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                    false                                    │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -38,34 +41,37 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings enabled' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             true*                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                             true*                                    │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│    Disable Auto Update                                  false                                    │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
+│    Enable Prompt Completion                             false                                    │
 │                                                                                                  │
-│   Enable Session Cleanup                               false                                     │
+│    Debug Keystroke Logging                              false                                    │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Session Cleanup                               false                                    │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│    Output Format                                        Text                                     │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                    false                                    │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -73,34 +79,37 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings disabled' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             false*                                    │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  false*                                    │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
-│   Enable Prompt Completion                             false*                                    │
+│    Vim Mode                                             false*                                   │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false*                                    │
+│    Disable Auto Update                                  false*                                   │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
+│    Enable Prompt Completion                             false*                                   │
 │                                                                                                  │
-│   Enable Session Cleanup                               false                                     │
+│    Debug Keystroke Logging                              false*                                   │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Session Cleanup                               false                                    │
 │                                                                                                  │
-│   Hide Window Title                                    false*                                    │
+│    Output Format                                        Text                                     │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                    false*                                   │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -108,34 +117,37 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 exports[`SettingsDialog > Snapshot Tests > should render 'default state' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             false                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                             false                                    │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│    Disable Auto Update                                  false                                    │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
+│    Enable Prompt Completion                             false                                    │
 │                                                                                                  │
-│   Enable Session Cleanup                               false                                     │
+│    Debug Keystroke Logging                              false                                    │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Session Cleanup                               false                                    │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│    Output Format                                        Text                                     │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                    false                                    │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -143,34 +155,37 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 exports[`SettingsDialog > Snapshot Tests > should render 'file filtering settings configured' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             false                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                             false                                    │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│    Disable Auto Update                                  false                                    │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
+│    Enable Prompt Completion                             false                                    │
 │                                                                                                  │
-│   Enable Session Cleanup                               false                                     │
+│    Debug Keystroke Logging                              false                                    │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Session Cleanup                               false                                    │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│    Output Format                                        Text                                     │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                    false                                    │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -178,34 +193,37 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selector' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│   Settings                                                                                       │
+│    Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│   Vim Mode                                             false                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│  ▲                                                                                               │
+│    Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                             false                                    │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│    Disable Auto Update                                  false                                    │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
+│    Enable Prompt Completion                             false                                    │
 │                                                                                                  │
-│   Enable Session Cleanup                               false                                     │
+│    Debug Keystroke Logging                              false                                    │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Session Cleanup                               false                                    │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│    Output Format                                        Text                                     │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                    false                                    │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│ > Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│  > Apply To                                                                                      │
+│  ● 1. User Settings                                                                              │
+│    2. Workspace Settings                                                                         │
+│    3. System Settings                                                                            │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -213,34 +231,37 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and number settings' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             false*                                    │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  true*                                     │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                             false*                                   │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│    Disable Auto Update                                  true*                                    │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
+│    Enable Prompt Completion                             false                                    │
 │                                                                                                  │
-│   Enable Session Cleanup                               false                                     │
+│    Debug Keystroke Logging                              false                                    │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Session Cleanup                               false                                    │
 │                                                                                                  │
-│   Hide Window Title                                    false*                                    │
+│    Output Format                                        Text                                     │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                    false*                                   │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -248,34 +269,37 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 exports[`SettingsDialog > Snapshot Tests > should render 'tools and security settings' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             false                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                             false                                    │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│    Disable Auto Update                                  false                                    │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
+│    Enable Prompt Completion                             false                                    │
 │                                                                                                  │
-│   Enable Session Cleanup                               false                                     │
+│    Debug Keystroke Logging                              false                                    │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Session Cleanup                               false                                    │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│    Output Format                                        Text                                     │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                    false                                    │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -283,34 +307,37 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settings enabled' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             true*                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  true*                                     │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
-│   Enable Prompt Completion                             true*                                     │
+│    Vim Mode                                             true*                                    │
 │                                                                                                  │
-│   Debug Keystroke Logging                              true*                                     │
+│    Disable Auto Update                                  true*                                    │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
+│    Enable Prompt Completion                             true*                                    │
 │                                                                                                  │
-│   Enable Session Cleanup                               false                                     │
+│    Debug Keystroke Logging                              true*                                    │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Session Cleanup                               false                                    │
 │                                                                                                  │
-│   Hide Window Title                                    true*                                     │
+│    Output Format                                        Text                                     │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                    true*                                    │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
