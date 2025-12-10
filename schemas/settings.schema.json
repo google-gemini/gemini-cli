@@ -1133,7 +1133,7 @@
       "title": "Use WriteTodos",
       "description": "Enable the write_todos tool.",
       "markdownDescription": "Enable the write_todos tool.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
-      "default": true,
+      "default": false,
       "type": "boolean"
     },
     "security": {
@@ -1283,7 +1283,7 @@
               "title": "Enable Codebase Investigator",
               "description": "Enable the Codebase Investigator agent.",
               "markdownDescription": "Enable the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-              "default": true,
+              "default": false,
               "type": "boolean"
             },
             "maxNumTurns": {
