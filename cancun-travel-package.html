@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TravelCloud | Cancún Luxury All-Inclusive Package</title>
+    <style>
+        :root {
+            /* BRANDING PALETTE */
+            --primary-blue: #0056b3;       /* Trustworthy Corporate Blue */
+            --primary-dark: #00334e;       /* Deep Navy for Contrast */
+            --accent-teal: #00a8cc;        /* Tropical Accent */
+            --action-orange: #ff6700;      /* HIGH CONVERSION CTA */
+            --action-hover: #e55c00;
+            --bg-light: #f8f9fa;
+            --white: #ffffff;
+            --text-main: #333333;
+            --text-muted: #666666;
+
+            /* UI VARIABLES */
+            --shadow-card: 0 10px 30px rgba(0, 0, 0, 0.08);
+            --shadow-hover: 0 20px 40px rgba(0, 0, 0, 0.12);
+            --radius: 12px;
+            --gradient-hero: linear-gradient(135deg, #00334e 0%, #0056b3 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-main);
+            background-color: var(--bg-light);
+            padding-bottom: 80px; /* Space for mobile sticky bar */
+        }
+
+        /* TYPOGRAPHY */
+        h1, h2, h3, h4 {
+            font-family: 'Georgia', serif; /* Serif for high-end travel feel */
+            color: var(--primary-dark);
+            margin-bottom: 1rem;
+        }
+
+        p { margin-bottom: 1rem; }
+
+        a { color: var(--primary-blue); text-decoration: none; transition: 0.3s; }
+        a:hover { color: var(--action-orange); }
+
+        /* BUTTONS */
+        .btn {
+            display: inline-block;
+            padding: 16px 32px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 18px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(255, 103, 0, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-cta {
+            background-color: var(--action-orange);
+            color: var(--white);
+        }
+
+        .btn-cta:hover {
+            background-color: var(--action-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(255, 103, 0, 0.4);
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 2px solid var(--white);
+            color: var(--white);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--white);
+            color: var(--primary-blue);
+        }
+
+        /* HEADER */
+        header {
+            background: var(--white);
+            padding: 15px 0;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .nav-flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--primary-blue);
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo span { color: var(--accent-teal); }
+
+        .nav-phone {
+            font-weight: 700;
+            color: var(--primary-dark);
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* HERO SECTION */
+        .hero {
+            background: var(--gradient-hero);
+            color: var(--white);
+            padding: 80px 0 100px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::after {
+            /* Decorative wave shape at bottom */
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 50px;
+            background: var(--bg-light);
+            clip-path: polygon(0 100%, 100% 100%, 100% 0);
+        }
+
+        .hero h1 {
+            color: var(--white);
+            font-size: 3.5rem;
+            line-height: 1.1;
+            margin-bottom: 20px;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            opacity: 0.9;
+            max-width: 700px;
+            margin: 0 auto 40px;
+        }
+
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(5px);
+            padding: 15px 25px;
+            border-radius: var(--radius);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .stat-item strong { display: block; font-size: 1.5rem; color: var(--accent-teal); }
+        .stat-item span { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* FEATURES GRID */
+        .section { padding: 80px 0; }
+
+        .section-title {
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto 60px;
+        }
+
+        .section-title h2 { font-size: 2.5rem; color: var(--primary-blue); }
+        .section-title .subtitle {
+            color: var(--action-orange);
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 1px;
+            font-size: 0.9rem;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .card {
+            background: var(--white);
+            padding: 40px 30px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-card);
+            transition: transform 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            border-top: 4px solid transparent;
+        }
+
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .card.featured {
+            border-top: 4px solid var(--action-orange);
+        }
+
+        .icon-box {
+            width: 60px;
+            height: 60px;
+            background: #e0f7fa;
+            color: var(--primary-blue);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .card ul { list-style: none; margin-top: 15px; }
+        .card li { margin-bottom: 10px; padding-left: 20px; position: relative; }
+        .card li::before {
+            content: "✓";
+            color: var(--action-orange);
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+
+        /* ITINERARY */
+        .itinerary {
+            background: var(--white);
+            border-left: 3px solid #e0e0e0;
+            margin-left: 20px;
+            padding-left: 30px;
+        }
+
+        .day-item {
+            position: relative;
+            margin-bottom: 40px;
+        }
+
+        .day-marker {
+            position: absolute;
+            left: -42px;
+            top: 0;
+            width: 20px;
+            height: 20px;
+            background: var(--primary-blue);
+            border: 4px solid var(--white);
+            border-radius: 50%;
+            box-shadow: 0 0 0 2px #e0e0e0;
+        }
+
+        .day-title {
+            color: var(--primary-blue);
+            font-weight: 700;
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+        }
+
+        /* FOOTER */
+        footer {
+            background: var(--primary-dark);
+            color: #b0c4de;
+            padding: 60px 0 30px;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        footer h4 { color: var(--white); }
+
+        .footer-legal {
+            border-top: 1px solid rgba(255,255,255,0.1);
+            margin-top: 40px;
+            padding-top: 20px;
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+
+        .footer-links a {
+            color: var(--accent-teal);
+            margin: 0 10px;
+        }
+
+        /* MOBILE STICKY CTA */
+        .mobile-cta {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: var(--white);
+            padding: 12px 20px;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.2rem; }
+            .hero-stats { gap: 10px; }
+            .stat-item { flex: 1 1 40%; }
+            .nav-phone span { display: none; } /* Hide text, keep icon on mobile header */
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container nav-flex">
+            <div class="logo">
+                ☁️ Travel<span>Cloud</span>
+            </div>
+            <div class="nav-phone">
+                <a href="tel:18006010414" style="color: var(--primary-dark); display: flex; align-items: center; gap: 8px;">
+                    📞 1-800-601-0414
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="container">
+            <h1>Cancún Luxury All-Inclusive</h1>
+            <p>5 Days / 4 Nights of pure paradise. Flights, 5-Star Resort, and Unlimited Dining included for the whole family.</p>
+
+            <div class="hero-stats">
+                <div class="stat-item">
+                    <strong>5 Days</strong>
+                    <span>4 Nights</span>
+                </div>
+                <div class="stat-item">
+                    <strong>All Incl.</strong>
+                    <span>Unlimited</span>
+                </div>
+                <div class="stat-item">
+                    <strong>Flight</strong>
+                    <span>Roundtrip</span>
+                </div>
+            </div>
+
+            <a href="tel:18006010414" class="btn btn-cta">Call Now: 1-800-601-0414</a>
+            <p style="margin-top: 15px; font-size: 0.9rem; opacity: 0.8;">Limited Availability. Code: CANCUN2025</p>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <div class="section-title">
+                <span class="subtitle">Experience TravelCloud</span>
+                <h2>Why Pay More? Get It All Included.</h2>
+                <p>We bundle flights, hotels, and meals to save you over 40% compared to booking separately.</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="card">
+                    <div class="icon-box">✈️</div>
+                    <h3>Flights Included</h3>
+                    <p>Roundtrip airfare from major US airports included in your package price.</p>
+                    <ul>
+                        <li>Major Airlines</li>
+                        <li>Carry-on included</li>
+                        <li>Taxes covered</li>
+                    </ul>
+                </div>
+                <div class="card featured">
+                    <div class="icon-box">🍽️</div>
+                    <h3>Unlimited Dining</h3>
+                    <p>Eat and drink as much as you want. Leave your wallet in the safe.</p>
+                    <ul>
+                        <li>Breakfast, Lunch, Dinner</li>
+                        <li>Alcoholic Beverages</li>
+                        <li>24/7 Snacks</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <div class="icon-box">🏖️</div>
+                    <h3>4-5 Star Resorts</h3>
+                    <p>Stay in verified, high-end properties in the Hotel Zone or Riviera Maya.</p>
+                    <ul>
+                        <li>Oceanfront Pools</li>
+                        <li>Kids Clubs (Free)</li>
+                        <li>Nightly Entertainment</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" style="background-color: white;">
+        <div class="container">
+            <div class="section-title">
+                <span class="subtitle">Your 5-Day Agenda</span>
+                <h2>Paradise Awaits</h2>
+            </div>
+
+            <div style="max-width: 800px; margin: 0 auto;">
+                <div class="itinerary">
+                    <div class="day-item">
+                        <div class="day-marker"></div>
+                        <div class="day-title">Day 1: Arrival in Paradise</div>
+                        <p>Fly into Cancun (CUN). VIP transfer to your resort. Welcome cocktail and first buffet dinner.</p>
+                    </div>
+                    <div class="day-item">
+                        <div class="day-marker"></div>
+                        <div class="day-title">Day 2: Sun & Sea</div>
+                        <p>Full day at the beach. Enjoy the swim-up bar while the kids play in the supervised club.</p>
+                    </div>
+                    <div class="day-item">
+                        <div class="day-marker"></div>
+                        <div class="day-title">Day 3: Explore or Relax</div>
+                        <p>Optional tours to Chichen Itza or just relax at the spa (tours/spa extra cost).</p>
+                    </div>
+                    <div class="day-item">
+                        <div class="day-marker"></div>
+                        <div class="day-title">Day 4: Farewell Fiesta</div>
+                        <p>Specialty a la carte dinner (Steakhouse or Seafood) and nightly theater show.</p>
+                    </div>
+                    <div class="day-item">
+                        <div class="day-marker"></div>
+                        <div class="day-title">Day 5: Return Home</div>
+                        <p>Final breakfast with an ocean view before your transfer back to the airport.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" style="background: #e0f7fa; text-align: center;">
+        <div class="container">
+            <h2 style="color: var(--primary-blue);">Ready to Book?</h2>
+            <p style="font-size: 1.2rem; margin-bottom: 30px;">Lock in this price today with a low deposit.</p>
+            <a href="tel:18006010414" class="btn btn-cta" style="font-size: 22px;">📞 Call 1-800-601-0414</a>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="logo" style="justify-content: center; color: white; margin-bottom: 20px;">
+                ☁️ Travel<span style="color: var(--accent-teal);">Cloud</span>
+            </div>
+            <p>Your Trusted Partner in Vacation Packages</p>
+
+            <div class="footer-links" style="margin: 20px 0;">
+                <a href="#">Privacy Policy</a> |
+                <a href="#">Terms and Conditions</a> |
+                <a href="#">Support</a>
+            </div>
+
+            <div class="footer-legal">
+                <p><strong>Travelmania LLC D.B.A Travelcloud is a registered Florida Seller of travel ST42-001.</strong></p>
+                <p>&copy; 2025 TravelCloud. All rights reserved. Prices are subject to availability and may change without notice.</p>
+            </div>
+        </div>
+    </footer>
+
+    <div class="mobile-cta">
+        <div>
+            <strong style="color: var(--primary-blue); display: block;">5-Day Package</strong>
+            <small style="color: var(--text-muted);">All-Inclusive Deal</small>
+        </div>
+        <a href="tel:18006010414" class="btn btn-cta" style="padding: 10px 20px; font-size: 16px;">Call Now</a>
+    </div>
+
+</body>
+</html>
