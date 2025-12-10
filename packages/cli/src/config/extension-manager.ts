@@ -43,6 +43,7 @@ import {
   type GeminiCLIExtension,
   type HookDefinition,
   type HookEventName,
+  type ResolvedExtensionSetting,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -499,6 +500,24 @@ export class ExtensionManager extends ExtensionLoader {
       );
       config = resolveEnvVarsInObject(config, customEnv);
 
+      const resolvedSettings: ResolvedExtensionSetting[] = [];
+      if (config.settings) {
+        for (const setting of config.settings) {
+          const value = customEnv[setting.envVar];
+          resolvedSettings.push({
+            name: setting.name,
+            envVar: setting.envVar,
+            value:
+              value === undefined
+                ? '[not set]'
+                : setting.sensitive
+                  ? '***'
+                  : value,
+            sensitive: setting.sensitive ?? false,
+          });
+        }
+      }
+
       if (config.mcpServers) {
         config.mcpServers = Object.fromEntries(
           Object.entries(config.mcpServers).map(([key, value]) => [
@@ -522,7 +541,7 @@ export class ExtensionManager extends ExtensionLoader {
         });
       }
 
-      const extension = {
+      const extension: GeminiCLIExtension = {
         name: config.name,
         version: config.version,
         path: effectiveExtensionPath,
@@ -536,6 +555,8 @@ export class ExtensionManager extends ExtensionLoader {
           this.workspaceDir,
         ),
         id: getExtensionId(config, installMetadata),
+        settings: config.settings,
+        resolvedSettings,
       };
       this.loadedExtensions = [...this.loadedExtensions, extension];
 
@@ -688,6 +709,13 @@ export class ExtensionManager extends ExtensionLoader {
       output += `\n Excluded tools:`;
       extension.excludeTools.forEach((tool) => {
         output += `\n  ${tool}`;
+      });
+    }
+    const resolvedSettings = extension.resolvedSettings;
+    if (resolvedSettings && resolvedSettings.length > 0) {
+      output += `\n Settings:`;
+      resolvedSettings.forEach((setting) => {
+        output += `\n  ${setting.name}: ${setting.value}`;
       });
     }
     return output;

@@ -59,12 +59,22 @@ export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
           }
 
           return (
-            <Box key={ext.name}>
+            <Box key={ext.name} flexDirection="column">
               <Text>
                 <Text color="cyan">{`${ext.name} (v${ext.version})`}</Text>
                 <Text color={activeColor}>{` - ${activeString}`}</Text>
                 {<Text color={stateColor}>{` (${stateText})`}</Text>}
               </Text>
+              {ext.resolvedSettings && ext.resolvedSettings.length > 0 && (
+                <Box flexDirection="column" paddingLeft={2}>
+                  <Text>settings:</Text>
+                  {ext.resolvedSettings.map((setting) => (
+                    <Text key={setting.name}>
+                      - {setting.name}: {setting.value}
+                    </Text>
+                  ))}
+                </Box>
+              )}
             </Box>
           );
         })}
