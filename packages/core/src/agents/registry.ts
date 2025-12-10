@@ -52,6 +52,13 @@ export class AgentRegistry {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
     const agentConfig = this.config.agents['codebase_investigator'];
 
+    // Only register the agent if it's enabled
+    const isEnabled =
+      agentConfig?.enabled ?? investigatorSettings?.enabled ?? true;
+    if (!isEnabled) {
+      return;
+    }
+
     let model =
       agentConfig?.model ??
       investigatorSettings?.model ??
@@ -92,22 +99,6 @@ export class AgentRegistry {
       },
     };
     this.registerAgent(agentDef);
-  }
-
-  /**
-   * Checks if an agent is enabled in the configuration.
-   */
-  isAgentEnabled(name: string): boolean {
-    // Special handling for codebase_investigator legacy settings
-    if (name === 'codebase_investigator') {
-      const investigatorSettings =
-        this.config.getCodebaseInvestigatorSettings();
-      const agentConfig = this.config.agents['codebase_investigator'];
-      return agentConfig?.enabled ?? investigatorSettings?.enabled ?? true;
-    }
-
-    // Generic check for other agents
-    return this.config.agents[name]?.enabled ?? true;
   }
 
   /**
@@ -183,15 +174,11 @@ export class AgentRegistry {
    * this is formatted for tool descriptions.
    */
   getToolDescription(): string {
-    const enabledAgents = Array.from(this.agents.entries()).filter(([name]) =>
-      this.isAgentEnabled(name),
-    );
-
-    if (enabledAgents.length === 0) {
+    if (this.agents.size === 0) {
       return 'Delegates a task to a specialized sub-agent. No agents are currently available.';
     }
 
-    const agentDescriptions = enabledAgents
+    const agentDescriptions = Array.from(this.agents.entries())
       .map(([name, def]) => `- **${name}**: ${def.description}`)
       .join('\n');
 
@@ -206,19 +193,15 @@ ${agentDescriptions}`;
    * This MUST be injected into the System Prompt of the parent agent.
    */
   getDirectoryContext(): string {
-    const enabledAgents = Array.from(this.agents.entries()).filter(([name]) =>
-      this.isAgentEnabled(name),
-    );
-
-    if (enabledAgents.length === 0) {
+    if (this.agents.size === 0) {
       return 'No sub-agents are currently available.';
     }
 
-    let context = '## Available Sub-Agents\n';
+    let context = '## Available Sub-Agents\n\n';
     context +=
       'Use `delegate_to_agent` for complex tasks requiring specialized analysis.\n\n';
 
-    for (const [name, def] of enabledAgents) {
+    for (const [name, def] of this.agents.entries()) {
       context += `- **${name}**: ${def.description}\n`;
     }
     return context;

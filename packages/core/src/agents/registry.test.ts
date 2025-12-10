@@ -131,43 +131,32 @@ describe('AgentRegistry', () => {
       expect(investigatorDef?.modelConfig.model).toBe('new-model');
       expect(investigatorDef?.runConfig.max_time_minutes).toBe(5);
     });
-  });
 
-  describe('isAgentEnabled', () => {
-    it('should return true by default if not configured', () => {
-      expect(registry.isAgentEnabled('some_random_agent')).toBe(true);
-    });
-
-    it('should return false if explicitly disabled in agents config', () => {
+    it('should not register agent when disabled in config', async () => {
       const disabledConfig = makeFakeConfig({
         agents: {
-          disabled_agent: { enabled: false },
+          codebase_investigator: { enabled: false },
         },
       });
       const disabledRegistry = new TestableAgentRegistry(disabledConfig);
-      expect(disabledRegistry.isAgentEnabled('disabled_agent')).toBe(false);
+      await disabledRegistry.initialize();
+
+      expect(
+        disabledRegistry.getDefinition('codebase_investigator'),
+      ).toBeUndefined();
     });
 
-    it('should respect legacy enabled setting for codebase_investigator', () => {
+    it('should not register agent when disabled in legacy settings', async () => {
       const legacyDisabledConfig = makeFakeConfig({
         codebaseInvestigatorSettings: { enabled: false },
         agents: {},
       });
       const legacyRegistry = new TestableAgentRegistry(legacyDisabledConfig);
-      expect(legacyRegistry.isAgentEnabled('codebase_investigator')).toBe(
-        false,
-      );
-    });
+      await legacyRegistry.initialize();
 
-    it('should prefer new enabled setting over legacy for codebase_investigator', () => {
-      const mixedConfig = makeFakeConfig({
-        codebaseInvestigatorSettings: { enabled: false },
-        agents: {
-          codebase_investigator: { enabled: true },
-        },
-      });
-      const mixedRegistry = new TestableAgentRegistry(mixedConfig);
-      expect(mixedRegistry.isAgentEnabled('codebase_investigator')).toBe(true);
+      expect(
+        legacyRegistry.getDefinition('codebase_investigator'),
+      ).toBeUndefined();
     });
   });
 
