@@ -15,6 +15,7 @@ import {
   PREVIEW_GEMINI_MODEL,
 } from '../config/models.js';
 import type { ModelConfigAlias } from '../services/modelConfigService.js';
+import { coreEvents } from '../utils/events.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -71,7 +72,14 @@ export class AgentRegistry {
       model = investigatorSettings.model;
       thinkingBudget = investigatorSettings.thinkingBudget;
       maxTimeMinutes = investigatorSettings.maxTimeMinutes;
-      maxTurns = investigatorSettings.maxNumTurns;
+      maxTurns = investigatorSettings.maxNumTurns; // Note legacy property name
+
+      if (this.config.hasExplicitLegacyCodebaseInvestigatorSettings) {
+        coreEvents.emitFeedback(
+          'warning',
+          'The `experimental.codebaseInvestigatorSettings` configuration is deprecated and will be removed in v0.24.0. Please update your `settings.json` to use the new `agents.codebase_investigator` configuration instead.',
+        );
+      }
     }
 
     if (!isEnabled) {

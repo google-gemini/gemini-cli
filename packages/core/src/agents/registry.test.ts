@@ -10,6 +10,7 @@ import { makeFakeConfig } from '../test-utils/config.js';
 import type { AgentDefinition } from './types.js';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 
 // A test-only subclass to expose the protected `registerAgent` method.
 class TestableAgentRegistry extends AgentRegistry {
@@ -161,6 +162,67 @@ describe('AgentRegistry', () => {
       expect(investigatorDef?.runConfig.max_time_minutes).toBe(10);
       expect(investigatorDef?.runConfig.max_turns).toBe(20);
       expect(investigatorDef?.modelConfig.thinkingBudget).toBe(1000);
+    });
+
+    it('should emit deprecation warning when legacy settings are used without new settings', async () => {
+      const legacyOnlyConfig = makeFakeConfig({
+        codebaseInvestigatorSettings: {
+          enabled: true,
+          model: 'legacy-model',
+        },
+      });
+      const legacyRegistry = new TestableAgentRegistry(legacyOnlyConfig);
+      const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+      await legacyRegistry.initialize();
+
+      expect(emitFeedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          'The `experimental.codebaseInvestigatorSettings` configuration is deprecated',
+        ),
+      );
+    });
+
+    it('should not emit deprecation warning when new settings are used', async () => {
+      const newConfig = makeFakeConfig({
+        agents: {
+          codebase_investigator: {
+            enabled: true,
+            model: 'new-model',
+          },
+        },
+        codebaseInvestigatorSettings: {
+          enabled: true,
+          model: 'legacy-model',
+        },
+      });
+      const newRegistry = new TestableAgentRegistry(newConfig);
+      const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+      await newRegistry.initialize();
+
+      expect(emitFeedbackSpy).not.toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          'The `experimental.codebaseInvestigatorSettings` configuration is deprecated',
+        ),
+      );
+    });
+
+    it('should not emit deprecation warning when no settings are configured', async () => {
+      const defaultConfig = makeFakeConfig({
+        // Neither agents nor codebaseInvestigatorSettings explicitly set
+      });
+      const defaultRegistry = new TestableAgentRegistry(defaultConfig);
+      const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+      await defaultRegistry.initialize();
+
+      expect(emitFeedbackSpy).not.toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('deprecated'),
+      );
     });
 
     it('should not register agent when disabled in config', async () => {
