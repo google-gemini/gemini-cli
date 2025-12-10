@@ -210,9 +210,7 @@ on GitHub.
   [pr](https://github.com/google-gemini/gemini-cli/pull/10883) by
   [@anj-s](https://github.com/anj-s))
 - **Markdown toggle:** Users can now switch between rendered and raw markdown
-  display using `Cmd+M` on macOS or `Ctrl+M` on Windows/Linux (pressing
-  `Option+M` on macOS also toggles Markdown because it emits the same `µ`
-  character). ([gif](https://imgur.com/a/lDNdLqr),
+  display using `alt+m `or` ctrl+m`. ([gif](https://imgur.com/a/lDNdLqr),
   [pr](https://github.com/google-gemini/gemini-cli/pull/10383) by
   [@srivatsj](https://github.com/srivatsj))
 - **Queued message editing:** Users can now quickly edit queued messages by
