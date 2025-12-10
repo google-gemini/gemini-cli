@@ -52,26 +52,42 @@ export class AgentRegistry {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
     const agentConfig = this.config.agents['codebase_investigator'];
 
-    // Only register the agent if it's enabled
-    const isEnabled =
-      agentConfig?.enabled ?? investigatorSettings?.enabled ?? true;
+    let model: string | undefined;
+    let thinkingBudget: number | undefined;
+    let maxTimeMinutes: number | undefined;
+    let maxTurns: number | undefined;
+    let isEnabled = true;
+
+    // If new config for this agent exists, use it as the exclusive source of truth.
+    if (agentConfig) {
+      isEnabled = agentConfig.enabled ?? true;
+      model = agentConfig.model;
+      thinkingBudget = agentConfig.thinkingBudget;
+      maxTimeMinutes = agentConfig.maxTimeMinutes;
+      maxTurns = agentConfig.maxTurns;
+    } else if (investigatorSettings) {
+      // Otherwise, fall back to legacy settings.
+      isEnabled = investigatorSettings.enabled ?? true;
+      model = investigatorSettings.model;
+      thinkingBudget = investigatorSettings.thinkingBudget;
+      maxTimeMinutes = investigatorSettings.maxTimeMinutes;
+      maxTurns = investigatorSettings.maxNumTurns;
+    }
+
     if (!isEnabled) {
       return;
     }
 
-    let model =
-      agentConfig?.model ??
-      investigatorSettings?.model ??
-      CodebaseInvestigatorAgent.modelConfig.model;
+    let finalModel = model ?? CodebaseInvestigatorAgent.modelConfig.model;
 
     // If the user is using the preview model for the main agent, force the sub-agent to use it too
     // if it's configured to use 'pro' or 'auto'.
     if (this.config.getModel() === PREVIEW_GEMINI_MODEL) {
       if (
-        model === GEMINI_MODEL_ALIAS_PRO ||
-        model === DEFAULT_GEMINI_MODEL_AUTO
+        finalModel === GEMINI_MODEL_ALIAS_PRO ||
+        finalModel === DEFAULT_GEMINI_MODEL_AUTO
       ) {
-        model = PREVIEW_GEMINI_MODEL;
+        finalModel = PREVIEW_GEMINI_MODEL;
       }
     }
 
@@ -79,23 +95,17 @@ export class AgentRegistry {
       ...CodebaseInvestigatorAgent,
       modelConfig: {
         ...CodebaseInvestigatorAgent.modelConfig,
-        model,
+        model: finalModel,
         thinkingBudget:
-          agentConfig?.thinkingBudget ??
-          investigatorSettings?.thinkingBudget ??
+          thinkingBudget ??
           CodebaseInvestigatorAgent.modelConfig.thinkingBudget,
       },
       runConfig: {
         ...CodebaseInvestigatorAgent.runConfig,
         max_time_minutes:
-          agentConfig?.maxTimeMinutes ??
-          investigatorSettings?.maxTimeMinutes ??
+          maxTimeMinutes ??
           CodebaseInvestigatorAgent.runConfig.max_time_minutes,
-        // Map legacy 'maxNumTurns' to standard 'maxTurns'
-        max_turns:
-          agentConfig?.maxTurns ??
-          investigatorSettings?.maxNumTurns ??
-          CodebaseInvestigatorAgent.runConfig.max_turns,
+        max_turns: maxTurns ?? CodebaseInvestigatorAgent.runConfig.max_turns,
       },
     };
     this.registerAgent(agentDef);

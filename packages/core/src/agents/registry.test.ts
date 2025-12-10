@@ -106,18 +106,19 @@ describe('AgentRegistry', () => {
       expect(investigatorDef?.modelConfig.thinkingBudget).toBe(1000);
     });
 
-    it('should prefer new agents settings over legacy settings', async () => {
+    it('should use new agents config exclusively when present (not merge with legacy)', async () => {
       const mixedConfig = makeFakeConfig({
         codebaseInvestigatorSettings: {
           enabled: true,
           model: 'legacy-model',
           maxTimeMinutes: 10,
+          maxNumTurns: 20,
         },
         agents: {
           codebase_investigator: {
             enabled: true,
             model: 'new-model',
-            maxTimeMinutes: 5,
+            // Note: maxTimeMinutes and maxTurns NOT specified
           },
         },
       });
@@ -128,8 +129,38 @@ describe('AgentRegistry', () => {
         'codebase_investigator',
       );
       expect(investigatorDef).toBeDefined();
+
+      // New config values should be used
       expect(investigatorDef?.modelConfig.model).toBe('new-model');
-      expect(investigatorDef?.runConfig.max_time_minutes).toBe(5);
+
+      // Unspecified values should fall back to HARDCODED DEFAULTS, not legacy settings
+      // CodebaseInvestigatorAgent defaults: max_time_minutes = 5, max_turns = 15
+      expect(investigatorDef?.runConfig.max_time_minutes).toBe(5); // NOT 10 from legacy
+      expect(investigatorDef?.runConfig.max_turns).toBe(15); // NOT 20 from legacy
+    });
+
+    it('should use legacy settings when new agents config is not present', async () => {
+      const legacyOnlyConfig = makeFakeConfig({
+        codebaseInvestigatorSettings: {
+          enabled: true,
+          model: 'legacy-model',
+          maxTimeMinutes: 10,
+          maxNumTurns: 20,
+          thinkingBudget: 1000,
+        },
+        // agents NOT specified or empty
+      });
+      const legacyRegistry = new TestableAgentRegistry(legacyOnlyConfig);
+      await legacyRegistry.initialize();
+
+      const investigatorDef = legacyRegistry.getDefinition(
+        'codebase_investigator',
+      );
+      expect(investigatorDef).toBeDefined();
+      expect(investigatorDef?.modelConfig.model).toBe('legacy-model');
+      expect(investigatorDef?.runConfig.max_time_minutes).toBe(10);
+      expect(investigatorDef?.runConfig.max_turns).toBe(20);
+      expect(investigatorDef?.modelConfig.thinkingBudget).toBe(1000);
     });
 
     it('should not register agent when disabled in config', async () => {
