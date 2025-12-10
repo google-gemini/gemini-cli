@@ -16,15 +16,6 @@ import type { Settings } from '../../config/settingsSchema.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const TERM_PROGRAM_BUNDLE_IDS: Record<string, string> = {
-  vscode: 'com.microsoft.VSCode',
-  WarpTerminal: 'dev.warp.Warp',
-  'iTerm.app': 'com.googlecode.iterm2',
-  Apple_Terminal: 'com.apple.Terminal',
-  cursor: 'com.todesktop.Cursor',
-  windsurf: 'com.exafunction.windsurf',
-};
-
 export const useNotification = (
   streamingState: StreamingState,
   isFocused: boolean,
@@ -45,7 +36,6 @@ export const useNotification = (
       !hasNotified.current
     ) {
       const isMac = process.platform === 'darwin';
-      const termProgram = process.env['TERM_PROGRAM'];
 
       let iconPath = path.resolve(__dirname, '../../../assets/icon.png');
       if (!fs.existsSync(iconPath)) {
@@ -57,15 +47,13 @@ export const useNotification = (
         title: 'Gemini CLI',
         message: 'Requires Permission to Execute Command',
         sound: isMac ? 'Glass' : true,
-        wait: true,
+        wait: false,
         icon: iconPath,
         contentImage: iconPath,
       };
 
       if (isMac) {
-        const bundleId =
-          process.env['__CFBundleIdentifier'] ||
-          (termProgram ? TERM_PROGRAM_BUNDLE_IDS[termProgram] : undefined);
+        const bundleId = process.env['__CFBundleIdentifier'];
 
         if (bundleId) {
           options.activate = bundleId;
