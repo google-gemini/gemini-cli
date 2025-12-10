@@ -36,6 +36,7 @@ interface HandleAtCommandParams {
 interface HandleAtCommandResult {
   processedQuery: PartListUnion | null;
   shouldProceed: boolean;
+  error?: string;
 }
 
 interface AtCommandPart {
@@ -172,7 +173,11 @@ export async function handleAtCommand({
       { type: 'error', text: 'Error: read_many_files tool not found.' },
       userMessageTimestamp,
     );
-    return { processedQuery: null, shouldProceed: false };
+    return {
+      processedQuery: null,
+      shouldProceed: false,
+      error: 'Error: read_many_files tool not found.',
+    };
   }
 
   for (const atPathPart of atPathCommandParts) {
@@ -189,16 +194,17 @@ export async function handleAtCommand({
     if (!pathName) {
       // This case should ideally not be hit if parseAllAtCommands ensures content after @
       // but as a safeguard:
+      const errMsg = `Error: Invalid @ command '${originalAtPath}'. No path specified.`;
       addItem(
         {
           type: 'error',
-          text: `Error: Invalid @ command '${originalAtPath}'. No path specified.`,
+          text: errMsg,
         },
         userMessageTimestamp,
       );
       // Decide if this is a fatal error for the whole command or just skip this @ part
       // For now, let's be strict and fail the command if one @path is malformed.
-      return { processedQuery: null, shouldProceed: false };
+      return { processedQuery: null, shouldProceed: false, error: errMsg };
     }
 
     // Check if this is an MCP resource reference (serverName:uri format)
@@ -494,8 +500,15 @@ export async function handleAtCommand({
       >,
       userMessageTimestamp,
     );
-    return { processedQuery: null, shouldProceed: false };
+    const firstError = resourceReadDisplays.find(
+      (d) => d.status === ToolCallStatus.Error,
+    );
+    const errorMsg = firstError
+      ? `Exiting due to an error processing the @ command: ${firstError.resultDisplay}`
+      : 'Exiting due to an error processing the @ command.';
+    return { processedQuery: null, shouldProceed: false, error: errorMsg };
   }
+  // Find the first error to report
 
   if (pathSpecsToRead.length === 0) {
     if (resourceReadDisplays.length > 0) {
@@ -612,7 +625,11 @@ export async function handleAtCommand({
       } as Omit<HistoryItem, 'id'>,
       userMessageTimestamp,
     );
-    return { processedQuery: null, shouldProceed: false };
+    return {
+      processedQuery: null,
+      shouldProceed: false,
+      error: `Exiting due to an error processing the @ command: ${readManyFilesDisplay.resultDisplay}`,
+    };
   }
 }
 
