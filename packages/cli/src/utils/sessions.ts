@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ChatRecordingService, type Config } from '@google/gemini-cli-core';
+import {
+  ChatRecordingService,
+  generateSummary,
+  type Config,
+} from '@google/gemini-cli-core';
 import {
   formatRelativeTime,
   SessionSelector,
@@ -12,6 +16,9 @@ import {
 } from './sessionUtils.js';
 
 export async function listSessions(config: Config): Promise<void> {
+  // Generate summary for most recent session if needed
+  await generateSummary(config);
+
   const sessionSelector = new SessionSelector(config);
   const sessions = await sessionSelector.listSessions();
 
@@ -31,9 +38,9 @@ export async function listSessions(config: Config): Promise<void> {
       const current = session.isCurrentSession ? ', current' : '';
       const time = formatRelativeTime(session.lastUpdated);
       const title =
-        session.firstUserMessage.length > 100
-          ? session.firstUserMessage.slice(0, 97) + '...'
-          : session.firstUserMessage;
+        session.displayName.length > 100
+          ? session.displayName.slice(0, 97) + '...'
+          : session.displayName;
       console.log(
         `  ${index + 1}. ${title} (${time}${current}) [${session.id}]`,
       );

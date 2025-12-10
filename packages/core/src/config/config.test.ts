@@ -750,6 +750,22 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('Shell Tool Inactivity Timeout', () => {
+    it('should default to 300000ms (300 seconds) when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getShellToolInactivityTimeout()).toBe(300000);
+    });
+
+    it('should convert provided seconds to milliseconds', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        shellToolInactivityTimeout: 10, // 10 seconds
+      };
+      const config = new Config(params);
+      expect(config.getShellToolInactivityTimeout()).toBe(10000);
+    });
+  });
+
   describe('ContinueOnFailedApiCall Configuration', () => {
     it('should default continueOnFailedApiCall to false when not provided', () => {
       const config = new Config(baseParams);
@@ -870,6 +886,11 @@ describe('Server Config (config.ts)', () => {
       await config.initialize();
 
       expect(SubagentToolWrapperMock).not.toHaveBeenCalled();
+    });
+
+    it('should not set default codebase investigator model in config (defaults in registry)', () => {
+      const config = new Config(baseParams);
+      expect(config.getCodebaseInvestigatorSettings()?.model).toBeUndefined();
     });
 
     describe('with minified tool class names', () => {
@@ -1614,5 +1635,44 @@ describe('Config setExperiments logging', () => {
     expect(loggedSummary).not.toContain('int32ListLength: 0');
 
     debugSpy.mockRestore();
+  });
+});
+
+describe('Availability Service Integration', () => {
+  const baseModel = 'test-model';
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: baseModel,
+    cwd: '.',
+  };
+
+  it('setActiveModel updates active model and emits event', async () => {
+    const config = new Config(baseParams);
+    const model1 = 'model1';
+    const model2 = 'model2';
+
+    config.setActiveModel(model1);
+    expect(config.getActiveModel()).toBe(model1);
+    expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(model1);
+
+    config.setActiveModel(model2);
+    expect(config.getActiveModel()).toBe(model2);
+    expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(model2);
+  });
+
+  it('getActiveModel defaults to configured model if not set', () => {
+    const config = new Config(baseParams);
+    expect(config.getActiveModel()).toBe(baseModel);
+  });
+
+  it('resetTurn delegates to availability service', () => {
+    const config = new Config(baseParams);
+    const service = config.getModelAvailabilityService();
+    const spy = vi.spyOn(service, 'resetTurn');
+
+    config.resetTurn();
+    expect(spy).toHaveBeenCalled();
   });
 });

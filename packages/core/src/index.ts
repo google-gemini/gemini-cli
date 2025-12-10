@@ -20,6 +20,8 @@ export * from './confirmation-bus/message-bus.js';
 
 // Export Commands logic
 export * from './commands/extensions.js';
+export * from './commands/restore.js';
+export * from './commands/types.js';
 
 // Export Core Logic
 export * from './core/client.js';
@@ -47,6 +49,7 @@ export * from './core/apiKeyCredentialStorage.js';
 export * from './utils/paths.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
+export * from './utils/exitCodes.js';
 export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
 export * from './utils/getPty.js';
@@ -75,12 +78,16 @@ export * from './utils/debugLogger.js';
 export * from './utils/events.js';
 export * from './utils/extensionLoader.js';
 export * from './utils/package.js';
+export * from './utils/version.js';
+export * from './utils/checkpointUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
 export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
+export * from './services/sessionSummaryUtils.js';
+export * from './services/contextManager.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';
@@ -98,6 +105,7 @@ export * from './tools/tools.js';
 export * from './tools/tool-error.js';
 export * from './tools/tool-registry.js';
 export * from './tools/tool-names.js';
+export * from './resources/resource-registry.js';
 
 // Export prompt logic
 export * from './prompts/mcp-prompts.js';
@@ -138,6 +146,9 @@ export * from './telemetry/index.js';
 export { sessionId } from './utils/session.js';
 export * from './utils/browser.js';
 export { Storage } from './config/storage.js';
+
+// Export hooks system
+export * from './hooks/index.js';
 
 // Export test utils
 export * from './test-utils/index.js';
