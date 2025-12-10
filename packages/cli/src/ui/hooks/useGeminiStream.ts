@@ -1220,7 +1220,7 @@ export const useGeminiStream = (
             functionResponse: {
               name: 'run_shell_command',
               response: {
-                stdout: `[INFO] The output of the previous 'run_shell_command' ('${originalCommand}') was too large to be displayed. Please run the command again and redirect the output to a temporary file.`,
+                stdout: `[INFO] The output of the previous 'run_shell_command' (${JSON.stringify(originalCommand)}) was too large to be displayed. Please run the command again and redirect the output to a temporary file.`,
               },
             },
           };
