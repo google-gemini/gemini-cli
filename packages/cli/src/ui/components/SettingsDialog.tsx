@@ -28,6 +28,7 @@ import {
   requiresRestart,
   getDefaultValue,
   setPendingSettingValueAny,
+  setNestedValue,
   getNestedValue,
   getEffectiveValue,
 } from '../../utils/settingsUtils.js';
@@ -341,26 +342,6 @@ export function SettingsDialog({
 
   const handleScopeHighlight = (scope: LoadableSettingScope) => {
     dispatch({ type: 'SET_SCOPE', scope });
-
-    const setNestedValue = (
-      obj: Record<string, unknown>,
-      path: string[],
-      value: unknown,
-    ): void => {
-      let current = obj;
-      for (let i = 0; i < path.length - 1; i++) {
-        const key = path[i];
-        if (
-          current[key] === undefined ||
-          typeof current[key] !== 'object' ||
-          current[key] === null
-        ) {
-          current[key] = {};
-        }
-        current = current[key] as Record<string, unknown>;
-      }
-      current[path[path.length - 1]] = value;
-    };
 
     // Update previewSettings with new scope's base settings + overlay unsaved changes
     const updated = structuredClone(settings.forScope(scope).settings);
