@@ -502,10 +502,8 @@ export async function handleAtCommand({
     );
     const firstError = resourceReadDisplays.find(
       (d) => d.status === ToolCallStatus.Error,
-    );
-    const errorMsg = firstError
-      ? `Exiting due to an error processing the @ command: ${firstError.resultDisplay}`
-      : 'Exiting due to an error processing the @ command.';
+    )!;
+    const errorMsg = `Exiting due to an error processing the @ command: ${firstError.resultDisplay}`;
     return { processedQuery: null, shouldProceed: false, error: errorMsg };
   }
   // Find the first error to report
