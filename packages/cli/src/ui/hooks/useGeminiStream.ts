@@ -1193,11 +1193,22 @@ export const useGeminiStream = (
         const responseParts = toolCall.response.responseParts;
         if (
           toolCall.request.name === 'run_shell_command' &&
-          config.getTruncateToolOutputThreshold() > 0 &&
-          getRequestSize(responseParts) >
-            config.getTruncateToolOutputThreshold()
+          config.get('request_size_limit') > 0 &&
+          getRequestSize(responseParts) > config.get('request_size_limit')
         ) {
-          const originalCommand = toolCall.request.args['command'] as string;
+          const originalCommand = toolCall.request.args?.['command'];
+          if (typeof originalCommand !== 'string') {
+            return responseParts;
+          }
+
+          const functionResponsePart = responseParts.find(
+            (part) => 'functionResponse' in part,
+          );
+          const originalStderr =
+            (functionResponsePart?.functionResponse?.response?.[
+              'stderr'
+            ] as string) ?? '';
+
           const tmpDir = config.storage.getProjectTempDir();
           const instructionalPart: Part = {
             functionResponse: {
@@ -1207,7 +1218,7 @@ export const useGeminiStream = (
                   tmpDir,
                   'output.txt',
                 )}\`. Then use the \`read_file\` tool to read the contents of the file.`,
-                stderr: '',
+                stderr: originalStderr,
               },
             },
           };
