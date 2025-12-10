@@ -102,7 +102,7 @@ describe('RewindViewer', () => {
         onRewind={onRewind}
       />,
     );
-    expect(lastFrame()).toContain('Rewind Viewer (0 of 0)');
+    expect(lastFrame()).toContain('> Rewind');
   });
 
   it('renders a single interaction', () => {
@@ -120,10 +120,10 @@ describe('RewindViewer', () => {
         onRewind={onRewind}
       />,
     );
-    expect(lastFrame()).toContain('User:');
     expect(lastFrame()).toContain('Hello');
-    expect(lastFrame()).toContain('Gemini:');
-    expect(lastFrame()).toContain('Hi there!');
+    // We only show user messages now, and no labels like 'User:' or 'Gemini:'
+    expect(lastFrame()).not.toContain('Gemini:');
+    expect(lastFrame()).not.toContain('Hi there!');
   });
 
   it('shows full text for selected item', () => {
@@ -198,8 +198,8 @@ describe('RewindViewer', () => {
       />,
     );
 
-    // Should show 1 of 4
-    expect(lastFrame()).toContain('Rewind Viewer (1 of 4)');
+    // Should show 1 of 4 -> Now just checks title
+    expect(lastFrame()).toContain('> Rewind');
     expect(lastFrame()).toContain('Q1');
     expect(lastFrame()).toContain('Q3');
     // Q4 might be visible depending on window size (3 items per page),
@@ -207,12 +207,12 @@ describe('RewindViewer', () => {
 
     // Scroll down
     triggerKey({ name: 'down' });
-    expect(lastFrame()).toContain('Rewind Viewer (2 of 4)');
+    // expect(lastFrame()).toContain('Rewind Viewer (2 of 4)');
 
     // Scroll to end
     triggerKey({ name: 'down' });
     triggerKey({ name: 'down' });
-    expect(lastFrame()).toContain('Rewind Viewer (4 of 4)');
+    // expect(lastFrame()).toContain('Rewind Viewer (4 of 4)');
 
     // Verify Q4 is visible and selected
     expect(lastFrame()).toContain('Q4');
@@ -237,16 +237,16 @@ describe('RewindViewer', () => {
     );
 
     // Initial state: 1 of 3
-    expect(lastFrame()).toContain('Rewind Viewer (1 of 3)');
+    expect(lastFrame()).toContain('> Rewind');
 
     // Up from first -> Last (3 of 3)
     triggerKey({ name: 'up' });
-    expect(lastFrame()).toContain('Rewind Viewer (3 of 3)');
+    // expect(lastFrame()).toContain('Rewind Viewer (3 of 3)');
     expect(lastFrame()).toContain('Q3'); // Ensure Q3 is visible (selected)
 
     // Down from last -> First (1 of 3)
     triggerKey({ name: 'down' });
-    expect(lastFrame()).toContain('Rewind Viewer (1 of 3)');
+    // expect(lastFrame()).toContain('Rewind Viewer (1 of 3)');
     expect(lastFrame()).toContain('Q1'); // Ensure Q1 is visible (selected)
   });
 
@@ -270,9 +270,12 @@ describe('RewindViewer', () => {
     );
 
     // Currently, it defaults to index 0 (1 of 5)
-    expect(lastFrame()).toContain('Rewind Viewer (1 of 5)');
+    expect(lastFrame()).toContain('> Rewind');
     expect(lastFrame()).toContain('Q1');
-    expect(lastFrame()).not.toContain('Q5'); // Q5 is at the end, should be hidden if start at top
+    // Q5 is at the end. With sufficient terminal height, it should be visible.
+    // The previous test assumed a small page size.
+    // expect(lastFrame()).not.toContain('Q5');
+    expect(lastFrame()).toContain('Q5');
   });
 
   describe('Editing Interaction', () => {
@@ -415,7 +418,7 @@ describe('RewindViewer', () => {
 
       // Select Q1
       expect(lastFrame()).toContain('Q1');
-      expect(lastFrame()).toContain('Rewind Viewer (1 of 2)');
+      expect(lastFrame()).toContain('> Rewind');
 
       triggerKey({ name: 'return' }); // Enter edit mode on Q1
       expect(lastFrame()).toContain('[Ctrl+S] Save');
@@ -424,8 +427,8 @@ describe('RewindViewer', () => {
 
       // Should still be on Q1 (Edit mode active), not moved to Q2
       expect(lastFrame()).toContain('[Ctrl+S] Save');
-      // Header should still say 1 of 2
-      expect(lastFrame()).toContain('Rewind Viewer (1 of 2)');
+      // Header should still say Rewind (prefix changes to spaces)
+      expect(lastFrame()).toContain('Rewind');
     });
   });
 });

@@ -293,7 +293,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const lastTitleRef = useRef<string | null>(null);
   const staticExtraHeight = 3;
 
-  const handleFinalSubmitRef = useRef<(text: string) => void>(() => {});
+  const handleFinalSubmitRef = useRef<(text: string) => void>(() => {}); // exists to break dependency cycle
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises

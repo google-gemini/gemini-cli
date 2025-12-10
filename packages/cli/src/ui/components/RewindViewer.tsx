@@ -5,17 +5,14 @@
  */
 
 import type React from 'react';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
-import { useKeypress } from '../hooks/useKeypress.js';
-import { Colors } from '../colors.js';
-import {
-  type ConversationRecord,
-  type MessageRecord,
-  partToString,
-} from '@google/gemini-cli-core';
+import { type ConversationRecord, partToString } from '@google/gemini-cli-core';
 import { InlineRewindEditor } from './InlineRewindEditor.js';
+import { BaseSelectionList } from './shared/BaseSelectionList.js';
+import { theme } from '../semantic-colors.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface RewindViewerProps {
   conversation: ConversationRecord;
@@ -23,7 +20,7 @@ interface RewindViewerProps {
   onRewind: (messageId: string, newText: string) => void;
 }
 
-const MAX_LINES_PER_BOX = 5;
+const MAX_LINES_PER_BOX = 2;
 
 export const RewindViewer: React.FC<RewindViewerProps> = ({
   conversation,
@@ -31,80 +28,22 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   onRewind,
 }) => {
   const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
-  const [scrollOffset, setScrollOffset] = useState(0);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [edits, setEdits] = useState<Record<number, string>>({});
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Group messages
   const interactions = useMemo(() => {
-    const grouped = [];
-    let currentInteraction: { user?: MessageRecord; gemini?: MessageRecord } =
-      {};
+    const prompts = [];
 
     for (const msg of conversation.messages) {
-      if (msg.type === 'gemini' && msg.toolCalls) {
-        continue;
-      }
       if (msg.type === 'user') {
-        if (currentInteraction.user) {
-          grouped.push(currentInteraction);
-          currentInteraction = {};
-        }
-        currentInteraction.user = msg;
-      } else if (msg.type === 'gemini') {
-        currentInteraction.gemini = msg;
-        grouped.push(currentInteraction);
-        currentInteraction = {};
+        prompts.push(msg);
       }
     }
-    if (currentInteraction.user || currentInteraction.gemini) {
-      grouped.push(currentInteraction);
-    }
-    return grouped;
+    return prompts;
   }, [conversation.messages]);
-
-  const ITEMS_PER_PAGE = 3;
-  const [selectedIndex, setSelectedIndex] = useState(0);
-
-  useEffect(() => {
-    if (selectedIndex < scrollOffset) {
-      setScrollOffset(selectedIndex);
-    } else if (selectedIndex >= scrollOffset + ITEMS_PER_PAGE) {
-      setScrollOffset(selectedIndex - ITEMS_PER_PAGE + 1);
-    }
-  }, [selectedIndex, scrollOffset, ITEMS_PER_PAGE]);
-
-  useKeypress(
-    (key) => {
-      // If we are editing, ignore navigation keys here (handled by InlineRewindEditor)
-      if (editingIndex !== null) return;
-
-      if (key.name === 'escape' || key.sequence === 'q') {
-        onExit();
-      } else if (key.name === 'up') {
-        setSelectedIndex((prev) => {
-          if (interactions.length === 0) return 0;
-          return prev === 0 ? interactions.length - 1 : prev - 1;
-        });
-      } else if (key.name === 'down') {
-        setSelectedIndex((prev) => {
-          if (interactions.length === 0) return 0;
-          return prev === interactions.length - 1 ? 0 : prev + 1;
-        });
-      } else if (key.name === 'return' || key.name === 'e') {
-        setEditingIndex(selectedIndex);
-      }
-    },
-    { isActive: true },
-  );
-
-  const visibleInteractions = interactions.slice(
-    scrollOffset,
-    scrollOffset + ITEMS_PER_PAGE,
-  );
 
   const truncate = (text: string, isSelected: boolean) => {
     if (isSelected) return text;
@@ -149,23 +88,73 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     }
   };
 
+  const items = interactions.map((msg, idx) => ({
+    key: `${msg.id || 'msg'}-${idx}`,
+    value: msg,
+    index: idx,
+  }));
+
+  useKeypress(
+    (key) => {
+      // If editing, allow the editor to handle keys (it uses useKeypress too)
+      // But BaseSelectionList listens to keys when focused.
+      // We handle ESC to exit here if NOT editing.
+      if (editingIndex === null) {
+        if (key.name === 'escape') {
+          onExit();
+        }
+      }
+    },
+    { isActive: true },
+  );
+
+  // Height constraint calculations
+  const DIALOG_PADDING = 2; // Top/bottom padding
+  const HEADER_HEIGHT = 2; // Title + margin
+  const CONTROLS_HEIGHT = 2; // Controls text + margin
+  const ERROR_HEIGHT = errorMessage ? 3 : 0;
+  const SAVING_HEIGHT = isSaving ? 1 : 0;
+
+  const listHeight = Math.max(
+    5,
+    terminalHeight -
+      DIALOG_PADDING -
+      HEADER_HEIGHT -
+      CONTROLS_HEIGHT -
+      ERROR_HEIGHT -
+      SAVING_HEIGHT -
+      2, // Borders
+  );
+
+  // Calculate items to show based on available height.
+  // Assuming roughly 3 lines per item on average?
+  // BaseSelectionList doesn't do variable height virtual scrolling perfectly if heights vary wildly,
+  // but it renders a slice.
+  // Let's set maxItemsToShow based on lines.
+  const maxItemsToShow = Math.max(1, Math.floor(listHeight / 4));
+
   return (
-    <Box flexDirection="column" width={terminalWidth} height={terminalHeight}>
-      <Box
-        borderStyle="single"
-        borderColor={Colors.AccentPurple}
-        flexDirection="column"
-        paddingX={1}
-      >
-        <Text bold color={Colors.AccentPurple}>
-          Rewind Viewer ({interactions.length > 0 ? selectedIndex + 1 : 0} of{' '}
-          {interactions.length})
-        </Text>
+    <Box
+      borderStyle="round"
+      borderColor={theme.border.default}
+      flexDirection="column"
+      width={terminalWidth}
+      height={terminalHeight}
+      paddingX={1}
+      paddingY={1}
+    >
+      <Box marginBottom={1}>
+        <Text bold>{editingIndex === null ? '> ' : '  '}Rewind</Text>
       </Box>
 
-      {/* Error Banner - Only renders if there is an error */}
+      {/* Error Banner */}
       {errorMessage && (
-        <Box borderStyle="single" borderColor="red" paddingX={1}>
+        <Box
+          borderStyle="single"
+          borderColor="red"
+          paddingX={1}
+          marginBottom={1}
+        >
           <Text color="red" bold>
             Error: {errorMessage}
           </Text>
@@ -174,100 +163,71 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
 
       {/* Saving Indicator */}
       {isSaving && (
-        <Box paddingX={1}>
-          <Text color={Colors.AccentYellow}>Rewinding conversation...</Text>
+        <Box paddingX={1} marginBottom={1}>
+          <Text color={theme.status.warning}>Rewinding conversation...</Text>
         </Box>
       )}
 
       <Box flexDirection="column" flexGrow={1}>
-        {visibleInteractions.map((interaction, idx) => {
-          const absoluteIndex = scrollOffset + idx;
-          const isSelected = absoluteIndex === selectedIndex;
-          const isEditingThis = editingIndex === absoluteIndex;
+        <BaseSelectionList
+          items={items}
+          isFocused={editingIndex === null}
+          showNumbers={false}
+          onSelect={(item) => {
+            const idx = items.findIndex((i) => i.value === item);
+            if (idx !== -1) {
+              setEditingIndex(idx);
+            }
+          }}
+          maxItemsToShow={maxItemsToShow}
+          renderItem={(itemWrapper, { isSelected }) => {
+            const idx = itemWrapper.index;
+            const userPrompt = itemWrapper.value;
+            const isEditingThis = editingIndex === idx;
 
-          // Determine text content: Check local edits first, fall back to conversation history
-          const originalUserText = interaction.user
-            ? partToString(interaction.user.content)
-            : '';
-          const displayUserText =
-            edits[absoluteIndex] !== undefined
-              ? edits[absoluteIndex]
-              : originalUserText;
+            // Determine text content
+            const originalUserText = userPrompt
+              ? partToString(userPrompt.content)
+              : '';
+            const displayUserText =
+              edits[idx] !== undefined ? edits[idx] : originalUserText;
 
-          return (
-            <Box
-              key={absoluteIndex}
-              borderStyle={isSelected ? 'double' : 'round'}
-              borderColor={isSelected ? Colors.AccentYellow : Colors.Gray}
-              flexDirection="column"
-              marginBottom={0}
-              paddingX={1}
-            >
-              {interaction.user && (
-                <Box flexDirection="column">
-                  <Text bold color={Colors.AccentGreen}>
-                    User:
-                  </Text>
-
-                  {/* Logic Switch: Editor vs Text Viewer */}
-                  {isEditingThis ? (
-                    <InlineRewindEditor
-                      initialText={displayUserText}
-                      width={terminalWidth - 6}
-                      onSave={(text) =>
-                        handleSaveEdit(
-                          absoluteIndex,
-                          text,
-                          interaction.user?.id ?? '',
-                        )
-                      }
-                      onCancel={() => {
-                        setEditingIndex(null);
-                        setErrorMessage(null);
-                      }}
-                    />
-                  ) : (
-                    <Text>{truncate(displayUserText, isSelected)}</Text>
-                  )}
+            if (isEditingThis) {
+              return (
+                <Box flexDirection="column" marginTop={1} marginBottom={1}>
+                  <InlineRewindEditor
+                    initialText={displayUserText}
+                    width={terminalWidth - 12} // Adjust for padding/indicators
+                    onSave={(text) =>
+                      handleSaveEdit(idx, text, userPrompt.id ?? '')
+                    }
+                    onCancel={() => {
+                      setEditingIndex(null);
+                      setErrorMessage(null);
+                    }}
+                  />
                 </Box>
-              )}
+              );
+            }
 
-              {interaction.user && interaction.gemini && (
-                <Box
-                  height={1}
-                  borderStyle="single"
-                  borderTop={false}
-                  borderLeft={false}
-                  borderRight={false}
-                  borderBottom={true}
-                  borderColor={Colors.DarkGray}
-                  marginY={0}
-                />
-              )}
-
-              {interaction.gemini && (
-                <Box flexDirection="column">
-                  <Text bold color={Colors.AccentBlue}>
-                    Gemini:
-                  </Text>
-                  <Text>
-                    {truncate(
-                      partToString(interaction.gemini.content),
-                      isSelected,
-                    )}
-                  </Text>
-                </Box>
-              )}
-            </Box>
-          );
-        })}
+            return (
+              <Box flexDirection="column" marginBottom={1}>
+                <Text
+                  color={
+                    isSelected ? theme.status.success : theme.text.secondary
+                  }
+                >
+                  {truncate(displayUserText, isSelected)}
+                </Text>
+              </Box>
+            );
+          }}
+        />
       </Box>
 
-      <Box borderStyle="single" borderColor={Colors.Gray} paddingX={1}>
-        <Text>
-          Controls: <Text bold>Up/Down</Text> navigate |{' '}
-          <Text bold>Enter/e</Text> edit user message | <Text bold>Esc/q</Text>{' '}
-          exit
+      <Box marginTop={1}>
+        <Text color={theme.text.secondary}>
+          (Use Enter to select, Esc to close)
         </Text>
       </Box>
     </Box>
