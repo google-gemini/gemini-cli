@@ -998,6 +998,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
   const [showFullTodos, setShowFullTodos] = useState<boolean>(false);
+  const [showFullOutput, setShowFullOutput] = useState<boolean>(false);
   const [renderMarkdown, setRenderMarkdown] = useState<boolean>(true);
 
   const [ctrlCPressCount, setCtrlCPressCount] = useState(0);
@@ -1219,6 +1220,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setShowErrorDetails((prev) => !prev);
       } else if (keyMatchers[Command.SHOW_FULL_TODOS](key)) {
         setShowFullTodos((prev) => !prev);
+      } else if (keyMatchers[Command.SHOW_FULL_OUTPUT](key)) {
+        setShowFullOutput((prev) => {
+          const newValue = !prev;
+          // Force re-render of static content to show/hide full output
+          refreshStatic();
+          return newValue;
+        });
       } else if (keyMatchers[Command.TOGGLE_MARKDOWN](key)) {
         setRenderMarkdown((prev) => {
           const newValue = !prev;
@@ -1487,6 +1495,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       constrainHeight,
       showErrorDetails,
       showFullTodos,
+      showFullOutput,
       filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
@@ -1575,6 +1584,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       constrainHeight,
       showErrorDetails,
       showFullTodos,
+      showFullOutput,
       filteredConsoleMessages,
       ideContextState,
       renderMarkdown,

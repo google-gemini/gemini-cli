@@ -5,8 +5,9 @@
  */
 
 import type React from 'react';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
+import * as fs from 'node:fs/promises';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
@@ -16,6 +17,7 @@ import { theme } from '../../semantic-colors.js';
 import { SHELL_COMMAND_NAME, SHELL_NAME } from '../../constants.js';
 import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
 import { useConfig } from '../../contexts/ConfigContext.js';
+import { useUIState } from '../../contexts/UIStateContext.js';
 
 interface ToolGroupMessageProps {
   groupId: number;
@@ -37,6 +39,37 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   activeShellPtyId,
   embeddedShellFocused,
 }) => {
+  const { showFullOutput } = useUIState();
+  const [fullOutputContents, setFullOutputContents] = useState<
+    Record<string, string>
+  >({});
+
+  // Load full output file contents when showFullOutput is toggled on
+  useEffect(() => {
+    if (!showFullOutput) {
+      setFullOutputContents({});
+      return;
+    }
+
+    const loadOutputFiles = async () => {
+      const contents: Record<string, string> = {};
+      for (const tool of toolCalls) {
+        if (tool.outputFile) {
+          try {
+            const content = await fs.readFile(tool.outputFile, 'utf-8');
+            contents[tool.callId] = content;
+          } catch {
+            contents[tool.callId] = `[Error reading file: ${tool.outputFile}]`;
+          }
+        }
+      }
+      setFullOutputContents(contents);
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    loadOutputFiles();
+  }, [showFullOutput, toolCalls]);
+
   const isEmbeddedShellFocused =
     embeddedShellFocused &&
     toolCalls.some(
@@ -167,10 +200,27 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                   />
                 )}
               {tool.outputFile && (
-                <Box>
-                  <Text color={theme.text.primary}>
-                    Output too long and was saved to: {tool.outputFile}
+                <Box flexDirection="column">
+                  <Text color={theme.text.secondary}>
+                    Output saved to: {tool.outputFile}
+                    {!showFullOutput && ' (Press Ctrl+O to view full output)'}
                   </Text>
+                  {showFullOutput && fullOutputContents[tool.callId] && (
+                    <Box
+                      flexDirection="column"
+                      marginTop={1}
+                      borderStyle="single"
+                      borderColor={theme.border.default}
+                      paddingX={1}
+                    >
+                      <Text color={theme.text.accent} bold>
+                        ─── Full Output ───
+                      </Text>
+                      <Text color={theme.text.primary} wrap="wrap">
+                        {fullOutputContents[tool.callId]}
+                      </Text>
+                    </Box>
+                  )}
                 </Box>
               )}
             </Box>

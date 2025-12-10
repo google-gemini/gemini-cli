@@ -79,6 +79,7 @@ describe('keyMatchers', () => {
       key.ctrl && key.name === 'f',
     [Command.EXPAND_SUGGESTION]: (key: Key) => key.name === 'right',
     [Command.COLLAPSE_SUGGESTION]: (key: Key) => key.name === 'left',
+    [Command.SHOW_FULL_OUTPUT]: (key: Key) => key.ctrl && key.name === 'o',
   };
 
   // Test data for each command with positive and negative test cases
@@ -335,6 +336,11 @@ describe('keyMatchers', () => {
       command: Command.TOGGLE_SHELL_INPUT_FOCUS,
       positive: [createKey('f', { ctrl: true })],
       negative: [createKey('f')],
+    },
+    {
+      command: Command.SHOW_FULL_OUTPUT,
+      positive: [createKey('o', { ctrl: true })],
+      negative: [createKey('o'), createKey('t', { ctrl: true })],
     },
   ];
 
