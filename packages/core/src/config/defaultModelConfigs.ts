@@ -10,7 +10,7 @@ import { DEFAULT_THINKING_MODE } from './models.js';
 
 // TODO(joshualitt): This is safe for orions belt, but this change SHOULD NOT
 // be merged when orions belt is merged with it's upstream.
-const FLASH_PREVIEW_MODEL_REVERT_BEFORE_MERGE = 'skyhawk';
+const FLASH_PREVIEW_MODEL_REVERT_BEFORE_MERGE = 'fiercefalcon';
 
 // The default model configs. We use `base` as the parent for all of our model
 // configs, while `chat-base`, a child of `base`, is the parent of the models
