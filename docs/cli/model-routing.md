@@ -21,9 +21,8 @@ Here's how it works:
 
 4.  **Model switch:** On the next request, the CLI will use the
     `DEFAULT_GEMINI_FLASH_MODEL` as the fallback model. This is handled by the
-    `resolveModel` function in
-    `packages/cli/src/zed-integration/zedIntegration.ts` which checks if
-    `isInFallbackMode()` is true.
+    `resolveModel` function in `packages/cli/src/acp/acpIntegration.ts` which
+    checks if `isInFallbackMode()` is true.
 
 ### Model selection precedence
 

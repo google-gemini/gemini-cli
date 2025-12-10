@@ -192,7 +192,7 @@ describe('gemini.tsx main function cleanup', () => {
       getMcpServers: () => ({}),
       getMcpClientManager: vi.fn(),
       getIdeMode: vi.fn(() => false),
-      getExperimentalZedIntegration: vi.fn(() => false),
+      getExperimentalACPIntegration: vi.fn(() => false),
       getScreenReader: vi.fn(() => false),
       getGeminiMdFileCount: vi.fn(() => 0),
       getProjectRoot: vi.fn(() => '/'),
