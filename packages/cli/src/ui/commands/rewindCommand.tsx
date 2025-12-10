@@ -88,7 +88,7 @@ export const rewindCommand: SlashCommand = {
               // Submit the new text as a prompt to the main loop.
               // This delegates stream handling, tool execution, and history updates
               // (for the new message) to the main application logic.
-              context.ui.submitPrompt(newText);
+              context.ui.setInput(newText);
             } catch (error) {
               context.ui.addItem(
                 {

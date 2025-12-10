@@ -61,7 +61,7 @@ interface SlashCommandProcessorActions {
   toggleDebugProfiler: () => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
-  submitPrompt: (text: string) => void;
+  setInput: (text: string) => void;
 }
 
 /**
@@ -221,7 +221,7 @@ export const useSlashCommandProcessor = (
         addConfirmUpdateExtensionRequest:
           actions.addConfirmUpdateExtensionRequest,
         removeComponent: () => setCustomDialog(null),
-        submitPrompt: actions.submitPrompt,
+        setInput: actions.setInput,
       },
       session: {
         stats: session.stats,

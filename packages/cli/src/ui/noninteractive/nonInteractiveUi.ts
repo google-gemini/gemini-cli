@@ -28,6 +28,6 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     dispatchExtensionStateUpdate: (_action: ExtensionUpdateAction) => {},
     addConfirmUpdateExtensionRequest: (_request) => {},
     removeComponent: () => {},
-    submitPrompt: (_text) => {},
+    setInput: (_text) => {},
   };
 }

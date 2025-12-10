@@ -77,7 +77,8 @@ export interface CommandContext {
     dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
     addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
     removeComponent: () => void;
-    submitPrompt: (text: string) => void;
+    /** Sets the text in the input prompt without submitting it. */
+    setInput: (text: string) => void;
   };
   // Session-specific data
   session: {

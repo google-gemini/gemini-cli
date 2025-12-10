@@ -278,157 +278,27 @@ describe('RewindViewer', () => {
     expect(lastFrame()).toContain('Q5');
   });
 
-  describe('Editing Interaction', () => {
-    it('enters edit mode on Enter', () => {
+  describe('Interaction Selection', () => {
+    it('calls onRewind immediately on Enter', () => {
       const conversation = createConversation([
         { type: 'user', content: 'Original Prompt', id: '1', timestamp: '1' },
       ]);
+      const onRewind = vi.fn();
       const { lastFrame } = render(
         <RewindViewer
           conversation={conversation}
           onExit={vi.fn()}
-          onRewind={vi.fn()}
+          onRewind={onRewind}
         />,
       );
 
-      // Verify not in edit mode initially (no save instruction)
-      expect(lastFrame()).not.toContain('[Ctrl+S] Save');
-
-      // Enter edit mode
-      triggerKey({ name: 'return' });
-      expect(lastFrame()).toContain('[Ctrl+S] Save');
+      // Verify initial state
       expect(lastFrame()).toContain('Original Prompt');
-    });
 
-    it('saves edit and calls onRewind', async () => {
-      const conversation = createConversation([
-        { type: 'user', content: 'Old', id: 'msg-1', timestamp: '1' },
-      ]);
-
-      let resolveRewind: (value: void) => void;
-      const rewindPromise = new Promise<void>((resolve) => {
-        resolveRewind = resolve;
-      });
-      const onRewind = vi.fn().mockReturnValue(rewindPromise);
-
-      const { lastFrame } = render(
-        <RewindViewer
-          conversation={conversation}
-          onExit={vi.fn()}
-          onRewind={onRewind}
-        />,
-      );
-
-      // Enter edit mode
+      // Press Enter
       triggerKey({ name: 'return' });
 
-      // Move to end of line
-      triggerKey({ name: 'end' });
-
-      // Simulate typing " New"
-      triggerKey({ sequence: ' ' });
-      triggerKey({ sequence: 'N' });
-      triggerKey({ sequence: 'e' });
-      triggerKey({ sequence: 'w' });
-
-      // Save with Ctrl+S
-      triggerKey({ name: 's', ctrl: true });
-
-      // Wait for initial async operations (setIsSaving(true))
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-
-      expect(onRewind).toHaveBeenCalledWith('msg-1', 'Old New');
-      expect(lastFrame()).toContain('Rewinding conversation...');
-
-      // Complete the rewind operation
-      await act(async () => {
-        resolveRewind();
-      });
-
-      // Wait for final state updates (setIsSaving(false))
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-
-      expect(lastFrame()).not.toContain('Rewinding conversation...');
-      // Editor should be closed, displaying the updated text (locally updated)
-      expect(lastFrame()).toContain('Old New');
-    });
-
-    it('handles save error', async () => {
-      const conversation = createConversation([
-        { type: 'user', content: 'Old', id: 'msg-1', timestamp: '1' },
-      ]);
-      const onRewind = vi.fn().mockRejectedValue(new Error('Rewind failed'));
-      const { lastFrame } = render(
-        <RewindViewer
-          conversation={conversation}
-          onExit={vi.fn()}
-          onRewind={onRewind}
-        />,
-      );
-
-      triggerKey({ name: 'return' }); // Enter edit
-      triggerKey({ name: 's', ctrl: true }); // Save
-
-      // Need to wait for async rejection to settle in state
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-
-      expect(lastFrame()).toContain('Error: Failed to save: Rewind failed');
-      // Should still be in edit mode
-      expect(lastFrame()).toContain('[Ctrl+S] Save');
-    });
-
-    it('cancels edit mode', () => {
-      const conversation = createConversation([
-        { type: 'user', content: 'Old', id: 'msg-1', timestamp: '1' },
-      ]);
-      const { lastFrame } = render(
-        <RewindViewer
-          conversation={conversation}
-          onExit={vi.fn()}
-          onRewind={vi.fn()}
-        />,
-      );
-
-      triggerKey({ name: 'return' }); // Enter edit
-      expect(lastFrame()).toContain('[Ctrl+S] Save');
-
-      triggerKey({ name: 'escape' }); // Cancel
-      expect(lastFrame()).not.toContain('[Ctrl+S] Save');
-    });
-
-    it('blocks navigation while editing', () => {
-      const conversation = createConversation([
-        { type: 'user', content: 'Q1', id: '1', timestamp: '1' },
-        { type: 'gemini', content: 'A1', id: '1', timestamp: '1' },
-        { type: 'user', content: 'Q2', id: '2', timestamp: '1' },
-      ]);
-      const { lastFrame } = render(
-        <RewindViewer
-          conversation={conversation}
-          onExit={vi.fn()}
-          onRewind={vi.fn()}
-        />,
-      );
-
-      // Select Q1
-      expect(lastFrame()).toContain('Q1');
-      expect(lastFrame()).toContain('> Rewind');
-
-      triggerKey({ name: 'return' }); // Enter edit mode on Q1
-      expect(lastFrame()).toContain('[Ctrl+S] Save');
-
-      triggerKey({ name: 'down' }); // Try to move down
-
-      // Should still be on Q1 (Edit mode active), not moved to Q2
-      expect(lastFrame()).toContain('[Ctrl+S] Save');
-      // Header should still say Rewind (prefix changes to spaces)
-      expect(lastFrame()).toContain('Rewind');
+      expect(onRewind).toHaveBeenCalledWith('1', 'Original Prompt');
     });
   });
 });

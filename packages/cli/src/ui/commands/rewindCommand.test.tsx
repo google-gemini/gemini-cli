@@ -27,6 +27,7 @@ const mockAddItem = vi.fn();
 const mockSetPendingItem = vi.fn();
 const mockResetContext = vi.fn();
 const mockSubmitPrompt = vi.fn();
+const mockSetInput = vi.fn();
 
 vi.mock('../components/RewindViewer.js', () => ({
   RewindViewer: () => null,
@@ -90,7 +91,7 @@ describe('rewindCommand', () => {
         loadHistory: mockLoadHistory,
         addItem: mockAddItem,
         setPendingItem: mockSetPendingItem,
-        submitPrompt: mockSubmitPrompt,
+        setInput: mockSetInput,
       },
     }) as unknown as CommandContext;
   });
@@ -123,8 +124,9 @@ describe('rewindCommand', () => {
     ]);
     expect(mockRemoveComponent).toHaveBeenCalled();
 
-    // Verify submitPrompt was called with the new text
-    expect(mockSubmitPrompt).toHaveBeenCalledWith('New Prompt');
+    // Verify setInput was called with the new text
+    expect(mockSetInput).toHaveBeenCalledWith('New Prompt');
+    expect(mockSubmitPrompt).not.toHaveBeenCalled();
 
     // Verify manually handling the stream did NOT happen
     expect(mockSendMessageStream).not.toHaveBeenCalled();
