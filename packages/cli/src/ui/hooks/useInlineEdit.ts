@@ -42,10 +42,6 @@ export function useInlineEdit(): UseInlineEditReturn {
   // Cursor blink effect - only active when editing
   useEffect(() => {
     if (!editState.key) {
-      // Reset cursor visibility when not editing
-      if (!editState.cursorVisible) {
-        setEditState((s) => ({ ...s, cursorVisible: true }));
-      }
       return;
     }
     const id = setInterval(
@@ -53,7 +49,7 @@ export function useInlineEdit(): UseInlineEditReturn {
       500,
     );
     return () => clearInterval(id);
-  }, [editState.key, editState.cursorVisible]);
+  }, [editState.key]);
 
   const startEdit = useCallback((key: string, initialValue?: string) => {
     const initial = initialValue ?? '';
