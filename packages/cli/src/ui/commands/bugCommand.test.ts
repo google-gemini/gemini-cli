@@ -8,13 +8,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import open from 'open';
 import { bugCommand } from './bugCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { getCliVersion } from '../../utils/version.js';
+import { getVersion } from '@google/gemini-cli-core';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 
 // Mock dependencies
 vi.mock('open');
-vi.mock('../../utils/version.js');
 vi.mock('../utils/formatters.js');
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -27,6 +26,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       }),
     },
     sessionId: 'test-session-id',
+    getVersion: vi.fn(),
   };
 });
 vi.mock('node:process', () => ({
@@ -41,7 +41,7 @@ vi.mock('node:process', () => ({
 
 describe('bugCommand', () => {
   beforeEach(() => {
-    vi.mocked(getCliVersion).mockResolvedValue('0.1.0');
+    vi.mocked(getVersion).mockResolvedValue('0.1.0');
     vi.mocked(formatMemoryUsage).mockReturnValue('100 MB');
     vi.stubEnv('SANDBOX', 'gemini-test');
   });
