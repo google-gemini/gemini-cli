@@ -1189,7 +1189,21 @@ export const useGeminiStream = (
       }
 
       const responsesToSend: Part[] = geminiTools.flatMap((toolCall) => {
-        const responseParts = toolCall.response.responseParts;
+        const responsePartsUnion = toolCall.response.responseParts;
+
+        const getPartsArray = (plu: PartListUnion): Part[] => {
+          if (typeof plu === 'string') {
+            return [{ text: plu }];
+          }
+          if (Array.isArray(plu)) {
+            return plu.map((p) => (typeof p === 'string' ? { text: p } : p));
+          }
+          // It's a single Part object.
+          return [plu];
+        };
+
+        const responseParts = getPartsArray(responsePartsUnion);
+
         if (
           toolCall.request.name === 'run_shell_command' &&
           config.getTruncateToolOutputThreshold() > 0 &&
