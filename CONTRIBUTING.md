@@ -41,7 +41,7 @@ This project follows
 
 The process for contributing code is as follows:
 
-1.  **Find an issue** that you want to work on. If an issue is flagged as
+1.  **Find an issue** that you want to work on. If an issue is tagged as
     "🔒Maintainers only", this means it is reserved for project maintainers. We
     will not accept pull requests related to these issues.
 2.  **Fork the repository** and create a new branch.
