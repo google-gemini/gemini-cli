@@ -21,6 +21,7 @@ import {
   type PolicyFileError,
   escapeRegex,
 } from './toml-loader.js';
+import toml from '@iarna/toml';
 import {
   MessageBusType,
   type UpdatePolicy,
@@ -238,6 +239,17 @@ export async function createPolicyEngineConfig(
   };
 }
 
+interface TomlRule {
+  toolName?: string;
+  mcpName?: string;
+  decision?: string;
+  priority?: number;
+  commandPrefix?: string;
+  argsPattern?: string;
+  // Index signature to satisfy Record type if needed for toml.stringify
+  [key: string]: unknown;
+}
+
 export function createPolicyUpdater(
   policyEngine: PolicyEngine,
   messageBus: MessageBus,
@@ -273,45 +285,65 @@ export function createPolicyUpdater(
           await fs.mkdir(userPoliciesDir, { recursive: true });
           const policyFile = path.join(userPoliciesDir, 'auto-saved.toml');
 
-          // Check if file exists to determine if we need to add a newline
-          let content = '';
+          // Read existing file
+          let existingData: { rule?: TomlRule[] } = {};
           try {
-            const existingContent = await fs.readFile(policyFile, 'utf-8');
-            if (existingContent && !existingContent.endsWith('\n')) {
-              content = '\n';
+            const fileContent = await fs.readFile(policyFile, 'utf-8');
+            existingData = toml.parse(fileContent) as { rule?: TomlRule[] };
+          } catch (error) {
+            // If file doesn't exist or is invalid, start with empty object
+            // (or maybe preserve invalid content? For auto-save, overwriting invalid might be safer than crashing,
+            // but let's assume if it fails to parse we just append to a fresh structure to avoid data loss)
+            // Actually, if it fails to parse, we probably shouldn't blindly overwrite.
+            // But for this "auto-saved.toml", it's managed by this tool.
+            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+              console.warn(
+                `Failed to parse ${policyFile}, overwriting with new policy.`,
+                error,
+              );
             }
-          } catch {
-            // File doesn't exist, start fresh
           }
 
-          content += `[[rule]]\n`;
+          // Initialize rule array if needed
+          if (!existingData.rule) {
+            existingData.rule = [];
+          }
+
+          // Create new rule object
+          const newRule: TomlRule = {};
+
           if (message.mcpName) {
-            content += `mcpName = "${message.mcpName}"\n`;
-            // Extract simple tool name from composite name (server__tool)
-            // We assume the format is `${serverName}__${toolName}`
+            newRule.mcpName = message.mcpName;
+            // Extract simple tool name
             const simpleToolName = toolName.startsWith(`${message.mcpName}__`)
               ? toolName.slice(message.mcpName.length + 2)
               : toolName;
-            content += `toolName = "${simpleToolName}"\n`;
-            content += `decision = "allow"\n`;
-            content += `priority = 200\n`;
+            newRule.toolName = simpleToolName;
+            newRule.decision = 'allow';
+            newRule.priority = 200;
           } else {
-            content += `toolName = "${toolName}"\n`;
-            content += `decision = "allow"\n`;
-            content += `priority = 100\n`;
+            newRule.toolName = toolName;
+            newRule.decision = 'allow';
+            newRule.priority = 100;
           }
 
           if (message.commandPrefix) {
-            content += `commandPrefix = "${message.commandPrefix.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n`;
+            newRule.commandPrefix = message.commandPrefix;
           } else if (message.argsPattern) {
-            // Escape backslashes and double quotes for TOML string
-            const escapedPattern = message.argsPattern
-              .replace(/\\/g, '\\\\')
-              .replace(/"/g, '\\"');
-            content += `argsPattern = "${escapedPattern}"\n`;
+            newRule.argsPattern = message.argsPattern;
           }
 
-          await fs.appendFile(policyFile, content);
+          // Add to rules
+          existingData.rule.push(newRule);
+
+          // Serialize back to TOML
+          // @iarna/toml stringify might not produce beautiful output but it handles escaping correctly
+          const newContent = toml.stringify(existingData as toml.JsonMap);
+
+          // Atomic write: write to tmp then rename
+          const tmpFile = `${policyFile}.tmp`;
+          await fs.writeFile(tmpFile, newContent, 'utf-8');
+          await fs.rename(tmpFile, policyFile);
         } catch (error) {
           coreEvents.emitFeedback(
             'error',

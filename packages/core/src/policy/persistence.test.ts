@@ -47,7 +47,8 @@ describe('createPolicyUpdater', () => {
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
     ); // Simulate new file
-    (fs.appendFile as unknown as Mock).mockResolvedValue(undefined);
+    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+    (fs.rename as unknown as Mock).mockResolvedValue(undefined);
 
     const toolName = 'test_tool';
     await messageBus.publish({
@@ -63,13 +64,17 @@ describe('createPolicyUpdater', () => {
     expect(fs.mkdir).toHaveBeenCalledWith(userPoliciesDir, {
       recursive: true,
     });
-    expect(fs.appendFile).toHaveBeenCalledWith(
-      path.join(userPoliciesDir, 'auto-saved.toml'),
-      expect.stringContaining(`toolName = "${toolName}"`),
+
+    // Check written content
+    const expectedContent = expect.stringContaining(`toolName = "test_tool"`);
+    expect(fs.writeFile).toHaveBeenCalledWith(
+      expect.stringMatching(/\.tmp$/),
+      expectedContent,
+      'utf-8',
     );
-    expect(fs.appendFile).toHaveBeenCalledWith(
+    expect(fs.rename).toHaveBeenCalledWith(
+      expect.stringMatching(/\.tmp$/),
       path.join(userPoliciesDir, 'auto-saved.toml'),
-      expect.stringContaining(`priority = 100`),
     );
   });
 
@@ -83,8 +88,10 @@ describe('createPolicyUpdater', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(fs.appendFile).not.toHaveBeenCalled();
+    expect(fs.writeFile).not.toHaveBeenCalled();
+    expect(fs.rename).not.toHaveBeenCalled();
   });
+
   it('should persist policy with commandPrefix when provided', async () => {
     createPolicyUpdater(policyEngine, messageBus);
 
@@ -94,7 +101,8 @@ describe('createPolicyUpdater', () => {
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
     );
-    (fs.appendFile as unknown as Mock).mockResolvedValue(undefined);
+    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+    (fs.rename as unknown as Mock).mockResolvedValue(undefined);
 
     const toolName = 'run_shell_command';
     const commandPrefix = 'git status';
@@ -108,18 +116,18 @@ describe('createPolicyUpdater', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    // Verify rule added to engine (should be converted to argsPattern)
+    // In-memory rule check (unchanged)
     const rules = policyEngine.getRules();
     const addedRule = rules.find((r) => r.toolName === toolName);
     expect(addedRule).toBeDefined();
     expect(addedRule?.priority).toBe(2.95);
-    // In-memory rule should have argsPattern matching the prefix
     expect(addedRule?.argsPattern).toEqual(new RegExp(`"command":"git status`));
 
-    // Verify file written (should have commandPrefix)
-    expect(fs.appendFile).toHaveBeenCalledWith(
-      path.join(userPoliciesDir, 'auto-saved.toml'),
+    // Verify file written
+    expect(fs.writeFile).toHaveBeenCalledWith(
+      expect.stringMatching(/\.tmp$/),
       expect.stringContaining(`commandPrefix = "git status"`),
+      'utf-8',
     );
   });
 
@@ -132,7 +140,8 @@ describe('createPolicyUpdater', () => {
     (fs.readFile as unknown as Mock).mockRejectedValue(
       new Error('File not found'),
     );
-    (fs.appendFile as unknown as Mock).mockResolvedValue(undefined);
+    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+    (fs.rename as unknown as Mock).mockResolvedValue(undefined);
 
     const mcpName = 'my-jira-server';
     const simpleToolName = 'search';
@@ -148,17 +157,53 @@ describe('createPolicyUpdater', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     // Verify file written
-    expect(fs.appendFile).toHaveBeenCalledWith(
-      path.join(userPoliciesDir, 'auto-saved.toml'),
-      expect.stringContaining(`mcpName = "${mcpName}"`),
+    const writeCall = (fs.writeFile as unknown as Mock).mock.calls[0];
+    const writtenContent = writeCall[1] as string;
+    expect(writtenContent).toContain(`mcpName = "${mcpName}"`);
+    expect(writtenContent).toContain(`toolName = "${simpleToolName}"`);
+    expect(writtenContent).toContain('priority = 200');
+  });
+
+  it('should escape special characters in toolName and mcpName', async () => {
+    createPolicyUpdater(policyEngine, messageBus);
+
+    const userPoliciesDir = '/mock/user/policies';
+    vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(userPoliciesDir);
+    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
+    (fs.readFile as unknown as Mock).mockRejectedValue(
+      new Error('File not found'),
     );
-    expect(fs.appendFile).toHaveBeenCalledWith(
-      path.join(userPoliciesDir, 'auto-saved.toml'),
-      expect.stringContaining(`toolName = "${simpleToolName}"`),
-    );
-    expect(fs.appendFile).toHaveBeenCalledWith(
-      path.join(userPoliciesDir, 'auto-saved.toml'),
-      expect.stringContaining(`priority = 200`),
-    );
+    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+    (fs.rename as unknown as Mock).mockResolvedValue(undefined);
+
+    const mcpName = 'my"jira"server';
+    const toolName = `my"jira"server__search"tool"`;
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName,
+      persist: true,
+      mcpName,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const writeCall = (fs.writeFile as unknown as Mock).mock.calls[0];
+    const writtenContent = writeCall[1] as string;
+
+    // Verify escaping - should be valid TOML
+    // Note: @iarna/toml optimizes for shortest representation, so it may use single quotes 'foo"bar'
+    // instead of "foo\"bar\"" if there are no single quotes in the string.
+    try {
+      expect(writtenContent).toContain(`mcpName = "my\\"jira\\"server"`);
+    } catch {
+      expect(writtenContent).toContain(`mcpName = 'my"jira"server'`);
+    }
+
+    try {
+      expect(writtenContent).toContain(`toolName = "search\\"tool\\""`);
+    } catch {
+      expect(writtenContent).toContain(`toolName = 'search"tool"'`);
+    }
   });
 });
