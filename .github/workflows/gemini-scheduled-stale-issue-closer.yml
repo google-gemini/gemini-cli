@@ -1,0 +1,152 @@
+name: '🔒 Gemini Scheduled Stale Issue Closer'
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Every Sunday at midnight UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (no changes applied)'
+        required: false
+        default: false
+        type: 'boolean'
+
+concurrency:
+  group: '${{ github.workflow }}'
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash'
+
+jobs:
+  close-stale-issues:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      issues: 'write'
+    steps:
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@v1'
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
+
+      - name: 'Process Stale Issues'
+        uses: 'actions/github-script@v7'
+        env:
+          DRY_RUN: '${{ inputs.dry_run }}'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |
+            const dryRun = process.env.DRY_RUN === 'true';
+            if (dryRun) {
+              core.info('DRY RUN MODE ENABLED: No changes will be applied.');
+            }
+            const batchLabel = 'Stale';
+
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+            const tenDaysAgo = new Date();
+            tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+
+            core.info(`Cutoff date for creation: ${threeMonthsAgo.toISOString()}`);
+            core.info(`Cutoff date for updates: ${tenDaysAgo.toISOString()}`);
+
+            const query = `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open created:<${threeMonthsAgo.toISOString()}`;
+            core.info(`Searching with query: ${query}`);
+
+            const itemsToCheck = await github.paginate(github.rest.search.issuesAndPullRequests, {
+              q: query,
+              sort: 'created',
+              order: 'asc',
+              per_page: 100
+            });
+
+            core.info(`Found ${itemsToCheck.length} open issues to check.`);
+
+            let processedCount = 0;
+
+            for (const issue of itemsToCheck) {
+              const createdAt = new Date(issue.created_at);
+              const updatedAt = new Date(issue.updated_at);
+              const reactionCount = issue.reactions.total_count;
+
+              // Basic thresholds
+              if (reactionCount >= 5) {
+                continue;
+              }
+
+              // Skip if it has a maintainer label
+              if (issue.labels.some(label => label.name.toLowerCase().includes('maintainer'))) {
+                continue;
+              }
+
+              let isStale = updatedAt < tenDaysAgo;
+
+              // If apparently active, check if it's only bot activity
+              if (!isStale) {
+                try {
+                  const comments = await github.rest.issues.listComments({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    per_page: 100,
+                    sort: 'created',
+                    direction: 'desc'
+                  });
+
+                  const lastHumanComment = comments.data.find(comment => comment.user.type !== 'Bot');
+                  if (lastHumanComment) {
+                    isStale = new Date(lastHumanComment.created_at) < tenDaysAgo;
+                  } else {
+                    // No human comments. Check if creator is human.
+                    if (issue.user.type !== 'Bot') {
+                       isStale = createdAt < tenDaysAgo;
+                    } else {
+                       isStale = true; // Bot created, only bot comments
+                    }
+                  }
+                } catch (error) {
+                  core.warning(`Failed to fetch comments for issue #${issue.number}: ${error.message}`);
+                  continue;
+                }
+              }
+
+              if (isStale) {
+                processedCount++;
+                const message = `Closing stale issue #${issue.number}: "${issue.title}" (${issue.html_url})`;
+                core.info(message);
+
+                if (!dryRun) {
+                  // Add label
+                  await github.rest.issues.addLabels({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    labels: [batchLabel]
+                  });
+
+                  // Add comment
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    body: 'Hello! As part of our effort to keep our backlog manageable and focus on the most active issues, we are tidying up older reports.\n\nIt looks like this issue hasn\'t been active for a while, so we are closing it for now. However, if you are still experiencing this bug on the latest stable build, please feel free to comment on this issue or create a new one with updated details.\n\nThank you for your contribution!'
+                  });
+
+                  // Close issue
+                  await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    state: 'closed',
+                    state_reason: 'not_planned'
+                  });
+                }
+              }
+            }
+
+            core.info(`\nTotal issues processed: ${processedCount}`);

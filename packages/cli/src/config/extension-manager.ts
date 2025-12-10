@@ -41,6 +41,8 @@ import {
   type MCPServerConfig,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
+  type HookDefinition,
+  type HookEventName,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -253,10 +255,20 @@ export class ExtensionManager extends ExtensionLoader {
           );
         }
 
+        const newHasHooks = fs.existsSync(
+          path.join(localSourcePath, 'hooks', 'hooks.json'),
+        );
+        let previousHasHooks = false;
+        if (isUpdate && previous && previous.hooks) {
+          previousHasHooks = Object.keys(previous.hooks).length > 0;
+        }
+
         await maybeRequestConsentOrFail(
           newExtensionConfig,
           this.requestConsent,
+          newHasHooks,
           previousExtensionConfig,
+          previousHasHooks,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);
         const destinationPath = new ExtensionStorage(
@@ -334,6 +346,7 @@ export class ExtensionManager extends ExtensionLoader {
               'success',
             ),
           );
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           this.enableExtension(newExtensionConfig.name, SettingScope.User);
         }
       } finally {
@@ -501,6 +514,14 @@ export class ExtensionManager extends ExtensionLoader {
         )
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
+      let hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
+      if (this.settings.tools?.enableHooks) {
+        hooks = await this.loadExtensionHooks(effectiveExtensionPath, {
+          extensionPath: effectiveExtensionPath,
+          workspacePath: this.workspaceDir,
+        });
+      }
+
       const extension = {
         name: config.name,
         version: config.version,
@@ -509,6 +530,7 @@ export class ExtensionManager extends ExtensionLoader {
         installMetadata,
         mcpServers: config.mcpServers,
         excludeTools: config.excludeTools,
+        hooks,
         isActive: this.extensionEnablementManager.isEnabled(
           config.name,
           this.workspaceDir,
@@ -573,6 +595,53 @@ export class ExtensionManager extends ExtensionLoader {
           e,
         )}`,
       );
+    }
+  }
+
+  private async loadExtensionHooks(
+    extensionDir: string,
+    context: { extensionPath: string; workspacePath: string },
+  ): Promise<{ [K in HookEventName]?: HookDefinition[] } | undefined> {
+    const hooksFilePath = path.join(extensionDir, 'hooks', 'hooks.json');
+
+    try {
+      const hooksContent = await fs.promises.readFile(hooksFilePath, 'utf-8');
+      const rawHooks = JSON.parse(hooksContent);
+
+      if (
+        !rawHooks ||
+        typeof rawHooks !== 'object' ||
+        typeof rawHooks.hooks !== 'object' ||
+        rawHooks.hooks === null ||
+        Array.isArray(rawHooks.hooks)
+      ) {
+        debugLogger.warn(
+          `Invalid hooks configuration in ${hooksFilePath}: "hooks" property must be an object`,
+        );
+        return undefined;
+      }
+
+      // Hydrate variables in the hooks configuration
+      const hydratedHooks = recursivelyHydrateStrings(
+        rawHooks.hooks as unknown as JsonObject,
+        {
+          ...context,
+          '/': path.sep,
+          pathSeparator: path.sep,
+        },
+      ) as { [K in HookEventName]?: HookDefinition[] };
+
+      return hydratedHooks;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
+        return undefined; // File not found is not an error here.
+      }
+      debugLogger.warn(
+        `Failed to load extension hooks from ${hooksFilePath}: ${getErrorMessage(
+          e,
+        )}`,
+      );
+      return undefined;
     }
   }
 
