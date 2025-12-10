@@ -44,7 +44,6 @@ import { FileOperation } from '../telemetry/metrics.js';
 import { getSpecificMimeType } from '../utils/fileUtils.js';
 import { getLanguageFromFilePath } from '../utils/language-detection.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { MessageBusType } from '../confirmation-bus/types.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -225,18 +224,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
         }
-        if (
-          outcome === ToolConfirmationOutcome.ProceedAlways ||
-          outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
-        ) {
-          if (this.messageBus && this._toolName) {
-            await this.messageBus.publish({
-              type: MessageBusType.UPDATE_POLICY,
-              toolName: this._toolName,
-              persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
-            });
-          }
-        }
+        await this.publishPolicyUpdate(outcome);
 
         if (ideConfirmation) {
           const result = await ideConfirmation;

@@ -22,6 +22,7 @@ import {
   BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
+  type PolicyUpdateOptions,
 } from './tools.js';
 import { ApprovalMode } from '../policy/types.js';
 
@@ -43,7 +44,6 @@ import {
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { MessageBusType } from '../confirmation-bus/types.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -82,6 +82,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
       description += ` (${this.params.description.replace(/\n/g, ' ')})`;
     }
     return description;
+  }
+
+  protected override getPolicyUpdateOptions(
+    outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
+      return { commandPrefix: this.params.command };
+    }
+    return undefined;
   }
 
   protected override async getConfirmationDetails(
@@ -125,25 +134,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           commandsToConfirm.forEach((command) => this.allowlist.add(command));
         }
-        if (
-          outcome === ToolConfirmationOutcome.ProceedAlways ||
-          outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
-        ) {
-          if (this.messageBus && this._toolName) {
-            let commandPrefix: string | undefined;
-            if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
-              // Use the command as the prefix
-              commandPrefix = this.params.command;
-            }
-
-            await this.messageBus.publish({
-              type: MessageBusType.UPDATE_POLICY,
-              toolName: this._toolName,
-              persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
-              commandPrefix,
-            });
-          }
-        }
+        await this.publishPolicyUpdate(outcome);
       },
     };
     return confirmationDetails;

@@ -16,12 +16,12 @@ import {
   BaseToolInvocation,
   Kind,
   ToolConfirmationOutcome,
+  type PolicyUpdateOptions,
 } from './tools.js';
 import type { CallableTool, FunctionCall, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { MessageBusType } from '../confirmation-bus/types.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -88,6 +88,12 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     );
   }
 
+  protected override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return { mcpName: this.serverName };
+  }
+
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
@@ -118,14 +124,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
         } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
-          if (this.messageBus && this._toolName) {
-            await this.messageBus.publish({
-              type: MessageBusType.UPDATE_POLICY,
-              toolName: this._toolName,
-              persist: true,
-              mcpName: this.serverName,
-            });
-          }
+          await this.publishPolicyUpdate(outcome);
         }
       },
     };

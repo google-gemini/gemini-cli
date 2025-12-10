@@ -25,7 +25,6 @@ import type {
 import { ToolErrorType } from './tool-error.js';
 import { MEMORY_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { MessageBusType } from '../confirmation-bus/types.js';
 
 const memoryToolSchemaData: FunctionDeclaration = {
   name: MEMORY_TOOL_NAME,
@@ -227,18 +226,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           MemoryToolInvocation.allowlist.add(allowlistKey);
         }
-        if (
-          outcome === ToolConfirmationOutcome.ProceedAlways ||
-          outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
-        ) {
-          if (this.messageBus && this._toolName) {
-            await this.messageBus.publish({
-              type: MessageBusType.UPDATE_POLICY,
-              toolName: this._toolName,
-              persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
-            });
-          }
-        }
+        await this.publishPolicyUpdate(outcome);
       },
     };
     return confirmationDetails;
