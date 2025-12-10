@@ -127,6 +127,7 @@ import { enableSupportedProtocol } from './utils/kittyProtocolDetector.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { enableBracketedPaste } from './utils/bracketedPaste.js';
 import { useBanner } from './hooks/useBanner.js';
+import { useNotification } from './hooks/useNotification.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -909,6 +910,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const isFocused = useFocus();
   useBracketedPaste();
+  useNotification(streamingState, isFocused, settings.merged);
 
   // Context file names computation
   const contextFileNames = useMemo(() => {

@@ -577,6 +577,16 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      enableNotifications: {
+        type: 'boolean',
+        label: 'Enable Desktop Notifications',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable desktop notifications for user permission prompts when the CLI is not in focus.',
+        showInDialog: true,
+      },
     },
   },
 
