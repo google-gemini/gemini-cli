@@ -183,11 +183,15 @@ export class AgentRegistry {
    * this is formatted for tool descriptions.
    */
   getToolDescription(): string {
-    if (this.agents.size === 0) {
+    const enabledAgents = Array.from(this.agents.entries()).filter(([name]) =>
+      this.isAgentEnabled(name),
+    );
+
+    if (enabledAgents.length === 0) {
       return 'Delegates a task to a specialized sub-agent. No agents are currently available.';
     }
 
-    const agentDescriptions = Array.from(this.agents.entries())
+    const agentDescriptions = enabledAgents
       .map(([name, def]) => `- **${name}**: ${def.description}`)
       .join('\n');
 

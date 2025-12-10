@@ -149,43 +149,6 @@ const SETTINGS_SCHEMA = {
     additionalProperties: {
       type: 'object',
       ref: 'AgentConfig',
-      properties: {
-        enabled: {
-          type: 'boolean',
-          default: true,
-          label: 'Enabled',
-          category: 'Agents',
-          requiresRestart: false,
-        },
-        model: {
-          type: 'string',
-          label: 'Model',
-          category: 'Agents',
-          requiresRestart: false,
-          default: undefined,
-        },
-        maxTimeMinutes: {
-          type: 'number',
-          label: 'Max Time (Minutes)',
-          category: 'Agents',
-          requiresRestart: false,
-          default: undefined,
-        },
-        maxTurns: {
-          type: 'number',
-          label: 'Max Turns',
-          category: 'Agents',
-          requiresRestart: false,
-          default: undefined,
-        },
-        thinkingBudget: {
-          type: 'number',
-          label: 'Thinking Budget',
-          category: 'Agents',
-          requiresRestart: false,
-          default: undefined,
-        },
-      },
     },
   },
   // Maintained for compatibility/criticality

@@ -359,5 +359,21 @@ describe('AgentRegistry', () => {
       const context = registryWithDisabled.getDirectoryContext();
       expect(context).toContain('No sub-agents are currently available');
     });
+
+    it('should exclude disabled agents from tool description', async () => {
+      const configWithDisabled = makeFakeConfig({
+        agents: {
+          codebase_investigator: { enabled: false },
+        },
+      });
+      const registryWithDisabled = new TestableAgentRegistry(
+        configWithDisabled,
+      );
+      await registryWithDisabled.initialize();
+
+      const description = registryWithDisabled.getToolDescription();
+      expect(description).toContain('No agents are currently available');
+      expect(description).not.toContain('codebase_investigator');
+    });
   });
 });
