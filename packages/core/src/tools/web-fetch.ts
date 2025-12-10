@@ -253,7 +253,7 @@ ${textContent}
     const userPrompt = this.params.prompt;
     const { validUrls: urls } = parsePrompt(userPrompt);
     const url = urls[0];
-    const isPrivate = isPrivateIp(url);
+    const isPrivate = await isPrivateIp(url);
 
     if (isPrivate) {
       logWebFetchFallbackAttempt(
