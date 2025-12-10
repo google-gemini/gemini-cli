@@ -96,9 +96,6 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
 
   useKeypress(
     (key) => {
-      // If editing, allow the editor to handle keys (it uses useKeypress too)
-      // But BaseSelectionList listens to keys when focused.
-      // We handle ESC to exit here if NOT editing.
       if (editingIndex === null) {
         if (key.name === 'escape') {
           onExit();
@@ -126,11 +123,6 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
       2, // Borders
   );
 
-  // Calculate items to show based on available height.
-  // Assuming roughly 3 lines per item on average?
-  // BaseSelectionList doesn't do variable height virtual scrolling perfectly if heights vary wildly,
-  // but it renders a slice.
-  // Let's set maxItemsToShow based on lines.
   const maxItemsToShow = Math.max(1, Math.floor(listHeight / 4));
 
   return (
