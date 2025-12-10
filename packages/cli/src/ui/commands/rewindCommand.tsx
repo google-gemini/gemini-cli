@@ -62,7 +62,7 @@ export const rewindCommand: SlashCommand = {
                 convertSessionToHistoryFormats(updatedConversation.messages);
 
               // Reset the client's internal history to match the file
-              client.setHistory(clientHistory as unknown as Content[]);
+              client.setHistory(clientHistory as Content[]);
 
               // Reset context manager as we are rewinding history
               config.getContextManager()?.reset();

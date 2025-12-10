@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -69,11 +69,13 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   const ITEMS_PER_PAGE = 3;
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  if (selectedIndex < scrollOffset) {
-    setScrollOffset(selectedIndex);
-  } else if (selectedIndex >= scrollOffset + ITEMS_PER_PAGE) {
-    setScrollOffset(selectedIndex - ITEMS_PER_PAGE + 1);
-  }
+  useEffect(() => {
+    if (selectedIndex < scrollOffset) {
+      setScrollOffset(selectedIndex);
+    } else if (selectedIndex >= scrollOffset + ITEMS_PER_PAGE) {
+      setScrollOffset(selectedIndex - ITEMS_PER_PAGE + 1);
+    }
+  }, [selectedIndex, scrollOffset, ITEMS_PER_PAGE]);
 
   useKeypress(
     (key) => {
