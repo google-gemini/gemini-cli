@@ -15,6 +15,7 @@ import {
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
+import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
 
 /**
  * Constant for the resume "latest" identifier.
@@ -60,6 +61,8 @@ export interface SessionInfo {
   isCurrentSession: boolean;
   /** Display index in the list */
   index: number;
+  /** AI-generated summary of the session (if available) */
+  summary?: string;
   /** Full concatenated content (only loaded when needed for search) */
   fullContent?: string;
   /** Processed messages with normalized roles (only loaded when needed) */
@@ -88,6 +91,15 @@ export interface SessionSelectionResult {
   sessionData: ConversationRecord;
   displayInfo: string;
 }
+
+/**
+ * Checks if a session has at least one user or assistant (gemini) message.
+ * Sessions with only system messages (info, error, warning) are considered empty.
+ * @param messages - The array of message records to check
+ * @returns true if the session has meaningful content
+ */
+export const hasUserOrAssistantMessage = (messages: MessageRecord[]): boolean =>
+  messages.some((msg) => msg.type === 'user' || msg.type === 'gemini');
 
 /**
  * Cleans and sanitizes message content for display by:
@@ -215,6 +227,11 @@ export const getAllSessionFiles = async (
             return { fileName: file, sessionInfo: null };
           }
 
+          // Skip sessions that only contain system messages (info, error, warning)
+          if (!hasUserOrAssistantMessage(content.messages)) {
+            return { fileName: file, sessionInfo: null };
+          }
+
           const firstUserMessage = extractFirstUserMessage(content.messages);
           const isCurrentSession = currentSessionId
             ? file.includes(currentSessionId.slice(0, 8))
@@ -245,10 +262,13 @@ export const getAllSessionFiles = async (
             startTime: content.startTime,
             lastUpdated: content.lastUpdated,
             messageCount: content.messages.length,
-            displayName: firstUserMessage,
+            displayName: content.summary
+              ? stripUnsafeCharacters(content.summary)
+              : firstUserMessage,
             firstUserMessage,
             isCurrentSession,
             index: 0, // Will be set after sorting valid sessions
+            summary: content.summary,
             fullContent,
             messages,
           };

@@ -131,6 +131,7 @@ export abstract class BaseToolInvocation<
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           if (this.messageBus && this._toolName) {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.messageBus.publish({
               type: MessageBusType.UPDATE_POLICY,
               toolName: this._toolName,
@@ -220,6 +221,7 @@ export abstract class BaseToolInvocation<
       };
 
       try {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.messageBus.publish(request);
       } catch (_error) {
         cleanup();
