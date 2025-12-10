@@ -50,45 +50,64 @@ export class AgentRegistry {
 
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
+    const agentConfig = this.config.agents['codebase_investigator'];
 
-    // Only register the agent if it's enabled in the settings.
-    if (investigatorSettings?.enabled) {
-      let model =
-        investigatorSettings.model ??
-        CodebaseInvestigatorAgent.modelConfig.model;
+    let model =
+      agentConfig?.model ??
+      investigatorSettings?.model ??
+      CodebaseInvestigatorAgent.modelConfig.model;
 
-      // If the user is using the preview model for the main agent, force the sub-agent to use it too
-      // if it's configured to use 'pro' or 'auto'.
-      if (this.config.getModel() === PREVIEW_GEMINI_MODEL) {
-        if (
-          model === GEMINI_MODEL_ALIAS_PRO ||
-          model === DEFAULT_GEMINI_MODEL_AUTO
-        ) {
-          model = PREVIEW_GEMINI_MODEL;
-        }
+    // If the user is using the preview model for the main agent, force the sub-agent to use it too
+    // if it's configured to use 'pro' or 'auto'.
+    if (this.config.getModel() === PREVIEW_GEMINI_MODEL) {
+      if (
+        model === GEMINI_MODEL_ALIAS_PRO ||
+        model === DEFAULT_GEMINI_MODEL_AUTO
+      ) {
+        model = PREVIEW_GEMINI_MODEL;
       }
-
-      const agentDef = {
-        ...CodebaseInvestigatorAgent,
-        modelConfig: {
-          ...CodebaseInvestigatorAgent.modelConfig,
-          model,
-          thinkingBudget:
-            investigatorSettings.thinkingBudget ??
-            CodebaseInvestigatorAgent.modelConfig.thinkingBudget,
-        },
-        runConfig: {
-          ...CodebaseInvestigatorAgent.runConfig,
-          max_time_minutes:
-            investigatorSettings.maxTimeMinutes ??
-            CodebaseInvestigatorAgent.runConfig.max_time_minutes,
-          max_turns:
-            investigatorSettings.maxNumTurns ??
-            CodebaseInvestigatorAgent.runConfig.max_turns,
-        },
-      };
-      this.registerAgent(agentDef);
     }
+
+    const agentDef = {
+      ...CodebaseInvestigatorAgent,
+      modelConfig: {
+        ...CodebaseInvestigatorAgent.modelConfig,
+        model,
+        thinkingBudget:
+          agentConfig?.thinkingBudget ??
+          investigatorSettings?.thinkingBudget ??
+          CodebaseInvestigatorAgent.modelConfig.thinkingBudget,
+      },
+      runConfig: {
+        ...CodebaseInvestigatorAgent.runConfig,
+        max_time_minutes:
+          agentConfig?.maxTimeMinutes ??
+          investigatorSettings?.maxTimeMinutes ??
+          CodebaseInvestigatorAgent.runConfig.max_time_minutes,
+        // Map legacy 'maxNumTurns' to standard 'maxTurns'
+        max_turns:
+          agentConfig?.maxTurns ??
+          investigatorSettings?.maxNumTurns ??
+          CodebaseInvestigatorAgent.runConfig.max_turns,
+      },
+    };
+    this.registerAgent(agentDef);
+  }
+
+  /**
+   * Checks if an agent is enabled in the configuration.
+   */
+  isAgentEnabled(name: string): boolean {
+    // Special handling for codebase_investigator legacy settings
+    if (name === 'codebase_investigator') {
+      const investigatorSettings =
+        this.config.getCodebaseInvestigatorSettings();
+      const agentConfig = this.config.agents['codebase_investigator'];
+      return agentConfig?.enabled ?? investigatorSettings?.enabled ?? true;
+    }
+
+    // Generic check for other agents
+    return this.config.agents[name]?.enabled ?? true;
   }
 
   /**
@@ -183,7 +202,11 @@ ${agentDescriptions}`;
    * This MUST be injected into the System Prompt of the parent agent.
    */
   getDirectoryContext(): string {
-    if (this.agents.size === 0) {
+    const enabledAgents = Array.from(this.agents.entries()).filter(([name]) =>
+      this.isAgentEnabled(name),
+    );
+
+    if (enabledAgents.length === 0) {
       return 'No sub-agents are currently available.';
     }
 
@@ -191,7 +214,7 @@ ${agentDescriptions}`;
     context +=
       'Use `delegate_to_agent` for complex tasks requiring specialized analysis.\n\n';
 
-    for (const [name, def] of this.agents.entries()) {
+    for (const [name, def] of enabledAgents) {
       context += `- **${name}**: ${def.description}\n`;
     }
     return context;

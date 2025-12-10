@@ -106,6 +106,8 @@ export * from './tools/tool-error.js';
 export * from './tools/tool-registry.js';
 export * from './tools/tool-names.js';
 export * from './resources/resource-registry.js';
+export * from './agents/registry.js';
+export * from './agents/types.js';
 
 // Export prompt logic
 export * from './prompts/mcp-prompts.js';
