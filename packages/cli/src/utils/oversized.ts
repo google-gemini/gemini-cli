@@ -74,7 +74,7 @@ function getRequestSizeOfFunctionCall(functionCall: GenerativeAI.FunctionCall) {
 function getRequestSizeOfFunctionResponse(
   functionResponse: GenerativeAI.FunctionResponse,
 ) {
-  return JSON.stringify(functionResponse.response).length;
+  return JSON.stringify(functionResponse).length;
 }
 
 function getRequestSizeOfExecutableCode(
