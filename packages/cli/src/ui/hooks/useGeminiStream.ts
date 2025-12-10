@@ -204,9 +204,7 @@ export const useGeminiStream = (
   const [
     loopDetectionConfirmationRequest,
     setLoopDetectionConfirmationRequest,
-  ] = useState<{
-    onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
-  } | null>(null);
+  ] = useState<{ onComplete: (result: { userSelection: 'disable' | 'keep' }) => void; } | null>(null);
 
   const onExec = useCallback(async (done: Promise<void>) => {
     setIsResponding(true);
@@ -405,10 +403,8 @@ export const useGeminiStream = (
       userMessageTimestamp: number,
       abortSignal: AbortSignal,
       prompt_id: string,
-    ): Promise<{
-      queryToSend: PartListUnion | null;
-      shouldProceed: boolean;
-    }> => {
+    ): Promise<{ queryToSend: PartListUnion | null; shouldProceed: boolean; }>
+     => {
       if (turnCancelledRef.current) {
         return { queryToSend: null, shouldProceed: false };
       }
@@ -705,9 +701,9 @@ export const useGeminiStream = (
 
   const handleChatCompressionEvent = useCallback(
     (
-      eventValue: ServerGeminiChatCompressedEvent['value'],
-      userMessageTimestamp: number,
-    ) => {
+        eventValue: ServerGeminiChatCompressedEvent['value'],
+        userMessageTimestamp: number,
+      ) => {
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
@@ -1193,8 +1189,9 @@ export const useGeminiStream = (
         const responseParts = toolCall.response.responseParts;
         if (
           toolCall.request.name === 'run_shell_command' &&
-          config.get('request_size_limit') > 0 &&
-          getRequestSize(responseParts) > config.get('request_size_limit')
+          config.getTruncateToolOutputThreshold() > 0 &&
+          getRequestSize(responseParts) >
+            config.getTruncateToolOutputThreshold()
         ) {
           const originalCommand = toolCall.request.args?.['command'];
           if (typeof originalCommand !== 'string') {
@@ -1205,19 +1202,19 @@ export const useGeminiStream = (
             (part) => 'functionResponse' in part,
           );
           const originalStderr =
-            (functionResponsePart?.functionResponse?.response?.[
-              'stderr'
-            ] as string) ?? '';
+            (functionResponsePart?.functionResponse?.response?.[ 'stderr'] as string) ?? '';
 
           const tmpDir = config.storage.getProjectTempDir();
           const instructionalPart: Part = {
             functionResponse: {
               name: 'run_shell_command',
               response: {
-                stdout: `[INFO] The output of the previous 'run_shell_command' ('${originalCommand}') was too large to be displayed. Please run the command again and redirect the output to a temporary file. For example: \`${originalCommand} > ${path.join(
+                stdout: `[INFO] The output of the previous 'run_shell_command' ('${originalCommand}') was too large to be displayed. Please run the command again and redirect the output to a temporary file. For example: 
+`${originalCommand} > ${path.join(
                   tmpDir,
                   'output.txt',
-                )}\`. Then use the \`read_file\` tool to read the contents of the file.`,
+                )}\n`. Then use the 
+read_file\n tool to read the contents of the file.`, 
                 stderr: originalStderr,
               },
             },
