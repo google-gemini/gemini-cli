@@ -21,7 +21,6 @@ import {
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import {
   getDialogSettingKeys,
-  setPendingSettingValue,
   getDisplayValue,
   saveModifiedSettings,
   getSettingDefinition,
@@ -343,17 +342,40 @@ export function SettingsDialog({
   const handleScopeHighlight = (scope: LoadableSettingScope) => {
     dispatch({ type: 'SET_SCOPE', scope });
 
+    const setNestedValue = (
+      obj: Record<string, unknown>,
+      path: string[],
+      value: unknown,
+    ): void => {
+      let current = obj;
+      for (let i = 0; i < path.length - 1; i++) {
+        const key = path[i];
+        if (
+          current[key] === undefined ||
+          typeof current[key] !== 'object' ||
+          current[key] === null
+        ) {
+          current[key] = {};
+        }
+        current = current[key] as Record<string, unknown>;
+      }
+      current[path[path.length - 1]] = value;
+    };
+
     // Update previewSettings with new scope's base settings + overlay unsaved changes
-    let updated = structuredClone(settings.forScope(scope).settings);
+    const updated = structuredClone(settings.forScope(scope).settings);
     for (const [key, value] of globalPendingChanges.entries()) {
       const def = getSettingDefinition(key);
-      if (def?.type === 'boolean' && typeof value === 'boolean') {
-        updated = setPendingSettingValue(key, value, updated);
-      } else if (
+      if (
+        (def?.type === 'boolean' && typeof value === 'boolean') ||
         (def?.type === 'number' && typeof value === 'number') ||
         (def?.type === 'string' && typeof value === 'string')
       ) {
-        updated = setPendingSettingValueAny(key, value, updated);
+        setNestedValue(
+          updated as Record<string, unknown>,
+          key.split('.'),
+          value,
+        );
       }
     }
     setPendingSettings(updated);
