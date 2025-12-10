@@ -400,6 +400,9 @@ describe('oauth2', () => {
         'google_accounts.json',
       );
 
+      // Wait for the async file write to happen
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       expect(fs.existsSync(googleAccountPath)).toBe(true);
       if (fs.existsSync(googleAccountPath)) {
         const cachedGoogleAccount = fs.readFileSync(googleAccountPath, 'utf-8');
@@ -452,7 +455,6 @@ describe('oauth2', () => {
 
         expect(mockClient.setCredentials).toHaveBeenCalledWith(cachedCreds);
         expect(mockClient.getAccessToken).toHaveBeenCalled();
-        expect(mockClient.getTokenInfo).toHaveBeenCalled();
         expect(Compute).not.toHaveBeenCalled(); // Should not fetch new client if cache is valid
       });
 

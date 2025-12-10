@@ -371,6 +371,14 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         redirect_uri: redirectUri,
       });
       client.setCredentials(tokens);
+
+      // Retrieve and cache Google Account ID during authentication (non-blocking)
+      fetchAndCacheUserInfo(client).catch((error) => {
+        debugLogger.warn(
+          'Failed to retrieve Google Account ID during authentication:',
+          getErrorMessage(error),
+        );
+      });
     } catch (error) {
       writeToStderr(
         'Failed to authenticate with authorization code:' +
