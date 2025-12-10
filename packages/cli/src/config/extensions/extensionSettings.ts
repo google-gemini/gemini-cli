@@ -289,7 +289,7 @@ async function clearSettings(
   if (fsSync.existsSync(envFilePath)) {
     await fs.writeFile(envFilePath, '');
   }
-  if (!keychain.isAvailable()) {
+  if (!(await keychain.isAvailable())) {
     return;
   }
   const secrets = await keychain.listSecrets();
