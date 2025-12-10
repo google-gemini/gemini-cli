@@ -616,13 +616,10 @@ describe('editor utils', () => {
       });
     }
 
-    it('should log an error if editor is not available', async () => {
-      const consoleErrorSpy = vi
-        .spyOn(debugLogger, 'error')
-        .mockImplementation(() => {});
+    it('should throw an error if editor is not available', async () => {
+      vi.spyOn(debugLogger, 'error').mockImplementation(() => {});
       // @ts-expect-error Testing unsupported editor
-      await openInEditor('file.txt', 'foobar');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      await expect(openInEditor('file.txt', 'foobar')).rejects.toThrow(
         'No editor available. Install a supported editor.',
       );
     });

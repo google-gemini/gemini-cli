@@ -10,7 +10,7 @@ import { viewCommand } from './viewCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { isEditorAvailable, openInEditor } from '@google/gemini-cli-core';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, unlinkSync } from 'node:fs';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -24,6 +24,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
 vi.mock('node:fs', () => ({
   writeFileSync: vi.fn(),
+  unlinkSync: vi.fn(),
 }));
 
 describe('viewCommand', () => {
@@ -31,6 +32,7 @@ describe('viewCommand', () => {
   let mockIsEditorAvailable: Mock;
   let mockOpenInEditor: Mock;
   let mockWriteFileSync: Mock;
+  let mockUnlinkSync: Mock;
   let mockGetChat: Mock;
   let mockGetHistory: Mock;
 
@@ -40,6 +42,7 @@ describe('viewCommand', () => {
     mockIsEditorAvailable = vi.mocked(isEditorAvailable);
     mockOpenInEditor = vi.mocked(openInEditor);
     mockWriteFileSync = vi.mocked(writeFileSync);
+    mockUnlinkSync = vi.mocked(unlinkSync);
     mockGetChat = vi.fn();
     mockGetHistory = vi.fn();
 
@@ -185,6 +188,9 @@ describe('viewCommand', () => {
     expect(mockOpenInEditor).toHaveBeenCalledWith(
       expect.stringMatching(/gemini-output-\d+\.md$/),
       'vscode',
+    );
+    expect(mockUnlinkSync).toHaveBeenCalledWith(
+      expect.stringMatching(/gemini-output-\d+\.md$/),
     );
     expect(result).toEqual({
       type: 'message',

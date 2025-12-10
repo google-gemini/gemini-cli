@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -64,9 +64,10 @@ export const viewCommand: SlashCommand = {
       };
     }
 
+    let tempFile: string | undefined;
     try {
       // Create a temporary file with the content
-      const tempFile = join(tmpdir(), `gemini-output-${Date.now()}.md`);
+      tempFile = join(tmpdir(), `gemini-output-${Date.now()}.md`);
       writeFileSync(tempFile, lastAiOutput, 'utf-8');
 
       // Open the file in the preferred editor
@@ -86,6 +87,15 @@ export const viewCommand: SlashCommand = {
         messageType: 'error',
         content: `Failed to open in editor. ${message}`,
       };
+    } finally {
+      // Clean up temporary file
+      if (tempFile) {
+        try {
+          unlinkSync(tempFile);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
     }
   },
 };

@@ -239,7 +239,7 @@ export async function openInEditor(
   const openCommand = getOpenCommand(filePath, editor);
   if (!openCommand) {
     debugLogger.error('No editor available. Install a supported editor.');
-    return;
+    throw new Error('No editor available. Install a supported editor.');
   }
 
   if (isTerminalEditor(editor)) {
