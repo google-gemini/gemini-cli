@@ -278,6 +278,7 @@ export interface ConfigParameters {
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   folderTrust?: boolean;
   ideMode?: boolean;
+  a2aRequest?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
   importFormat?: 'tree' | 'flat';
   discoveryMaxDirs?: number;
@@ -381,6 +382,7 @@ export class Config {
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
+  private readonly a2aRequest: boolean;
 
   private inFallbackMode = false;
   private _activeModel: string;
@@ -526,6 +528,8 @@ export class Config {
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.folderTrust = params.folderTrust ?? false;
     this.ideMode = params.ideMode ?? false;
+    this.a2aRequest = params.a2aRequest ?? false;
+
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
     this.importFormat = params.importFormat ?? 'tree';
@@ -1260,6 +1264,10 @@ export class Config {
 
   getIdeMode(): boolean {
     return this.ideMode;
+  }
+
+  isA2ARequest(): boolean {
+    return this.a2aRequest;
   }
 
   /**

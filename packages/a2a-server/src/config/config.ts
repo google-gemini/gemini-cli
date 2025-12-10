@@ -69,6 +69,7 @@ export async function loadConfig(
         settings.fileFiltering?.enableRecursiveFileSearch,
     },
     ideMode: false,
+    a2aRequest: true,
     folderTrust: settings.folderTrust === true,
     extensionLoader,
     checkpointing: process.env['CHECKPOINTING']
