@@ -351,6 +351,21 @@ describe('Server Config (config.ts)', () => {
       expect(config.isInFallbackMode()).toBe(false);
     });
 
+    it('should reset model availability status', async () => {
+      const config = new Config(baseParams);
+      const service = config.getModelAvailabilityService();
+      const spy = vi.spyOn(service, 'reset');
+
+      vi.mocked(createContentGeneratorConfig).mockImplementation(
+        async (_: Config, authType: AuthType | undefined) =>
+          ({ authType }) as unknown as ContentGeneratorConfig,
+      );
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(spy).toHaveBeenCalled();
+    });
+
     it('should strip thoughts when switching from GenAI to Vertex', async () => {
       const config = new Config(baseParams);
 
@@ -1512,6 +1527,9 @@ describe('Config getHooks', () => {
   describe('setModel', () => {
     it('should allow setting a pro (any) model and disable fallback mode', () => {
       const config = new Config(baseParams);
+      const service = config.getModelAvailabilityService();
+      const spy = vi.spyOn(service, 'reset');
+
       config.setFallbackMode(true);
       expect(config.isInFallbackMode()).toBe(true);
 
@@ -1521,10 +1539,14 @@ describe('Config getHooks', () => {
       expect(config.getModel()).toBe(proModel);
       expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(proModel);
+      expect(spy).toHaveBeenCalled();
     });
 
     it('should allow setting auto model from non-auto model and disable fallback mode', () => {
       const config = new Config(baseParams);
+      const service = config.getModelAvailabilityService();
+      const spy = vi.spyOn(service, 'reset');
+
       config.setFallbackMode(true);
       expect(config.isInFallbackMode()).toBe(true);
 
@@ -1533,6 +1555,7 @@ describe('Config getHooks', () => {
       expect(config.getModel()).toBe('auto');
       expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
+      expect(spy).toHaveBeenCalled();
     });
 
     it('should allow setting auto model from auto model if it is in the fallback mode', () => {
@@ -1544,6 +1567,9 @@ describe('Config getHooks', () => {
         model: 'auto',
         usageStatisticsEnabled: false,
       });
+      const service = config.getModelAvailabilityService();
+      const spy = vi.spyOn(service, 'reset');
+
       config.setFallbackMode(true);
       expect(config.isInFallbackMode()).toBe(true);
 
@@ -1552,6 +1578,7 @@ describe('Config getHooks', () => {
       expect(config.getModel()).toBe('auto');
       expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
+      expect(spy).toHaveBeenCalled();
     });
   });
 });
