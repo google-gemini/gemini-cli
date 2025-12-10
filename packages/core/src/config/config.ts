@@ -459,6 +459,7 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
   readonly agents: Record<string, AgentConfig>;
+  readonly hasExplicitLegacyCodebaseInvestigatorSettings: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -608,6 +609,8 @@ export class Config {
     this.hooks = params.hooks;
     this.experiments = params.experiments;
     this.agents = params.agents ?? {};
+    this.hasExplicitLegacyCodebaseInvestigatorSettings =
+      !!params.codebaseInvestigatorSettings;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
