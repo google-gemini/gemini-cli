@@ -19,7 +19,9 @@ import type {
 import { SettingScope } from '../../config/settings.js';
 import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { ScopeSelector } from './shared/ScopeSelector.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
@@ -44,6 +46,8 @@ export function ThemeDialog({
   availableTerminalHeight,
   terminalWidth,
 }: ThemeDialogProps): React.JSX.Element {
+  const isAlternateBuffer = useAlternateBuffer();
+  const { refreshStatic } = useUIActions();
   const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
   );
@@ -91,8 +95,9 @@ export function ThemeDialog({
   const handleThemeSelect = useCallback(
     (themeName: string) => {
       onSelect(themeName, selectedScope);
+      refreshStatic();
     },
-    [onSelect, selectedScope],
+    [onSelect, selectedScope, refreshStatic],
   );
 
   const handleThemeHighlight = (themeName: string) => {
@@ -107,8 +112,9 @@ export function ThemeDialog({
   const handleScopeSelect = useCallback(
     (scope: LoadableSettingScope) => {
       onSelect(highlightedThemeName, scope);
+      refreshStatic();
     },
-    [onSelect, highlightedThemeName],
+    [onSelect, highlightedThemeName, refreshStatic],
   );
 
   const [mode, setMode] = useState<'theme' | 'scope'>('theme');
@@ -243,17 +249,19 @@ export function ThemeDialog({
                   paddingRight={1}
                   flexDirection="column"
                 >
-                  {colorizeCode(
-                    `# function
+                  {colorizeCode({
+                    code: `# function
 def fibonacci(n):
     a, b = 0, 1
     for _ in range(n):
         a, b = b, a + b
     return a`,
-                    'python',
-                    codeBlockHeight,
-                    colorizeCodeWidth,
-                  )}
+                    language: 'python',
+                    availableHeight:
+                      isAlternateBuffer === false ? codeBlockHeight : undefined,
+                    maxWidth: colorizeCodeWidth,
+                    settings,
+                  })}
                   <Box marginTop={1} />
                   <DiffRenderer
                     diffContent={`--- a/util.py
@@ -262,7 +270,9 @@ def fibonacci(n):
 - print("Hello, " + name)
 + print(f"Hello, {name}!")
 `}
-                    availableTerminalHeight={diffHeight}
+                    availableTerminalHeight={
+                      isAlternateBuffer === false ? diffHeight : undefined
+                    }
                     terminalWidth={colorizeCodeWidth}
                     theme={previewTheme}
                   />

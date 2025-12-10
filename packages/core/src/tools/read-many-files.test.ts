@@ -88,6 +88,7 @@ describe('ReadManyFilesTool', () => {
         buildExcludePatterns: () => DEFAULT_FILE_EXCLUDES,
         getReadManyFilesExcludes: () => DEFAULT_FILE_EXCLUDES,
       }),
+      isInteractive: () => false,
     } as Partial<Config> as Config;
     tool = new ReadManyFilesTool(mockConfig);
 
@@ -430,7 +431,7 @@ describe('ReadManyFilesTool', () => {
       ).toBe(true);
       expect(result.returnDisplay).toContain('**Skipped 1 item(s):**');
       expect(result.returnDisplay).toContain(
-        '- `document.pdf` (Reason: asset file (image/pdf) was not explicitly requested by name or extension)',
+        '- `document.pdf` (Reason: asset file (image/pdf/audio) was not explicitly requested by name or extension)',
       );
     });
 
@@ -502,6 +503,7 @@ describe('ReadManyFilesTool', () => {
           buildExcludePatterns: () => [],
           getReadManyFilesExcludes: () => [],
         }),
+        isInteractive: () => false,
       } as Partial<Config> as Config;
       tool = new ReadManyFilesTool(mockConfig);
 

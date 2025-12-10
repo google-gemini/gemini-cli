@@ -120,7 +120,35 @@ describe('telemetry/config helpers', () => {
         logPrompts: false,
         outfile: 'argv.log',
         useCollector: true, // from env as no argv option
+        useCliAuth: undefined,
       });
+    });
+
+    it('resolves useCliAuth from settings', async () => {
+      const settings = {
+        useCliAuth: true,
+      };
+      const resolved = await resolveTelemetrySettings({ settings });
+      expect(resolved.useCliAuth).toBe(true);
+    });
+
+    it('resolves useCliAuth from env', async () => {
+      const env = {
+        GEMINI_TELEMETRY_USE_CLI_AUTH: 'true',
+      };
+      const resolved = await resolveTelemetrySettings({ env });
+      expect(resolved.useCliAuth).toBe(true);
+    });
+
+    it('env overrides settings for useCliAuth', async () => {
+      const settings = {
+        useCliAuth: false,
+      };
+      const env = {
+        GEMINI_TELEMETRY_USE_CLI_AUTH: 'true',
+      };
+      const resolved = await resolveTelemetrySettings({ env, settings });
+      expect(resolved.useCliAuth).toBe(true);
     });
 
     it('falls back to OTEL_EXPORTER_OTLP_ENDPOINT when GEMINI var is missing', async () => {

@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import Gradient from 'ink-gradient';
+import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
 import { formatDuration } from '../utils/formatters.js';
 import type { ModelMetrics } from '../contexts/SessionContext.js';
@@ -19,6 +19,10 @@ import {
   USER_AGREEMENT_RATE_MEDIUM,
 } from '../utils/displayUtils.js';
 import { computeSessionStats } from '../utils/computeStats.js';
+import {
+  type RetrieveUserQuotaResponse,
+  VALID_GEMINI_MODELS,
+} from '@google/gemini-cli-core';
 
 // A more flexible and powerful StatRow component
 interface StatRowProps {
@@ -69,15 +73,91 @@ const Section: React.FC<SectionProps> = ({ title, children }) => (
   </Box>
 );
 
+// Logic for building the unified list of table rows
+const buildModelRows = (
+  models: Record<string, ModelMetrics>,
+  quotas?: RetrieveUserQuotaResponse,
+) => {
+  const getBaseModelName = (name: string) => name.replace('-001', '');
+  const usedModelNames = new Set(Object.keys(models).map(getBaseModelName));
+
+  // 1. Models with active usage
+  const activeRows = Object.entries(models).map(([name, metrics]) => {
+    const modelName = getBaseModelName(name);
+    return {
+      key: name,
+      modelName,
+      requests: metrics.api.totalRequests,
+      inputTokens: metrics.tokens.prompt.toLocaleString(),
+      outputTokens: metrics.tokens.candidates.toLocaleString(),
+      bucket: quotas?.buckets?.find((b) => b.modelId === modelName),
+      isActive: true,
+    };
+  });
+
+  // 2. Models with quota only
+  const quotaRows =
+    quotas?.buckets
+      ?.filter(
+        (b) =>
+          b.modelId &&
+          VALID_GEMINI_MODELS.has(b.modelId) &&
+          !usedModelNames.has(b.modelId),
+      )
+      .map((bucket) => ({
+        key: bucket.modelId!,
+        modelName: bucket.modelId!,
+        requests: '-',
+        inputTokens: '-',
+        outputTokens: '-',
+        bucket,
+        isActive: false,
+      })) || [];
+
+  return [...activeRows, ...quotaRows];
+};
+
+const formatResetTime = (resetTime: string): string => {
+  const diff = new Date(resetTime).getTime() - Date.now();
+  if (diff <= 0) return '';
+
+  const totalMinutes = Math.ceil(diff / (1000 * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  const fmt = (val: number, unit: 'hour' | 'minute') =>
+    new Intl.NumberFormat('en', {
+      style: 'unit',
+      unit,
+      unitDisplay: 'narrow',
+    }).format(val);
+
+  if (hours > 0 && minutes > 0) {
+    return `(Resets in ${fmt(hours, 'hour')} ${fmt(minutes, 'minute')})`;
+  } else if (hours > 0) {
+    return `(Resets in ${fmt(hours, 'hour')})`;
+  }
+
+  return `(Resets in ${fmt(minutes, 'minute')})`;
+};
+
 const ModelUsageTable: React.FC<{
   models: Record<string, ModelMetrics>;
   totalCachedTokens: number;
   cacheEfficiency: number;
-}> = ({ models, totalCachedTokens, cacheEfficiency }) => {
+  quotas?: RetrieveUserQuotaResponse;
+}> = ({ models, totalCachedTokens, cacheEfficiency, quotas }) => {
+  const rows = buildModelRows(models, quotas);
+
+  if (rows.length === 0) {
+    return null;
+  }
+
   const nameWidth = 25;
   const requestsWidth = 8;
   const inputTokensWidth = 15;
   const outputTokensWidth = 15;
+  const usageLimitWidth = quotas ? 30 : 0;
 
   return (
     <Box flexDirection="column" marginTop={1}>
@@ -103,7 +183,15 @@ const ModelUsageTable: React.FC<{
             Output Tokens
           </Text>
         </Box>
+        {quotas && (
+          <Box width={usageLimitWidth} justifyContent="flex-end">
+            <Text bold color={theme.text.primary}>
+              Usage limit remaining
+            </Text>
+          </Box>
+        )}
       </Box>
+
       {/* Divider */}
       <Box
         borderStyle="round"
@@ -112,32 +200,54 @@ const ModelUsageTable: React.FC<{
         borderLeft={false}
         borderRight={false}
         borderColor={theme.border.default}
-        width={nameWidth + requestsWidth + inputTokensWidth + outputTokensWidth}
+        width={
+          nameWidth +
+          requestsWidth +
+          inputTokensWidth +
+          outputTokensWidth +
+          usageLimitWidth
+        }
       ></Box>
 
-      {/* Rows */}
-      {Object.entries(models).map(([name, modelMetrics]) => (
-        <Box key={name}>
+      {rows.map((row) => (
+        <Box key={row.key}>
           <Box width={nameWidth}>
-            <Text color={theme.text.primary}>{name.replace('-001', '')}</Text>
+            <Text color={theme.text.primary}>{row.modelName}</Text>
           </Box>
           <Box width={requestsWidth} justifyContent="flex-end">
-            <Text color={theme.text.primary}>
-              {modelMetrics.api.totalRequests}
+            <Text
+              color={row.isActive ? theme.text.primary : theme.text.secondary}
+            >
+              {row.requests}
             </Text>
           </Box>
           <Box width={inputTokensWidth} justifyContent="flex-end">
-            <Text color={theme.status.warning}>
-              {modelMetrics.tokens.prompt.toLocaleString()}
+            <Text
+              color={row.isActive ? theme.status.warning : theme.text.secondary}
+            >
+              {row.inputTokens}
             </Text>
           </Box>
           <Box width={outputTokensWidth} justifyContent="flex-end">
-            <Text color={theme.status.warning}>
-              {modelMetrics.tokens.candidates.toLocaleString()}
+            <Text
+              color={row.isActive ? theme.status.warning : theme.text.secondary}
+            >
+              {row.outputTokens}
             </Text>
+          </Box>
+          <Box width={usageLimitWidth} justifyContent="flex-end">
+            {row.bucket &&
+              row.bucket.remainingFraction != null &&
+              row.bucket.resetTime && (
+                <Text color={theme.text.secondary}>
+                  {(row.bucket.remainingFraction * 100).toFixed(1)}%{' '}
+                  {formatResetTime(row.bucket.resetTime)}
+                </Text>
+              )}
           </Box>
         </Box>
       ))}
+
       {cacheEfficiency > 0 && (
         <Box flexDirection="column" marginTop={1}>
           <Text color={theme.text.primary}>
@@ -145,11 +255,20 @@ const ModelUsageTable: React.FC<{
             {totalCachedTokens.toLocaleString()} ({cacheEfficiency.toFixed(1)}
             %) of input tokens were served from the cache, reducing costs.
           </Text>
-          <Box height={1} />
+        </Box>
+      )}
+
+      {models && (
+        <>
+          <Box marginTop={1} marginBottom={2}>
+            <Text color={theme.text.primary}>
+              {`Usage limits span all sessions and reset daily.\n/auth to upgrade or switch to API key.`}
+            </Text>
+          </Box>
           <Text color={theme.text.secondary}>
             » Tip: For a full token breakdown, run `/stats model`.
           </Text>
-        </Box>
+        </>
       )}
     </Box>
   );
@@ -158,11 +277,13 @@ const ModelUsageTable: React.FC<{
 interface StatsDisplayProps {
   duration: string;
   title?: string;
+  quotas?: RetrieveUserQuotaResponse;
 }
 
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   duration,
   title,
+  quotas,
 }) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
@@ -185,17 +306,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
 
   const renderTitle = () => {
     if (title) {
-      return theme.ui.gradient && theme.ui.gradient.length > 0 ? (
-        <Gradient colors={theme.ui.gradient}>
-          <Text bold color={theme.text.primary}>
-            {title}
-          </Text>
-        </Gradient>
-      ) : (
-        <Text bold color={theme.text.accent}>
-          {title}
-        </Text>
-      );
+      return <ThemedGradient bold>{title}</ThemedGradient>;
     }
     return (
       <Text bold color={theme.text.accent}>
@@ -280,14 +391,12 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
           </Text>
         </SubStatRow>
       </Section>
-
-      {Object.keys(models).length > 0 && (
-        <ModelUsageTable
-          models={models}
-          totalCachedTokens={computed.totalCachedTokens}
-          cacheEfficiency={computed.cacheEfficiency}
-        />
-      )}
+      <ModelUsageTable
+        models={models}
+        totalCachedTokens={computed.totalCachedTokens}
+        cacheEfficiency={computed.cacheEfficiency}
+        quotas={quotas}
+      />
     </Box>
   );
 };

@@ -9,6 +9,21 @@ import type { AgentDefinition } from './types.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  DEFAULT_GEMINI_MODEL_AUTO,
+  GEMINI_MODEL_ALIAS_PRO,
+  PREVIEW_GEMINI_MODEL,
+} from '../config/models.js';
+import type { ModelConfigAlias } from '../services/modelConfigService.js';
+
+/**
+ * Returns the model config alias for a given agent definition.
+ */
+export function getModelConfigAlias<TOutput extends z.ZodTypeAny>(
+  definition: AgentDefinition<TOutput>,
+): string {
+  return `${definition.name}-config`;
+}
 
 /**
  * Manages the discovery, loading, validation, and registration of
@@ -38,13 +53,26 @@ export class AgentRegistry {
 
     // Only register the agent if it's enabled in the settings.
     if (investigatorSettings?.enabled) {
+      let model =
+        investigatorSettings.model ??
+        CodebaseInvestigatorAgent.modelConfig.model;
+
+      // If the user is using the preview model for the main agent, force the sub-agent to use it too
+      // if it's configured to use 'pro' or 'auto'.
+      if (this.config.getModel() === PREVIEW_GEMINI_MODEL) {
+        if (
+          model === GEMINI_MODEL_ALIAS_PRO ||
+          model === DEFAULT_GEMINI_MODEL_AUTO
+        ) {
+          model = PREVIEW_GEMINI_MODEL;
+        }
+      }
+
       const agentDef = {
         ...CodebaseInvestigatorAgent,
         modelConfig: {
           ...CodebaseInvestigatorAgent.modelConfig,
-          model:
-            investigatorSettings.model ??
-            CodebaseInvestigatorAgent.modelConfig.model,
+          model,
           thinkingBudget:
             investigatorSettings.thinkingBudget ??
             CodebaseInvestigatorAgent.modelConfig.thinkingBudget,
@@ -84,6 +112,29 @@ export class AgentRegistry {
     }
 
     this.agents.set(definition.name, definition);
+
+    // Register model config.
+    // TODO(12916): Migrate sub-agents where possible to static configs.
+    const modelConfig = definition.modelConfig;
+
+    const runtimeAlias: ModelConfigAlias = {
+      modelConfig: {
+        model: modelConfig.model,
+        generateContentConfig: {
+          temperature: modelConfig.temp,
+          topP: modelConfig.top_p,
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingBudget: modelConfig.thinkingBudget ?? -1,
+          },
+        },
+      },
+    };
+
+    this.config.modelConfigService.registerRuntimeModelConfig(
+      getModelConfigAlias(definition),
+      runtimeAlias,
+    );
   }
 
   /**

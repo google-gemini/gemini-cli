@@ -3,27 +3,27 @@
 Learn how to enable and setup OpenTelemetry for Gemini CLI.
 
 - [Observability with OpenTelemetry](#observability-with-opentelemetry)
-  - [Key Benefits](#key-benefits)
-  - [OpenTelemetry Integration](#opentelemetry-integration)
+  - [Key benefits](#key-benefits)
+  - [OpenTelemetry integration](#opentelemetry-integration)
   - [Configuration](#configuration)
-  - [Google Cloud Telemetry](#google-cloud-telemetry)
+  - [Google Cloud telemetry](#google-cloud-telemetry)
     - [Prerequisites](#prerequisites)
-    - [Direct Export (Recommended)](#direct-export-recommended)
-    - [Collector-Based Export (Advanced)](#collector-based-export-advanced)
-  - [Local Telemetry](#local-telemetry)
-    - [File-based Output (Recommended)](#file-based-output-recommended)
-    - [Collector-Based Export (Advanced)](#collector-based-export-advanced-1)
-  - [Logs and Metrics](#logs-and-metrics)
+    - [Direct export (recommended)](#direct-export-recommended)
+    - [Collector-based export (advanced)](#collector-based-export-advanced)
+  - [Local telemetry](#local-telemetry)
+    - [File-based output (recommended)](#file-based-output-recommended)
+    - [Collector-based export (advanced)](#collector-based-export-advanced-1)
+  - [Logs and metrics](#logs-and-metrics)
     - [Logs](#logs)
       - [Sessions](#sessions)
       - [Tools](#tools)
       - [Files](#files)
       - [API](#api)
-      - [Model Routing](#model-routing)
-      - [Chat and Streaming](#chat-and-streaming)
+      - [Model routing](#model-routing)
+      - [Chat and streaming](#chat-and-streaming)
       - [Resilience](#resilience)
       - [Extensions](#extensions)
-      - [Agent Runs](#agent-runs)
+      - [Agent runs](#agent-runs)
       - [IDE](#ide)
       - [UI](#ui)
     - [Metrics](#metrics)
@@ -31,40 +31,40 @@ Learn how to enable and setup OpenTelemetry for Gemini CLI.
         - [Sessions](#sessions-1)
         - [Tools](#tools-1)
         - [API](#api-1)
-        - [Token Usage](#token-usage)
+        - [Token usage](#token-usage)
         - [Files](#files-1)
-        - [Chat and Streaming](#chat-and-streaming-1)
-        - [Model Routing](#model-routing-1)
-        - [Agent Runs](#agent-runs-1)
+        - [Chat and streaming](#chat-and-streaming-1)
+        - [Model routing](#model-routing-1)
+        - [Agent runs](#agent-runs-1)
         - [UI](#ui-1)
         - [Performance](#performance)
-      - [GenAI Semantic Convention](#genai-semantic-convention)
+      - [GenAI semantic convention](#genai-semantic-convention)
 
-## Key Benefits
+## Key benefits
 
-- **🔍 Usage Analytics**: Understand interaction patterns and feature adoption
+- **🔍 Usage analytics**: Understand interaction patterns and feature adoption
   across your team
-- **⚡ Performance Monitoring**: Track response times, token consumption, and
+- **⚡ Performance monitoring**: Track response times, token consumption, and
   resource utilization
-- **🐛 Real-time Debugging**: Identify bottlenecks, failures, and error patterns
+- **🐛 Real-time debugging**: Identify bottlenecks, failures, and error patterns
   as they occur
-- **📊 Workflow Optimization**: Make informed decisions to improve
+- **📊 Workflow optimization**: Make informed decisions to improve
   configurations and processes
-- **🏢 Enterprise Governance**: Monitor usage across teams, track costs, ensure
+- **🏢 Enterprise governance**: Monitor usage across teams, track costs, ensure
   compliance, and integrate with existing monitoring infrastructure
 
-## OpenTelemetry Integration
+## OpenTelemetry integration
 
 Built on **[OpenTelemetry]** — the vendor-neutral, industry-standard
 observability framework — Gemini CLI's observability system provides:
 
-- **Universal Compatibility**: Export to any OpenTelemetry backend (Google
+- **Universal compatibility**: Export to any OpenTelemetry backend (Google
   Cloud, Jaeger, Prometheus, Datadog, etc.)
-- **Standardized Data**: Use consistent formats and collection methods across
+- **Standardized data**: Use consistent formats and collection methods across
   your toolchain
-- **Future-Proof Integration**: Connect with existing and future observability
+- **Future-proof integration**: Connect with existing and future observability
   infrastructure
-- **No Vendor Lock-in**: Switch between backends without changing your
+- **No vendor lock-in**: Switch between backends without changing your
   instrumentation
 
 [OpenTelemetry]: https://opentelemetry.io/
@@ -74,24 +74,25 @@ observability framework — Gemini CLI's observability system provides:
 All telemetry behavior is controlled through your `.gemini/settings.json` file.
 Environment variables can be used to override the settings in the file.
 
-| Setting        | Environment Variable             | Description                                       | Values            | Default                 |
-| -------------- | -------------------------------- | ------------------------------------------------- | ----------------- | ----------------------- |
-| `enabled`      | `GEMINI_TELEMETRY_ENABLED`       | Enable or disable telemetry                       | `true`/`false`    | `false`                 |
-| `target`       | `GEMINI_TELEMETRY_TARGET`        | Where to send telemetry data                      | `"gcp"`/`"local"` | `"local"`               |
-| `otlpEndpoint` | `GEMINI_TELEMETRY_OTLP_ENDPOINT` | OTLP collector endpoint                           | URL string        | `http://localhost:4317` |
-| `otlpProtocol` | `GEMINI_TELEMETRY_OTLP_PROTOCOL` | OTLP transport protocol                           | `"grpc"`/`"http"` | `"grpc"`                |
-| `outfile`      | `GEMINI_TELEMETRY_OUTFILE`       | Save telemetry to file (overrides `otlpEndpoint`) | file path         | -                       |
-| `logPrompts`   | `GEMINI_TELEMETRY_LOG_PROMPTS`   | Include prompts in telemetry logs                 | `true`/`false`    | `true`                  |
-| `useCollector` | `GEMINI_TELEMETRY_USE_COLLECTOR` | Use external OTLP collector (advanced)            | `true`/`false`    | `false`                 |
+| Setting        | Environment Variable             | Description                                         | Values            | Default                 |
+| -------------- | -------------------------------- | --------------------------------------------------- | ----------------- | ----------------------- |
+| `enabled`      | `GEMINI_TELEMETRY_ENABLED`       | Enable or disable telemetry                         | `true`/`false`    | `false`                 |
+| `target`       | `GEMINI_TELEMETRY_TARGET`        | Where to send telemetry data                        | `"gcp"`/`"local"` | `"local"`               |
+| `otlpEndpoint` | `GEMINI_TELEMETRY_OTLP_ENDPOINT` | OTLP collector endpoint                             | URL string        | `http://localhost:4317` |
+| `otlpProtocol` | `GEMINI_TELEMETRY_OTLP_PROTOCOL` | OTLP transport protocol                             | `"grpc"`/`"http"` | `"grpc"`                |
+| `outfile`      | `GEMINI_TELEMETRY_OUTFILE`       | Save telemetry to file (overrides `otlpEndpoint`)   | file path         | -                       |
+| `logPrompts`   | `GEMINI_TELEMETRY_LOG_PROMPTS`   | Include prompts in telemetry logs                   | `true`/`false`    | `true`                  |
+| `useCollector` | `GEMINI_TELEMETRY_USE_COLLECTOR` | Use external OTLP collector (advanced)              | `true`/`false`    | `false`                 |
+| `useCliAuth`   | `GEMINI_TELEMETRY_USE_CLI_AUTH`  | Use CLI credentials for telemetry (GCP target only) | `true`/`false`    | `false`                 |
 
 **Note on boolean environment variables:** For the boolean settings (`enabled`,
 `logPrompts`, `useCollector`), setting the corresponding environment variable to
 `true` or `1` will enable the feature. Any other value will disable it.
 
 For detailed information about all configuration options, see the
-[Configuration Guide](../get-started/configuration.md).
+[Configuration guide](../get-started/configuration.md).
 
-## Google Cloud Telemetry
+## Google Cloud telemetry
 
 ### Prerequisites
 
@@ -130,7 +131,35 @@ Before using either method below, complete these steps:
      --project="$OTLP_GOOGLE_CLOUD_PROJECT"
    ```
 
-### Direct Export (Recommended)
+### Authenticating with CLI Credentials
+
+By default, the telemetry collector for Google Cloud uses Application Default
+Credentials (ADC). However, you can configure it to use the same OAuth
+credentials that you use to log in to the Gemini CLI. This is useful in
+environments where you don't have ADC set up.
+
+To enable this, set the `useCliAuth` property in your `telemetry` settings to
+`true`:
+
+```json
+{
+  "telemetry": {
+    "enabled": true,
+    "target": "gcp",
+    "useCliAuth": true
+  }
+}
+```
+
+**Important:**
+
+- This setting requires the use of **Direct Export** (in-process exporters).
+- It **cannot** be used with `useCollector: true`. If you enable both, telemetry
+  will be disabled and an error will be logged.
+- The CLI will automatically use your credentials to authenticate with Google
+  Cloud Trace, Metrics, and Logging APIs.
+
+### Direct export (recommended)
 
 Sends telemetry directly to Google Cloud services. No collector needed.
 
@@ -150,7 +179,7 @@ Sends telemetry directly to Google Cloud services. No collector needed.
      - Metrics: https://console.cloud.google.com/monitoring/metrics-explorer
      - Traces: https://console.cloud.google.com/traces/list
 
-### Collector-Based Export (Advanced)
+### Collector-based export (advanced)
 
 For custom processing, filtering, or routing, use an OpenTelemetry collector to
 forward data to Google Cloud.
@@ -184,11 +213,11 @@ forward data to Google Cloud.
    - Open `~/.gemini/tmp/<projectHash>/otel/collector-gcp.log` to view local
      collector logs.
 
-## Local Telemetry
+## Local telemetry
 
 For local development and debugging, you can capture telemetry data locally:
 
-### File-based Output (Recommended)
+### File-based output (recommended)
 
 1. Enable telemetry in your `.gemini/settings.json`:
    ```json
@@ -204,7 +233,7 @@ For local development and debugging, you can capture telemetry data locally:
 2. Run Gemini CLI and send prompts.
 3. View logs and metrics in the specified file (e.g., `.gemini/telemetry.log`).
 
-### Collector-Based Export (Advanced)
+### Collector-based export (advanced)
 
 1. Run the automation script:
    ```bash
@@ -220,7 +249,7 @@ For local development and debugging, you can capture telemetry data locally:
 3. View traces at http://localhost:16686 and logs/metrics in the collector log
    file.
 
-## Logs and Metrics
+## Logs and metrics
 
 The following section describes the structure of logs and metrics generated for
 Gemini CLI.
@@ -361,6 +390,7 @@ Captures Gemini API requests, responses, and errors.
     - `response_text` (string, optional)
     - `prompt_id` (string)
     - `auth_type` (string)
+    - `finish_reasons` (array of strings)
 
 - `gemini_cli.api_error`: API request failed.
   - **Attributes**:
@@ -377,9 +407,7 @@ Captures Gemini API requests, responses, and errors.
   - **Attributes**:
     - `model` (string)
 
-#### Model Routing
-
-Tracks model selections via slash commands and router decisions.
+#### Model routing
 
 - `gemini_cli.slash_command`: A slash command was executed.
   - **Attributes**:
@@ -400,9 +428,7 @@ Tracks model selections via slash commands and router decisions.
     - `failed` (boolean)
     - `error_message` (string, optional)
 
-#### Chat and Streaming
-
-Observes streaming integrity, compression, and retry behavior.
+#### Chat and streaming
 
 - `gemini_cli.chat_compression`: Chat context was compressed.
   - **Attributes**:
@@ -488,9 +514,7 @@ Tracks extension lifecycle and settings changes.
     - `extension_source` (string)
     - `status` (string)
 
-#### Agent Runs
-
-Tracks agent lifecycle and outcomes.
+#### Agent runs
 
 - `gemini_cli.agent.start`: Agent run started.
   - **Attributes**:
@@ -566,7 +590,7 @@ Tracks API request volume and latency.
     - `model`
   - Note: Overlaps with `gen_ai.client.operation.duration` (GenAI conventions).
 
-##### Token Usage
+##### Token usage
 
 Tracks tokens used by model and type.
 
@@ -594,7 +618,7 @@ Counts file operations with basic context.
     - `function_name`
     - `type` ("added" or "removed")
 
-##### Chat and Streaming
+##### Chat and streaming
 
 Resilience counters for compression, invalid chunks, and retries.
 
@@ -613,7 +637,7 @@ Resilience counters for compression, invalid chunks, and retries.
 - `gemini_cli.chat.content_retry_failure.count` (Counter, Int): Counts requests
   where all content retries failed.
 
-##### Model Routing
+##### Model routing
 
 Routing latency/failures and slash-command selections.
 
@@ -634,7 +658,7 @@ Routing latency/failures and slash-command selections.
     - `routing.decision_source` (string)
     - `routing.error_message` (string)
 
-##### Agent Runs
+##### Agent runs
 
 Agent lifecycle metrics: runs, durations, and turns.
 
@@ -726,7 +750,7 @@ Optional performance monitoring for startup, CPU/memory, and phase timing.
     - `current_value` (number)
     - `baseline_value` (number)
 
-#### GenAI Semantic Convention
+#### GenAI semantic convention
 
 The following metrics comply with [OpenTelemetry GenAI semantic conventions] for
 standardized observability across GenAI applications:
