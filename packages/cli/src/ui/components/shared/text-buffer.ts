@@ -17,7 +17,7 @@ import {
   stripUnsafeCharacters,
   getCachedStringWidth,
 } from '../../utils/textUtils.js';
-import { processPastedPaths } from '../../utils/clipboardUtils.js';
+import { parsePastedPaths } from '../../utils/clipboardUtils.js';
 import type { Key } from '../../contexts/KeypressContext.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
@@ -1677,7 +1677,7 @@ export function useTextBuffer({
 
         potentialPath = potentialPath.trim();
 
-        const processed = processPastedPaths(potentialPath, isValidPath);
+        const processed = parsePastedPaths(potentialPath, isValidPath);
         if (processed) {
           ch = processed;
         }

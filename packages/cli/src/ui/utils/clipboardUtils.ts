@@ -213,7 +213,7 @@ export function splitEscapedPaths(text: string): string[] {
  * @param isValidPath Function to validate if a path exists/is valid
  * @returns Processed string with @ prefixes on valid paths, or null if no valid paths
  */
-export function processPastedPaths(
+export function parsePastedPaths(
   text: string,
   isValidPath: (path: string) => boolean,
 ): string | null {

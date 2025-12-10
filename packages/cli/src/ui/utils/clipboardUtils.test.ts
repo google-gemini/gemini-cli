@@ -10,7 +10,7 @@ import {
   saveClipboardImage,
   cleanupOldClipboardImages,
   splitEscapedPaths,
-  processPastedPaths,
+  parsePastedPaths,
 } from './clipboardUtils.js';
 
 describe('clipboardUtils', () => {
@@ -138,26 +138,26 @@ describe('clipboardUtils', () => {
     });
   });
 
-  describe('processPastedPaths', () => {
+  describe('parsePastedPaths', () => {
     it('should return null for empty string', () => {
-      const result = processPastedPaths('', () => true);
+      const result = parsePastedPaths('', () => true);
       expect(result).toBe(null);
     });
 
     it('should add @ prefix to single valid path', () => {
-      const result = processPastedPaths('/path/to/file.txt', () => true);
+      const result = parsePastedPaths('/path/to/file.txt', () => true);
       expect(result).toBe('@/path/to/file.txt ');
     });
 
     it('should return null for single invalid path', () => {
-      const result = processPastedPaths('/path/to/file.txt', () => false);
+      const result = parsePastedPaths('/path/to/file.txt', () => false);
       expect(result).toBe(null);
     });
 
     it('should add @ prefix to all valid paths', () => {
       // Use Set to model reality: individual paths exist, combined string doesn't
       const validPaths = new Set(['/path/to/file1.txt', '/path/to/file2.txt']);
-      const result = processPastedPaths(
+      const result = parsePastedPaths(
         '/path/to/file1.txt /path/to/file2.txt',
         (p) => validPaths.has(p),
       );
@@ -165,7 +165,7 @@ describe('clipboardUtils', () => {
     });
 
     it('should only add @ prefix to valid paths', () => {
-      const result = processPastedPaths(
+      const result = parsePastedPaths(
         '/valid/file.txt /invalid/file.jpg',
         (p) => p.endsWith('.txt'),
       );
@@ -173,7 +173,7 @@ describe('clipboardUtils', () => {
     });
 
     it('should return null if no paths are valid', () => {
-      const result = processPastedPaths(
+      const result = parsePastedPaths(
         '/path/to/file1.txt /path/to/file2.txt',
         () => false,
       );
@@ -183,7 +183,7 @@ describe('clipboardUtils', () => {
     it('should handle paths with escaped spaces', () => {
       // Use Set to model reality: individual paths exist, combined string doesn't
       const validPaths = new Set(['/path/to/my file.txt', '/other/path.txt']);
-      const result = processPastedPaths(
+      const result = parsePastedPaths(
         '/path/to/my\\ file.txt /other/path.txt',
         (p) => validPaths.has(p),
       );
@@ -194,7 +194,7 @@ describe('clipboardUtils', () => {
       // Use Set to model reality: individual paths exist, combined string doesn't
       const validPaths = new Set(['/my file.txt', '/other.txt']);
       const validatedPaths: string[] = [];
-      processPastedPaths('/my\\ file.txt /other.txt', (p) => {
+      parsePastedPaths('/my\\ file.txt /other.txt', (p) => {
         validatedPaths.push(p);
         return validPaths.has(p);
       });
@@ -207,33 +207,30 @@ describe('clipboardUtils', () => {
     });
 
     it('should handle single path with unescaped spaces from copy-paste', () => {
-      const result = processPastedPaths('/path/to/my file.txt', () => true);
+      const result = parsePastedPaths('/path/to/my file.txt', () => true);
       expect(result).toBe('@/path/to/my\\ file.txt ');
     });
 
     it('should handle Windows path', () => {
-      const result = processPastedPaths('C:\\Users\\file.txt', () => true);
+      const result = parsePastedPaths('C:\\Users\\file.txt', () => true);
       expect(result).toBe('@C:\\Users\\file.txt ');
     });
 
     it('should handle Windows path with unescaped spaces', () => {
-      const result = processPastedPaths(
-        'C:\\My Documents\\file.txt',
-        () => true,
-      );
+      const result = parsePastedPaths('C:\\My Documents\\file.txt', () => true);
       expect(result).toBe('@C:\\My\\ Documents\\file.txt ');
     });
 
     it('should handle multiple Windows paths', () => {
       const validPaths = new Set(['C:\\file1.txt', 'D:\\file2.txt']);
-      const result = processPastedPaths('C:\\file1.txt D:\\file2.txt', (p) =>
+      const result = parsePastedPaths('C:\\file1.txt D:\\file2.txt', (p) =>
         validPaths.has(p),
       );
       expect(result).toBe('@C:\\file1.txt @D:\\file2.txt ');
     });
 
     it('should handle Windows UNC path', () => {
-      const result = processPastedPaths(
+      const result = parsePastedPaths(
         '\\\\server\\share\\file.txt',
         () => true,
       );
