@@ -235,16 +235,33 @@
         "slug": "docs/releases"
       },
       {
-        "label": "Changelog",
-        "slug": "docs/changelogs"
-      },
-      {
         "label": "Integration tests",
         "slug": "docs/integration-tests"
       },
       {
         "label": "Issue and PR automation",
         "slug": "docs/issue-and-pr-automation"
+      }
+    ]
+  },
+  {
+    "label": "Releases",
+    "items": [
+      {
+        "label": "Release notes",
+        "slug": "docs/changelogs/"
+      },
+      {
+        "label": "Latest release",
+        "slug": "docs/changelogs/latest"
+      },
+      {
+        "label": "Preview release",
+        "slug": "docs/changelogs/preview"
+      },
+      {
+        "label": "Changelog",
+        "slug": "docs/changelogs/releases"
       }
     ]
   },

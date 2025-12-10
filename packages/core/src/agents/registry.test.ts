@@ -72,6 +72,25 @@ describe('AgentRegistry', () => {
         `[AgentRegistry] Initialized with ${agentCount} agents.`,
       );
     });
+
+    it('should use preview model for codebase investigator if main model is preview', async () => {
+      const previewConfig = makeFakeConfig({
+        model: 'gemini-3-pro-preview',
+        codebaseInvestigatorSettings: {
+          enabled: true,
+          model: 'pro',
+        },
+      });
+      const previewRegistry = new TestableAgentRegistry(previewConfig);
+
+      await previewRegistry.initialize();
+
+      const investigatorDef = previewRegistry.getDefinition(
+        'codebase_investigator',
+      );
+      expect(investigatorDef).toBeDefined();
+      expect(investigatorDef?.modelConfig.model).toBe('gemini-3-pro-preview');
+    });
   });
 
   describe('registration logic', () => {
