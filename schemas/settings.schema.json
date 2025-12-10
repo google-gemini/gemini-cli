@@ -1304,7 +1304,7 @@
               "title": "Enable Codebase Investigator",
               "description": "Enable the Codebase Investigator agent.",
               "markdownDescription": "Enable the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-              "default": true,
+              "default": false,
               "type": "boolean"
             },
             "maxNumTurns": {

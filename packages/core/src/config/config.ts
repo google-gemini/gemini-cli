@@ -567,7 +567,7 @@ export class Config {
       params.enableMessageBusIntegration ??
       (hooksNeedMessageBus ? true : false);
     this.codebaseInvestigatorSettings = {
-      enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
+      enabled: params.codebaseInvestigatorSettings?.enabled ?? false,
       maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 10,
       maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 3,
       thinkingBudget:
