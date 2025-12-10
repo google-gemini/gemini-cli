@@ -849,11 +849,12 @@ export const useGeminiStream = (
           case ServerGeminiEventType.InvalidStream:
             // Will add the missing logic later
             break;
-          default: {
-            // enforces exhaustive switch-case
-            const unreachable: never = event;
-            return unreachable;
-          }
+          default:
+            {
+              // enforces exhaustive switch-case
+              const unreachable: never = event;
+              return unreachable;
+            }
         }
       }
       if (toolCallRequests.length > 0) {
@@ -884,7 +885,7 @@ export const useGeminiStream = (
         { name: 'submitQuery' },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
-          const queryId = `${Date.now()}-${Math.random()}`;
+          const queryId = `${Date.Now()}-${Math.random()}`;
           activeQueryIdRef.current = queryId;
           if (
             (streamingState === StreamingState.Responding ||
@@ -1089,26 +1090,27 @@ export const useGeminiStream = (
 
   const handleCompletedTools = useCallback(
     async (completedToolCallsFromScheduler: TrackedToolCall[]) => {
-      const completedAndReadyToSubmitTools = completedToolCallsFromScheduler.filter(
-        (
-          tc: TrackedToolCall,
-        ): tc is TrackedCompletedToolCall | TrackedCancelledToolCall => {
-          const isTerminalState =
-            tc.status === 'success' ||
-            tc.status === 'error' ||
-            tc.status === 'cancelled';
+      const completedAndReadyToSubmitTools =
+        completedToolCallsFromScheduler.filter(
+          (
+            tc: TrackedToolCall,
+          ): tc is TrackedCompletedToolCall | TrackedCancelledToolCall => {
+            const isTerminalState =
+              tc.status === 'success' ||
+              tc.status === 'error' ||
+              tc.status === 'cancelled';
 
-          if (isTerminalState) {
-            const completedOrCancelledCall = tc as
-              | TrackedCompletedToolCall
-              | TrackedCancelledToolCall;
-            return (
-              completedOrCancelledCall.response?.responseParts !== undefined
-            );
-          }
-          return false;
-        },
-      );
+            if (isTerminalState) {
+              const completedOrCancelledCall = tc as
+                | TrackedCompletedToolCall
+                | TrackedCancelledToolCall;
+              return (
+                completedOrCancelledCall.response?.responseParts !== undefined
+              );
+            }
+            return false;
+          },
+        );
 
       // Finalize any client-initiated tools as soon as they are done.
       const clientTools = completedAndReadyToSubmitTools.filter(
