@@ -992,7 +992,8 @@ export const useGeminiStream = (
                       );
 
                       if (lastQueryRef.current && lastPromptIdRef.current) {
-                        void submitQuery(
+                        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                        submitQuery(
                           lastQueryRef.current,
                           { isContinuation: true },
                           lastPromptIdRef.current,
@@ -1177,7 +1178,8 @@ export const useGeminiStream = (
           const combinedParts = geminiTools.flatMap(
             (toolCall) => toolCall.response.responseParts,
           );
-          void geminiClient.addHistory({
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          geminiClient.addHistory({
             role: 'user',
             parts: combinedParts,
           });
@@ -1243,7 +1245,8 @@ export const useGeminiStream = (
         return;
       }
 
-      void submitQuery(
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      submitQuery(
         responsesToSend,
         {
           isContinuation: true,
@@ -1318,7 +1321,8 @@ export const useGeminiStream = (
         }
       }
     };
-    void saveRestorableToolCalls();
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    saveRestorableToolCalls();
   }, [
     toolCalls,
     config,
