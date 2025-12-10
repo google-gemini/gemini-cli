@@ -12,7 +12,7 @@ import { GEMINI_DIR } from '../utils/paths.js';
 
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 export const OAUTH_FILE = 'oauth_creds.json';
-const TMP_DIR_NAME = 'tmp';
+const TMP_DIR_NAME = 'data';
 const BIN_DIR_NAME = 'bin';
 
 export class Storage {
