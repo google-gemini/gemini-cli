@@ -9,6 +9,19 @@ import * as path from 'node:path';
 import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
 
 /**
+ * Supported image file extensions based on Gemini API.
+ * See: https://ai.google.dev/gemini-api/docs/image-understanding
+ */
+export const IMAGE_EXTENSIONS = [
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.webp',
+  '.heic',
+  '.heif',
+];
+
+/**
  * Checks if the system clipboard contains an image (macOS only for now)
  * @returns true if clipboard contains an image
  */
@@ -50,12 +63,11 @@ export async function saveClipboardImage(
     // Generate a unique filename with timestamp
     const timestamp = new Date().getTime();
 
-    // Try different image formats in order of preference
+    // AppleScript clipboard classes to try, in order of preference.
+    // macOS converts clipboard images to these formats (WEBP/HEIC/HEIF not supported by osascript).
     const formats = [
       { class: 'PNGf', extension: 'png' },
       { class: 'JPEG', extension: 'jpg' },
-      { class: 'TIFF', extension: 'tiff' },
-      { class: 'GIFf', extension: 'gif' },
     ];
 
     for (const format of formats) {
@@ -125,13 +137,8 @@ export async function cleanupOldClipboardImages(
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
     for (const file of files) {
-      if (
-        file.startsWith('clipboard-') &&
-        (file.endsWith('.png') ||
-          file.endsWith('.jpg') ||
-          file.endsWith('.tiff') ||
-          file.endsWith('.gif'))
-      ) {
+      const ext = path.extname(file).toLowerCase();
+      if (file.startsWith('clipboard-') && IMAGE_EXTENSIONS.includes(ext)) {
         const filePath = path.join(tempDir, file);
         const stats = await fs.stat(filePath);
         if (stats.mtimeMs < oneHourAgo) {

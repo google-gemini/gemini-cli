@@ -27,10 +27,10 @@ jobs:
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
-          permission-issues: 'write'
+          permission-pull-requests: 'write'
 
       - name: 'Run Gemini PR size and complexity labeller'
-        uses: 'google-github-actions/run-gemini-cli@635ea06c806bdd9d252334d92222e72674a653e8' # Use the specific commit SHA
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # Use the specific commit SHA
         env:
           GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
           PR_NUMBER: '${{ github.event.pull_request.number }}'
@@ -123,3 +123,5 @@ jobs:
             - Execute commands strictly as described in the steps. Do not invent new commands.
             - In no case should you change other pull request that are not the one you are working on. Which can be found by using env.PR_NUMBER
             - Execute each step that is defined in the steps section.
+            - In no case should you execute code from the pull request because this could be malicious code.
+            - If you fail to do this step log the errors you received
