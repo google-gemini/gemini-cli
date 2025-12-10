@@ -225,8 +225,8 @@ export function SettingsDialog({
 
             // Force re-render by updating previewSettings state
             // This is necessary because the settings prop was mutated but React doesn't know
-            setPendingSettings(
-              setPendingSettingValueAny(key, newValue, pendingSettings),
+            setPendingSettings((prev) =>
+              setPendingSettingValueAny(key, newValue, prev),
             );
 
             // Special handling for vim mode to sync with VimModeContext
@@ -255,8 +255,8 @@ export function SettingsDialog({
             });
 
             // Force re-render by updating previewSettings state
-            setPendingSettings(
-              setPendingSettingValueAny(key, newValue, pendingSettings),
+            setPendingSettings((prev) =>
+              setPendingSettingValueAny(key, newValue, prev),
             );
           }
         },
@@ -310,8 +310,8 @@ export function SettingsDialog({
       );
 
       // Force re-render by updating previewSettings state
-      setPendingSettings(
-        setPendingSettingValueAny(key, parsed, pendingSettings),
+      setPendingSettings((prev) =>
+        setPendingSettingValueAny(key, parsed, prev),
       );
 
       // Remove from pending changes if present
@@ -325,8 +325,8 @@ export function SettingsDialog({
       });
 
       // Force re-render by updating previewSettings state
-      setPendingSettings(
-        setPendingSettingValueAny(key, parsed, pendingSettings),
+      setPendingSettings((prev) =>
+        setPendingSettingValueAny(key, parsed, prev),
       );
     }
 
@@ -671,11 +671,11 @@ export function SettingsDialog({
 
               // Force re-render by updating previewSettings state
               if (toSaveValue !== undefined) {
-                setPendingSettings(
+                setPendingSettings((prev) =>
                   setPendingSettingValueAny(
                     currentSetting.value,
                     toSaveValue,
-                    pendingSettings,
+                    prev,
                   ),
                 );
               }
@@ -702,11 +702,11 @@ export function SettingsDialog({
                 });
 
                 // Force re-render by updating previewSettings state
-                setPendingSettings(
+                setPendingSettings((prev) =>
                   setPendingSettingValueAny(
                     currentSetting.value,
                     defaultValue,
-                    pendingSettings,
+                    prev,
                   ),
                 );
               }
