@@ -138,8 +138,12 @@ vi.mock('../agents/registry.js', () => {
   return { AgentRegistry: AgentRegistryMock };
 });
 
-vi.mock('../agents/subagent-tool-wrapper.js', () => ({
-  SubagentToolWrapper: vi.fn(),
+vi.mock('../agents/delegate-to-agent-tool.js', () => ({
+  DelegateToAgentTool: vi.fn(),
+}));
+
+vi.mock('../resources/resource-registry.js', () => ({
+  ResourceRegistry: vi.fn(),
 }));
 
 const mockCoreEvents = vi.hoisted(() => ({
@@ -842,11 +846,11 @@ describe('Server Config (config.ts)', () => {
         mockAgentDefinition,
       );
 
-      const SubagentToolWrapperMock = (
-        (await vi.importMock('../agents/subagent-tool-wrapper.js')) as {
-          SubagentToolWrapper: Mock;
+      const DelegateToAgentToolMock = (
+        (await vi.importMock('../agents/delegate-to-agent-tool.js')) as {
+          DelegateToAgentTool: Mock;
         }
-      ).SubagentToolWrapper;
+      ).DelegateToAgentTool;
 
       await config.initialize();
 
@@ -856,16 +860,16 @@ describe('Server Config (config.ts)', () => {
         }
       ).ToolRegistry.prototype.registerTool;
 
-      expect(SubagentToolWrapperMock).toHaveBeenCalledTimes(1);
-      expect(SubagentToolWrapperMock).toHaveBeenCalledWith(
-        mockAgentDefinition,
+      expect(DelegateToAgentToolMock).toHaveBeenCalledTimes(1);
+      expect(DelegateToAgentToolMock).toHaveBeenCalledWith(
+        expect.anything(), // AgentRegistry
         config,
         undefined,
       );
 
       const calls = registerToolMock.mock.calls;
       const registeredWrappers = calls.filter(
-        (call) => call[0] instanceof SubagentToolWrapperMock,
+        (call) => call[0] instanceof DelegateToAgentToolMock,
       );
       expect(registeredWrappers).toHaveLength(1);
     });
@@ -877,15 +881,15 @@ describe('Server Config (config.ts)', () => {
       };
       const config = new Config(params);
 
-      const SubagentToolWrapperMock = (
-        (await vi.importMock('../agents/subagent-tool-wrapper.js')) as {
-          SubagentToolWrapper: Mock;
+      const DelegateToAgentToolMock = (
+        (await vi.importMock('../agents/delegate-to-agent-tool.js')) as {
+          DelegateToAgentTool: Mock;
         }
-      ).SubagentToolWrapper;
+      ).DelegateToAgentTool;
 
       await config.initialize();
 
-      expect(SubagentToolWrapperMock).not.toHaveBeenCalled();
+      expect(DelegateToAgentToolMock).not.toHaveBeenCalled();
     });
 
     it('should not set default codebase investigator model in config (defaults in registry)', () => {
