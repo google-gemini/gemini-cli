@@ -38,6 +38,7 @@ describe('ApiAuthDialog', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('GEMINI_API_KEY', '');
     mockBuffer = {
       text: '',
       lines: [''],
