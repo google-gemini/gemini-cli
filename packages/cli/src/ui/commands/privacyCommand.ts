@@ -11,6 +11,7 @@ export const privacyCommand: SlashCommand = {
   name: 'privacy',
   description: 'Display the privacy notice',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: (): OpenDialogActionReturn => ({
     type: 'dialog',
     dialog: 'privacy',

@@ -17,6 +17,7 @@ import {
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
+import { ResourceRegistry } from '../resources/resource-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
@@ -47,7 +48,6 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
   DEFAULT_THINKING_MODE,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
@@ -65,6 +65,7 @@ import { OutputFormat } from '../output/types.js';
 import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
+import { ContextManager } from '../services/contextManager.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
@@ -87,6 +88,7 @@ import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { startupProfiler } from '../telemetry/startupProfiler.js';
 
 import { ApprovalMode } from '../policy/types.js';
 
@@ -111,6 +113,7 @@ export interface TelemetrySettings {
   logPrompts?: boolean;
   outfile?: string;
   useCollector?: boolean;
+  useCliAuth?: boolean;
 }
 
 export interface OutputSettings {
@@ -189,6 +192,12 @@ export class MCPServerConfig {
     readonly headers?: Record<string, string>,
     // For websocket transport
     readonly tcp?: string,
+    // Transport type (optional, for use with 'url' field)
+    // When set to 'http', uses StreamableHTTPClientTransport
+    // When set to 'sse', uses SSEClientTransport
+    // When omitted, auto-detects transport type
+    // Note: 'httpUrl' is deprecated in favor of 'url' + 'type'
+    readonly type?: 'sse' | 'http',
     // Common
     readonly timeout?: number,
     readonly trust?: boolean,
@@ -205,8 +214,6 @@ export class MCPServerConfig {
     readonly targetAudience?: string,
     /* targetServiceAccount format: <service-account-name>@<project-num>.iam.gserviceaccount.com */
     readonly targetServiceAccount?: string,
-    // Include the MCP server initialization instructions in the system instructions
-    readonly useInstructions?: boolean,
   ) {}
 }
 
@@ -307,11 +314,17 @@ export interface ConfigParameters {
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   experiments?: Experiments;
-  hooks?: {
-    [K in HookEventName]?: HookDefinition[];
-  };
+  hooks?:
+    | {
+        [K in HookEventName]?: HookDefinition[];
+      }
+    | ({
+        [K in HookEventName]?: HookDefinition[];
+      } & { disabled?: string[] });
   previewFeatures?: boolean;
+  enableAgents?: boolean;
   enableModelAvailabilityService?: boolean;
+  experimentalJitContext?: boolean;
 }
 
 export class Config {
@@ -320,6 +333,7 @@ export class Config {
   private allowedMcpServers: string[];
   private blockedMcpServers: string[];
   private promptRegistry!: PromptRegistry;
+  private resourceRegistry!: ResourceRegistry;
   private agentRegistry!: AgentRegistry;
   private sessionId: string;
   private fileSystemService: FileSystemService;
@@ -371,6 +385,7 @@ export class Config {
   private ideMode: boolean;
 
   private inFallbackMode = false;
+  private _activeModel: string;
   private readonly maxSessionTurns: number;
   private readonly listSessions: boolean;
   private readonly deleteSession: string | undefined;
@@ -424,6 +439,7 @@ export class Config {
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
+  private readonly disabledHooks: string[];
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
@@ -431,6 +447,10 @@ export class Config {
   private previewModelFallbackMode = false;
   private previewModelBypassMode = false;
   private readonly enableModelAvailabilityService: boolean;
+  private readonly enableAgents: boolean;
+
+  private readonly experimentalJitContext: boolean;
+  private contextManager?: ContextManager;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -468,6 +488,7 @@ export class Config {
       logPrompts: params.telemetry?.logPrompts ?? true,
       outfile: params.telemetry?.outfile,
       useCollector: params.telemetry?.useCollector,
+      useCliAuth: params.telemetry?.useCliAuth,
     };
     this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
 
@@ -488,8 +509,11 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this._activeModel = params.model;
     this.enableModelAvailabilityService =
       params.enableModelAvailabilityService ?? false;
+    this.enableAgents = params.enableAgents ?? false;
+    this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
@@ -533,6 +557,10 @@ export class Config {
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? true;
     this.enableHooks = params.enableHooks ?? false;
+    this.disabledHooks =
+      (params.hooks && 'disabled' in params.hooks
+        ? params.hooks.disabled
+        : undefined) ?? [];
 
     // Enable MessageBus integration if:
     // 1. Explicitly enabled via setting, OR
@@ -549,7 +577,7 @@ export class Config {
       thinkingBudget:
         params.codebaseInvestigatorSettings?.thinkingBudget ??
         DEFAULT_THINKING_MODE,
-      model: params.codebaseInvestigatorSettings?.model ?? DEFAULT_GEMINI_MODEL,
+      model: params.codebaseInvestigatorSettings?.model,
     };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
@@ -579,6 +607,7 @@ export class Config {
     }
 
     if (this.telemetrySettings.enabled) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       initializeTelemetry(this);
     }
 
@@ -627,30 +656,39 @@ export class Config {
     this.initialized = true;
 
     // Initialize centralized FileDiscoveryService
+    const discoverToolsHandle = startupProfiler.start('discover_tools');
     this.getFileService();
     if (this.getCheckpointingEnabled()) {
       await this.getGitService();
     }
     this.promptRegistry = new PromptRegistry();
+    this.resourceRegistry = new ResourceRegistry();
 
     this.agentRegistry = new AgentRegistry(this);
     await this.agentRegistry.initialize();
 
     this.toolRegistry = await this.createToolRegistry();
+    discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
       this.toolRegistry,
       this,
       this.eventEmitter,
     );
+    const initMcpHandle = startupProfiler.start('initialize_mcp_clients');
     await Promise.all([
       await this.mcpClientManager.startConfiguredMcpServers(),
       await this.getExtensionLoader().start(this),
     ]);
+    initMcpHandle?.end();
 
     // Initialize hook system if enabled
     if (this.enableHooks) {
       this.hookSystem = new HookSystem(this);
       await this.hookSystem.initialize();
+    }
+
+    if (this.experimentalJitContext) {
+      this.contextManager = new ContextManager(this);
     }
 
     await this.geminiClient.initialize();
@@ -781,9 +819,26 @@ export class Config {
   setModel(newModel: string): void {
     if (this.model !== newModel || this.inFallbackMode) {
       this.model = newModel;
+      // When the user explicitly sets a model, that becomes the active model.
+      this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
     }
     this.setFallbackMode(false);
+  }
+
+  getActiveModel(): string {
+    return this._activeModel ?? this.model;
+  }
+
+  setActiveModel(model: string): void {
+    if (this._activeModel !== model) {
+      this._activeModel = model;
+      coreEvents.emitModelChanged(model);
+    }
+  }
+
+  resetTurn(): void {
+    this.modelAvailabilityService.resetTurn();
   }
 
   isInFallbackMode(): boolean {
@@ -873,6 +928,10 @@ export class Config {
     return this.promptRegistry;
   }
 
+  getResourceRegistry(): ResourceRegistry {
+    return this.resourceRegistry;
+  }
+
   getDebugMode(): boolean {
     return this.debugMode;
   }
@@ -960,6 +1019,22 @@ export class Config {
     this.userMemory = newUserMemory;
   }
 
+  getGlobalMemory(): string {
+    return this.contextManager?.getGlobalMemory() ?? '';
+  }
+
+  getEnvironmentMemory(): string {
+    return this.contextManager?.getEnvironmentMemory() ?? '';
+  }
+
+  getContextManager(): ContextManager | undefined {
+    return this.contextManager;
+  }
+
+  isJitContextEnabled(): boolean {
+    return this.experimentalJitContext;
+  }
+
   getGeminiMdFileCount(): number {
     return this.geminiMdFileCount;
   }
@@ -1035,6 +1110,10 @@ export class Config {
 
   getTelemetryUseCollector(): boolean {
     return this.telemetrySettings.useCollector ?? false;
+  }
+
+  getTelemetryUseCliAuth(): boolean {
+    return this.telemetrySettings.useCliAuth ?? false;
   }
 
   getGeminiClient(): GeminiClient {
@@ -1164,6 +1243,10 @@ export class Config {
 
   isModelAvailabilityServiceEnabled(): boolean {
     return this.enableModelAvailabilityService;
+  }
+
+  isAgentsEnabled(): boolean {
+    return this.enableAgents;
   }
 
   getNoBrowser(): boolean {
@@ -1529,6 +1612,13 @@ export class Config {
    */
   getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.hooks;
+  }
+
+  /**
+   * Get disabled hooks list
+   */
+  getDisabledHooks(): string[] {
+    return this.disabledHooks;
   }
 
   /**

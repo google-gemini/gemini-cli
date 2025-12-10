@@ -42,11 +42,23 @@ export interface UseCommandCompletionReturn {
   navigateDown: () => void;
   handleAutocomplete: (indexToUse: number) => void;
   promptCompletion: PromptCompletion;
+  getCommandFromSuggestion: (
+    suggestion: Suggestion,
+  ) => SlashCommand | undefined;
+  slashCompletionRange: {
+    completionStart: number;
+    completionEnd: number;
+    getCommandFromSuggestion: (
+      suggestion: Suggestion,
+    ) => SlashCommand | undefined;
+    isArgumentCompletion: boolean;
+    leafCommand: SlashCommand | null;
+  };
+  getCompletedText: (suggestion: Suggestion) => string | null;
 }
 
 export function useCommandCompletion(
   buffer: TextBuffer,
-  dirs: readonly string[],
   cwd: string,
   slashCommands: readonly SlashCommand[],
   commandContext: CommandContext,
@@ -200,12 +212,16 @@ export function useCommandCompletion(
     setShowSuggestions,
   ]);
 
-  const handleAutocomplete = useCallback(
-    (indexToUse: number) => {
-      if (indexToUse < 0 || indexToUse >= suggestions.length) {
-        return;
-      }
-      const suggestion = suggestions[indexToUse].value;
+  /**
+   * Gets the completed text by replacing the completion range with the suggestion value.
+   * This is the core string replacement logic used by both autocomplete and auto-execute.
+   *
+   * @param suggestion The suggestion to apply
+   * @returns The completed text with the suggestion applied, or null if invalid
+   */
+  const getCompletedText = useCallback(
+    (suggestion: Suggestion): string | null => {
+      const currentLine = buffer.lines[cursorRow] || '';
 
       let start = completionStart;
       let end = completionEnd;
@@ -215,10 +231,56 @@ export function useCommandCompletion(
       }
 
       if (start === -1 || end === -1) {
+        return null;
+      }
+
+      // Apply space padding for slash commands (needed for subcommands like "/chat list")
+      let suggestionText = suggestion.value;
+      if (completionMode === CompletionMode.SLASH) {
+        // Add leading space if completing a subcommand (cursor is after parent command with no space)
+        if (start === end && start > 1 && currentLine[start - 1] !== ' ') {
+          suggestionText = ' ' + suggestionText;
+        }
+      }
+
+      // Build the completed text with proper spacing
+      return (
+        currentLine.substring(0, start) +
+        suggestionText +
+        currentLine.substring(end)
+      );
+    },
+    [
+      cursorRow,
+      buffer.lines,
+      completionMode,
+      completionStart,
+      completionEnd,
+      slashCompletionRange,
+    ],
+  );
+
+  const handleAutocomplete = useCallback(
+    (indexToUse: number) => {
+      if (indexToUse < 0 || indexToUse >= suggestions.length) {
+        return;
+      }
+      const suggestion = suggestions[indexToUse];
+      const completedText = getCompletedText(suggestion);
+
+      if (completedText === null) {
         return;
       }
 
-      let suggestionText = suggestion;
+      let start = completionStart;
+      let end = completionEnd;
+      if (completionMode === CompletionMode.SLASH) {
+        start = slashCompletionRange.completionStart;
+        end = slashCompletionRange.completionEnd;
+      }
+
+      // Add space padding for Tab completion (auto-execute gets padding from getCompletedText)
+      let suggestionText = suggestion.value;
       if (completionMode === CompletionMode.SLASH) {
         if (
           start === end &&
@@ -253,6 +315,7 @@ export function useCommandCompletion(
       completionStart,
       completionEnd,
       slashCompletionRange,
+      getCompletedText,
     ],
   );
 
@@ -270,5 +333,8 @@ export function useCommandCompletion(
     navigateDown,
     handleAutocomplete,
     promptCompletion,
+    getCommandFromSuggestion: slashCompletionRange.getCommandFromSuggestion,
+    slashCompletionRange,
+    getCompletedText,
   };
 }

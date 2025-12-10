@@ -1,21 +1,21 @@
-# Release Confidence Strategy
+# Release confidence strategy
 
 This document outlines the strategy for gaining confidence in every release of
 the Gemini CLI. It serves as a checklist and quality gate for release manager to
 ensure we are shipping a high-quality product.
 
-## The Goal
+## The goal
 
 To answer the question, "Is this release _truly_ ready for our users?" with a
 high degree of confidence, based on a holistic evaluation of automated signals,
 manual verification, and data.
 
-## Level 1: Automated Gates (Must Pass)
+## Level 1: Automated gates (must pass)
 
 These are the baseline requirements. If any of these fail, the release is a
 no-go.
 
-### 1. CI/CD Health
+### 1. CI/CD health
 
 All workflows in `.github/workflows/ci.yml` must pass on the `main` branch (for
 nightly) or the release branch (for preview/stable).
@@ -31,15 +31,15 @@ nightly) or the release branch (for preview/stable).
     pass.
   - **Build:** The project must build and bundle successfully.
 
-### 2. End-to-End (E2E) Tests
+### 2. End-to-end (E2E) tests
 
-All workflows in `.github/workflows/e2e.yml` must pass.
+All workflows in `.github/workflows/chained_e2e.yml` must pass.
 
 - **Platforms:** **Linux, macOS and Windows**.
 - **Sandboxing:** Tests must pass with both `sandbox:none` and `sandbox:docker`
   on Linux.
 
-### 3. Post-Deployment Smoke Tests
+### 3. Post-deployment smoke tests
 
 After a release is published to npm, the `smoke-test.yml` workflow runs. This
 must pass to confirm the package is installable and the binary is executable.
@@ -48,11 +48,11 @@ must pass to confirm the package is installable and the binary is executable.
   correct version without error.
 - **Platform:** Currently runs on `ubuntu-latest`.
 
-## Level 2: Manual Verification & Dogfooding
+## Level 2: Manual verification and dogfooding
 
 Automated tests cannot catch everything, especially UX issues.
 
-### 1. Dogfooding via `preview` Tag
+### 1. Dogfooding via `preview` tag
 
 The weekly release cadence promotes code from `main` -> `nightly` -> `preview`
 -> `stable`.
@@ -66,7 +66,7 @@ The weekly release cadence promotes code from `main` -> `nightly` -> `preview`
 - **Goal:** To catch regressions and UX issues in day-to-day usage before they
   reach the broad user base.
 
-### 2. Critical User Journey (CUJ) Checklist
+### 2. Critical user journey (CUJ) checklist
 
 Before promoting a `preview` release to `stable`, a release manager must
 manually run through this checklist.
@@ -84,15 +84,15 @@ manually run through this checklist.
     - [ ] API Key
     - [ ] Vertex AI
 
-- **Basic Prompting:**
+- **Basic prompting:**
   - [ ] Run `gemini "Tell me a joke"` and verify a sensible response.
   - [ ] Run in interactive mode: `gemini`. Ask a follow-up question to test
         context.
 
-- **Piped Input:**
+- **Piped input:**
   - [ ] Run `echo "Summarize this" | gemini` and verify it processes stdin.
 
-- **Context Management:**
+- **Context management:**
   - [ ] In interactive mode, use `@file` to add a local file to context. Ask a
         question about it.
 
@@ -100,20 +100,20 @@ manually run through this checklist.
   - [ ] In interactive mode run `/settings` and make modifications
   - [ ] Validate that setting is changed
 
-- **Function Calling:**
+- **Function calling:**
   - [ ] In interactive mode, ask gemini to "create a file named hello.md with
         the content 'hello world'" and verify the file is created correctly.
 
 If any of these CUJs fail, the release is a no-go until a patch is applied to
 the `preview` channel.
 
-### 3. Pre-Launch Bug Bash (Tier 1 & 2 Launches)
+### 3. Pre-Launch bug bash (tier 1 and 2 launches)
 
 For high-impact releases, an organized bug bash is required to ensure a higher
 level of quality and to catch issues across a wider range of environments and
 use cases.
 
-**Definition of Tiers:**
+**Definition of tiers:**
 
 - **Tier 1:** Industry-Moving News 🚀
 - **Tier 2:** Important News for Our Users 📣
@@ -125,7 +125,7 @@ use cases.
 A bug bash must be scheduled at least **72 hours in advance** of any Tier 1 or
 Tier 2 launch.
 
-**Rule of Thumb:**
+**Rule of thumb:**
 
 A bug bash should be considered for any release that involves:
 
@@ -134,22 +134,22 @@ A bug bash should be considered for any release that involves:
 - Media relations or press outreach
 - A "Turbo" launch event
 
-## Level 3: Telemetry & Data Review
+## Level 3: Telemetry and data review
 
-### Dashboard Health
+### Dashboard health
 
 - [ ] Go to `go/gemini-cli-dash`.
 - [ ] Navigate to the "Tool Call" tab.
 - [ ] Validate that there are no spikes in errors for the release you would like
       to promote.
 
-### Model Evaluation
+### Model evaluation
 
 - [ ] Navigate to `go/gemini-cli-offline-evals-dash`.
 - [ ] Make sure that the release you want to promote's recurring run is within
       average eval runs.
 
-## The "Go/No-Go" Decision
+## The "go/no-go" decision
 
 Before triggering the `Release: Promote` workflow to move `preview` to `stable`:
 

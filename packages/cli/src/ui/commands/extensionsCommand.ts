@@ -92,6 +92,7 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
     extensions,
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
   updateComplete.then((updateInfos) => {
     if (updateInfos.length === 0) {
       context.ui.addItem(
@@ -473,6 +474,7 @@ const listExtensionsCommand: SlashCommand = {
   name: 'list',
   description: 'List active extensions',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: listAction,
 };
 
@@ -480,6 +482,7 @@ const updateExtensionsCommand: SlashCommand = {
   name: 'update',
   description: 'Update extensions. Usage: update <extension-names>|--all',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: updateAction,
   completion: completeExtensions,
 };
@@ -488,6 +491,7 @@ const disableCommand: SlashCommand = {
   name: 'disable',
   description: 'Disable an extension',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: disableAction,
   completion: completeExtensionsAndScopes,
 };
@@ -496,6 +500,7 @@ const enableCommand: SlashCommand = {
   name: 'enable',
   description: 'Enable an extension',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: enableAction,
   completion: completeExtensionsAndScopes,
 };
@@ -504,6 +509,7 @@ const exploreExtensionsCommand: SlashCommand = {
   name: 'explore',
   description: 'Open extensions page in your browser',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: exploreAction,
 };
 
@@ -511,6 +517,7 @@ const restartCommand: SlashCommand = {
   name: 'restart',
   description: 'Restart all extensions',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: restartAction,
   completion: completeExtensions,
 };
@@ -525,6 +532,7 @@ export function extensionsCommand(
     name: 'extensions',
     description: 'Manage extensions',
     kind: CommandKind.BUILT_IN,
+    autoExecute: false,
     subCommands: [
       listExtensionsCommand,
       updateExtensionsCommand,
