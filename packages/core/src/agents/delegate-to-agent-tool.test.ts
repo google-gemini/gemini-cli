@@ -10,6 +10,9 @@ import { AgentRegistry } from './registry.js';
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
 import { SubagentInvocation } from './invocation.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { MessageBusType } from '../confirmation-bus/types.js';
+import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
 vi.mock('./invocation.js', () => ({
   SubagentInvocation: vi.fn().mockImplementation(() => ({
@@ -23,6 +26,7 @@ describe('DelegateToAgentTool', () => {
   let registry: AgentRegistry;
   let config: Config;
   let tool: DelegateToAgentTool;
+  let messageBus: MessageBus;
 
   const mockAgentDef: AgentDefinition = {
     name: 'test_agent',
@@ -52,7 +56,13 @@ describe('DelegateToAgentTool', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (registry as any).agents.set(mockAgentDef.name, mockAgentDef);
 
-    tool = new DelegateToAgentTool(registry, config);
+    messageBus = {
+      publish: vi.fn(),
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    } as unknown as MessageBus;
+
+    tool = new DelegateToAgentTool(registry, config, messageBus);
   });
 
   it('should use dynamic description from registry', () => {
@@ -87,7 +97,7 @@ describe('DelegateToAgentTool', () => {
       { arg1: 'valid' },
       mockAgentDef,
       config,
-      undefined,
+      messageBus,
     );
   });
 
@@ -143,6 +153,26 @@ describe('DelegateToAgentTool', () => {
 
     expect(() => new DelegateToAgentTool(registry, config)).toThrow(
       "Agent 'invalid_agent' cannot have an input parameter named 'agent_name' as it is a reserved parameter for delegation.",
+    );
+  });
+
+  it('should use correct tool name "delegate_to_agent" when requesting confirmation', async () => {
+    const invocation = tool.build({
+      agent_name: 'test_agent',
+      arg1: 'valid',
+    });
+
+    // Trigger confirmation check
+    const p = invocation.shouldConfirmExecute(new AbortController().signal);
+    void p;
+
+    expect(messageBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        toolCall: expect.objectContaining({
+          name: DELEGATE_TO_AGENT_TOOL_NAME,
+        }),
+      }),
     );
   });
 });

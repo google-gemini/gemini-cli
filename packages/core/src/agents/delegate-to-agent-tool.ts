@@ -147,7 +147,7 @@ class DelegateInvocation extends BaseToolInvocation<
     private readonly config: Config,
     messageBus?: MessageBus,
   ) {
-    super(params, messageBus);
+    super(params, messageBus, DELEGATE_TO_AGENT_TOOL_NAME);
   }
 
   getDescription(): string {
