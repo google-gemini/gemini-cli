@@ -50,7 +50,7 @@
     }
   },
   "gemini-3-flash-preview": {
-    "model": "skyhawk",
+    "model": "fiercefalcon",
     "generateContentConfig": {
       "temperature": 1,
       "topP": 0.95,
@@ -216,7 +216,7 @@
     "generateContentConfig": {}
   },
   "chat-compression-3-flash": {
-    "model": "skyhawk",
+    "model": "fiercefalcon",
     "generateContentConfig": {}
   },
   "chat-compression-2.5-pro": {

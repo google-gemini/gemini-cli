@@ -370,7 +370,7 @@ their corresponding top-level category object in your `settings.json` file.
       "gemini-3-flash-preview": {
         "extends": "chat-base-3",
         "modelConfig": {
-          "model": "skyhawk"
+          "model": "fiercefalcon"
         }
       },
       "gemini-2.5-pro": {
@@ -504,7 +504,7 @@ their corresponding top-level category object in your `settings.json` file.
       },
       "chat-compression-3-flash": {
         "modelConfig": {
-          "model": "skyhawk"
+          "model": "fiercefalcon"
         }
       },
       "chat-compression-2.5-pro": {
