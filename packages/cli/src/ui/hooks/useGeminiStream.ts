@@ -1215,20 +1215,11 @@ export const useGeminiStream = (
             return responseParts;
           }
 
-          const functionResponsePart = responseParts.find(
-            (part) => 'functionResponse' in part,
-          );
-          const originalStderr =
-            (functionResponsePart?.functionResponse?.response?.[
-              'stderr'
-            ] as string) ?? '';
-
           const instructionalPart: Part = {
             functionResponse: {
               name: 'run_shell_command',
               response: {
                 stdout: `[INFO] The output of the previous 'run_shell_command' ('${originalCommand}') was too large to be displayed. Please run the command again and redirect the output to a temporary file.`,
-                stderr: originalStderr,
               },
             },
           };
