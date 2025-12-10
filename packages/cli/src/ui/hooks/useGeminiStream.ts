@@ -1155,6 +1155,8 @@ export const useGeminiStream = (
         (tc) => tc.status === 'cancelled',
       );
 
+      const truncateThreshold = config.getTruncateToolOutputThreshold();
+
       if (allToolsCancelled) {
         // If the turn was cancelled via the imperative escape key flow,
         // the cancellation message is added there. We check the ref to avoid duplication.
@@ -1188,27 +1190,26 @@ export const useGeminiStream = (
         return;
       }
 
+      const getPartsArray = (plu: PartListUnion): Part[] => {
+        if (typeof plu === 'string') {
+          return [{ text: plu }];
+        }
+        if (Array.isArray(plu)) {
+          return plu.map((p) => (typeof p === 'string' ? { text: p } : p));
+        }
+        // It's a single Part object.
+        return [plu];
+      };
+
       const responsesToSend: Part[] = geminiTools.flatMap((toolCall) => {
         const responsePartsUnion = toolCall.response.responseParts;
-
-        const getPartsArray = (plu: PartListUnion): Part[] => {
-          if (typeof plu === 'string') {
-            return [{ text: plu }];
-          }
-          if (Array.isArray(plu)) {
-            return plu.map((p) => (typeof p === 'string' ? { text: p } : p));
-          }
-          // It's a single Part object.
-          return [plu];
-        };
 
         const responseParts = getPartsArray(responsePartsUnion);
 
         if (
           toolCall.request.name === 'run_shell_command' &&
-          config.getTruncateToolOutputThreshold() > 0 &&
-          getRequestSize(responseParts) >
-            config.getTruncateToolOutputThreshold()
+          truncateThreshold > 0 &&
+          getRequestSize(responseParts) > truncateThreshold
         ) {
           const originalCommand = toolCall.request.args?.['command'];
           if (typeof originalCommand !== 'string') {
