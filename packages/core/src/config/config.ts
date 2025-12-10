@@ -629,11 +629,19 @@ export class Config {
     // TODO(12593): Fix the settings loading logic to properly merge defaults and
     // remove this hack.
     let modelConfigServiceConfig = params.modelConfigServiceConfig;
-    if (modelConfigServiceConfig && !modelConfigServiceConfig.aliases) {
-      modelConfigServiceConfig = {
-        ...modelConfigServiceConfig,
-        aliases: DEFAULT_MODEL_CONFIGS.aliases,
-      };
+    if (modelConfigServiceConfig) {
+      if (!modelConfigServiceConfig.aliases) {
+        modelConfigServiceConfig = {
+          ...modelConfigServiceConfig,
+          aliases: DEFAULT_MODEL_CONFIGS.aliases,
+        };
+      }
+      if (!modelConfigServiceConfig.overrides) {
+        modelConfigServiceConfig = {
+          ...modelConfigServiceConfig,
+          overrides: DEFAULT_MODEL_CONFIGS.overrides,
+        };
+      }
     }
 
     this.modelConfigService = new ModelConfigService(
