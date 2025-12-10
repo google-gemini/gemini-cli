@@ -571,10 +571,10 @@ async function disableAction(
 
   // Get current disabled servers from settings
   const settings = context.services.settings;
-  const disabledServers: string[] = settings.merged.mcp?.disabled || [];
+  const mergedDisabled: string[] = settings.merged.mcp?.disabled || [];
 
   // Check if already disabled
-  if (disabledServers.includes(serverName)) {
+  if (mergedDisabled.includes(serverName)) {
     return {
       type: 'message',
       messageType: 'info',
@@ -583,8 +583,9 @@ async function disableAction(
   }
 
   try {
-    // Add to disabled list
-    const newDisabledServers = [...disabledServers, serverName];
+    // Add to disabled list (use user-scope list to avoid copying workspace settings)
+    const userDisabled: string[] = settings.user.settings.mcp?.disabled || [];
+    const newDisabledServers = [...userDisabled, serverName];
 
     // Update settings (persists to file)
     settings.setValue(SettingScope.User, 'mcp.disabled', newDisabledServers);
