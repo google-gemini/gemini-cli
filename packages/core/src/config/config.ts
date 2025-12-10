@@ -703,6 +703,9 @@ export class Config {
   }
 
   async refreshAuth(authMethod: AuthType) {
+    // Reset availability service when switching auth
+    this.modelAvailabilityService.reset();
+
     // Vertex and Genai have incompatible encryption and sending history with
     // thoughtSignature from Genai to Vertex will fail, we need to strip them
     if (
@@ -828,6 +831,7 @@ export class Config {
       coreEvents.emitModelChanged(newModel);
     }
     this.setFallbackMode(false);
+    this.modelAvailabilityService.reset();
   }
 
   getActiveModel(): string {
