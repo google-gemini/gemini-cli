@@ -48,16 +48,6 @@ describe('AgentRegistry', () => {
   });
 
   describe('initialize', () => {
-    // TODO: Add this test once we actually have a built-in agent configured.
-    // it('should load built-in agents upon initialization', async () => {
-    //   expect(registry.getAllDefinitions()).toHaveLength(0);
-
-    //   await registry.initialize();
-
-    //   // There are currently no built-in agents.
-    //   expect(registry.getAllDefinitions()).toEqual([]);
-    // });
-
     it('should log the count of loaded agents in debug mode', async () => {
       const debugConfig = makeFakeConfig({ debugMode: true });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
@@ -90,6 +80,114 @@ describe('AgentRegistry', () => {
       );
       expect(investigatorDef).toBeDefined();
       expect(investigatorDef?.modelConfig.model).toBe('gemini-3-pro-preview');
+    });
+
+    it('should respect legacy codebase_investigator settings', async () => {
+      const legacyConfig = makeFakeConfig({
+        codebaseInvestigatorSettings: {
+          enabled: true,
+          model: 'legacy-model',
+          maxTimeMinutes: 10,
+          maxNumTurns: 20,
+          thinkingBudget: 1000,
+        },
+        agents: {}, // Empty new settings
+      });
+      const legacyRegistry = new TestableAgentRegistry(legacyConfig);
+      await legacyRegistry.initialize();
+
+      const investigatorDef = legacyRegistry.getDefinition(
+        'codebase_investigator',
+      );
+      expect(investigatorDef).toBeDefined();
+      expect(investigatorDef?.modelConfig.model).toBe('legacy-model');
+      expect(investigatorDef?.runConfig.max_time_minutes).toBe(10);
+      expect(investigatorDef?.runConfig.max_turns).toBe(20);
+      expect(investigatorDef?.modelConfig.thinkingBudget).toBe(1000);
+    });
+
+    it('should use new agents config exclusively when present (not merge with legacy)', async () => {
+      const mixedConfig = makeFakeConfig({
+        codebaseInvestigatorSettings: {
+          enabled: true,
+          model: 'legacy-model',
+          maxTimeMinutes: 10,
+          maxNumTurns: 20,
+        },
+        agents: {
+          codebase_investigator: {
+            enabled: true,
+            model: 'new-model',
+            // Note: maxTimeMinutes and maxTurns NOT specified
+          },
+        },
+      });
+      const mixedRegistry = new TestableAgentRegistry(mixedConfig);
+      await mixedRegistry.initialize();
+
+      const investigatorDef = mixedRegistry.getDefinition(
+        'codebase_investigator',
+      );
+      expect(investigatorDef).toBeDefined();
+
+      // New config values should be used
+      expect(investigatorDef?.modelConfig.model).toBe('new-model');
+
+      // Unspecified values should fall back to HARDCODED DEFAULTS, not legacy settings
+      // CodebaseInvestigatorAgent defaults: max_time_minutes = 5, max_turns = 15
+      expect(investigatorDef?.runConfig.max_time_minutes).toBe(5); // NOT 10 from legacy
+      expect(investigatorDef?.runConfig.max_turns).toBe(15); // NOT 20 from legacy
+    });
+
+    it('should use legacy settings when new agents config is not present', async () => {
+      const legacyOnlyConfig = makeFakeConfig({
+        codebaseInvestigatorSettings: {
+          enabled: true,
+          model: 'legacy-model',
+          maxTimeMinutes: 10,
+          maxNumTurns: 20,
+          thinkingBudget: 1000,
+        },
+        // agents NOT specified or empty
+      });
+      const legacyRegistry = new TestableAgentRegistry(legacyOnlyConfig);
+      await legacyRegistry.initialize();
+
+      const investigatorDef = legacyRegistry.getDefinition(
+        'codebase_investigator',
+      );
+      expect(investigatorDef).toBeDefined();
+      expect(investigatorDef?.modelConfig.model).toBe('legacy-model');
+      expect(investigatorDef?.runConfig.max_time_minutes).toBe(10);
+      expect(investigatorDef?.runConfig.max_turns).toBe(20);
+      expect(investigatorDef?.modelConfig.thinkingBudget).toBe(1000);
+    });
+
+    it('should not register agent when disabled in config', async () => {
+      const disabledConfig = makeFakeConfig({
+        agents: {
+          codebase_investigator: { enabled: false },
+        },
+      });
+      const disabledRegistry = new TestableAgentRegistry(disabledConfig);
+      await disabledRegistry.initialize();
+
+      expect(
+        disabledRegistry.getDefinition('codebase_investigator'),
+      ).toBeUndefined();
+    });
+
+    it('should not register agent when disabled in legacy settings', async () => {
+      const legacyDisabledConfig = makeFakeConfig({
+        codebaseInvestigatorSettings: { enabled: false },
+        agents: {},
+      });
+      const legacyRegistry = new TestableAgentRegistry(legacyDisabledConfig);
+      await legacyRegistry.initialize();
+
+      expect(
+        legacyRegistry.getDefinition('codebase_investigator'),
+      ).toBeUndefined();
     });
   });
 
@@ -264,6 +362,38 @@ describe('AgentRegistry', () => {
       expect(description).toContain(
         `- **AnotherAgent**: Another agent description`,
       );
+    });
+
+    it('should exclude disabled agents from directory context', async () => {
+      const configWithDisabled = makeFakeConfig({
+        codebaseInvestigatorSettings: { enabled: true },
+        agents: {
+          codebase_investigator: { enabled: false },
+        },
+      });
+      const registryWithDisabled = new TestableAgentRegistry(
+        configWithDisabled,
+      );
+      await registryWithDisabled.initialize();
+
+      const context = registryWithDisabled.getDirectoryContext();
+      expect(context).toContain('No sub-agents are currently available');
+    });
+
+    it('should exclude disabled agents from tool description', async () => {
+      const configWithDisabled = makeFakeConfig({
+        agents: {
+          codebase_investigator: { enabled: false },
+        },
+      });
+      const registryWithDisabled = new TestableAgentRegistry(
+        configWithDisabled,
+      );
+      await registryWithDisabled.initialize();
+
+      const description = registryWithDisabled.getToolDescription();
+      expect(description).toContain('No agents are currently available');
+      expect(description).not.toContain('codebase_investigator');
     });
   });
 });

@@ -45,6 +45,7 @@ describe('DelegateToAgentTool', () => {
       modelConfigService: {
         registerRuntimeModelConfig: vi.fn(),
       },
+      agents: {},
     } as unknown as Config;
 
     registry = new AgentRegistry(config);

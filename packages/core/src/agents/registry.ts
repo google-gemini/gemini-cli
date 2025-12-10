@@ -50,45 +50,65 @@ export class AgentRegistry {
 
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
+    const agentConfig = this.config.agents['codebase_investigator'];
 
-    // Only register the agent if it's enabled in the settings.
-    if (investigatorSettings?.enabled) {
-      let model =
-        investigatorSettings.model ??
-        CodebaseInvestigatorAgent.modelConfig.model;
+    let model: string | undefined;
+    let thinkingBudget: number | undefined;
+    let maxTimeMinutes: number | undefined;
+    let maxTurns: number | undefined;
+    let isEnabled = true;
 
-      // If the user is using the preview model for the main agent, force the sub-agent to use it too
-      // if it's configured to use 'pro' or 'auto'.
-      if (this.config.getModel() === PREVIEW_GEMINI_MODEL) {
-        if (
-          model === GEMINI_MODEL_ALIAS_PRO ||
-          model === DEFAULT_GEMINI_MODEL_AUTO
-        ) {
-          model = PREVIEW_GEMINI_MODEL;
-        }
-      }
-
-      const agentDef = {
-        ...CodebaseInvestigatorAgent,
-        modelConfig: {
-          ...CodebaseInvestigatorAgent.modelConfig,
-          model,
-          thinkingBudget:
-            investigatorSettings.thinkingBudget ??
-            CodebaseInvestigatorAgent.modelConfig.thinkingBudget,
-        },
-        runConfig: {
-          ...CodebaseInvestigatorAgent.runConfig,
-          max_time_minutes:
-            investigatorSettings.maxTimeMinutes ??
-            CodebaseInvestigatorAgent.runConfig.max_time_minutes,
-          max_turns:
-            investigatorSettings.maxNumTurns ??
-            CodebaseInvestigatorAgent.runConfig.max_turns,
-        },
-      };
-      this.registerAgent(agentDef);
+    // If new config for this agent exists, use it as the exclusive source of truth.
+    if (agentConfig) {
+      isEnabled = agentConfig.enabled ?? true;
+      model = agentConfig.model;
+      thinkingBudget = agentConfig.thinkingBudget;
+      maxTimeMinutes = agentConfig.maxTimeMinutes;
+      maxTurns = agentConfig.maxTurns;
+    } else if (investigatorSettings) {
+      // Otherwise, fall back to legacy settings.
+      isEnabled = investigatorSettings.enabled ?? true;
+      model = investigatorSettings.model;
+      thinkingBudget = investigatorSettings.thinkingBudget;
+      maxTimeMinutes = investigatorSettings.maxTimeMinutes;
+      maxTurns = investigatorSettings.maxNumTurns;
     }
+
+    if (!isEnabled) {
+      return;
+    }
+
+    let finalModel = model ?? CodebaseInvestigatorAgent.modelConfig.model;
+
+    // If the user is using the preview model for the main agent, force the sub-agent to use it too
+    // if it's configured to use 'pro' or 'auto'.
+    if (this.config.getModel() === PREVIEW_GEMINI_MODEL) {
+      if (
+        finalModel === GEMINI_MODEL_ALIAS_PRO ||
+        finalModel === DEFAULT_GEMINI_MODEL_AUTO
+      ) {
+        finalModel = PREVIEW_GEMINI_MODEL;
+      }
+    }
+
+    const agentDef = {
+      ...CodebaseInvestigatorAgent,
+      modelConfig: {
+        ...CodebaseInvestigatorAgent.modelConfig,
+        model: finalModel,
+        thinkingBudget:
+          thinkingBudget ??
+          CodebaseInvestigatorAgent.modelConfig.thinkingBudget,
+      },
+      runConfig: {
+        ...CodebaseInvestigatorAgent.runConfig,
+        max_time_minutes:
+          maxTimeMinutes ??
+          CodebaseInvestigatorAgent.runConfig.max_time_minutes,
+        max_turns: maxTurns ?? CodebaseInvestigatorAgent.runConfig.max_turns,
+      },
+    };
+    this.registerAgent(agentDef);
   }
 
   /**
@@ -187,7 +207,7 @@ ${agentDescriptions}`;
       return 'No sub-agents are currently available.';
     }
 
-    let context = '## Available Sub-Agents\n';
+    let context = '## Available Sub-Agents\n\n';
     context +=
       'Use `delegate_to_agent` for complex tasks requiring specialized analysis.\n\n';
 

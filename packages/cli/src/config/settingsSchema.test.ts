@@ -371,6 +371,17 @@ describe('SettingsSchema', () => {
         'Enable model routing using new availability service.',
       );
     });
+
+    it('should have agents setting in schema', () => {
+      const setting = getSettingsSchema().agents;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('object');
+      expect(setting.category).toBe('Agents');
+      expect(setting.requiresRestart).toBe(false);
+      expect(setting.showInDialog).toBe(false);
+      expect(setting.additionalProperties).toBeDefined();
+      expect(setting.additionalProperties?.ref).toBe('AgentConfig');
+    });
   });
 
   it('has JSON schema definitions for every referenced ref', () => {
