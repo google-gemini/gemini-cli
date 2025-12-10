@@ -11,5 +11,13 @@ if (process.env.NO_COLOR !== undefined) {
 
 import { setSimulate429 } from './src/utils/testUtils.js';
 
+// Surface any uncaught exceptions or unhandled rejections inside vitest worker processes.
+process.on('uncaughtException', (err) => {
+  console.error('[vitest][uncaughtException]', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[vitest][unhandledRejection]', reason);
+});
+
 // Disable 429 simulation globally for all tests
 setSimulate429(false);
