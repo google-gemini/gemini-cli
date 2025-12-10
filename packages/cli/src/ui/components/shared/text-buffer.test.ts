@@ -639,8 +639,10 @@ describe('useTextBuffer', () => {
     });
 
     it('should prepend @ to multiple valid file paths on insert', () => {
+      // Use Set to model reality: individual paths exist, combined string doesn't
+      const validPaths = new Set(['/path/to/file1.txt', '/path/to/file2.txt']);
       const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => true }),
+        useTextBuffer({ viewport, isValidPath: (p) => validPaths.has(p) }),
       );
       const filePaths = '/path/to/file1.txt /path/to/file2.txt';
       act(() => result.current.insert(filePaths, { paste: true }));
@@ -650,8 +652,10 @@ describe('useTextBuffer', () => {
     });
 
     it('should handle multiple paths with escaped spaces', () => {
+      // Use Set to model reality: individual paths exist, combined string doesn't
+      const validPaths = new Set(['/path/to/my file.txt', '/other/path.txt']);
       const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => true }),
+        useTextBuffer({ viewport, isValidPath: (p) => validPaths.has(p) }),
       );
       const filePaths = '/path/to/my\\ file.txt /other/path.txt';
       act(() => result.current.insert(filePaths, { paste: true }));

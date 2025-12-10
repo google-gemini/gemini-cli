@@ -7,7 +7,12 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { debugLogger, spawnAsync, unescapePath } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  spawnAsync,
+  unescapePath,
+  escapePath,
+} from '@google/gemini-cli-core';
 
 /**
  * Supported image file extensions based on Gemini API.
@@ -22,8 +27,8 @@ export const IMAGE_EXTENSIONS = [
   '.heif',
 ];
 
-/** Matches strings that start with a path prefix (/, ~, ., or Windows drive letter) */
-const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:)/;
+/** Matches strings that start with a path prefix (/, ~, ., Windows drive letter, or UNC path) */
+const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;
 
 /**
  * Checks if the system clipboard contains an image (macOS only for now)
@@ -383,6 +388,12 @@ export function processPastedPaths(
   text: string,
   isValidPath: (path: string) => boolean,
 ): string | null {
+  // First, check if the entire text is a single valid path
+  if (PATH_PREFIX_PATTERN.test(text) && isValidPath(text)) {
+    return `@${escapePath(text)} `;
+  }
+
+  // Otherwise, try splitting on unescaped spaces
   const segments = splitEscapedPaths(text);
   if (segments.length === 0) {
     return null;
