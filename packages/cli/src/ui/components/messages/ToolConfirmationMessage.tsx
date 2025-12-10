@@ -115,9 +115,9 @@ export const ToolConfirmationMessage: React.FC<
             key: 'Yes, allow always',
           });
           options.push({
-            label: 'Yes, always allow and save to policy',
+            label: 'Yes, allow always and save to policy',
             value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-            key: 'Yes, always allow and save to policy',
+            key: 'Yes, allow always and save to policy',
           });
         }
         if (!config.getIdeMode() || !isDiffingEnabled) {
@@ -151,9 +151,9 @@ export const ToolConfirmationMessage: React.FC<
           key: `Yes, allow always ...`,
         });
         options.push({
-          label: `Yes, always allow and save to policy`,
+          label: `Yes, allow always and save to policy`,
           value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-          key: `Yes, always allow and save to policy`,
+          key: `Yes, allow always and save to policy`,
         });
       }
       options.push({
@@ -175,9 +175,9 @@ export const ToolConfirmationMessage: React.FC<
           key: 'Yes, allow always',
         });
         options.push({
-          label: 'Yes, always allow and save to policy',
+          label: 'Yes, allow always and save to policy',
           value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-          key: 'Yes, always allow and save to policy',
+          key: 'Yes, allow always and save to policy',
         });
       }
       options.push({
@@ -206,9 +206,9 @@ export const ToolConfirmationMessage: React.FC<
           key: `Yes, always allow all tools from server "${mcpProps.serverName}"`,
         });
         options.push({
-          label: `Yes, always allow tool "${mcpProps.toolName}" and save to policy`,
+          label: `Yes, allow always tool "${mcpProps.toolName}" and save to policy`,
           value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-          key: `Yes, always allow tool "${mcpProps.toolName}" and save to policy`,
+          key: `Yes, allow always tool "${mcpProps.toolName}" and save to policy`,
         });
       }
       options.push({
