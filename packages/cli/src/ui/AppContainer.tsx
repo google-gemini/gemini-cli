@@ -293,6 +293,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const lastTitleRef = useRef<string | null>(null);
   const staticExtraHeight = 3;
 
+  const handleFinalSubmitRef = useRef<(text: string) => void>(() => {});
+
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
@@ -634,6 +636,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
+      submitPrompt: (text: string) => handleFinalSubmitRef.current(text),
     }),
     [
       setAuthState,
@@ -848,6 +851,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
     },
     [addMessage, addInput],
   );
+
+  useEffect(() => {
+    handleFinalSubmitRef.current = handleFinalSubmit;
+  }, [handleFinalSubmit]);
 
   const handleClearScreen = useCallback(() => {
     historyManager.clearItems();

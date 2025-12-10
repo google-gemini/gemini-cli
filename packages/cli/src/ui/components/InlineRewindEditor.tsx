@@ -10,26 +10,23 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { Colors } from '../colors.js';
 import { useTextBuffer } from './shared/text-buffer.js';
 
-interface InlineHistoryEditorProps {
+interface InlineRewindEditorProps {
   initialText: string;
   width: number;
   onSave: (newText: string) => void;
   onCancel: () => void;
 }
 
-export const InlineHistoryEditor: React.FC<InlineHistoryEditorProps> = ({
+export const InlineRewindEditor: React.FC<InlineRewindEditorProps> = ({
   initialText,
   width,
   onSave,
   onCancel,
 }) => {
-  // Initialize the text buffer
   const buffer = useTextBuffer({
     initialText,
-    // Provide a viewport. Height is arbitrary here as we let the box grow,
-    // but width is crucial for wrapping.
     viewport: { width: width - 4, height: 10 },
-    isValidPath: () => false, // Mock for this specific use case
+    isValidPath: () => false,
   });
 
   useKeypress(

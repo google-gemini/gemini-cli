@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '../../test-utils/render.js';
-import { InlineHistoryEditor } from './InlineHistoryEditor.js';
+import { InlineRewindEditor } from './InlineRewindEditor.js';
 import { act } from 'react';
 
 // Mock useKeypress to capture handlers
@@ -53,7 +53,7 @@ const triggerKey = (
   });
 };
 
-describe('InlineHistoryEditor', () => {
+describe('InlineRewindEditor', () => {
   beforeEach(() => {
     keypressHandlers.length = 0;
     vi.clearAllMocks();
@@ -61,7 +61,7 @@ describe('InlineHistoryEditor', () => {
 
   it('renders initial text', () => {
     const { lastFrame } = render(
-      <InlineHistoryEditor
+      <InlineRewindEditor
         initialText="Hello World"
         width={80}
         onSave={vi.fn()}
@@ -74,7 +74,7 @@ describe('InlineHistoryEditor', () => {
 
   it('updates text on input', () => {
     const { lastFrame } = render(
-      <InlineHistoryEditor
+      <InlineRewindEditor
         initialText="Hello"
         width={80}
         onSave={vi.fn()}
@@ -91,7 +91,7 @@ describe('InlineHistoryEditor', () => {
   it('calls onSave when Ctrl+S is pressed', () => {
     const onSave = vi.fn();
     render(
-      <InlineHistoryEditor
+      <InlineRewindEditor
         initialText="Save Me"
         width={80}
         onSave={onSave}
@@ -106,7 +106,7 @@ describe('InlineHistoryEditor', () => {
   it('calls onCancel when Escape is pressed', () => {
     const onCancel = vi.fn();
     render(
-      <InlineHistoryEditor
+      <InlineRewindEditor
         initialText="Cancel Me"
         width={80}
         onSave={vi.fn()}
@@ -124,7 +124,7 @@ describe('InlineHistoryEditor', () => {
     // Ideally, we'd check for the visual structure if we had a more robust Ink test renderer.
     // For now, ensuring text updates implies cursor logic (in text-buffer) is driving rendering.
     const { lastFrame } = render(
-      <InlineHistoryEditor
+      <InlineRewindEditor
         initialText="A"
         width={80}
         onSave={vi.fn()}

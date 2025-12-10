@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
-import { HistoryViewer } from './HistoryViewer.js';
+import { RewindViewer } from './RewindViewer.js';
 import type {
   ConversationRecord,
   MessageRecord,
@@ -85,7 +85,7 @@ const createConversation = (messages: MessageRecord[]): ConversationRecord => ({
   messages,
 });
 
-describe('HistoryViewer', () => {
+describe('RewindViewer', () => {
   beforeEach(() => {
     keypressHandlers.length = 0;
     vi.clearAllMocks();
@@ -96,13 +96,13 @@ describe('HistoryViewer', () => {
     const onExit = vi.fn();
     const onRewind = vi.fn();
     const { lastFrame } = render(
-      <HistoryViewer
+      <RewindViewer
         conversation={conversation}
         onExit={onExit}
         onRewind={onRewind}
       />,
     );
-    expect(lastFrame()).toContain('History Viewer (0 of 0)');
+    expect(lastFrame()).toContain('Rewind Viewer (0 of 0)');
   });
 
   it('renders a single interaction', () => {
@@ -114,7 +114,7 @@ describe('HistoryViewer', () => {
     const onRewind = vi.fn();
 
     const { lastFrame } = render(
-      <HistoryViewer
+      <RewindViewer
         conversation={conversation}
         onExit={onExit}
         onRewind={onRewind}
@@ -134,7 +134,7 @@ describe('HistoryViewer', () => {
     const onExit = vi.fn();
     const onRewind = vi.fn();
     const { lastFrame } = render(
-      <HistoryViewer
+      <RewindViewer
         conversation={conversation}
         onExit={onExit}
         onRewind={onRewind}
@@ -159,7 +159,7 @@ describe('HistoryViewer', () => {
     const onExit = vi.fn();
     const onRewind = vi.fn();
     const { lastFrame } = render(
-      <HistoryViewer
+      <RewindViewer
         conversation={conversation}
         onExit={onExit}
         onRewind={onRewind}
@@ -191,7 +191,7 @@ describe('HistoryViewer', () => {
     const onExit = vi.fn();
     const onRewind = vi.fn();
     const { lastFrame } = render(
-      <HistoryViewer
+      <RewindViewer
         conversation={conversation}
         onExit={onExit}
         onRewind={onRewind}
@@ -199,7 +199,7 @@ describe('HistoryViewer', () => {
     );
 
     // Should show 1 of 4
-    expect(lastFrame()).toContain('History Viewer (1 of 4)');
+    expect(lastFrame()).toContain('Rewind Viewer (1 of 4)');
     expect(lastFrame()).toContain('Q1');
     expect(lastFrame()).toContain('Q3');
     // Q4 might be visible depending on window size (3 items per page),
@@ -207,12 +207,12 @@ describe('HistoryViewer', () => {
 
     // Scroll down
     triggerKey({ name: 'down' });
-    expect(lastFrame()).toContain('History Viewer (2 of 4)');
+    expect(lastFrame()).toContain('Rewind Viewer (2 of 4)');
 
     // Scroll to end
     triggerKey({ name: 'down' });
     triggerKey({ name: 'down' });
-    expect(lastFrame()).toContain('History Viewer (4 of 4)');
+    expect(lastFrame()).toContain('Rewind Viewer (4 of 4)');
 
     // Verify Q4 is visible and selected
     expect(lastFrame()).toContain('Q4');
@@ -229,7 +229,7 @@ describe('HistoryViewer', () => {
     const onExit = vi.fn();
     const onRewind = vi.fn();
     const { lastFrame } = render(
-      <HistoryViewer
+      <RewindViewer
         conversation={conversation}
         onExit={onExit}
         onRewind={onRewind}
@@ -237,16 +237,16 @@ describe('HistoryViewer', () => {
     );
 
     // Initial state: 1 of 3
-    expect(lastFrame()).toContain('History Viewer (1 of 3)');
+    expect(lastFrame()).toContain('Rewind Viewer (1 of 3)');
 
     // Up from first -> Last (3 of 3)
     triggerKey({ name: 'up' });
-    expect(lastFrame()).toContain('History Viewer (3 of 3)');
+    expect(lastFrame()).toContain('Rewind Viewer (3 of 3)');
     expect(lastFrame()).toContain('Q3'); // Ensure Q3 is visible (selected)
 
     // Down from last -> First (1 of 3)
     triggerKey({ name: 'down' });
-    expect(lastFrame()).toContain('History Viewer (1 of 3)');
+    expect(lastFrame()).toContain('Rewind Viewer (1 of 3)');
     expect(lastFrame()).toContain('Q1'); // Ensure Q1 is visible (selected)
   });
 
@@ -262,7 +262,7 @@ describe('HistoryViewer', () => {
     const onRewind = vi.fn();
 
     const { lastFrame } = render(
-      <HistoryViewer
+      <RewindViewer
         conversation={conversation}
         onExit={onExit}
         onRewind={onRewind}
@@ -270,7 +270,7 @@ describe('HistoryViewer', () => {
     );
 
     // Currently, it defaults to index 0 (1 of 5)
-    expect(lastFrame()).toContain('History Viewer (1 of 5)');
+    expect(lastFrame()).toContain('Rewind Viewer (1 of 5)');
     expect(lastFrame()).toContain('Q1');
     expect(lastFrame()).not.toContain('Q5'); // Q5 is at the end, should be hidden if start at top
   });
@@ -281,7 +281,7 @@ describe('HistoryViewer', () => {
         { type: 'user', content: 'Original Prompt', id: '1', timestamp: '1' },
       ]);
       const { lastFrame } = render(
-        <HistoryViewer
+        <RewindViewer
           conversation={conversation}
           onExit={vi.fn()}
           onRewind={vi.fn()}
@@ -309,7 +309,7 @@ describe('HistoryViewer', () => {
       const onRewind = vi.fn().mockReturnValue(rewindPromise);
 
       const { lastFrame } = render(
-        <HistoryViewer
+        <RewindViewer
           conversation={conversation}
           onExit={vi.fn()}
           onRewind={onRewind}
@@ -336,7 +336,7 @@ describe('HistoryViewer', () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
-      expect(onRewind).toHaveBeenCalledWith('msg-1', 'Old New', 1);
+      expect(onRewind).toHaveBeenCalledWith('msg-1', 'Old New');
       expect(lastFrame()).toContain('Rewinding conversation...');
 
       // Complete the rewind operation
@@ -360,7 +360,7 @@ describe('HistoryViewer', () => {
       ]);
       const onRewind = vi.fn().mockRejectedValue(new Error('Rewind failed'));
       const { lastFrame } = render(
-        <HistoryViewer
+        <RewindViewer
           conversation={conversation}
           onExit={vi.fn()}
           onRewind={onRewind}
@@ -385,7 +385,7 @@ describe('HistoryViewer', () => {
         { type: 'user', content: 'Old', id: 'msg-1', timestamp: '1' },
       ]);
       const { lastFrame } = render(
-        <HistoryViewer
+        <RewindViewer
           conversation={conversation}
           onExit={vi.fn()}
           onRewind={vi.fn()}
@@ -406,7 +406,7 @@ describe('HistoryViewer', () => {
         { type: 'user', content: 'Q2', id: '2', timestamp: '1' },
       ]);
       const { lastFrame } = render(
-        <HistoryViewer
+        <RewindViewer
           conversation={conversation}
           onExit={vi.fn()}
           onRewind={vi.fn()}
@@ -415,7 +415,7 @@ describe('HistoryViewer', () => {
 
       // Select Q1
       expect(lastFrame()).toContain('Q1');
-      expect(lastFrame()).toContain('History Viewer (1 of 2)');
+      expect(lastFrame()).toContain('Rewind Viewer (1 of 2)');
 
       triggerKey({ name: 'return' }); // Enter edit mode on Q1
       expect(lastFrame()).toContain('[Ctrl+S] Save');
@@ -425,8 +425,7 @@ describe('HistoryViewer', () => {
       // Should still be on Q1 (Edit mode active), not moved to Q2
       expect(lastFrame()).toContain('[Ctrl+S] Save');
       // Header should still say 1 of 2
-      expect(lastFrame()).toContain('History Viewer (1 of 2)');
+      expect(lastFrame()).toContain('Rewind Viewer (1 of 2)');
     });
   });
 });
-// Mock removed - using real InlineHistoryEditor logic via useKeypress mock

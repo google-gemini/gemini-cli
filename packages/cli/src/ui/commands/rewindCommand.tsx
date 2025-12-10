@@ -5,16 +5,15 @@
  */
 
 import { CommandKind, type SlashCommand } from './types.js';
-import { HistoryViewer } from '../components/HistoryViewer.js';
+import { RewindViewer } from '../components/RewindViewer.js';
 import { MessageType, type HistoryItem } from '../types.js';
 import { convertSessionToHistoryFormats } from '../hooks/useSessionBrowser.js';
 
 import type { Content } from '@google/genai';
-import { GeminiEventType } from '@google/gemini-cli-core';
 
-export const historyCommand: SlashCommand = {
-  name: 'history',
-  description: 'Navigate chat history to edit previous messages',
+export const rewindCommand: SlashCommand = {
+  name: 'rewind',
+  description: 'Jump back to a specific message and restart the conversation',
   kind: CommandKind.BUILT_IN,
   action: (context) => {
     const config = context.services.config;
@@ -52,19 +51,21 @@ export const historyCommand: SlashCommand = {
     return {
       type: 'custom_dialog',
       component: (
-        <HistoryViewer
+        <RewindViewer
           conversation={conversation}
           onExit={() => context.ui.removeComponent()}
-          onRewind={async (messageId, newText, promptCount) => {
+          onRewind={async (messageId, newText) => {
             try {
               const updatedConversation = recordingService.rewindTo(messageId);
-
               // Convert to UI and Client formats
               const { uiHistory, clientHistory } =
                 convertSessionToHistoryFormats(updatedConversation.messages);
 
               // Reset the client's internal history to match the file
               client.setHistory(clientHistory as unknown as Content[]);
+
+              // Reset context manager as we are rewinding history
+              config.getContextManager()?.reset();
 
               // Update UI History
               // We generate IDs based on index for the rewind history
@@ -84,71 +85,21 @@ export const historyCommand: SlashCommand = {
               // Wait a tick for Ink to clear the screen
               await new Promise((resolve) => setTimeout(resolve, 50));
 
+              // Submit the new text as a prompt to the main loop.
+              // This delegates stream handling, tool execution, and history updates
+              // (for the new message) to the main application logic.
+              context.ui.submitPrompt(newText);
+            } catch (error) {
               context.ui.addItem(
                 {
-                  type: MessageType.USER,
-                  text: newText,
+                  type: MessageType.ERROR,
+                  text:
+                    error instanceof Error
+                      ? error.message
+                      : 'Unknown error during rewind',
                 },
                 Date.now(),
               );
-
-              context.ui.setPendingItem({ type: MessageType.GEMINI, text: '' });
-
-              const abortController = new AbortController();
-
-              const prompt_id =
-                config.getSessionId() + '########' + promptCount;
-
-              const stream = await client.sendMessageStream(
-                [{ text: newText }],
-                abortController.signal,
-                prompt_id,
-              );
-
-              let fullResponseText = '';
-
-              for await (const event of stream) {
-                switch (event.type) {
-                  case GeminiEventType.Content:
-                    fullResponseText += event.value;
-                    context.ui.setPendingItem({
-                      type: MessageType.GEMINI,
-                      text: fullResponseText,
-                    });
-                    break;
-
-                  case GeminiEventType.Finished:
-                    break;
-
-                  case GeminiEventType.Error:
-                    context.ui.addItem(
-                      {
-                        type: MessageType.ERROR,
-                        text: event.value.error.message,
-                      },
-                      Date.now(),
-                    );
-                    break;
-                  default:
-                    continue;
-                }
-              }
-
-              // Clear pending item
-              context.ui.setPendingItem(null);
-
-              // Add final Gemini message to UI and Disk
-              if (fullResponseText) {
-                context.ui.addItem(
-                  {
-                    type: MessageType.GEMINI,
-                    text: fullResponseText,
-                  },
-                  Date.now(),
-                );
-              }
-            } catch (error) {
-              console.error('Failed to rewind and rerun:', error);
             }
           }}
         />

@@ -15,18 +15,17 @@ import {
   type MessageRecord,
   partToString,
 } from '@google/gemini-cli-core';
-import { InlineHistoryEditor } from './InlineHistoryEditor.js';
-import { useSessionStats } from '../contexts/SessionContext.js';
+import { InlineRewindEditor } from './InlineRewindEditor.js';
 
-interface HistoryViewerProps {
+interface RewindViewerProps {
   conversation: ConversationRecord;
   onExit: () => void;
-  onRewind: (messageId: string, newText: string, promptCount: number) => void;
+  onRewind: (messageId: string, newText: string) => void;
 }
 
 const MAX_LINES_PER_BOX = 5;
 
-export const HistoryViewer: React.FC<HistoryViewerProps> = ({
+export const RewindViewer: React.FC<RewindViewerProps> = ({
   conversation,
   onExit,
   onRewind,
@@ -38,8 +37,6 @@ export const HistoryViewer: React.FC<HistoryViewerProps> = ({
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-
-  const { getPromptCount } = useSessionStats();
 
   // Group messages
   const interactions = useMemo(() => {
@@ -80,7 +77,7 @@ export const HistoryViewer: React.FC<HistoryViewerProps> = ({
 
   useKeypress(
     (key) => {
-      // If we are editing, ignore navigation keys here (handled by InlineHistoryEditor)
+      // If we are editing, ignore navigation keys here (handled by InlineRewindEditor)
       if (editingIndex !== null) return;
 
       if (key.name === 'escape' || key.sequence === 'q') {
@@ -133,7 +130,7 @@ export const HistoryViewer: React.FC<HistoryViewerProps> = ({
       setEdits((prev) => ({ ...prev, [index]: newText }));
 
       // Attempt the rewind. If successful, parent closes this component.
-      await onRewind(messageId, newText, getPromptCount());
+      await onRewind(messageId, newText);
 
       // If we are here, the parent hasn't closed us yet (or logic finished).
       // We close the editor mode locally.
@@ -159,7 +156,7 @@ export const HistoryViewer: React.FC<HistoryViewerProps> = ({
         paddingX={1}
       >
         <Text bold color={Colors.AccentPurple}>
-          History Viewer ({interactions.length > 0 ? selectedIndex + 1 : 0} of{' '}
+          Rewind Viewer ({interactions.length > 0 ? selectedIndex + 1 : 0} of{' '}
           {interactions.length})
         </Text>
       </Box>
@@ -212,7 +209,7 @@ export const HistoryViewer: React.FC<HistoryViewerProps> = ({
 
                   {/* Logic Switch: Editor vs Text Viewer */}
                   {isEditingThis ? (
-                    <InlineHistoryEditor
+                    <InlineRewindEditor
                       initialText={displayUserText}
                       width={terminalWidth - 6}
                       onSave={(text) =>
