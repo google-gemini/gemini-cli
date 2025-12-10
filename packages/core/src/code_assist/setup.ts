@@ -13,6 +13,8 @@ import type {
 import { UserTierId } from './types.js';
 import { CodeAssistServer } from './server.js';
 import type { AuthClient } from 'google-auth-library';
+import { debugLogger } from '../utils/debugLogger.js';
+import { persistentState } from '../utils/persistentState.js';
 
 export class ProjectIdRequiredError extends Error {
   constructor() {
@@ -27,6 +29,8 @@ export interface UserData {
   userTier: UserTierId;
 }
 
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 /**
  *
  * @param projectId the user's project id, if any
@@ -37,6 +41,24 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
     process.env['GOOGLE_CLOUD_PROJECT'] ||
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
+
+  // Try to load from cache first
+  const cached = persistentState.get('userTierCache');
+  if (
+    cached &&
+    cached.projectId &&
+    Date.now() - cached.timestamp <= CACHE_TTL_MS
+  ) {
+    // If a specific project ID is requested, ensure the cache matches
+    if (!projectId || cached.projectId === projectId) {
+      debugLogger.debug('Using cached user tier and project ID.');
+      return {
+        projectId: cached.projectId,
+        userTier: cached.userTier,
+      };
+    }
+  }
+
   const caServer = new CodeAssistServer(client, projectId, {}, '', undefined);
   const coreClientMetadata: ClientMetadata = {
     ideType: 'IDE_UNSPECIFIED',
@@ -53,19 +75,28 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
   });
 
   if (loadRes.currentTier) {
+    let result: UserData;
     if (!loadRes.cloudaicompanionProject) {
       if (projectId) {
-        return {
+        result = {
           projectId,
           userTier: loadRes.currentTier.id,
         };
+      } else {
+        throw new ProjectIdRequiredError();
       }
-      throw new ProjectIdRequiredError();
+    } else {
+      result = {
+        projectId: loadRes.cloudaicompanionProject,
+        userTier: loadRes.currentTier.id,
+      };
     }
-    return {
-      projectId: loadRes.cloudaicompanionProject,
-      userTier: loadRes.currentTier.id,
-    };
+    // Cache the result
+    persistentState.set('userTierCache', {
+      ...result,
+      timestamp: Date.now(),
+    });
+    return result;
   }
 
   const tier = getOnboardTier(loadRes);
@@ -98,18 +129,28 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
 
   if (!lroRes.response?.cloudaicompanionProject?.id) {
     if (projectId) {
-      return {
+      const result = {
         projectId,
         userTier: tier.id,
       };
+      persistentState.set('userTierCache', {
+        ...result,
+        timestamp: Date.now(),
+      });
+      return result;
     }
     throw new ProjectIdRequiredError();
   }
 
-  return {
+  const finalResult = {
     projectId: lroRes.response.cloudaicompanionProject.id,
     userTier: tier.id,
   };
+  persistentState.set('userTierCache', {
+    ...finalResult,
+    timestamp: Date.now(),
+  });
+  return finalResult;
 }
 
 function getOnboardTier(res: LoadCodeAssistResponse): GeminiUserTier {

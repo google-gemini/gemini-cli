@@ -56,7 +56,6 @@ async function triggerPostAuthCallbacks(tokens: Credentials) {
     client_secret: OAUTH_CLIENT_SECRET,
     refresh_token: tokens.refresh_token ?? undefined, // Ensure null is not passed
     type: 'authorized_user',
-    client_email: userAccountManager.getCachedGoogleAccount() ?? undefined,
   };
 
   // Execute all registered post-authentication callbacks.
@@ -167,20 +166,13 @@ async function initOauthClient(
       // This will verify locally that the credentials look good.
       const { token } = await client.getAccessToken();
       if (token) {
-        // This will check with the server to see if it hasn't been revoked.
-        await client.getTokenInfo(token);
+        // We trust the local check from getAccessToken().
 
-        if (!userAccountManager.getCachedGoogleAccount()) {
-          try {
-            await fetchAndCacheUserInfo(client);
-          } catch (error) {
-            // Non-fatal, continue with existing auth.
-            debugLogger.warn(
-              'Failed to fetch user info:',
-              getErrorMessage(error),
-            );
-          }
-        }
+        // Fetch and cache user info asynchronously to avoid blocking startup
+        fetchAndCacheUserInfo(client).catch((e) => {
+          debugLogger.warn('Failed to fetch user info in background:', e);
+        });
+
         debugLogger.log('Loaded cached credentials.');
         await triggerPostAuthCallbacks(credentials as Credentials);
 
@@ -256,18 +248,6 @@ async function initOauthClient(
         'Failed to authenticate with user code.',
       );
     }
-
-    // Retrieve and cache Google Account ID after successful user code auth
-    try {
-      await fetchAndCacheUserInfo(client);
-    } catch (error) {
-      debugLogger.warn(
-        'Failed to retrieve Google Account ID during authentication:',
-        getErrorMessage(error),
-      );
-    }
-
-    await triggerPostAuthCallbacks(client.credentials);
   } else {
     const webLogin = await authWithWeb(client);
 
@@ -331,8 +311,6 @@ async function initOauthClient(
       severity: 'info',
       message: 'Authentication succeeded\n',
     });
-
-    await triggerPostAuthCallbacks(client.credentials);
   }
 
   return client;

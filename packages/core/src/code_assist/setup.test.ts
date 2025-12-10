@@ -10,8 +10,18 @@ import { CodeAssistServer } from '../code_assist/server.js';
 import type { OAuth2Client } from 'google-auth-library';
 import type { GeminiUserTier } from './types.js';
 import { UserTierId } from './types.js';
+import {
+  persistentState,
+  type PersistentStateData,
+} from '../utils/persistentState.js';
 
 vi.mock('../code_assist/server.js');
+vi.mock('../utils/persistentState.js', () => ({
+  persistentState: {
+    get: vi.fn(),
+    set: vi.fn(),
+  },
+}));
 
 const mockPaidTier: GeminiUserTier = {
   id: UserTierId.STANDARD,
@@ -26,6 +36,91 @@ const mockFreeTier: GeminiUserTier = {
   description: 'Free tier',
   isDefault: true,
 };
+
+describe('setupUser with caching', () => {
+  let mockLoad: ReturnType<typeof vi.fn>;
+  let mockOnboardUser: ReturnType<typeof vi.fn>;
+  // unused variables mockCacheDir, mockCacheFile removed to satisfy lint
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockLoad = vi.fn();
+    mockOnboardUser = vi.fn();
+
+    vi.mocked(persistentState.get).mockReturnValue(undefined); // Default no cache
+
+    vi.mocked(CodeAssistServer).mockImplementation(
+      () =>
+        ({
+          loadCodeAssist: mockLoad,
+          onboardUser: mockOnboardUser,
+        }) as unknown as CodeAssistServer,
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should return cached data if valid cache exists', async () => {
+    const cachedData = {
+      projectId: 'cached-project',
+      userTier: UserTierId.STANDARD,
+      timestamp: Date.now(),
+    };
+    vi.mocked(persistentState.get).mockReturnValue(cachedData);
+
+    const result = await setupUser({} as OAuth2Client);
+
+    expect(result).toEqual({
+      projectId: 'cached-project',
+      userTier: UserTierId.STANDARD,
+    });
+    expect(mockLoad).not.toHaveBeenCalled();
+  });
+
+  it('should ignore expired cache', async () => {
+    const cachedData = {
+      projectId: 'cached-project',
+      userTier: UserTierId.STANDARD,
+      timestamp: Date.now() - 25 * 60 * 60 * 1000, // 25 hours ago
+    };
+    vi.mocked(persistentState.get).mockReturnValue(cachedData);
+
+    // Mock server response
+    mockLoad.mockResolvedValue({
+      currentTier: mockPaidTier,
+      cloudaicompanionProject: 'server-project',
+    });
+
+    const result = await setupUser({} as OAuth2Client);
+
+    expect(result).toEqual({
+      projectId: 'server-project',
+      userTier: 'standard-tier',
+    });
+    expect(mockLoad).toHaveBeenCalled();
+  });
+
+  it('should write to cache after successful fetch', async () => {
+    vi.mocked(persistentState.get).mockReturnValue(undefined);
+    mockLoad.mockResolvedValue({
+      currentTier: mockPaidTier,
+      cloudaicompanionProject: 'server-project',
+    });
+
+    await setupUser({} as OAuth2Client);
+
+    expect(persistentState.set).toHaveBeenCalled();
+    const args = vi.mocked(persistentState.set).mock.calls[0];
+    expect(args[0]).toBe('userTierCache');
+    const content = args[1] as PersistentStateData['userTierCache'];
+    expect(content).toMatchObject({
+      projectId: 'server-project',
+      userTier: 'standard-tier',
+    });
+  });
+});
 
 describe('setupUser for existing user', () => {
   let mockLoad: ReturnType<typeof vi.fn>;
