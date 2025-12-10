@@ -33,7 +33,6 @@ import {
   runExitCleanup,
   registerTelemetryConfig,
 } from './utils/cleanup.js';
-import { getCliVersion } from './utils/version.js';
 import {
   type Config,
   type ResumedSessionData,
@@ -63,6 +62,7 @@ import {
   SessionEndReason,
   fireSessionStartHook,
   fireSessionEndHook,
+  getVersion,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -196,7 +196,7 @@ export async function startInteractiveUI(
     });
   }
 
-  const version = await getCliVersion();
+  const version = await getVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
   const consolePatcher = new ConsolePatcher({
@@ -498,6 +498,20 @@ export async function main() {
 
     // Handle --list-sessions flag
     if (config.getListSessions()) {
+      // Attempt auth for summary generation (gracefully skips if not configured)
+      const authType = settings.merged.security?.auth?.selectedType;
+      if (authType) {
+        try {
+          await config.refreshAuth(authType);
+        } catch (e) {
+          // Auth failed - continue without summary generation capability
+          debugLogger.debug(
+            'Auth failed for --list-sessions, summaries may not be generated:',
+            e,
+          );
+        }
+      }
+
       await listSessions(config);
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);

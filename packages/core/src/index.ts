@@ -78,6 +78,8 @@ export * from './utils/debugLogger.js';
 export * from './utils/events.js';
 export * from './utils/extensionLoader.js';
 export * from './utils/package.js';
+export * from './utils/version.js';
+export * from './utils/checkpointUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -103,6 +105,7 @@ export * from './tools/tools.js';
 export * from './tools/tool-error.js';
 export * from './tools/tool-registry.js';
 export * from './tools/tool-names.js';
+export * from './resources/resource-registry.js';
 
 // Export prompt logic
 export * from './prompts/mcp-prompts.js';
