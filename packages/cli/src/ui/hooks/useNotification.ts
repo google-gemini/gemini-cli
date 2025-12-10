@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import notifier from 'node-notifier';
 import fs from 'node:fs';
 import process from 'node:process';
@@ -30,11 +30,19 @@ export const useNotification = (
   isFocused: boolean,
   settings: Settings,
 ) => {
+  const hasNotified = useRef(false);
+
   useEffect(() => {
+    if (streamingState !== StreamingState.WaitingForConfirmation) {
+      hasNotified.current = false;
+      return;
+    }
+
     if (
       streamingState === StreamingState.WaitingForConfirmation &&
       !isFocused &&
-      settings.ui?.enableNotifications
+      settings.ui?.enableNotifications &&
+      !hasNotified.current
     ) {
       const isMac = process.platform === 'darwin';
       const termProgram = process.env['TERM_PROGRAM'];
@@ -65,6 +73,7 @@ export const useNotification = (
       }
 
       notifier.notify(options);
+      hasNotified.current = true;
     }
   }, [streamingState, isFocused, settings.ui?.enableNotifications]);
 };

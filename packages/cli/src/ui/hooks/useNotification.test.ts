@@ -213,4 +213,56 @@ describe('useNotification', () => {
       }),
     );
   });
+
+  it('should not notify multiple times for the same confirmation event when focus toggles', () => {
+    Object.defineProperty(process, 'platform', {
+      value: 'darwin',
+    });
+    const settings = createSettings(true);
+    const { rerender } = renderHook(
+      ({ state, focused }) => useNotification(state, focused, settings),
+      {
+        initialProps: {
+          state: StreamingState.WaitingForConfirmation,
+          focused: false,
+        },
+      },
+    );
+
+    // First render: Waiting + Not Focused -> Notify
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+
+    // Rerender: Waiting + Focused -> No new notification
+    rerender({ state: StreamingState.WaitingForConfirmation, focused: true });
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+
+    // Rerender: Waiting + Not Focused again -> Should NOT notify again
+    rerender({ state: StreamingState.WaitingForConfirmation, focused: false });
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+  });
+
+  it('should notify again if state changes to something else then back to Waiting', () => {
+    Object.defineProperty(process, 'platform', {
+      value: 'darwin',
+    });
+    const settings = createSettings(true);
+    const { rerender } = renderHook(
+      ({ state, focused }) => useNotification(state, focused, settings),
+      {
+        initialProps: {
+          state: StreamingState.WaitingForConfirmation,
+          focused: false,
+        },
+      },
+    );
+
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+
+    // State changes to responding
+    rerender({ state: StreamingState.Responding, focused: false });
+
+    // State changes back to Waiting + Not Focused -> Notify again
+    rerender({ state: StreamingState.WaitingForConfirmation, focused: false });
+    expect(mockNotify).toHaveBeenCalledTimes(2);
+  });
 });
