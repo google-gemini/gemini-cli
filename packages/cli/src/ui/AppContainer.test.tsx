@@ -73,6 +73,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     disableMouseEvents: vi.fn(),
   };
 });
+import ansiEscapes from 'ansi-escapes';
 import type { LoadedSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
@@ -1912,6 +1913,37 @@ describe('AppContainer State Management', () => {
       expect(capturedUIState.userMessages).toContain('first prompt');
       expect(capturedUIState.userMessages).toContain('second prompt');
 
+      unmount();
+    });
+  });
+
+  describe('Regression Tests', () => {
+    it('does not refresh static on startup if banner text is empty', async () => {
+      // Mock banner text to be empty strings
+      vi.spyOn(mockConfig, 'getBannerTextNoCapacityIssues').mockResolvedValue(
+        '',
+      );
+      vi.spyOn(mockConfig, 'getBannerTextCapacityIssues').mockResolvedValue('');
+
+      // Clear previous calls
+      mocks.mockStdout.write.mockClear();
+
+      const { unmount } = renderAppContainer();
+
+      // Allow async effects to run
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      // Wait for fetchBannerTexts to complete
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+
+      // Check that clearTerminal was NOT written to stdout
+      const clearTerminalCalls = mocks.mockStdout.write.mock.calls.filter(
+        (call: unknown[]) => call[0] === ansiEscapes.clearTerminal,
+      );
+
+      expect(clearTerminalCalls).toHaveLength(0);
       unmount();
     });
   });

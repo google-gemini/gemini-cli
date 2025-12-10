@@ -22,6 +22,7 @@ import { directoryCommand } from '../ui/commands/directoryCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
+import { hooksCommand } from '../ui/commands/hooksCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
 import { initCommand } from '../ui/commands/initCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
@@ -72,6 +73,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       editorCommand,
       extensionsCommand(this.config?.getEnableExtensionReloading()),
       helpCommand,
+      ...(this.config?.getEnableHooks() ? [hooksCommand] : []),
       await ideCommand(),
       initCommand,
       mcpCommand,

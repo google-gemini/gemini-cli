@@ -1024,11 +1024,28 @@ export class TestRig {
     return null;
   }
 
-  async runInteractive(...args: string[]): Promise<InteractiveRun> {
-    const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
-    const commandArgs = [...initialArgs, ...args];
+  async runInteractive(
+    options?: { yolo?: boolean } | string,
+    ...args: string[]
+  ): Promise<InteractiveRun> {
+    // Handle backward compatibility: if first param is a string, treat as arg
+    let yolo = true; // Default to YOLO mode
+    let additionalArgs: string[] = args;
 
-    const options: pty.IPtyForkOptions = {
+    if (typeof options === 'string') {
+      // Old-style call: runInteractive('--debug')
+      additionalArgs = [options, ...args];
+    } else if (typeof options === 'object' && options !== null) {
+      // New-style call: runInteractive({ yolo: false })
+      yolo = options.yolo !== false;
+    }
+
+    const { command, initialArgs } = this._getCommandAndArgs(
+      yolo ? ['--yolo'] : [],
+    );
+    const commandArgs = [...initialArgs, ...additionalArgs];
+
+    const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
       rows: 80,
@@ -1039,7 +1056,7 @@ export class TestRig {
     };
 
     const executable = command === 'node' ? process.execPath : command;
-    const ptyProcess = pty.spawn(executable, commandArgs, options);
+    const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
 
     const run = new InteractiveRun(ptyProcess);
     // Wait for the app to be ready

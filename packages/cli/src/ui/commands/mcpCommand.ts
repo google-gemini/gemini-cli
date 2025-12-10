@@ -8,10 +8,13 @@ import type {
   SlashCommand,
   SlashCommandActionReturn,
   CommandContext,
-  MessageActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
-import type { DiscoveredMCPPrompt } from '@google/gemini-cli-core';
+import type {
+  DiscoveredMCPPrompt,
+  DiscoveredMCPResource,
+  MessageActionReturn,
+} from '@google/gemini-cli-core';
 import {
   DiscoveredMCPTool,
   getMCPDiscoveryState,
@@ -29,7 +32,7 @@ const authCommand: SlashCommand = {
   name: 'auth',
   description: 'Authenticate with an OAuth-enabled MCP server',
   kind: CommandKind.BUILT_IN,
-  autoExecute: false,
+  autoExecute: true,
   action: async (
     context: CommandContext,
     args: string,
@@ -228,6 +231,13 @@ const listAction = async (
         serverNames.includes(prompt.serverName as string),
     ) as DiscoveredMCPPrompt[];
 
+  const resourceRegistry = config.getResourceRegistry();
+  const mcpResources = resourceRegistry
+    .getAllResources()
+    .filter((entry) =>
+      serverNames.includes(entry.serverName),
+    ) as DiscoveredMCPResource[];
+
   const authStatus: HistoryItemMcpStatus['authStatus'] = {};
   const tokenStorage = new MCPOAuthTokenStorage();
   for (const serverName of serverNames) {
@@ -262,6 +272,13 @@ const listAction = async (
       serverName: prompt.serverName as string,
       name: prompt.name,
       description: prompt.description,
+    })),
+    resources: mcpResources.map((resource) => ({
+      serverName: resource.serverName,
+      name: resource.name,
+      uri: resource.uri,
+      mimeType: resource.mimeType,
+      description: resource.description,
     })),
     authStatus,
     blockedServers: blockedMcpServers,

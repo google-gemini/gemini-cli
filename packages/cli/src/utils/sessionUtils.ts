@@ -15,6 +15,7 @@ import {
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
+import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
 
 /**
  * Constant for the resume "latest" identifier.
@@ -60,6 +61,8 @@ export interface SessionInfo {
   isCurrentSession: boolean;
   /** Display index in the list */
   index: number;
+  /** AI-generated summary of the session (if available) */
+  summary?: string;
   /** Full concatenated content (only loaded when needed for search) */
   fullContent?: string;
   /** Processed messages with normalized roles (only loaded when needed) */
@@ -259,10 +262,13 @@ export const getAllSessionFiles = async (
             startTime: content.startTime,
             lastUpdated: content.lastUpdated,
             messageCount: content.messages.length,
-            displayName: firstUserMessage,
+            displayName: content.summary
+              ? stripUnsafeCharacters(content.summary)
+              : firstUserMessage,
             firstUserMessage,
             isCurrentSession,
             index: 0, // Will be set after sorting valid sessions
+            summary: content.summary,
             fullContent,
             messages,
           };

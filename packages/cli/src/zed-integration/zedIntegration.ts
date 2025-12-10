@@ -113,8 +113,16 @@ export class GeminiAgent {
 
   async authenticate({ methodId }: acp.AuthenticateRequest): Promise<void> {
     const method = z.nativeEnum(AuthType).parse(methodId);
+    const selectedAuthType = this.settings.merged.security?.auth?.selectedType;
 
-    await clearCachedCredentialFile();
+    // Only clear credentials when switching to a different auth method
+    if (selectedAuthType && selectedAuthType !== method) {
+      await clearCachedCredentialFile();
+    }
+
+    // Refresh auth with the requested method
+    // This will reuse existing credentials if they're valid,
+    // or perform new authentication if needed
     await this.config.refreshAuth(method);
     this.settings.setValue(
       SettingScope.User,
@@ -281,6 +289,7 @@ export class Session {
                 text: part.text,
               };
 
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
               this.sendUpdate({
                 sessionUpdate: part.thought
                   ? 'agent_thought_chunk'

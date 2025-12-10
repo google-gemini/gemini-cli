@@ -224,11 +224,20 @@ export interface JsonMcpPrompt {
   description?: string;
 }
 
+export interface JsonMcpResource {
+  serverName: string;
+  name?: string;
+  uri?: string;
+  mimeType?: string;
+  description?: string;
+}
+
 export type HistoryItemMcpStatus = HistoryItemBase & {
   type: 'mcp_status';
   servers: Record<string, MCPServerConfig>;
   tools: JsonMcpTool[];
   prompts: JsonMcpPrompt[];
+  resources: JsonMcpResource[];
   authStatus: Record<
     string,
     'authenticated' | 'expired' | 'unauthenticated' | 'not-configured'
@@ -238,6 +247,18 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
   connectingServers: string[];
   showDescriptions: boolean;
   showSchema: boolean;
+};
+
+export type HistoryItemHooksList = HistoryItemBase & {
+  type: 'hooks_list';
+  hooks: Array<{
+    config: { command?: string; type: string; timeout?: number };
+    source: string;
+    eventName: string;
+    matcher?: string;
+    sequential?: boolean;
+    enabled: boolean;
+  }>;
 };
 
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
@@ -264,7 +285,8 @@ export type HistoryItemWithoutId =
   | HistoryItemExtensionsList
   | HistoryItemToolsList
   | HistoryItemMcpStatus
-  | HistoryItemChatList;
+  | HistoryItemChatList
+  | HistoryItemHooksList;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -286,6 +308,7 @@ export enum MessageType {
   TOOLS_LIST = 'tools_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
+  HOOKS_LIST = 'hooks_list',
 }
 
 // Simplified message structure for internal feedback

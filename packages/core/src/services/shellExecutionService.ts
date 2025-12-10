@@ -24,6 +24,11 @@ const { Terminal } = pkg;
 const SIGKILL_TIMEOUT_MS = 200;
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
+// We want to allow shell outputs that are close to the context window in size.
+// 300,000 lines is roughly equivalent to a large context window, ensuring
+// we capture significant output from long-running commands.
+export const SCROLLBACK_LIMIT = 300000;
+
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
 
@@ -77,6 +82,7 @@ export interface ShellExecutionConfig {
   defaultBg?: string;
   // Used for testing
   disableDynamicLineTrimming?: boolean;
+  scrollback?: number;
 }
 
 /**
@@ -110,11 +116,89 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
   const lines: string[] = [];
   for (let i = 0; i < buffer.length; i++) {
     const line = buffer.getLine(i);
-    const lineContent = line ? line.translateToString() : '';
-    lines.push(lineContent);
+    if (!line) {
+      continue;
+    }
+    // If the NEXT line is wrapped, it means it's a continuation of THIS line.
+    // We should not trim the right side of this line because trailing spaces
+    // might be significant parts of the wrapped content.
+    // If it's not wrapped, we trim normally.
+    let trimRight = true;
+    if (i + 1 < buffer.length) {
+      const nextLine = buffer.getLine(i + 1);
+      if (nextLine?.isWrapped) {
+        trimRight = false;
+      }
+    }
+
+    const lineContent = line.translateToString(trimRight);
+
+    if (line.isWrapped && lines.length > 0) {
+      lines[lines.length - 1] += lineContent;
+    } else {
+      lines.push(lineContent);
+    }
   }
-  return lines.join('\n').trimEnd();
+
+  // Remove trailing empty lines
+  while (lines.length > 0 && lines[lines.length - 1] === '') {
+    lines.pop();
+  }
+
+  return lines.join('\n');
 };
+
+function getSanitizedEnv(): NodeJS.ProcessEnv {
+  const isRunningInGithub =
+    process.env['GITHUB_SHA'] || process.env['SURFACE'] === 'Github';
+
+  if (!isRunningInGithub) {
+    // For local runs, we want to preserve the user's full environment.
+    return { ...process.env };
+  }
+
+  // For CI runs (GitHub), we sanitize the environment for security.
+  const env: NodeJS.ProcessEnv = {};
+  const essentialVars = [
+    // Cross-platform
+    'PATH',
+    // Windows specific
+    'Path',
+    'SYSTEMROOT',
+    'SystemRoot',
+    'COMSPEC',
+    'ComSpec',
+    'PATHEXT',
+    'WINDIR',
+    'TEMP',
+    'TMP',
+    'USERPROFILE',
+    'SYSTEMDRIVE',
+    'SystemDrive',
+    // Unix/Linux/macOS specific
+    'HOME',
+    'LANG',
+    'SHELL',
+    'TMPDIR',
+    'USER',
+    'LOGNAME',
+  ];
+
+  for (const key of essentialVars) {
+    if (process.env[key] !== undefined) {
+      env[key] = process.env[key];
+    }
+  }
+
+  // Always carry over test-specific variables for our own integration tests.
+  for (const key in process.env) {
+    if (key.startsWith('GEMINI_CLI_TEST')) {
+      env[key] = process.env[key];
+    }
+  }
+
+  return env;
+}
 
 /**
  * A centralized service for executing shell commands with robust process
@@ -217,7 +301,7 @@ export class ShellExecutionService {
         shell: false,
         detached: !isWindows,
         env: {
-          ...process.env,
+          ...getSanitizedEnv(),
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: 'cat',
@@ -431,7 +515,7 @@ export class ShellExecutionService {
         cols,
         rows,
         env: {
-          ...process.env,
+          ...getSanitizedEnv(),
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: shellExecutionConfig.pager ?? 'cat',
@@ -445,6 +529,7 @@ export class ShellExecutionService {
           allowProposedApi: true,
           cols,
           rows,
+          scrollback: shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT,
         });
         headlessTerminal.scrollToTop();
 
@@ -486,24 +571,14 @@ export class ShellExecutionService {
           if (shellExecutionConfig.showColor) {
             newOutput = serializeTerminalToObject(headlessTerminal);
           } else {
-            const lines: AnsiOutput = [];
-            for (let y = 0; y < headlessTerminal.rows; y++) {
-              const line = buffer.getLine(buffer.viewportY + y);
-              const lineContent = line ? line.translateToString(true) : '';
-              lines.push([
-                {
-                  text: lineContent,
-                  bold: false,
-                  italic: false,
-                  underline: false,
-                  dim: false,
-                  inverse: false,
-                  fg: '',
-                  bg: '',
-                },
-              ]);
-            }
-            newOutput = lines;
+            newOutput = (serializeTerminalToObject(headlessTerminal) || []).map(
+              (line) =>
+                line.map((token) => {
+                  token.fg = '';
+                  token.bg = '';
+                  return token;
+                }),
+            );
           }
 
           let lastNonEmptyLine = -1;
@@ -662,6 +737,7 @@ export class ShellExecutionService {
               });
             });
 
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
             Promise.race([processingComplete, abortFired]).then(() => {
               finalize();
             });

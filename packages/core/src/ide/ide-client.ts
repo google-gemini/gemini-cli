@@ -151,9 +151,10 @@ export class IdeClient {
     this.setState(IDEConnectionStatus.Connecting);
 
     this.connectionConfig = await this.getConnectionConfigFromFile();
-    if (this.connectionConfig?.authToken) {
-      this.authToken = this.connectionConfig.authToken;
-    }
+    this.authToken =
+      this.connectionConfig?.authToken ??
+      process.env['GEMINI_CLI_IDE_AUTH_TOKEN'];
+
     const workspacePath =
       this.connectionConfig?.workspacePath ??
       process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
@@ -278,6 +279,7 @@ export class IdeClient {
     });
 
     // Ensure the mutex is released only after the diff interaction is complete.
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     promise.finally(release);
 
     return promise;
@@ -406,6 +408,7 @@ export class IdeClient {
       IDEConnectionStatus.Disconnected,
       'IDE integration disabled. To enable it again, run /ide enable.',
     );
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.client?.close();
   }
 

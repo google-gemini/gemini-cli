@@ -84,6 +84,7 @@ export function useShellHistory(
       const loadedHistory = await readHistoryFile(filePath);
       setHistory(loadedHistory.reverse()); // Newest first
     }
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     loadHistory();
   }, [projectRoot, storage]);
 
@@ -97,6 +98,7 @@ export function useShellHistory(
         .filter(Boolean);
       setHistory(newHistory);
       // Write to file in reverse order (oldest first)
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       writeHistoryFile(historyFilePath, [...newHistory].reverse());
       setHistoryIndex(-1);
     },

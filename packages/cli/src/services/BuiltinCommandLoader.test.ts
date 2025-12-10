@@ -98,6 +98,7 @@ describe('BuiltinCommandLoader', () => {
       getFolderTrust: vi.fn().mockReturnValue(true),
       getEnableMessageBusIntegration: () => false,
       getEnableExtensionReloading: () => false,
+      getEnableHooks: () => false,
     } as unknown as Config;
 
     restoreCommandMock.mockReturnValue({
@@ -172,6 +173,7 @@ describe('BuiltinCommandLoader', () => {
     const mockConfigWithMessageBus = {
       ...mockConfig,
       getEnableMessageBusIntegration: () => true,
+      getEnableHooks: () => false,
     } as unknown as Config;
     const loader = new BuiltinCommandLoader(mockConfigWithMessageBus);
     const commands = await loader.loadCommands(new AbortController().signal);
@@ -183,6 +185,7 @@ describe('BuiltinCommandLoader', () => {
     const mockConfigWithoutMessageBus = {
       ...mockConfig,
       getEnableMessageBusIntegration: () => false,
+      getEnableHooks: () => false,
     } as unknown as Config;
     const loader = new BuiltinCommandLoader(mockConfigWithoutMessageBus);
     const commands = await loader.loadCommands(new AbortController().signal);
@@ -201,6 +204,7 @@ describe('BuiltinCommandLoader profile', () => {
       getCheckpointingEnabled: () => false,
       getEnableMessageBusIntegration: () => false,
       getEnableExtensionReloading: () => false,
+      getEnableHooks: () => false,
     } as unknown as Config;
   });
 

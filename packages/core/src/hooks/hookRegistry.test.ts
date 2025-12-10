@@ -50,6 +50,7 @@ describe('HookRegistry', () => {
       storage: mockStorage,
       getExtensions: vi.fn().mockReturnValue([]),
       getHooks: vi.fn().mockReturnValue({}),
+      getDisabledHooks: vi.fn().mockReturnValue([]),
     } as unknown as Config;
 
     hookRegistry = new HookRegistry(mockConfig);

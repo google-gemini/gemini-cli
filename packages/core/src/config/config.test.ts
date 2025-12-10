@@ -888,6 +888,11 @@ describe('Server Config (config.ts)', () => {
       expect(SubagentToolWrapperMock).not.toHaveBeenCalled();
     });
 
+    it('should not set default codebase investigator model in config (defaults in registry)', () => {
+      const config = new Config(baseParams);
+      expect(config.getCodebaseInvestigatorSettings()?.model).toBeUndefined();
+    });
+
     describe('with minified tool class names', () => {
       beforeEach(() => {
         Object.defineProperty(
@@ -1339,6 +1344,30 @@ describe('Generation Config Merging (HACK)', () => {
     expect(serviceConfig.overrides).toEqual(userOverrides);
   });
 
+  it('should merge default overrides when user provides only aliases', () => {
+    const userAliases = {
+      'my-alias': {
+        modelConfig: { model: 'my-model' },
+      },
+    };
+
+    const params: ConfigParameters = {
+      ...baseParams,
+      modelConfigServiceConfig: {
+        aliases: userAliases,
+      },
+    };
+
+    const config = new Config(params);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const serviceConfig = (config.modelConfigService as any).config;
+
+    // Assert that the user's aliases are present
+    expect(serviceConfig.aliases).toEqual(userAliases);
+    // Assert that the default overrides are present
+    expect(serviceConfig.overrides).toEqual(DEFAULT_MODEL_CONFIGS.overrides);
+  });
+
   it('should use user-provided aliases if they exist', () => {
     const userAliases = {
       'my-alias': {
@@ -1630,5 +1659,44 @@ describe('Config setExperiments logging', () => {
     expect(loggedSummary).not.toContain('int32ListLength: 0');
 
     debugSpy.mockRestore();
+  });
+});
+
+describe('Availability Service Integration', () => {
+  const baseModel = 'test-model';
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: baseModel,
+    cwd: '.',
+  };
+
+  it('setActiveModel updates active model and emits event', async () => {
+    const config = new Config(baseParams);
+    const model1 = 'model1';
+    const model2 = 'model2';
+
+    config.setActiveModel(model1);
+    expect(config.getActiveModel()).toBe(model1);
+    expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(model1);
+
+    config.setActiveModel(model2);
+    expect(config.getActiveModel()).toBe(model2);
+    expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(model2);
+  });
+
+  it('getActiveModel defaults to configured model if not set', () => {
+    const config = new Config(baseParams);
+    expect(config.getActiveModel()).toBe(baseModel);
+  });
+
+  it('resetTurn delegates to availability service', () => {
+    const config = new Config(baseParams);
+    const service = config.getModelAvailabilityService();
+    const spy = vi.spyOn(service, 'resetTurn');
+
+    config.resetTurn();
+    expect(spy).toHaveBeenCalled();
   });
 });

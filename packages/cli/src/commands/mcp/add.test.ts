@@ -131,6 +131,38 @@ describe('mcp add command', () => {
     );
   });
 
+  it('should add an sse server using --type alias', async () => {
+    await parser.parseAsync(
+      'add --type sse --scope user -H "X-API-Key: your-key" sse-server https://example.com/sse',
+    );
+
+    expect(mockSetValue).toHaveBeenCalledWith(SettingScope.User, 'mcpServers', {
+      'sse-server': {
+        url: 'https://example.com/sse',
+        type: 'sse',
+        headers: { 'X-API-Key': 'your-key' },
+      },
+    });
+  });
+
+  it('should add an http server using --type alias', async () => {
+    await parser.parseAsync(
+      'add --type http -H "Authorization: Bearer your-token" http-server https://example.com/mcp',
+    );
+
+    expect(mockSetValue).toHaveBeenCalledWith(
+      SettingScope.Workspace,
+      'mcpServers',
+      {
+        'http-server': {
+          url: 'https://example.com/mcp',
+          type: 'http',
+          headers: { Authorization: 'Bearer your-token' },
+        },
+      },
+    );
+  });
+
   it('should handle MCP server args with -- separator', async () => {
     await parser.parseAsync(
       'add my-server npx -- -y http://example.com/some-package',

@@ -96,6 +96,7 @@ export class GcpLogExporter implements LogRecordExporter {
         .finally(() => {
           const index = this.pendingWrites.indexOf(writePromise);
           if (index > -1) {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.pendingWrites.splice(index, 1);
           }
         });

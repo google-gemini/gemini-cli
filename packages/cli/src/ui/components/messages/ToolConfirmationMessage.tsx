@@ -57,6 +57,7 @@ export const ToolConfirmationMessage: React.FC<
           setIsDiffingEnabled(client?.isDiffingEnabled() ?? false);
         }
       };
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       getIdeClient();
     }
     return () => {
@@ -75,6 +76,7 @@ export const ToolConfirmationMessage: React.FC<
         );
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     onConfirm(outcome);
   };
 
@@ -84,6 +86,7 @@ export const ToolConfirmationMessage: React.FC<
     (key) => {
       if (!isFocused) return;
       if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleConfirm(ToolConfirmationOutcome.Cancel);
       }
     },

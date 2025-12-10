@@ -100,6 +100,7 @@ export function handleError(
     const formattedError = formatter.formatError(
       error instanceof Error ? error : new Error(getErrorMessage(error)),
       errorCode,
+      config.getSessionId(),
     );
 
     console.error(formattedError);
@@ -152,6 +153,7 @@ export function handleToolError(
       const formattedError = formatter.formatError(
         toolExecutionError,
         errorType ?? toolExecutionError.exitCode,
+        config.getSessionId(),
       );
       console.error(formattedError);
     } else {
@@ -191,6 +193,7 @@ export function handleCancellationError(config: Config): never {
     const formattedError = formatter.formatError(
       cancellationError,
       cancellationError.exitCode,
+      config.getSessionId(),
     );
 
     console.error(formattedError);
@@ -231,6 +234,7 @@ export function handleMaxTurnsExceededError(config: Config): never {
     const formattedError = formatter.formatError(
       maxTurnsError,
       maxTurnsError.exitCode,
+      config.getSessionId(),
     );
 
     console.error(formattedError);

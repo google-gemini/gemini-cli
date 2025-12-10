@@ -1166,6 +1166,7 @@ describe('CoreToolScheduler request queueing', () => {
     };
 
     // Schedule the first call, which will pause execution.
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     scheduler.schedule([request1], abortController.signal);
 
     // Wait for the first call to be in the 'executing' state.

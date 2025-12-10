@@ -261,6 +261,58 @@ describe('McpPromptLoader', () => {
       expect(commands).toEqual([]);
     });
 
+    describe('autoExecute', () => {
+      it('should set autoExecute to true for prompts with no arguments (undefined)', async () => {
+        vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([
+          { ...mockPrompt, arguments: undefined },
+        ]);
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
+        expect(commands[0].autoExecute).toBe(true);
+      });
+
+      it('should set autoExecute to true for prompts with empty arguments array', async () => {
+        vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([
+          { ...mockPrompt, arguments: [] },
+        ]);
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
+        expect(commands[0].autoExecute).toBe(true);
+      });
+
+      it('should set autoExecute to false for prompts with only optional arguments', async () => {
+        vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([
+          {
+            ...mockPrompt,
+            arguments: [{ name: 'optional', required: false }],
+          },
+        ]);
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
+        expect(commands[0].autoExecute).toBe(false);
+      });
+
+      it('should set autoExecute to false for prompts with required arguments', async () => {
+        vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([
+          {
+            ...mockPrompt,
+            arguments: [{ name: 'required', required: true }],
+          },
+        ]);
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
+        expect(commands[0].autoExecute).toBe(false);
+      });
+    });
+
     describe('completion', () => {
       it('should suggest no arguments when using positional arguments', async () => {
         const loader = new McpPromptLoader(mockConfigWithPrompts);

@@ -24,7 +24,6 @@ describe('AcpFileSystemService', () => {
     mockFallback = {
       readTextFile: vi.fn(),
       writeTextFile: vi.fn(),
-      findFiles: vi.fn(),
     };
   });
 
@@ -112,20 +111,5 @@ describe('AcpFileSystemService', () => {
 
       verify();
     });
-  });
-
-  it('should always use fallback for findFiles', () => {
-    service = new AcpFileSystemService(
-      mockClient,
-      'session-1',
-      { readTextFile: true, writeTextFile: true },
-      mockFallback,
-    );
-    mockFallback.findFiles.mockReturnValue(['file1', 'file2']);
-
-    const result = service.findFiles('pattern', ['/path']);
-
-    expect(mockFallback.findFiles).toHaveBeenCalledWith('pattern', ['/path']);
-    expect(result).toEqual(['file1', 'file2']);
   });
 });

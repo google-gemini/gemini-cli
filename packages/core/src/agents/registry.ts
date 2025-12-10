@@ -9,6 +9,11 @@ import type { AgentDefinition } from './types.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  DEFAULT_GEMINI_MODEL_AUTO,
+  GEMINI_MODEL_ALIAS_PRO,
+  PREVIEW_GEMINI_MODEL,
+} from '../config/models.js';
 import type { ModelConfigAlias } from '../services/modelConfigService.js';
 
 /**
@@ -48,13 +53,26 @@ export class AgentRegistry {
 
     // Only register the agent if it's enabled in the settings.
     if (investigatorSettings?.enabled) {
+      let model =
+        investigatorSettings.model ??
+        CodebaseInvestigatorAgent.modelConfig.model;
+
+      // If the user is using the preview model for the main agent, force the sub-agent to use it too
+      // if it's configured to use 'pro' or 'auto'.
+      if (this.config.getModel() === PREVIEW_GEMINI_MODEL) {
+        if (
+          model === GEMINI_MODEL_ALIAS_PRO ||
+          model === DEFAULT_GEMINI_MODEL_AUTO
+        ) {
+          model = PREVIEW_GEMINI_MODEL;
+        }
+      }
+
       const agentDef = {
         ...CodebaseInvestigatorAgent,
         modelConfig: {
           ...CodebaseInvestigatorAgent.modelConfig,
-          model:
-            investigatorSettings.model ??
-            CodebaseInvestigatorAgent.modelConfig.model,
+          model,
           thinkingBudget:
             investigatorSettings.thinkingBudget ??
             CodebaseInvestigatorAgent.modelConfig.thinkingBudget,

@@ -88,7 +88,7 @@ export function getInstallationInfo(
           packageManager: PackageManager.HOMEBREW,
           isGlobal: true,
           updateMessage:
-            'Installed via Homebrew. Please update with "brew upgrade".',
+            'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
         };
       } catch (_error) {
         // Brew is not installed or gemini-cli is not installed via brew.

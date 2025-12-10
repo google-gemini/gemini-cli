@@ -154,6 +154,7 @@ export function AuthDialog({
     if (error) {
       onAuthError(error);
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       onSelect(authMethod, SettingScope.User);
     }
   };
@@ -173,6 +174,7 @@ export function AuthDialog({
           );
           return;
         }
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         onSelect(undefined, SettingScope.User);
       }
     },

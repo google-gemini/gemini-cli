@@ -1,4 +1,4 @@
-name: 'Test Chained E2E'
+name: 'Testing: E2E (Chained)'
 
 on:
   push:
@@ -37,14 +37,15 @@ jobs:
       - id: 'merge-queue-e2e-skipper'
         uses: 'cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772' # ratchet:cariad-tech/merge-queue-ci-skipper@main
         with:
-          secret: '${{ secrets.GITHUB_TOKEN }}'
+          secret: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
     continue-on-error: true
 
   download_repo_name:
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: "github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'"
+    if: "${{github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'}}"
     outputs:
       repo_name: '${{ steps.output-repo-name.outputs.repo_name }}'
+      head_sha: '${{ steps.output-repo-name.outputs.head_sha }}'
     steps:
       - name: 'Mock Repo Artifact'
         if: "${{ github.event_name == 'workflow_dispatch' }}"
@@ -66,7 +67,7 @@ jobs:
           name: 'repo_name'
           run-id: '${{ env.RUN_ID }}'
           path: '${{ runner.temp }}/artifacts'
-      - name: 'Output Repo Name'
+      - name: 'Output Repo Name and SHA'
         id: 'output-repo-name'
         uses: 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd' # ratchet:actions/github-script@v8
         with:
@@ -75,8 +76,16 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             const temp = '${{ runner.temp }}/artifacts';
-            const repo_name = String(fs.readFileSync(path.join(temp, 'repo_name')));
-            core.setOutput('repo_name', repo_name);
+            const repoPath = path.join(temp, 'repo_name');
+            if (fs.existsSync(repoPath)) {
+              const repo_name = String(fs.readFileSync(repoPath)).trim();
+              core.setOutput('repo_name', repo_name);
+            }
+            const shaPath = path.join(temp, 'head_sha');
+            if (fs.existsSync(shaPath)) {
+              const head_sha = String(fs.readFileSync(shaPath)).trim();
+              core.setOutput('head_sha', head_sha);
+            }
 
   parse_run_context:
     name: 'Parse run context'
@@ -91,7 +100,7 @@ jobs:
         name: 'Set dynamic repository and SHA'
         env:
           REPO: '${{ needs.download_repo_name.outputs.repo_name || github.repository }}'
-          SHA: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha || github.sha }}'
+          SHA: '${{ needs.download_repo_name.outputs.head_sha || github.event.inputs.head_sha || github.event.workflow_run.head_sha || github.sha }}'
         shell: 'bash'
         run: |
           echo "REPO=$REPO" >> "$GITHUB_OUTPUT"
@@ -100,19 +109,20 @@ jobs:
   set_pending_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
     permissions: 'write-all'
-    if: "github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'"
     needs:
       - 'parse_run_context'
+    if: 'always()'
     steps:
       - name: 'Set pending status'
         uses: 'myrotvorets/set-commit-status-action@16037e056d73b2d3c88e37e393ff369047f70886' # ratchet:myrotvorets/set-commit-status-action@master
         if: 'always()'
         with:
           allowForks: 'true'
-          repo: '${{ needs.parse_run_context.outputs.repository }}'
+          repo: '${{ github.repository }}'
           sha: '${{ needs.parse_run_context.outputs.sha }}'
-          token: '${{ secrets.GITHUB_TOKEN }}'
+          token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           status: 'pending'
+          context: 'E2E (Chained)'
 
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
@@ -121,7 +131,7 @@ jobs:
       - 'parse_run_context'
     runs-on: 'gemini-cli-ubuntu-16-core'
     if: |
-      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false')
+      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     strategy:
       fail-fast: false
       matrix:
@@ -150,7 +160,7 @@ jobs:
         run: 'npm run build'
 
       - name: 'Set up Docker'
-        if: "matrix.sandbox == 'sandbox:docker'"
+        if: "${{matrix.sandbox == 'sandbox:docker'}}"
         uses: 'docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435' # ratchet:docker/setup-buildx-action@v3
 
       - name: 'Run E2E tests'
@@ -173,7 +183,7 @@ jobs:
       - 'parse_run_context'
     runs-on: 'macos-latest'
     if: |
-      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false')
+      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
@@ -193,11 +203,11 @@ jobs:
         run: 'npm run build'
 
       - name: 'Fix rollup optional dependencies on macOS'
-        if: "runner.os == 'macOS'"
+        if: "${{runner.os == 'macOS'}}"
         run: |
           npm cache clean --force
       - name: 'Run E2E tests (non-Windows)'
-        if: "runner.os != 'Windows'"
+        if: "${{runner.os != 'Windows'}}"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           KEEP_OUTPUT: 'true'
@@ -211,7 +221,7 @@ jobs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
     if: |
-      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false')
+      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
@@ -269,7 +279,7 @@ jobs:
   e2e:
     name: 'E2E'
     if: |
-      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false')
+      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     needs:
       - 'e2e_linux'
       - 'e2e_mac'
@@ -288,7 +298,7 @@ jobs:
   set_workflow_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
     permissions: 'write-all'
-    if: "github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'"
+    if: 'always()'
     needs:
       - 'parse_run_context'
       - 'e2e'
@@ -298,7 +308,8 @@ jobs:
         if: 'always()'
         with:
           allowForks: 'true'
-          repo: '${{ needs.parse_run_context.outputs.repository }}'
+          repo: '${{ github.repository }}'
           sha: '${{ needs.parse_run_context.outputs.sha }}'
           token: '${{ secrets.GITHUB_TOKEN }}'
-          status: '${{ job.status }}'
+          status: '${{ needs.e2e.result }}'
+          context: 'E2E (Chained)'

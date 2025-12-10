@@ -209,4 +209,14 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
   },
+  overrides: [
+    {
+      match: { model: 'chat-base', isRetry: true },
+      modelConfig: {
+        generateContentConfig: {
+          temperature: 1,
+        },
+      },
+    },
+  ],
 };

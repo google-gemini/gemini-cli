@@ -155,10 +155,10 @@ describe('restoreCommand', () => {
 
     it('should restore a tool call and project state', async () => {
       const toolCallData = {
-        history: [{ type: 'user', text: 'do a thing' }],
+        history: [{ type: 'user', text: 'do a thing', id: 123 }],
         clientHistory: [{ role: 'user', parts: [{ text: 'do a thing' }] }],
         commitHash: 'abcdef123',
-        toolCall: { name: 'run_shell_command', args: 'ls' },
+        toolCall: { name: 'run_shell_command', args: { command: 'ls' } },
       };
       await fs.writeFile(
         path.join(checkpointsDir, 'my-checkpoint.json'),
@@ -169,7 +169,7 @@ describe('restoreCommand', () => {
       expect(await command?.action?.(mockContext, 'my-checkpoint')).toEqual({
         type: 'tool',
         toolName: 'run_shell_command',
-        toolArgs: 'ls',
+        toolArgs: { command: 'ls' },
       });
       expect(mockContext.ui.loadHistory).toHaveBeenCalledWith(
         toolCallData.history,
@@ -189,7 +189,7 @@ describe('restoreCommand', () => {
 
     it('should restore even if only toolCall is present', async () => {
       const toolCallData = {
-        toolCall: { name: 'run_shell_command', args: 'ls' },
+        toolCall: { name: 'run_shell_command', args: { command: 'ls' } },
       };
       await fs.writeFile(
         path.join(checkpointsDir, 'my-checkpoint.json'),
@@ -201,7 +201,7 @@ describe('restoreCommand', () => {
       expect(await command?.action?.(mockContext, 'my-checkpoint')).toEqual({
         type: 'tool',
         toolName: 'run_shell_command',
-        toolArgs: 'ls',
+        toolArgs: { command: 'ls' },
       });
 
       expect(mockContext.ui.loadHistory).not.toHaveBeenCalled();
@@ -222,7 +222,7 @@ describe('restoreCommand', () => {
       type: 'message',
       messageType: 'error',
       // A more specific error message would be ideal, but for now, we can assert the current behavior.
-      content: expect.stringContaining('Could not read restorable tool calls.'),
+      content: expect.stringContaining('Checkpoint file is invalid'),
     });
   });
 

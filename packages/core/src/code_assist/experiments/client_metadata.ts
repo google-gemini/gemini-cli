@@ -8,6 +8,7 @@ import { getReleaseChannel } from '../../utils/channel.js';
 import type { ClientMetadata, ClientMetadataPlatform } from '../types.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { getVersion } from '../../utils/version.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,7 +48,7 @@ export async function getClientMetadata(): Promise<ClientMetadata> {
     clientMetadataPromise = (async () => ({
       ideName: 'IDE_UNSPECIFIED',
       pluginType: 'GEMINI',
-      ideVersion: process.env['CLI_VERSION'] || process.version,
+      ideVersion: await getVersion(),
       platform: getPlatform(),
       updateChannel: await getReleaseChannel(__dirname),
     }))();

@@ -645,12 +645,14 @@ describe('KeypressContext', () => {
     expect(keyHandler).not.toHaveBeenCalled();
 
     // Advance time just before timeout
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     act(() => vi.advanceTimersByTime(ESC_TIMEOUT - 5));
 
     // Still shouldn't broadcast
     expect(keyHandler).not.toHaveBeenCalled();
 
     // Advance past timeout
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     act(() => vi.advanceTimersByTime(10));
 
     // Should now broadcast the incomplete sequence as regular input
@@ -789,12 +791,14 @@ describe('KeypressContext', () => {
     act(() => stdin.write('\x1b[97;13'));
 
     // Advance time partway
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     act(() => vi.advanceTimersByTime(30));
 
     // Add more to sequence
     act(() => stdin.write('5'));
 
     // Advance time from the first timeout point
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     act(() => vi.advanceTimersByTime(25));
 
     // Should not have timed out yet (timeout restarted)
@@ -878,6 +882,7 @@ describe('KeypressContext', () => {
       act(() => stdin.write('\x1b[<'));
 
       // Advance time past the normal kitty timeout (50ms)
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       act(() => vi.advanceTimersByTime(ESC_TIMEOUT + 10));
 
       // Send the rest
@@ -930,6 +935,8 @@ describe('KeypressContext', () => {
 
       for (const char of sequence) {
         act(() => stdin.write(char));
+
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         act(() => vi.advanceTimersByTime(0));
       }
 

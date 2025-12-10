@@ -33,10 +33,11 @@ import {
   parseAndFormatApiError,
   ToolConfirmationOutcome,
   promptIdContext,
-  WRITE_FILE_TOOL_NAME,
   tokenLimit,
   debugLogger,
   runInDevTraceSpan,
+  EDIT_TOOL_NAMES,
+  processRestorableToolCalls,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -74,8 +75,6 @@ enum StreamProcessingStatus {
   UserCancelled,
   Error,
 }
-
-const EDIT_TOOL_NAMES = new Set(['replace', WRITE_FILE_TOOL_NAME]);
 
 function showCitations(settings: LoadedSettings): boolean {
   const enabled = settings?.merged?.ui?.showCitations;
@@ -992,6 +991,7 @@ export const useGeminiStream = (
                       );
 
                       if (lastQueryRef.current && lastPromptIdRef.current) {
+                        // eslint-disable-next-line @typescript-eslint/no-floating-promises
                         submitQuery(
                           lastQueryRef.current,
                           { isContinuation: true },
@@ -1175,6 +1175,7 @@ export const useGeminiStream = (
           const combinedParts = geminiTools.flatMap(
             (toolCall) => toolCall.response.responseParts,
           );
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           geminiClient.addHistory({
             role: 'user',
             parts: combinedParts,
@@ -1206,6 +1207,7 @@ export const useGeminiStream = (
         return;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       submitQuery(
         responsesToSend,
         {
@@ -1244,102 +1246,43 @@ export const useGeminiStream = (
       );
 
       if (restorableToolCalls.length > 0) {
-        const checkpointDir = storage.getProjectTempCheckpointsDir();
-
-        if (!checkpointDir) {
+        if (!gitService) {
+          onDebugMessage(
+            'Checkpointing is enabled but Git service is not available. Failed to create snapshot. Ensure Git is installed and working properly.',
+          );
           return;
         }
 
-        try {
-          await fs.mkdir(checkpointDir, { recursive: true });
-        } catch (error) {
-          if (!isNodeError(error) || error.code !== 'EEXIST') {
-            onDebugMessage(
-              `Failed to create checkpoint directory: ${getErrorMessage(error)}`,
-            );
-            return;
-          }
+        const { checkpointsToWrite, errors } = await processRestorableToolCalls<
+          HistoryItem[]
+        >(
+          restorableToolCalls.map((call) => call.request),
+          gitService,
+          geminiClient,
+          history,
+        );
+
+        if (errors.length > 0) {
+          errors.forEach(onDebugMessage);
         }
 
-        for (const toolCall of restorableToolCalls) {
-          const filePath = toolCall.request.args['file_path'] as string;
-          if (!filePath) {
-            onDebugMessage(
-              `Skipping restorable tool call due to missing file_path: ${toolCall.request.name}`,
-            );
-            continue;
-          }
-
+        if (checkpointsToWrite.size > 0) {
+          const checkpointDir = storage.getProjectTempCheckpointsDir();
           try {
-            if (!gitService) {
-              onDebugMessage(
-                `Checkpointing is enabled but Git service is not available. Failed to create snapshot for ${filePath}. Ensure Git is installed and working properly.`,
-              );
-              continue;
+            await fs.mkdir(checkpointDir, { recursive: true });
+            for (const [fileName, content] of checkpointsToWrite) {
+              const filePath = path.join(checkpointDir, fileName);
+              await fs.writeFile(filePath, content);
             }
-
-            let commitHash: string | undefined;
-            try {
-              commitHash = await gitService.createFileSnapshot(
-                `Snapshot for ${toolCall.request.name}`,
-              );
-            } catch (error) {
-              onDebugMessage(
-                `Failed to create new snapshot: ${getErrorMessage(error)}. Attempting to use current commit.`,
-              );
-            }
-
-            if (!commitHash) {
-              commitHash = await gitService.getCurrentCommitHash();
-            }
-
-            if (!commitHash) {
-              onDebugMessage(
-                `Failed to create snapshot for ${filePath}. Checkpointing may not be working properly. Ensure Git is installed and the project directory is accessible.`,
-              );
-              continue;
-            }
-
-            const timestamp = new Date()
-              .toISOString()
-              .replace(/:/g, '-')
-              .replace(/\./g, '_');
-            const toolName = toolCall.request.name;
-            const fileName = path.basename(filePath);
-            const toolCallWithSnapshotFileName = `${timestamp}-${fileName}-${toolName}.json`;
-            const clientHistory = await geminiClient?.getHistory();
-            const toolCallWithSnapshotFilePath = path.join(
-              checkpointDir,
-              toolCallWithSnapshotFileName,
-            );
-
-            await fs.writeFile(
-              toolCallWithSnapshotFilePath,
-              JSON.stringify(
-                {
-                  history,
-                  clientHistory,
-                  toolCall: {
-                    name: toolCall.request.name,
-                    args: toolCall.request.args,
-                  },
-                  commitHash,
-                  filePath,
-                },
-                null,
-                2,
-              ),
-            );
           } catch (error) {
             onDebugMessage(
-              `Failed to create checkpoint for ${filePath}: ${getErrorMessage(
-                error,
-              )}. This may indicate a problem with Git or file system permissions.`,
+              `Failed to write checkpoint file: ${getErrorMessage(error)}`,
             );
           }
         }
       }
     };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     saveRestorableToolCalls();
   }, [
     toolCalls,

@@ -40,6 +40,7 @@ function addShellCommandToGeminiHistory(
       ? resultText.substring(0, MAX_OUTPUT_LENGTH) + '\n... (truncated)'
       : resultText;
 
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
   geminiClient.addHistory({
     role: 'user',
     parts: [
@@ -350,6 +351,7 @@ export const useShellCommandProcessor = (
       };
 
       const execPromise = new Promise<void>((resolve) => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         executeCommand(resolve);
       });
 

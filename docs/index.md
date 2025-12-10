@@ -102,6 +102,15 @@ This documentation is organized into the following sections:
 - **[Extension releasing](./extensions/extension-releasing.md):** How to release
   Gemini CLI extensions.
 
+### Hooks
+
+- **[Hooks](./hooks/index.md):** Intercept and customize Gemini CLI behavior at
+  key lifecycle points.
+- **[Writing Hooks](./hooks/writing-hooks.md):** Learn how to create your first
+  hook with a comprehensive example.
+- **[Best Practices](./hooks/best-practices.md):** Security, performance, and
+  debugging guidelines for hooks.
+
 ### IDE integration
 
 - **[Introduction to IDE integration](./ide-integration/index.md):** Connect the
