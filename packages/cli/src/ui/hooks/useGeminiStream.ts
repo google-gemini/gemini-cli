@@ -1203,33 +1203,50 @@ export const useGeminiStream = (
         return [plu];
       };
 
-      const responsesToSend: Part[] = geminiTools.flatMap((toolCall) => {
-        const responsePartsUnion = toolCall.response.responseParts;
+      const { parts: responsesToSend } = geminiTools.reduce(
+        ({ parts, size }, toolCall) => {
+          const responsePartsUnion = toolCall.response.responseParts;
+          const responseParts = getPartsArray(responsePartsUnion);
+          const partSize = getRequestSize(responseParts);
 
-        const responseParts = getPartsArray(responsePartsUnion);
+          if (
+            toolCall.request.name === 'run_shell_command' &&
+            truncateThreshold > 0 &&
+            (partSize > truncateThreshold ||
+              size + partSize > truncateThreshold)
+          ) {
+            const originalCommand = toolCall.request.args?.['command'];
+            if (typeof originalCommand !== 'string') {
+              return {
+                parts: [...parts, ...responseParts],
+                size: size + partSize,
+              };
+            }
 
-        if (
-          toolCall.request.name === 'run_shell_command' &&
-          truncateThreshold > 0 &&
-          getRequestSize(responseParts) > truncateThreshold
-        ) {
-          const originalCommand = toolCall.request.args?.['command'];
-          if (typeof originalCommand !== 'string') {
-            return responseParts;
+            const instructionalPart: Part = {
+              functionResponse: {
+                name: 'run_shell_command',
+                response: {
+                  stdout: `[INFO] The output of the previous 'run_shell_command' (${JSON.stringify(originalCommand)}) was too large to be displayed. Please run the command again and redirect the output to a temporary file.`,
+                },
+              },
+            };
+            const instructionalPartSize = getRequestSize([instructionalPart]);
+            if (size + instructionalPartSize > truncateThreshold) {
+              // If even the instructional part would overflow, add nothing for this tool.
+              return { parts, size };
+            }
+            return {
+              parts: [...parts, instructionalPart],
+              size: size + instructionalPartSize,
+            };
           }
 
-          const instructionalPart: Part = {
-            functionResponse: {
-              name: 'run_shell_command',
-              response: {
-                stdout: `[INFO] The output of the previous 'run_shell_command' (${JSON.stringify(originalCommand)}) was too large to be displayed. Please run the command again and redirect the output to a temporary file.`,
-              },
-            },
-          };
-          return [instructionalPart];
-        }
-        return responseParts;
-      });
+          return { parts: [...parts, ...responseParts], size: size + partSize };
+        },
+        { parts: [] as Part[], size: 0 },
+      );
+
       const callIdsToMarkAsSubmitted = geminiTools.map(
         (toolCall) => toolCall.request.callId,
       );
