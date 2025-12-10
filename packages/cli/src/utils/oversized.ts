@@ -13,7 +13,11 @@ import type * as GenerativeAI from '@google/genai';
  * @returns The request size of the content.
  */
 export function getRequestSize(
-  content: string | GenerativeAI.Part | GenerativeAI.Part[],
+  content:
+    | string
+    | GenerativeAI.Content
+    | GenerativeAI.Part
+    | (GenerativeAI.Content | GenerativeAI.Part)[],
 ): number {
   if (Array.isArray(content)) {
     return content.reduce((acc, part) => acc + getRequestSize(part), 0);
@@ -26,6 +30,14 @@ export function getRequestSize(
   if (typeof content === 'object' && content !== null) {
     if ('text' in content && typeof content.text === 'string') {
       return (content.text as string).length;
+    }
+
+    if ('inlineData' in content && content.inlineData) {
+      return content.inlineData.data.length;
+    }
+
+    if ('fileData' in content && content.fileData) {
+      return content.fileData.fileUri.length;
     }
 
     if ('parts' in content && Array.isArray(content.parts)) {
