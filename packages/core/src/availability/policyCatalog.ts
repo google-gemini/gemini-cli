@@ -51,6 +51,7 @@ const PREVIEW_CHAIN: ModelPolicyChain = [
   definePolicy({
     model: PREVIEW_GEMINI_MODEL,
     stateTransitions: { transient: 'sticky_retry' },
+    actions: { transient: 'silent' },
   }),
   definePolicy({ model: DEFAULT_GEMINI_MODEL }),
   definePolicy({ model: DEFAULT_GEMINI_FLASH_MODEL, isLastResort: true }),
