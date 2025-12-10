@@ -34,6 +34,11 @@ describe('isPrivateIp', () => {
     });
   });
 
+  it('returns true for private IPv4 literal addresses', async () => {
+    await expect(isPrivateIp('http://192.168.1.10')).resolves.toBe(true);
+    expect(mockedLookup).not.toHaveBeenCalled();
+  });
+
   it('returns false when DNS resolves to a public IPv4 address', async () => {
     mockedLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
     await expect(isPrivateIp('https://example.com')).resolves.toBe(false);

@@ -49,7 +49,8 @@ function ipv4ToNumber(address: string): number {
     if (Number.isNaN(num)) {
       return NaN;
     }
-    return (acc << 8) + num;
+    // Use multiplication to avoid 32-bit signed overflow from bitwise shifts.
+    return acc * 256 + num;
   }, 0);
 }
 
