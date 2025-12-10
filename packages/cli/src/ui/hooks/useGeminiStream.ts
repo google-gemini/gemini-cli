@@ -1281,7 +1281,9 @@ read_file\n tool to read the contents of the file.`,
           return;
         }
 
-        const { checkpointsToWrite, errors } = await processRestorableToolCalls< HistoryItem[] >(
+        const { checkpointsToWrite, errors } = await processRestorableToolCalls<
+          HistoryItem[]
+        >(
           restorableToolCalls.map((call) => call.request),
           gitService,
           geminiClient,
