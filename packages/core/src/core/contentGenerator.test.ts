@@ -27,7 +27,13 @@ vi.mock('./apiKeyCredentialStorage.js', () => ({
 
 vi.mock('./fakeContentGenerator.js');
 
-const mockConfig = {} as unknown as Config;
+const mockConfig = {
+  getModel: vi.fn().mockReturnValue('gemini-pro'),
+  getProxy: vi.fn().mockReturnValue(undefined),
+  getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
+  isInFallbackMode: vi.fn().mockReturnValue(false),
+  getPreviewFeatures: vi.fn().mockReturnValue(false),
+} as unknown as Config;
 
 describe('createContentGenerator', () => {
   beforeEach(() => {
@@ -111,8 +117,15 @@ describe('createContentGenerator', () => {
 
   it('should create a GoogleGenAI content generator', async () => {
     const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => true,
+      isInFallbackMode: vi.fn().mockReturnValue(false),
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
+
+    // Set a fixed version for testing
+    vi.stubEnv('CLI_VERSION', '1.2.3');
 
     const mockGenerator = {
       models: {},
@@ -130,7 +143,7 @@ describe('createContentGenerator', () => {
       vertexai: undefined,
       httpOptions: {
         headers: {
-          'User-Agent': expect.any(String),
+          'User-Agent': expect.stringContaining('GeminiCLI/1.2.3/gemini-pro'),
           'x-gemini-api-privileged-user-id': expect.any(String),
         },
       },
@@ -176,7 +189,11 @@ describe('createContentGenerator', () => {
 
   it('should include custom headers from GEMINI_CLI_CUSTOM_HEADERS for GoogleGenAI requests without inferring auth mechanism', async () => {
     const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      isInFallbackMode: vi.fn().mockReturnValue(false),
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -220,7 +237,11 @@ describe('createContentGenerator', () => {
 
   it('should pass api key as Authorization Header when GEMINI_API_KEY_AUTH_MECHANISM is set to bearer', async () => {
     const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      isInFallbackMode: vi.fn().mockReturnValue(false),
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -251,7 +272,11 @@ describe('createContentGenerator', () => {
 
   it('should not pass api key as Authorization Header when GEMINI_API_KEY_AUTH_MECHANISM is not set (default behavior)', async () => {
     const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      isInFallbackMode: vi.fn().mockReturnValue(false),
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -291,7 +316,10 @@ describe('createContentGenerator', () => {
 
   it('should create a GoogleGenAI content generator with client install id logging disabled', async () => {
     const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
       getUsageStatisticsEnabled: () => false,
+      isInFallbackMode: vi.fn().mockReturnValue(false),
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
     const mockGenerator = {
       models: {},
