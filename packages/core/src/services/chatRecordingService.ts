@@ -407,11 +407,14 @@ export class ChatRecordingService {
   /**
    * Saves the conversation record; overwrites the file.
    */
-  private writeConversation(conversation: ConversationRecord): void {
+  private writeConversation(
+    conversation: ConversationRecord,
+    allowEmpty: boolean = false,
+  ): void {
     try {
       if (!this.conversationFile) return;
       // Don't write the file yet until there's at least one message.
-      if (conversation.messages.length === 0) return;
+      if (conversation.messages.length === 0 && !allowEmpty) return;
 
       // Only write the file if this change would change the file.
       if (this.cachedLastConvData !== JSON.stringify(conversation, null, 2)) {
@@ -501,7 +504,7 @@ export class ChatRecordingService {
       }
 
       conversation.messages = conversation.messages.slice(0, messageIndex);
-      this.writeConversation(conversation);
+      this.writeConversation(conversation, true);
       return conversation;
     } catch (error) {
       debugLogger.error('Error rewinding conversation.', error);
