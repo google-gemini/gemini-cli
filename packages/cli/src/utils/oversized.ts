@@ -17,7 +17,7 @@ export function getRequestSize(
     | string
     | GenerativeAI.Content
     | GenerativeAI.Part
-    | (GenerativeAI.Content | GenerativeAI.Part)[],
+    | Array<GenerativeAI.Content | GenerativeAI.Part>,
 ): number {
   if (Array.isArray(content)) {
     return content.reduce((acc, part) => acc + getRequestSize(part), 0);
@@ -29,14 +29,18 @@ export function getRequestSize(
 
   if (typeof content === 'object' && content !== null) {
     if ('text' in content && typeof content.text === 'string') {
-      return (content.text as string).length;
+      return content.text.length;
     }
 
-    if ('inlineData' in content && content.inlineData) {
+    if (
+      'inlineData' in content &&
+      content.inlineData &&
+      content.inlineData.data
+    ) {
       return content.inlineData.data.length;
     }
 
-    if ('fileData' in content && content.fileData) {
+    if ('fileData' in content && content.fileData && content.fileData.fileUri) {
       return content.fileData.fileUri.length;
     }
 
@@ -51,6 +55,14 @@ export function getRequestSize(
     if ('functionResponse' in content && content.functionResponse) {
       return getRequestSizeOfFunctionResponse(content.functionResponse);
     }
+
+    if ('executableCode' in content && content.executableCode) {
+      return getRequestSizeOfExecutableCode(content.executableCode);
+    }
+
+    if ('codeExecutionResult' in content && content.codeExecutionResult) {
+      return getRequestSizeOfCodeExecutionResult(content.codeExecutionResult);
+    }
   }
   return 0;
 }
@@ -63,4 +75,16 @@ function getRequestSizeOfFunctionResponse(
   functionResponse: GenerativeAI.FunctionResponse,
 ) {
   return JSON.stringify(functionResponse.response).length;
+}
+
+function getRequestSizeOfExecutableCode(
+  executableCode: GenerativeAI.ExecutableCode,
+) {
+  return JSON.stringify(executableCode).length;
+}
+
+function getRequestSizeOfCodeExecutionResult(
+  codeExecutionResult: GenerativeAI.CodeExecutionResult,
+) {
+  return JSON.stringify(codeExecutionResult).length;
 }
