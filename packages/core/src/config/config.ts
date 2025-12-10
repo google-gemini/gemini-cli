@@ -311,7 +311,6 @@ export interface ConfigParameters {
   disableYoloMode?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
-  enableGitAiIntegration?: boolean;
   experiments?: Experiments;
   hooks?:
     | {
@@ -433,7 +432,6 @@ export class Config {
   private readonly disableYoloMode: boolean;
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
-  private readonly enableGitAiIntegration: boolean;
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
@@ -553,7 +551,6 @@ export class Config {
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? true;
     this.enableHooks = params.enableHooks ?? false;
-    this.enableGitAiIntegration = params.enableGitAiIntegration ?? true;
     this.disabledHooks =
       (params.hooks && 'disabled' in params.hooks
         ? params.hooks.disabled
@@ -681,17 +678,6 @@ export class Config {
     if (this.enableHooks) {
       this.hookSystem = new HookSystem(this);
       await this.hookSystem.initialize();
-
-      // Initialize git-ai integration if enabled
-      if (this.enableGitAiIntegration) {
-        const { GitAiIntegrationService } = await import(
-          '../services/gitAiIntegrationService.js'
-        );
-        const gitAiIntegration = new GitAiIntegrationService(
-          this.enableGitAiIntegration,
-        );
-        await gitAiIntegration.initialize(this.hookSystem.getRegistry());
-      }
     }
 
     if (this.experimentalJitContext) {
@@ -1486,10 +1472,6 @@ export class Config {
 
   getEnableHooks(): boolean {
     return this.enableHooks;
-  }
-
-  getEnableGitAiIntegration(): boolean {
-    return this.enableGitAiIntegration;
   }
 
   getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {

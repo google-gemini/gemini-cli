@@ -1075,16 +1075,6 @@ const SETTINGS_SCHEMA = {
           'Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.',
         showInDialog: false,
       },
-      enableGitAiIntegration: {
-        type: 'boolean',
-        label: 'Enable Git AI Integration',
-        category: 'Advanced',
-        requiresRestart: true,
-        default: true,
-        description:
-          'Automatically track code authored by Gemini CLI if git-ai is available in your PATH. When enabled, git-ai checkpoint hooks are automatically registered for BeforeTool and AfterTool events matching write_file|replace tools.',
-        showInDialog: true,
-      },
     },
   },
 

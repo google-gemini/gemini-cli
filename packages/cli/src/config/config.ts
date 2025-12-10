@@ -675,7 +675,6 @@ export async function loadCliConfig(
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.tools?.enableHooks ?? false,
-    enableGitAiIntegration: settings.tools?.enableGitAiIntegration ?? true,
     hooks: settings.hooks || {},
   });
 }
