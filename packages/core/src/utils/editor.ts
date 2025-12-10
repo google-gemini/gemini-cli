@@ -187,6 +187,98 @@ export function getDiffCommand(
   }
 }
 
+interface OpenCommand {
+  command: string;
+  args: string[];
+}
+
+/**
+ * Get the command to open a file in a specific editor.
+ */
+export function getOpenCommand(
+  filePath: string,
+  editor: EditorType,
+): OpenCommand | null {
+  if (!isValidEditorType(editor)) {
+    return null;
+  }
+  const commandConfig = editorCommands[editor];
+  const commands =
+    process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
+  const command =
+    commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
+    commands[commands.length - 1];
+
+  switch (editor) {
+    case 'vscode':
+    case 'vscodium':
+    case 'windsurf':
+    case 'cursor':
+    case 'zed':
+    case 'antigravity':
+      return { command, args: ['--wait', filePath] };
+    case 'vim':
+    case 'neovim':
+      return { command, args: [filePath] };
+    case 'emacs':
+      return { command, args: [filePath] };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Opens a file in the specified editor.
+ * Terminal-based editors by default blocks parent process until the editor exits.
+ * GUI-based editors require args such as "--wait" to block parent process.
+ */
+export async function openInEditor(
+  filePath: string,
+  editor: EditorType,
+): Promise<void> {
+  const openCommand = getOpenCommand(filePath, editor);
+  if (!openCommand) {
+    debugLogger.error('No editor available. Install a supported editor.');
+    return;
+  }
+
+  if (isTerminalEditor(editor)) {
+    try {
+      const result = spawnSync(openCommand.command, openCommand.args, {
+        stdio: 'inherit',
+      });
+      if (result.error) {
+        throw result.error;
+      }
+      if (result.status !== 0) {
+        throw new Error(`${editor} exited with code ${result.status}`);
+      }
+    } finally {
+      coreEvents.emit(CoreEvent.ExternalEditorClosed);
+    }
+    return;
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const childProcess = spawn(openCommand.command, openCommand.args, {
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
+
+    childProcess.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`${editor} exited with code ${code}`));
+      }
+    });
+
+    childProcess.on('error', (error) => {
+      reject(error);
+    });
+  });
+}
+
 /**
  * Opens a diff tool to compare two files.
  * Terminal-based editors by default blocks parent process until the editor exits.

@@ -16,7 +16,9 @@ import {
 import {
   checkHasEditorType,
   getDiffCommand,
+  getOpenCommand,
   openDiff,
+  openInEditor,
   allowEditorTypeInSandbox,
   isEditorAvailable,
   type EditorType,
@@ -458,6 +460,172 @@ describe('editor utils', () => {
         expect(allowEditorTypeInSandbox(editor)).toBe(true);
       });
     }
+  });
+
+  describe('getOpenCommand', () => {
+    const guiEditors: Array<{
+      editor: EditorType;
+      commands: string[];
+      win32Commands: string[];
+    }> = [
+      { editor: 'vscode', commands: ['code'], win32Commands: ['code.cmd'] },
+      {
+        editor: 'vscodium',
+        commands: ['codium'],
+        win32Commands: ['codium.cmd'],
+      },
+      {
+        editor: 'windsurf',
+        commands: ['windsurf'],
+        win32Commands: ['windsurf'],
+      },
+      { editor: 'cursor', commands: ['cursor'], win32Commands: ['cursor'] },
+      { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
+      {
+        editor: 'antigravity',
+        commands: ['agy'],
+        win32Commands: ['agy.cmd'],
+      },
+    ];
+
+    for (const { editor, commands, win32Commands } of guiEditors) {
+      it(`should use first command "${commands[0]}" when it exists on non-windows for ${editor}`, () => {
+        Object.defineProperty(process, 'platform', { value: 'linux' });
+        (execSync as Mock).mockReturnValue(
+          Buffer.from(`/usr/bin/${commands[0]}`),
+        );
+        const openCommand = getOpenCommand('file.txt', editor);
+        expect(openCommand).toEqual({
+          command: commands[0],
+          args: ['--wait', 'file.txt'],
+        });
+      });
+
+      it(`should use first command "${win32Commands[0]}" when it exists on windows for ${editor}`, () => {
+        Object.defineProperty(process, 'platform', { value: 'win32' });
+        (execSync as Mock).mockReturnValue(
+          Buffer.from(`C:\\Program Files\\...\\${win32Commands[0]}`),
+        );
+        const openCommand = getOpenCommand('file.txt', editor);
+        expect(openCommand).toEqual({
+          command: win32Commands[0],
+          args: ['--wait', 'file.txt'],
+        });
+      });
+    }
+
+    const terminalEditors: Array<{
+      editor: EditorType;
+      command: string;
+    }> = [
+      { editor: 'vim', command: 'vim' },
+      { editor: 'neovim', command: 'nvim' },
+      { editor: 'emacs', command: 'emacs' },
+    ];
+
+    for (const { editor, command } of terminalEditors) {
+      it(`should return the correct command for ${editor}`, () => {
+        const openCommand = getOpenCommand('file.txt', editor);
+        expect(openCommand).toEqual({
+          command,
+          args: ['file.txt'],
+        });
+      });
+    }
+
+    it('should return null for an unsupported editor', () => {
+      // @ts-expect-error Testing unsupported editor
+      const command = getOpenCommand('file.txt', 'foobar');
+      expect(command).toBeNull();
+    });
+  });
+
+  describe('openInEditor', () => {
+    const guiEditors: EditorType[] = [
+      'vscode',
+      'vscodium',
+      'windsurf',
+      'cursor',
+      'zed',
+    ];
+
+    for (const editor of guiEditors) {
+      it(`should call spawn for ${editor}`, async () => {
+        const mockSpawnOn = vi.fn((event, cb) => {
+          if (event === 'close') {
+            cb(0);
+          }
+        });
+        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
+        await openInEditor('file.txt', editor);
+        const openCommand = getOpenCommand('file.txt', editor)!;
+        expect(spawn).toHaveBeenCalledWith(
+          openCommand.command,
+          openCommand.args,
+          {
+            stdio: 'inherit',
+            shell: process.platform === 'win32',
+          },
+        );
+        expect(mockSpawnOn).toHaveBeenCalledWith('close', expect.any(Function));
+        expect(mockSpawnOn).toHaveBeenCalledWith('error', expect.any(Function));
+      });
+
+      it(`should reject if spawn for ${editor} fails`, async () => {
+        const mockError = new Error('spawn error');
+        const mockSpawnOn = vi.fn((event, cb) => {
+          if (event === 'error') {
+            cb(mockError);
+          }
+        });
+        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
+        await expect(openInEditor('file.txt', editor)).rejects.toThrow(
+          'spawn error',
+        );
+      });
+
+      it(`should reject if ${editor} exits with non-zero code`, async () => {
+        const mockSpawnOn = vi.fn((event, cb) => {
+          if (event === 'close') {
+            cb(1);
+          }
+        });
+        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
+        await expect(openInEditor('file.txt', editor)).rejects.toThrow(
+          `${editor} exited with code 1`,
+        );
+      });
+    }
+
+    const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs'];
+
+    for (const editor of terminalEditors) {
+      it(`should call spawnSync for ${editor}`, async () => {
+        await openInEditor('file.txt', editor);
+        const openCommand = getOpenCommand('file.txt', editor)!;
+        expect(spawnSync).toHaveBeenCalledWith(
+          openCommand.command,
+          openCommand.args,
+          {
+            stdio: 'inherit',
+          },
+        );
+      });
+    }
+
+    it('should log an error if editor is not available', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(debugLogger, 'error')
+        .mockImplementation(() => {});
+      // @ts-expect-error Testing unsupported editor
+      await openInEditor('file.txt', 'foobar');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'No editor available. Install a supported editor.',
+      );
+    });
   });
 
   describe('isEditorAvailable', () => {
