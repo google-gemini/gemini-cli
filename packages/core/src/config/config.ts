@@ -265,7 +265,7 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   maxSessionTurns?: number;
-  experimentalZedIntegration?: boolean;
+  experimentalACPIntegration?: boolean;
   listSessions?: boolean;
   deleteSession?: string;
   listExtensions?: boolean;
@@ -396,7 +396,7 @@ export class Config {
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
-  private readonly experimentalZedIntegration: boolean = false;
+  private readonly experimentalACPIntegration: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly importFormat: 'tree' | 'flat';
   private readonly discoveryMaxDirs: number;
@@ -514,8 +514,8 @@ export class Config {
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
-    this.experimentalZedIntegration =
-      params.experimentalZedIntegration ?? false;
+    this.experimentalACPIntegration =
+      params.experimentalACPIntegration ?? false;
     this.listSessions = params.listSessions ?? false;
     this.deleteSession = params.deleteSession;
     this.listExtensions = params.listExtensions ?? false;
@@ -1198,8 +1198,8 @@ export class Config {
     return this.usageStatisticsEnabled;
   }
 
-  getExperimentalZedIntegration(): boolean {
-    return this.experimentalZedIntegration;
+  getExperimentalACPIntegration(): boolean {
+    return this.experimentalACPIntegration;
   }
 
   getListExtensions(): boolean {

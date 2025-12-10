@@ -47,7 +47,7 @@ import { randomUUID } from 'node:crypto';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
 
-export async function runZedIntegration(
+export async function runACPIntegration(
   config: Config,
   settings: LoadedSettings,
   argv: CliArgs,
