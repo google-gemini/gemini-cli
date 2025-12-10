@@ -9,7 +9,7 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 
 export const RawMarkdownIndicator: React.FC = () => {
-  const modKey = process.platform === 'darwin' ? 'option+m' : 'alt+m';
+  const modKey = process.platform === 'darwin' ? 'cmd+m' : 'ctrl+m';
   return (
     <Box>
       <Text>
