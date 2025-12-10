@@ -203,7 +203,9 @@ export const useGeminiStream = (
   const [
     loopDetectionConfirmationRequest,
     setLoopDetectionConfirmationRequest,
-  ] = useState<{ onComplete: (result: { userSelection: 'disable' | 'keep' }) => void; } | null>(null);
+  ] = useState<{
+    onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
+  } | null>(null);
 
   const onExec = useCallback(async (done: Promise<void>) => {
     setIsResponding(true);
@@ -402,8 +404,10 @@ export const useGeminiStream = (
       userMessageTimestamp: number,
       abortSignal: AbortSignal,
       prompt_id: string,
-    ): Promise<{ queryToSend: PartListUnion | null; shouldProceed: boolean; }>
-     => {
+    ): Promise<{
+      queryToSend: PartListUnion | null;
+      shouldProceed: boolean;
+    }> => {
       if (turnCancelledRef.current) {
         return { queryToSend: null, shouldProceed: false };
       }
@@ -700,9 +704,9 @@ export const useGeminiStream = (
 
   const handleChatCompressionEvent = useCallback(
     (
-        eventValue: ServerGeminiChatCompressedEvent['value'],
-        userMessageTimestamp: number,
-      ) => {
+      eventValue: ServerGeminiChatCompressedEvent['value'],
+      userMessageTimestamp: number,
+    ) => {
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
@@ -849,12 +853,11 @@ export const useGeminiStream = (
           case ServerGeminiEventType.InvalidStream:
             // Will add the missing logic later
             break;
-          default:
-            {
-              // enforces exhaustive switch-case
-              const unreachable: never = event;
-              return unreachable;
-            }
+          default: {
+            // enforces exhaustive switch-case
+            const unreachable: never = event;
+            return unreachable;
+          }
         }
       }
       if (toolCallRequests.length > 0) {
@@ -885,7 +888,7 @@ export const useGeminiStream = (
         { name: 'submitQuery' },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
-          const queryId = `${Date.Now()}-${Math.random()}`;
+          const queryId = `${Date.now()}-${Math.random()}`;
           activeQueryIdRef.current = queryId;
           if (
             (streamingState === StreamingState.Responding ||
@@ -970,7 +973,9 @@ export const useGeminiStream = (
                 loopDetectedRef.current = false;
                 // Show the confirmation dialog to choose whether to disable loop detection
                 setLoopDetectionConfirmationRequest({
-                  onComplete: (result: { userSelection: 'disable' | 'keep'; }) => {
+                  onComplete: (result: {
+                    userSelection: 'disable' | 'keep';
+                  }) => {
                     setLoopDetectionConfirmationRequest(null);
 
                     if (result.userSelection === 'disable') {
@@ -1200,20 +1205,15 @@ export const useGeminiStream = (
             (part) => 'functionResponse' in part,
           );
           const originalStderr =
-            (functionResponsePart?.functionResponse?.response?.[ 'stderr'] as string) ?? '';
+            (functionResponsePart?.functionResponse?.response?.[
+              'stderr'
+            ] as string) ?? '';
 
-          const tmpDir = config.storage.getProjectTempDir();
           const instructionalPart: Part = {
             functionResponse: {
               name: 'run_shell_command',
               response: {
-                stdout: `[INFO] The output of the previous 'run_shell_command' ('${originalCommand}') was too large to be displayed. Please run the command again and redirect the output to a temporary file. For example: 
-`${originalCommand} > ${path.join(
-                  tmpDir,
-                  'output.txt',
-                )}
-`. Then use the 
-read_file\n tool to read the contents of the file.`, 
+                stdout: `[INFO] The output of the previous 'run_shell_command' ('${originalCommand}') was too large to be displayed. Please run the command again and redirect the output to a temporary file.`,
                 stderr: originalStderr,
               },
             },
