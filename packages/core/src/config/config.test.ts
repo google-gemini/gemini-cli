@@ -888,6 +888,11 @@ describe('Server Config (config.ts)', () => {
       expect(SubagentToolWrapperMock).not.toHaveBeenCalled();
     });
 
+    it('should not set default codebase investigator model in config (defaults in registry)', () => {
+      const config = new Config(baseParams);
+      expect(config.getCodebaseInvestigatorSettings()?.model).toBeUndefined();
+    });
+
     describe('with minified tool class names', () => {
       beforeEach(() => {
         Object.defineProperty(
