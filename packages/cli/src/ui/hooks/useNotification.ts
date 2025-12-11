@@ -9,6 +9,12 @@ import notifier from 'node-notifier';
 import process from 'node:process';
 import { StreamingState } from '../types.js';
 import type { Settings } from '../../config/settingsSchema.js';
+import type NotificationCenter from 'node-notifier';
+
+interface MacNotificationOptions extends NotificationCenter.Notification {
+  sound?: boolean;
+  activate?: string;
+}
 
 /**
  * Triggers a system notification when the CLI is waiting for confirmation,
@@ -47,8 +53,7 @@ export const useNotification = (
     ) {
       const isMac = process.platform === 'darwin';
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const options: any = {
+      const options: MacNotificationOptions = {
         title: 'Gemini CLI',
         message: 'Requires Permission to Execute Command',
         sound: false,
