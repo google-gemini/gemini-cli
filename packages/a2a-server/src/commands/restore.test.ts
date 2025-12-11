@@ -69,6 +69,7 @@ describe('RestoreCommand', () => {
       clientHistory: [],
       commitHash: '123',
     };
+    mockFs.readdir.mockResolvedValue(['checkpoint1.json']);
     mockFs.readFile.mockResolvedValue(JSON.stringify(toolCallData));
     const restoreContent = {
       type: 'message',
@@ -86,19 +87,39 @@ describe('RestoreCommand', () => {
 
   it('should show "file not found" error for a non-existent checkpoint', async () => {
     const command = new RestoreCommand();
-    const error = new Error('File not found');
-    (error as NodeJS.ErrnoException).code = 'ENOENT';
-    mockFs.readFile.mockRejectedValue(error);
+    // Mock readdir to return a list not containing the target checkpoint file
+    mockFs.readdir.mockResolvedValue(['checkpoint1.json']);
+
     const result = await command.execute(mockConfig, ['checkpoint2.json']);
     expect(result.data).toEqual({
       type: 'message',
       messageType: 'error',
       content: 'File not found: checkpoint2.json',
     });
+    // Ensure readFile was not called since validation failed
+    expect(mockFs.readFile).not.toHaveBeenCalledWith(
+      expect.stringContaining('checkpoint2.json'),
+      expect.anything(),
+    );
+  });
+
+  it('should prevent path traversal attempts', async () => {
+    const command = new RestoreCommand();
+    mockFs.readdir.mockResolvedValue(['checkpoint1.json']);
+
+    const result = await command.execute(mockConfig, ['../secret.txt']);
+    expect(result.data).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'File not found: ../secret.txt.json',
+    });
+    // Ensure readFile was not called
+    expect(mockFs.readFile).not.toHaveBeenCalled();
   });
 
   it('should handle invalid JSON in checkpoint file', async () => {
     const command = new RestoreCommand();
+    mockFs.readdir.mockResolvedValue(['checkpoint1.json']);
     mockFs.readFile.mockResolvedValue('invalid json');
     const result = await command.execute(mockConfig, ['checkpoint1.json']);
     expect((result.data as { content: string }).content).toContain(

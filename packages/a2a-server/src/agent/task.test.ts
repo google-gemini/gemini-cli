@@ -575,7 +575,7 @@ describe('Task', () => {
         // no-op
       }
 
-      const expectedPromptId1 = 'test-session-id########0';
+      const expectedPromptId1 = 'test-session-id::0';
       expect(task.promptCount).toBe(1);
       expect(task.currentPromptId).toBe(expectedPromptId1);
 
@@ -593,7 +593,7 @@ describe('Task', () => {
         // no-op
       }
 
-      const expectedPromptId2 = 'test-session-id########1';
+      const expectedPromptId2 = 'test-session-id::1';
       expect(task.promptCount).toBe(2);
       expect(task.currentPromptId).toBe(expectedPromptId2);
 

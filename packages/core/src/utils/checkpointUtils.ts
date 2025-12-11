@@ -11,6 +11,8 @@ import { getErrorMessage } from './errors.js';
 import { z } from 'zod';
 import type { Content } from '@google/genai';
 import type { ToolCallRequestInfo } from '../core/turn.js';
+import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
+import { debugLogger } from './debugLogger.js';
 
 export interface ToolCallData<HistoryType = unknown, ArgsType = unknown> {
   history?: HistoryType;
@@ -52,6 +54,12 @@ export function generateCheckpointFileName(
   const toolFilePath = toolArgs['file_path'] as string;
 
   if (!toolFilePath) {
+    // Only warn for edit tools - other tools without file_path silently skip
+    if (EDIT_TOOL_NAMES.has(toolCall.name)) {
+      debugLogger.warn(
+        `[Checkpoint] Tool '${toolCall.name}' is an edit tool but missing 'file_path'. Skipping checkpoint generation.`,
+      );
+    }
     return null;
   }
 
