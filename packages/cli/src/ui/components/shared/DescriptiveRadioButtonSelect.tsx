@@ -12,7 +12,7 @@ import type { SelectionListItem } from '../../hooks/useSelectionList.js';
 
 export interface DescriptiveRadioSelectItem<T> extends SelectionListItem<T> {
   title: string;
-  description: string;
+  description?: string;
 }
 
 export interface DescriptiveRadioButtonSelectProps<T> {
@@ -62,7 +62,9 @@ export function DescriptiveRadioButtonSelect<T>({
       renderItem={(item, { titleColor }) => (
         <Box flexDirection="column" key={item.key}>
           <Text color={titleColor}>{item.title}</Text>
-          <Text color={theme.text.secondary}>{item.description}</Text>
+          {item.description && (
+            <Text color={theme.text.secondary}>{item.description}</Text>
+          )}
         </Box>
       )}
     />

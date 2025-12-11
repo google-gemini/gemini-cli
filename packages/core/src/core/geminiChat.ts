@@ -454,11 +454,7 @@ export class GeminiChat {
           }
         }
       } else {
-        modelToUse = getEffectiveModel(
-          this.config.isInFallbackMode(),
-          model,
-          this.config.getPreviewFeatures(),
-        );
+        modelToUse = getEffectiveModel(model, this.config.isInFallbackMode());
 
         // Preview Model Bypass Logic:
         // If we are in "Preview Model Bypass Mode" (transient failure), we force downgrade to 2.5 Pro

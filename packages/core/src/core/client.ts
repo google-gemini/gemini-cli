@@ -396,11 +396,7 @@ export class GeminiClient {
     }
 
     const configModel = this.config.getModel();
-    return getEffectiveModel(
-      this.config.isInFallbackMode(),
-      configModel,
-      this.config.getPreviewFeatures(),
-    );
+    return getEffectiveModel(configModel, this.config.isInFallbackMode());
   }
 
   async *sendMessageStream(

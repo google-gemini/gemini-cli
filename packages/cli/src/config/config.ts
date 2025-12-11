@@ -32,6 +32,7 @@ import {
   loadServerHierarchicalMemory,
   WEB_FETCH_TOOL_NAME,
   getVersion,
+  PREVIEW_GEMINI_MODEL_AUTO,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -569,7 +570,9 @@ export async function loadCliConfig(
     extraExcludes.length > 0 ? extraExcludes : undefined,
   );
 
-  const defaultModel = DEFAULT_GEMINI_MODEL_AUTO;
+  const defaultModel = settings.general?.previewFeatures
+    ? PREVIEW_GEMINI_MODEL_AUTO
+    : DEFAULT_GEMINI_MODEL_AUTO;
   const resolvedModel: string =
     argv.model ||
     process.env['GEMINI_MODEL'] ||

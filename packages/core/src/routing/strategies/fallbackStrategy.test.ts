@@ -13,6 +13,9 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_FLASH_MODEL,
 } from '../../config/models.js';
 
 describe('FallbackStrategy', () => {
@@ -32,11 +35,10 @@ describe('FallbackStrategy', () => {
   });
 
   describe('when in fallback mode', () => {
-    it('should downgrade a pro model to the flash model', async () => {
+    it('should downgrade a default auto model to the flash model', async () => {
       const mockConfig = {
         isInFallbackMode: () => true,
-        getModel: () => DEFAULT_GEMINI_MODEL,
-        getPreviewFeatures: () => false,
+        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       } as Config;
 
       const decision = await strategy.route(
@@ -47,6 +49,42 @@ describe('FallbackStrategy', () => {
 
       expect(decision).not.toBeNull();
       expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+      expect(decision?.metadata.source).toBe('fallback');
+      expect(decision?.metadata.reasoning).toContain('In fallback mode');
+    });
+
+    it('should downgrade a preview auto model to the preview flash model', async () => {
+      const mockConfig = {
+        isInFallbackMode: () => true,
+        getModel: () => PREVIEW_GEMINI_MODEL_AUTO,
+      } as Config;
+
+      const decision = await strategy.route(
+        mockContext,
+        mockConfig,
+        mockClient,
+      );
+
+      expect(decision).not.toBeNull();
+      expect(decision?.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+      expect(decision?.metadata.source).toBe('fallback');
+      expect(decision?.metadata.reasoning).toContain('In fallback mode');
+    });
+
+    it('should not downgrade a pro model to the flash model', async () => {
+      const mockConfig = {
+        isInFallbackMode: () => true,
+        getModel: () => DEFAULT_GEMINI_MODEL,
+      } as Config;
+
+      const decision = await strategy.route(
+        mockContext,
+        mockConfig,
+        mockClient,
+      );
+
+      expect(decision).not.toBeNull();
+      expect(decision?.model).toBe(DEFAULT_GEMINI_MODEL);
       expect(decision?.metadata.source).toBe('fallback');
       expect(decision?.metadata.reasoning).toContain('In fallback mode');
     });

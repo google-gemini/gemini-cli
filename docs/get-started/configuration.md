@@ -832,7 +832,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.codebaseInvestigatorSettings.model`** (string):
   - **Description:** The model to use for the Codebase Investigator agent.
-  - **Default:** `"pro"`
+  - **Default:** `"gemini-2.5-pro"`
   - **Requires restart:** Yes
 
 #### `hooks`

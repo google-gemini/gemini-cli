@@ -118,9 +118,8 @@ export async function createContentGenerator(
     }
     const version = await getVersion();
     const model = getEffectiveModel(
-      gcConfig.isInFallbackMode(),
       gcConfig.getModel(),
-      gcConfig.getPreviewFeatures(),
+      gcConfig.isInFallbackMode(),
     );
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
