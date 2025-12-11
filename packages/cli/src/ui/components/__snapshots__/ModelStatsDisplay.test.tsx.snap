@@ -14,8 +14,8 @@ exports[`<ModelStatsDisplay /> > should display a single model correctly 1`] = `
 │                                                                                                  │
 │  Tokens                                                                                          │
 │  Total                       30                                                                  │
-│    ↳ Prompt                  10                                                                  │
-│    ↳ Cached                  5 (50.0%)                                                           │
+│    ↳ Input                   5                                                                   │
+│    ↳ Cache Reads             5 (50.0%)                                                           │
 │    ↳ Thoughts                2                                                                   │
 │    ↳ Tool                    1                                                                   │
 │    ↳ Output                  20                                                                  │
@@ -37,8 +37,8 @@ exports[`<ModelStatsDisplay /> > should display conditional rows if at least one
 │                                                                                                  │
 │  Tokens                                                                                          │
 │  Total                       30                    15                                            │
-│    ↳ Prompt                  10                    5                                             │
-│    ↳ Cached                  5 (50.0%)             0 (0.0%)                                      │
+│    ↳ Input                   5                     5                                             │
+│    ↳ Cache Reads             5 (50.0%)             0 (0.0%)                                      │
 │    ↳ Thoughts                2                     0                                             │
 │    ↳ Tool                    0                     3                                             │
 │    ↳ Output                  20                    10                                            │
@@ -60,8 +60,8 @@ exports[`<ModelStatsDisplay /> > should display stats for multiple models correc
 │                                                                                                  │
 │  Tokens                                                                                          │
 │  Total                       300                   600                                           │
-│    ↳ Prompt                  100                   200                                           │
-│    ↳ Cached                  50 (50.0%)            100 (50.0%)                                   │
+│    ↳ Input                   50                    100                                           │
+│    ↳ Cache Reads             50 (50.0%)            100 (50.0%)                                   │
 │    ↳ Thoughts                10                    20                                            │
 │    ↳ Tool                    5                     10                                            │
 │    ↳ Output                  200                   400                                           │
@@ -83,8 +83,8 @@ exports[`<ModelStatsDisplay /> > should handle large values without wrapping or 
 │                                                                                                  │
 │  Tokens                                                                                          │
 │  Total                       999,999,999                                                         │
-│    ↳ Prompt                  987,654,321                                                         │
-│    ↳ Cached                  123,456,789 (12.5%)                                                 │
+│    ↳ Input                   864,197,532                                                         │
+│    ↳ Cache Reads             123,456,789 (12.5%)                                                 │
 │    ↳ Thoughts                111,111,111                                                         │
 │    ↳ Tool                    222,222,222                                                         │
 │    ↳ Output                  123,456,789                                                         │
@@ -106,7 +106,7 @@ exports[`<ModelStatsDisplay /> > should not display conditional rows if no model
 │                                                                                                  │
 │  Tokens                                                                                          │
 │  Total                       30                                                                  │
-│    ↳ Prompt                  10                                                                  │
+│    ↳ Input                   10                                                                  │
 │    ↳ Output                  20                                                                  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
