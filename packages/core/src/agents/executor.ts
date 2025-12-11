@@ -933,6 +933,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           this.runtimeContext,
           requestInfo,
           signal,
+          // Child tools will have their confirmation requests handled by the
+          // parent's useToolConfirmationListener hook via MessageBus.
+          // No need for interactive mode - the hook shows a generic dialog.
         );
 
         if (toolResponse.error) {

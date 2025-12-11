@@ -685,11 +685,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
       return slashCommandConfirmationRequest;
     }
     if (toolConfirmationRequest) {
+      // Include the confirmation details for rich UI rendering
       return {
         prompt: `Allow tool execution: ${toolConfirmationRequest.toolCall.name}(${JSON.stringify(
           toolConfirmationRequest.toolCall.args,
         )})?`,
         onConfirm: onToolConfirm,
+        // Pass through the confirmation details if available
+        toolConfirmationDetails: toolConfirmationRequest.confirmationDetails,
+        toolName: toolConfirmationRequest.toolCall.name,
       };
     }
     return null;

@@ -423,7 +423,14 @@ describe('WebFetchTool', () => {
       confirmed: boolean,
       correlationId = 'test-correlation-id',
     ) => {
-      const responseHandler = subscribeSpy.mock.calls[0][1] as (
+      // Find the response handler - should be subscribed to TOOL_CONFIRMATION_RESPONSE
+      const call = subscribeSpy.mock.calls.find(
+        (c) => c[0] === MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      );
+      if (!call) {
+        throw new Error('No response handler subscribed');
+      }
+      const responseHandler = call[1] as (
         response: ToolConfirmationResponse,
       ) => void;
       const response: ToolConfirmationResponse = {
@@ -433,6 +440,23 @@ describe('WebFetchTool', () => {
       };
       responseHandler(response);
     };
+
+    const waitForSubscription = (
+      subscribeSpy: ReturnType<typeof vi.spyOn>,
+    ): Promise<void> =>
+      new Promise((resolve) => {
+        const check = () => {
+          const call = subscribeSpy.mock.calls.find(
+            (c) => c[0] === MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          );
+          if (call) {
+            resolve();
+          } else {
+            setImmediate(check);
+          }
+        };
+        setImmediate(check);
+      });
 
     beforeEach(() => {
       policyEngine = new PolicyEngine();
@@ -451,6 +475,9 @@ describe('WebFetchTool', () => {
         new AbortController().signal,
       );
 
+      // Wait for the async flow to subscribe
+      await waitForSubscription(subscribeSpy);
+
       expect(publishSpy).toHaveBeenCalledWith({
         type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
         toolCall: {
@@ -458,6 +485,13 @@ describe('WebFetchTool', () => {
           args: { prompt: 'fetch https://example.com' },
         },
         correlationId: 'test-correlation-id',
+        // confirmationDetails is now included in the published request
+        confirmationDetails: {
+          type: 'info',
+          title: 'Confirm Web Fetch',
+          prompt: 'fetch https://example.com',
+          urls: ['https://example.com/'],
+        },
       });
 
       expect(subscribeSpy).toHaveBeenCalledWith(
@@ -480,6 +514,7 @@ describe('WebFetchTool', () => {
         new AbortController().signal,
       );
 
+      await waitForSubscription(subscribeSpy);
       simulateMessageBusResponse(subscribeSpy, false);
 
       await expect(confirmationPromise).rejects.toThrow(
@@ -534,6 +569,8 @@ describe('WebFetchTool', () => {
         new AbortController().signal,
       );
 
+      // Need to advance timers to allow async flow to complete
+      await vi.advanceTimersByTimeAsync(10);
       simulateMessageBusResponse(subscribeSpy, true, 'wrong-id');
 
       await vi.advanceTimersByTimeAsync(30000);
@@ -576,6 +613,7 @@ describe('WebFetchTool', () => {
         new AbortController().signal,
       );
 
+      await waitForSubscription(subscribeSpy);
       simulateMessageBusResponse(subscribeSpy, true);
 
       await confirmationPromise;

@@ -92,8 +92,16 @@ export abstract class BaseToolInvocation<
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.messageBus) {
-      const decision = await this.getMessageBusDecision(abortSignal);
+      // First, get confirmation details so we can include them in the MessageBus request.
+      // This allows child tool confirmations to be displayed by the parent UI.
+      const details = await this.getConfirmationDetails(abortSignal);
+
+      // Get decision from MessageBus, including serializable confirmation details
+      // so the parent UI can display the standard confirmation dialog.
+      const decision = await this.getMessageBusDecision(abortSignal, details);
+
       if (decision === 'ALLOW') {
+        // Tool is auto-allowed by policy
         return false;
       }
 
@@ -105,8 +113,19 @@ export abstract class BaseToolInvocation<
         );
       }
 
+      if (decision === 'CONFIRMED') {
+        // User confirmed via MessageBus (e.g., from parent UI for child tools).
+        // Call the onConfirm callback if the details have one.
+        if (details && details.onConfirm) {
+          await details.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+        }
+        return false;
+      }
+
+      // ASK_USER: Return confirmation details for inline UI display
+      // (This is the legacy flow for tools in the main scheduler)
       if (decision === 'ASK_USER') {
-        return this.getConfirmationDetails(abortSignal);
+        return details;
       }
     }
     // When no message bus, use default confirmation flow
@@ -146,7 +165,8 @@ export abstract class BaseToolInvocation<
 
   protected getMessageBusDecision(
     abortSignal: AbortSignal,
-  ): Promise<'ALLOW' | 'DENY' | 'ASK_USER'> {
+    confirmationDetails?: ToolCallConfirmationDetails | false,
+  ): Promise<'ALLOW' | 'DENY' | 'ASK_USER' | 'CONFIRMED'> {
     if (!this.messageBus) {
       // If there's no message bus, we can't make a decision, so we allow.
       // The legacy confirmation flow will still apply if the tool needs it.
@@ -159,100 +179,157 @@ export abstract class BaseToolInvocation<
       args: this.params as Record<string, unknown>,
     };
 
-    return new Promise<'ALLOW' | 'DENY' | 'ASK_USER'>((resolve) => {
-      // Debug logging
-      const log = (msg: string) => {
-        try {
-          appendFileSync(
-            '/Users/adh/debug.log',
-            `${new Date().toISOString()} [tools.ts] ${msg}\n`,
+    return new Promise<'ALLOW' | 'DENY' | 'ASK_USER' | 'CONFIRMED'>(
+      (resolve) => {
+        // Debug logging
+        const log = (msg: string) => {
+          try {
+            appendFileSync(
+              '/Users/adh/debug.log',
+              `${new Date().toISOString()} [tools.ts] ${msg}\n`,
+            );
+          } catch {
+            // ignore
+          }
+        };
+
+        if (!this.messageBus) {
+          resolve('ALLOW');
+          return;
+        }
+
+        log(
+          `Starting getMessageBusDecision for ${toolCall.name} with correlationId ${correlationId}`,
+        );
+
+        let timeoutId: NodeJS.Timeout | undefined;
+
+        const cleanup = () => {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = undefined;
+          }
+          abortSignal.removeEventListener('abort', abortHandler);
+          this.messageBus?.unsubscribe(
+            MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+            responseHandler,
           );
-        } catch {
-          // ignore
+        };
+
+        const abortHandler = () => {
+          log(`Abort triggered for ${correlationId}`);
+          cleanup();
+          resolve('DENY');
+        };
+
+        if (abortSignal.aborted) {
+          log(`Already aborted for ${correlationId}`);
+          resolve('DENY');
+          return;
         }
-      };
 
-      if (!this.messageBus) {
-        resolve('ALLOW');
-        return;
-      }
+        const responseHandler = (response: ToolConfirmationResponse) => {
+          log(
+            `Received response for ${correlationId}: ID=${response.correlationId} Confirmed=${response.confirmed} RequiresUser=${response.requiresUserConfirmation}`,
+          );
+          if (response.correlationId === correlationId) {
+            cleanup();
+            if (response.requiresUserConfirmation) {
+              // Scheduler said ASK_USER, so use inline confirmation UI
+              resolve('ASK_USER');
+            } else if (response.confirmed) {
+              // User explicitly confirmed via parent UI (e.g., for child tools)
+              resolve('CONFIRMED');
+            } else {
+              resolve('DENY');
+            }
+          }
+        };
 
-      log(
-        `Starting getMessageBusDecision for ${toolCall.name} with correlationId ${correlationId}`,
-      );
+        abortSignal.addEventListener('abort', abortHandler);
 
-      let timeoutId: NodeJS.Timeout | undefined;
+        timeoutId = setTimeout(() => {
+          log(`Timeout triggered for ${correlationId}`);
+          cleanup();
+          resolve('ASK_USER'); // Default to ASK_USER on timeout
+        }, 30000);
 
-      const cleanup = () => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = undefined;
-        }
-        abortSignal.removeEventListener('abort', abortHandler);
-        this.messageBus?.unsubscribe(
+        this.messageBus.subscribe(
           MessageBusType.TOOL_CONFIRMATION_RESPONSE,
           responseHandler,
         );
-      };
 
-      const abortHandler = () => {
-        log(`Abort triggered for ${correlationId}`);
-        cleanup();
-        resolve('DENY');
-      };
+        // Convert confirmation details to serializable format for parent UI
+        const serializableDetails = confirmationDetails
+          ? this.serializeConfirmationDetails(confirmationDetails)
+          : undefined;
 
-      if (abortSignal.aborted) {
-        log(`Already aborted for ${correlationId}`);
-        resolve('DENY');
-        return;
-      }
+        const request: ToolConfirmationRequest = {
+          type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+          toolCall,
+          correlationId,
+          serverName: this._serverName,
+          confirmationDetails: serializableDetails,
+        };
 
-      const responseHandler = (response: ToolConfirmationResponse) => {
-        log(
-          `Received response for ${correlationId}: ID=${response.correlationId} Confirmed=${response.confirmed} RequiresUser=${response.requiresUserConfirmation}`,
-        );
-        if (response.correlationId === correlationId) {
+        try {
+          log(`Publishing request for ${correlationId}`);
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          this.messageBus.publish(request);
+        } catch (_error) {
+          log(`Error publishing request for ${correlationId}: ${_error}`);
           cleanup();
-          if (response.requiresUserConfirmation) {
-            resolve('ASK_USER');
-          } else if (response.confirmed) {
-            resolve('ALLOW');
-          } else {
-            resolve('DENY');
-          }
+          resolve('ALLOW');
         }
-      };
+      },
+    );
+  }
 
-      abortSignal.addEventListener('abort', abortHandler);
-
-      timeoutId = setTimeout(() => {
-        log(`Timeout triggered for ${correlationId}`);
-        cleanup();
-        resolve('ASK_USER'); // Default to ASK_USER on timeout
-      }, 30000);
-
-      this.messageBus.subscribe(
-        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-        responseHandler,
-      );
-
-      const request: ToolConfirmationRequest = {
-        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
-        toolCall,
-        correlationId,
-        serverName: this._serverName,
-      };
-
-      try {
-        log(`Publishing request for ${correlationId}`);
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.messageBus.publish(request);
-      } catch (_error) {
-        log(`Error publishing request for ${correlationId}: ${_error}`);
-        cleanup();
-        resolve('ALLOW');
-      }
-    });
+  /**
+   * Converts ToolCallConfirmationDetails to a serializable format for the MessageBus.
+   * The onConfirm callback cannot be serialized, so we extract only the data properties.
+   */
+  private serializeConfirmationDetails(
+    details: ToolCallConfirmationDetails,
+  ): ToolConfirmationRequest['confirmationDetails'] {
+    switch (details.type) {
+      case 'edit':
+        return {
+          type: 'edit',
+          title: details.title,
+          fileName: details.fileName,
+          filePath: details.filePath,
+          fileDiff: details.fileDiff,
+          originalContent: details.originalContent,
+          newContent: details.newContent,
+          isModifying: details.isModifying,
+        };
+      case 'exec':
+        return {
+          type: 'exec',
+          title: details.title,
+          command: details.command,
+          rootCommand: details.rootCommand,
+        };
+      case 'mcp':
+        return {
+          type: 'mcp',
+          title: details.title,
+          serverName: details.serverName,
+          toolName: details.toolName,
+          toolDisplayName: details.toolDisplayName,
+        };
+      case 'info':
+        return {
+          type: 'info',
+          title: details.title,
+          prompt: details.prompt,
+          urls: details.urls,
+        };
+      default:
+        // Exhaustiveness check
+        return undefined;
+    }
   }
 
   abstract execute(

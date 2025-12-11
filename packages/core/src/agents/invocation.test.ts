@@ -201,7 +201,7 @@ describe('SubagentInvocation', () => {
       expect(updateOutput).toHaveBeenCalledTimes(3); // Initial message + 2 thoughts
     });
 
-    it('should NOT stream other activities (e.g., TOOL_CALL_START, ERROR)', async () => {
+    it('should stream TOOL_CALL_START but NOT ERROR activities', async () => {
       mockExecutorInstance.run.mockImplementation(async () => {
         const onActivity = MockAgentExecutor.create.mock.calls[0][2];
 
@@ -224,9 +224,10 @@ describe('SubagentInvocation', () => {
 
       await invocation.execute(signal, updateOutput);
 
-      // Should only contain the initial "Subagent starting..." message
-      expect(updateOutput).toHaveBeenCalledTimes(1);
+      // Initial message + TOOL_CALL_START (ERROR should NOT be streamed)
+      expect(updateOutput).toHaveBeenCalledTimes(2);
       expect(updateOutput).toHaveBeenCalledWith('Subagent starting...\n');
+      expect(updateOutput).toHaveBeenCalledWith('\nRunning tool: ls()...');
     });
 
     it('should run successfully without an updateOutput callback', async () => {

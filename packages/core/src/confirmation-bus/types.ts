@@ -23,6 +23,57 @@ export interface ToolConfirmationRequest {
   toolCall: FunctionCall;
   correlationId: string;
   serverName?: string;
+  /**
+   * Tool-specific confirmation details for rendering the standard confirmation UI.
+   * When provided, the parent UI should use ToolConfirmationMessage instead of
+   * a generic text prompt.
+   * Note: This is a simplified serializable version of ToolCallConfirmationDetails,
+   * since function callbacks cannot be serialized through MessageBus.
+   */
+  confirmationDetails?: SerializableToolConfirmationDetails;
+}
+
+/**
+ * Serializable version of ToolCallConfirmationDetails for MessageBus transport.
+ * Discriminated union matching the original ToolCallConfirmationDetails structure.
+ */
+export type SerializableToolConfirmationDetails =
+  | SerializableEditConfirmationDetails
+  | SerializableExecConfirmationDetails
+  | SerializableMcpConfirmationDetails
+  | SerializableInfoConfirmationDetails;
+
+export interface SerializableEditConfirmationDetails {
+  type: 'edit';
+  title: string;
+  fileName: string;
+  filePath: string;
+  fileDiff: string;
+  originalContent: string | null;
+  newContent: string;
+  isModifying?: boolean;
+}
+
+export interface SerializableExecConfirmationDetails {
+  type: 'exec';
+  title: string;
+  command: string;
+  rootCommand: string;
+}
+
+export interface SerializableMcpConfirmationDetails {
+  type: 'mcp';
+  title: string;
+  serverName: string;
+  toolName: string;
+  toolDisplayName: string;
+}
+
+export interface SerializableInfoConfirmationDetails {
+  type: 'info';
+  title: string;
+  prompt: string;
+  urls?: string[];
 }
 
 export interface ToolConfirmationResponse {

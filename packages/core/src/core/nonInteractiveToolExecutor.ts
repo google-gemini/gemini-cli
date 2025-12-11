@@ -11,7 +11,16 @@ import {
 } from './coreToolScheduler.js';
 
 /**
- * Executes a single tool call non-interactively by leveraging the CoreToolScheduler.
+ * Executes a single tool call by leveraging the CoreToolScheduler.
+ *
+ * This executor is designed for "headless" or non-interactive tool execution,
+ * such as within subagents. Tool confirmations are not shown inline; instead,
+ * confirmation requests are published to the MessageBus and handled by the
+ * parent UI's useToolConfirmationListener hook.
+ *
+ * @param config The runtime configuration.
+ * @param toolCallRequest The tool call to execute.
+ * @param abortSignal Signal to abort the tool execution.
  */
 export async function executeToolCall(
   config: Config,
@@ -22,6 +31,8 @@ export async function executeToolCall(
     const scheduler = new CoreToolScheduler({
       config,
       getPreferredEditor: () => undefined,
+      // Don't respond to confirmation requests - let the parent UI's
+      // useToolConfirmationListener hook handle them via MessageBus.
       ignoreToolConfirmationRequests: true,
       onAllToolCallsComplete: async (completedToolCalls) => {
         if (completedToolCalls.length > 0) {
