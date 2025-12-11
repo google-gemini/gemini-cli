@@ -16,6 +16,7 @@ import type {
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { ToolResultDisplay } from '../tools/tools.js';
 
 export const SESSION_FILE_PREFIX = 'session-';
 
@@ -53,7 +54,7 @@ export interface ToolCallRecord {
   // UI-specific fields for display purposes
   displayName?: string;
   description?: string;
-  resultDisplay?: string;
+  resultDisplay?: ToolResultDisplay;
   renderOutputAsMarkdown?: boolean;
 }
 

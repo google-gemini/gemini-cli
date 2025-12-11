@@ -43,6 +43,52 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     return prompts;
   }, [conversation.messages]);
 
+  const calculateStats = (userMessage: MessageRecord) => {
+    const msgIndex = conversation.messages.indexOf(userMessage);
+    if (msgIndex === -1) return null;
+
+    let addedLines = 0;
+    let removedLines = 0;
+    const files = new Set<string>();
+    let hasEdits = false;
+
+    // Look ahead until the next user message or end of conversation
+    for (let i = msgIndex + 1; i < conversation.messages.length; i++) {
+      const msg = conversation.messages[i];
+      if (msg.type === 'user') break; // Stop at next user message
+
+      if (msg.type === 'gemini' && msg.toolCalls) {
+        for (const toolCall of msg.toolCalls) {
+          const result = toolCall.resultDisplay;
+          if (
+            result &&
+            typeof result === 'object' &&
+            'diffStat' in result &&
+            result.diffStat
+          ) {
+            hasEdits = true;
+            const stats = result.diffStat;
+            addedLines += stats.model_added_lines + stats.user_added_lines;
+            removedLines +=
+              stats.model_removed_lines + stats.user_removed_lines;
+            if ('fileName' in result && typeof result.fileName === 'string') {
+              files.add(result.fileName);
+            }
+          }
+        }
+      }
+    }
+
+    if (!hasEdits) return null;
+
+    return {
+      addedLines,
+      removedLines,
+      fileCount: files.size,
+      firstFileName: files.values().next().value as string,
+    };
+  };
+
   const truncate = (text: string, isSelected: boolean) => {
     if (isSelected) return text;
     const lines = text.split('\n');
@@ -113,21 +159,42 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
           maxItemsToShow={maxItemsToShow}
           renderItem={(itemWrapper, { isSelected }) => {
             const userPrompt = itemWrapper.value;
+            const stats = calculateStats(userPrompt);
 
-            // Determine text content
             const originalUserText = userPrompt.content
               ? partToString(userPrompt.content)
               : '';
 
             return (
               <Box flexDirection="column" marginBottom={1}>
-                <Text
-                  color={
-                    isSelected ? theme.status.success : theme.text.secondary
-                  }
-                >
-                  {truncate(originalUserText, isSelected)}
-                </Text>
+                <Box>
+                  <Text
+                    color={
+                      isSelected ? theme.status.success : theme.text.secondary
+                    }
+                  >
+                    {truncate(originalUserText, isSelected)}
+                  </Text>
+                </Box>
+                {stats ? (
+                  <Box flexDirection="row">
+                    <Text color={theme.text.primary}>
+                      {stats.fileCount === 1
+                        ? stats.firstFileName
+                        : `${stats.fileCount} files changed`}{' '}
+                    </Text>
+                    {stats.addedLines > 0 && (
+                      <Text color="green">+{stats.addedLines} </Text>
+                    )}
+                    {stats.removedLines > 0 && (
+                      <Text color="red">-{stats.removedLines}</Text>
+                    )}
+                  </Box>
+                ) : (
+                  <Text color={theme.text.primary}>
+                    No files have been changed
+                  </Text>
+                )}
               </Box>
             );
           }}
