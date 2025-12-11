@@ -10,12 +10,15 @@ export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
 
-export const DEFAULT_GEMINI_MODEL_AUTO = 'auto';
+export const VALID_GEMINI_MODELS = new Set([
+  PREVIEW_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+]);
 
-// Model aliases for user convenience.
-export const GEMINI_MODEL_ALIAS_PRO = 'pro';
-export const GEMINI_MODEL_ALIAS_FLASH = 'flash';
-export const GEMINI_MODEL_ALIAS_FLASH_LITE = 'flash-lite';
+export const PREVIEW_GEMINI_MODEL_AUTO = 'auto-gemini-3';
+export const DEFAULT_GEMINI_MODEL_AUTO = 'auto-gemini-2.5';
 
 export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 
@@ -23,70 +26,52 @@ export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 export const DEFAULT_THINKING_MODE = 8192;
 
 /**
- * Resolves the requested model alias (e.g., 'auto', 'pro', 'flash', 'flash-lite')
- * to a concrete model name, considering preview features.
- *
- * @param requestedModel The model alias or concrete model name requested by the user.
- * @param previewFeaturesEnabled A boolean indicating if preview features are enabled.
- * @returns The resolved concrete model name.
- */
-export function resolveModel(
-  requestedModel: string,
-  previewFeaturesEnabled: boolean | undefined,
-): string {
-  switch (requestedModel) {
-    case DEFAULT_GEMINI_MODEL_AUTO:
-    case GEMINI_MODEL_ALIAS_PRO: {
-      return previewFeaturesEnabled
-        ? PREVIEW_GEMINI_MODEL
-        : DEFAULT_GEMINI_MODEL;
-    }
-    case GEMINI_MODEL_ALIAS_FLASH: {
-      return DEFAULT_GEMINI_FLASH_MODEL;
-    }
-    case GEMINI_MODEL_ALIAS_FLASH_LITE: {
-      return DEFAULT_GEMINI_FLASH_LITE_MODEL;
-    }
-    default: {
-      return requestedModel;
-    }
-  }
-}
-
-/**
  * Determines the effective model to use, applying fallback logic if necessary.
  *
  * When fallback mode is active, this function enforces the use of the standard
- * fallback model. However, it makes an exception for "lite" models (any model
- * with "lite" in its name), allowing them to be used to preserve cost savings.
- * This ensures that "pro" models are always downgraded, while "lite" model
- * requests are honored.
+ * fallback model.
  *
- * @param isInFallbackMode Whether the application is in fallback mode.
  * @param requestedModel The model that was originally requested.
- * @param previewFeaturesEnabled A boolean indicating if preview features are enabled.
+ * @param isInFallbackMode Whether the application is in fallback mode.
  * @returns The effective model name.
  */
 export function getEffectiveModel(
-  isInFallbackMode: boolean,
   requestedModel: string,
-  previewFeaturesEnabled: boolean | undefined,
+  useFallbackModel: boolean,
 ): string {
-  const resolvedModel = resolveModel(requestedModel, previewFeaturesEnabled);
-
   // If we are not in fallback mode, simply use the resolved model.
-  if (!isInFallbackMode) {
-    return resolvedModel;
+  if (!useFallbackModel) {
+    switch (requestedModel) {
+      case PREVIEW_GEMINI_MODEL_AUTO:
+        return PREVIEW_GEMINI_MODEL;
+      case DEFAULT_GEMINI_MODEL_AUTO:
+        return DEFAULT_GEMINI_MODEL;
+      default:
+        return requestedModel;
+    }
   }
 
-  // If a "lite" model is requested, honor it. This allows for variations of
-  // lite models without needing to list them all as constants.
-  if (resolvedModel.includes('lite')) {
-    return resolvedModel;
+  // Fallback model for corresponding model family. We are doing fallback only
+  // for Auto modes
+  switch (requestedModel) {
+    case PREVIEW_GEMINI_MODEL_AUTO:
+      return PREVIEW_GEMINI_FLASH_MODEL;
+    case DEFAULT_GEMINI_MODEL_AUTO:
+      return DEFAULT_GEMINI_FLASH_MODEL;
+    default:
+      return requestedModel;
   }
+}
 
-  // Default fallback for Gemini CLI.
-  return DEFAULT_GEMINI_FLASH_MODEL;
+export function getDisplayString(model: string) {
+  switch (model) {
+    case PREVIEW_GEMINI_MODEL_AUTO:
+      return 'Auto (Gemini 3)';
+    case DEFAULT_GEMINI_MODEL_AUTO:
+      return 'Auto (Gemini 2.5)';
+    default:
+      return model;
+  }
 }
 
 /**

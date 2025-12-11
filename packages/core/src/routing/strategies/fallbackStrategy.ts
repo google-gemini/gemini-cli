@@ -28,9 +28,8 @@ export class FallbackStrategy implements RoutingStrategy {
     }
 
     const effectiveModel = getEffectiveModel(
-      isInFallbackMode,
       config.getModel(),
-      config.getPreviewFeatures(),
+      isInFallbackMode,
     );
     return {
       model: effectiveModel,

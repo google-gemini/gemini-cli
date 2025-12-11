@@ -10,6 +10,7 @@ import { makeFakeConfig } from '../test-utils/config.js';
 import type { AgentDefinition } from './types.js';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 
 // A test-only subclass to expose the protected `registerAgent` method.
 class TestableAgentRegistry extends AgentRegistry {
@@ -78,7 +79,7 @@ describe('AgentRegistry', () => {
         model: 'gemini-3-pro-preview',
         codebaseInvestigatorSettings: {
           enabled: true,
-          model: 'pro',
+          model: DEFAULT_GEMINI_MODEL,
         },
       });
       const previewRegistry = new TestableAgentRegistry(previewConfig);

@@ -10,9 +10,10 @@ import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
+  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
-  GEMINI_MODEL_ALIAS_PRO,
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
 } from '../config/models.js';
 import type { ModelConfigAlias } from '../services/modelConfigService.js';
 
@@ -59,10 +60,14 @@ export class AgentRegistry {
 
       // If the user is using the preview model for the main agent, force the sub-agent to use it too
       // if it's configured to use 'pro' or 'auto'.
-      if (this.config.getModel() === PREVIEW_GEMINI_MODEL) {
+      if (
+        this.config.getModel() === PREVIEW_GEMINI_MODEL ||
+        this.config.getModel() === PREVIEW_GEMINI_MODEL_AUTO
+      ) {
         if (
-          model === GEMINI_MODEL_ALIAS_PRO ||
-          model === DEFAULT_GEMINI_MODEL_AUTO
+          model === PREVIEW_GEMINI_MODEL_AUTO ||
+          model === DEFAULT_GEMINI_MODEL_AUTO ||
+          model === DEFAULT_GEMINI_MODEL
         ) {
           model = PREVIEW_GEMINI_MODEL;
         }

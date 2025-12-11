@@ -106,9 +106,8 @@ export function getCoreSystemPrompt(
 
   // TODO(joshualitt): Replace with system instructions on model configs.
   const desiredModel = getEffectiveModel(
-    config.isInFallbackMode(),
     config.getModel(),
-    config.getPreviewFeatures(),
+    config.isInFallbackMode(),
   );
 
   const isGemini3 = desiredModel === PREVIEW_GEMINI_MODEL;

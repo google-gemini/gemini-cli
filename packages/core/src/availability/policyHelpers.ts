@@ -33,11 +33,7 @@ export function resolvePolicyChain(
   // Switch to getActiveModel()
   const activeModel =
     preferredModel ??
-    getEffectiveModel(
-      config.isInFallbackMode(),
-      config.getModel(),
-      config.getPreviewFeatures(),
-    );
+    getEffectiveModel(config.getModel(), config.isInFallbackMode());
 
   if (activeModel === 'auto') {
     return [...chain];

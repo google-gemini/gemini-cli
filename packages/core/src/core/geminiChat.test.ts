@@ -21,7 +21,9 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_THINKING_MODE,
+  PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
 } from '../config/models.js';
 import { AuthType } from './contentGenerator.js';
 import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
@@ -155,7 +157,8 @@ describe('GeminiChat', () => {
       getUserTier: vi.fn().mockReturnValue(undefined),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {
-          const thinkingConfig = modelConfigKey.model.startsWith('gemini-3')
+          const model = modelConfigKey.model ?? mockConfig.getModel();
+          const thinkingConfig = model.startsWith('gemini-3')
             ? {
                 thinkingLevel: ThinkingLevel.HIGH,
               }
@@ -163,7 +166,7 @@ describe('GeminiChat', () => {
                 thinkingBudget: DEFAULT_THINKING_MODE,
               };
           return {
-            model: modelConfigKey.model,
+            model,
             generateContentConfig: {
               temperature: 0,
               thinkingConfig,
@@ -1859,7 +1862,7 @@ describe('GeminiChat', () => {
     } as unknown as GenerateContentResponse;
 
     it('should use the FLASH model when in fallback mode (sendMessageStream)', async () => {
-      vi.mocked(mockConfig.getModel).mockReturnValue('gemini-pro');
+      vi.mocked(mockConfig.getModel).mockReturnValue('auto-gemini-2.5');
       vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(true);
       vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
         async () =>
@@ -1869,7 +1872,7 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        { model: 'test-model' },
+        { model: 'auto-gemini-2.5' },
         'test message',
         'prompt-id-res3',
         new AbortController().signal,
@@ -1983,7 +1986,7 @@ describe('GeminiChat', () => {
       expect(modelTurn.parts![0]!.text).toBe('Success on retry');
     });
 
-    it('should switch to DEFAULT_GEMINI_FLASH_MODEL and use thinkingBudget when falling back from a gemini-3 model', async () => {
+    it('should switch to PREVIEW_GEMINI_FLASH_MODEL and use thinkingLevel when falling back from a gemini-3 model', async () => {
       // ARRANGE
       const authType = AuthType.LOGIN_WITH_GOOGLE;
       vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
@@ -2020,7 +2023,7 @@ describe('GeminiChat', () => {
 
       // ACT
       const stream = await chat.sendMessageStream(
-        { model: 'gemini-3-test-model' }, // Start with a gemini-3 model
+        { model: PREVIEW_GEMINI_MODEL_AUTO }, // Start with a gemini-3 model
         'test fallback thinking',
         'prompt-id-fb3',
         new AbortController().signal,
@@ -2040,7 +2043,7 @@ describe('GeminiChat', () => {
       ).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({
-          model: 'gemini-3-test-model',
+          model: PREVIEW_GEMINI_MODEL,
           config: expect.objectContaining({
             thinkingConfig: {
               thinkingBudget: undefined,
@@ -2051,17 +2054,17 @@ describe('GeminiChat', () => {
         'prompt-id-fb3',
       );
 
-      // Second call: DEFAULT_GEMINI_FLASH_MODEL (due to fallback), thinkingBudget set (due to fix)
+      // Second call: PREVIEW_GEMINI_FLASH_MODEL (due to fallback), thinkingLevel set
       expect(
         mockContentGenerator.generateContentStream,
       ).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({
-          model: DEFAULT_GEMINI_FLASH_MODEL,
+          model: PREVIEW_GEMINI_FLASH_MODEL,
           config: expect.objectContaining({
             thinkingConfig: {
-              thinkingBudget: DEFAULT_THINKING_MODE,
-              thinkingLevel: undefined,
+              thinkingBudget: undefined,
+              thinkingLevel: ThinkingLevel.HIGH,
             },
           }),
         }),
