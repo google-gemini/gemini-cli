@@ -8,21 +8,11 @@
 import type { CommandModule } from 'yargs';
 import { loadSettings } from '../../config/settings.js';
 import type { MCPServerConfig } from '@google/gemini-cli-core';
-import {
-  MCPServerStatus,
-  createTransport,
-  debugLogger,
-} from '@google/gemini-cli-core';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { debugLogger } from '@google/gemini-cli-core';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
-
-const COLOR_GREEN = '\u001b[32m';
-const COLOR_YELLOW = '\u001b[33m';
-const COLOR_RED = '\u001b[31m';
-const RESET_COLOR = '\u001b[0m';
 
 async function getMcpServersFromConfig(): Promise<
   Record<string, MCPServerConfig>
@@ -50,47 +40,6 @@ async function getMcpServersFromConfig(): Promise<
   return mcpServers;
 }
 
-async function testMCPConnection(
-  serverName: string,
-  config: MCPServerConfig,
-): Promise<MCPServerStatus> {
-  const client = new Client({
-    name: 'mcp-test-client',
-    version: '0.0.1',
-  });
-
-  let transport;
-  try {
-    // Use the same transport creation logic as core
-    transport = await createTransport(serverName, config, false);
-  } catch (_error) {
-    await client.close();
-    return MCPServerStatus.DISCONNECTED;
-  }
-
-  try {
-    // Attempt actual MCP connection with short timeout
-    await client.connect(transport, { timeout: 5000 }); // 5s timeout
-
-    // Test basic MCP protocol by pinging the server
-    await client.ping();
-
-    await client.close();
-    return MCPServerStatus.CONNECTED;
-  } catch (_error) {
-    await transport.close();
-    return MCPServerStatus.DISCONNECTED;
-  }
-}
-
-async function getServerStatus(
-  serverName: string,
-  server: MCPServerConfig,
-): Promise<MCPServerStatus> {
-  // Test all server types by attempting actual connection
-  return testMCPConnection(serverName, server);
-}
-
 export async function listMcpServers(): Promise<void> {
   const mcpServers = await getMcpServersFromConfig();
   const serverNames = Object.keys(mcpServers);
@@ -105,26 +54,6 @@ export async function listMcpServers(): Promise<void> {
   for (const serverName of serverNames) {
     const server = mcpServers[serverName];
 
-    const status = await getServerStatus(serverName, server);
-
-    let statusIndicator = '';
-    let statusText = '';
-    switch (status) {
-      case MCPServerStatus.CONNECTED:
-        statusIndicator = COLOR_GREEN + '✓' + RESET_COLOR;
-        statusText = 'Connected';
-        break;
-      case MCPServerStatus.CONNECTING:
-        statusIndicator = COLOR_YELLOW + '…' + RESET_COLOR;
-        statusText = 'Connecting';
-        break;
-      case MCPServerStatus.DISCONNECTED:
-      default:
-        statusIndicator = COLOR_RED + '✗' + RESET_COLOR;
-        statusText = 'Disconnected';
-        break;
-    }
-
     let serverInfo =
       serverName +
       (server.extension?.name ? ` (from ${server.extension.name})` : '') +
@@ -137,7 +66,7 @@ export async function listMcpServers(): Promise<void> {
       serverInfo += `${server.command} ${server.args?.join(' ') || ''} (stdio)`;
     }
 
-    debugLogger.log(`${statusIndicator} ${serverInfo} - ${statusText}`);
+    debugLogger.log(serverInfo);
   }
 }
 
