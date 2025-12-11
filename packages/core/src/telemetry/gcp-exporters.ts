@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { type JWTInput } from 'google-auth-library';
 import { TraceExporter } from '@google-cloud/opentelemetry-cloud-trace-exporter';
 import { MetricExporter } from '@google-cloud/opentelemetry-cloud-monitoring-exporter';
 import { Logging } from '@google-cloud/logging';
@@ -20,9 +21,10 @@ import type {
  * Google Cloud Trace exporter that extends the official trace exporter
  */
 export class GcpTraceExporter extends TraceExporter {
-  constructor(projectId?: string) {
+  constructor(projectId?: string, credentials?: JWTInput) {
     super({
       projectId,
+      credentials,
       resourceFilter: /^gcp\./,
     });
   }
@@ -32,9 +34,10 @@ export class GcpTraceExporter extends TraceExporter {
  * Google Cloud Monitoring exporter that extends the official metrics exporter
  */
 export class GcpMetricExporter extends MetricExporter {
-  constructor(projectId?: string) {
+  constructor(projectId?: string, credentials?: JWTInput) {
     super({
       projectId,
+      credentials,
       prefix: 'custom.googleapis.com/gemini_cli',
     });
   }
@@ -48,8 +51,8 @@ export class GcpLogExporter implements LogRecordExporter {
   private log: Log;
   private pendingWrites: Array<Promise<void>> = [];
 
-  constructor(projectId?: string) {
-    this.logging = new Logging({ projectId });
+  constructor(projectId?: string, credentials?: JWTInput) {
+    this.logging = new Logging({ projectId, credentials });
     this.log = this.logging.log('gemini_cli');
   }
 
@@ -93,6 +96,7 @@ export class GcpLogExporter implements LogRecordExporter {
         .finally(() => {
           const index = this.pendingWrites.indexOf(writePromise);
           if (index > -1) {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
             this.pendingWrites.splice(index, 1);
           }
         });

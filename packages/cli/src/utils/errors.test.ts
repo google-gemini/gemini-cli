@@ -29,20 +29,32 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       return `API Error: ${String(error)}`;
     }),
     JsonFormatter: vi.fn().mockImplementation(() => ({
-      formatError: vi.fn((error: Error, code?: string | number) =>
-        JSON.stringify(
-          {
-            error: {
-              type: error.constructor.name,
-              message: error.message,
-              ...(code && { code }),
+      formatError: vi.fn(
+        (error: Error, code?: string | number, sessionId?: string) =>
+          JSON.stringify(
+            {
+              ...(sessionId && { session_id: sessionId }),
+              error: {
+                type: error.constructor.name,
+                message: error.message,
+                ...(code && { code }),
+              },
             },
-          },
-          null,
-          2,
-        ),
+            null,
+            2,
+          ),
       ),
     })),
+    StreamJsonFormatter: vi.fn().mockImplementation(() => ({
+      emitEvent: vi.fn(),
+      convertToStreamStats: vi.fn().mockReturnValue({}),
+    })),
+    uiTelemetryService: {
+      getMetrics: vi.fn().mockReturnValue({}),
+    },
+    JsonStreamEventType: {
+      RESULT: 'result',
+    },
     FatalToolExecutionError: class extends Error {
       constructor(message: string) {
         super(message);
@@ -67,6 +79,8 @@ describe('errors', () => {
   let processExitSpy: MockInstance;
   let consoleErrorSpy: MockInstance;
 
+  const TEST_SESSION_ID = 'test-session-123';
+
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
@@ -83,6 +97,7 @@ describe('errors', () => {
     mockConfig = {
       getOutputFormat: vi.fn().mockReturnValue(OutputFormat.TEXT),
       getContentGeneratorConfig: vi.fn().mockReturnValue({ authType: 'test' }),
+      getSessionId: vi.fn().mockReturnValue(TEST_SESSION_ID),
     } as unknown as Config;
   });
 
@@ -156,6 +171,7 @@ describe('errors', () => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           JSON.stringify(
             {
+              session_id: TEST_SESSION_ID,
               error: {
                 type: 'Error',
                 message: 'Test error',
@@ -178,6 +194,7 @@ describe('errors', () => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           JSON.stringify(
             {
+              session_id: TEST_SESSION_ID,
               error: {
                 type: 'Error',
                 message: 'Test error',
@@ -200,6 +217,7 @@ describe('errors', () => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           JSON.stringify(
             {
+              session_id: TEST_SESSION_ID,
               error: {
                 type: 'FatalInputError',
                 message: 'Fatal error',
@@ -236,6 +254,7 @@ describe('errors', () => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           JSON.stringify(
             {
+              session_id: TEST_SESSION_ID,
               error: {
                 type: 'Error',
                 message: 'Error with status',
@@ -246,6 +265,30 @@ describe('errors', () => {
             2,
           ),
         );
+      });
+    });
+
+    describe('in STREAM_JSON mode', () => {
+      beforeEach(() => {
+        (
+          mockConfig.getOutputFormat as ReturnType<typeof vi.fn>
+        ).mockReturnValue(OutputFormat.STREAM_JSON);
+      });
+
+      it('should emit result event and exit', () => {
+        const testError = new Error('Test error');
+
+        expect(() => {
+          handleError(testError, mockConfig);
+        }).toThrow('process.exit called with code: 1');
+      });
+
+      it('should extract exitCode from FatalError instances', () => {
+        const fatalError = new FatalInputError('Fatal error');
+
+        expect(() => {
+          handleError(fatalError, mockConfig);
+        }).toThrow('process.exit called with code: 42');
       });
     });
   });
@@ -364,6 +407,7 @@ describe('errors', () => {
           expect(consoleErrorSpy).toHaveBeenCalledWith(
             JSON.stringify(
               {
+                session_id: TEST_SESSION_ID,
                 error: {
                   type: 'FatalToolExecutionError',
                   message: 'Error executing tool test-tool: Tool failed',
@@ -375,6 +419,28 @@ describe('errors', () => {
             ),
           );
         });
+      });
+    });
+
+    describe('in STREAM_JSON mode', () => {
+      beforeEach(() => {
+        (
+          mockConfig.getOutputFormat as ReturnType<typeof vi.fn>
+        ).mockReturnValue(OutputFormat.STREAM_JSON);
+      });
+
+      it('should emit result event and exit for fatal errors', () => {
+        expect(() => {
+          handleToolError(toolName, toolError, mockConfig, 'no_space_left');
+        }).toThrow('process.exit called with code: 54');
+      });
+
+      it('should log to stderr and not exit for non-fatal errors', () => {
+        handleToolError(toolName, toolError, mockConfig, 'invalid_tool_params');
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          'Error executing tool test-tool: Tool failed',
+        );
+        expect(processExitSpy).not.toHaveBeenCalled();
       });
     });
   });
@@ -411,6 +477,7 @@ describe('errors', () => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           JSON.stringify(
             {
+              session_id: TEST_SESSION_ID,
               error: {
                 type: 'FatalCancellationError',
                 message: 'Operation cancelled.',
@@ -421,6 +488,20 @@ describe('errors', () => {
             2,
           ),
         );
+      });
+    });
+
+    describe('in STREAM_JSON mode', () => {
+      beforeEach(() => {
+        (
+          mockConfig.getOutputFormat as ReturnType<typeof vi.fn>
+        ).mockReturnValue(OutputFormat.STREAM_JSON);
+      });
+
+      it('should emit result event and exit with 130', () => {
+        expect(() => {
+          handleCancellationError(mockConfig);
+        }).toThrow('process.exit called with code: 130');
       });
     });
   });
@@ -459,6 +540,7 @@ describe('errors', () => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           JSON.stringify(
             {
+              session_id: TEST_SESSION_ID,
               error: {
                 type: 'FatalTurnLimitedError',
                 message:
@@ -470,6 +552,20 @@ describe('errors', () => {
             2,
           ),
         );
+      });
+    });
+
+    describe('in STREAM_JSON mode', () => {
+      beforeEach(() => {
+        (
+          mockConfig.getOutputFormat as ReturnType<typeof vi.fn>
+        ).mockReturnValue(OutputFormat.STREAM_JSON);
+      });
+
+      it('should emit result event and exit with 53', () => {
+        expect(() => {
+          handleMaxTurnsExceededError(mockConfig);
+        }).toThrow('process.exit called with code: 53');
       });
     });
   });

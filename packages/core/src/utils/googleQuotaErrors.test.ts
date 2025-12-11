@@ -12,6 +12,7 @@ import {
 } from './googleQuotaErrors.js';
 import * as errorParser from './googleErrors.js';
 import type { GoogleApiError } from './googleErrors.js';
+import { ModelNotFoundError } from './httpErrors.js';
 
 describe('classifyGoogleError', () => {
   afterEach(() => {
@@ -23,6 +24,44 @@ describe('classifyGoogleError', () => {
     vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(null);
     const result = classifyGoogleError(regularError);
     expect(result).toBe(regularError);
+  });
+
+  it('should return RetryableQuotaError when message contains "Please retry in Xs"', () => {
+    const complexError = {
+      error: {
+        message:
+          '{"error": {"code": 429, "status": 429, "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 2\nPlease retry in 44.097740004s.", "details": [{"detail": "??? to (unknown) : APP_ERROR(8) You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 2\nPlease retry in 44.097740004s."}]}}',
+        code: 429,
+        status: 'Too Many Requests',
+      },
+    };
+    const rawError = new Error(JSON.stringify(complexError));
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(null);
+
+    const result = classifyGoogleError(rawError);
+
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    expect((result as RetryableQuotaError).retryDelayMs).toBe(44097.740004);
+    expect((result as RetryableQuotaError).message).toBe(rawError.message);
+  });
+
+  it('should return RetryableQuotaError when error is a string and message contains "Please retry in Xms"', () => {
+    const complexErrorString = JSON.stringify({
+      error: {
+        message:
+          '{"error": {"code": 429, "status": 429, "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 2\nPlease retry in 900.2ms.", "details": [{"detail": "??? to (unknown) : APP_ERROR(8) You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 2\nPlease retry in 900.2ms."}]}}',
+        code: 429,
+        status: 'Too Many Requests',
+      },
+    });
+    const rawError = new Error(complexErrorString);
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(null);
+
+    const result = classifyGoogleError(rawError);
+
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    expect((result as RetryableQuotaError).retryDelayMs).toBeCloseTo(900.2);
+    expect((result as RetryableQuotaError).message).toBe(rawError.message);
   });
 
   it('should return original error if code is not 429', () => {
@@ -302,5 +341,52 @@ describe('classifyGoogleError', () => {
     const originalError = new Error();
     const result = classifyGoogleError(originalError);
     expect(result).toBe(originalError);
+  });
+
+  it('should classify nested JSON string 404 error as ModelNotFoundError', () => {
+    // Mimic the double-wrapped JSON structure seen in the user report
+    const innerError = {
+      error: {
+        code: 404,
+        message:
+          'models/NOT_FOUND is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.',
+        status: 'NOT_FOUND',
+      },
+    };
+    const errorString = JSON.stringify(innerError);
+
+    const outerErrorString = JSON.stringify({
+      error: {
+        message: errorString,
+      },
+    });
+    const error = new Error(`[API Error: ${outerErrorString}]`);
+
+    const classified = classifyGoogleError(error);
+    expect(classified).toBeInstanceOf(ModelNotFoundError);
+    expect((classified as ModelNotFoundError).code).toBe(404);
+  });
+
+  it('should fallback to string parsing for retry delays when details array is empty', () => {
+    const errorWithEmptyDetails = {
+      error: {
+        code: 429,
+        message: 'Resource exhausted. Please retry in 5s',
+        details: [],
+      },
+    };
+
+    const result = classifyGoogleError(errorWithEmptyDetails);
+
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.retryDelayMs).toBe(5000);
+      // The cause should be the parsed GoogleApiError
+      expect(result.cause).toEqual({
+        code: 429,
+        message: 'Resource exhausted. Please retry in 5s',
+        details: [],
+      });
+    }
   });
 });

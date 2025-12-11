@@ -42,6 +42,7 @@ interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
   toHaveEventName: (name: EventNames) => R;
   toHaveMetadataKey: (key: EventMetadataKey) => R;
+  toHaveGwsExperiments: (exps: number[]) => R;
 }
 
 declare module 'vitest' {
@@ -65,7 +66,6 @@ expect.extend({
     received: LogEventEntry[],
     [key, value]: [EventMetadataKey, string],
   ) {
-    const { isNot } = this;
     const event = JSON.parse(received[0].source_extension_json) as LogEvent;
     const metadata = event['event_metadata'][0];
     const data = metadata.find((m) => m.gemini_cli_key === key)?.value;
@@ -74,8 +74,7 @@ expect.extend({
 
     return {
       pass,
-      message: () =>
-        `event ${received} does${isNot ? ' not' : ''} have ${value}}`,
+      message: () => `event ${received} should have: ${value}. Found: ${data}`,
     };
   },
 
@@ -133,7 +132,11 @@ describe('ClearcutLogger', () => {
   });
 
   function setup({
-    config = {} as Partial<ConfigParameters>,
+    config = {
+      experiments: {
+        experimentIds: [123, 456, 789],
+      },
+    } as unknown as Partial<ConfigParameters>,
     lifetimeGoogleAccounts = 1,
     cachedGoogleAccount = 'test@google.com',
   } = {}) {
@@ -292,7 +295,7 @@ describe('ClearcutLogger', () => {
 
     it('logs all user settings', () => {
       const { logger } = setup({
-        config: { useSmartEdit: true, useModelRouter: true },
+        config: { useSmartEdit: true },
       });
 
       vi.stubEnv('TERM_PROGRAM', 'vscode');
@@ -374,6 +377,15 @@ describe('ClearcutLogger', () => {
         },
         expected: 'devin',
       },
+      {
+        name: 'unidentified',
+        env: {
+          GITHUB_SHA: undefined,
+          TERM_PROGRAM: undefined,
+          SURFACE: undefined,
+        },
+        expected: 'SURFACE_NOT_SET',
+      },
     ])(
       'logs the current surface as $expected from $name',
       ({ env, expected }) => {
@@ -388,6 +400,109 @@ describe('ClearcutLogger', () => {
         });
       },
     );
+  });
+
+  describe('GH_WORKFLOW_NAME metadata', () => {
+    it('includes workflow name when GH_WORKFLOW_NAME is set', () => {
+      const { logger } = setup({});
+      vi.stubEnv('GH_WORKFLOW_NAME', 'test-workflow');
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
+        value: 'test-workflow',
+      });
+    });
+
+    it('does not include workflow name when GH_WORKFLOW_NAME is not set', () => {
+      const { logger } = setup({});
+      vi.stubEnv('GH_WORKFLOW_NAME', undefined);
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hasWorkflowName = event?.event_metadata[0].some(
+        (item) =>
+          item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
+      );
+      expect(hasWorkflowName).toBe(false);
+    });
+  });
+
+  describe('GITHUB_REPOSITORY metadata', () => {
+    it('includes hashed repository when GITHUB_REPOSITORY is set', () => {
+      vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const repositoryMetadata = event?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
+      );
+      expect(repositoryMetadata).toBeDefined();
+      expect(repositoryMetadata?.value).toMatch(/^[a-f0-9]{64}$/);
+      expect(repositoryMetadata?.value).not.toBe('google/gemini-cli');
+    });
+
+    it('hashes repository name consistently', () => {
+      vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
+      const { logger } = setup({});
+
+      const event1 = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event2 = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      const hash1 = event1?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
+      )?.value;
+      const hash2 = event2?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
+      )?.value;
+
+      expect(hash1).toBeDefined();
+      expect(hash2).toBeDefined();
+      expect(hash1).toBe(hash2);
+    });
+
+    it('produces different hashes for different repositories', () => {
+      vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
+      const { logger: logger1 } = setup({});
+      const event1 = logger1?.createLogEvent(EventNames.API_ERROR, []);
+      const hash1 = event1?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
+      )?.value;
+
+      vi.stubEnv('GITHUB_REPOSITORY', 'google/other-repo');
+      ClearcutLogger.clearInstance();
+      const { logger: logger2 } = setup({});
+      const event2 = logger2?.createLogEvent(EventNames.API_ERROR, []);
+      const hash2 = event2?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
+      )?.value;
+
+      expect(hash1).toBeDefined();
+      expect(hash2).toBeDefined();
+      expect(hash1).not.toBe(hash2);
+    });
+
+    it('does not include repository when GITHUB_REPOSITORY is not set', () => {
+      vi.stubEnv('GITHUB_REPOSITORY', undefined);
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hasRepository = event?.event_metadata[0].some(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
+      );
+      expect(hasRepository).toBe(false);
+    });
   });
 
   describe('logChatCompressionEvent', () => {
@@ -713,6 +828,23 @@ describe('ClearcutLogger', () => {
     });
   });
 
+  describe('logExperiments', () => {
+    it('logs an event with gws_experiment field containing exp ids', () => {
+      const { logger } = setup();
+      const event = new AgentStartEvent('agent-123', 'TestAgent');
+
+      logger?.logAgentStartEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.AGENT_START);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_EXPERIMENT_IDS,
+        '123,456,789',
+      ]);
+    });
+  });
+
   describe('logAgentFinishEvent', () => {
     it('logs an event with proper fields (success)', () => {
       const { logger } = setup();
@@ -851,8 +983,7 @@ describe('ClearcutLogger', () => {
         status: 'success',
       } as SuccessfulToolCall;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall as any));
+      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall));
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -897,8 +1028,7 @@ describe('ClearcutLogger', () => {
         status: 'success',
       } as SuccessfulToolCall;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall as any));
+      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall));
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -906,6 +1036,33 @@ describe('ClearcutLogger', () => {
       expect(events[0]).not.toHaveMetadataKey(
         EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
       );
+    });
+  });
+
+  describe('flushIfNeeded', () => {
+    it('should not flush if the interval has not passed', () => {
+      const { logger } = setup();
+      const flushSpy = vi
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .spyOn(logger!, 'flushToClearcut' as any)
+        .mockResolvedValue({ nextRequestWaitMs: 0 });
+
+      logger!.flushIfNeeded();
+      expect(flushSpy).not.toHaveBeenCalled();
+    });
+
+    it('should flush if the interval has passed', async () => {
+      const { logger } = setup();
+      const flushSpy = vi
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .spyOn(logger!, 'flushToClearcut' as any)
+        .mockResolvedValue({ nextRequestWaitMs: 0 });
+
+      // Advance time by more than the flush interval
+      await vi.advanceTimersByTimeAsync(1000 * 60 * 2);
+
+      logger!.flushIfNeeded();
+      expect(flushSpy).toHaveBeenCalled();
     });
   });
 

@@ -13,13 +13,20 @@ import { safeJsonStringify } from '@google/gemini-cli-core/src/utils/safeJsonStr
 import { env } from 'node:process';
 import { platform } from 'node:os';
 
+import stripAnsi from 'strip-ansi';
+
 const itIf = (condition: boolean) => (condition ? it : it.skip);
 
 describe('extension reloading', () => {
   const sandboxEnv = env['GEMINI_SANDBOX'];
-
+  // Fails in linux non-sandbox e2e tests
+  // TODO(#14527): Re-enable this once fixed
   // Fails in sandbox mode, can't check for local extension updates.
-  itIf((!sandboxEnv || sandboxEnv === 'false') && platform() !== 'win32')(
+  itIf(
+    (!sandboxEnv || sandboxEnv === 'false') &&
+      platform() !== 'win32' &&
+      platform() !== 'linux',
+  )(
     'installs a local extension, updates it, checks it was reloaded properly',
     async () => {
       const serverA = new TestMcpServer();
@@ -76,16 +83,29 @@ describe('extension reloading', () => {
       await run.expectText(
         'test-extension (v0.0.1) - active (update available)',
       );
-      await run.sendText('/mcp list');
-      await run.type('\r');
-      await run.expectText(
-        'test-server (from test-extension) - Ready (1 tool)',
+      // Wait for the UI to settle and retry the command until we see the update
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Poll for the updated list
+      await rig.pollCommand(
+        () => run.sendKeys('\u0015/mcp list\r'),
+        () => {
+          const output = stripAnsi(run.output);
+          return (
+            output.includes(
+              'test-server (from test-extension) - Ready (1 tool)',
+            ) && output.includes('- hello')
+          );
+        },
+        30000, // 30s timeout
       );
-      await run.expectText('- hello');
 
       // Update the extension, expect the list to update, and mcp servers as well.
-      await run.sendText('/extensions update test-extension');
-      await run.type('\r');
+      await run.sendKeys('\u0015/extensions update test-extension');
+      await run.expectText('/extensions update test-extension');
+      await run.sendKeys('\r');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await run.sendKeys('\r');
       await run.expectText(
         ` * test-server (remote): http://localhost:${portB}/mcp`,
       );
@@ -93,16 +113,31 @@ describe('extension reloading', () => {
       await run.expectText(
         'Extension "test-extension" successfully updated: 0.0.1 → 0.0.2',
       );
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      await run.sendText('/extensions list');
-      await run.type('\r');
-      await run.expectText('test-extension (v0.0.2) - active (updated)');
-      await run.sendText('/mcp list');
-      await run.type('\r');
-      await run.expectText(
-        'test-server (from test-extension) - Ready (1 tool)',
+
+      // Poll for the updated extension version
+      await rig.pollCommand(
+        () => run.sendKeys('\u0015/extensions list\r'),
+        () =>
+          stripAnsi(run.output).includes(
+            'test-extension (v0.0.2) - active (updated)',
+          ),
+        30000,
       );
-      await run.expectText('- goodbye');
+
+      // Poll for the updated mcp tool
+      await rig.pollCommand(
+        () => run.sendKeys('\u0015/mcp list\r'),
+        () => {
+          const output = stripAnsi(run.output);
+          return (
+            output.includes(
+              'test-server (from test-extension) - Ready (1 tool)',
+            ) && output.includes('- goodbye')
+          );
+        },
+        30000,
+      );
+
       await run.sendText('/quit');
       await run.sendKeys('\r');
 

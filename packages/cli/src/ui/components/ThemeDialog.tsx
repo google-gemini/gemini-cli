@@ -12,15 +12,20 @@ import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
-import type { LoadedSettings } from '../../config/settings.js';
+import type {
+  LoadableSettingScope,
+  LoadedSettings,
+} from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
 import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { ScopeSelector } from './shared/ScopeSelector.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
-  onSelect: (themeName: string, scope: SettingScope) => void;
+  onSelect: (themeName: string, scope: LoadableSettingScope) => void;
 
   /** Callback function when the dialog is cancelled */
   onCancel: () => void;
@@ -41,7 +46,9 @@ export function ThemeDialog({
   availableTerminalHeight,
   terminalWidth,
 }: ThemeDialogProps): React.JSX.Element {
-  const [selectedScope, setSelectedScope] = useState<SettingScope>(
+  const isAlternateBuffer = useAlternateBuffer();
+  const { refreshStatic } = useUIActions();
+  const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
   );
 
@@ -88,8 +95,9 @@ export function ThemeDialog({
   const handleThemeSelect = useCallback(
     (themeName: string) => {
       onSelect(themeName, selectedScope);
+      refreshStatic();
     },
-    [onSelect, selectedScope],
+    [onSelect, selectedScope, refreshStatic],
   );
 
   const handleThemeHighlight = (themeName: string) => {
@@ -97,15 +105,16 @@ export function ThemeDialog({
     onHighlight(themeName);
   };
 
-  const handleScopeHighlight = useCallback((scope: SettingScope) => {
+  const handleScopeHighlight = useCallback((scope: LoadableSettingScope) => {
     setSelectedScope(scope);
   }, []);
 
   const handleScopeSelect = useCallback(
-    (scope: SettingScope) => {
+    (scope: LoadableSettingScope) => {
       onSelect(highlightedThemeName, scope);
+      refreshStatic();
     },
-    [onSelect, highlightedThemeName],
+    [onSelect, highlightedThemeName, refreshStatic],
   );
 
   const [mode, setMode] = useState<'theme' | 'scope'>('theme');
@@ -240,17 +249,19 @@ export function ThemeDialog({
                   paddingRight={1}
                   flexDirection="column"
                 >
-                  {colorizeCode(
-                    `# function
+                  {colorizeCode({
+                    code: `# function
 def fibonacci(n):
     a, b = 0, 1
     for _ in range(n):
         a, b = b, a + b
     return a`,
-                    'python',
-                    codeBlockHeight,
-                    colorizeCodeWidth,
-                  )}
+                    language: 'python',
+                    availableHeight:
+                      isAlternateBuffer === false ? codeBlockHeight : undefined,
+                    maxWidth: colorizeCodeWidth,
+                    settings,
+                  })}
                   <Box marginTop={1} />
                   <DiffRenderer
                     diffContent={`--- a/util.py
@@ -259,7 +270,9 @@ def fibonacci(n):
 - print("Hello, " + name)
 + print(f"Hello, {name}!")
 `}
-                    availableTerminalHeight={diffHeight}
+                    availableTerminalHeight={
+                      isAlternateBuffer === false ? diffHeight : undefined
+                    }
                     terminalWidth={colorizeCodeWidth}
                     theme={previewTheme}
                   />

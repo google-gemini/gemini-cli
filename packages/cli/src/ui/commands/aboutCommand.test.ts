@@ -8,9 +8,8 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { aboutCommand } from './aboutCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import * as versionUtils from '../../utils/version.js';
 import { MessageType } from '../types.js';
-import { IdeClient } from '@google/gemini-cli-core';
+import { IdeClient, getVersion } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -22,12 +21,12 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getDetectedIdeDisplayName: vi.fn().mockReturnValue('test-ide'),
       }),
     },
+    UserAccountManager: vi.fn().mockImplementation(() => ({
+      getCachedGoogleAccount: vi.fn().mockReturnValue('test-email@example.com'),
+    })),
+    getVersion: vi.fn(),
   };
 });
-
-vi.mock('../../utils/version.js', () => ({
-  getCliVersion: vi.fn(),
-}));
 
 describe('aboutCommand', () => {
   let mockContext: CommandContext;
@@ -56,7 +55,7 @@ describe('aboutCommand', () => {
       },
     } as unknown as CommandContext);
 
-    vi.mocked(versionUtils.getCliVersion).mockResolvedValue('test-version');
+    vi.mocked(getVersion).mockResolvedValue('test-version');
     vi.spyOn(mockContext.services.config!, 'getModel').mockReturnValue(
       'test-model',
     );
@@ -98,6 +97,7 @@ describe('aboutCommand', () => {
         selectedAuthType: 'test-auth',
         gcpProject: 'test-gcp-project',
         ideClient: 'test-ide',
+        userEmail: 'test-email@example.com',
       },
       expect.any(Number),
     );

@@ -46,8 +46,7 @@ jobs:
           ))
         )
       ) &&
-      !contains(github.event.issue.labels.*.name, 'area/') &&
-      !contains(github.event.issue.labels.*.name, 'priority/')
+      !contains(github.event.issue.labels.*.name, 'area/')
     timeout-minutes: 5
     runs-on: 'ubuntu-latest'
     steps:
@@ -81,8 +80,8 @@ jobs:
             exit 1
           fi
 
-          if echo "${LABELS}" | grep -q 'area/' || echo "${LABELS}" | grep -q 'priority/'; then
-            echo "Issue #${ISSUE_NUMBER_INPUT} already has 'area/' or 'priority/' labels. Stopping workflow."
+          if echo "${LABELS}" | grep -q 'area/'; then
+            echo "Issue #${ISSUE_NUMBER_INPUT} already has 'area/' label. Stopping workflow."
             exit 1
           fi
 
@@ -110,11 +109,6 @@ jobs:
               repo: context.repo.repo,
             });
             const allowedLabels = [
-              'priority/p0',
-              'priority/p1',
-              'priority/p2',
-              'priority/p3',
-              'priority/unknown',
               'area/agent',
               'area/enterprise',
               'area/non-interactive',
@@ -153,9 +147,6 @@ jobs:
           settings: |-
             {
               "maxSessionTurns": 25,
-              "coreTools": [
-                "run_shell_command(echo)"
-              ],
               "telemetry": {
                 "enabled": true,
                 "target": "gcp"
@@ -164,23 +155,20 @@ jobs:
           prompt: |-
             ## Role
 
-            You are an issue triage assistant. Your role is to analyze a GitHub issue and determine the single most appropriate area/ label and the single most appropriate priority/ label based on the definitions provided.
+            You are an issue triage assistant. Your role is to analyze a GitHub issue and determine the single most appropriate area/ label based on the definitions provided.
 
             ## Steps
-            1. Review the issue title and body provided in the environment variables: ${ISSUE_TITLE} and ${ISSUE_BODY}.
-            2. Review the available labels provided in the environment variable: ${AVAILABLE_LABELS}.
+            1. Review the issue title and body: ${{ env.ISSUE_TITLE }} and ${{ env.ISSUE_BODY }}.
+            2. Review the available labels: ${{ env.AVAILABLE_LABELS }}.
             3. Select exactly one area/ label that best matches the issue based on Reference 1: Area Definitions.
-            4. Select exactly one priority/ label that best matches the issue based on Reference 2: Priority Definitions.
-            5. Fallback Logic:
+            4. Fallback Logic:
                 - If you cannot confidently determine the correct area/ label from the definitions, you must use area/unknown.
-                - If you cannot confidently determine the correct priority/ label from the definitions, you must use priority/unknown.
-            6. Output your two selected labels in JSON format and nothing else. Example:
-                {"labels_to_set": ["area/core", "priority/p1"]}
+            5. Output your selected label in JSON format and nothing else. Example:
+                {"labels_to_set": ["area/core"]}
 
             ## Guidelines
-            - Your output must contain exactly one area/ label and exactly one priority/ label.
+            - Your output must contain exactly one area/ label.
             - Triage only the current issue based on its title and body.
-            - Reference all shell variables as "${VAR}" (with quotes and braces).
             - Output only valid JSON format.
             - Do not include any explanation or additional text, just the JSON.
 
@@ -262,38 +250,6 @@ jobs:
             area/unknown
             - Description: Issues that do not clearly fit into any other defined area/ category, or where information is too limited to make a determination. Use this when no other area is appropriate.
 
-            Reference 2: Priority Definitions
-            priority/p0: Critical / Blocker
-            - Definition: A catastrophic failure that makes the CLI unusable for most users or poses a severe security risk. This includes installation failures, authentication failures, persistent crashes, or critical security vulnerabilities.
-            - Key Questions:
-              - Is the CLI failing to install or run?
-              - Does it fail to authenticate or connect to the Gemini API, making all commands useless?
-              - Is it consistently crashing on basic, common commands?
-              - Does this represent a critical security vulnerability?
-
-            priority/p1: High
-            - Definition: A severe issue where a core feature (e.g., text generation, code generation, file processing) is unusable, failing, has severe performance degradation, or providing fundamentally incorrect output formatting (e.g., truncated text, broken JSON). Affects many users, and there is no reasonable workaround.
-            - Key Questions:
-              - Is a core feature failing for a specific, large user group (e.g., all Windows users, all users of a specific shell)?
-              - Is the CLI failing to process a supported input or misinterpreting critical flags?
-              - Is the CLI's output formatting consistently broken, making the response unusable?
-              - Is a core command or feature extremely slow, making it impractical to use?
-
-            priority/p2: Medium
-            - Definition: A moderately impactful issue causing inconvenience or a non-optimal experience, but a reasonable workaround exists. This also includes failures in non-core features.
-            - Key Questions:
-              - Is a command or flag behaving incorrectly, but the user can achieve their goal via other means?
-              - Is there a significant, non-blocking UI/UX problem in the terminal (e.g., broken progress indicators, bad terminal coloring)?
-
-            priority/p3: Low
-            - Definition: A minor, low-impact issue with minimal effect on functionality. This includes most cosmetic defects, typos in documentation, or unclear help text.
-            - Key Questions:
-              - Is this a typo in the README.md, gemini --help text, or other documentation?
-              - Is this a minor cosmetic issue (e.g., text alignment in output, an extra newline) that doesn't affect usability?
-
-            priority/unknown
-            - Description: Issues that do not clearly fit into any other defined priority/ category, or where information is too limited to make a determination. Use this when no other priority is appropriate.
-
       - name: 'Apply Labels to Issue'
         if: |-
           ${{ steps.gemini_issue_analysis.outputs.summary != '' }}
@@ -331,8 +287,8 @@ jobs:
             const issueNumber = parseInt(process.env.ISSUE_NUMBER);
             const labelsToAdd = parsedLabels.labels_to_set || [];
 
-            if (labelsToAdd.length !== 2) {
-              core.setFailed(`Expected exactly 2 labels (one area/ and one priority/), but got ${labelsToAdd.length}. Labels: ${labelsToAdd.join(', ')}`);
+            if (labelsToAdd.length !== 1) {
+              core.setFailed(`Expected exactly 1 label (area/), but got ${labelsToAdd.length}. Labels: ${labelsToAdd.join(', ')}`);
               return;
             }
 

@@ -107,6 +107,7 @@ function sendIdeContextUpdateNotification(
     params: ideContext,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
   transport.send(notification);
 }
 
@@ -196,6 +197,7 @@ export class IDEServer {
       const onDidChangeDiffSubscription = this.diffManager.onDidChange(
         (notification) => {
           for (const transport of Object.values(this.transports)) {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
             transport.send(notification);
           }
         },
@@ -248,6 +250,8 @@ export class IDEServer {
               delete this.transports[transport.sessionId];
             }
           };
+
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           mcpServer.connect(transport);
         } else {
           this.log(
@@ -453,7 +457,7 @@ const createMcpServer = (
     'openDiff',
     {
       description:
-        '(IDE Tool) Open a diff view to create or modify a file. Returns a notification once the diff has been accepted or rejcted.',
+        '(IDE Tool) Open a diff view to create or modify a file. Returns a notification once the diff has been accepted or rejected.',
       inputSchema: OpenDiffRequestSchema.shape,
     },
     async ({ filePath, newContent }: z.infer<typeof OpenDiffRequestSchema>) => {

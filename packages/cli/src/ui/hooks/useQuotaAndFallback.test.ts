@@ -25,10 +25,14 @@ import {
   makeFakeConfig,
   type GoogleApiError,
   RetryableQuotaError,
+  PREVIEW_GEMINI_MODEL,
+  ModelNotFoundError,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import { useQuotaAndFallback } from './useQuotaAndFallback.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { AuthState, MessageType } from '../types.js';
+import { MessageType } from '../types.js';
 
 // Use a type alias for SpyInstance as it's not directly exported
 type SpyInstance = ReturnType<typeof vi.spyOn>;
@@ -36,7 +40,6 @@ type SpyInstance = ReturnType<typeof vi.spyOn>;
 describe('useQuotaAndFallback', () => {
   let mockConfig: Config;
   let mockHistoryManager: UseHistoryManagerReturn;
-  let mockSetAuthState: Mock;
   let mockSetModelSwitchedFromQuotaError: Mock;
   let setFallbackHandlerSpy: SpyInstance;
   let mockGoogleApiError: GoogleApiError;
@@ -62,7 +65,6 @@ describe('useQuotaAndFallback', () => {
       clearItems: vi.fn(),
       loadHistory: vi.fn(),
     };
-    mockSetAuthState = vi.fn();
     mockSetModelSwitchedFromQuotaError = vi.fn();
 
     setFallbackHandlerSpy = vi.spyOn(mockConfig, 'setFallbackModelHandler');
@@ -79,7 +81,6 @@ describe('useQuotaAndFallback', () => {
         config: mockConfig,
         historyManager: mockHistoryManager,
         userTier: UserTierId.FREE,
-        setAuthState: mockSetAuthState,
         setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
       }),
     );
@@ -90,31 +91,17 @@ describe('useQuotaAndFallback', () => {
 
   describe('Fallback Handler Logic', () => {
     // Helper function to render the hook and extract the registered handler
-    const getRegisteredHandler = (
-      userTier: UserTierId = UserTierId.FREE,
-    ): FallbackModelHandler => {
-      renderHook(
-        (props) =>
-          useQuotaAndFallback({
-            config: mockConfig,
-            historyManager: mockHistoryManager,
-            userTier: props.userTier,
-            setAuthState: mockSetAuthState,
-            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
-          }),
-        { initialProps: { userTier } },
+    const getRegisteredHandler = (): FallbackModelHandler => {
+      renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.FREE,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+        }),
       );
       return setFallbackHandlerSpy.mock.calls[0][0] as FallbackModelHandler;
     };
-
-    it('should return null and take no action if already in fallback mode', async () => {
-      vi.spyOn(mockConfig, 'isInFallbackMode').mockReturnValue(true);
-      const handler = getRegisteredHandler();
-      const result = await handler('gemini-pro', 'gemini-flash', new Error());
-
-      expect(result).toBeNull();
-      expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
-    });
 
     it('should return null and take no action if authType is not LOGIN_WITH_GOOGLE', async () => {
       // Override the default mock from beforeEach for this specific test
@@ -129,97 +116,13 @@ describe('useQuotaAndFallback', () => {
       expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
     });
 
-    describe('Automatic Fallback Scenarios', () => {
-      const testCases = [
-        {
-          description: 'other error for FREE tier',
-          tier: UserTierId.FREE,
-          error: new Error('some error'),
-          expectedMessageSnippets: [
-            'Automatically switching from model-A to model-B for faster responses',
-            'upgrade to a Gemini Code Assist Standard or Enterprise plan',
-          ],
-        },
-        {
-          description: 'other error for LEGACY tier',
-          tier: UserTierId.LEGACY, // Paid tier
-          error: new Error('some error'),
-          expectedMessageSnippets: [
-            'Automatically switching from model-A to model-B for faster responses',
-            'switch to using a paid API key from AI Studio',
-          ],
-        },
-        {
-          description: 'retryable quota error for FREE tier',
-          tier: UserTierId.FREE,
-          error: new RetryableQuotaError(
-            'retryable quota',
-            mockGoogleApiError,
-            5,
-          ),
-          expectedMessageSnippets: [
-            'Your requests are being throttled right now due to server being at capacity for model-A',
-            'Automatically switching from model-A to model-B',
-            'upgrading to a Gemini Code Assist Standard or Enterprise plan',
-          ],
-        },
-        {
-          description: 'retryable quota error for LEGACY tier',
-          tier: UserTierId.LEGACY, // Paid tier
-          error: new RetryableQuotaError(
-            'retryable quota',
-            mockGoogleApiError,
-            5,
-          ),
-          expectedMessageSnippets: [
-            'Your requests are being throttled right now due to server being at capacity for model-A',
-            'Automatically switching from model-A to model-B',
-            'switch to using a paid API key from AI Studio',
-          ],
-        },
-      ];
-
-      for (const {
-        description,
-        tier,
-        error,
-        expectedMessageSnippets,
-      } of testCases) {
-        it(`should handle ${description} correctly`, async () => {
-          const handler = getRegisteredHandler(tier);
-          let result: FallbackIntent | null;
-          await act(async () => {
-            result = await handler('model-A', 'model-B', error);
-          });
-
-          // Automatic fallbacks should return 'stop'
-          expect(result!).toBe('stop');
-
-          expect(mockHistoryManager.addItem).toHaveBeenCalledWith(
-            expect.objectContaining({ type: MessageType.INFO }),
-            expect.any(Number),
-          );
-
-          const message = (mockHistoryManager.addItem as Mock).mock.calls[0][0]
-            .text;
-          for (const snippet of expectedMessageSnippets) {
-            expect(message).toContain(snippet);
-          }
-
-          expect(mockSetModelSwitchedFromQuotaError).toHaveBeenCalledWith(true);
-          expect(mockConfig.setQuotaErrorOccurred).toHaveBeenCalledWith(true);
-        });
-      }
-    });
-
-    describe('Interactive Fallback (Pro Quota Error)', () => {
-      it('should set an interactive request and wait for user choice', async () => {
+    describe('Interactive Fallback', () => {
+      it('should set an interactive request for a terminal quota error', async () => {
         const { result } = renderHook(() =>
           useQuotaAndFallback({
             config: mockConfig,
             historyManager: mockHistoryManager,
             userTier: UserTierId.FREE,
-            setAuthState: mockSetAuthState,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           }),
         );
@@ -227,31 +130,42 @@ describe('useQuotaAndFallback', () => {
         const handler = setFallbackHandlerSpy.mock
           .calls[0][0] as FallbackModelHandler;
 
-        // Call the handler but do not await it, to check the intermediate state
         let promise: Promise<FallbackIntent | null>;
+        const error = new TerminalQuotaError(
+          'pro quota',
+          mockGoogleApiError,
+          1000 * 60 * 5,
+        ); // 5 minutes
         await act(() => {
-          promise = handler(
-            'gemini-pro',
-            'gemini-flash',
-            new TerminalQuotaError('pro quota', mockGoogleApiError),
-          );
+          promise = handler('gemini-pro', 'gemini-flash', error);
         });
 
         // The hook should now have a pending request for the UI to handle
-        expect(result.current.proQuotaRequest).not.toBeNull();
-        expect(result.current.proQuotaRequest?.failedModel).toBe('gemini-pro');
+        const request = result.current.proQuotaRequest;
+        expect(request).not.toBeNull();
+        expect(request?.failedModel).toBe('gemini-pro');
+        expect(request?.isTerminalQuotaError).toBe(true);
+
+        const message = request!.message;
+        expect(message).toContain('Usage limit reached for gemini-pro.');
+        expect(message).toContain('Access resets at'); // From getResetTimeMessage
+        expect(message).toContain('/stats for usage details');
+        expect(message).toContain('/auth to switch to API key.');
+
+        expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
 
         // Simulate the user choosing to continue with the fallback model
         await act(() => {
-          result.current.handleProQuotaChoice('continue');
+          result.current.handleProQuotaChoice('retry_always');
         });
 
         // The original promise from the handler should now resolve
         const intent = await promise!;
-        expect(intent).toBe('retry');
+        expect(intent).toBe('retry_always');
 
         // The pending request should be cleared from the state
         expect(result.current.proQuotaRequest).toBeNull();
+        expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
       });
 
       it('should handle race conditions by stopping subsequent requests', async () => {
@@ -260,7 +174,6 @@ describe('useQuotaAndFallback', () => {
             config: mockConfig,
             historyManager: mockHistoryManager,
             userTier: UserTierId.FREE,
-            setAuthState: mockSetAuthState,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           }),
         );
@@ -294,11 +207,127 @@ describe('useQuotaAndFallback', () => {
         expect(result.current.proQuotaRequest).toBe(firstRequest);
 
         await act(() => {
-          result.current.handleProQuotaChoice('continue');
+          result.current.handleProQuotaChoice('retry_always');
         });
 
         const intent1 = await promise1!;
-        expect(intent1).toBe('retry');
+        expect(intent1).toBe('retry_always');
+        expect(result.current.proQuotaRequest).toBeNull();
+      });
+
+      // Non-TerminalQuotaError test cases
+      const testCases = [
+        {
+          description: 'generic error',
+          error: new Error('some error'),
+        },
+        {
+          description: 'retryable quota error',
+          error: new RetryableQuotaError(
+            'retryable quota',
+            mockGoogleApiError,
+            5,
+          ),
+        },
+      ];
+
+      for (const { description, error } of testCases) {
+        it(`should handle ${description} correctly`, async () => {
+          const { result } = renderHook(() =>
+            useQuotaAndFallback({
+              config: mockConfig,
+              historyManager: mockHistoryManager,
+              userTier: UserTierId.FREE,
+              setModelSwitchedFromQuotaError:
+                mockSetModelSwitchedFromQuotaError,
+            }),
+          );
+
+          const handler = setFallbackHandlerSpy.mock
+            .calls[0][0] as FallbackModelHandler;
+
+          let promise: Promise<FallbackIntent | null>;
+          await act(() => {
+            promise = handler('model-A', 'model-B', error);
+          });
+
+          // The hook should now have a pending request for the UI to handle
+          const request = result.current.proQuotaRequest;
+          expect(request).not.toBeNull();
+          expect(request?.failedModel).toBe('model-A');
+          expect(request?.isTerminalQuotaError).toBe(false);
+
+          // Check that the correct initial message was generated
+          expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
+          const message = request!.message;
+          expect(message).toContain(
+            'model-A is currently experiencing high demand. We apologize and appreciate your patience.',
+          );
+
+          // Simulate the user choosing to continue with the fallback model
+          await act(() => {
+            result.current.handleProQuotaChoice('retry_always');
+          });
+
+          expect(mockSetModelSwitchedFromQuotaError).toHaveBeenCalledWith(true);
+          // The original promise from the handler should now resolve
+          const intent = await promise!;
+          expect(intent).toBe('retry_always');
+
+          // The pending request should be cleared from the state
+          expect(result.current.proQuotaRequest).toBeNull();
+          expect(mockConfig.setQuotaErrorOccurred).toHaveBeenCalledWith(true);
+
+          // Check for the "Switched to fallback model" message
+          expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
+          const lastCall = (mockHistoryManager.addItem as Mock).mock
+            .calls[0][0];
+          expect(lastCall.type).toBe(MessageType.INFO);
+          expect(lastCall.text).toContain('Switched to fallback model.');
+        });
+      }
+
+      it('should handle ModelNotFoundError correctly', async () => {
+        const { result } = renderHook(() =>
+          useQuotaAndFallback({
+            config: mockConfig,
+            historyManager: mockHistoryManager,
+            userTier: UserTierId.FREE,
+            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          }),
+        );
+
+        const handler = setFallbackHandlerSpy.mock
+          .calls[0][0] as FallbackModelHandler;
+
+        let promise: Promise<FallbackIntent | null>;
+        const error = new ModelNotFoundError('model not found', 404);
+
+        await act(() => {
+          promise = handler('gemini-3-pro-preview', 'gemini-2.5-pro', error);
+        });
+
+        // The hook should now have a pending request for the UI to handle
+        const request = result.current.proQuotaRequest;
+        expect(request).not.toBeNull();
+        expect(request?.failedModel).toBe('gemini-3-pro-preview');
+        expect(request?.isTerminalQuotaError).toBe(false);
+        expect(request?.isModelNotFoundError).toBe(true);
+
+        const message = request!.message;
+        expect(message).toBe(
+          `It seems like you don't have access to Gemini 3.
+Learn more at https://goo.gle/enable-preview-features
+To disable Gemini 3, disable "Preview features" in /settings.`,
+        );
+
+        // Simulate the user choosing to switch
+        await act(() => {
+          result.current.handleProQuotaChoice('retry_always');
+        });
+
+        const intent = await promise!;
+        expect(intent).toBe('retry_always');
         expect(result.current.proQuotaRequest).toBeNull();
       });
     });
@@ -311,26 +340,23 @@ describe('useQuotaAndFallback', () => {
           config: mockConfig,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
-          setAuthState: mockSetAuthState,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
         }),
       );
 
       act(() => {
-        result.current.handleProQuotaChoice('auth');
+        result.current.handleProQuotaChoice('retry_later');
       });
 
-      expect(mockSetAuthState).not.toHaveBeenCalled();
       expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
     });
 
-    it('should resolve intent to "auth" and trigger auth state update', async () => {
+    it('should resolve intent to "retry_later"', async () => {
       const { result } = renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
-          setAuthState: mockSetAuthState,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
         }),
       );
@@ -347,29 +373,27 @@ describe('useQuotaAndFallback', () => {
       });
 
       await act(() => {
-        result.current.handleProQuotaChoice('auth');
+        result.current.handleProQuotaChoice('retry_later');
       });
 
       const intent = await promise!;
-      expect(intent).toBe('auth');
-      expect(mockSetAuthState).toHaveBeenCalledWith(AuthState.Updating);
+      expect(intent).toBe('retry_later');
       expect(result.current.proQuotaRequest).toBeNull();
     });
 
-    it('should resolve intent to "retry" and add info message on continue', async () => {
+    it('should resolve intent to "retry_always" and add info message on continue', async () => {
       const { result } = renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
-          setAuthState: mockSetAuthState,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
         }),
       );
 
       const handler = setFallbackHandlerSpy.mock
         .calls[0][0] as FallbackModelHandler;
-      // The first `addItem` call is for the initial quota error message
+
       let promise: Promise<FallbackIntent | null>;
       await act(() => {
         promise = handler(
@@ -380,18 +404,88 @@ describe('useQuotaAndFallback', () => {
       });
 
       await act(() => {
-        result.current.handleProQuotaChoice('continue');
+        result.current.handleProQuotaChoice('retry_always');
       });
 
       const intent = await promise!;
-      expect(intent).toBe('retry');
+      expect(intent).toBe('retry_always');
       expect(result.current.proQuotaRequest).toBeNull();
 
-      // Check for the second "Switched to fallback model" message
-      expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(2);
-      const lastCall = (mockHistoryManager.addItem as Mock).mock.calls[1][0];
+      // Check for the "Switched to fallback model" message
+      expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
+      const lastCall = (mockHistoryManager.addItem as Mock).mock.calls[0][0];
       expect(lastCall.type).toBe(MessageType.INFO);
       expect(lastCall.text).toContain('Switched to fallback model.');
+    });
+
+    it('should show a special message when falling back from the preview model', async () => {
+      const { result } = renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.FREE,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+      let promise: Promise<FallbackIntent | null>;
+      await act(() => {
+        promise = handler(
+          PREVIEW_GEMINI_MODEL,
+          DEFAULT_GEMINI_MODEL,
+          new Error('preview model failed'),
+        );
+      });
+
+      await act(() => {
+        result.current.handleProQuotaChoice('retry_always');
+      });
+
+      await promise!;
+
+      expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
+      const lastCall = (mockHistoryManager.addItem as Mock).mock.calls[0][0];
+      expect(lastCall.type).toBe(MessageType.INFO);
+      expect(lastCall.text).toContain(
+        `Switched to fallback model gemini-2.5-pro. We will periodically check if ${PREVIEW_GEMINI_MODEL} is available again.`,
+      );
+    });
+
+    it('should show a special message when falling back from the preview model, but do not show periodical check message for flash model fallback', async () => {
+      const { result } = renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.FREE,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+      let promise: Promise<FallbackIntent | null>;
+      await act(() => {
+        promise = handler(
+          PREVIEW_GEMINI_MODEL,
+          DEFAULT_GEMINI_FLASH_MODEL,
+          new Error('preview model failed'),
+        );
+      });
+
+      await act(() => {
+        result.current.handleProQuotaChoice('retry_always');
+      });
+
+      await promise!;
+
+      expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
+      const lastCall = (mockHistoryManager.addItem as Mock).mock.calls[0][0];
+      expect(lastCall.type).toBe(MessageType.INFO);
+      expect(lastCall.text).toContain(
+        `Switched to fallback model gemini-2.5-flash.`,
+      );
     });
   });
 });

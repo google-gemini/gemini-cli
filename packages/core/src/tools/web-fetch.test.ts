@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { WebFetchTool, parsePrompt } from './web-fetch.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import * as fetchUtils from '../utils/fetch.js';
@@ -71,46 +71,38 @@ describe('parsePrompt', () => {
     expect(validUrls[0]).toBe('https://example.com./');
   });
 
-  it('should detect URLs wrapped in punctuation as malformed', () => {
-    const prompt = 'Read (https://example.com)';
+  it.each([
+    {
+      name: 'URLs wrapped in punctuation',
+      prompt: 'Read (https://example.com)',
+      expectedErrorContent: ['Malformed URL detected', '(https://example.com)'],
+    },
+    {
+      name: 'unsupported protocols (httpshttps://)',
+      prompt: 'Summarize httpshttps://github.com/JuliaLang/julia/issues/58346',
+      expectedErrorContent: [
+        'Unsupported protocol',
+        'httpshttps://github.com/JuliaLang/julia/issues/58346',
+      ],
+    },
+    {
+      name: 'unsupported protocols (ftp://)',
+      prompt: 'ftp://example.com/file.txt',
+      expectedErrorContent: ['Unsupported protocol'],
+    },
+    {
+      name: 'malformed URLs (http://)',
+      prompt: 'http://',
+      expectedErrorContent: ['Malformed URL detected'],
+    },
+  ])('should detect $name as errors', ({ prompt, expectedErrorContent }) => {
     const { validUrls, errors } = parsePrompt(prompt);
 
     expect(validUrls).toHaveLength(0);
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain('Malformed URL detected');
-    expect(errors[0]).toContain('(https://example.com)');
-  });
-
-  it('should detect unsupported protocols (httpshttps://)', () => {
-    const prompt =
-      'Summarize httpshttps://github.com/JuliaLang/julia/issues/58346';
-    const { validUrls, errors } = parsePrompt(prompt);
-
-    expect(validUrls).toHaveLength(0);
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain('Unsupported protocol');
-    expect(errors[0]).toContain(
-      'httpshttps://github.com/JuliaLang/julia/issues/58346',
-    );
-  });
-
-  it('should detect unsupported protocols (ftp://)', () => {
-    const prompt = 'ftp://example.com/file.txt';
-    const { validUrls, errors } = parsePrompt(prompt);
-
-    expect(validUrls).toHaveLength(0);
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain('Unsupported protocol');
-  });
-
-  it('should detect malformed URLs', () => {
-    // http:// is not a valid URL in Node's new URL()
-    const prompt = 'http://';
-    const { validUrls, errors } = parsePrompt(prompt);
-
-    expect(validUrls).toHaveLength(0);
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain('Malformed URL detected');
+    expectedErrorContent.forEach((content) => {
+      expect(errors[0]).toContain(content);
+    });
   });
 
   it('should handle prompts with no URLs', () => {
@@ -142,28 +134,37 @@ describe('WebFetchTool', () => {
       setApprovalMode: vi.fn(),
       getProxy: vi.fn(),
       getGeminiClient: mockGetGeminiClient,
+      getRetryFetchErrors: vi.fn().mockReturnValue(false),
+      modelConfigService: {
+        getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
+          model,
+          generateContentConfig: {},
+        })),
+      },
+      isInteractive: () => false,
     } as unknown as Config;
   });
 
   describe('validateToolParamValues', () => {
-    it('should throw if prompt is empty', () => {
+    it.each([
+      {
+        name: 'empty prompt',
+        prompt: '',
+        expectedError: "The 'prompt' parameter cannot be empty",
+      },
+      {
+        name: 'prompt with no URLs',
+        prompt: 'hello world',
+        expectedError: "The 'prompt' must contain at least one valid URL",
+      },
+      {
+        name: 'prompt with malformed URLs',
+        prompt: 'fetch httpshttps://example.com',
+        expectedError: 'Error(s) in prompt URLs:',
+      },
+    ])('should throw if $name', ({ prompt, expectedError }) => {
       const tool = new WebFetchTool(mockConfig);
-      expect(() => tool.build({ prompt: '' })).toThrow(
-        "The 'prompt' parameter cannot be empty",
-      );
-    });
-
-    it('should throw if prompt contains no URLs', () => {
-      const tool = new WebFetchTool(mockConfig);
-      expect(() => tool.build({ prompt: 'hello world' })).toThrow(
-        "The 'prompt' must contain at least one valid URL",
-      );
-    });
-
-    it('should throw if prompt contains malformed URLs (httpshttps://)', () => {
-      const tool = new WebFetchTool(mockConfig);
-      const prompt = 'fetch httpshttps://example.com';
-      expect(() => tool.build({ prompt })).toThrow('Error(s) in prompt URLs:');
+      expect(() => tool.build({ prompt })).toThrow(expectedError);
     });
 
     it('should pass if prompt contains at least one valid URL', () => {
@@ -260,105 +261,71 @@ describe('WebFetchTool', () => {
       });
     });
 
-    it('should convert HTML content using html-to-text', async () => {
-      const htmlContent = '<html><body><h1>Hello</h1></body></html>';
-      vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
-        ok: true,
-        headers: new Headers({ 'content-type': 'text/html; charset=utf-8' }),
-        text: () => Promise.resolve(htmlContent),
-      } as Response);
+    it.each([
+      {
+        name: 'HTML content using html-to-text',
+        content: '<html><body><h1>Hello</h1></body></html>',
+        contentType: 'text/html; charset=utf-8',
+        shouldConvert: true,
+      },
+      {
+        name: 'raw text for JSON content',
+        content: '{"key": "value"}',
+        contentType: 'application/json',
+        shouldConvert: false,
+      },
+      {
+        name: 'raw text for plain text content',
+        content: 'Just some text.',
+        contentType: 'text/plain',
+        shouldConvert: false,
+      },
+      {
+        name: 'content with no Content-Type header as HTML',
+        content: '<p>No header</p>',
+        contentType: null,
+        shouldConvert: true,
+      },
+    ])(
+      'should handle $name',
+      async ({ content, contentType, shouldConvert }) => {
+        const headers = contentType
+          ? new Headers({ 'content-type': contentType })
+          : new Headers();
 
-      // Mock fallback LLM call to return the content passed to it
-      mockGenerateContent.mockImplementationOnce(async (req) => ({
-        candidates: [{ content: { parts: [{ text: req[0].parts[0].text }] } }],
-      }));
+        vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
+          ok: true,
+          headers,
+          text: () => Promise.resolve(content),
+        } as Response);
 
-      const tool = new WebFetchTool(mockConfig);
-      const params = { prompt: 'fetch https://example.com' };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+        // Mock fallback LLM call to return the content passed to it
+        mockGenerateContent.mockImplementationOnce(async (_, req) => ({
+          candidates: [
+            { content: { parts: [{ text: req[0].parts[0].text }] } },
+          ],
+        }));
 
-      expect(convert).toHaveBeenCalledWith(htmlContent, {
-        wordwrap: false,
-        selectors: [
-          { selector: 'a', options: { ignoreHref: true } },
-          { selector: 'img', format: 'skip' },
-        ],
-      });
-      expect(result.llmContent).toContain(`Converted: ${htmlContent}`);
-    });
+        const tool = new WebFetchTool(mockConfig);
+        const params = { prompt: 'fetch https://example.com' };
+        const invocation = tool.build(params);
+        const result = await invocation.execute(new AbortController().signal);
 
-    it('should return raw text for JSON content', async () => {
-      const jsonContent = '{"key": "value"}';
-      vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
-        ok: true,
-        headers: new Headers({ 'content-type': 'application/json' }),
-        text: () => Promise.resolve(jsonContent),
-      } as Response);
-
-      // Mock fallback LLM call to return the content passed to it
-      mockGenerateContent.mockImplementationOnce(async (req) => ({
-        candidates: [{ content: { parts: [{ text: req[0].parts[0].text }] } }],
-      }));
-
-      const tool = new WebFetchTool(mockConfig);
-      const params = { prompt: 'fetch https://example.com' };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(convert).not.toHaveBeenCalled();
-      expect(result.llmContent).toContain(jsonContent);
-    });
-
-    it('should return raw text for plain text content', async () => {
-      const textContent = 'Just some text.';
-      vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
-        ok: true,
-        headers: new Headers({ 'content-type': 'text/plain' }),
-        text: () => Promise.resolve(textContent),
-      } as Response);
-
-      // Mock fallback LLM call to return the content passed to it
-      mockGenerateContent.mockImplementationOnce(async (req) => ({
-        candidates: [{ content: { parts: [{ text: req[0].parts[0].text }] } }],
-      }));
-
-      const tool = new WebFetchTool(mockConfig);
-      const params = { prompt: 'fetch https://example.com' };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(convert).not.toHaveBeenCalled();
-      expect(result.llmContent).toContain(textContent);
-    });
-
-    it('should treat content with no Content-Type header as HTML', async () => {
-      const content = '<p>No header</p>';
-      vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
-        ok: true,
-        headers: new Headers(),
-        text: () => Promise.resolve(content),
-      } as Response);
-
-      // Mock fallback LLM call to return the content passed to it
-      mockGenerateContent.mockImplementationOnce(async (req) => ({
-        candidates: [{ content: { parts: [{ text: req[0].parts[0].text }] } }],
-      }));
-
-      const tool = new WebFetchTool(mockConfig);
-      const params = { prompt: 'fetch https://example.com' };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(convert).toHaveBeenCalledWith(content, {
-        wordwrap: false,
-        selectors: [
-          { selector: 'a', options: { ignoreHref: true } },
-          { selector: 'img', format: 'skip' },
-        ],
-      });
-      expect(result.llmContent).toContain(`Converted: ${content}`);
-    });
+        if (shouldConvert) {
+          expect(convert).toHaveBeenCalledWith(content, {
+            wordwrap: false,
+            selectors: [
+              { selector: 'a', options: { ignoreHref: true } },
+              { selector: 'img', format: 'skip' },
+            ],
+          });
+          expect(result.llmContent).toContain(`Converted: ${content}`);
+        } else {
+          expect(convert).not.toHaveBeenCalled();
+          expect(result.llmContent).toContain(content);
+        }
+      },
+    );
   });
 
   describe('shouldConfirmExecute', () => {
@@ -445,6 +412,28 @@ describe('WebFetchTool', () => {
     let messageBus: MessageBus;
     let mockUUID: Mock;
 
+    const createToolWithMessageBus = (bus?: MessageBus) => {
+      const tool = new WebFetchTool(mockConfig, bus);
+      const params = { prompt: 'fetch https://example.com' };
+      return { tool, invocation: tool.build(params) };
+    };
+
+    const simulateMessageBusResponse = (
+      subscribeSpy: ReturnType<typeof vi.spyOn>,
+      confirmed: boolean,
+      correlationId = 'test-correlation-id',
+    ) => {
+      const responseHandler = subscribeSpy.mock.calls[0][1] as (
+        response: ToolConfirmationResponse,
+      ) => void;
+      const response: ToolConfirmationResponse = {
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId,
+        confirmed,
+      };
+      responseHandler(response);
+    };
+
     beforeEach(() => {
       policyEngine = new PolicyEngine();
       messageBus = new MessageBus(policyEngine);
@@ -453,21 +442,15 @@ describe('WebFetchTool', () => {
     });
 
     it('should use message bus for confirmation when available', async () => {
-      const tool = new WebFetchTool(mockConfig, messageBus);
-      const params = { prompt: 'fetch https://example.com' };
-      const invocation = tool.build(params);
-
-      // Mock message bus publish and subscribe
+      const { invocation } = createToolWithMessageBus(messageBus);
       const publishSpy = vi.spyOn(messageBus, 'publish');
       const subscribeSpy = vi.spyOn(messageBus, 'subscribe');
       const unsubscribeSpy = vi.spyOn(messageBus, 'unsubscribe');
 
-      // Start confirmation process
       const confirmationPromise = invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
 
-      // Verify confirmation request was published
       expect(publishSpy).toHaveBeenCalledWith({
         type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
         toolCall: {
@@ -477,49 +460,28 @@ describe('WebFetchTool', () => {
         correlationId: 'test-correlation-id',
       });
 
-      // Verify subscription to response
       expect(subscribeSpy).toHaveBeenCalledWith(
         MessageBusType.TOOL_CONFIRMATION_RESPONSE,
         expect.any(Function),
       );
 
-      // Simulate confirmation response
-      const responseHandler = subscribeSpy.mock.calls[0][1];
-      const response: ToolConfirmationResponse = {
-        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-        correlationId: 'test-correlation-id',
-        confirmed: true,
-      };
-
-      responseHandler(response);
+      simulateMessageBusResponse(subscribeSpy, true);
 
       const result = await confirmationPromise;
-      expect(result).toBe(false); // No further confirmation needed
+      expect(result).toBe(false);
       expect(unsubscribeSpy).toHaveBeenCalled();
     });
 
     it('should reject promise when confirmation is denied via message bus', async () => {
-      const tool = new WebFetchTool(mockConfig, messageBus);
-      const params = { prompt: 'fetch https://example.com' };
-      const invocation = tool.build(params);
-
+      const { invocation } = createToolWithMessageBus(messageBus);
       const subscribeSpy = vi.spyOn(messageBus, 'subscribe');
 
       const confirmationPromise = invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
 
-      // Simulate denial response
-      const responseHandler = subscribeSpy.mock.calls[0][1];
-      const response: ToolConfirmationResponse = {
-        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-        correlationId: 'test-correlation-id',
-        confirmed: false,
-      };
+      simulateMessageBusResponse(subscribeSpy, false);
 
-      responseHandler(response);
-
-      // Should reject with error when denied
       await expect(confirmationPromise).rejects.toThrow(
         'Tool execution for "WebFetch" denied by policy.',
       );
@@ -527,16 +489,11 @@ describe('WebFetchTool', () => {
 
     it('should handle timeout gracefully', async () => {
       vi.useFakeTimers();
-
-      const tool = new WebFetchTool(mockConfig, messageBus);
-      const params = { prompt: 'fetch https://example.com' };
-      const invocation = tool.build(params);
-
+      const { invocation } = createToolWithMessageBus(messageBus);
       const confirmationPromise = invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
 
-      // Fast-forward past timeout
       await vi.advanceTimersByTimeAsync(30000);
       const result = await confirmationPromise;
       expect(result).not.toBe(false);
@@ -546,16 +503,12 @@ describe('WebFetchTool', () => {
     });
 
     it('should handle abort signal during confirmation', async () => {
-      const tool = new WebFetchTool(mockConfig, messageBus);
-      const params = { prompt: 'fetch https://example.com' };
-      const invocation = tool.build(params);
-
+      const { invocation } = createToolWithMessageBus(messageBus);
       const abortController = new AbortController();
       const confirmationPromise = invocation.shouldConfirmExecute(
         abortController.signal,
       );
 
-      // Abort the operation
       abortController.abort();
 
       await expect(confirmationPromise).rejects.toThrow(
@@ -564,42 +517,25 @@ describe('WebFetchTool', () => {
     });
 
     it('should fall back to legacy confirmation when no message bus', async () => {
-      const tool = new WebFetchTool(mockConfig); // No message bus
-      const params = { prompt: 'fetch https://example.com' };
-      const invocation = tool.build(params);
-
+      const { invocation } = createToolWithMessageBus(); // No message bus
       const result = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
 
-      // Should use legacy confirmation flow (returns confirmation details, not false)
       expect(result).not.toBe(false);
       expect(result).toHaveProperty('type', 'info');
     });
 
     it('should ignore responses with wrong correlation ID', async () => {
       vi.useFakeTimers();
-
-      const tool = new WebFetchTool(mockConfig, messageBus);
-      const params = { prompt: 'fetch https://example.com' };
-      const invocation = tool.build(params);
-
+      const { invocation } = createToolWithMessageBus(messageBus);
       const subscribeSpy = vi.spyOn(messageBus, 'subscribe');
       const confirmationPromise = invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
 
-      // Send response with wrong correlation ID
-      const responseHandler = subscribeSpy.mock.calls[0][1];
-      const wrongResponse: ToolConfirmationResponse = {
-        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-        correlationId: 'wrong-id',
-        confirmed: true,
-      };
+      simulateMessageBusResponse(subscribeSpy, true, 'wrong-id');
 
-      responseHandler(wrongResponse);
-
-      // Should timeout since correct response wasn't received
       await vi.advanceTimersByTimeAsync(30000);
       const result = await confirmationPromise;
       expect(result).not.toBe(false);
@@ -609,11 +545,7 @@ describe('WebFetchTool', () => {
     });
 
     it('should handle message bus publish errors gracefully', async () => {
-      const tool = new WebFetchTool(mockConfig, messageBus);
-      const params = { prompt: 'fetch https://example.com' };
-      const invocation = tool.build(params);
-
-      // Mock publish to throw error
+      const { invocation } = createToolWithMessageBus(messageBus);
       vi.spyOn(messageBus, 'publish').mockImplementation(() => {
         throw new Error('Message bus error');
       });
@@ -621,7 +553,7 @@ describe('WebFetchTool', () => {
       const result = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
-      expect(result).toBe(false); // Should gracefully fall back
+      expect(result).toBe(false);
     });
 
     it('should execute normally after confirmation approval', async () => {
@@ -637,28 +569,17 @@ describe('WebFetchTool', () => {
         ],
       });
 
-      const tool = new WebFetchTool(mockConfig, messageBus);
-      const params = { prompt: 'fetch https://example.com' };
-      const invocation = tool.build(params);
-
+      const { invocation } = createToolWithMessageBus(messageBus);
       const subscribeSpy = vi.spyOn(messageBus, 'subscribe');
 
-      // Start confirmation
       const confirmationPromise = invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
 
-      // Approve via message bus
-      const responseHandler = subscribeSpy.mock.calls[0][1];
-      responseHandler({
-        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-        correlationId: 'test-correlation-id',
-        confirmed: true,
-      });
+      simulateMessageBusResponse(subscribeSpy, true);
 
       await confirmationPromise;
 
-      // Execute the tool
       const result = await invocation.execute(new AbortController().signal);
       expect(result.error).toBeUndefined();
       expect(result.llmContent).toContain('Fetched content');

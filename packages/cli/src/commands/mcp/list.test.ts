@@ -21,28 +21,32 @@ vi.mock('../../config/extensions/storage.js', () => ({
   },
 }));
 vi.mock('../../config/extension-manager.js');
-vi.mock('@google/gemini-cli-core', () => ({
-  createTransport: vi.fn(),
-  MCPServerStatus: {
-    CONNECTED: 'CONNECTED',
-    CONNECTING: 'CONNECTING',
-    DISCONNECTED: 'DISCONNECTED',
-  },
-  Storage: vi.fn().mockImplementation((_cwd: string) => ({
-    getGlobalSettingsPath: () => '/tmp/gemini/settings.json',
-    getWorkspaceSettingsPath: () => '/tmp/gemini/workspace-settings.json',
-    getProjectTempDir: () => '/test/home/.gemini/tmp/mocked_hash',
-  })),
-  GEMINI_DIR: '.gemini',
-  getErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
-  debugLogger: {
-    log: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  },
-}));
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...original,
+    createTransport: vi.fn(),
+    MCPServerStatus: {
+      CONNECTED: 'CONNECTED',
+      CONNECTING: 'CONNECTING',
+      DISCONNECTED: 'DISCONNECTED',
+    },
+    Storage: vi.fn().mockImplementation((_cwd: string) => ({
+      getGlobalSettingsPath: () => '/tmp/gemini/settings.json',
+      getWorkspaceSettingsPath: () => '/tmp/gemini/workspace-settings.json',
+      getProjectTempDir: () => '/test/home/.gemini/tmp/mocked_hash',
+    })),
+    GEMINI_DIR: '.gemini',
+    getErrorMessage: (e: unknown) =>
+      e instanceof Error ? e.message : String(e),
+  };
+});
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
+
+vi.mock('../utils.js', () => ({
+  exitCli: vi.fn(),
+}));
 
 const mockedGetUserExtensionsDir =
   ExtensionStorage.getUserExtensionsDir as Mock;
@@ -72,6 +76,7 @@ describe('mcp list command', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
 
     mockTransport = { close: vi.fn() };
     mockClient = {

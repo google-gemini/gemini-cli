@@ -48,16 +48,21 @@ describe('useSelectionList', () => {
     mockOnHighlight.mockClear();
   });
 
-  const pressKey = (name: string, sequence: string = name) => {
+  const pressKey = (
+    name: string,
+    sequence: string = name,
+    options: { shift?: boolean; ctrl?: boolean } = {},
+  ) => {
     act(() => {
       if (activeKeypressHandler) {
         const key: Key = {
           name,
           sequence,
-          ctrl: false,
+          ctrl: options.ctrl ?? false,
           meta: false,
-          shift: false,
+          shift: options.shift ?? false,
           paste: false,
+          insertable: false,
         };
         activeKeypressHandler(key);
       } else {
@@ -202,6 +207,31 @@ describe('useSelectionList', () => {
       expect(result.current.activeIndex).toBe(0);
     });
 
+    it('should ignore navigation keys when shift is pressed', async () => {
+      const { result } = await renderSelectionListHook({
+        items,
+        initialIndex: 2, // Start at middle item 'C'
+        onSelect: mockOnSelect,
+      });
+      expect(result.current.activeIndex).toBe(2);
+
+      // Shift+Down / Shift+J should not move down
+      pressKey('down', undefined, { shift: true });
+      expect(result.current.activeIndex).toBe(2);
+      pressKey('j', undefined, { shift: true });
+      expect(result.current.activeIndex).toBe(2);
+
+      // Shift+Up / Shift+K should not move up
+      pressKey('up', undefined, { shift: true });
+      expect(result.current.activeIndex).toBe(2);
+      pressKey('k', undefined, { shift: true });
+      expect(result.current.activeIndex).toBe(2);
+
+      // Verify normal navigation still works
+      pressKey('down');
+      expect(result.current.activeIndex).toBe(3);
+    });
+
     it('should wrap navigation correctly', async () => {
       const { result } = await renderSelectionListHook({
         items,
@@ -302,6 +332,7 @@ describe('useSelectionList', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
         };
         handler(key);
       };
@@ -351,6 +382,7 @@ describe('useSelectionList', () => {
             meta: false,
             shift: false,
             paste: false,
+            insertable: false,
           };
           handler(key);
         };
@@ -552,11 +584,13 @@ describe('useSelectionList', () => {
       });
 
       pressNumber('0');
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       act(() => vi.advanceTimersByTime(1000)); // Timeout the '0' input
 
       pressNumber('1');
       expect(mockOnSelect).not.toHaveBeenCalled(); // Should be waiting for second digit
 
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       act(() => vi.advanceTimersByTime(1000)); // Timeout '1'
       expect(mockOnSelect).toHaveBeenCalledWith('Item 1');
     });

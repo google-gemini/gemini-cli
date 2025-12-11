@@ -1,4 +1,4 @@
-# Gemini CLI Core
+# Gemini CLI core
 
 Gemini CLI's core package (`packages/core`) is the backend portion of Gemini
 CLI, handling communication with the Gemini API, managing tools, and processing
