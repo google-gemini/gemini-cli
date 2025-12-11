@@ -46,6 +46,11 @@ Your command definition files must be written in the TOML format and use the
   does. This text will be displayed next to your command in the `/help` menu.
   **If you omit this field, a generic description will be generated from the
   filename.**
+- `model` (String): The ID of the model to use for this specific command (e.g.,
+  `"gemini-2.5-flash"`). If provided, this will override the currently active
+  session model for the duration of this command's execution. If the model is
+  invalid or unsupported, a warning will be logged, and the session's default
+  model will be used instead.
 
 ## Handling arguments
 

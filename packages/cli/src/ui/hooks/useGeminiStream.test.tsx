@@ -65,6 +65,7 @@ const MockedGeminiClientClass = vi.hoisted(() =>
       recordToolCalls: vi.fn(),
       getConversationFile: vi.fn(),
     });
+    this.getCurrentSequenceModel = vi.fn().mockReturnValue('gemini-2.5-pro');
   }),
 );
 
@@ -615,6 +616,9 @@ describe('useGeminiStream', () => {
       expectedMergedResponse,
       expect.any(AbortSignal),
       'prompt-id-2',
+      expect.any(Number), // MAX_TURNS
+      false, // isInvalidStreamRetry
+      undefined, // modelOverride
     );
   });
 
@@ -937,6 +941,9 @@ describe('useGeminiStream', () => {
         toolCallResponseParts,
         expect.any(AbortSignal),
         'prompt-id-4',
+        expect.any(Number), // MAX_TURNS
+        false, // isInvalidStreamRetry
+        undefined, // modelOverride
       );
     });
 
@@ -1322,7 +1329,10 @@ describe('useGeminiStream', () => {
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
           'This is the actual prompt from the command file.',
           expect.any(AbortSignal),
-          expect.any(String),
+          expect.any(String), // prompt_id
+          expect.any(Number), // MAX_TURNS
+          false, // isInvalidStreamRetry
+          undefined, // modelOverride
         );
 
         expect(mockScheduleToolCalls).not.toHaveBeenCalled();
@@ -1348,7 +1358,10 @@ describe('useGeminiStream', () => {
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
           '',
           expect.any(AbortSignal),
-          expect.any(String),
+          expect.any(String), // prompt_id
+          expect.any(Number), // MAX_TURNS
+          false, // isInvalidStreamRetry
+          undefined, // modelOverride
         );
       });
     });
@@ -1366,7 +1379,10 @@ describe('useGeminiStream', () => {
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
           '// This is a line comment',
           expect.any(AbortSignal),
-          expect.any(String),
+          expect.any(String), // prompt_id
+          expect.any(Number), // MAX_TURNS
+          false, // isInvalidStreamRetry
+          undefined, // modelOverride
         );
       });
     });
@@ -1384,7 +1400,10 @@ describe('useGeminiStream', () => {
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
           '/* This is a block comment */',
           expect.any(AbortSignal),
-          expect.any(String),
+          expect.any(String), // prompt_id
+          expect.any(Number), // MAX_TURNS
+          false, // isInvalidStreamRetry
+          undefined, // modelOverride
         );
       });
     });
@@ -2117,6 +2136,9 @@ describe('useGeminiStream', () => {
       processedQueryParts, // Argument 1: The parts array directly
       expect.any(AbortSignal), // Argument 2: An AbortSignal
       expect.any(String), // Argument 3: The prompt_id string
+      expect.any(Number), // MAX_TURNS
+      false, // isInvalidStreamRetry
+      undefined, // modelOverride
     );
   });
   describe('Thought Reset', () => {
@@ -2510,7 +2532,10 @@ describe('useGeminiStream', () => {
           2,
           'test query',
           expect.any(AbortSignal),
-          expect.any(String),
+          expect.any(String), // prompt_id
+          expect.any(Number), // MAX_TURNS
+          false, // isInvalidStreamRetry
+          undefined, // modelOverride
         );
       });
     });
@@ -2666,7 +2691,10 @@ describe('useGeminiStream', () => {
           3,
           'second query',
           expect.any(AbortSignal),
-          expect.any(String),
+          expect.any(String), // prompt_id
+          expect.any(Number), // MAX_TURNS
+          false, // isInvalidStreamRetry
+          undefined, // modelOverride
         );
       });
     });

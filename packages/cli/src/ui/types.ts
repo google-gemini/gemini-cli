@@ -377,6 +377,11 @@ export interface ConsoleMessageItem {
 export interface SubmitPromptResult {
   type: 'submit_prompt';
   content: PartListUnion;
+  /**
+   * The ID of the model to use for this prompt (e.g., `gemini-2.5-flash`).
+   * This overrides the session's default model for this specific execution.
+   */
+  model?: string;
 }
 
 /**

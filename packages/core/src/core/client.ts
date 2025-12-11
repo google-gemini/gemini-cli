@@ -63,7 +63,7 @@ import {
 } from '../availability/policyHelpers.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 
-const MAX_TURNS = 100;
+export const MAX_TURNS = 100;
 
 export class GeminiClient {
   private chat?: GeminiChat;
@@ -409,6 +409,7 @@ export class GeminiClient {
     prompt_id: string,
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
+    modelOverride?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
@@ -535,9 +536,24 @@ export class GeminiClient {
     };
 
     let modelToUse: string;
+    let overrideModelResolved = false;
 
+    if (modelOverride) {
+      try {
+        this.config.modelConfigService.getResolvedConfig({
+          model: modelOverride,
+        });
+        overrideModelResolved = true;
+      } catch {
+        debugLogger.warn(
+          `[GeminiClient] Invalid model override "${modelOverride}"`,
+        );
+      }
+    }
     // Determine Model (Stickiness vs. Routing)
-    if (this.currentSequenceModel) {
+    if (modelOverride && overrideModelResolved) {
+      modelToUse = modelOverride;
+    } else if (this.currentSequenceModel) {
       modelToUse = this.currentSequenceModel;
     } else {
       const router = await this.config.getModelRouterService();

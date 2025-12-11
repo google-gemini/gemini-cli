@@ -177,6 +177,12 @@ export interface SlashCommand {
   extensionName?: string;
   extensionId?: string;
 
+  /**
+   * The ID of the model to use for this command (e.g., `gemini-2.5-flash`).
+   * This overrides the session's default model for this specific execution.
+   */
+  model?: string;
+
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (
     context: CommandContext,

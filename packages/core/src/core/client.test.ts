@@ -39,6 +39,7 @@ import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
+import type { ModelConfigService } from '../services/modelConfigService.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import type {
   ModelConfigKey,
@@ -47,6 +48,7 @@ import type {
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { HookSystem } from '../hooks/hookSystem.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
+import { MAX_TURNS } from './client.js'; // Corrected import
 
 vi.mock('../services/chatCompressionService.js');
 
@@ -250,16 +252,17 @@ describe('Gemini Client (client.ts)', () => {
         }),
       }),
       modelConfigService: {
-        getResolvedConfig(modelConfigKey: ModelConfigKey) {
-          return {
-            model: modelConfigKey.model,
-            generateContentConfig: {
-              temperature: 0,
-              topP: 1,
-            } as unknown as ResolvedModelConfig,
-          };
-        },
-      },
+        getResolvedConfig: vi.fn(
+          (modelConfigKey: ModelConfigKey) =>
+            ({
+              model: modelConfigKey.model,
+              generateContentConfig: {
+                temperature: 0,
+                topP: 1,
+              },
+            }) as unknown as ResolvedModelConfig,
+        ),
+      } as unknown as ModelConfigService,
       isInteractive: vi.fn().mockReturnValue(false),
       getExperiments: () => {},
       isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(false),
@@ -1460,6 +1463,25 @@ ${JSON.stringify(
         );
       });
 
+      it('should use modelOverride when provided, bypassing the router', async () => {
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-1',
+          MAX_TURNS,
+          false,
+          'overridden-model',
+        );
+        await fromAsync(stream); // consume stream
+
+        expect(mockConfig.getModelRouterService).not.toHaveBeenCalled();
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          { model: 'overridden-model' },
+          [{ text: 'Hi' }],
+          expect.any(AbortSignal),
+        );
+      });
+
       it('should use the same model for subsequent turns in the same prompt (stickiness)', async () => {
         // First turn
         let stream = client.sendMessageStream(
@@ -2595,6 +2617,49 @@ ${JSON.stringify(
       // Assert
       expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
       expect(capturedSignal!.aborted).toBe(true);
+    });
+
+    it('should fall back to current model and log a warning if modelOverride is invalid', async () => {
+      const invalidModel = 'non-existent-model';
+      const errorMessage = `Could not resolve a model name for alias "${invalidModel}". Please ensure the alias chain or a matching override specifies a model.`;
+      (
+        mockConfig.modelConfigService.getResolvedConfig as Mock
+      ).mockImplementation((context) => {
+        if (context.model === invalidModel) {
+          throw new Error(errorMessage);
+        }
+        return {
+          model: context.model,
+          generateContentConfig: {},
+        } as ResolvedModelConfig;
+      });
+
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })(),
+      );
+
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-invalid-model',
+        MAX_TURNS,
+        false,
+        invalidModel, // Invalid model override
+      );
+      await fromAsync(stream); // consume stream
+
+      // Assert
+      expect(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).toHaveBeenNthCalledWith(1, { model: invalidModel });
+
+      expect(mockTurnRunFn).toHaveBeenCalledWith(
+        { model: mockConfig.getGeminiClient().getCurrentSequenceModel() },
+        [{ text: 'Hi' }],
+        expect.any(AbortSignal),
+      );
     });
   });
 
