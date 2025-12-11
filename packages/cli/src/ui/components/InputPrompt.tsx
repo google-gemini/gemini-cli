@@ -821,8 +821,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Ctrl+Y for copying current input to clipboard
       if (keyMatchers[Command.COPY_INPUT](key)) {
         if (buffer.text) {
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          copyToClipboard(buffer.text);
+          copyToClipboard(buffer.text).catch(() => {
+            // Silently ignore clipboard errors - user can retry if needed
+          });
         }
         return;
       }
