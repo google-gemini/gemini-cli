@@ -29,10 +29,11 @@ export function ApiAuthDialog({
   const { mainAreaWidth } = useUIState();
   const viewportWidth = mainAreaWidth - 8;
 
+  const initialApiKey = process.env['GEMINI_API_KEY'] ?? defaultValue;
+
   const buffer = useTextBuffer({
-    initialText: process.env['GEMINI_API_KEY'] || defaultValue || '',
-    initialCursorOffset:
-      (process.env['GEMINI_API_KEY'] || defaultValue)?.length || 0,
+    initialText: initialApiKey || '',
+    initialCursorOffset: initialApiKey?.length || 0,
     viewport: {
       width: viewportWidth,
       height: 4,
