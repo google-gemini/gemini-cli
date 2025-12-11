@@ -405,8 +405,13 @@ export class GeminiClient {
   }
 
   private _resolveModelOverride(modelOverride: string): string | undefined {
+    const trimmedModel = modelOverride.trim();
+    if (!trimmedModel) {
+      return undefined;
+    }
+
     const resolvedModelAlias = resolveModel(
-      modelOverride,
+      trimmedModel,
       this.config.getPreviewFeatures(),
     );
     const resolvedConfig = this.config.modelConfigService.getResolvedConfig({
