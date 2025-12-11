@@ -50,7 +50,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       ),
     ),
     patchStdio: vi.fn(() => () => {}),
-    createInkStdio: vi.fn(() => ({
+    createWorkingStdio: vi.fn(() => ({
       stdout: {
         write: vi.fn((...args) =>
           process.stdout.write(
@@ -70,6 +70,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     disableMouseEvents: vi.fn(),
     enterAlternateScreen: vi.fn(),
     disableLineWrapping: vi.fn(),
+    getVersion: vi.fn(() => Promise.resolve('1.0.0')),
   };
 });
 
@@ -257,6 +258,7 @@ describe('gemini.tsx main function', () => {
         getMessageBus: () => ({
           subscribe: vi.fn(),
         }),
+        getEnableHooks: () => false,
         getToolRegistry: vi.fn(),
         getContentGeneratorConfig: vi.fn(),
         getModel: () => 'gemini-pro',
@@ -489,6 +491,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getMessageBus: () => ({
         subscribe: vi.fn(),
       }),
+      getEnableHooks: () => false,
       getToolRegistry: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getModel: () => 'gemini-pro',
@@ -588,6 +591,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getExtensions: () => [{ name: 'ext1' }],
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -668,6 +672,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getExtensions: () => [],
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -733,6 +738,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getDebugMode: () => false,
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -814,6 +820,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getDebugMode: () => false,
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -890,6 +897,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getDebugMode: () => false,
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -961,6 +969,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getDebugMode: () => false,
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -1130,6 +1139,7 @@ describe('gemini.tsx main function exit codes', () => {
       getGeminiMdFileCount: () => 0,
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       getToolRegistry: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getModel: () => 'gemini-pro',
@@ -1191,6 +1201,7 @@ describe('gemini.tsx main function exit codes', () => {
       getGeminiMdFileCount: () => 0,
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
       getToolRegistry: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getModel: () => 'gemini-pro',
@@ -1284,10 +1295,6 @@ describe('startInteractiveUI', () => {
     geminiMdFileCount: 0,
   };
 
-  vi.mock('./utils/version.js', () => ({
-    getCliVersion: vi.fn(() => Promise.resolve('1.0.0')),
-  }));
-
   vi.mock('./ui/utils/kittyProtocolDetector.js', () => ({
     detectAndEnableKittyProtocol: vi.fn(() => Promise.resolve(true)),
     isKittyProtocolSupported: vi.fn(() => true),
@@ -1302,6 +1309,7 @@ describe('startInteractiveUI', () => {
     registerCleanup: vi.fn(),
     runExitCleanup: vi.fn(),
     registerSyncCleanup: vi.fn(),
+    registerTelemetryConfig: vi.fn(),
   }));
 
   afterEach(() => {
@@ -1388,7 +1396,7 @@ describe('startInteractiveUI', () => {
   });
 
   it('should perform all startup tasks in correct order', async () => {
-    const { getCliVersion } = await import('./utils/version.js');
+    const { getVersion } = await import('@google/gemini-cli-core');
     const { checkForUpdates } = await import('./ui/utils/updateCheck.js');
     const { registerCleanup } = await import('./utils/cleanup.js');
 
@@ -1402,7 +1410,7 @@ describe('startInteractiveUI', () => {
     );
 
     // Verify all startup tasks were called
-    expect(getCliVersion).toHaveBeenCalledTimes(1);
+    expect(getVersion).toHaveBeenCalledTimes(1);
     expect(registerCleanup).toHaveBeenCalledTimes(3);
 
     // Verify cleanup handler is registered with unmount function

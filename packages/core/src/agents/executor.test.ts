@@ -65,13 +65,11 @@ const {
   mockExecuteToolCall,
   mockSetSystemInstruction,
   mockCompress,
-  mockSetTools,
 } = vi.hoisted(() => ({
   mockSendMessageStream: vi.fn(),
   mockExecuteToolCall: vi.fn(),
   mockSetSystemInstruction: vi.fn(),
   mockCompress: vi.fn(),
-  mockSetTools: vi.fn(),
 }));
 
 let mockChatHistory: Content[] = [];
@@ -94,7 +92,6 @@ vi.mock('../core/geminiChat.js', async (importOriginal) => {
       getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
       setHistory: mockSetHistory,
       setSystemInstruction: mockSetSystemInstruction,
-      setTools: mockSetTools,
     })),
   };
 });
@@ -238,7 +235,6 @@ describe('AgentExecutor', () => {
     mockSetHistory.mockClear();
     mockSendMessageStream.mockReset();
     mockSetSystemInstruction.mockReset();
-    mockSetTools.mockReset();
     mockExecuteToolCall.mockReset();
     mockedLogAgentStart.mockReset();
     mockedLogAgentFinish.mockReset();
@@ -258,7 +254,6 @@ describe('AgentExecutor', () => {
         ({
           sendMessageStream: mockSendMessageStream,
           setSystemInstruction: mockSetSystemInstruction,
-          setTools: mockSetTools,
           getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
           getLastPromptTokenCount: vi.fn(() => 100),
           setHistory: mockSetHistory,
@@ -490,8 +485,10 @@ describe('AgentExecutor', () => {
       const { modelConfigKey } = getMockMessageParams(0);
       expect(modelConfigKey.model).toBe(getModelConfigAlias(definition));
 
-      const call = mockSetTools.mock.calls[0];
-      const sentTools = (call[0] as Tool[])[0].functionDeclarations;
+      const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
+      // tools are the 3rd argument (index 2), passed as [{ functionDeclarations: [...] }]
+      const passedToolsArg = chatConstructorArgs[2] as Tool[];
+      const sentTools = passedToolsArg[0].functionDeclarations;
       expect(sentTools).toBeDefined();
 
       expect(sentTools).toEqual(
@@ -615,8 +612,9 @@ describe('AgentExecutor', () => {
       const { modelConfigKey } = getMockMessageParams(0);
       expect(modelConfigKey.model).toBe(getModelConfigAlias(definition));
 
-      const call = mockSetTools.mock.calls[0];
-      const sentTools = (call[0] as Tool[])[0].functionDeclarations;
+      const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
+      const passedToolsArg = chatConstructorArgs[2] as Tool[];
+      const sentTools = passedToolsArg[0].functionDeclarations;
       expect(sentTools).toBeDefined();
 
       const completeToolDef = sentTools!.find(

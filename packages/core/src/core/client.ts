@@ -57,6 +57,11 @@ import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
+import {
+  applyModelSelection,
+  createAvailabilityContextProvider,
+} from '../availability/policyHelpers.js';
+import type { RetryAvailabilityContext } from '../utils/retry.js';
 
 const MAX_TURNS = 100;
 
@@ -405,6 +410,10 @@ export class GeminiClient {
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    if (!isInvalidStreamRetry) {
+      this.config.resetTurn();
+    }
+
     // Fire BeforeAgent hook through MessageBus (only if hooks are enabled)
     const hooksEnabled = this.config.getEnableHooks();
     const messageBus = this.config.getMessageBus();
@@ -534,10 +543,20 @@ export class GeminiClient {
       const router = await this.config.getModelRouterService();
       const decision = await router.route(routingContext);
       modelToUse = decision.model;
-      // Lock the model for the rest of the sequence
-      this.currentSequenceModel = modelToUse;
-      yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
+
+    // availability logic
+    const { model: finalModel } = applyModelSelection(
+      this.config,
+      modelToUse,
+      undefined,
+      undefined,
+      { consumeAttempt: false },
+    );
+    modelToUse = finalModel;
+
+    this.currentSequenceModel = modelToUse;
+    yield { type: GeminiEventType.ModelInfo, value: modelToUse };
 
     const resultStream = turn.run({ model: modelToUse }, request, linkedSignal);
     for await (const event of resultStream) {
@@ -665,14 +684,53 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+      const {
+        model,
+        config: newConfig,
+        maxAttempts: availabilityMaxAttempts,
+      } = applyModelSelection(
+        this.config,
+        currentAttemptModel,
+        currentAttemptGenerateContentConfig,
+        modelConfigKey.overrideScope,
+      );
+      currentAttemptModel = model;
+      if (newConfig) {
+        currentAttemptGenerateContentConfig = newConfig;
+      }
+
+      // Define callback to refresh context based on currentAttemptModel which might be updated by fallback handler
+      const getAvailabilityContext: () => RetryAvailabilityContext | undefined =
+        createAvailabilityContextProvider(
+          this.config,
+          () => currentAttemptModel,
+        );
 
       const apiCall = () => {
-        const modelConfigToUse = this.config.isInFallbackMode()
-          ? fallbackModelConfig
-          : desiredModelConfig;
-        currentAttemptModel = modelConfigToUse.model;
-        currentAttemptGenerateContentConfig =
-          modelConfigToUse.generateContentConfig;
+        let modelConfigToUse = desiredModelConfig;
+
+        if (!this.config.isModelAvailabilityServiceEnabled()) {
+          modelConfigToUse = this.config.isInFallbackMode()
+            ? fallbackModelConfig
+            : desiredModelConfig;
+          currentAttemptModel = modelConfigToUse.model;
+          currentAttemptGenerateContentConfig =
+            modelConfigToUse.generateContentConfig;
+        } else {
+          // AvailabilityService
+          const active = this.config.getActiveModel();
+          if (active !== currentAttemptModel) {
+            currentAttemptModel = active;
+            // Re-resolve config if model changed
+            const newConfig = this.config.modelConfigService.getResolvedConfig({
+              ...modelConfigKey,
+              model: currentAttemptModel,
+            });
+            currentAttemptGenerateContentConfig =
+              newConfig.generateContentConfig;
+          }
+        }
+
         const requestConfig: GenerateContentConfig = {
           ...currentAttemptGenerateContentConfig,
           abortSignal,
@@ -693,12 +751,15 @@ export class GeminiClient {
         error?: unknown,
       ) =>
         // Pass the captured model to the centralized handler.
-        await handleFallback(this.config, currentAttemptModel, authType, error);
+        handleFallback(this.config, currentAttemptModel, authType, error);
 
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: onPersistent429Callback,
         authType: this.config.getContentGeneratorConfig()?.authType,
+        maxAttempts: availabilityMaxAttempts,
+        getAvailabilityContext,
       });
+
       return result;
     } catch (error: unknown) {
       if (abortSignal.aborted) {
@@ -742,7 +803,8 @@ export class GeminiClient {
       info.compressionStatus ===
       CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT
     ) {
-      this.hasFailedCompressionAttempt = !force && true;
+      this.hasFailedCompressionAttempt =
+        this.hasFailedCompressionAttempt || !force;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
         this.chat = await this.startChat(newHistory);

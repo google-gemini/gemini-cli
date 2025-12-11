@@ -107,6 +107,7 @@ describe('mcp add command', () => {
     expect(mockSetValue).toHaveBeenCalledWith(SettingScope.User, 'mcpServers', {
       'sse-server': {
         url: 'https://example.com/sse-endpoint',
+        type: 'sse',
         headers: { 'X-API-Key': 'your-key' },
       },
     });
@@ -122,7 +123,40 @@ describe('mcp add command', () => {
       'mcpServers',
       {
         'http-server': {
-          httpUrl: 'https://example.com/mcp',
+          url: 'https://example.com/mcp',
+          type: 'http',
+          headers: { Authorization: 'Bearer your-token' },
+        },
+      },
+    );
+  });
+
+  it('should add an sse server using --type alias', async () => {
+    await parser.parseAsync(
+      'add --type sse --scope user -H "X-API-Key: your-key" sse-server https://example.com/sse',
+    );
+
+    expect(mockSetValue).toHaveBeenCalledWith(SettingScope.User, 'mcpServers', {
+      'sse-server': {
+        url: 'https://example.com/sse',
+        type: 'sse',
+        headers: { 'X-API-Key': 'your-key' },
+      },
+    });
+  });
+
+  it('should add an http server using --type alias', async () => {
+    await parser.parseAsync(
+      'add --type http -H "Authorization: Bearer your-token" http-server https://example.com/mcp',
+    );
+
+    expect(mockSetValue).toHaveBeenCalledWith(
+      SettingScope.Workspace,
+      'mcpServers',
+      {
+        'http-server': {
+          url: 'https://example.com/mcp',
+          type: 'http',
           headers: { Authorization: 'Bearer your-token' },
         },
       },

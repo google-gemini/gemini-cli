@@ -29,6 +29,7 @@ import {
 } from '../telemetry/index.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { retryWithBackoff } from '../utils/retry.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
@@ -102,6 +103,10 @@ export interface WebFetchToolParams {
   prompt: string;
 }
 
+interface ErrorWithStatus extends Error {
+  status?: number;
+}
+
 class WebFetchToolInvocation extends BaseToolInvocation<
   WebFetchToolParams,
   ToolResult
@@ -129,12 +134,22 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     }
 
     try {
-      const response = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS);
-      if (!response.ok) {
-        throw new Error(
-          `Request failed with status code ${response.status} ${response.statusText}`,
-        );
-      }
+      const response = await retryWithBackoff(
+        async () => {
+          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS);
+          if (!res.ok) {
+            const error = new Error(
+              `Request failed with status code ${res.status} ${res.statusText}`,
+            );
+            (error as ErrorWithStatus).status = res.status;
+            throw error;
+          }
+          return res;
+        },
+        {
+          retryFetchErrors: this.config.getRetryFetchErrors(),
+        },
+      );
 
       const rawContent = await response.text();
       const contentType = response.headers.get('content-type') || '';
@@ -307,7 +322,7 @@ ${textContent}
           this.config,
           new WebFetchFallbackAttemptEvent('primary_failed'),
         );
-        return this.executeFallback(signal);
+        return await this.executeFallback(signal);
       }
 
       const sourceListFormatted: string[] = [];

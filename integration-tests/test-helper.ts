@@ -159,6 +159,14 @@ interface ParsedLog {
     success?: boolean;
     duration_ms?: number;
     request_text?: string;
+    hook_event_name?: string;
+    hook_name?: string;
+    hook_input?: Record<string, unknown>;
+    hook_output?: Record<string, unknown>;
+    exit_code?: number;
+    stdout?: string;
+    stderr?: string;
+    error?: string;
   };
   scopeMetrics?: {
     metrics: {
@@ -1016,11 +1024,28 @@ export class TestRig {
     return null;
   }
 
-  async runInteractive(...args: string[]): Promise<InteractiveRun> {
-    const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
-    const commandArgs = [...initialArgs, ...args];
+  async runInteractive(
+    options?: { yolo?: boolean } | string,
+    ...args: string[]
+  ): Promise<InteractiveRun> {
+    // Handle backward compatibility: if first param is a string, treat as arg
+    let yolo = true; // Default to YOLO mode
+    let additionalArgs: string[] = args;
 
-    const options: pty.IPtyForkOptions = {
+    if (typeof options === 'string') {
+      // Old-style call: runInteractive('--debug')
+      additionalArgs = [options, ...args];
+    } else if (typeof options === 'object' && options !== null) {
+      // New-style call: runInteractive({ yolo: false })
+      yolo = options.yolo !== false;
+    }
+
+    const { command, initialArgs } = this._getCommandAndArgs(
+      yolo ? ['--yolo'] : [],
+    );
+    const commandArgs = [...initialArgs, ...additionalArgs];
+
+    const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
       rows: 80,
@@ -1031,7 +1056,7 @@ export class TestRig {
     };
 
     const executable = command === 'node' ? process.execPath : command;
-    const ptyProcess = pty.spawn(executable, commandArgs, options);
+    const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
 
     const run = new InteractiveRun(ptyProcess);
     // Wait for the app to be ready
@@ -1080,5 +1105,24 @@ export class TestRig {
     }
 
     return logs;
+  }
+
+  async pollCommand(
+    commandFn: () => Promise<void>,
+    predicateFn: () => boolean,
+    timeout: number = 30000,
+    interval: number = 1000,
+  ) {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      await commandFn();
+      // Give it a moment to process
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      if (predicateFn()) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+    throw new Error(`pollCommand timed out after ${timeout}ms`);
   }
 }
