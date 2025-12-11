@@ -581,7 +581,21 @@ export class Task {
             this.config.storage.getProjectTempCheckpointsDir();
           await fs.mkdir(checkpointDir, { recursive: true });
           for (const [fileName, content] of checkpointsToWrite) {
+            // Prevent path traversal attacks by rejecting absolute paths and parent directory references
+            if (path.isAbsolute(fileName) || fileName.includes('..')) {
+              throw new Error(
+                `Invalid checkpoint file name: ${fileName}. Must not be an absolute path or contain parent directory references.`,
+              );
+            }
             const filePath = path.join(checkpointDir, fileName);
+            // Additional safety: ensure resolved path is still within checkpoint directory
+            const resolvedPath = path.resolve(filePath);
+            const resolvedDir = path.resolve(checkpointDir);
+            if (!resolvedPath.startsWith(resolvedDir + path.sep) && resolvedPath !== resolvedDir) {
+              throw new Error(
+                `Checkpoint file path escapes checkpoint directory: ${fileName}`,
+              );
+            }
             await fs.writeFile(filePath, content);
           }
         }
