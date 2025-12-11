@@ -38,6 +38,8 @@ overview of Gemini CLI, see the [main documentation page](../index.md).
   files and directories from being accessed by tools.
 - **[Context files (GEMINI.md)](./gemini-md.md):** Provide persistent,
   hierarchical context to the model.
+- **[System prompt override](./system-prompt.md):** Replace the built‑in system
+  instructions using `GEMINI_SYSTEM_MD`.
 
 ## Non-interactive mode
 

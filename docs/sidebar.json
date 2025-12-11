@@ -115,6 +115,10 @@
       {
         "label": "Uninstall",
         "slug": "docs/cli/uninstall"
+      },
+      {
+        "label": "System prompt override",
+        "slug": "docs/cli/system-prompt"
       }
     ]
   },
