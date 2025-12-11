@@ -373,3 +373,43 @@ See the [Uninstall Guide](docs/cli/uninstall.md) for removal instructions.
 <p align="center">
   Built with ❤️ by Google and the open source community
 </p>
+
+
+## Troubleshooting Homebrew Installation (macOS)
+
+If you installed Gemini CLI with Homebrew on macOS and are facing issues, it's likely your shell is not configured correctly for Homebrew.
+
+**Common Symptoms:**
+
+- `brew upgrade gemini` doesn't update to the latest version.
+- The `gemini` command uses an old binary even after upgrading.
+- The `gemini` command is not found in your terminal, or only works inside `gemini shell`.
+
+This happens when Homebrew's `bin` directory is not in your shell's `PATH`.
+
+### Permanent Fix
+
+To fix this permanently, you need to add Homebrew's initialization script to your shell's startup file.
+
+1.  **Add `brew shellenv` to your shell profile.**
+    The command depends on your Mac's architecture. The default shell on modern macOS is Zsh, which uses `~/.zshrc`.
+
+    - For **Apple Silicon** Macs (M1/M2/M3), run:
+      ```bash
+      echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zshrc
+      ```
+
+    - For **Intel** Macs, run:
+      ```bash
+      echo 'eval "$(/usr/local/bin/brew shellenv)"' >> ~/.zshrc
+      ```
+
+    > **Note:** If you use Bash, replace `~/.zshrc` with `~/.bash_profile`.
+
+2.  **Reload your shell** for the changes to take effect in your current session:
+    ```bash
+    source ~/.zshrc
+    ```
+    > Or `source ~/.bash_profile` if you use Bash.
+
+New terminal sessions will now have the correct `PATH` for Homebrew.
