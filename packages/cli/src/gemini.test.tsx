@@ -70,6 +70,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     disableMouseEvents: vi.fn(),
     enterAlternateScreen: vi.fn(),
     disableLineWrapping: vi.fn(),
+    getVersion: vi.fn(() => Promise.resolve('1.0.0')),
   };
 });
 
@@ -1294,10 +1295,6 @@ describe('startInteractiveUI', () => {
     geminiMdFileCount: 0,
   };
 
-  vi.mock('./utils/version.js', () => ({
-    getCliVersion: vi.fn(() => Promise.resolve('1.0.0')),
-  }));
-
   vi.mock('./ui/utils/kittyProtocolDetector.js', () => ({
     detectAndEnableKittyProtocol: vi.fn(() => Promise.resolve(true)),
     isKittyProtocolSupported: vi.fn(() => true),
@@ -1399,7 +1396,7 @@ describe('startInteractiveUI', () => {
   });
 
   it('should perform all startup tasks in correct order', async () => {
-    const { getCliVersion } = await import('./utils/version.js');
+    const { getVersion } = await import('@google/gemini-cli-core');
     const { checkForUpdates } = await import('./ui/utils/updateCheck.js');
     const { registerCleanup } = await import('./utils/cleanup.js');
 
@@ -1413,7 +1410,7 @@ describe('startInteractiveUI', () => {
     );
 
     // Verify all startup tasks were called
-    expect(getCliVersion).toHaveBeenCalledTimes(1);
+    expect(getVersion).toHaveBeenCalledTimes(1);
     expect(registerCleanup).toHaveBeenCalledTimes(3);
 
     // Verify cleanup handler is registered with unmount function
