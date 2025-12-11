@@ -49,8 +49,8 @@ Your command definition files must be written in the TOML format and use the
 - `model` (String): The ID of the model to use for this specific command (e.g.,
   `"gemini-2.5-flash"`). If provided, this will override the currently active
   session model for the duration of this command's execution. If the model is
-  invalid or unsupported, a warning will be logged, and the session's default
-  model will be used instead.
+  invalid or unsupported, it will throw an error when sending a message. You can
+  also use model aliases here (E.g. pro, flash, flash-lite)
 
 ## Handling arguments
 
