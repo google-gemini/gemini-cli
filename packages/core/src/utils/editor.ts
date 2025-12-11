@@ -238,7 +238,8 @@ export async function openDiff(
     });
 
     childProcess.on('error', (error) => {
-      coreEvents.emit(CoreEvent.ExternalEditorClosed);
+      // Note: Node.js guarantees 'close' will be emitted after 'error',
+      // so ExternalEditorClosed event is emitted in the 'close' handler.
       reject(error);
     });
   });
