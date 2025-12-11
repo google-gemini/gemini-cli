@@ -135,6 +135,11 @@ export async function handleAtCommand({
   messageId: userMessageTimestamp,
   signal,
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {
+  // Fast path: if no @ symbol exists, skip all parsing
+  if (!query.includes('@')) {
+    return { processedQuery: [{ text: query }], shouldProceed: true };
+  }
+
   const resourceRegistry = config.getResourceRegistry();
   const mcpClientManager = config.getMcpClientManager();
 
