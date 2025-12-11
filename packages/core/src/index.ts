@@ -78,6 +78,8 @@ export * from './utils/debugLogger.js';
 export * from './utils/events.js';
 export * from './utils/extensionLoader.js';
 export * from './utils/package.js';
+export * from './utils/version.js';
+export * from './utils/checkpointUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
