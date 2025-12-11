@@ -53,6 +53,10 @@
         "slug": "docs/cli"
       },
       {
+        "label": "CLI Reference",
+        "slug": "docs/cli/cli-reference"
+      },
+      {
         "label": "Commands",
         "slug": "docs/cli/commands"
       },
