@@ -17,7 +17,6 @@ import {
   type ToolConfirmationRequest,
   type ToolConfirmationResponse,
 } from '../confirmation-bus/types.js';
-import { appendFileSync } from 'node:fs';
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -181,26 +180,10 @@ export abstract class BaseToolInvocation<
 
     return new Promise<'ALLOW' | 'DENY' | 'ASK_USER' | 'CONFIRMED'>(
       (resolve) => {
-        // Debug logging
-        const log = (msg: string) => {
-          try {
-            appendFileSync(
-              '/Users/adh/debug.log',
-              `${new Date().toISOString()} [tools.ts] ${msg}\n`,
-            );
-          } catch {
-            // ignore
-          }
-        };
-
         if (!this.messageBus) {
           resolve('ALLOW');
           return;
         }
-
-        log(
-          `Starting getMessageBusDecision for ${toolCall.name} with correlationId ${correlationId}`,
-        );
 
         let timeoutId: NodeJS.Timeout | undefined;
 
@@ -217,21 +200,16 @@ export abstract class BaseToolInvocation<
         };
 
         const abortHandler = () => {
-          log(`Abort triggered for ${correlationId}`);
           cleanup();
           resolve('DENY');
         };
 
         if (abortSignal.aborted) {
-          log(`Already aborted for ${correlationId}`);
           resolve('DENY');
           return;
         }
 
         const responseHandler = (response: ToolConfirmationResponse) => {
-          log(
-            `Received response for ${correlationId}: ID=${response.correlationId} Confirmed=${response.confirmed} RequiresUser=${response.requiresUserConfirmation}`,
-          );
           if (response.correlationId === correlationId) {
             cleanup();
             if (response.requiresUserConfirmation) {
@@ -249,7 +227,6 @@ export abstract class BaseToolInvocation<
         abortSignal.addEventListener('abort', abortHandler);
 
         timeoutId = setTimeout(() => {
-          log(`Timeout triggered for ${correlationId}`);
           cleanup();
           resolve('ASK_USER'); // Default to ASK_USER on timeout
         }, 30000);
@@ -273,11 +250,9 @@ export abstract class BaseToolInvocation<
         };
 
         try {
-          log(`Publishing request for ${correlationId}`);
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
           this.messageBus.publish(request);
-        } catch (_error) {
-          log(`Error publishing request for ${correlationId}: ${_error}`);
+        } catch {
           cleanup();
           resolve('ALLOW');
         }
