@@ -848,7 +848,7 @@ export async function saveModelChange(
   model: string,
 ): Promise<void> {
   try {
-    loadedSettings.setValue(SettingScope.User, 'model.preferredModel', model);
+    loadedSettings.setValue(SettingScope.User, 'model.name', model);
   } catch (error) {
     coreEvents.emitFeedback(
       'error',

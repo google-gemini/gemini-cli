@@ -145,7 +145,7 @@ describe('<ModelDialog />', () => {
 
     expect(mockGetModel).toHaveBeenCalled();
 
-    // When getModel returns undefined, preferredModel falls back to DEFAULT_GEMINI_MODEL_AUTO
+    // When getModel returns undefined, it falls back to DEFAULT_GEMINI_MODEL_AUTO
     // which has index 0, so initialIndex should be 0
     expect(mockedSelect).toHaveBeenCalledWith(
       expect.objectContaining({

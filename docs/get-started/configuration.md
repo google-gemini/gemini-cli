@@ -311,10 +311,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Skip the next speaker check.
   - **Default:** `true`
 
-- **`model.preferredModel`** (string):
-  - **Description:** The preferred model to use for conversations.
-  - **Default:** `undefined`
-
 #### `modelConfigs`
 
 - **`modelConfigs.aliases`** (object):

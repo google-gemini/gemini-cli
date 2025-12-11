@@ -578,7 +578,6 @@ export async function loadCliConfig(
     argv.model ||
     process.env['GEMINI_MODEL'] ||
     settings.model?.name ||
-    settings.model?.preferredModel ||
     defaultModel;
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
