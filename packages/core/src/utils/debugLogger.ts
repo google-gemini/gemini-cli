@@ -46,7 +46,9 @@ class DebugLogger {
 
   log(...args: unknown[]): void {
     this.writeToFile('LOG', args);
-    console.log(...args);
+    // Intentionally writing to error, not log, as debug output should go to
+    // stderr, not stdout.
+    console.error(...args);
   }
 
   warn(...args: unknown[]): void {
@@ -61,7 +63,9 @@ class DebugLogger {
 
   debug(...args: unknown[]): void {
     this.writeToFile('DEBUG', args);
-    console.debug(...args);
+    // Intentionally writing to error, not debug, as debug output should go to
+    // stderr, not stdout.
+    console.error(...args);
   }
 }
 
