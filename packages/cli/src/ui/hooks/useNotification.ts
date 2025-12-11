@@ -6,16 +6,18 @@
 
 import { useEffect, useRef } from 'react';
 import notifier from 'node-notifier';
-import fs from 'node:fs';
 import process from 'node:process';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { StreamingState } from '../types.js';
 import type { Settings } from '../../config/settingsSchema.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
+/**
+ * Triggers a system notification when the CLI is waiting for confirmation,
+ * the window is not focused, and notifications are enabled.
+ *
+ * @param streamingState The current streaming state of the application.
+ * @param isFocused Whether the application window is currently focused.
+ * @param settings The application settings.
+ */
 export const useNotification = (
   streamingState: StreamingState,
   isFocused: boolean,
@@ -28,30 +30,33 @@ export const useNotification = (
       hasNotified.current = false;
       return;
     }
+    /**
+     * List of terminals that do not properly support focus detection.
+     * In these terminals, we always send notifications when waiting for confirmation.
+     */
+    const unsupportedTerminals = ['WarpTerminal'];
+    const currentTerminal = process.env['TERM_PROGRAM'];
+    const isUnsupportedTerminal =
+      currentTerminal && unsupportedTerminals.includes(currentTerminal);
 
     if (
       streamingState === StreamingState.WaitingForConfirmation &&
-      !isFocused &&
+      (isUnsupportedTerminal || !isFocused) &&
       settings.ui?.enableNotifications &&
       !hasNotified.current
     ) {
       const isMac = process.platform === 'darwin';
 
-      let iconPath = path.resolve(__dirname, '../../../assets/icon.png');
-      if (!fs.existsSync(iconPath)) {
-        iconPath = path.resolve(__dirname, '../../../../assets/icon.png');
-      }
-
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const options: any = {
         title: 'Gemini CLI',
         message: 'Requires Permission to Execute Command',
-        sound: isMac ? 'Glass' : true,
+        sound: false,
         wait: false,
-        icon: iconPath,
-        contentImage: iconPath,
       };
 
+      // On macOS, set the activate option to bring the app to the foreground when
+      // the notification is clicked.
       if (isMac) {
         const bundleId = process.env['__CFBundleIdentifier'];
 

@@ -38,6 +38,9 @@ describe('useNotification', () => {
     process.env['__CFBundleIdentifier'] = originalEnvBundleId;
   });
 
+  /**
+   * Helper to create a partial Settings object with just the notification setting.
+   */
   const createSettings = (enableNotifications: boolean): Settings =>
     ({
       ui: {
@@ -61,15 +64,14 @@ describe('useNotification', () => {
       expect.objectContaining({
         title: 'Gemini CLI',
         message: 'Requires Permission to Execute Command',
-        sound: 'Glass',
-        wait: true,
-        icon: expect.any(String),
-        contentImage: expect.any(String),
+        sound: false,
+        wait: false,
       }),
     );
     expect(mockNotify).toHaveBeenCalledWith(
       expect.not.objectContaining({
         activate: expect.anything(),
+        contentImage: expect.anything(),
       }),
     );
   });
@@ -87,10 +89,8 @@ describe('useNotification', () => {
       expect.objectContaining({
         title: 'Gemini CLI',
         message: 'Requires Permission to Execute Command',
-        sound: true,
-        wait: true,
-        icon: expect.any(String),
-        contentImage: expect.any(String),
+        sound: false,
+        wait: false,
       }),
     );
   });
@@ -127,6 +127,7 @@ describe('useNotification', () => {
       value: 'darwin',
     });
     process.env['TERM_PROGRAM'] = 'vscode';
+    process.env['__CFBundleIdentifier'] = 'com.microsoft.VSCode';
     const settings = createSettings(true);
 
     renderHook(() =>
@@ -140,11 +141,12 @@ describe('useNotification', () => {
     );
   });
 
-  it('should include activate option for Warp on macOS', () => {
+  it('should include activate option for WarpTerminal on macOS', () => {
     Object.defineProperty(process, 'platform', {
       value: 'darwin',
     });
     process.env['TERM_PROGRAM'] = 'WarpTerminal';
+    process.env['__CFBundleIdentifier'] = 'dev.warp.Warp';
     const settings = createSettings(true);
 
     renderHook(() =>
@@ -154,6 +156,26 @@ describe('useNotification', () => {
     expect(mockNotify).toHaveBeenCalledWith(
       expect.objectContaining({
         activate: 'dev.warp.Warp',
+      }),
+    );
+  });
+
+  it('should notify in unsupported terminal (Warp) even if focused', () => {
+    Object.defineProperty(process, 'platform', {
+      value: 'darwin',
+    });
+    process.env['TERM_PROGRAM'] = 'WarpTerminal';
+    const settings = createSettings(true);
+
+    renderHook(() =>
+      useNotification(StreamingState.WaitingForConfirmation, true, settings),
+    );
+
+    expect(mockNotify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Gemini CLI',
+        message: 'Requires Permission to Execute Command',
+        wait: false,
       }),
     );
   });
