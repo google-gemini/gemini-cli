@@ -485,13 +485,11 @@ describe('WebFetchTool', () => {
           args: { prompt: 'fetch https://example.com' },
         },
         correlationId: 'test-correlation-id',
-        // confirmationDetails is now included in the published request
-        confirmationDetails: {
-          type: 'info',
-          title: 'Confirm Web Fetch',
-          prompt: 'fetch https://example.com',
-          urls: ['https://example.com/'],
-        },
+        // For inline tools (not subagent), confirmationDetails is undefined since
+        // the inline ToolConfirmationMessage handles the UI, not the parent DialogManager.
+        // Subagent tools have _requiresParentUI=true which includes confirmationDetails.
+        confirmationDetails: undefined,
+        serverName: undefined,
       });
 
       expect(subscribeSpy).toHaveBeenCalledWith(

@@ -63,6 +63,13 @@ export interface ToolInvocation<
     updateOutput?: (output: string | AnsiOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<TResult>;
+
+  /**
+   * If true, the tool requires parent UI for confirmation (e.g., subagent tools).
+   * When set, confirmationDetails are included in MessageBus requests so the
+   * parent can display the standard confirmation dialog.
+   */
+  _requiresParentUI: boolean;
 }
 
 /**
@@ -73,6 +80,13 @@ export abstract class BaseToolInvocation<
   TResult extends ToolResult,
 > implements ToolInvocation<TParams, TResult>
 {
+  /**
+   * If true, the tool requires parent UI for confirmation (e.g., subagent tools).
+   * When set, confirmationDetails are included in MessageBus requests so the
+   * parent can display the standard confirmation dialog.
+   */
+  _requiresParentUI: boolean = false;
+
   constructor(
     readonly params: TParams,
     protected readonly messageBus?: MessageBus,
@@ -236,10 +250,13 @@ export abstract class BaseToolInvocation<
           responseHandler,
         );
 
-        // Convert confirmation details to serializable format for parent UI
-        const serializableDetails = confirmationDetails
-          ? this.serializeConfirmationDetails(confirmationDetails)
-          : undefined;
+        // Only serialize confirmation details for subagent tools that need parent UI.
+        // Normal inline tools have their own ToolConfirmationMessage and don't need
+        // the parent UI to show a duplicate dialog.
+        const serializableDetails =
+          confirmationDetails && this._requiresParentUI
+            ? this.serializeConfirmationDetails(confirmationDetails)
+            : undefined;
 
         const request: ToolConfirmationRequest = {
           type: MessageBusType.TOOL_CONFIRMATION_REQUEST,

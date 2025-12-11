@@ -684,14 +684,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
     if (slashCommandConfirmationRequest) {
       return slashCommandConfirmationRequest;
     }
-    if (toolConfirmationRequest) {
-      // Include the confirmation details for rich UI rendering
+    // Only show DialogManager confirmation for subagent tool requests that have
+    // confirmationDetails. Normal inline tools don't have confirmationDetails and
+    // are handled by the inline ToolConfirmationMessage in ToolGroupMessage.
+    if (toolConfirmationRequest?.confirmationDetails) {
       return {
         prompt: `Allow tool execution: ${toolConfirmationRequest.toolCall.name}(${JSON.stringify(
           toolConfirmationRequest.toolCall.args,
         )})?`,
         onConfirm: onToolConfirm,
-        // Pass through the confirmation details if available
         toolConfirmationDetails: toolConfirmationRequest.confirmationDetails,
         toolName: toolConfirmationRequest.toolCall.name,
       };

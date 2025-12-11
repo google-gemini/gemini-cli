@@ -349,6 +349,7 @@ export class CoreToolScheduler {
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
+  private ignoreToolConfirmationRequests: boolean;
   private isFinalizingToolCalls = false;
   private isScheduling = false;
   private isCancelling = false;
@@ -363,6 +364,8 @@ export class CoreToolScheduler {
 
   constructor(options: CoreToolSchedulerOptions) {
     this.config = options.config;
+    this.ignoreToolConfirmationRequests =
+      options.ignoreToolConfirmationRequests ?? false;
     this.outputUpdateHandler = options.outputUpdateHandler;
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
@@ -648,7 +651,13 @@ export class CoreToolScheduler {
     args: object,
   ): AnyToolInvocation | Error {
     try {
-      return tool.build(args);
+      const invocation = tool.build(args);
+      // For subagent tools (ignoreToolConfirmationRequests=true), set flag so
+      // confirmationDetails are included in MessageBus requests for parent UI.
+      if (this.ignoreToolConfirmationRequests) {
+        invocation._requiresParentUI = true;
+      }
+      return invocation;
     } catch (e) {
       if (e instanceof Error) {
         return e;
