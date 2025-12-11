@@ -1376,9 +1376,16 @@ describe('handleAtCommand', () => {
         signal: abortController.signal,
       });
 
-      // The @ in email should be parsed but not treated as a valid file path
-      expect(result.shouldProceed).toBe(true);
-      expect(result.processedQuery).toBeDefined();
+      // The @ in email is parsed as an @-path but not treated as a valid file path.
+      // Note: The parser adds a space before the @ when reconstructing the query.
+      // No tool calls should be made.
+      expect(result).toEqual({
+        processedQuery: [
+          { text: 'Contact me at user @example.com for more info.' },
+        ],
+        shouldProceed: true,
+      });
+      expect(mockAddItem).not.toHaveBeenCalled();
     });
 
     it('should handle multi-line prompts from external editor with @file on non-first line', async () => {
