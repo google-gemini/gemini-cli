@@ -36,6 +36,7 @@ import {
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
 import {
+  copyToClipboard,
   isAutoExecutableCommand,
   isSlashCommand,
 } from '../utils/commandUtils.js';
@@ -814,6 +815,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (keyMatchers[Command.PASTE_CLIPBOARD](key)) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleClipboardPaste();
+        return;
+      }
+
+      // Ctrl+Y for copying current input to clipboard
+      if (keyMatchers[Command.COPY_INPUT](key)) {
+        if (buffer.text) {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          copyToClipboard(buffer.text);
+        }
         return;
       }
 

@@ -55,6 +55,7 @@ export enum Command {
   // External tools
   OPEN_EXTERNAL_EDITOR = 'openExternalEditor',
   PASTE_CLIPBOARD = 'pasteClipboard',
+  COPY_INPUT = 'copyInput',
 
   // App level bindings
   SHOW_ERROR_DETAILS = 'showErrorDetails',
@@ -193,6 +194,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { sequence: '\x18', ctrl: true },
   ],
   [Command.PASTE_CLIPBOARD]: [{ key: 'v', ctrl: true }],
+  [Command.COPY_INPUT]: [{ key: 'y', ctrl: true }],
 
   // App level bindings
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
@@ -292,7 +294,11 @@ export const commandCategories: readonly CommandCategory[] = [
   },
   {
     title: 'External Tools',
-    commands: [Command.OPEN_EXTERNAL_EDITOR, Command.PASTE_CLIPBOARD],
+    commands: [
+      Command.OPEN_EXTERNAL_EDITOR,
+      Command.PASTE_CLIPBOARD,
+      Command.COPY_INPUT,
+    ],
   },
   {
     title: 'App Controls',
@@ -345,6 +351,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.OPEN_EXTERNAL_EDITOR]:
     'Open the current prompt in an external editor.',
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
+  [Command.COPY_INPUT]: 'Copy the current input to the clipboard.',
   [Command.SHOW_ERROR_DETAILS]: 'Toggle detailed error information.',
   [Command.SHOW_FULL_TODOS]: 'Toggle the full TODO list.',
   [Command.TOGGLE_IDE_CONTEXT_DETAIL]: 'Toggle IDE context details.',
