@@ -133,6 +133,13 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     }
 
     if (response) {
+      // Check for top-level isError (MCP Spec compliant)
+      const isErrorTop = (response as { isError?: boolean | string }).isError;
+      if (isErrorTop === true || isErrorTop === 'true') {
+        return true;
+      }
+
+      // Legacy check for nested error object (keep for backward compatibility if any tools rely on it)
       const error = (response as { error?: McpError })?.error;
       const isError = error?.isError;
 
