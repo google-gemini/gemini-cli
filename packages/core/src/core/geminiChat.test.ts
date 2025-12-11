@@ -20,12 +20,19 @@ import { setSimulate429 } from '../utils/testUtils.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_THINKING_MODE,
   PREVIEW_GEMINI_MODEL,
 } from '../config/models.js';
 import { AuthType } from './contentGenerator.js';
 import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
 import { retryWithBackoff, type RetryOptions } from '../utils/retry.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
+import { HookSystem } from '../hooks/hookSystem.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { createAvailabilityServiceMock } from '../availability/testUtils.js';
+import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
+import * as policyHelpers from '../availability/policyHelpers.js';
+import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -45,6 +52,10 @@ vi.mock('node:fs', () => {
       });
     }),
     existsSync: vi.fn((path: string) => mockFileSystem.has(path)),
+    createWriteStream: vi.fn(() => ({
+      write: vi.fn(),
+      on: vi.fn(),
+    })),
   };
 
   return {
@@ -62,9 +73,13 @@ const { mockRetryWithBackoff } = vi.hoisted(() => ({
   mockRetryWithBackoff: vi.fn(),
 }));
 
-vi.mock('../utils/retry.js', () => ({
-  retryWithBackoff: mockRetryWithBackoff,
-}));
+vi.mock('../utils/retry.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/retry.js')>();
+  return {
+    ...actual,
+    retryWithBackoff: mockRetryWithBackoff,
+  };
+});
 
 vi.mock('../fallback/handler.js', () => ({
   handleFallback: mockHandleFallback,
@@ -104,7 +119,14 @@ describe('GeminiChat', () => {
 
     mockHandleFallback.mockClear();
     // Default mock implementation for tests that don't care about retry logic
-    mockRetryWithBackoff.mockImplementation(async (apiCall) => apiCall());
+    mockRetryWithBackoff.mockImplementation(async (apiCall, options) => {
+      const result = await apiCall();
+      const context = options?.getAvailabilityContext?.();
+      if (context) {
+        context.service.markHealthy(context.policy.model);
+      }
+      return result;
+    });
     mockConfig = {
       getSessionId: () => 'test-session-id',
       getTelemetryLogPromptsEnabled: () => true,
@@ -130,28 +152,48 @@ describe('GeminiChat', () => {
       }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
+      getUserTier: vi.fn().mockReturnValue(undefined),
       modelConfigService: {
-        getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => ({
-          model: modelConfigKey.model,
-          generateContentConfig: {
-            temperature: 0,
-            thinkingConfig: {
-              thinkingBudget: 1000,
+        getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {
+          const thinkingConfig = modelConfigKey.model.startsWith('gemini-3')
+            ? {
+                thinkingLevel: ThinkingLevel.HIGH,
+              }
+            : {
+                thinkingBudget: DEFAULT_THINKING_MODE,
+              };
+          return {
+            model: modelConfigKey.model,
+            generateContentConfig: {
+              temperature: 0,
+              thinkingConfig,
             },
-          },
-        })),
+          };
+        }),
       },
       isPreviewModelBypassMode: vi.fn().mockReturnValue(false),
       setPreviewModelBypassMode: vi.fn(),
       isPreviewModelFallbackMode: vi.fn().mockReturnValue(false),
       setPreviewModelFallbackMode: vi.fn(),
       isInteractive: vi.fn().mockReturnValue(false),
+      getEnableHooks: vi.fn().mockReturnValue(false),
+      isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(false),
+      getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
+      setActiveModel: vi.fn(),
+      getModelAvailabilityService: vi.fn(),
     } as unknown as Config;
+
+    // Use proper MessageBus mocking for Phase 3 preparation
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
 
     // Disable 429 simulation for tests
     setSimulate429(false);
     // Reset history for each test by creating a new instance
     chat = new GeminiChat(mockConfig);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
   });
 
   afterEach(() => {
@@ -166,15 +208,15 @@ describe('GeminiChat', () => {
         { role: 'model', parts: [{ text: 'Hi there' }] },
       ];
       const chatWithHistory = new GeminiChat(mockConfig, '', [], history);
-      const estimatedTokens = Math.ceil(JSON.stringify(history).length / 4);
-      expect(chatWithHistory.getLastPromptTokenCount()).toBe(estimatedTokens);
+      // 'Hello': 5 chars * 0.25 = 1.25
+      // 'Hi there': 8 chars * 0.25 = 2.0
+      // Total: 3.25 -> floor(3.25) = 3
+      expect(chatWithHistory.getLastPromptTokenCount()).toBe(3);
     });
 
     it('should initialize lastPromptTokenCount for empty history', () => {
       const chatEmpty = new GeminiChat(mockConfig);
-      expect(chatEmpty.getLastPromptTokenCount()).toBe(
-        Math.ceil(JSON.stringify([]).length / 4),
-      );
+      expect(chatEmpty.getLastPromptTokenCount()).toBe(0);
     });
   });
 
@@ -976,7 +1018,7 @@ describe('GeminiChat', () => {
             tools: [],
             temperature: 0,
             thinkingConfig: {
-              thinkingBudget: 1000,
+              thinkingBudget: DEFAULT_THINKING_MODE,
             },
             abortSignal: expect.any(AbortSignal),
           },
@@ -1021,6 +1063,45 @@ describe('GeminiChat', () => {
           }),
         }),
         'prompt-id-thinking-level',
+      );
+    });
+
+    it('should use thinkingBudget and remove thinkingLevel for non-gemini-3 models', async () => {
+      const response = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'response' }], role: 'model' },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        response,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'hello',
+        'prompt-id-thinking-budget',
+        new AbortController().signal,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gemini-2.0-flash',
+          config: expect.objectContaining({
+            thinkingConfig: {
+              thinkingBudget: DEFAULT_THINKING_MODE,
+              thinkingLevel: undefined,
+            },
+          }),
+        }),
+        'prompt-id-thinking-budget',
       );
     });
   });
@@ -1829,7 +1910,7 @@ describe('GeminiChat', () => {
             error,
           );
           if (shouldRetry) {
-            return await apiCall();
+            return apiCall();
           }
         }
         throw error; // Stop if callback returns false/null or doesn't exist
@@ -1900,6 +1981,92 @@ describe('GeminiChat', () => {
       const history = chat.getHistory();
       const modelTurn = history[1]!;
       expect(modelTurn.parts![0]!.text).toBe('Success on retry');
+    });
+
+    it('should switch to DEFAULT_GEMINI_FLASH_MODEL and use thinkingBudget when falling back from a gemini-3 model', async () => {
+      // ARRANGE
+      const authType = AuthType.LOGIN_WITH_GOOGLE;
+      vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
+        authType,
+      });
+
+      // Initial state: Not in fallback mode
+      const isInFallbackModeSpy = vi.spyOn(mockConfig, 'isInFallbackMode');
+      isInFallbackModeSpy.mockReturnValue(false);
+
+      // Mock API calls:
+      // 1. Fails with 429 (simulating gemini-3 failure)
+      // 2. Succeeds (simulating fallback success)
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockRejectedValueOnce(error429)
+        .mockResolvedValueOnce(
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Fallback success' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
+
+      // Mock handleFallback to enable fallback mode and signal retry
+      mockHandleFallback.mockImplementation(async () => {
+        isInFallbackModeSpy.mockReturnValue(true); // Next call will see fallback mode = true
+        return true;
+      });
+
+      // ACT
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-3-test-model' }, // Start with a gemini-3 model
+        'test fallback thinking',
+        'prompt-id-fb3',
+        new AbortController().signal,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      // ASSERT
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        2,
+      );
+
+      // First call: gemini-3 model, thinkingLevel set
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          model: 'gemini-3-test-model',
+          config: expect.objectContaining({
+            thinkingConfig: {
+              thinkingBudget: undefined,
+              thinkingLevel: ThinkingLevel.HIGH,
+            },
+          }),
+        }),
+        'prompt-id-fb3',
+      );
+
+      // Second call: DEFAULT_GEMINI_FLASH_MODEL (due to fallback), thinkingBudget set (due to fix)
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          model: DEFAULT_GEMINI_FLASH_MODEL,
+          config: expect.objectContaining({
+            thinkingConfig: {
+              thinkingBudget: DEFAULT_THINKING_MODE,
+              thinkingLevel: undefined,
+            },
+          }),
+        }),
+        'prompt-id-fb3',
+      );
     });
 
     it('should stop retrying if handleFallback returns false (e.g., auth intent)', async () => {
@@ -2206,6 +2373,262 @@ describe('GeminiChat', () => {
       const history: Content[] = [{ role: 'user', parts: [{ text: 'Hello' }] }];
       const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
       expect(newContents).toEqual(history);
+    });
+  });
+
+  describe('Availability Service Integration', () => {
+    let mockAvailabilityService: ModelAvailabilityService;
+
+    beforeEach(async () => {
+      mockAvailabilityService = createAvailabilityServiceMock();
+      vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
+        mockAvailabilityService,
+      );
+      vi.mocked(mockConfig.isModelAvailabilityServiceEnabled).mockReturnValue(
+        true,
+      );
+
+      // Stateful mock for activeModel
+      let activeModel = 'model-a';
+      vi.mocked(mockConfig.getActiveModel).mockImplementation(
+        () => activeModel,
+      );
+      vi.mocked(mockConfig.setActiveModel).mockImplementation((model) => {
+        activeModel = model;
+      });
+
+      vi.spyOn(policyHelpers, 'resolvePolicyChain').mockReturnValue([
+        {
+          model: 'model-a',
+          isLastResort: false,
+          actions: {},
+          stateTransitions: {},
+        },
+        {
+          model: 'model-b',
+          isLastResort: false,
+          actions: {},
+          stateTransitions: {},
+        },
+        {
+          model: 'model-c',
+          isLastResort: true,
+          actions: {},
+          stateTransitions: {},
+        },
+      ]);
+    });
+
+    it('should mark healthy on successful stream', async () => {
+      vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
+        selectedModel: 'model-b',
+        skipped: [],
+      });
+      // Simulate selection happening upstream
+      mockConfig.setActiveModel('model-b');
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Response' }], role: 'model' },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'test',
+        'prompt-healthy',
+        new AbortController().signal,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(mockAvailabilityService.markHealthy).toHaveBeenCalledWith(
+        'model-b',
+      );
+    });
+
+    it('caps retries to a single attempt when selection is sticky', async () => {
+      vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
+        selectedModel: 'model-a',
+        attempts: 1,
+        skipped: [],
+      });
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Response' }], role: 'model' },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'test',
+        'prompt-sticky-once',
+        new AbortController().signal,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(mockRetryWithBackoff).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({ maxAttempts: 1 }),
+      );
+      expect(mockAvailabilityService.consumeStickyAttempt).toHaveBeenCalledWith(
+        'model-a',
+      );
+    });
+
+    it('should pass attempted model to onPersistent429 callback which calls handleFallback', async () => {
+      vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
+        selectedModel: 'model-a',
+        skipped: [],
+      });
+      // Simulate selection happening upstream
+      mockConfig.setActiveModel('model-a');
+
+      // Simulate retry logic behavior: catch error, call onPersistent429
+      const error = new TerminalQuotaError('Quota', {
+        code: 429,
+        message: 'quota',
+        details: [],
+      });
+      vi.mocked(mockContentGenerator.generateContentStream).mockRejectedValue(
+        error,
+      );
+
+      // We need retryWithBackoff to trigger the callback
+      mockRetryWithBackoff.mockImplementation(async (apiCall, options) => {
+        try {
+          await apiCall();
+        } catch (e) {
+          if (options?.onPersistent429) {
+            await options.onPersistent429(AuthType.LOGIN_WITH_GOOGLE, e);
+          }
+          throw e; // throw anyway to end test
+        }
+      });
+
+      const consume = async () => {
+        const stream = await chat.sendMessageStream(
+          { model: 'gemini-pro' },
+          'test',
+          'prompt-fallback-arg',
+          new AbortController().signal,
+        );
+        for await (const _ of stream) {
+          // consume
+        }
+      };
+
+      await expect(consume()).rejects.toThrow();
+
+      // handleFallback is called with the ATTEMPTED model (model-a), not the requested one (gemini-pro)
+      expect(mockHandleFallback).toHaveBeenCalledWith(
+        expect.anything(),
+        'model-a',
+        expect.anything(),
+        error,
+      );
+    });
+
+    it('re-resolves generateContentConfig when active model changes between retries', async () => {
+      // Availability enabled with stateful active model
+      let activeModel = 'model-a';
+      vi.mocked(mockConfig.getActiveModel).mockImplementation(
+        () => activeModel,
+      );
+      vi.mocked(mockConfig.setActiveModel).mockImplementation((model) => {
+        activeModel = model;
+      });
+
+      // Different configs per model
+      vi.mocked(mockConfig.modelConfigService.getResolvedConfig)
+        .mockReturnValueOnce(
+          makeResolvedModelConfig('model-a', { temperature: 0.1 }),
+        )
+        .mockReturnValueOnce(
+          makeResolvedModelConfig('model-b', { temperature: 0.9 }),
+        );
+
+      // First attempt uses model-a, then simulate availability switching to model-b
+      mockRetryWithBackoff.mockImplementation(async (apiCall) => {
+        await apiCall(); // first attempt
+        activeModel = 'model-b'; // simulate switch before retry
+        return apiCall(); // second attempt
+      });
+
+      // Generators for each attempt
+      const firstResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'first' }], role: 'model' },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      const secondResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'second' }], role: 'model' },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockResolvedValueOnce(firstResponse)
+        .mockResolvedValueOnce(secondResponse);
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'test',
+        'prompt-config-refresh',
+        new AbortController().signal,
+      );
+      // Consume to drive both attempts
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          model: 'model-a',
+          config: expect.objectContaining({ temperature: 0.1 }),
+        }),
+        expect.any(String),
+      );
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          model: 'model-b',
+          config: expect.objectContaining({ temperature: 0.9 }),
+        }),
+        expect.any(String),
+      );
     });
   });
 });

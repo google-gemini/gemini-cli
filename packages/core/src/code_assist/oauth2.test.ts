@@ -12,6 +12,7 @@ import {
   resetOauthClientForTesting,
   clearCachedCredentialFile,
   clearOauthClientCache,
+  authEvents,
 } from './oauth2.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import { OAuth2Client, Compute, GoogleAuth } from 'google-auth-library';
@@ -27,6 +28,7 @@ import readline from 'node:readline';
 import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { writeToStdout } from '../utils/stdio.js';
 
 vi.mock('os', async (importOriginal) => {
   const os = await importOriginal<typeof import('os')>();
@@ -43,6 +45,19 @@ vi.mock('crypto');
 vi.mock('node:readline');
 vi.mock('../utils/browser.js', () => ({
   shouldAttemptBrowserLaunch: () => true,
+}));
+vi.mock('../utils/stdio.js', () => ({
+  writeToStdout: vi.fn(),
+  writeToStderr: vi.fn(),
+  createWorkingStdio: vi.fn(() => ({
+    stdout: process.stdout,
+    stderr: process.stderr,
+  })),
+  enterAlternateScreen: vi.fn(),
+  exitAlternateScreen: vi.fn(),
+  enableLineWrapping: vi.fn(),
+  disableMouseEvents: vi.fn(),
+  disableKittyKeyboardProtocol: vi.fn(),
 }));
 
 vi.mock('./oauth-credential-storage.js', () => ({
@@ -95,13 +110,18 @@ describe('oauth2', () => {
       const mockGetAccessToken = vi
         .fn()
         .mockResolvedValue({ token: 'mock-access-token' });
+      let tokensListener: ((tokens: Credentials) => void) | undefined;
       const mockOAuth2Client = {
         generateAuthUrl: mockGenerateAuthUrl,
         getToken: mockGetToken,
         setCredentials: mockSetCredentials,
         getAccessToken: mockGetAccessToken,
         credentials: mockTokens,
-        on: vi.fn(),
+        on: vi.fn((event, listener) => {
+          if (event === 'tokens') {
+            tokensListener = listener;
+          }
+        }),
       } as unknown as OAuth2Client;
       vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
 
@@ -181,6 +201,11 @@ describe('oauth2', () => {
       });
       expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
 
+      // Manually trigger the 'tokens' event listener
+      if (tokensListener) {
+        await tokensListener(mockTokens);
+      }
+
       // Verify Google Account was cached
       const googleAccountPath = path.join(
         tempHomeDir,
@@ -201,7 +226,115 @@ describe('oauth2', () => {
       );
     });
 
+    it('should clear credentials file', async () => {
+      // Setup initial state with files
+      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+      await fs.promises.writeFile(credsPath, '{}');
+
+      await clearCachedCredentialFile();
+
+      expect(fs.existsSync(credsPath)).toBe(false);
+    });
+
+    it('should emit post_auth event when loading cached credentials', async () => {
+      const cachedCreds = { refresh_token: 'cached-token' };
+      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+      await fs.promises.writeFile(credsPath, JSON.stringify(cachedCreds));
+
+      const mockClient = {
+        setCredentials: vi.fn(),
+        getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+        getTokenInfo: vi.fn().mockResolvedValue({}),
+        on: vi.fn(),
+      };
+      vi.mocked(OAuth2Client).mockImplementation(
+        () => mockClient as unknown as OAuth2Client,
+      );
+
+      const eventPromise = new Promise<void>((resolve) => {
+        authEvents.once('post_auth', (creds) => {
+          expect(creds.refresh_token).toBe('cached-token');
+          resolve();
+        });
+      });
+
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+      await eventPromise;
+    });
+
     it('should perform login with user code', async () => {
+      const mockConfigWithNoBrowser = {
+        getNoBrowser: () => true,
+        getProxy: () => 'http://test.proxy.com:8080',
+        isBrowserLaunchSuppressed: () => true,
+      } as unknown as Config;
+
+      const mockCodeVerifier = {
+        codeChallenge: 'test-challenge',
+        codeVerifier: 'test-verifier',
+      };
+      const mockAuthUrl = 'https://example.com/auth-user-code';
+      const mockCode = 'test-user-code';
+
+      const mockTokens = {
+        access_token: 'test-access-token-user-code',
+        refresh_token: 'test-refresh-token-user-code',
+      };
+
+      const mockGenerateAuthUrl = vi.fn().mockReturnValue(mockAuthUrl);
+      const mockGetToken = vi.fn().mockResolvedValue({ tokens: mockTokens });
+      const mockGenerateCodeVerifierAsync = vi
+        .fn()
+        .mockResolvedValue(mockCodeVerifier);
+
+      const mockOAuth2Client = {
+        generateAuthUrl: mockGenerateAuthUrl,
+        getToken: mockGetToken,
+        generateCodeVerifierAsync: mockGenerateCodeVerifierAsync,
+        on: vi.fn(),
+        credentials: {},
+      } as unknown as OAuth2Client;
+      mockOAuth2Client.setCredentials = vi.fn().mockImplementation((creds) => {
+        mockOAuth2Client.credentials = creds;
+      });
+      vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+
+      const mockReadline = {
+        question: vi.fn((_query, callback) => callback(mockCode)),
+        close: vi.fn(),
+        on: vi.fn(),
+      };
+      (readline.createInterface as Mock).mockReturnValue(mockReadline);
+
+      const client = await getOauthClient(
+        AuthType.LOGIN_WITH_GOOGLE,
+        mockConfigWithNoBrowser,
+      );
+
+      expect(client).toBe(mockOAuth2Client);
+
+      // Verify the auth flow
+      expect(mockGenerateCodeVerifierAsync).toHaveBeenCalled();
+      expect(mockGenerateAuthUrl).toHaveBeenCalled();
+      expect(vi.mocked(writeToStdout)).toHaveBeenCalledWith(
+        expect.stringContaining(mockAuthUrl),
+      );
+      expect(mockReadline.question).toHaveBeenCalledWith(
+        'Enter the authorization code: ',
+        expect.any(Function),
+      );
+      expect(mockGetToken).toHaveBeenCalledWith({
+        code: mockCode,
+        codeVerifier: mockCodeVerifier.codeVerifier,
+        redirect_uri: 'https://codeassist.google.com/authcode',
+      });
+      expect(mockOAuth2Client.setCredentials).toHaveBeenCalledWith(mockTokens);
+    });
+
+    it('should cache Google Account when logging in with user code', async () => {
       const mockConfigWithNoBrowser = {
         getNoBrowser: () => true,
         getProxy: () => 'http://test.proxy.com:8080',
@@ -221,55 +354,60 @@ describe('oauth2', () => {
 
       const mockGenerateAuthUrl = vi.fn().mockReturnValue(mockAuthUrl);
       const mockGetToken = vi.fn().mockResolvedValue({ tokens: mockTokens });
-      const mockSetCredentials = vi.fn();
       const mockGenerateCodeVerifierAsync = vi
         .fn()
         .mockResolvedValue(mockCodeVerifier);
+      const mockGetAccessToken = vi
+        .fn()
+        .mockResolvedValue({ token: 'test-access-token-user-code' });
 
       const mockOAuth2Client = {
         generateAuthUrl: mockGenerateAuthUrl,
         getToken: mockGetToken,
-        setCredentials: mockSetCredentials,
         generateCodeVerifierAsync: mockGenerateCodeVerifierAsync,
+        getAccessToken: mockGetAccessToken,
         on: vi.fn(),
+        credentials: {},
       } as unknown as OAuth2Client;
+      mockOAuth2Client.setCredentials = vi.fn().mockImplementation((creds) => {
+        mockOAuth2Client.credentials = creds;
+      });
       vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+
+      vi.spyOn(crypto, 'randomBytes').mockReturnValue('test-state' as never);
 
       const mockReadline = {
         question: vi.fn((_query, callback) => callback(mockCode)),
         close: vi.fn(),
+        on: vi.fn(),
       };
       (readline.createInterface as Mock).mockReturnValue(mockReadline);
 
-      const consoleLogSpy = vi
-        .spyOn(debugLogger, 'log')
-        .mockImplementation(() => {});
+      // Mock User Info API
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        json: vi
+          .fn()
+          .mockResolvedValue({ email: 'test-user-code-account@gmail.com' }),
+      } as unknown as Response);
 
-      const client = await getOauthClient(
-        AuthType.LOGIN_WITH_GOOGLE,
-        mockConfigWithNoBrowser,
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfigWithNoBrowser);
+
+      // Verify Google Account was cached
+      const googleAccountPath = path.join(
+        tempHomeDir,
+        GEMINI_DIR,
+        'google_accounts.json',
       );
 
-      expect(client).toBe(mockOAuth2Client);
-
-      // Verify the auth flow
-      expect(mockGenerateCodeVerifierAsync).toHaveBeenCalled();
-      expect(mockGenerateAuthUrl).toHaveBeenCalled();
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining(mockAuthUrl),
-      );
-      expect(mockReadline.question).toHaveBeenCalledWith(
-        'Enter the authorization code: ',
-        expect.any(Function),
-      );
-      expect(mockGetToken).toHaveBeenCalledWith({
-        code: mockCode,
-        codeVerifier: mockCodeVerifier.codeVerifier,
-        redirect_uri: 'https://codeassist.google.com/authcode',
-      });
-      expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
-
-      consoleLogSpy.mockRestore();
+      expect(fs.existsSync(googleAccountPath)).toBe(true);
+      if (fs.existsSync(googleAccountPath)) {
+        const cachedGoogleAccount = fs.readFileSync(googleAccountPath, 'utf-8');
+        expect(JSON.parse(cachedGoogleAccount)).toEqual({
+          active: 'test-user-code-account@gmail.com',
+          old: [],
+        });
+      }
     });
 
     describe('in Cloud Shell', () => {
@@ -835,12 +973,17 @@ describe('oauth2', () => {
         const mockOAuth2Client = {
           generateAuthUrl: vi.fn().mockReturnValue(mockAuthUrl),
           getToken: vi.fn().mockResolvedValue({ tokens: mockTokens }),
-          setCredentials: vi.fn(),
           getAccessToken: vi
             .fn()
             .mockResolvedValue({ token: 'test-access-token' }),
           on: vi.fn(),
+          credentials: {},
         } as unknown as OAuth2Client;
+        mockOAuth2Client.setCredentials = vi
+          .fn()
+          .mockImplementation((creds) => {
+            mockOAuth2Client.credentials = creds;
+          });
         vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
 
         vi.spyOn(crypto, 'randomBytes').mockReturnValue(mockState as never);
@@ -932,6 +1075,7 @@ describe('oauth2', () => {
         const mockReadline = {
           question: vi.fn((_query, callback) => callback('invalid-code')),
           close: vi.fn(),
+          on: vi.fn(),
         };
         (readline.createInterface as Mock).mockReturnValue(mockReadline);
 

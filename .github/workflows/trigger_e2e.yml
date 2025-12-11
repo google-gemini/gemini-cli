@@ -3,11 +3,15 @@ name: 'Trigger E2E'
 on:
   workflow_dispatch:
     inputs:
-      branch_ref:
-        description: 'Branch to run on'
-        required: true
-        default: 'main'
+      repo_name:
+        description: 'Repository name (e.g., owner/repo)'
+        required: false
         type: 'string'
+      head_sha:
+        description: 'SHA of the commit to test'
+        required: false
+        type: 'string'
+  pull_request:
 
 jobs:
   save_repo_name:
@@ -15,11 +19,12 @@ jobs:
     steps:
       - name: 'Save Repo name'
         env:
-          # Replace with github.event.pull_request.head.repo.full_name when switched to listen on pull request events. This repo name does not contain the org which is needed for checkout.
-          REPO_NAME: '${{ github.event.repository.name }}'
+          REPO_NAME: '${{ github.event.inputs.repo_name || github.event.pull_request.head.repo.full_name }}'
+          HEAD_SHA: '${{ github.event.inputs.head_sha || github.event.pull_request.head.sha }}'
         run: |
           mkdir -p ./pr
           echo '${{ env.REPO_NAME }}' > ./pr/repo_name
+          echo '${{ env.HEAD_SHA }}' > ./pr/head_sha
       - uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
           name: 'repo_name'

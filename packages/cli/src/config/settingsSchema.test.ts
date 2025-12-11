@@ -346,19 +346,30 @@ describe('SettingsSchema', () => {
       ).toBe('Enable preview features (e.g., preview models).');
     });
 
-    it('should have useModelRouter setting in schema', () => {
-      expect(
-        getSettingsSchema().experimental.properties.useModelRouter,
-      ).toBeDefined();
-      expect(
-        getSettingsSchema().experimental.properties.useModelRouter.type,
-      ).toBe('boolean');
-      expect(
-        getSettingsSchema().experimental.properties.useModelRouter.category,
-      ).toBe('Experimental');
-      expect(
-        getSettingsSchema().experimental.properties.useModelRouter.default,
-      ).toBe(true);
+    it('should have enableAgents setting in schema', () => {
+      const setting = getSettingsSchema().experimental.properties.enableAgents;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Experimental');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(false);
+      expect(setting.description).toBe('Enable local and remote subagents.');
+    });
+
+    it('should have isModelAvailabilityServiceEnabled setting in schema', () => {
+      const setting =
+        getSettingsSchema().experimental.properties
+          .isModelAvailabilityServiceEnabled;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Experimental');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(false);
+      expect(setting.description).toBe(
+        'Enable model routing using new availability service.',
+      );
     });
   });
 

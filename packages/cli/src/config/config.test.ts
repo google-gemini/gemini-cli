@@ -9,12 +9,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
-  DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
   OutputFormat,
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
   type ExtensionLoader,
   debugLogger,
 } from '@google/gemini-cli-core';
@@ -437,37 +436,15 @@ describe('parseArguments', () => {
     debugErrorSpy.mockRestore();
   });
 
-  it('should throw an error when resuming a session without prompt in non-interactive mode', async () => {
+  it('should allow resuming a session without prompt argument in non-interactive mode (expecting stdin)', async () => {
     const originalIsTTY = process.stdin.isTTY;
     process.stdin.isTTY = false;
     process.argv = ['node', 'script.js', '--resume', 'session-id'];
 
-    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
-
-    const mockConsoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
-    const debugErrorSpy = vi
-      .spyOn(debugLogger, 'error')
-      .mockImplementation(() => {});
-
     try {
-      await expect(parseArguments({} as Settings)).rejects.toThrow(
-        'process.exit called',
-      );
-
-      expect(debugErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'When resuming a session, you must provide a message via --prompt (-p) or stdin',
-        ),
-      );
-      expect(mockConsoleError).toHaveBeenCalled();
+      const argv = await parseArguments({} as Settings);
+      expect(argv.resume).toBe('session-id');
     } finally {
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
-      debugErrorSpy.mockRestore();
       process.stdin.isTTY = originalIsTTY;
     }
   });
@@ -655,6 +632,14 @@ describe('loadCliConfig', () => {
       DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
     );
   });
+
+  it('should default enableMessageBusIntegration to true when unconfigured', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config['enableMessageBusIntegration']).toBe(true);
+  });
 });
 
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
@@ -717,39 +702,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       undefined, // maxDirs
     );
   });
-
-  // NOTE TO FUTURE DEVELOPERS:
-  // To re-enable tests for loadHierarchicalGeminiMemory, ensure that:
-  // 1. os.homedir() is reliably mocked *before* the config.ts module is loaded
-  //    and its functions (which use os.homedir()) are called.
-  // 2. fs/promises and fs mocks correctly simulate file/directory existence,
-  //    readability, and content based on paths derived from the mocked os.homedir().
-  // 3. Spies on console functions (for logger output) are correctly set up if needed.
-  // Example of a previously failing test structure:
-  it.skip('should correctly use mocked homedir for global path', async () => {
-    // This test is skipped because mockFs and fsPromises are not properly imported/mocked
-    // TODO: Fix this test by properly setting up mock-fs and fs/promises mocks
-    /*
-    const MOCK_GEMINI_DIR_LOCAL = path.join(
-      '/mock/home/user',
-      ServerConfig.GEMINI_DIR,
-    );
-    const MOCK_GLOBAL_PATH_LOCAL = path.join(
-      MOCK_GEMINI_DIR_LOCAL,
-      'GEMINI.md',
-    );
-    mockFs({
-      [MOCK_GLOBAL_PATH_LOCAL]: { type: 'file', content: 'GlobalContentOnly' },
-    });
-    const memory = await loadHierarchicalGeminiMemory('/some/other/cwd', false);
-    expect(memory).toBe('GlobalContentOnly');
-    expect(vi.mocked(os.homedir)).toHaveBeenCalled();
-    expect(fsPromises.readFile).toHaveBeenCalledWith(
-      MOCK_GLOBAL_PATH_LOCAL,
-      'utf-8',
-    );
-    */
-  });
 });
 
 describe('mergeMcpServers', () => {
@@ -791,6 +743,7 @@ describe('mergeExcludeTools', () => {
     SHELL_TOOL_NAME,
     EDIT_TOOL_NAME,
     WRITE_FILE_TOOL_NAME,
+    WEB_FETCH_TOOL_NAME,
   ]);
   const originalIsTTY = process.stdin.isTTY;
 
@@ -1364,100 +1317,6 @@ describe('loadCliConfig model selection', () => {
   });
 });
 
-describe('loadCliConfig model selection with model router', () => {
-  beforeEach(() => {
-    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
-  });
-
-  afterEach(() => {
-    vi.resetAllMocks();
-  });
-
-  it('should use auto model when useModelRouter is true and no model is provided', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(
-      {
-        experimental: {
-          useModelRouter: true,
-        },
-      },
-      'test-session',
-      argv,
-    );
-
-    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
-  });
-
-  it('should use default model when useModelRouter is false and no model is provided', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(
-      {
-        experimental: {
-          useModelRouter: false,
-        },
-      },
-      'test-session',
-      argv,
-    );
-
-    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
-  });
-
-  it('should prioritize argv over useModelRouter', async () => {
-    process.argv = ['node', 'script.js', '--model', 'gemini-from-argv'];
-    const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(
-      {
-        experimental: {
-          useModelRouter: true,
-        },
-      },
-      'test-session',
-      argv,
-    );
-
-    expect(config.getModel()).toBe('gemini-from-argv');
-  });
-
-  it('should prioritize settings over useModelRouter', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(
-      {
-        experimental: {
-          useModelRouter: true,
-        },
-        model: {
-          name: 'gemini-from-settings',
-        },
-      },
-      'test-session',
-      argv,
-    );
-
-    expect(config.getModel()).toBe('gemini-from-settings');
-  });
-
-  it('should prioritize environment variable over useModelRouter', async () => {
-    process.argv = ['node', 'script.js'];
-    vi.stubEnv('GEMINI_MODEL', 'gemini-from-env');
-    const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(
-      {
-        experimental: {
-          useModelRouter: true,
-        },
-      },
-      'test-session',
-      argv,
-    );
-
-    expect(config.getModel()).toBe('gemini-from-env');
-  });
-});
-
 describe('loadCliConfig folderTrust', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -1633,32 +1492,6 @@ describe('loadCliConfig useRipgrep', () => {
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getUseRipgrep()).toBe(true);
   });
-
-  describe('loadCliConfig useModelRouter', () => {
-    it('should be true by default when useModelRouter is not set in settings', async () => {
-      process.argv = ['node', 'script.js'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = {};
-      const config = await loadCliConfig(settings, 'test-session', argv);
-      expect(config.getUseModelRouter()).toBe(true);
-    });
-
-    it('should be true when useModelRouter is set to true in settings', async () => {
-      process.argv = ['node', 'script.js'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = { experimental: { useModelRouter: true } };
-      const config = await loadCliConfig(settings, 'test-session', argv);
-      expect(config.getUseModelRouter()).toBe(true);
-    });
-
-    it('should be false when useModelRouter is explicitly set to false in settings', async () => {
-      process.argv = ['node', 'script.js'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = { experimental: { useModelRouter: false } };
-      const config = await loadCliConfig(settings, 'test-session', argv);
-      expect(config.getUseModelRouter()).toBe(false);
-    });
-  });
 });
 
 describe('screenReader configuration', () => {
@@ -1787,6 +1620,29 @@ describe('loadCliConfig tool exclusions', () => {
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getExcludeTools()).not.toContain(SHELL_TOOL_NAME);
+  });
+
+  it('should exclude web-fetch in non-interactive mode when not allowed', async () => {
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js', '-p', 'test'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.getExcludeTools()).toContain(WEB_FETCH_TOOL_NAME);
+  });
+
+  it('should not exclude web-fetch in non-interactive mode when allowed', async () => {
+    process.stdin.isTTY = false;
+    process.argv = [
+      'node',
+      'script.js',
+      '-p',
+      'test',
+      '--allowed-tools',
+      WEB_FETCH_TOOL_NAME,
+    ];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.getExcludeTools()).not.toContain(WEB_FETCH_TOOL_NAME);
   });
 
   it('should not exclude shell tool in non-interactive mode when --allowed-tools="run_shell_command" is set', async () => {

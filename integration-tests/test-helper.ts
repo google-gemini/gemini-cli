@@ -159,6 +159,14 @@ interface ParsedLog {
     success?: boolean;
     duration_ms?: number;
     request_text?: string;
+    hook_event_name?: string;
+    hook_name?: string;
+    hook_input?: Record<string, unknown>;
+    hook_output?: Record<string, unknown>;
+    exit_code?: number;
+    stdout?: string;
+    stderr?: string;
+    error?: string;
   };
   scopeMetrics?: {
     metrics: {
@@ -320,6 +328,9 @@ export class TestRig {
         auth: {
           selectedType: 'gemini-api-key',
         },
+      },
+      ui: {
+        useAlternateBuffer: true,
       },
       model: DEFAULT_GEMINI_MODEL,
       sandbox:
@@ -949,6 +960,16 @@ export class TestRig {
     return logs;
   }
 
+  readAllApiRequest(): ParsedLog[] {
+    const logs = this._readAndParseTelemetryLog();
+    const apiRequests = logs.filter(
+      (logData) =>
+        logData.attributes &&
+        logData.attributes['event.name'] === 'gemini_cli.api_request',
+    );
+    return apiRequests;
+  }
+
   readLastApiRequest(): ParsedLog | null {
     const logs = this._readAndParseTelemetryLog();
     const apiRequests = logs.filter(
@@ -1003,11 +1024,28 @@ export class TestRig {
     return null;
   }
 
-  async runInteractive(...args: string[]): Promise<InteractiveRun> {
-    const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
-    const commandArgs = [...initialArgs, ...args];
+  async runInteractive(
+    options?: { yolo?: boolean } | string,
+    ...args: string[]
+  ): Promise<InteractiveRun> {
+    // Handle backward compatibility: if first param is a string, treat as arg
+    let yolo = true; // Default to YOLO mode
+    let additionalArgs: string[] = args;
 
-    const options: pty.IPtyForkOptions = {
+    if (typeof options === 'string') {
+      // Old-style call: runInteractive('--debug')
+      additionalArgs = [options, ...args];
+    } else if (typeof options === 'object' && options !== null) {
+      // New-style call: runInteractive({ yolo: false })
+      yolo = options.yolo !== false;
+    }
+
+    const { command, initialArgs } = this._getCommandAndArgs(
+      yolo ? ['--yolo'] : [],
+    );
+    const commandArgs = [...initialArgs, ...additionalArgs];
+
+    const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
       rows: 80,
@@ -1018,11 +1056,73 @@ export class TestRig {
     };
 
     const executable = command === 'node' ? process.execPath : command;
-    const ptyProcess = pty.spawn(executable, commandArgs, options);
+    const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
 
     const run = new InteractiveRun(ptyProcess);
     // Wait for the app to be ready
     await run.expectText('  Type your message or @path/to/file', 30000);
     return run;
+  }
+
+  readHookLogs() {
+    const parsedLogs = this._readAndParseTelemetryLog();
+    const logs: {
+      hookCall: {
+        hook_event_name: string;
+        hook_name: string;
+        hook_input: Record<string, unknown>;
+        hook_output: Record<string, unknown>;
+        exit_code: number;
+        stdout: string;
+        stderr: string;
+        duration_ms: number;
+        success: boolean;
+        error: string;
+      };
+    }[] = [];
+
+    for (const logData of parsedLogs) {
+      // Look for tool call logs
+      if (
+        logData.attributes &&
+        logData.attributes['event.name'] === 'gemini_cli.hook_call'
+      ) {
+        logs.push({
+          hookCall: {
+            hook_event_name: logData.attributes.hook_event_name ?? '',
+            hook_name: logData.attributes.hook_name ?? '',
+            hook_input: logData.attributes.hook_input ?? {},
+            hook_output: logData.attributes.hook_output ?? {},
+            exit_code: logData.attributes.exit_code ?? 0,
+            stdout: logData.attributes.stdout ?? '',
+            stderr: logData.attributes.stderr ?? '',
+            duration_ms: logData.attributes.duration_ms ?? 0,
+            success: logData.attributes.success ?? false,
+            error: logData.attributes.error ?? '',
+          },
+        });
+      }
+    }
+
+    return logs;
+  }
+
+  async pollCommand(
+    commandFn: () => Promise<void>,
+    predicateFn: () => boolean,
+    timeout: number = 30000,
+    interval: number = 1000,
+  ) {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      await commandFn();
+      // Give it a moment to process
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      if (predicateFn()) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+    throw new Error(`pollCommand timed out after ${timeout}ms`);
   }
 }

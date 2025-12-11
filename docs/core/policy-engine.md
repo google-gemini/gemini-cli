@@ -1,4 +1,4 @@
-# Policy Engine
+# Policy engine
 
 :::note This feature is currently in testing. To enable it, set
 `tools.enableMessageBusIntegration` to `true` in your `settings.json` file. :::
@@ -49,7 +49,7 @@ The `toolName` in the rule must match the name of the tool being called.
   wildcard. A `toolName` of `my-server__*` will match any tool from the
   `my-server` MCP.
 
-#### Arguments Pattern
+#### Arguments pattern
 
 If `argsPattern` is specified, the tool's arguments are converted to a stable
 JSON string, which is then tested against the provided regular expression. If
@@ -64,7 +64,7 @@ There are three possible decisions a rule can enforce:
 - `ask_user`: The user is prompted to approve or deny the tool call. (In
   non-interactive mode, this is treated as `deny`.)
 
-### Priority system & tiers
+### Priority system and tiers
 
 The policy engine uses a sophisticated priority system to resolve conflicts when
 multiple rules match a single tool call. The core principle is simple: **the
@@ -112,12 +112,12 @@ outcome.
 
 A rule matches a tool call if all of its conditions are met:
 
-1.  **Tool Name**: The `toolName` in the rule must match the name of the tool
+1.  **Tool name**: The `toolName` in the rule must match the name of the tool
     being called.
     - **Wildcards**: For Model-hosting-protocol (MCP) servers, you can use a
       wildcard. A `toolName` of `my-server__*` will match any tool from the
       `my-server` MCP.
-2.  **Arguments Pattern**: If `argsPattern` is specified, the tool's arguments
+2.  **Arguments pattern**: If `argsPattern` is specified, the tool's arguments
     are converted to a stable JSON string, which is then tested against the
     provided regular expression. If the arguments don't match the pattern, the
     rule does not apply.
@@ -220,7 +220,7 @@ decision = "allow"
 priority = 200
 ```
 
-**2. Using a Wildcard**
+**2. Using a wildcard**
 
 To create a rule that applies to _all_ tools on a specific MCP server, specify
 only the `mcpName`.
@@ -239,6 +239,8 @@ The Gemini CLI ships with a set of default policies to provide a safe
 out-of-the-box experience.
 
 - **Read-only tools** (like `read_file`, `glob`) are generally **allowed**.
+- **Agent delegation** (like `delegate_to_agent`) is **allowed** (sub-agent
+  actions are checked individually).
 - **Write tools** (like `write_file`, `run_shell_command`) default to
   **`ask_user`**.
 - In **`yolo`** mode, a high-priority rule allows all tools.

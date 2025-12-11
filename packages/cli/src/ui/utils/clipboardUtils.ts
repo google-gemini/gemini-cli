@@ -11,6 +11,22 @@ import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
 import Clipboard from '@crosscopy/clipboard';
 
 /**
+ * Supported image file extensions based on Gemini API.
+ * See: https://ai.google.dev/gemini-api/docs/image-understanding
+ */
+export const IMAGE_EXTENSIONS = [
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.webp',
+  '.heic',
+  '.heif',
+  '.tiff',
+  '.gif',
+  '.bmp',
+];
+
+/**
  * Detects if the system is running in WSL (Windows Subsystem for Linux)
  * @returns true if running in WSL
  */
@@ -193,12 +209,12 @@ async function wslSaveClipboardImage(
 export async function clipboardHasImage(): Promise<boolean> {
   // Check if running in WSL
   if (isWSL()) {
-    return await wslClipboardHasImage();
+    return wslClipboardHasImage();
   }
 
   // Use cross-platform clipboard library
   try {
-    return await Clipboard.hasImage();
+    return Clipboard.hasImage();
   } catch (error) {
     debugLogger.warn('Error checking clipboard for image:', error);
     return false;
@@ -276,7 +292,7 @@ export async function saveClipboardImage(
 ): Promise<string | null> {
   // Check if running in WSL
   if (isWSL()) {
-    return await wslSaveClipboardImage(targetDir);
+    return wslSaveClipboardImage(targetDir);
   }
 
   // Use cross-platform clipboard library
@@ -345,10 +361,10 @@ export async function cleanupOldClipboardImages(
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
     for (const file of files) {
+      const ext = path.extname(file).toLowerCase();
       if (
-        file.match(
-          /^(clipboard-\d+|image-\d+)\.(png|jpg|jpeg|tiff|gif|bmp|webp)$/,
-        )
+        (file.startsWith('clipboard-') || file.startsWith('image-')) &&
+        IMAGE_EXTENSIONS.includes(ext)
       ) {
         const filePath = path.join(tempDir, file);
         const stats = await fs.stat(filePath);

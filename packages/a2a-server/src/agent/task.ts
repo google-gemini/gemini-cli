@@ -15,6 +15,7 @@ import {
   isNodeError,
   parseAndFormatApiError,
   safeLiteralReplace,
+  DEFAULT_GUI_EDITOR,
   type AnyDeclarativeTool,
   type ToolCall,
   type ToolConfirmationPayload,
@@ -26,6 +27,8 @@ import {
   type Config,
   type UserTierId,
   type AnsiOutput,
+  EDIT_TOOL_NAMES,
+  processRestorableToolCalls,
 } from '@google/gemini-cli-core';
 import type { RequestContext } from '@a2a-js/sdk/server';
 import { type ExecutionEventBus } from '@a2a-js/sdk/server';
@@ -39,7 +42,8 @@ import type {
 } from '@a2a-js/sdk';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { CoderAgentEvent } from '../types.js';
 import type {
   CoderAgentMessage,
@@ -66,6 +70,9 @@ export class Task {
   eventBus?: ExecutionEventBus;
   completedToolCalls: CompletedToolCall[];
   skipFinalTrueAfterInlineEdit = false;
+  modelInfo?: string;
+  currentPromptId: string | undefined;
+  promptCount = 0;
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
@@ -135,7 +142,7 @@ export class Task {
       id: this.id,
       contextId: this.contextId,
       taskState: this.taskState,
-      model: this.config.getModel(),
+      model: this.modelInfo || this.config.getModel(),
       mcpServers: servers,
       availableTools,
     };
@@ -230,7 +237,7 @@ export class Task {
       traceId?: string;
     } = {
       coderAgent: coderAgentMessage,
-      model: this.config.getModel(),
+      model: this.modelInfo || this.config.getModel(),
       userTier: this.config.getUserTier(),
     };
 
@@ -393,6 +400,7 @@ export class Task {
       logger.info('[Task] YOLO mode enabled. Auto-approving all tool calls.');
       toolCalls.forEach((tc: ToolCall) => {
         if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           tc.confirmationDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
           this.pendingToolConfirmationDetails.delete(tc.request.callId);
         }
@@ -434,7 +442,7 @@ export class Task {
       outputUpdateHandler: this._schedulerOutputUpdate.bind(this),
       onAllToolCallsComplete: this._schedulerAllToolCallsComplete.bind(this),
       onToolCallsUpdate: this._schedulerToolCallsUpdate.bind(this),
-      getPreferredEditor: () => 'vscode',
+      getPreferredEditor: () => DEFAULT_GUI_EDITOR,
       config: this.config,
     });
     return scheduler;
@@ -460,7 +468,7 @@ export class Task {
   ): Message {
     const messageParts: Part[] = [];
 
-    // Create a serializable version of the ToolCall (pick necesssary
+    // Create a serializable version of the ToolCall (pick necessary
     // properties/avoid methods causing circular reference errors)
     const serializableToolCall: Partial<ToolCall> = this._pickFields(
       tc,
@@ -506,7 +514,7 @@ export class Task {
     new_string: string,
   ): Promise<string> {
     try {
-      const currentContent = fs.readFileSync(file_path, 'utf8');
+      const currentContent = await fs.readFile(file_path, 'utf8');
       return this._applyReplacement(
         currentContent,
         old_string,
@@ -547,6 +555,44 @@ export class Task {
   ): Promise<void> {
     if (requests.length === 0) {
       return;
+    }
+
+    // Set checkpoint file before any file modification tool executes
+    const restorableToolCalls = requests.filter((request) =>
+      EDIT_TOOL_NAMES.has(request.name),
+    );
+
+    if (restorableToolCalls.length > 0) {
+      const gitService = await this.config.getGitService();
+      if (gitService) {
+        const { checkpointsToWrite, toolCallToCheckpointMap, errors } =
+          await processRestorableToolCalls(
+            restorableToolCalls,
+            gitService,
+            this.geminiClient,
+          );
+
+        if (errors.length > 0) {
+          errors.forEach((error) => logger.error(error));
+        }
+
+        if (checkpointsToWrite.size > 0) {
+          const checkpointDir =
+            this.config.storage.getProjectTempCheckpointsDir();
+          await fs.mkdir(checkpointDir, { recursive: true });
+          for (const [fileName, content] of checkpointsToWrite) {
+            const filePath = path.join(checkpointDir, fileName);
+            await fs.writeFile(filePath, content);
+          }
+        }
+
+        for (const request of requests) {
+          const checkpoint = toolCallToCheckpointMap.get(request.callId);
+          if (checkpoint) {
+            request.checkpoint = checkpoint;
+          }
+        }
+      }
     }
 
     const updatedRequests = await Promise.all(
@@ -647,6 +693,9 @@ export class Task {
       case GeminiEventType.Finished:
         logger.info(`[Task ${this.id}] Agent finished its turn.`);
         break;
+      case GeminiEventType.ModelInfo:
+        this.modelInfo = event.value;
+        break;
       case GeminiEventType.Error:
       default: {
         // Block scope for lexical declaration
@@ -658,7 +707,7 @@ export class Task {
           errorMessage,
         );
 
-        let errMessage = 'Unknown error from LLM stream';
+        let errMessage = `Unknown error from LLM stream: ${JSON.stringify(event)}`;
         if (errorEvent.value) {
           errMessage = parseAndFormatApiError(errorEvent.value);
         }
@@ -742,7 +791,14 @@ export class Task {
               } as ToolConfirmationPayload)
             : undefined;
           this.skipFinalTrueAfterInlineEdit = !!payload;
-          await confirmationDetails.onConfirm(confirmationOutcome, payload);
+          try {
+            await confirmationDetails.onConfirm(confirmationOutcome, payload);
+          } finally {
+            // Once confirmationDetails.onConfirm finishes (or fails) with a payload,
+            // reset skipFinalTrueAfterInlineEdit so that external callers receive
+            // their call has been completed.
+            this.skipFinalTrueAfterInlineEdit = false;
+          }
         } else {
           await confirmationDetails.onConfirm(confirmationOutcome);
         }
@@ -814,6 +870,7 @@ export class Task {
       } else {
         parts = [response];
       }
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       this.geminiClient.addHistory({
         role: 'user',
         parts,
@@ -852,11 +909,10 @@ export class Task {
     };
     // Set task state to working as we are about to call LLM
     this.setTaskStateAndPublishUpdate('working', stateChange);
-    // TODO: Determine what it mean to have, then add a prompt ID.
     yield* this.geminiClient.sendMessageStream(
       llmParts,
       aborted,
-      /*prompt_id*/ '',
+      completedToolCalls[0]?.request.prompt_id ?? '',
     );
   }
 
@@ -886,17 +942,18 @@ export class Task {
     }
 
     if (hasContentForLlm) {
+      this.currentPromptId =
+        this.config.getSessionId() + '########' + this.promptCount++;
       logger.info('[Task] Sending new parts to LLM.');
       const stateChange: StateChange = {
         kind: CoderAgentEvent.StateChangeEvent,
       };
       // Set task state to working as we are about to call LLM
       this.setTaskStateAndPublishUpdate('working', stateChange);
-      // TODO: Determine what it mean to have, then add a prompt ID.
       yield* this.geminiClient.sendMessageStream(
         llmParts,
         aborted,
-        /*prompt_id*/ '',
+        this.currentPromptId,
       );
     } else if (anyConfirmationHandled) {
       logger.info(

@@ -10,12 +10,12 @@ import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
 import type { OutputFormat } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
+import { hooksCommand } from '../commands/hooks.js';
 import {
   Config,
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
-  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -30,10 +30,11 @@ import {
   EDIT_TOOL_NAME,
   debugLogger,
   loadServerHierarchicalMemory,
+  WEB_FETCH_TOOL_NAME,
+  getVersion,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
-import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
 import { appEvents } from '../utils/events.js';
@@ -263,11 +264,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       if (argv['prompt'] && argv['promptInteractive']) {
         return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
       }
-      if (argv['resume'] && !argv['prompt'] && !process.stdin.isTTY) {
-        throw new Error(
-          'When resuming a session, you must provide a message via --prompt (-p) or stdin',
-        );
-      }
       if (argv['yolo'] && argv['approvalMode']) {
         return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
       }
@@ -286,8 +282,13 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     yargsInstance.command(extensionsCommand);
   }
 
+  // Register hooks command if hooks are enabled
+  if (settings?.tools?.enableHooks) {
+    yargsInstance.command(hooksCommand);
+  }
+
   yargsInstance
-    .version(await getCliVersion()) // This will enable the --version flag based on package.json
+    .version(await getVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
     .alias('h', 'help')
@@ -309,19 +310,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
 
   // Handle help and version flags manually since we disabled exitProcess
   if (result['help'] || result['version']) {
-    await runExitCleanup();
-    process.exit(0);
-  }
-
-  // If yargs handled --help/--version it will have exited; nothing to do here.
-
-  // Handle case where MCP subcommands are executed - they should exit the process
-  // and not return to main CLI logic
-  if (
-    result._.length > 0 &&
-    (result._[0] === 'mcp' || result._[0] === 'extensions')
-  ) {
-    // MCP commands handle their own execution and process exit
     await runExitCleanup();
     process.exit(0);
   }
@@ -531,7 +519,7 @@ export async function loadCliConfig(
   );
 
   const enableMessageBusIntegration =
-    settings.tools?.enableMessageBusIntegration ?? false;
+    settings.tools?.enableMessageBusIntegration ?? true;
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -549,6 +537,7 @@ export async function loadCliConfig(
       SHELL_TOOL_NAME,
       EDIT_TOOL_NAME,
       WRITE_FILE_TOOL_NAME,
+      WEB_FETCH_TOOL_NAME,
     ];
     const autoEditExcludes = [SHELL_TOOL_NAME];
 
@@ -580,10 +569,7 @@ export async function loadCliConfig(
     extraExcludes.length > 0 ? extraExcludes : undefined,
   );
 
-  const useModelRouter = settings.experimental?.useModelRouter ?? true;
-  const defaultModel = useModelRouter
-    ? DEFAULT_GEMINI_MODEL_AUTO
-    : DEFAULT_GEMINI_MODEL;
+  const defaultModel = DEFAULT_GEMINI_MODEL_AUTO;
   const resolvedModel: string =
     argv.model ||
     process.env['GEMINI_MODEL'] ||
@@ -653,6 +639,10 @@ export async function loadCliConfig(
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,
+    enableAgents: settings.experimental?.enableAgents,
+    enableModelAvailabilityService:
+      settings.experimental?.isModelAvailabilityServiceEnabled,
+    experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
@@ -663,6 +653,7 @@ export async function loadCliConfig(
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell:
       settings.tools?.shell?.enableInteractiveShell ?? true,
+    shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
@@ -674,7 +665,6 @@ export async function loadCliConfig(
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
-    useModelRouter,
     enableMessageBusIntegration,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,

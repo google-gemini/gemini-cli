@@ -29,7 +29,9 @@ import {
   ToolConfirmationOutcome,
   Kind,
   ApprovalMode,
+  HookSystem,
 } from '../index.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import type { Part, PartListUnion } from '@google/genai';
 import {
   MockModifiableTool,
@@ -223,6 +225,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     discoverTools: async () => {},
     getAllTools: () => [],
     getToolsByServer: () => [],
+    getExperiments: () => {},
   } as unknown as ToolRegistry;
 
   const baseConfig = {
@@ -248,11 +251,12 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
     getToolRegistry: () => defaultToolRegistry,
     getUseSmartEdit: () => false,
-    getUseModelRouter: () => false,
     getGeminiClient: () => null,
     getEnableMessageBusIntegration: () => false,
     getMessageBus: () => null,
+    getEnableHooks: () => false,
     getPolicyEngine: () => null,
+    getExperiments: () => {},
   } as unknown as Config;
 
   return { ...baseConfig, ...overrides } as Config;
@@ -350,6 +354,7 @@ describe('CoreToolScheduler', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
       isInteractive: () => false,
+      getHookSystem: () => undefined,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -451,6 +456,7 @@ describe('CoreToolScheduler', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
       isInteractive: () => false,
+      getHookSystem: () => undefined,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -639,6 +645,12 @@ describe('CoreToolScheduler with payload', () => {
       getToolRegistry: () => mockToolRegistry,
       isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -940,6 +952,12 @@ describe('CoreToolScheduler edit cancellation', () => {
       getToolRegistry: () => mockToolRegistry,
       isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -1025,6 +1043,12 @@ describe('CoreToolScheduler YOLO mode', () => {
       getApprovalMode: () => ApprovalMode.YOLO,
       isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -1111,6 +1135,12 @@ describe('CoreToolScheduler request queueing', () => {
       getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
       isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -1136,6 +1166,7 @@ describe('CoreToolScheduler request queueing', () => {
     };
 
     // Schedule the first call, which will pause execution.
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     scheduler.schedule([request1], abortController.signal);
 
     // Wait for the first call to be in the 'executing' state.
@@ -1224,6 +1255,12 @@ describe('CoreToolScheduler request queueing', () => {
       }),
       isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -1330,6 +1367,7 @@ describe('CoreToolScheduler request queueing', () => {
       }),
       getToolRegistry: () => toolRegistry,
       isInteractive: () => false,
+      getHookSystem: () => undefined,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -1387,6 +1425,12 @@ describe('CoreToolScheduler request queueing', () => {
       getApprovalMode: () => ApprovalMode.YOLO,
       isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -1442,6 +1486,12 @@ describe('CoreToolScheduler request queueing', () => {
       },
       isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const testTool = new TestApprovalTool(mockConfig);
     const toolRegistry = {
@@ -1613,6 +1663,12 @@ describe('CoreToolScheduler Sequential Execution', () => {
       getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
       isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -1712,6 +1768,12 @@ describe('CoreToolScheduler Sequential Execution', () => {
       getApprovalMode: () => ApprovalMode.YOLO,
       isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -1810,6 +1872,12 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
