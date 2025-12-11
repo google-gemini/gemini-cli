@@ -51,10 +51,10 @@ The following example pipes a command to Gemini CLI from your terminal:
 echo "What is fine tuning?" | gemini
 ```
 
-You can also use the `--prompt` or `-p` flag:
+You can also pass the prompt as a positional argument:
 
 ```bash
-gemini -p "What is fine tuning?"
+gemini "What is fine tuning?"
 ```
 
 For comprehensive documentation on headless usage, scripting, automation, and

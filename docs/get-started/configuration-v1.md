@@ -647,9 +647,9 @@ for that specific session.
 - **`--model <model_name>`** (**`-m <model_name>`**):
   - Specifies the Gemini model to use for this session.
   - Example: `npm start -- --model gemini-1.5-pro-latest`
-- **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
-  - Used to pass a prompt directly to the command. This invokes Gemini CLI in a
-    non-interactive mode.
+- **`--prompt <your_prompt>`** (**`-p <your_prompt>`**) (Deprecated):
+  - This flag is deprecated. Use a positional argument to pass a prompt in non-interactive mode.
+  - Example: `gemini "your prompt here"`
 - **`--prompt-interactive <your_prompt>`** (**`-i <your_prompt>`**):
   - Starts an interactive session with the provided prompt as the initial input.
   - The prompt is processed within the interactive session, not before it.
