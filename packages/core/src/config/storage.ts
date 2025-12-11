@@ -14,6 +14,7 @@ export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 export const OAUTH_FILE = 'oauth_creds.json';
 const TMP_DIR_NAME = 'data';
 const BIN_DIR_NAME = 'bin';
+const OLD_DIR_NAME = 'tmp';
 
 export class Storage {
   private readonly targetDir: string;
@@ -137,5 +138,14 @@ export class Storage {
 
   getHistoryFilePath(): string {
     return path.join(this.getProjectTempDir(), 'shell_history');
+  }
+}
+export function migrateStorage(): void {
+  const baseDir = Storage.getGlobalGeminiDir();
+  const oldPath = path.join(baseDir, OLD_DIR_NAME);
+  const newPath = path.join(baseDir, TMP_DIR_NAME);
+
+  if (fs.existsSync(oldPath) && !fs.existsSync(newPath)) {
+    fs.renameSync(oldPath, newPath);
   }
 }
