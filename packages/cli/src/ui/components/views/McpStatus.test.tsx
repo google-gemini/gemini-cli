@@ -36,6 +36,7 @@ describe('McpStatus', () => {
       },
     ],
     prompts: [],
+    resources: [],
     blockedServers: [],
     serverStatus: () => MCPServerStatus.CONNECTED,
     authStatus: {},
@@ -139,6 +140,24 @@ describe('McpStatus', () => {
             serverName: 'server-1',
             name: 'prompt-1',
             description: 'A test prompt',
+          },
+        ]}
+      />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders correctly with resources', () => {
+    const { lastFrame, unmount } = render(
+      <McpStatus
+        {...baseProps}
+        resources={[
+          {
+            serverName: 'server-1',
+            name: 'resource-1',
+            uri: 'file:///tmp/resource-1.txt',
+            description: 'A test resource',
           },
         ]}
       />,

@@ -51,6 +51,12 @@ const platformArch = getPlatformArch();
 
 const PYTHON_VENV_PATH = join(TEMP_DIR, 'python_venv');
 
+const pythonVenvPythonPath = join(
+  PYTHON_VENV_PATH,
+  process.platform === 'win32' ? 'Scripts' : 'bin',
+  process.platform === 'win32' ? 'python.exe' : 'python',
+);
+
 const yamllintCheck =
   process.platform === 'win32'
     ? `if exist "${PYTHON_VENV_PATH}\\Scripts\\yamllint.exe" (exit 0) else (exit 1)`
@@ -107,7 +113,8 @@ const LINTERS = {
     check: yamllintCheck,
     installer: `
     python3 -m venv "${PYTHON_VENV_PATH}" && \
-    "${PYTHON_VENV_PATH}/bin/pip" install "yamllint==${YAMLLINT_VERSION}"
+    "${pythonVenvPythonPath}" -m pip install --upgrade pip && \
+    "${pythonVenvPythonPath}" -m pip install "yamllint==${YAMLLINT_VERSION}" --index-url https://pypi.org/simple
   `,
     run: "git ls-files | grep -E '\\.(yaml|yml)' | xargs yamllint --format github",
   },

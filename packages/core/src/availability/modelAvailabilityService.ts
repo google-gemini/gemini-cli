@@ -123,6 +123,10 @@ export class ModelAvailabilityService {
     }
   }
 
+  reset() {
+    this.health.clear();
+  }
+
   private setState(model: ModelId, nextState: HealthState) {
     this.health.set(model, nextState);
   }

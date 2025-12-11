@@ -697,4 +697,122 @@ describe('ModelConfigService', () => {
       });
     });
   });
+
+  describe('custom overrides', () => {
+    it('should apply custom overrides on top of defaults', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {
+          'test-alias': {
+            modelConfig: {
+              model: 'gemini-test',
+              generateContentConfig: { temperature: 0.5 },
+            },
+          },
+        },
+        overrides: [
+          {
+            match: { model: 'test-alias' },
+            modelConfig: { generateContentConfig: { temperature: 0.6 } },
+          },
+        ],
+        customOverrides: [
+          {
+            match: { model: 'test-alias' },
+            modelConfig: { generateContentConfig: { temperature: 0.7 } },
+          },
+        ],
+      };
+      const service = new ModelConfigService(config);
+      const resolved = service.getResolvedConfig({ model: 'test-alias' });
+
+      // Custom overrides should be appended to overrides, so they win
+      expect(resolved.generateContentConfig.temperature).toBe(0.7);
+    });
+  });
+
+  describe('retry behavior', () => {
+    it('should apply retry-specific overrides when isRetry is true', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {
+          'test-model': {
+            modelConfig: {
+              model: 'gemini-test',
+              generateContentConfig: {
+                temperature: 0.5,
+              },
+            },
+          },
+        },
+        overrides: [
+          {
+            match: { model: 'test-model', isRetry: true },
+            modelConfig: {
+              generateContentConfig: {
+                temperature: 1.0,
+              },
+            },
+          },
+        ],
+      };
+      const service = new ModelConfigService(config);
+
+      // Normal request
+      const normal = service.getResolvedConfig({ model: 'test-model' });
+      expect(normal.generateContentConfig.temperature).toBe(0.5);
+
+      // Retry request
+      const retry = service.getResolvedConfig({
+        model: 'test-model',
+        isRetry: true,
+      });
+      expect(retry.generateContentConfig.temperature).toBe(1.0);
+    });
+
+    it('should prioritize retry overrides over generic overrides', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {
+          'test-model': {
+            modelConfig: {
+              model: 'gemini-test',
+              generateContentConfig: {
+                temperature: 0.5,
+              },
+            },
+          },
+        },
+        overrides: [
+          // Generic override for this model
+          {
+            match: { model: 'test-model' },
+            modelConfig: {
+              generateContentConfig: {
+                temperature: 0.7,
+              },
+            },
+          },
+          // Retry-specific override
+          {
+            match: { model: 'test-model', isRetry: true },
+            modelConfig: {
+              generateContentConfig: {
+                temperature: 1.0,
+              },
+            },
+          },
+        ],
+      };
+      const service = new ModelConfigService(config);
+
+      // Normal request - hits generic override
+      const normal = service.getResolvedConfig({ model: 'test-model' });
+      expect(normal.generateContentConfig.temperature).toBe(0.7);
+
+      // Retry request - hits retry override (more specific)
+      const retry = service.getResolvedConfig({
+        model: 'test-model',
+        isRetry: true,
+      });
+      expect(retry.generateContentConfig.temperature).toBe(1.0);
+    });
+  });
 });

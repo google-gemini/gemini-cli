@@ -24,7 +24,6 @@ describe('AcpFileSystemService', () => {
     mockFallback = {
       readTextFile: vi.fn(),
       writeTextFile: vi.fn(),
-      findFiles: vi.fn(),
     };
   });
 

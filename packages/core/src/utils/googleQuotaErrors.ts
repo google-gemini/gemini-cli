@@ -89,9 +89,15 @@ export function classifyGoogleError(error: unknown): unknown {
     return new ModelNotFoundError(message, status);
   }
 
-  if (!googleApiError || googleApiError.code !== 429) {
+  if (
+    !googleApiError ||
+    googleApiError.code !== 429 ||
+    googleApiError.details.length === 0
+  ) {
     // Fallback: try to parse the error message for a retry delay
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage =
+      googleApiError?.message ||
+      (error instanceof Error ? error.message : String(error));
     const match = errorMessage.match(/Please retry in ([0-9.]+(?:ms|s))/);
     if (match?.[1]) {
       const retryDelaySeconds = parseDurationInSeconds(match[1]);
@@ -108,7 +114,7 @@ export function classifyGoogleError(error: unknown): unknown {
       }
     }
 
-    return error; // Not a 429 error we can handle.
+    return error; // Not a 429 error we can handle with structured details or a parsable retry message.
   }
 
   const quotaFailure = googleApiError.details.find(

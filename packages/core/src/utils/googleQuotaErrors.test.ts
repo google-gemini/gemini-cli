@@ -12,6 +12,7 @@ import {
 } from './googleQuotaErrors.js';
 import * as errorParser from './googleErrors.js';
 import type { GoogleApiError } from './googleErrors.js';
+import { ModelNotFoundError } from './httpErrors.js';
 
 describe('classifyGoogleError', () => {
   afterEach(() => {
@@ -340,5 +341,52 @@ describe('classifyGoogleError', () => {
     const originalError = new Error();
     const result = classifyGoogleError(originalError);
     expect(result).toBe(originalError);
+  });
+
+  it('should classify nested JSON string 404 error as ModelNotFoundError', () => {
+    // Mimic the double-wrapped JSON structure seen in the user report
+    const innerError = {
+      error: {
+        code: 404,
+        message:
+          'models/NOT_FOUND is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.',
+        status: 'NOT_FOUND',
+      },
+    };
+    const errorString = JSON.stringify(innerError);
+
+    const outerErrorString = JSON.stringify({
+      error: {
+        message: errorString,
+      },
+    });
+    const error = new Error(`[API Error: ${outerErrorString}]`);
+
+    const classified = classifyGoogleError(error);
+    expect(classified).toBeInstanceOf(ModelNotFoundError);
+    expect((classified as ModelNotFoundError).code).toBe(404);
+  });
+
+  it('should fallback to string parsing for retry delays when details array is empty', () => {
+    const errorWithEmptyDetails = {
+      error: {
+        code: 429,
+        message: 'Resource exhausted. Please retry in 5s',
+        details: [],
+      },
+    };
+
+    const result = classifyGoogleError(errorWithEmptyDetails);
+
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.retryDelayMs).toBe(5000);
+      // The cause should be the parsed GoogleApiError
+      expect(result.cause).toEqual({
+        code: 429,
+        message: 'Resource exhausted. Please retry in 5s',
+        details: [],
+      });
+    }
   });
 });

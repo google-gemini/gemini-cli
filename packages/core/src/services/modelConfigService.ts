@@ -21,6 +21,11 @@ export interface ModelConfigKey {
   // model calls made by this specific subagent, and no others, while still
   // ensuring model configs are fully orthogonal to the agents who use them.
   overrideScope?: string;
+
+  // Indicates whether this configuration request is happening during a retry attempt.
+  // This allows overrides to specify different settings (e.g., higher temperature)
+  // specifically for retry scenarios.
+  isRetry?: boolean;
 }
 
 export interface ModelConfig {
@@ -32,6 +37,7 @@ export interface ModelConfigOverride {
   match: {
     model?: string; // Can be a model name or an alias
     overrideScope?: string;
+    isRetry?: boolean;
   };
   modelConfig: ModelConfig;
 }
@@ -45,6 +51,7 @@ export interface ModelConfigServiceConfig {
   aliases?: Record<string, ModelConfigAlias>;
   customAliases?: Record<string, ModelConfigAlias>;
   overrides?: ModelConfigOverride[];
+  customOverrides?: ModelConfigOverride[];
 }
 
 export type ResolvedModelConfig = _ResolvedModelConfig & {
@@ -105,12 +112,18 @@ export class ModelConfigService {
     generateContentConfig: GenerateContentConfig;
   } {
     const config = this.config || {};
-    const { aliases = {}, customAliases = {}, overrides = [] } = config;
+    const {
+      aliases = {},
+      customAliases = {},
+      overrides = [],
+      customOverrides = [],
+    } = config;
     const allAliases = {
       ...aliases,
       ...customAliases,
       ...this.runtimeAliases,
     };
+    const allOverrides = [...overrides, ...customOverrides];
     let baseModel: string | undefined = context.model;
     let resolvedConfig: GenerateContentConfig = {};
 
@@ -135,7 +148,7 @@ export class ModelConfigService {
     };
 
     // Step 2: Override Application
-    const matches = overrides
+    const matches = allOverrides
       .map((override, index) => {
         const matchEntries = Object.entries(override.match);
         if (matchEntries.length === 0) {
