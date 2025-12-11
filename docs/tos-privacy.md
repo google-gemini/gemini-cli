@@ -10,7 +10,7 @@ and Privacy Notices applicable to those services apply to such access and use.
 Your Gemini CLI Usage Statistics are handled in accordance with Google's Privacy
 Policy.
 
-**Note:** See [quotas and pricing](/docs/quota-and-pricing.md) for the quota and
+**Note:** See [quotas and pricing](./quota-and-pricing.md) for the quota and
 pricing details that apply to your usage of the Gemini CLI.
 
 ## Supported authentication methods
