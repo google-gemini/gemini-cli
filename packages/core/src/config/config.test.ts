@@ -138,8 +138,12 @@ vi.mock('../agents/registry.js', () => {
   return { AgentRegistry: AgentRegistryMock };
 });
 
-vi.mock('../agents/subagent-tool-wrapper.js', () => ({
-  SubagentToolWrapper: vi.fn(),
+vi.mock('../agents/delegate-to-agent-tool.js', () => ({
+  DelegateToAgentTool: vi.fn(),
+}));
+
+vi.mock('../resources/resource-registry.js', () => ({
+  ResourceRegistry: vi.fn(),
 }));
 
 const mockCoreEvents = vi.hoisted(() => ({
@@ -349,6 +353,21 @@ describe('Server Config (config.ts)', () => {
       expect(GeminiClient).toHaveBeenCalledWith(config);
       // Verify that fallback mode is reset
       expect(config.isInFallbackMode()).toBe(false);
+    });
+
+    it('should reset model availability status', async () => {
+      const config = new Config(baseParams);
+      const service = config.getModelAvailabilityService();
+      const spy = vi.spyOn(service, 'reset');
+
+      vi.mocked(createContentGeneratorConfig).mockImplementation(
+        async (_: Config, authType: AuthType | undefined) =>
+          ({ authType }) as unknown as ContentGeneratorConfig,
+      );
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(spy).toHaveBeenCalled();
     });
 
     it('should strip thoughts when switching from GenAI to Vertex', async () => {
@@ -842,11 +861,11 @@ describe('Server Config (config.ts)', () => {
         mockAgentDefinition,
       );
 
-      const SubagentToolWrapperMock = (
-        (await vi.importMock('../agents/subagent-tool-wrapper.js')) as {
-          SubagentToolWrapper: Mock;
+      const DelegateToAgentToolMock = (
+        (await vi.importMock('../agents/delegate-to-agent-tool.js')) as {
+          DelegateToAgentTool: Mock;
         }
-      ).SubagentToolWrapper;
+      ).DelegateToAgentTool;
 
       await config.initialize();
 
@@ -856,16 +875,16 @@ describe('Server Config (config.ts)', () => {
         }
       ).ToolRegistry.prototype.registerTool;
 
-      expect(SubagentToolWrapperMock).toHaveBeenCalledTimes(1);
-      expect(SubagentToolWrapperMock).toHaveBeenCalledWith(
-        mockAgentDefinition,
+      expect(DelegateToAgentToolMock).toHaveBeenCalledTimes(1);
+      expect(DelegateToAgentToolMock).toHaveBeenCalledWith(
+        expect.anything(), // AgentRegistry
         config,
         undefined,
       );
 
       const calls = registerToolMock.mock.calls;
       const registeredWrappers = calls.filter(
-        (call) => call[0] instanceof SubagentToolWrapperMock,
+        (call) => call[0] instanceof DelegateToAgentToolMock,
       );
       expect(registeredWrappers).toHaveLength(1);
     });
@@ -877,15 +896,15 @@ describe('Server Config (config.ts)', () => {
       };
       const config = new Config(params);
 
-      const SubagentToolWrapperMock = (
-        (await vi.importMock('../agents/subagent-tool-wrapper.js')) as {
-          SubagentToolWrapper: Mock;
+      const DelegateToAgentToolMock = (
+        (await vi.importMock('../agents/delegate-to-agent-tool.js')) as {
+          DelegateToAgentTool: Mock;
         }
-      ).SubagentToolWrapper;
+      ).DelegateToAgentTool;
 
       await config.initialize();
 
-      expect(SubagentToolWrapperMock).not.toHaveBeenCalled();
+      expect(DelegateToAgentToolMock).not.toHaveBeenCalled();
     });
 
     it('should not set default codebase investigator model in config (defaults in registry)', () => {
@@ -1344,6 +1363,30 @@ describe('Generation Config Merging (HACK)', () => {
     expect(serviceConfig.overrides).toEqual(userOverrides);
   });
 
+  it('should merge default overrides when user provides only aliases', () => {
+    const userAliases = {
+      'my-alias': {
+        modelConfig: { model: 'my-model' },
+      },
+    };
+
+    const params: ConfigParameters = {
+      ...baseParams,
+      modelConfigServiceConfig: {
+        aliases: userAliases,
+      },
+    };
+
+    const config = new Config(params);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const serviceConfig = (config.modelConfigService as any).config;
+
+    // Assert that the user's aliases are present
+    expect(serviceConfig.aliases).toEqual(userAliases);
+    // Assert that the default overrides are present
+    expect(serviceConfig.overrides).toEqual(DEFAULT_MODEL_CONFIGS.overrides);
+  });
+
   it('should use user-provided aliases if they exist', () => {
     const userAliases = {
       'my-alias': {
@@ -1488,6 +1531,9 @@ describe('Config getHooks', () => {
   describe('setModel', () => {
     it('should allow setting a pro (any) model and disable fallback mode', () => {
       const config = new Config(baseParams);
+      const service = config.getModelAvailabilityService();
+      const spy = vi.spyOn(service, 'reset');
+
       config.setFallbackMode(true);
       expect(config.isInFallbackMode()).toBe(true);
 
@@ -1497,10 +1543,14 @@ describe('Config getHooks', () => {
       expect(config.getModel()).toBe(proModel);
       expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(proModel);
+      expect(spy).toHaveBeenCalled();
     });
 
     it('should allow setting auto model from non-auto model and disable fallback mode', () => {
       const config = new Config(baseParams);
+      const service = config.getModelAvailabilityService();
+      const spy = vi.spyOn(service, 'reset');
+
       config.setFallbackMode(true);
       expect(config.isInFallbackMode()).toBe(true);
 
@@ -1509,6 +1559,7 @@ describe('Config getHooks', () => {
       expect(config.getModel()).toBe('auto');
       expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
+      expect(spy).toHaveBeenCalled();
     });
 
     it('should allow setting auto model from auto model if it is in the fallback mode', () => {
@@ -1520,6 +1571,9 @@ describe('Config getHooks', () => {
         model: 'auto',
         usageStatisticsEnabled: false,
       });
+      const service = config.getModelAvailabilityService();
+      const spy = vi.spyOn(service, 'reset');
+
       config.setFallbackMode(true);
       expect(config.isInFallbackMode()).toBe(true);
 
@@ -1528,6 +1582,7 @@ describe('Config getHooks', () => {
       expect(config.getModel()).toBe('auto');
       expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
+      expect(spy).toHaveBeenCalled();
     });
   });
 });
