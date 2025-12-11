@@ -2626,10 +2626,13 @@ ${JSON.stringify(
       // It does NOT throw by default for unknown models (unless they are aliases that fail resolution)
       (
         mockConfig.modelConfigService.getResolvedConfig as Mock
-      ).mockImplementation((context) => ({
-          model: context.model, // Returns the input model (invalidModel)
-          generateContentConfig: {},
-        } as ResolvedModelConfig));
+      ).mockImplementation(
+        (context) =>
+          ({
+            model: context.model, // Returns the input model (invalidModel)
+            generateContentConfig: {},
+          }) as ResolvedModelConfig,
+      );
 
       mockTurnRunFn.mockReturnValue(
         (async function* () {
@@ -2652,18 +2655,9 @@ ${JSON.stringify(
         mockConfig.modelConfigService.getResolvedConfig,
       ).toHaveBeenNthCalledWith(1, { model: invalidModel });
 
-      // Should fall back to the routed/sequence model (mocked as 'default-routed-model' or similar)
-      // NOT the invalidModel.
+      // Will use the invalid model, which will fail when sending message instead of silently using a default model
       expect(mockTurnRunFn).toHaveBeenCalledWith(
-        expect.not.objectContaining({ model: invalidModel }),
-        [{ text: 'Hi' }],
-        expect.any(AbortSignal),
-      );
-
-      // Specifically check it used the fallback
-      // Since currentSequenceModel is null initially, and we mocked the router:
-      expect(mockTurnRunFn).toHaveBeenCalledWith(
-        { model: 'default-routed-model' },
+        { model: invalidModel },
         [{ text: 'Hi' }],
         expect.any(AbortSignal),
       );
