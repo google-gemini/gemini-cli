@@ -171,6 +171,10 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
 
 export class ShellExecutionService {
   private static activePtys = new Map<number, ActivePty>();
+  private static exitedPtyInfo = new Map<
+    number,
+    { exitCode: number; signal?: number }
+  >();
   private static activeResolvers = new Map<
     number,
     (res: ShellExecutionResult) => void
@@ -583,8 +587,7 @@ export class ShellExecutionService {
             ? newOutput
             : trimmedOutput;
 
-          // Using stringify for a quick deep comparison.
-          if (JSON.stringify(output) !== JSON.stringify(finalOutput)) {
+          if (output !== finalOutput) {
             output = finalOutput;
             const event: ShellOutputEvent = {
               type: 'data',
@@ -700,6 +703,16 @@ export class ShellExecutionService {
           ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
             exited = true;
             abortSignal.removeEventListener('abort', abortHandler);
+
+            // Store exit info for late subscribers (e.g. backgrounding race condition)
+            this.exitedPtyInfo.set(ptyProcess.pid, { exitCode, signal });
+            setTimeout(
+              () => {
+                this.exitedPtyInfo.delete(ptyProcess.pid);
+              },
+              5 * 60 * 1000,
+            );
+
             this.activePtys.delete(ptyProcess.pid);
             this.activeResolvers.delete(ptyProcess.pid);
 
@@ -850,15 +863,18 @@ export class ShellExecutionService {
   ): void {
     const activePty = this.activePtys.get(pid);
     if (activePty) {
-      // We rely on node-pty's event emitter.
-      // Since this is added *after* the process is spawned (usually upon backgrounding),
-      // it will be an additional listener.
       const disposable = activePty.ptyProcess.onExit(
         ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
           callback(exitCode, signal);
           disposable.dispose();
         },
       );
+    } else {
+      // Check if it already exited recently
+      const exitedInfo = this.exitedPtyInfo.get(pid);
+      if (exitedInfo) {
+        callback(exitedInfo.exitCode, exitedInfo.signal);
+      }
     }
   }
 
@@ -874,14 +890,13 @@ export class ShellExecutionService {
         if (os.platform() === 'win32') {
           activePty.ptyProcess.kill();
         } else {
-          // Kill the process group
           try {
             process.kill(-pid, 'SIGKILL');
-          } catch (_e) {
+          } catch {
             activePty.ptyProcess.kill('SIGKILL');
           }
         }
-      } catch (_e) {
+      } catch {
         // Ignore errors if process is already dead
       }
       this.activePtys.delete(pid);
@@ -904,12 +919,10 @@ export class ShellExecutionService {
 
       if (activePty) {
         output = getFullBufferText(activePty.headlessTerminal);
-        // We don't have easy access to the full raw output chunks here since they are local to the promise closure.
-        // However, for backgrounding, the precise raw buffer is less critical than the fact it's continuing.
       }
 
       resolve({
-        rawOutput, // Partial/empty, but acceptable for backgrounding signal
+        rawOutput,
         output,
         exitCode: null,
         signal: null,
@@ -920,9 +933,6 @@ export class ShellExecutionService {
         backgrounded: true,
       });
 
-      // We don't delete the resolver here because onExit might still try to use it (which is fine, it's a no-op).
-      // But we should probably clean it up to avoid leaks?
-      // If we clean it up, onExit won't find it.
       this.activeResolvers.delete(pid);
     }
   }

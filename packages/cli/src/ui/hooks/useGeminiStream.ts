@@ -237,10 +237,9 @@ export const useGeminiStream = (
     isBackgroundShellVisible,
     toggleBackgroundShell,
     backgroundCurrentShell,
-    backgroundShells,
     registerBackgroundShell,
-    killBackgroundShell,
-    lastShellOutputTime,
+    dismissBackgroundShell,
+    backgroundShells,
   } = useShellCommandProcessor(
     addItem,
     setPendingHistoryItem,
@@ -1428,6 +1427,6 @@ export const useGeminiStream = (
     toggleBackgroundShell,
     backgroundCurrentShell,
     backgroundShells,
-    killBackgroundShell,
+    dismissBackgroundShell,
   };
 };

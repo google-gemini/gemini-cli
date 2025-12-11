@@ -14,13 +14,13 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { type Key, type KeypressHandler } from '../contexts/KeypressContext.js';
 
 // Mock dependencies
-const mockKillBackgroundShell = vi.fn();
+const mockDismissBackgroundShell = vi.fn();
 const mockSetActiveBackgroundShellPid = vi.fn();
 const mockSetIsBackgroundShellListOpen = vi.fn();
 
 vi.mock('../contexts/UIActionsContext.js', () => ({
   useUIActions: () => ({
-    killBackgroundShell: mockKillBackgroundShell,
+    dismissBackgroundShell: mockDismissBackgroundShell,
     setActiveBackgroundShellPid: mockSetActiveBackgroundShellPid,
     setIsBackgroundShellListOpen: mockSetIsBackgroundShellListOpen,
   }),
@@ -74,6 +74,7 @@ describe('<BackgroundShellDisplay />', () => {
     output: 'Starting server...',
     isBinary: false,
     binaryBytesReceived: 0,
+    status: 'running',
   };
   const shell2: BackgroundShell = {
     pid: 1002,
@@ -81,6 +82,7 @@ describe('<BackgroundShellDisplay />', () => {
     output: 'Log entry 1',
     isBinary: false,
     binaryBytesReceived: 0,
+    status: 'running',
   };
 
   beforeEach(() => {

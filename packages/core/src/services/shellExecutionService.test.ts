@@ -1547,6 +1547,59 @@ describe('Background Shell Management', () => {
     getSpy.mockRestore();
   });
 
+  it('should call onExit callback even if attached after process exit (race condition)', async () => {
+    const getSpy = vi.spyOn(ShellExecutionService['activePtys'], 'get');
+    // We simulate the PTY being active initially
+    getSpy.mockReturnValue({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ptyProcess: mockPtyProcess as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      headlessTerminal: mockHeadlessTerminal as any,
+      shellExecutionConfig: {},
+    });
+
+    const executionPromise = ShellExecutionService.execute(
+      'quick-die',
+      '/test',
+      vi.fn(),
+      new AbortController().signal,
+      true,
+      shellExecutionConfig,
+    );
+    await new Promise((resolve) => process.nextTick(resolve));
+    const handle = await executionPromise;
+
+    // Simulate process exit BEFORE we background or attach listeners
+    // The internal onExit handler runs, cleaning up activePtys and populating exitedPtyInfo
+    // We need to trigger the internal handler.
+    const listeners = mockPtyProcess.onExit.mock.calls;
+    const internalHandler = listeners[listeners.length - 1][0];
+
+    // Simulate exit
+    internalHandler({ exitCode: 0, signal: null });
+
+    // Process is now dead in our simulation
+    mockProcessKill.mockImplementation((pid) => {
+      if (pid === handle.pid) {
+        throw new Error('ESRCH');
+      }
+      return true;
+    });
+
+    // Now activePtys should be empty (or at least missing this pid)
+    // We need to update our spy to reflect this, or stop spying if the code uses real map
+    getSpy.mockRestore(); // Use real map state (which should be empty for this pid now)
+
+    // Verify it's gone from activePtys (indirectly via isPtyActive or just trusting logic)
+    expect(ShellExecutionService.isPtyActive(handle.pid!)).toBe(false);
+
+    // Now try to attach onExit
+    const exitCallback = vi.fn();
+    ShellExecutionService.onExit(handle.pid!, exitCallback);
+
+    expect(exitCallback).toHaveBeenCalledWith(0, null);
+  });
+
   it('should kill a process by PID', async () => {
     const getSpy = vi.spyOn(ShellExecutionService['activePtys'], 'get');
     getSpy.mockReturnValue({

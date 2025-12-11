@@ -43,6 +43,7 @@ import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+const BACKGROUND_DELAY_MS = 200;
 
 export interface ShellToolParams {
   command: string;
@@ -260,10 +261,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
         // If the model requested to run in the background, do so after a short delay.
         if (this.params.is_background) {
           setTimeout(() => {
-            // This call will resolve the `resultPromise` with `backgrounded: true`
-            // if the process is still running. If it has already exited, this is a no-op.
             ShellExecutionService.background(pid);
-          }, 200);
+          }, BACKGROUND_DELAY_MS);
         }
       }
 
@@ -312,7 +311,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           llmContent += ' There was no output before it was cancelled.';
         }
       } else if (result.backgrounded) {
-        llmContent = `Command moved to background (PID: ${result.pid}). Use 'fg' (conceptually) to bring it back, or check the footer for status. Output is hidden from this conversation but continues in the background.`;
+        llmContent = `Command moved to background (PID: ${result.pid}). Output is hidden from this conversation but continues in the background.`;
         data = {
           pid: result.pid,
           command: this.params.command,

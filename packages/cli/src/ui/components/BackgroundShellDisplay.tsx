@@ -15,7 +15,6 @@ import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
 import { AnsiOutputText } from './AnsiOutput.js';
 import { Command, keyMatchers } from '../keyMatchers.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { useMouse } from '../contexts/MouseContext.js';
 
 interface BackgroundShellDisplayProps {
   shells: Map<number, BackgroundShell>;
@@ -28,6 +27,8 @@ interface BackgroundShellDisplayProps {
 
 const CONTENT_PADDING_X = 1;
 const RIGHT_TEXT = 'Ctrl+B Hide | Ctrl+K Kill';
+// 2 for borders, 2 for padding
+const TAB_DISPLAY_HORIZONTAL_PADDING = 4;
 
 export const BackgroundShellDisplay = ({
   shells,
@@ -38,7 +39,7 @@ export const BackgroundShellDisplay = ({
   isListOpenProp,
 }: BackgroundShellDisplayProps) => {
   const {
-    killBackgroundShell,
+    dismissBackgroundShell,
     setActiveBackgroundShellPid,
     setIsBackgroundShellListOpen,
   } = useUIActions();
@@ -51,7 +52,10 @@ export const BackgroundShellDisplay = ({
     if (!shells.has(activePid)) return;
     // Resize the active PTY
     // 2 for borders, plus padding on both sides
-    const ptyWidth = Math.max(1, width - 2 - CONTENT_PADDING_X * 2);
+    const ptyWidth = Math.max(
+      1,
+      width - TAB_DISPLAY_HORIZONTAL_PADDING / 2 - CONTENT_PADDING_X * 2,
+    );
     const ptyHeight = Math.max(1, height - 3); // -2 for border, -1 for header
     ShellExecutionService.resizePty(activePid, ptyWidth, ptyHeight);
   }, [activePid, width, height, shells]);
@@ -130,9 +134,9 @@ export const BackgroundShellDisplay = ({
         return;
       }
 
-      // Ctrl+K to kill
+      // Ctrl+K to dismiss
       if (key.ctrl && key.name === 'k') {
-        killBackgroundShell(activeShell.pid);
+        dismissBackgroundShell(activeShell.pid);
         return;
       }
 
@@ -154,78 +158,6 @@ export const BackgroundShellDisplay = ({
     { isActive: isFocused && !!activeShell },
   );
 
-  // Ensure active shell exists, fallback logic handled in AppContainer but safe to check
-  // Move conditional logic after all hooks
-  // if (!activeShell) {
-  //   return null;
-  // }
-
-  // Use standard ink input for mouse clicks (experimental but standard for newer ink)
-  // This might not work if input is intercepted globally, but we can try.
-  // We only care about the '...' click if possible.
-  // Since we can't rely on it, we'll just implement the visual + key binding fallback.
-
-  useMouse(
-    (event) => {
-      if (!activeShell || !isFocused) return;
-
-      if (event.name === 'left-press') {
-        // We need to calculate if the click happened on the "..." part.
-        // This is tricky because we don't know the absolute position of the Box easily.
-        // However, we know the width and height of the component from props.
-        // The "..." is at the top right area roughly.
-        // Mouse event coordinates (event.col, event.row) are absolute terminal coordinates.
-        // We can't reliably hit-test without knowing our absolute offset.
-        //
-        // BUT, we can implement a heuristic if we assume the component is at the bottom.
-        // `height` is passed in.
-        // If we assume the component is rendered at `terminalHeight - height`, we can check.
-        // But we don't have terminalHeight here easily, or absolute Y.
-        //
-        // Given the complexity of absolute positioning in Ink without a layout ref that gives absolute coordinates,
-        // and the fact that `renderTabs` does overflow calculation *during* render,
-        // implementing a precise click handler for "..." is very brittle.
-        //
-        // However, the user asked for: "if a user clicks on it it should show a list".
-        // If we can't do precise positioning, we can't reliably do this.
-        //
-        // Alternative: If the user clicks *anywhere* in the header area (row 0 of this component),
-        // and there is overflow, we could toggle the list?
-        // Or maybe just clicking the header toggles the list?
-        //
-        // Let's try to support it if we can get the layout.
-        // Since we don't have the absolute layout, we will rely on the keyboard shortcut Ctrl+O primarily,
-        // but maybe we can add a "global" click handler that checks if the list is open?
-        //
-        // Actually, without `measureElement` or similar returning absolute coordinates (which Ink's measureElement doesn't do for Y usually in a helpful way relative to screen start for mouse events),
-        // we are stuck.
-        //
-        // Let's stick to the Keyboard implementation which is robust.
-        // The user prompt said "if a user clicks on it".
-        // I will add a comment that mouse support for specific text requires absolute positioning which isn't available here.
-        // But wait, if I use `useInput` I get key events. `useMouse` gets mouse events.
-        //
-        // If I just open the list on ANY mouse click in the component (if I could detect it), that might be annoying.
-        //
-        // Let's rely on the list view being accessible via Ctrl+O.
-        //
-        // However, if the user *really* wants mouse support, they might be using a terminal that sends click events as keys (like some modes).
-        // But our `MouseContext` handles SGR/X11.
-        //
-        // I will assume the Ctrl+O solution is the "menu" they requested, and if they clicked "..." and nothing happened, it's because they need to use the key or I need absolute coords.
-        //
-        // Let's try to satisfy the "menu" requirement better by ensuring `...` is visible and `Ctrl+O` works.
-        // The user said "i don't see a menu". Maybe they didn't know about Ctrl+O?
-        // I added "Ctrl+O List" to the help text.
-        //
-        // If I really want to support click, I'd need to know where I am.
-        // I'll leave it as is for now regarding mouse, as precise hit testing is not feasible without more context.
-        return;
-      }
-    },
-    { isActive: isFocused },
-  );
-
   const renderTabs = () => {
     const tabs = [];
     const shellList = Array.from(shells.values());
@@ -234,7 +166,11 @@ export const BackgroundShellDisplay = ({
     // width - borders(2) - padding(2) - rightText - pidText - spacing
     // PID text approx: " (PID: 123456) (Focused)" -> ~25 chars
     const pidTextEstimate = 25;
-    const availableWidth = width - 4 - RIGHT_TEXT.length - pidTextEstimate;
+    const availableWidth =
+      width -
+      TAB_DISPLAY_HORIZONTAL_PADDING -
+      RIGHT_TEXT.length -
+      pidTextEstimate;
 
     let currentWidth = 0;
     let overflow = false;
@@ -250,14 +186,16 @@ export const BackgroundShellDisplay = ({
       }
 
       const isActive = shell.pid === activePid;
+      const isExited = shell.status === 'exited';
       tabs.push(
         <Text
           key={shell.pid}
-          color={isActive ? 'white' : 'gray'}
-          backgroundColor={isActive ? 'blue' : undefined}
+          color={isActive ? 'white' : isExited ? 'red' : 'gray'}
+          backgroundColor={isActive ? (isExited ? 'red' : 'blue') : undefined}
           bold={isActive}
         >
           {label}
+          {isExited ? '(Exited)' : ''}
         </Text>,
       );
       currentWidth += labelWidth;
@@ -283,6 +221,8 @@ export const BackgroundShellDisplay = ({
         </Text>
         {shellList.map((shell, index) => {
           const isSelected = index === listSelectionIndex;
+          const statusText =
+            shell.status === 'exited' ? ` (Exited: ${shell.exitCode})` : '';
           return (
             <Text
               key={shell.pid}
@@ -290,7 +230,7 @@ export const BackgroundShellDisplay = ({
               backgroundColor={isSelected ? 'green' : undefined}
             >
               {isSelected ? '> ' : '  '} {index + 1}: {shell.command} (PID:{' '}
-              {shell.pid})
+              {shell.pid}){statusText}
             </Text>
           );
         })}
