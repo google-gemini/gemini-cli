@@ -10,6 +10,8 @@ import { theme } from '../semantic-colors.js';
 import { TextInput } from '../components/shared/TextInput.js';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { clearApiKey } from '@google/gemini-cli-core';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface ApiAuthDialogProps {
   onSubmit: (apiKey: string) => void;
@@ -44,6 +46,20 @@ export function ApiAuthDialog({
   const handleSubmit = (value: string) => {
     onSubmit(value);
   };
+
+  const handleClear = async () => {
+    await clearApiKey();
+    buffer.setText('');
+  };
+
+  useKeypress(
+    async (key) => {
+      if (key.ctrl && key.name === 'k') {
+        await handleClear();
+      }
+    },
+    { isActive: true },
+  );
 
   return (
     <Box
@@ -90,7 +106,7 @@ export function ApiAuthDialog({
       )}
       <Box marginTop={1}>
         <Text color={theme.text.secondary}>
-          (Press Enter to submit, Esc to cancel)
+          (Press Enter to submit, Esc to cancel, Ctrl+K to clear stored key)
         </Text>
       </Box>
     </Box>
