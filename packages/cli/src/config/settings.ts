@@ -799,6 +799,7 @@ export function migrateDeprecatedSettings(
         `Migrating deprecated extensions.disabled settings from ${scope} settings...`,
       );
       for (const extension of settings.extensions.disabled ?? []) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         extensionManager.disableExtension(extension, scope);
       }
 

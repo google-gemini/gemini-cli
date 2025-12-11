@@ -346,6 +346,7 @@ export class ExtensionManager extends ExtensionLoader {
               'success',
             ),
           );
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           this.enableExtension(newExtensionConfig.name, SettingScope.User);
         }
       } finally {
@@ -513,10 +514,13 @@ export class ExtensionManager extends ExtensionLoader {
         )
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
-      const hooks = await this.loadExtensionHooks(effectiveExtensionPath, {
-        extensionPath: effectiveExtensionPath,
-        workspacePath: this.workspaceDir,
-      });
+      let hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
+      if (this.settings.tools?.enableHooks) {
+        hooks = await this.loadExtensionHooks(effectiveExtensionPath, {
+          extensionPath: effectiveExtensionPath,
+          workspacePath: this.workspaceDir,
+        });
+      }
 
       const extension = {
         name: config.name,

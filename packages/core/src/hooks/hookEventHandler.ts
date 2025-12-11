@@ -548,9 +548,16 @@ export class HookEventHandler {
    * Create base hook input with common fields
    */
   private createBaseInput(eventName: HookEventName): HookInput {
+    // Get the transcript path from the ChatRecordingService if available
+    const transcriptPath =
+      this.config
+        .getGeminiClient()
+        ?.getChatRecordingService()
+        ?.getConversationFilePath() ?? '';
+
     return {
       session_id: this.config.getSessionId(),
-      transcript_path: '', // TODO: Implement transcript path when supported
+      transcript_path: transcriptPath,
       cwd: this.config.getWorkingDir(),
       hook_event_name: eventName,
       timestamp: new Date().toISOString(),
@@ -776,6 +783,7 @@ export class HookEventHandler {
 
       // Publish response through MessageBus
       if (this.messageBus) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.messageBus.publish({
           type: MessageBusType.HOOK_EXECUTION_RESPONSE,
           correlationId: request.correlationId,
@@ -786,6 +794,7 @@ export class HookEventHandler {
     } catch (error) {
       // Publish error response
       if (this.messageBus) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.messageBus.publish({
           type: MessageBusType.HOOK_EXECUTION_RESPONSE,
           correlationId: request.correlationId,
