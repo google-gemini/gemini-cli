@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
 import { RewindViewer } from './RewindViewer.js';
+import { RewindOutcome } from './RewindConfirmation.js';
 import type {
   ConversationRecord,
   MessageRecord,
@@ -56,8 +57,7 @@ const triggerKey = (
     shift: boolean;
   }>,
 ) => {
-  const handler = keypressHandlers[keypressHandlers.length - 1];
-  if (!handler) {
+  if (keypressHandlers.length === 0) {
     throw new Error('No keypress handler registered');
   }
 
@@ -73,7 +73,7 @@ const triggerKey = (
   };
 
   act(() => {
-    handler(key);
+    keypressHandlers.forEach((handler) => handler(key));
   });
 };
 
@@ -279,7 +279,7 @@ describe('RewindViewer', () => {
   });
 
   describe('Interaction Selection', () => {
-    it('calls onRewind immediately on Enter', () => {
+    it('shows confirmation dialog on Enter and handles selection', () => {
       const conversation = createConversation([
         { type: 'user', content: 'Original Prompt', id: '1', timestamp: '1' },
       ]);
@@ -295,10 +295,49 @@ describe('RewindViewer', () => {
       // Verify initial state
       expect(lastFrame()).toContain('Original Prompt');
 
-      // Press Enter
+      // Press Enter to select
       triggerKey({ name: 'return' });
 
-      expect(onRewind).toHaveBeenCalledWith('1', 'Original Prompt');
+      // Should show confirmation
+      expect(lastFrame()).toContain('Confirm Rewind');
+      expect(lastFrame()).toContain(
+        'Rewind conversation and revert code changes',
+      );
+
+      // Press Enter again to confirm (first option selected by default)
+      triggerKey({ name: 'return' });
+
+      expect(onRewind).toHaveBeenCalledWith(
+        '1',
+        'Original Prompt',
+        RewindOutcome.RewindAndRevert,
+      );
+    });
+
+    it('can cancel from confirmation dialog', () => {
+      const conversation = createConversation([
+        { type: 'user', content: 'Original Prompt', id: '1', timestamp: '1' },
+      ]);
+      const onRewind = vi.fn();
+      const { lastFrame } = render(
+        <RewindViewer
+          conversation={conversation}
+          onExit={vi.fn()}
+          onRewind={onRewind}
+        />,
+      );
+
+      // Enter to open confirmation
+      triggerKey({ name: 'return' });
+      expect(lastFrame()).toContain('Confirm Rewind');
+
+      // Escape to cancel
+      triggerKey({ name: 'escape' });
+
+      // Should return to list view
+      expect(lastFrame()).not.toContain('Confirm Rewind');
+      expect(lastFrame()).toContain('Original Prompt');
+      expect(onRewind).not.toHaveBeenCalled();
     });
   });
 });

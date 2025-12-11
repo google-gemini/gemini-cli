@@ -8,6 +8,8 @@ import { CommandKind, type SlashCommand } from './types.js';
 import { RewindViewer } from '../components/RewindViewer.js';
 import { MessageType, type HistoryItem } from '../types.js';
 import { convertSessionToHistoryFormats } from '../hooks/useSessionBrowser.js';
+import { revertFileChanges } from '../utils/rewindFileOps.js';
+import { RewindOutcome } from '../components/RewindConfirmation.js';
 
 import type { Content } from '@google/genai';
 
@@ -54,8 +56,42 @@ export const rewindCommand: SlashCommand = {
         <RewindViewer
           conversation={conversation}
           onExit={() => context.ui.removeComponent()}
-          onRewind={async (messageId, newText) => {
+          onRewind={async (messageId, newText, outcome) => {
             try {
+              if (outcome === RewindOutcome.Cancel) {
+                context.ui.removeComponent();
+                return;
+              }
+
+              const projectRoot = config.getProjectRoot();
+
+              if (
+                outcome === RewindOutcome.RewindAndRevert ||
+                outcome === RewindOutcome.RevertOnly
+              ) {
+                const currentConversation = recordingService.getConversation();
+                if (currentConversation) {
+                  await revertFileChanges(
+                    currentConversation,
+                    messageId,
+                    projectRoot,
+                  );
+                }
+              }
+
+              if (outcome === RewindOutcome.RevertOnly) {
+                context.ui.removeComponent();
+                context.ui.addItem(
+                  {
+                    type: MessageType.INFO,
+                    text: 'File changes reverted.',
+                  },
+                  Date.now(),
+                );
+                return;
+              }
+
+              // Proceed with Rewind (for RewindOnly and RewindAndRevert)
               const updatedConversation = recordingService.rewindTo(messageId);
               // Convert to UI and Client formats
               const { uiHistory, clientHistory } =
@@ -78,18 +114,20 @@ export const rewindCommand: SlashCommand = {
                   }) as HistoryItem,
               );
 
-              context.ui.loadHistory(historyWithIds);
-
+              // 1. Remove component FIRST to avoid flicker and clear the stage
               context.ui.removeComponent();
+
+              // 2. Load the rewound history
+              context.ui.loadHistory(historyWithIds);
 
               // Wait a tick for Ink to clear the screen
               await new Promise((resolve) => setTimeout(resolve, 50));
 
               // Submit the new text as a prompt to the main loop.
-              // This delegates stream handling, tool execution, and history updates
-              // (for the new message) to the main application logic.
               context.ui.setInput(newText);
             } catch (error) {
+              // If an error occurs, we still want to remove the component if possible
+              context.ui.removeComponent();
               context.ui.addItem(
                 {
                   type: MessageType.ERROR,

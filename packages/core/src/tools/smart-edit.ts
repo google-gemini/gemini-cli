@@ -796,6 +796,7 @@ class EditToolInvocation
           originalContent: editData.currentContent,
           newContent: editData.newContent,
           diffStat,
+          isNewFile: editData.currentContent === null,
         };
       }
 

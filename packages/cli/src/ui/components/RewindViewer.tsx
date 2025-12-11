@@ -5,7 +5,6 @@
  */
 
 import type React from 'react';
-import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import {
@@ -16,11 +15,17 @@ import {
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useRewindLogic } from '../hooks/useRewindLogic.js';
+import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
 
 interface RewindViewerProps {
   conversation: ConversationRecord;
   onExit: () => void;
-  onRewind: (messageId: string, newText: string) => void;
+  onRewind: (
+    messageId: string,
+    newText: string,
+    outcome: RewindOutcome,
+  ) => void;
 }
 
 const MAX_LINES_PER_BOX = 2;
@@ -31,63 +36,14 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   onRewind,
 }) => {
   const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
-
-  const interactions = useMemo(() => {
-    const prompts: MessageRecord[] = [];
-
-    for (const msg of conversation.messages) {
-      if (msg.type === 'user') {
-        prompts.push(msg);
-      }
-    }
-    return prompts;
-  }, [conversation.messages]);
-
-  const calculateStats = (userMessage: MessageRecord) => {
-    const msgIndex = conversation.messages.indexOf(userMessage);
-    if (msgIndex === -1) return null;
-
-    let addedLines = 0;
-    let removedLines = 0;
-    const files = new Set<string>();
-    let hasEdits = false;
-
-    // Look ahead until the next user message or end of conversation
-    for (let i = msgIndex + 1; i < conversation.messages.length; i++) {
-      const msg = conversation.messages[i];
-      if (msg.type === 'user') break; // Stop at next user message
-
-      if (msg.type === 'gemini' && msg.toolCalls) {
-        for (const toolCall of msg.toolCalls) {
-          const result = toolCall.resultDisplay;
-          if (
-            result &&
-            typeof result === 'object' &&
-            'diffStat' in result &&
-            result.diffStat
-          ) {
-            hasEdits = true;
-            const stats = result.diffStat;
-            addedLines += stats.model_added_lines + stats.user_added_lines;
-            removedLines +=
-              stats.model_removed_lines + stats.user_removed_lines;
-            if ('fileName' in result && typeof result.fileName === 'string') {
-              files.add(result.fileName);
-            }
-          }
-        }
-      }
-    }
-
-    if (!hasEdits) return null;
-
-    return {
-      addedLines,
-      removedLines,
-      fileCount: files.size,
-      firstFileName: files.values().next().value as string,
-    };
-  };
+  const {
+    interactions,
+    selectedMessageId,
+    confirmationStats,
+    getStats,
+    selectMessage,
+    clearSelection,
+  } = useRewindLogic(conversation);
 
   const truncate = (text: string, isSelected: boolean) => {
     if (isSelected) return text;
@@ -109,8 +65,10 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
 
   useKeypress(
     (key) => {
-      if (key.name === 'escape') {
-        onExit();
+      if (!selectedMessageId) {
+        if (key.name === 'escape') {
+          onExit();
+        }
       }
     },
     { isActive: true },
@@ -127,6 +85,30 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   );
 
   const maxItemsToShow = Math.max(1, Math.floor(listHeight / 4));
+
+  if (selectedMessageId) {
+    return (
+      <RewindConfirmation
+        stats={confirmationStats}
+        terminalWidth={terminalWidth}
+        onConfirm={(outcome) => {
+          if (outcome === RewindOutcome.Cancel) {
+            clearSelection();
+          } else {
+            const userPrompt = interactions.find(
+              (m) => m.id === selectedMessageId,
+            );
+            if (userPrompt) {
+              const originalUserText = userPrompt.content
+                ? partToString(userPrompt.content)
+                : '';
+              onRewind(selectedMessageId, originalUserText, outcome);
+            }
+          }
+        }}
+      />
+    );
+  }
 
   return (
     <Box
@@ -149,17 +131,14 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
           showNumbers={false}
           onSelect={(item: MessageRecord) => {
             const userPrompt = item;
-            if (userPrompt) {
-              const originalUserText = userPrompt.content
-                ? partToString(userPrompt.content)
-                : '';
-              onRewind(userPrompt.id ?? '', originalUserText);
+            if (userPrompt && userPrompt.id) {
+              selectMessage(userPrompt.id);
             }
           }}
           maxItemsToShow={maxItemsToShow}
           renderItem={(itemWrapper, { isSelected }) => {
             const userPrompt = itemWrapper.value;
-            const stats = calculateStats(userPrompt);
+            const stats = getStats(userPrompt);
 
             const originalUserText = userPrompt.content
               ? partToString(userPrompt.content)
@@ -178,7 +157,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
                 </Box>
                 {stats ? (
                   <Box flexDirection="row">
-                    <Text color={theme.text.primary}>
+                    <Text color={theme.text.secondary}>
                       {stats.fileCount === 1
                         ? stats.firstFileName
                         : `${stats.fileCount} files changed`}{' '}
@@ -191,7 +170,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
                     )}
                   </Box>
                 ) : (
-                  <Text color={theme.text.primary}>
+                  <Text color={theme.text.secondary}>
                     No files have been changed
                   </Text>
                 )}
@@ -203,7 +182,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
 
       <Box marginTop={1}>
         <Text color={theme.text.secondary}>
-          (Use Enter to rewind to this message, Esc to close)
+          (Use Enter to select a message, Esc to close)
         </Text>
       </Box>
     </Box>

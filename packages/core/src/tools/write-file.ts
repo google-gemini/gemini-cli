@@ -344,6 +344,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         originalContent: correctedContentResult.originalContent,
         newContent: correctedContentResult.correctedContent,
         diffStat,
+        isNewFile,
       };
 
       return {

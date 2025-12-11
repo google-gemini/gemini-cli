@@ -416,6 +416,7 @@ class EditToolInvocation
         originalContent: editData.currentContent,
         newContent: editData.newContent,
         diffStat,
+        isNewFile: editData.isNewFile,
       };
 
       // Log file operation for telemetry (without diff_stat to avoid double-counting)
