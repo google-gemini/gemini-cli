@@ -227,10 +227,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (shellModeActive) {
         shellHistory.addCommandToHistory(submittedValue);
       }
+
+      // Transform [image #N] to @.gemini-clipboard/image-N.png before submission
+      // Most clipboard images are PNG format
+      const transformedValue = submittedValue.replace(
+        /\[image #(\d+)\]/g,
+        '@.gemini-clipboard/image-$1.png',
+      );
+
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
-      onSubmit(submittedValue);
+      onSubmit(transformedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
     },
@@ -332,10 +340,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             // Ignore cleanup errors
           });
 
-          // Get relative path from current directory
-          const relativePath = path.relative(config.getTargetDir(), imagePath);
-
+          // Extract image number from filename (e.g., "image-1.png" -> 1)
+          const filename = path.basename(imagePath);
+          const imageNumberMatch = filename.match(/image-(\d+)\./);
           // Insert @path reference
+          const relativePath = path.relative(config.getTargetDir(), imagePath);
           const insertText = `@${relativePath}`;
           const currentText = buffer.text;
           const offset = buffer.getOffset();

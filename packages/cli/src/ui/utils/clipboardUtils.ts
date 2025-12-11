@@ -363,8 +363,14 @@ export async function cleanupOldClipboardImages(
     for (const file of files) {
       const ext = path.extname(file).toLowerCase();
       if (
+<<<<<<< HEAD
         (file.startsWith('clipboard-') || file.startsWith('image-')) &&
         IMAGE_EXTENSIONS.includes(ext)
+=======
+        file.match(
+          /^(clipboard-\d+|image-\d+)\.(png|jpg|jpeg|tiff|gif|bmp|webp)$/,
+        )
+>>>>>>> refs/rewritten/main-3
       ) {
         const filePath = path.join(tempDir, file);
         const stats = await fs.stat(filePath);
