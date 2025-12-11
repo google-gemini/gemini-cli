@@ -90,6 +90,7 @@ import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
+import { type Event } from '../code_assist/events/types.js';
 
 import { ApprovalMode } from '../policy/types.js';
 
@@ -168,6 +169,8 @@ import {
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
+import { getEvents } from '../code_assist/events/events.js';
+import type { Events, EventType } from '../code_assist/events/types.js';
 
 export type { FileFilteringOptions };
 export {
@@ -439,7 +442,9 @@ export class Config {
     | undefined;
   private readonly disabledHooks: string[];
   private experiments: Experiments | undefined;
+  private events: Events | undefined;
   private experimentsPromise: Promise<void> | undefined;
+  private eventsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
 
   private previewModelFallbackMode = false;
@@ -751,9 +756,19 @@ export class Config {
         .catch((e) => {
           debugLogger.error('Failed to fetch experiments', e);
         });
+
+      this.eventsPromise = getEvents(codeAssistServer)
+        .then((events) => {
+          this.setEvents(events);
+        })
+        .catch((e) => {
+          debugLogger.error('Failed fetch events', e);
+        });
     } else {
       this.experiments = undefined;
       this.experimentsPromise = undefined;
+      this.events = undefined;
+      this.eventsPromise = undefined;
     }
 
     // Reset the session flag since we're explicitly changing auth and using default model
@@ -1345,20 +1360,15 @@ export class Config {
     return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
   }
 
-  async getBannerTextNoCapacityIssues(): Promise<string> {
-    await this.ensureExperimentsLoaded();
-    return (
-      this.experiments?.flags[ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES]
-        ?.stringValue ?? ''
-    );
-  }
-
-  async getBannerTextCapacityIssues(): Promise<string> {
-    await this.ensureExperimentsLoaded();
-    return (
-      this.experiments?.flags[ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES]
-        ?.stringValue ?? ''
-    );
+  private async ensureEventsLoaded(): Promise<void> {
+    if (!this.eventsPromise) {
+      return;
+    }
+    try {
+      await this.eventsPromise;
+    } catch (e) {
+      debugLogger.debug('Failed to fetch events', e);
+    }
   }
 
   private async ensureExperimentsLoaded(): Promise<void> {
@@ -1673,6 +1683,29 @@ export class Config {
       compact: false,
     });
     debugLogger.debug('Experiments loaded', summaryString);
+  }
+
+  /**
+   * Get event based on an event type
+   */
+  async getEvent(eventType: EventType): Promise<Event | undefined> {
+    await this.ensureEventsLoaded();
+    if (!this.events?.events) {
+      return;
+    }
+    for (const event of this.events.events) {
+      if (event.eventType === eventType) {
+        return event;
+      }
+    }
+    return;
+  }
+
+  /**
+   * Set events
+   */
+  setEvents(events: Events): void {
+    this.events = events;
   }
 }
 // Export model constants for use in CLI

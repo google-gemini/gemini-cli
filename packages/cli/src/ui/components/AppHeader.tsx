@@ -20,9 +20,9 @@ interface AppHeaderProps {
 export const AppHeader = ({ version }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
-  const { nightly, mainAreaWidth, bannerData, bannerVisible } = useUIState();
+  const { nightly, mainAreaWidth, banner, bannerVisible } = useUIState();
 
-  const { bannerText } = useBanner(bannerData, config);
+  const { bannerText } = useBanner(banner, config);
 
   return (
     <Box flexDirection="column">
@@ -33,7 +33,7 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
             <Banner
               width={mainAreaWidth}
               bannerText={bannerText}
-              isWarning={bannerData.warningText !== ''}
+              isWarning={banner.isWarning}
             />
           )}
         </>

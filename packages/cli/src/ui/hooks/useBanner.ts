@@ -4,24 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { persistentState } from '../../utils/persistentState.js';
+import { useState, useEffect } from 'react';
 import type { Config } from '@google/gemini-cli-core';
-import crypto from 'node:crypto';
 
-const DEFAULT_MAX_BANNER_SHOWN_COUNT = 5;
-
-interface BannerData {
-  defaultText: string;
-  warningText: string;
+export interface BannerData {
+  bannerText: string;
+  isWarning: boolean;
 }
 
 export function useBanner(bannerData: BannerData, config: Config) {
-  const { defaultText, warningText } = bannerData;
-
   const [previewEnabled, setPreviewEnabled] = useState(
     config.getPreviewFeatures(),
   );
+
+  const { bannerText } = bannerData;
 
   useEffect(() => {
     const isEnabled = config.getPreviewFeatures();
@@ -30,44 +26,11 @@ export function useBanner(bannerData: BannerData, config: Config) {
     }
   }, [config, previewEnabled]);
 
-  const [bannerCounts] = useState(
-    () => persistentState.get('defaultBannerShownCount') || {},
-  );
-
-  const hashedText = crypto
-    .createHash('sha256')
-    .update(defaultText)
-    .digest('hex');
-
-  const currentBannerCount = bannerCounts[hashedText] || 0;
-
-  const showDefaultBanner =
-    warningText === '' &&
-    !previewEnabled &&
-    currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT;
-
-  const rawBannerText = showDefaultBanner ? defaultText : warningText;
-  const bannerText = rawBannerText.replace(/\\n/g, '\n');
-
-  const lastIncrementedKey = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (showDefaultBanner && defaultText) {
-      if (lastIncrementedKey.current !== defaultText) {
-        lastIncrementedKey.current = defaultText;
-
-        const allCounts = persistentState.get('defaultBannerShownCount') || {};
-        const current = allCounts[hashedText] || 0;
-
-        persistentState.set('defaultBannerShownCount', {
-          ...allCounts,
-          [hashedText]: current + 1,
-        });
-      }
-    }
-  }, [showDefaultBanner, defaultText, hashedText]);
+  const bannerTextEscaped = !previewEnabled
+    ? bannerText.replace(/\\n/g, '\n')
+    : '';
 
   return {
-    bannerText,
+    bannerText: bannerTextEscaped,
   };
 }

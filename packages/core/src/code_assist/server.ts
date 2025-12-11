@@ -42,6 +42,7 @@ import {
   toCountTokenRequest,
   toGenerateContentRequest,
 } from './converter.js';
+import type { ReceiveEventsResponse } from './events/types.js';
 
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
@@ -176,6 +177,12 @@ export class CodeAssistServer implements ContentGenerator {
     );
   }
 
+  async receiveEvents(): Promise<ReceiveEventsResponse> {
+    const response: ReceiveEventsResponse =
+      await this.requestGet('event:receive');
+    return response;
+  }
+
   async requestPost<T>(
     method: string,
     req: object,
@@ -254,7 +261,10 @@ export class CodeAssistServer implements ContentGenerator {
   getMethodUrl(method: string): string {
     const endpoint =
       process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
-    return `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`;
+
+    return method === 'event:receive'
+      ? `${endpoint}/${CODE_ASSIST_API_VERSION}/${method}`
+      : `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`;
   }
 }
 
