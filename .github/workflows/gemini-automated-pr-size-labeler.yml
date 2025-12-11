@@ -6,7 +6,7 @@ on:
 
 jobs:
   label-pr:
-    timeout-minutes: 5
+    timeout-minutes: 10
     if: |-
       ${{ github.repository == 'google-gemini/gemini-cli' }}
     permissions:
