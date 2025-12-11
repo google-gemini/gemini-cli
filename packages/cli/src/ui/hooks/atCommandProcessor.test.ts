@@ -11,7 +11,7 @@ import type { Config, DiscoveredMCPResource } from '@google/gemini-cli-core';
 import {
   FileDiscoveryService,
   GlobTool,
-  ReadManyFilesTool, // Import a reference for mocking
+  ReadManyFilesTool,
   StandardFileSystemService,
   ToolRegistry,
   COMMON_IGNORE_PATTERNS,

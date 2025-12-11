@@ -500,13 +500,17 @@ export async function handleAtCommand({
       >,
       userMessageTimestamp,
     );
+    // Find the first error to report
     const firstError = resourceReadDisplays.find(
       (d) => d.status === ToolCallStatus.Error,
     )!;
+    const errorMessages = resourceReadDisplays
+      .filter((d) => d.status === ToolCallStatus.Error)
+      .map((d) => d.resultDisplay);
+    console.error(errorMessages);
     const errorMsg = `Exiting due to an error processing the @ command: ${firstError.resultDisplay}`;
     return { processedQuery: null, shouldProceed: false, error: errorMsg };
   }
-  // Find the first error to report
 
   if (pathSpecsToRead.length === 0) {
     if (resourceReadDisplays.length > 0) {
