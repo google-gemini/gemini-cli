@@ -34,6 +34,7 @@ import type { ContentGenerator } from './contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
   getEffectiveModel,
+  resolveModel,
 } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
@@ -62,6 +63,7 @@ import {
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
+import { DEFAULT_MODEL_CONFIGS } from '../config/defaultModelConfigs.js';
 
 export const MAX_TURNS = 100;
 
@@ -535,24 +537,53 @@ export class GeminiClient {
       signal,
     };
 
+    debugLogger.log(`[GeminiClient] Sending message with ${modelOverride}"`);
+
     let modelToUse: string;
     let overrideModelResolved = false;
+    let resolvedOverrideModelName: string | undefined;
 
     if (modelOverride) {
       try {
-        this.config.modelConfigService.getResolvedConfig({
-          model: modelOverride,
-        });
-        overrideModelResolved = true;
-      } catch {
-        debugLogger.warn(
-          `[GeminiClient] Invalid model override "${modelOverride}"`,
+        const resolvedModelAlias = resolveModel(
+          modelOverride,
+          this.config.getPreviewFeatures(),
+        );
+        const resolvedConfig = this.config.modelConfigService.getResolvedConfig(
+          {
+            model: resolvedModelAlias,
+          },
+        );
+        const resolvedModel = resolvedConfig.model;
+        const isSupported =
+          resolvedModel &&
+          (Object.keys(DEFAULT_MODEL_CONFIGS.aliases || {}).includes(
+            resolvedModel,
+          ) ||
+            Object.values(DEFAULT_MODEL_CONFIGS.aliases || {}).some(
+              (alias) => alias.modelConfig.model === resolvedModel,
+            ));
+
+        if (isSupported) {
+          resolvedOverrideModelName = resolvedModel;
+          overrideModelResolved = true;
+          debugLogger.log(
+            `[GeminiClient] Overriding current model with "${resolvedConfig.model}"`,
+          );
+        } else {
+          debugLogger.error(
+            `[GeminiClient] Invalid model override "${modelOverride}" (resolved: "${resolvedModel}"). Model is not in the supported list.`,
+          );
+        }
+      } catch (e) {
+        debugLogger.error(
+          `[GeminiClient] Error resolving model override "${modelOverride}": ${getErrorMessage(e)}`,
         );
       }
     }
     // Determine Model (Stickiness vs. Routing)
-    if (modelOverride && overrideModelResolved) {
-      modelToUse = modelOverride;
+    if (modelOverride && overrideModelResolved && resolvedOverrideModelName) {
+      modelToUse = resolvedOverrideModelName;
     } else if (this.currentSequenceModel) {
       modelToUse = this.currentSequenceModel;
     } else {

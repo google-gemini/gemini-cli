@@ -1464,19 +1464,20 @@ ${JSON.stringify(
       });
 
       it('should use modelOverride when provided, bypassing the router', async () => {
+        const validOverrideModel = 'gemini-2.5-flash';
         const stream = client.sendMessageStream(
           [{ text: 'Hi' }],
           new AbortController().signal,
           'prompt-1',
           MAX_TURNS,
           false,
-          'overridden-model',
+          validOverrideModel,
         );
         await fromAsync(stream); // consume stream
 
         expect(mockConfig.getModelRouterService).not.toHaveBeenCalled();
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'overridden-model' },
+          { model: validOverrideModel },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
         );
@@ -2621,18 +2622,14 @@ ${JSON.stringify(
 
     it('should fall back to current model and log a warning if modelOverride is invalid', async () => {
       const invalidModel = 'non-existent-model';
-      const errorMessage = `Could not resolve a model name for alias "${invalidModel}". Please ensure the alias chain or a matching override specifies a model.`;
+      // modelConfigService returns the model name if it can't resolve it as an alias
+      // It does NOT throw by default for unknown models (unless they are aliases that fail resolution)
       (
         mockConfig.modelConfigService.getResolvedConfig as Mock
-      ).mockImplementation((context) => {
-        if (context.model === invalidModel) {
-          throw new Error(errorMessage);
-        }
-        return {
-          model: context.model,
+      ).mockImplementation((context) => ({
+          model: context.model, // Returns the input model (invalidModel)
           generateContentConfig: {},
-        } as ResolvedModelConfig;
-      });
+        } as ResolvedModelConfig));
 
       mockTurnRunFn.mockReturnValue(
         (async function* () {
@@ -2655,8 +2652,18 @@ ${JSON.stringify(
         mockConfig.modelConfigService.getResolvedConfig,
       ).toHaveBeenNthCalledWith(1, { model: invalidModel });
 
+      // Should fall back to the routed/sequence model (mocked as 'default-routed-model' or similar)
+      // NOT the invalidModel.
       expect(mockTurnRunFn).toHaveBeenCalledWith(
-        { model: mockConfig.getGeminiClient().getCurrentSequenceModel() },
+        expect.not.objectContaining({ model: invalidModel }),
+        [{ text: 'Hi' }],
+        expect.any(AbortSignal),
+      );
+
+      // Specifically check it used the fallback
+      // Since currentSequenceModel is null initially, and we mocked the router:
+      expect(mockTurnRunFn).toHaveBeenCalledWith(
+        { model: 'default-routed-model' },
         [{ text: 'Hi' }],
         expect.any(AbortSignal),
       );
