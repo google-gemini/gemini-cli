@@ -64,6 +64,10 @@ export class AgentSideConnection implements Client {
     this.#connection = new Connection(handler, input, output);
   }
 
+  get closed(): Promise<void> {
+    return this.#connection.closed;
+  }
+
   /**
    * Streams new content to the client including text, tool calls, etc.
    */
