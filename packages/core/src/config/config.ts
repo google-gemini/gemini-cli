@@ -177,6 +177,7 @@ export {
 
 export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 4_000_000;
 export const DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES = 1000;
+export const DEFAULT_RIPGREP_MAX_MATCHES = 20_000;
 
 export class MCPServerConfig {
   constructor(
@@ -294,6 +295,7 @@ export interface ConfigParameters {
   truncateToolOutputThreshold?: number;
   truncateToolOutputLines?: number;
   enableToolOutputTruncation?: boolean;
+  ripgrepMaxMatches?: number;
   eventEmitter?: EventEmitter;
   useSmartEdit?: boolean;
   useWriteTodos?: boolean;
@@ -414,6 +416,7 @@ export class Config {
   private readonly truncateToolOutputThreshold: number;
   private readonly truncateToolOutputLines: number;
   private readonly enableToolOutputTruncation: boolean;
+  private readonly ripgrepMaxMatches: number;
   private initialized: boolean = false;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
@@ -550,6 +553,8 @@ export class Config {
     this.truncateToolOutputLines =
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
+    this.ripgrepMaxMatches =
+      params.ripgrepMaxMatches ?? DEFAULT_RIPGREP_MAX_MATCHES;
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? true;
     this.enableHooks = params.enableHooks ?? false;
@@ -1386,6 +1391,10 @@ export class Config {
 
   getUseRipgrep(): boolean {
     return this.useRipgrep;
+  }
+
+  getRipgrepMaxMatches(): number {
+    return this.ripgrepMaxMatches;
   }
 
   getEnableInteractiveShell(): boolean {
