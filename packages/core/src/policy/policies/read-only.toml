@@ -56,6 +56,6 @@ decision = "allow"
 priority = 50
 
 [[rule]]
-toolName = "codebase_investigator"
+toolName = "SubagentInvocation"
 decision = "allow"
 priority = 50
