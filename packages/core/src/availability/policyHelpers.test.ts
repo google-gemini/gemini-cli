@@ -12,6 +12,7 @@ import {
 } from './policyHelpers.js';
 import { createDefaultPolicy } from './policyCatalog.js';
 import type { Config } from '../config/config.js';
+import { DEFAULT_GEMINI_MODEL_AUTO } from '../config/models.js';
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
@@ -43,7 +44,7 @@ describe('policyHelpers', () => {
 
     it('returns the default chain when active model is "auto"', () => {
       const config = createMockConfig({
-        getModel: () => 'auto',
+        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       });
       const chain = resolvePolicyChain(config);
 
@@ -63,7 +64,7 @@ describe('policyHelpers', () => {
       ];
       const context = buildFallbackPolicyContext(chain, 'b');
       expect(context.failedPolicy?.model).toBe('b');
-      expect(context.candidates.map((p) => p.model)).toEqual(['c', 'a']);
+      expect(context.candidates.map((p) => p.model)).toEqual(['c']);
     });
 
     it('returns full chain when model is not in policy list', () => {

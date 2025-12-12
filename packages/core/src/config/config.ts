@@ -507,8 +507,7 @@ export class Config {
     this.bugCommand = params.bugCommand;
     this.model = params.model;
     this._activeModel = params.model;
-    this.enableModelAvailabilityService =
-      params.enableModelAvailabilityService ?? false;
+    this.enableModelAvailabilityService = true;
     this.enableAgents = params.enableAgents ?? false;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.modelAvailabilityService = new ModelAvailabilityService();
@@ -706,6 +705,9 @@ export class Config {
       // Restore the conversation history to the new client
       this.geminiClient.stripThoughtsFromHistory();
     }
+
+    // Reset availability status when switching auth (e.g. from limited key to OAuth)
+    this.modelAvailabilityService.reset();
 
     const newContentGeneratorConfig = await createContentGeneratorConfig(
       this,

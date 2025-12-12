@@ -291,7 +291,7 @@ describe('Settings Loading and Merging', () => {
         theme: 'legacy-dark',
         vimMode: true,
         contextFileName: 'LEGACY_CONTEXT.md',
-        model: 'gemini-pro',
+        model: 'gemini-2.5-pro',
         mcpServers: {
           'legacy-server-1': {
             command: 'npm',
@@ -329,7 +329,7 @@ describe('Settings Loading and Merging', () => {
           fileName: 'LEGACY_CONTEXT.md',
         },
         model: {
-          name: 'gemini-pro',
+          name: 'gemini-2.5-pro',
         },
         mcpServers: {
           'legacy-server-1': {
@@ -1929,7 +1929,7 @@ describe('Settings Loading and Merging', () => {
           usageStatisticsEnabled: false,
         },
         model: {
-          name: 'gemini-pro',
+          name: 'gemini-2.5-pro',
         },
         context: {
           fileName: 'CONTEXT.md',
@@ -1968,7 +1968,7 @@ describe('Settings Loading and Merging', () => {
         vimMode: true,
         theme: 'dark',
         usageStatisticsEnabled: false,
-        model: 'gemini-pro',
+        model: 'gemini-2.5-pro',
         contextFileName: 'CONTEXT.md',
         includeDirectories: ['/src'],
         sandbox: true,
