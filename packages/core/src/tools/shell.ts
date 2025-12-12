@@ -310,7 +310,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
-      } else if (result.backgrounded) {
+      } else if (this.params.is_background) {
         llmContent = `Command moved to background (PID: ${result.pid}). Output is hidden from this conversation but continues in the background.`;
         data = {
           pid: result.pid,
@@ -342,7 +342,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (this.config.getDebugMode()) {
         returnDisplayMessage = llmContent;
       } else {
-        if (result.backgrounded) {
+        if (this.params.is_background) {
           returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden.`;
         } else if (result.output.trim()) {
           returnDisplayMessage = result.output;
@@ -408,7 +408,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 }
 
-function getShellToolDescription(): string {
+function getShellToolDescription(enableInteractiveShell: boolean): string {
   const returnedInfo = `
 
       The following information is returned:
@@ -424,9 +424,15 @@ function getShellToolDescription(): string {
       Process Group PGID: Process group started or \`(none)\``;
 
   if (os.platform() === 'win32') {
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${returnedInfo}`;
+    const backgroundInstructions = enableInteractiveShell
+      ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use PowerShell background constructs.'
+      : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
+    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${returnedInfo}`;
   } else {
-    return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
+    const backgroundInstructions = enableInteractiveShell
+      ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use `&` to background commands.'
+      : 'Command can start background processes using `&`.';
+    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
   }
 }
 
@@ -454,7 +460,7 @@ export class ShellTool extends BaseDeclarativeTool<
     super(
       ShellTool.Name,
       'Shell',
-      getShellToolDescription(),
+      getShellToolDescription(config.getEnableInteractiveShell()),
       Kind.Execute,
       {
         type: 'object',

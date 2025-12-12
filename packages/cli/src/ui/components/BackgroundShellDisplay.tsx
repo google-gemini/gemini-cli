@@ -26,7 +26,7 @@ interface BackgroundShellDisplayProps {
 }
 
 const CONTENT_PADDING_X = 1;
-const RIGHT_TEXT = 'Ctrl+B Hide | Ctrl+K Kill';
+const RIGHT_TEXT = 'F11 Hide | Ctrl+K Kill';
 // 2 for borders, 2 for padding
 const TAB_DISPLAY_HORIZONTAL_PADDING = 4;
 
