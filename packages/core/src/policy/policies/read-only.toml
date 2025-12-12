@@ -54,3 +54,8 @@ priority = 50
 toolName = "google_web_search"
 decision = "allow"
 priority = 50
+
+[[rule]]
+toolName = "codebase_investigator"
+decision = "allow"
+priority = 50
