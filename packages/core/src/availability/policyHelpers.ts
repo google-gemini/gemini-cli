@@ -13,8 +13,17 @@ import type {
   ModelPolicyChain,
   RetryAvailabilityContext,
 } from './modelPolicy.js';
-import { createDefaultPolicy, getModelPolicyChain } from './policyCatalog.js';
-import { DEFAULT_GEMINI_MODEL, resolveModel } from '../config/models.js';
+import {
+  createDefaultPolicy,
+  createSingleModelChain,
+  getModelPolicyChain,
+} from './policyCatalog.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  resolveModel,
+} from '../config/models.js';
 import type { ModelSelectionResult } from './modelAvailabilityService.js';
 
 /**
@@ -31,15 +40,20 @@ export function resolvePolicyChain(
   const modelFromConfig =
     preferredModel ?? config.getActiveModel?.() ?? config.getModel();
 
-  const isPreviewRequest =
-    modelFromConfig.includes('gemini-3') ||
-    modelFromConfig.includes('preview') ||
-    modelFromConfig === 'fiercefalcon';
+  let chain;
 
-  const chain = getModelPolicyChain({
-    previewEnabled: isPreviewRequest,
-    userTier: config.getUserTier(),
-  });
+  if (
+    config.getModel() === PREVIEW_GEMINI_MODEL_AUTO ||
+    config.getModel() === DEFAULT_GEMINI_MODEL_AUTO
+  ) {
+    chain = getModelPolicyChain({
+      previewEnabled: config.getModel() === PREVIEW_GEMINI_MODEL_AUTO,
+      userTier: config.getUserTier(),
+    });
+  } else {
+    chain = createSingleModelChain(modelFromConfig);
+  }
+
   const activeModel = resolveModel(modelFromConfig);
 
   const activeIndex = chain.findIndex((policy) => policy.model === activeModel);
