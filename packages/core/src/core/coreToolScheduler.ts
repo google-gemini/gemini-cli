@@ -246,22 +246,26 @@ const createErrorResponse = (
   request: ToolCallRequestInfo,
   error: Error,
   errorType: ToolErrorType | undefined,
-): ToolCallResponseInfo => ({
-  callId: request.callId,
-  error,
-  responseParts: [
-    {
-      functionResponse: {
-        id: request.callId,
-        name: request.name,
-        response: { error: error.message },
+  returnDisplay?: string,
+): ToolCallResponseInfo => {
+  const displayText = returnDisplay ?? error.message;
+  return {
+    callId: request.callId,
+    error,
+    responseParts: [
+      {
+        functionResponse: {
+          id: request.callId,
+          name: request.name,
+          response: { error: error.message },
+        },
       },
-    },
-  ],
-  resultDisplay: error.message,
-  errorType,
-  contentLength: error.message.length,
-});
+    ],
+    resultDisplay: displayText,
+    errorType,
+    contentLength: displayText.length,
+  };
+};
 
 export async function truncateAndSaveToFile(
   content: string,
@@ -1242,10 +1246,15 @@ export class CoreToolScheduler {
               } else {
                 // It is a failure
                 const error = new Error(toolResult.error.message);
+                const displayText =
+                  typeof toolResult.returnDisplay === 'string'
+                    ? toolResult.returnDisplay
+                    : undefined;
                 const errorResponse = createErrorResponse(
                   scheduledCall.request,
                   error,
                   toolResult.error.type,
+                  displayText,
                 );
                 this.setStatusInternal(callId, 'error', signal, errorResponse);
               }
