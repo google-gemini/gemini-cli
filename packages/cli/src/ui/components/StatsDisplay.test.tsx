@@ -76,11 +76,6 @@ describe('<StatsDisplay />', () => {
 
     expect(output).toContain('Performance');
     expect(output).toContain('Interaction Summary');
-<<<<<<< HEAD
-    expect(output).not.toContain('Efficiency & Optimizations');
-    expect(output).not.toContain('Model'); // The table header
-=======
->>>>>>> 54de67536 (feat(cli): polish cached token stats and simplify stats display when quota is present. (#14961))
     expect(output).toMatchSnapshot();
   });
 
