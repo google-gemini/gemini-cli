@@ -11,8 +11,7 @@ vi.mock('node:child_process', async (importOriginal) => {
     (await importOriginal()) as typeof import('node:child_process');
   return {
     ...actual,
-    execSync: vi.fn(),
-    spawnSync: vi.fn(() => ({ status: 0 })),
+    spawnSync: vi.fn(() => ({ status: 0, stdout: '' })),
   };
 });
 vi.mock('fs');
@@ -25,6 +24,36 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
+
+function mockCommandLookup({
+  platform,
+  status = 0,
+  stdout = '',
+}: {
+  platform: NodeJS.Platform;
+  status?: number;
+  stdout?: string;
+}) {
+  return vi.spyOn(child_process, 'spawnSync').mockImplementation((cmd) => {
+    const normalizedCommand = typeof cmd === 'string' ? cmd.toLowerCase() : '';
+    const isLookup =
+      platform === 'win32'
+        ? normalizedCommand === 'where.exe'
+        : normalizedCommand === 'command';
+    if (isLookup) {
+      return {
+        status,
+        stdout,
+        stderr: '',
+      };
+    }
+    return {
+      status: 0,
+      stdout: '',
+      stderr: '',
+    };
+  });
+}
 
 describe('ide-installer', () => {
   const HOME_DIR = '/home/user';
@@ -60,15 +89,21 @@ describe('ide-installer', () => {
     function setup({
       ide = IDE_DEFINITIONS.vscode,
       existsResult = false,
-      execSync = () => '',
       platform = 'linux' as NodeJS.Platform,
+      commandLookupStatus = 0,
+      commandLookupStdout = '',
     }: {
       ide?: IdeInfo;
       existsResult?: boolean;
-      execSync?: () => string;
       platform?: NodeJS.Platform;
+      commandLookupStatus?: number;
+      commandLookupStdout?: string;
     } = {}) {
-      vi.spyOn(child_process, 'execSync').mockImplementation(execSync);
+      mockCommandLookup({
+        platform,
+        status: commandLookupStatus,
+        stdout: commandLookupStdout,
+      });
       vi.spyOn(fs, 'existsSync').mockReturnValue(existsResult);
       const installer = getIdeInstaller(ide, platform)!;
 
@@ -103,9 +138,7 @@ describe('ide-installer', () => {
         async ({ platform, expectedLookupPaths }) => {
           const { installer } = setup({
             platform,
-            execSync: () => {
-              throw new Error('Command not found'); // `code` is not in PATH
-            },
+            commandLookupStatus: 1,
           });
           await installer.install();
           for (const [idx, path] of expectedLookupPaths.entries()) {
@@ -133,7 +166,8 @@ describe('ide-installer', () => {
       it('installs the extension using code cli on windows', async () => {
         const { installer } = setup({
           platform: 'win32',
-          execSync: () => 'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd',
+          commandLookupStdout:
+            'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd',
         });
         await installer.install();
         expect(child_process.spawnSync).toHaveBeenCalledWith(
@@ -182,9 +216,7 @@ describe('ide-installer', () => {
         async ({ ide, expectedErr }) => {
           const { installer } = setup({
             ide,
-            execSync: () => {
-              throw new Error('Command not found');
-            },
+            commandLookupStatus: 1,
             existsResult: false,
           });
           const result = await installer.install();
@@ -198,13 +230,19 @@ describe('ide-installer', () => {
 
 describe('AntigravityInstaller', () => {
   function setup({
-    execSync = () => '',
     platform = 'linux' as NodeJS.Platform,
+    commandLookupStatus = 0,
+    commandLookupStdout = 'agy',
   }: {
-    execSync?: () => string;
     platform?: NodeJS.Platform;
+    commandLookupStatus?: number;
+    commandLookupStdout?: string;
   } = {}) {
-    vi.spyOn(child_process, 'execSync').mockImplementation(execSync);
+    mockCommandLookup({
+      platform,
+      status: commandLookupStatus,
+      stdout: commandLookupStdout,
+    });
     const installer = getIdeInstaller(IDE_DEFINITIONS.antigravity, platform)!;
 
     return { installer };
@@ -227,6 +265,22 @@ describe('AntigravityInstaller', () => {
     );
   });
 
+  it('passes alias to command lookup without shell interpretation', async () => {
+    const alias = 'agy && rm -rf /';
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', alias);
+    const { installer } = setup({
+      commandLookupStdout: alias,
+    });
+    await installer.install();
+
+    expect(child_process.spawnSync).toHaveBeenNthCalledWith(
+      1,
+      'command',
+      ['-v', alias],
+      expect.objectContaining({ stdio: 'ignore', shell: false }),
+    );
+  });
+
   it('returns a failure message if the alias is not set', async () => {
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
     const { installer } = setup({});
@@ -241,9 +295,7 @@ describe('AntigravityInstaller', () => {
   it('returns a failure message if the command is not found', async () => {
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'not-a-command');
     const { installer } = setup({
-      execSync: () => {
-        throw new Error('Command not found');
-      },
+      commandLookupStatus: 1,
     });
     const result = await installer.install();
 

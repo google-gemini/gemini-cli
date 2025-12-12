@@ -10,7 +10,8 @@ export default defineConfig({
   test: {
     reporters: ['default', 'junit'],
     timeout: 30000,
-    silent: true,
+    silent: false,
+    pool: 'threads',
     setupFiles: ['./test-setup.ts'],
     outputFile: {
       junit: 'junit.xml',
