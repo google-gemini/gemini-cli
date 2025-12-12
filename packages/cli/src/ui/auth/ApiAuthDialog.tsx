@@ -32,9 +32,12 @@ export function ApiAuthDialog({
 
   const isMounted = useRef(true);
 
-  useEffect(() => () => {
+  useEffect(
+    () => () => {
       isMounted.current = false;
-    }, []);
+    },
+    [],
+  );
 
   const initialApiKey = defaultValue;
 
