@@ -2,6 +2,7 @@
   "name": "@google/gemini-cli",
   "version": "0.21.0-nightly.20251211.8c83e1ea9",
   "description": "Gemini CLI",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
