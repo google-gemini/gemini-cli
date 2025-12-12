@@ -46,8 +46,8 @@ describe('stdin context', () => {
     ).toBeGreaterThan(-1);
 
     expect(
-      stdinIndex < promptIndex,
-      `Expected stdin content (index ${stdinIndex}) to appear before prompt (index ${promptIndex}) in conversation history`,
+      promptIndex < stdinIndex,
+      `Expected prompt (index ${promptIndex}) to appear before stdin content (index ${stdinIndex}) in conversation history`,
     ).toBeTruthy();
 
     // Add debugging information
