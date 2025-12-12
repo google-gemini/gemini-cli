@@ -12,6 +12,7 @@ export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
 
 export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -21,6 +22,7 @@ export const PREVIEW_GEMINI_MODEL_AUTO = 'auto-gemini-3';
 export const DEFAULT_GEMINI_MODEL_AUTO = 'auto-gemini-2.5';
 
 // Model aliases for user convenience.
+export const GEMINI_MODEL_ALIAS_AUTO = 'auto';
 export const GEMINI_MODEL_ALIAS_PRO = 'pro';
 export const GEMINI_MODEL_ALIAS_FLASH = 'flash';
 export const GEMINI_MODEL_ALIAS_FLASH_LITE = 'flash-lite';
@@ -122,6 +124,20 @@ export function getDisplayString(model: string) {
     default:
       return model;
   }
+}
+
+/**
+ * Checks if the model is a preview model.
+ *
+ * @param model The model name to check.
+ * @returns True if the model is a preview model.
+ */
+export function isPreviewModel(model: string): boolean {
+  return (
+    model === PREVIEW_GEMINI_MODEL ||
+    model === PREVIEW_GEMINI_FLASH_MODEL ||
+    model === PREVIEW_GEMINI_MODEL_AUTO
+  );
 }
 
 /**

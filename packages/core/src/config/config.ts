@@ -843,7 +843,6 @@ export class Config {
   setActiveModel(model: string): void {
     if (this._activeModel !== model) {
       this._activeModel = model;
-      coreEvents.emitModelChanged(model);
     }
   }
 
