@@ -35,7 +35,6 @@ interface HandleAtCommandParams {
 
 interface HandleAtCommandResult {
   processedQuery: PartListUnion | null;
-  shouldProceed: boolean;
   error?: string;
 }
 
@@ -145,7 +144,7 @@ export async function handleAtCommand({
   );
 
   if (atPathCommandParts.length === 0) {
-    return { processedQuery: [{ text: query }], shouldProceed: true };
+    return { processedQuery: [{ text: query }] };
   }
 
   // Get centralized file discovery service
@@ -175,7 +174,6 @@ export async function handleAtCommand({
     );
     return {
       processedQuery: null,
-      shouldProceed: false,
       error: 'Error: read_many_files tool not found.',
     };
   }
@@ -204,7 +202,7 @@ export async function handleAtCommand({
       );
       // Decide if this is a fatal error for the whole command or just skip this @ part
       // For now, let's be strict and fail the command if one @path is malformed.
-      return { processedQuery: null, shouldProceed: false, error: errMsg };
+      return { processedQuery: null, error: errMsg };
     }
 
     // Check if this is an MCP resource reference (serverName:uri format)
@@ -423,16 +421,13 @@ export async function handleAtCommand({
     onDebugMessage('No valid file paths found in @ commands to read.');
     if (initialQueryText === '@' && query.trim() === '@') {
       // If the only thing was a lone @, pass original query (which might have spaces)
-      return { processedQuery: [{ text: query }], shouldProceed: true };
+      return { processedQuery: [{ text: query }] };
     } else if (!initialQueryText && query) {
       // If all @-commands were invalid and no surrounding text, pass original query
-      return { processedQuery: [{ text: query }], shouldProceed: true };
+      return { processedQuery: [{ text: query }] };
     }
     // Otherwise, proceed with the (potentially modified) query text that doesn't involve file reading
-    return {
-      processedQuery: [{ text: initialQueryText || query }],
-      shouldProceed: true,
-    };
+    return { processedQuery: [{ text: initialQueryText || query }] };
   }
 
   const processedQueryParts: PartListUnion = [{ text: initialQueryText }];
@@ -509,7 +504,7 @@ export async function handleAtCommand({
       .map((d) => d.resultDisplay);
     console.error(errorMessages);
     const errorMsg = `Exiting due to an error processing the @ command: ${firstError.resultDisplay}`;
-    return { processedQuery: null, shouldProceed: false, error: errorMsg };
+    return { processedQuery: null, error: errorMsg };
   }
 
   if (pathSpecsToRead.length === 0) {
@@ -522,7 +517,7 @@ export async function handleAtCommand({
         userMessageTimestamp,
       );
     }
-    return { processedQuery: processedQueryParts, shouldProceed: true };
+    return { processedQuery: processedQueryParts };
   }
 
   const toolArgs = {
@@ -608,7 +603,7 @@ export async function handleAtCommand({
         userMessageTimestamp,
       );
     }
-    return { processedQuery: processedQueryParts, shouldProceed: true };
+    return { processedQuery: processedQueryParts };
   } catch (error: unknown) {
     readManyFilesDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
@@ -629,7 +624,6 @@ export async function handleAtCommand({
     );
     return {
       processedQuery: null,
-      shouldProceed: false,
       error: `Exiting due to an error processing the @ command: ${readManyFilesDisplay.resultDisplay}`,
     };
   }

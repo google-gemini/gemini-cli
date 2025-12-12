@@ -121,7 +121,6 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [{ text: query }],
-      shouldProceed: true,
     });
   });
 
@@ -139,7 +138,6 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [{ text: queryWithSpaces }],
-      shouldProceed: true,
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       'Lone @ detected, will be treated as text in the modified query.',
@@ -172,7 +170,6 @@ describe('handleAtCommand', () => {
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -212,7 +209,6 @@ describe('handleAtCommand', () => {
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Path ${dirPath} resolved to directory, using glob: ${resolvedGlob}`,
@@ -247,7 +243,6 @@ describe('handleAtCommand', () => {
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
   });
 
@@ -277,7 +272,6 @@ describe('handleAtCommand', () => {
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -322,7 +316,6 @@ describe('handleAtCommand', () => {
         { text: content2 },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
   });
 
@@ -363,7 +356,6 @@ describe('handleAtCommand', () => {
         { text: content2 },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
   });
 
@@ -402,7 +394,6 @@ describe('handleAtCommand', () => {
         { text: content1 },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Path ${invalidFile} not found directly, attempting glob search.`,
@@ -429,7 +420,6 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [{ text: 'Check @nonexistent.txt and @ also' }],
-      shouldProceed: true,
     });
   });
 
@@ -463,7 +453,6 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [{ text: query }],
-        shouldProceed: true,
       });
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
         `Path ${gitIgnoredFile} is git-ignored and will be skipped.`,
@@ -502,7 +491,6 @@ describe('handleAtCommand', () => {
           { text: 'console.log("Hello world");' },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -535,7 +523,6 @@ describe('handleAtCommand', () => {
           { text: '# Project README' },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
         `Path ${gitIgnoredFile} is git-ignored and will be skipped.`,
@@ -563,7 +550,6 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [{ text: query }],
-        shouldProceed: true,
       });
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
         `Path ${gitFile} is git-ignored and will be skipped.`,
@@ -596,7 +582,8 @@ describe('handleAtCommand', () => {
         `Glob tool not found. Path ${invalidFile} will be skipped.`,
       );
       expect(result.processedQuery).toEqual([{ text: query }]);
-      expect(result.shouldProceed).toBe(true);
+      expect(result.processedQuery).not.toBeNull();
+      expect(result.error).toBeUndefined();
     });
   });
 
@@ -623,7 +610,6 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [{ text: query }],
-        shouldProceed: true,
       });
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
         `Path ${geminiIgnoredFile} is gemini-ignored and will be skipped.`,
@@ -661,7 +647,6 @@ describe('handleAtCommand', () => {
         { text: 'console.log("Hello world");' },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
   });
 
@@ -697,7 +682,6 @@ describe('handleAtCommand', () => {
         { text: '// Main application entry' },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Path ${geminiIgnoredFile} is gemini-ignored and will be skipped.`,
@@ -825,7 +809,6 @@ describe('handleAtCommand', () => {
             { text: fileContent },
             { text: '\n--- End of content ---' },
           ],
-          shouldProceed: true,
         });
       },
     );
@@ -864,7 +847,6 @@ describe('handleAtCommand', () => {
           { text: content2 },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -894,7 +876,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -925,7 +906,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -956,7 +936,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -987,7 +966,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -1018,7 +996,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -1047,7 +1024,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -1076,7 +1052,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -1105,7 +1080,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
   });
@@ -1137,7 +1111,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
 
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
@@ -1166,7 +1139,8 @@ describe('handleAtCommand', () => {
         signal: abortController.signal,
       });
 
-      expect(result.shouldProceed).toBe(true);
+      expect(result.processedQuery).not.toBeNull();
+      expect(result.error).toBeUndefined();
       expect(result.processedQuery).toEqual(
         expect.arrayContaining([
           { text: `Check @${path.join(subDirPath, '**')} please.` },
@@ -1208,7 +1182,6 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [{ text: `Check @${outsidePath} please.` }],
-        shouldProceed: true,
       });
 
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
@@ -1327,7 +1300,8 @@ describe('handleAtCommand', () => {
         signal: abortController.signal,
       });
 
-      expect(result.shouldProceed).toBe(false);
+      expect(result.processedQuery).toBeNull();
+      expect(result.error).toBeDefined();
       expect(mockAddItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'tool_group',
@@ -1344,7 +1318,7 @@ describe('handleAtCommand', () => {
     });
   });
 
-  it('should return shouldProceed: false if the read_many_files tool is cancelled by user', async () => {
+  it('should return error if the read_many_files tool is cancelled by user', async () => {
     const fileContent = 'Some content';
     const filePath = await createTestFile(
       path.join(testRootDir, 'file.txt'),
@@ -1379,7 +1353,6 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: null,
-      shouldProceed: false,
       error: `Exiting due to an error processing the @ command: Error reading files (file.txt): User cancelled operation`,
     });
 
