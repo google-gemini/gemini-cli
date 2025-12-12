@@ -25,7 +25,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
 
 describe('policyHelpers', () => {
   describe('resolvePolicyChain', () => {
-    it('inserts the active model when missing from the catalog', () => {
+    it('returns a single-model chain for a custom model', () => {
       const config = createMockConfig({
         getModel: () => 'custom-model',
       });
@@ -53,6 +53,25 @@ describe('policyHelpers', () => {
       expect(chain[0]?.model).toBe('gemini-2.5-pro');
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
     });
+
+    it('starts chain from preferredModel when model is "auto"', () => {
+      const config = createMockConfig({
+        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+      });
+      const chain = resolvePolicyChain(config, 'gemini-2.5-flash');
+      expect(chain).toHaveLength(1);
+      expect(chain[0]?.model).toBe('gemini-2.5-flash');
+    });
+
+    it('wraps around the chain when wrapsAround is true', () => {
+      const config = createMockConfig({
+        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+      });
+      const chain = resolvePolicyChain(config, 'gemini-2.5-flash', true);
+      expect(chain).toHaveLength(2);
+      expect(chain[0]?.model).toBe('gemini-2.5-flash');
+      expect(chain[1]?.model).toBe('gemini-2.5-pro');
+    });
   });
 
   describe('buildFallbackPolicyContext', () => {
@@ -65,6 +84,17 @@ describe('policyHelpers', () => {
       const context = buildFallbackPolicyContext(chain, 'b');
       expect(context.failedPolicy?.model).toBe('b');
       expect(context.candidates.map((p) => p.model)).toEqual(['c']);
+    });
+
+    it('wraps around when building fallback context if wrapsAround is true', () => {
+      const chain = [
+        createDefaultPolicy('a'),
+        createDefaultPolicy('b'),
+        createDefaultPolicy('c'),
+      ];
+      const context = buildFallbackPolicyContext(chain, 'b', true);
+      expect(context.failedPolicy?.model).toBe('b');
+      expect(context.candidates.map((p) => p.model)).toEqual(['c', 'a']);
     });
 
     it('returns full chain when model is not in policy list', () => {

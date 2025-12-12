@@ -66,6 +66,10 @@ export function getModelPolicyChain(
   return cloneChain(DEFAULT_CHAIN);
 }
 
+export function createSingleModelChain(model: string): ModelPolicyChain {
+  return [definePolicy({ model, isLastResort: true })];
+}
+
 /**
  * Provides a default policy scaffold for models not present in the catalog.
  */

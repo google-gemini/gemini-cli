@@ -115,12 +115,23 @@ export function getEffectiveModel(
   return resolveModel(requestedModel, previewFeaturesEnabled);
 }
 
-export function getDisplayString(model: string) {
+export function getDisplayString(
+  model: string,
+  previewFeaturesEnabled: boolean = false,
+) {
   switch (model) {
     case PREVIEW_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 3)';
     case DEFAULT_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 2.5)';
+    case GEMINI_MODEL_ALIAS_PRO:
+      return previewFeaturesEnabled
+        ? PREVIEW_GEMINI_MODEL
+        : DEFAULT_GEMINI_MODEL;
+    case GEMINI_MODEL_ALIAS_FLASH:
+      return previewFeaturesEnabled
+        ? PREVIEW_GEMINI_FLASH_MODEL
+        : DEFAULT_GEMINI_FLASH_MODEL;
     default:
       return model;
   }
