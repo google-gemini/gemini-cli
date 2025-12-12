@@ -33,9 +33,12 @@ export function ApiAuthDialog({
 
   const pendingPromise = useRef<{ cancel: () => void } | null>(null);
 
-  useEffect(() => () => {
+  useEffect(
+    () => () => {
       pendingPromise.current?.cancel();
-    }, []);
+    },
+    [],
+  );
 
   const initialApiKey = defaultValue;
 
