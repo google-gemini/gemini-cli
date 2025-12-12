@@ -63,19 +63,13 @@ export const rewindCommand: SlashCommand = {
                 return;
               }
 
-              const projectRoot = config.getProjectRoot();
-
               if (
                 outcome === RewindOutcome.RewindAndRevert ||
                 outcome === RewindOutcome.RevertOnly
               ) {
                 const currentConversation = recordingService.getConversation();
                 if (currentConversation) {
-                  await revertFileChanges(
-                    currentConversation,
-                    messageId,
-                    projectRoot,
-                  );
+                  await revertFileChanges(currentConversation, messageId);
                 }
               }
 

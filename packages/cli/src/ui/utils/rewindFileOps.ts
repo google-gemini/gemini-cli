@@ -10,7 +10,6 @@ import type {
   MessageRecord,
 } from '@google/gemini-cli-core';
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import * as Diff from 'diff';
 
 export interface FileChangeStats {
@@ -71,7 +70,6 @@ export function calculateRewindStats(
 export async function revertFileChanges(
   conversation: ConversationRecord,
   targetMessageId: string,
-  projectRoot: string,
 ): Promise<void> {
   const messageIndex = conversation.messages.findIndex(
     (m) => m.id === targetMessageId,
@@ -95,7 +93,7 @@ export async function revertFileChanges(
           'newContent' in result &&
           'originalContent' in result
         ) {
-          const filePath = path.resolve(projectRoot, result.fileName);
+          const filePath = result.filePath;
 
           try {
             let currentContent: string | null = null;

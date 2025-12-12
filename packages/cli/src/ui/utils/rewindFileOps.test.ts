@@ -110,7 +110,7 @@ describe('rewindFileOps', () => {
   describe('revertFileChanges', () => {
     it('does nothing if message not found', async () => {
       mockConversation.messages = [];
-      await revertFileChanges(mockConversation, 'missing-id', '/root');
+      await revertFileChanges(mockConversation, 'missing-id');
       expect(fs.writeFile).not.toHaveBeenCalled();
     });
 
@@ -135,6 +135,7 @@ describe('rewindFileOps', () => {
             args: {},
             resultDisplay: {
               fileName: 'file.txt',
+              filePath: '/root/file.txt',
               originalContent: 'old',
               newContent: 'new',
               isNewFile: false,
@@ -157,10 +158,10 @@ describe('rewindFileOps', () => {
 
       vi.mocked(fs.readFile).mockResolvedValue('new');
 
-      await revertFileChanges(mockConversation, '1', '/root');
+      await revertFileChanges(mockConversation, '1');
 
       expect(fs.writeFile).toHaveBeenCalledWith(
-        path.resolve('/root', 'file.txt'),
+        path.resolve('/root/file.txt'),
         'old',
       );
     });
@@ -185,7 +186,8 @@ describe('rewindFileOps', () => {
             timestamp: '2',
             args: {},
             resultDisplay: {
-              fileName: 'newfile.txt',
+              fileName: 'file.txt',
+              filePath: '/root/file.txt',
               originalContent: null,
               newContent: 'content',
               isNewFile: true,
@@ -208,11 +210,9 @@ describe('rewindFileOps', () => {
 
       vi.mocked(fs.readFile).mockResolvedValue('content');
 
-      await revertFileChanges(mockConversation, '1', '/root');
+      await revertFileChanges(mockConversation, '1');
 
-      expect(fs.unlink).toHaveBeenCalledWith(
-        path.resolve('/root', 'newfile.txt'),
-      );
+      expect(fs.unlink).toHaveBeenCalledWith(path.resolve('/root/file.txt'));
     });
   });
 });

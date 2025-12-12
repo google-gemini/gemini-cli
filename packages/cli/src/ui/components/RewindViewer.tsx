@@ -30,6 +30,26 @@ interface RewindViewerProps {
 
 const MAX_LINES_PER_BOX = 2;
 
+const REFERENCE_CONTENT_START = '--- Content from referenced files ---';
+const REFERENCE_CONTENT_END = '--- End of content ---';
+
+function stripReferenceContent(text: string): string {
+  const startIndex = text.indexOf(REFERENCE_CONTENT_START);
+  if (startIndex === -1) return text;
+
+  const endIndex = text.lastIndexOf(REFERENCE_CONTENT_END);
+  if (endIndex === -1 || endIndex < startIndex) return text;
+
+  let removeStart = startIndex;
+  if (removeStart > 0 && text[removeStart - 1] === '\n') {
+    removeStart--;
+  }
+
+  const removeEnd = endIndex + REFERENCE_CONTENT_END.length;
+
+  return (text.slice(0, removeStart) + text.slice(removeEnd)).trim();
+}
+
 export const RewindViewer: React.FC<RewindViewerProps> = ({
   conversation,
   onExit,
@@ -40,7 +60,6 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     interactions,
     selectedMessageId,
     confirmationStats,
-    getStats,
     selectMessage,
     clearSelection,
   } = useRewindLogic(conversation);
@@ -102,7 +121,8 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
               const originalUserText = userPrompt.content
                 ? partToString(userPrompt.content)
                 : '';
-              onRewind(selectedMessageId, originalUserText, outcome);
+              const cleanedText = stripReferenceContent(originalUserText);
+              onRewind(selectedMessageId, cleanedText, outcome);
             }
           }
         }}
@@ -116,7 +136,6 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
       borderColor={theme.border.default}
       flexDirection="column"
       width={terminalWidth}
-      height={terminalHeight}
       paddingX={1}
       paddingY={1}
     >
@@ -138,42 +157,23 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
           maxItemsToShow={maxItemsToShow}
           renderItem={(itemWrapper, { isSelected }) => {
             const userPrompt = itemWrapper.value;
-            const stats = getStats(userPrompt);
 
             const originalUserText = userPrompt.content
               ? partToString(userPrompt.content)
               : '';
+            const cleanedText = stripReferenceContent(originalUserText);
 
             return (
               <Box flexDirection="column" marginBottom={1}>
                 <Box>
                   <Text
                     color={
-                      isSelected ? theme.status.success : theme.text.secondary
+                      isSelected ? theme.status.success : theme.text.primary
                     }
                   >
-                    {truncate(originalUserText, isSelected)}
+                    {truncate(cleanedText, isSelected)}
                   </Text>
                 </Box>
-                {stats ? (
-                  <Box flexDirection="row">
-                    <Text color={theme.text.secondary}>
-                      {stats.fileCount === 1
-                        ? stats.firstFileName
-                        : `${stats.fileCount} files changed`}{' '}
-                    </Text>
-                    {stats.addedLines > 0 && (
-                      <Text color="green">+{stats.addedLines} </Text>
-                    )}
-                    {stats.removedLines > 0 && (
-                      <Text color="red">-{stats.removedLines}</Text>
-                    )}
-                  </Box>
-                ) : (
-                  <Text color={theme.text.secondary}>
-                    No files have been changed
-                  </Text>
-                )}
               </Box>
             );
           }}

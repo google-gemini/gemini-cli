@@ -151,7 +151,6 @@ describe('rewindCommand', () => {
     expect(mockRevertFileChanges).toHaveBeenCalledWith(
       expect.anything(),
       'msg-id-123',
-      '/mock/root',
     );
     expect(mockRewindTo).toHaveBeenCalledWith('msg-id-123');
     expect(mockSetInput).not.toHaveBeenCalled();
@@ -174,7 +173,6 @@ describe('rewindCommand', () => {
     expect(mockRevertFileChanges).toHaveBeenCalledWith(
       expect.anything(),
       'msg-id-123',
-      '/mock/root',
     );
     expect(mockRewindTo).not.toHaveBeenCalled();
     expect(mockRemoveComponent).toHaveBeenCalled();

@@ -52,7 +52,6 @@ export function useRewindLogic(conversation: ConversationRecord) {
     interactions,
     selectedMessageId,
     confirmationStats,
-    getStats,
     selectMessage,
     clearSelection,
   };

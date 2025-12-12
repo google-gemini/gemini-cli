@@ -413,6 +413,7 @@ class EditToolInvocation
       const displayResult = {
         fileDiff,
         fileName,
+        filePath: this.resolvedPath,
         originalContent: editData.currentContent,
         newContent: editData.newContent,
         diffStat,

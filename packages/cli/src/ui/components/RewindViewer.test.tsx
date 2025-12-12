@@ -340,4 +340,58 @@ describe('RewindViewer', () => {
       expect(onRewind).not.toHaveBeenCalled();
     });
   });
+
+  describe('Content Filtering', () => {
+    it('filters out referenced file content from display', () => {
+      const userPrompt =
+        'some command @file\n--- Content from referenced files ---\nContent from file:\nblah blah\n--- End of content ---';
+
+      const conversation = createConversation([
+        { type: 'user', content: userPrompt, id: '1', timestamp: '1' },
+      ]);
+      const onRewind = vi.fn();
+      const { lastFrame } = render(
+        <RewindViewer
+          conversation={conversation}
+          onExit={vi.fn()}
+          onRewind={onRewind}
+        />,
+      );
+
+      expect(lastFrame()).toContain('some command @file');
+      expect(lastFrame()).not.toContain(
+        '--- Content from referenced files ---',
+      );
+      expect(lastFrame()).not.toContain('blah blah');
+    });
+
+    it('passes cleaned text to onRewind callback', () => {
+      const userPrompt =
+        'some command @file\n--- Content from referenced files ---\nContent from file:\nblah blah\n--- End of content ---';
+
+      const conversation = createConversation([
+        { type: 'user', content: userPrompt, id: '1', timestamp: '1' },
+      ]);
+      const onRewind = vi.fn();
+      const { lastFrame } = render(
+        <RewindViewer
+          conversation={conversation}
+          onExit={vi.fn()}
+          onRewind={onRewind}
+        />,
+      );
+
+      expect(lastFrame()).toContain('some command @file');
+
+      // Select and confirm
+      triggerKey({ name: 'return' }); // Select
+      triggerKey({ name: 'return' }); // Confirm
+
+      expect(onRewind).toHaveBeenCalledWith(
+        '1',
+        'some command @file', // Should be stripped
+        RewindOutcome.RewindAndRevert,
+      );
+    });
+  });
 });
