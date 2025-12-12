@@ -20,6 +20,8 @@ import {
   type ToolCallRequestInfo,
   type GitService,
   type CompletedToolCall,
+  ApprovalMode,
+  ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus, RequestContext } from '@a2a-js/sdk/server';
@@ -353,10 +355,12 @@ describe('Task', () => {
     let task: Task;
     type SpyInstance = ReturnType<typeof vi.spyOn>;
     let setTaskStateAndPublishUpdateSpy: SpyInstance;
+    let mockConfig: Config;
+    let mockEventBus: ExecutionEventBus;
 
     beforeEach(() => {
-      const mockConfig = createMockConfig();
-      const mockEventBus: ExecutionEventBus = {
+      mockConfig = createMockConfig() as Config;
+      mockEventBus = {
         publish: vi.fn(),
         on: vi.fn(),
         off: vi.fn(),
@@ -464,6 +468,67 @@ describe('Task', () => {
         (call) => call[4] === true,
       );
       expect(finalCall).toBeUndefined();
+    });
+
+    describe('auto-approval', () => {
+      it('should auto-approve tool calls when autoExecute is true', () => {
+        task.autoExecute = true;
+        const onConfirmSpy = vi.fn();
+        const toolCalls = [
+          {
+            request: { callId: '1' },
+            status: 'awaiting_approval',
+            confirmationDetails: { onConfirm: onConfirmSpy },
+          },
+        ] as unknown as ToolCall[];
+
+        // @ts-expect-error - Calling private method
+        task._schedulerToolCallsUpdate(toolCalls);
+
+        expect(onConfirmSpy).toHaveBeenCalledWith(
+          ToolConfirmationOutcome.ProceedOnce,
+        );
+      });
+
+      it('should auto-approve tool calls when approval mode is YOLO', () => {
+        (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.YOLO);
+        task.autoExecute = false;
+        const onConfirmSpy = vi.fn();
+        const toolCalls = [
+          {
+            request: { callId: '1' },
+            status: 'awaiting_approval',
+            confirmationDetails: { onConfirm: onConfirmSpy },
+          },
+        ] as unknown as ToolCall[];
+
+        // @ts-expect-error - Calling private method
+        task._schedulerToolCallsUpdate(toolCalls);
+
+        expect(onConfirmSpy).toHaveBeenCalledWith(
+          ToolConfirmationOutcome.ProceedOnce,
+        );
+      });
+
+      it('should NOT auto-approve when autoExecute is false and mode is not YOLO', () => {
+        task.autoExecute = false;
+        (mockConfig.getApprovalMode as Mock).mockReturnValue(
+          ApprovalMode.DEFAULT,
+        );
+        const onConfirmSpy = vi.fn();
+        const toolCalls = [
+          {
+            request: { callId: '1' },
+            status: 'awaiting_approval',
+            confirmationDetails: { onConfirm: onConfirmSpy },
+          },
+        ] as unknown as ToolCall[];
+
+        // @ts-expect-error - Calling private method
+        task._schedulerToolCallsUpdate(toolCalls);
+
+        expect(onConfirmSpy).not.toHaveBeenCalled();
+      });
     });
   });
 

@@ -1061,5 +1061,118 @@ describe('E2E Tests', () => {
       expect(response.status).toBe(200);
       expect(response.body.data).toBe('success');
     });
+
+    it('should include agentExecutor in context', async () => {
+      const mockCommand = {
+        name: 'context-check-command',
+        description: 'checks context',
+        execute: vi.fn(async (context: CommandContext) => {
+          if (!context.agentExecutor) {
+            throw new Error('agentExecutor missing');
+          }
+          return { name: 'context-check-command', data: 'success' };
+        }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockCommand);
+
+      const agent = request.agent(app);
+      const res = await agent
+        .post('/executeCommand')
+        .send({ command: 'context-check-command', args: [] })
+        .set('Content-Type', 'application/json')
+        .expect(200);
+
+      expect(res.body.data).toBe('success');
+    });
+
+    describe('/executeCommand streaming', () => {
+      it('should execute a streaming command and stream back events', (done: (
+        err?: unknown,
+      ) => void) => {
+        const executeSpy = vi.fn(async (context: CommandContext) => {
+          context.eventBus?.publish({
+            kind: 'status-update',
+            status: { state: 'working' },
+            taskId: 'test-task',
+            contextId: 'test-context',
+            final: false,
+          });
+          context.eventBus?.publish({
+            kind: 'status-update',
+            status: { state: 'completed' },
+            taskId: 'test-task',
+            contextId: 'test-context',
+            final: true,
+          });
+          return { name: 'stream-test', data: 'done' };
+        });
+
+        const mockStreamCommand = {
+          name: 'stream-test',
+          description: 'A test streaming command',
+          streaming: true,
+          execute: executeSpy,
+        };
+        vi.spyOn(commandRegistry, 'get').mockReturnValue(mockStreamCommand);
+
+        const agent = request.agent(app);
+        agent
+          .post('/executeCommand')
+          .send({ command: 'stream-test', args: [] })
+          .set('Content-Type', 'application/json')
+          .set('Accept', 'text/event-stream')
+          .on('response', (res) => {
+            let data = '';
+            res.on('data', (chunk: Buffer) => {
+              data += chunk.toString();
+            });
+            res.on('end', () => {
+              try {
+                const events = streamToSSEEvents(data);
+                expect(events.length).toBe(2);
+                expect(events[0].result).toEqual({
+                  kind: 'status-update',
+                  status: { state: 'working' },
+                  taskId: 'test-task',
+                  contextId: 'test-context',
+                  final: false,
+                });
+                expect(events[1].result).toEqual({
+                  kind: 'status-update',
+                  status: { state: 'completed' },
+                  taskId: 'test-task',
+                  contextId: 'test-context',
+                  final: true,
+                });
+                expect(executeSpy).toHaveBeenCalled();
+                done();
+              } catch (e) {
+                done(e);
+              }
+            });
+          })
+          .end();
+      });
+
+      it('should handle non-streaming commands gracefully', async () => {
+        const mockNonStreamCommand = {
+          name: 'non-stream-test',
+          description: 'A test non-streaming command',
+          execute: vi
+            .fn()
+            .mockResolvedValue({ name: 'non-stream-test', data: 'done' }),
+        };
+        vi.spyOn(commandRegistry, 'get').mockReturnValue(mockNonStreamCommand);
+
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'non-stream-test', args: [] })
+          .set('Content-Type', 'application/json')
+          .expect(200);
+
+        expect(res.body).toEqual({ name: 'non-stream-test', data: 'done' });
+      });
+    });
   });
 });
