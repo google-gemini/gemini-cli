@@ -1593,8 +1593,9 @@ export class Config {
     // Register Subagents as Tools
     // Register DelegateToAgentTool if agents are enabled
     if (
-      this.isAgentsEnabled() ||
-      this.getCodebaseInvestigatorSettings().enabled
+      (this.isAgentsEnabled() ||
+        this.getCodebaseInvestigatorSettings().enabled) &&
+      !this.isMonkMode()
     ) {
       // Check if the delegate tool itself is allowed (if allowedTools is set)
       const allowedTools = this.getAllowedTools();
