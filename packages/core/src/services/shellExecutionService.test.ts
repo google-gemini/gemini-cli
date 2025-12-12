@@ -70,6 +70,9 @@ vi.mock('../utils/getPty.js', () => ({
 vi.mock('../utils/terminalSerializer.js', () => ({
   serializeTerminalToObject: mockSerializeTerminalToObject,
 }));
+vi.mock('../utils/systemEncoding.js', () => ({
+  getCachedEncodingForBuffer: vi.fn().mockReturnValue('utf-8'),
+}));
 
 const mockProcessKill = vi
   .spyOn(process, 'kill')

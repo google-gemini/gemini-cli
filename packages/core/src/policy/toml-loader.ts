@@ -349,7 +349,7 @@ export async function loadPoliciesFromToml(
             const argsPatterns: Array<string | undefined> =
               commandPrefixes.length > 0
                 ? commandPrefixes.map(
-                    (prefix) => `"command":"${escapeRegex(prefix)}`,
+                    (prefix) => `"command":"${escapeRegex(prefix)}(?:[\\s"]|$)`,
                   )
                 : [effectiveArgsPattern];
 
@@ -434,7 +434,7 @@ export async function loadPoliciesFromToml(
             const argsPatterns: Array<string | undefined> =
               commandPrefixes.length > 0
                 ? commandPrefixes.map(
-                    (prefix) => `"command":"${escapeRegex(prefix)}`,
+                    (prefix) => `"command":"${escapeRegex(prefix)}(?:[\\s"]|$)`,
                   )
                 : [effectiveArgsPattern];
 
