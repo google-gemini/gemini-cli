@@ -38,6 +38,7 @@ class CORSError extends Error {
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
 const IDE_WORKSPACE_PATH_ENV_VAR = 'GEMINI_CLI_IDE_WORKSPACE_PATH';
+const IDE_AUTH_TOKEN_ENV_VAR = 'GEMINI_CLI_IDE_AUTH_TOKEN';
 
 interface WritePortAndWorkspaceArgs {
   context: vscode.ExtensionContext;
@@ -69,6 +70,10 @@ async function writePortAndWorkspace({
   context.environmentVariableCollection.replace(
     IDE_WORKSPACE_PATH_ENV_VAR,
     workspacePath,
+  );
+  context.environmentVariableCollection.replace(
+    IDE_AUTH_TOKEN_ENV_VAR,
+    authToken,
   );
 
   const content = JSON.stringify({
