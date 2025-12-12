@@ -137,6 +137,20 @@ describe('ClearcutLogger', () => {
     vi.unstubAllEnvs();
   });
 
+  beforeEach(() => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+    vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('CODESPACES', '');
+    vi.stubEnv('VSCODE_IPC_HOOK_CLI', '');
+    vi.stubEnv('EDITOR_IN_CLOUD_SHELL', '');
+    vi.stubEnv('CLOUD_SHELL', '');
+    vi.stubEnv('TERM_PRODUCT', '');
+    vi.stubEnv('MONOSPACE_ENV', '');
+    vi.stubEnv('REPLIT_USER', '');
+    vi.stubEnv('__COG_BASHRC_SOURCED', '');
+  });
+
   function setup({
     config = {
       experiments: {
