@@ -49,6 +49,7 @@ import {
   fireToolNotificationHook,
   executeToolWithHooks,
 } from './coreToolHookTriggers.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -187,6 +188,11 @@ export function convertToFunctionResponse(
     } else if (part.inlineData || part.fileData) {
       binaryParts.push(part);
     } else if (part.functionResponse) {
+      if (parts.length > 1) {
+        debugLogger.warn(
+          'convertToFunctionResponse received multiple parts with a functionResponse. Only the functionResponse will be used, other parts will be ignored',
+        );
+      }
       // Handle passthrough case
       return [
         {
