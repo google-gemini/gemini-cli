@@ -14,15 +14,17 @@ import {
   afterEach,
 } from 'vitest';
 import {
-  checkCommandPermissions,
   escapeShellArg,
   getCommandRoots,
   getShellConfiguration,
-  isCommandAllowed,
   initializeShellParsers,
   stripShellWrapper,
-  isShellInvocationAllowlisted,
 } from './shell-utils.js';
+import {
+  checkCommandPermissions,
+  isCommandAllowed,
+  isShellInvocationAllowlisted,
+} from './shell-permissions.js';
 import type { Config } from '../config/config.js';
 import type { AnyToolInvocation } from '../index.js';
 
@@ -60,6 +62,8 @@ beforeEach(() => {
     getCoreTools: () => [],
     getExcludeTools: () => new Set([]),
     getAllowedTools: () => [],
+    getApprovalMode: () => 'strict',
+    isInteractive: () => false,
   } as unknown as Config;
 });
 
