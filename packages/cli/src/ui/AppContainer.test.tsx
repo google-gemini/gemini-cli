@@ -55,7 +55,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     coreEvents: mockCoreEvents,
     IdeClient: mockIdeClient,
     writeToStdout: vi.fn((...args) =>
-      process.stdout.write(
+      mocks.mockStdout.write(
         ...(args as Parameters<typeof process.stdout.write>),
       ),
     ),
@@ -398,7 +398,9 @@ describe('AppContainer State Management', () => {
   });
 
   afterEach(() => {
-    cleanup();
+    act(() => {
+      cleanup();
+    });
   });
 
   describe('Basic Rendering', () => {
@@ -1661,6 +1663,333 @@ describe('AppContainer State Management', () => {
           unmount();
         });
       }
+    });
+  });
+
+  describe('Terminal Bell', () => {
+    const settingsWithTerminalBell = {
+      merged: {
+        hideBanner: false,
+        hideFooter: false,
+        hideTips: false,
+        showMemoryUsage: false,
+        theme: 'default',
+        ui: {
+          accessibility: {
+            enableTerminalBell: true,
+          },
+        },
+      },
+    } as unknown as LoadedSettings;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      mocks.mockStdout.write.mockClear();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should not ring bell on initial render', () => {
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      renderAppContainer({ settings: settingsWithTerminalBell });
+
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith('\u0007');
+    });
+
+    it('should ring bell when streaming state becomes idle', () => {
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'responding',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      const { rerender } = renderAppContainer({
+        settings: settingsWithTerminalBell,
+      });
+
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith('\u0007');
+
+      // Simulate state change to idle
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      rerender(
+        getAppContainer({
+          settings: settingsWithTerminalBell,
+        }),
+      );
+
+      expect(mocks.mockStdout.write).toHaveBeenCalledWith('\u0007');
+    });
+
+    it('should ring bell when streaming state is waiting for confirmation', () => {
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'responding',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      const { rerender } = renderAppContainer({
+        settings: settingsWithTerminalBell,
+      });
+
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith('\u0007');
+
+      // Simulate state change to waiting_for_confirmation
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'waiting_for_confirmation',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      rerender(
+        getAppContainer({
+          settings: settingsWithTerminalBell,
+        }),
+      );
+
+      expect(mocks.mockStdout.write).toHaveBeenCalledWith('\u0007');
+    });
+
+    it('should not ring bell if model has not been responding', () => {
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      const { rerender } = renderAppContainer({
+        settings: settingsWithTerminalBell,
+      });
+
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith('\u0007');
+
+      // Simulate state change to waiting_for_confirmation
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'waiting_for_confirmation',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      rerender(
+        getAppContainer({
+          settings: settingsWithTerminalBell,
+        }),
+      );
+
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith('\u0007');
+    });
+
+    it('should not ring bell if not enough time has passed', () => {
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'responding',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      const { rerender } = renderAppContainer({
+        settings: settingsWithTerminalBell,
+      });
+
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      rerender(
+        getAppContainer({
+          settings: settingsWithTerminalBell,
+        }),
+      );
+
+      // First round, should ring the bell.
+      expect(mocks.mockStdout.write).toHaveBeenCalledWith('\u0007');
+      mocks.mockStdout.write.mockReset();
+
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'responding',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      rerender(
+        getAppContainer({
+          settings: settingsWithTerminalBell,
+        }),
+      );
+
+      // Not enough time to allow another ring of the bell.
+      vi.advanceTimersByTime(200);
+
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      rerender(
+        getAppContainer({
+          settings: settingsWithTerminalBell,
+        }),
+      );
+
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith('\u0007');
+    });
+
+    it('should ring bell if enough time has passed', () => {
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'responding',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      const { rerender } = renderAppContainer({
+        settings: settingsWithTerminalBell,
+      });
+
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      rerender(
+        getAppContainer({
+          settings: settingsWithTerminalBell,
+        }),
+      );
+
+      // First round, should ring the bell.
+      expect(mocks.mockStdout.write).toHaveBeenCalledWith('\u0007');
+      mocks.mockStdout.write.mockReset();
+
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'responding',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      rerender(
+        getAppContainer({
+          settings: settingsWithTerminalBell,
+        }),
+      );
+
+      // Enough time to allow another ring of the bell.
+      vi.advanceTimersByTime(1001);
+
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      rerender(
+        getAppContainer({
+          settings: settingsWithTerminalBell,
+        }),
+      );
+
+      expect(mocks.mockStdout.write).toHaveBeenCalledWith('\u0007');
+    });
+
+    it('should not ring bell if setting is disabled', () => {
+      const settingsWithoutTerminalBell = {
+        merged: {
+          hideBanner: false,
+          hideFooter: false,
+          hideTips: false,
+          showMemoryUsage: false,
+          theme: 'default',
+          ui: {
+            accessibility: {
+              enableTerminalBell: false,
+            },
+          },
+        },
+      } as unknown as LoadedSettings;
+
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'responding',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      const { rerender } = renderAppContainer({
+        settings: settingsWithoutTerminalBell,
+      });
+
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      rerender(getAppContainer({ settings: settingsWithoutTerminalBell }));
+
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith('\u0007');
     });
   });
 

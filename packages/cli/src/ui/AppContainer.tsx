@@ -130,6 +130,7 @@ import { useBanner } from './hooks/useBanner.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
+const MIN_BELL_INTERVAL_MS = 1000;
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -1393,6 +1394,35 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isSessionBrowserOpen ||
     isAuthDialogOpen ||
     authState === AuthState.AwaitingApiKeyInput;
+
+  const needsBell = useRef(false);
+  const bellSafetyLatch = useRef(true);
+  useEffect(() => {
+    switch (streamingState) {
+      case StreamingState.Idle:
+      case StreamingState.WaitingForConfirmation:
+        if (needsBell.current) {
+          if (
+            settings.merged.ui?.accessibility?.enableTerminalBell &&
+            bellSafetyLatch.current
+          ) {
+            writeToStdout('\u0007');
+            bellSafetyLatch.current = false;
+            setTimeout(
+              () => (bellSafetyLatch.current = true),
+              MIN_BELL_INTERVAL_MS,
+            );
+          }
+          needsBell.current = false;
+        }
+        break;
+      case StreamingState.Responding:
+        needsBell.current = true;
+        break;
+      default:
+        break;
+    }
+  }, [streamingState, settings.merged.ui?.accessibility?.enableTerminalBell]);
 
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
