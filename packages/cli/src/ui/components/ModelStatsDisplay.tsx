@@ -160,24 +160,28 @@ export const ModelStatsDisplay: React.FC = () => {
       <StatRow
         title="Total"
         values={getModelValues((m) => (
-          <Text color={theme.status.warning}>
+          <Text color={theme.text.secondary}>
             {m.tokens.total.toLocaleString()}
           </Text>
         ))}
       />
       <StatRow
-        title="Prompt"
+        title="Input"
         isSubtle
-        values={getModelValues((m) => m.tokens.prompt.toLocaleString())}
+        values={getModelValues((m) => (
+          <Text color={theme.text.primary}>
+            {Math.max(0, m.tokens.prompt - m.tokens.cached).toLocaleString()}
+          </Text>
+        ))}
       />
       {hasCached && (
         <StatRow
-          title="Cached"
+          title="Cache Reads"
           isSubtle
           values={getModelValues((m) => {
             const cacheHitRate = calculateCacheHitRate(m);
             return (
-              <Text color={theme.status.success}>
+              <Text color={theme.text.secondary}>
                 {m.tokens.cached.toLocaleString()} ({cacheHitRate.toFixed(1)}%)
               </Text>
             );
@@ -188,20 +192,32 @@ export const ModelStatsDisplay: React.FC = () => {
         <StatRow
           title="Thoughts"
           isSubtle
-          values={getModelValues((m) => m.tokens.thoughts.toLocaleString())}
+          values={getModelValues((m) => (
+            <Text color={theme.text.primary}>
+              {m.tokens.thoughts.toLocaleString()}
+            </Text>
+          ))}
         />
       )}
       {hasTool && (
         <StatRow
           title="Tool"
           isSubtle
-          values={getModelValues((m) => m.tokens.tool.toLocaleString())}
+          values={getModelValues((m) => (
+            <Text color={theme.text.primary}>
+              {m.tokens.tool.toLocaleString()}
+            </Text>
+          ))}
         />
       )}
       <StatRow
         title="Output"
         isSubtle
-        values={getModelValues((m) => m.tokens.candidates.toLocaleString())}
+        values={getModelValues((m) => (
+          <Text color={theme.text.primary}>
+            {m.tokens.candidates.toLocaleString()}
+          </Text>
+        ))}
       />
     </Box>
   );
