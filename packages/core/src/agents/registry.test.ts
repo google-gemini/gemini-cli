@@ -10,7 +10,13 @@ import { makeFakeConfig } from '../test-utils/config.js';
 import type { AgentDefinition } from './types.js';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  GEMINI_MODEL_ALIAS_AUTO,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
+} from '../config/models.js';
 
 // A test-only subclass to expose the protected `registerAgent` method.
 class TestableAgentRegistry extends AgentRegistry {
@@ -74,12 +80,12 @@ describe('AgentRegistry', () => {
       );
     });
 
-    it('should use preview model for codebase investigator if main model is preview', async () => {
+    it('should use preview flash model for codebase investigator if main model is preview pro', async () => {
       const previewConfig = makeFakeConfig({
-        model: 'gemini-3-pro-preview',
+        model: PREVIEW_GEMINI_MODEL,
         codebaseInvestigatorSettings: {
           enabled: true,
-          model: DEFAULT_GEMINI_MODEL,
+          model: GEMINI_MODEL_ALIAS_AUTO,
         },
       });
       const previewRegistry = new TestableAgentRegistry(previewConfig);
@@ -90,7 +96,51 @@ describe('AgentRegistry', () => {
         'codebase_investigator',
       );
       expect(investigatorDef).toBeDefined();
-      expect(investigatorDef?.modelConfig.model).toBe('gemini-3-pro-preview');
+      expect(investigatorDef?.modelConfig.model).toBe(
+        PREVIEW_GEMINI_FLASH_MODEL,
+      );
+    });
+
+    it('should use preview flash model for codebase investigator if main model is preview auto', async () => {
+      const previewConfig = makeFakeConfig({
+        model: PREVIEW_GEMINI_MODEL_AUTO,
+        codebaseInvestigatorSettings: {
+          enabled: true,
+          model: GEMINI_MODEL_ALIAS_AUTO,
+        },
+      });
+      const previewRegistry = new TestableAgentRegistry(previewConfig);
+
+      await previewRegistry.initialize();
+
+      const investigatorDef = previewRegistry.getDefinition(
+        'codebase_investigator',
+      );
+      expect(investigatorDef).toBeDefined();
+      expect(investigatorDef?.modelConfig.model).toBe(
+        PREVIEW_GEMINI_FLASH_MODEL,
+      );
+    });
+
+    it('should use the model from the investigator settings', async () => {
+      const previewConfig = makeFakeConfig({
+        model: PREVIEW_GEMINI_MODEL,
+        codebaseInvestigatorSettings: {
+          enabled: true,
+          model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        },
+      });
+      const previewRegistry = new TestableAgentRegistry(previewConfig);
+
+      await previewRegistry.initialize();
+
+      const investigatorDef = previewRegistry.getDefinition(
+        'codebase_investigator',
+      );
+      expect(investigatorDef).toBeDefined();
+      expect(investigatorDef?.modelConfig.model).toBe(
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      );
     });
   });
 

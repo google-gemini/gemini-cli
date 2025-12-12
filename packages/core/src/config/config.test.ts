@@ -1676,18 +1676,16 @@ describe('Availability Service Integration', () => {
     cwd: '.',
   };
 
-  it('setActiveModel updates active model and emits event', async () => {
+  it('setActiveModel updates active model', async () => {
     const config = new Config(baseParams);
     const model1 = 'model1';
     const model2 = 'model2';
 
     config.setActiveModel(model1);
     expect(config.getActiveModel()).toBe(model1);
-    expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(model1);
 
     config.setActiveModel(model2);
     expect(config.getActiveModel()).toBe(model2);
-    expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(model2);
   });
 
   it('getActiveModel defaults to configured model if not set', () => {
