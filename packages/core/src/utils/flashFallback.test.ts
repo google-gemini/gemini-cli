@@ -124,7 +124,7 @@ describe('Retry Utility Fallback Integration', () => {
     });
 
     await expect(promise).rejects.toThrow('Daily limit');
-    expect(fallbackCallback).not.toHaveBeenCalled();
+    expect(fallbackCallback).toHaveBeenCalledTimes(1);
     expect(mockApiCall).toHaveBeenCalledTimes(1);
   });
 

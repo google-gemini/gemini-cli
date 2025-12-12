@@ -13,6 +13,8 @@ import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
+  FLASH_PREVIEW_MODEL_REVERT_BEFORE_MERGE,
+  PREVIEW_GEMINI_FLASH_MODEL,
   UserTierId,
 } from '@google/gemini-cli-core';
 
@@ -44,7 +46,9 @@ export function ProQuotaDialog({
   // flash and flash lite don't have options to switch or upgrade.
   if (
     failedModel === DEFAULT_GEMINI_FLASH_MODEL ||
-    failedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL
+    failedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL ||
+    failedModel === PREVIEW_GEMINI_FLASH_MODEL ||
+    failedModel === FLASH_PREVIEW_MODEL_REVERT_BEFORE_MERGE
   ) {
     items = [
       {

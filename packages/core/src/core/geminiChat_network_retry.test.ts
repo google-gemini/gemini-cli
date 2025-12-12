@@ -78,6 +78,8 @@ describe('GeminiChat Network Retries', () => {
         model: 'test-model',
       }),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
+      setActiveModel: vi.fn(),
       isInFallbackMode: vi.fn().mockReturnValue(false),
       getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),

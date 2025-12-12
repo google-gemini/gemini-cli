@@ -20,47 +20,97 @@ export const VALID_GEMINI_MODELS = new Set([
 export const PREVIEW_GEMINI_MODEL_AUTO = 'auto-gemini-3';
 export const DEFAULT_GEMINI_MODEL_AUTO = 'auto-gemini-2.5';
 
+// Model aliases for user convenience.
+export const GEMINI_MODEL_ALIAS_PRO = 'pro';
+export const GEMINI_MODEL_ALIAS_FLASH = 'flash';
+export const GEMINI_MODEL_ALIAS_FLASH_LITE = 'flash-lite';
+
 export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 
 // Cap the thinking at 8192 to prevent run-away thinking loops.
 export const DEFAULT_THINKING_MODE = 8192;
 
 /**
- * Determines the effective model to use, applying fallback logic if necessary.
+ * Resolves the requested model alias (e.g., 'auto', 'pro', 'flash', 'flash-lite')
+ * to a concrete model name, considering preview features.
  *
- * When fallback mode is active, this function enforces the use of the standard
- * fallback model.
+ * @param requestedModel The model alias or concrete model name requested by the user.
+ * @param previewFeaturesEnabled A boolean indicating if preview features are enabled.
+ * @returns The resolved concrete model name.
+ */
+export function resolveModel(
+  requestedModel: string,
+  previewFeaturesEnabled: boolean = false,
+): string {
+  switch (requestedModel) {
+    case PREVIEW_GEMINI_MODEL_AUTO: {
+      return PREVIEW_GEMINI_MODEL;
+    }
+    case DEFAULT_GEMINI_MODEL_AUTO: {
+      return DEFAULT_GEMINI_MODEL;
+    }
+    case GEMINI_MODEL_ALIAS_PRO: {
+      return previewFeaturesEnabled
+        ? PREVIEW_GEMINI_MODEL
+        : DEFAULT_GEMINI_MODEL;
+    }
+    case GEMINI_MODEL_ALIAS_FLASH: {
+      return previewFeaturesEnabled
+        ? PREVIEW_GEMINI_FLASH_MODEL
+        : DEFAULT_GEMINI_FLASH_MODEL;
+    }
+    case GEMINI_MODEL_ALIAS_FLASH_LITE: {
+      return DEFAULT_GEMINI_FLASH_LITE_MODEL;
+    }
+    default: {
+      return requestedModel;
+    }
+  }
+}
+
+/**
+ * Resolves the appropriate model based on the classifier's decision.
+ *
+ * @param requestedModel The current requested model (e.g. auto-gemini-2.5).
+ * @param modelAlias The alias selected by the classifier ('flash' or 'pro').
+ * @param previewFeaturesEnabled Whether preview features are enabled.
+ * @returns The resolved concrete model name.
+ */
+export function resolveClassifierModel(
+  requestedModel: string,
+  modelAlias: string,
+  previewFeaturesEnabled: boolean = false,
+): string {
+  if (modelAlias === GEMINI_MODEL_ALIAS_FLASH) {
+    if (
+      requestedModel === DEFAULT_GEMINI_MODEL_AUTO ||
+      requestedModel === DEFAULT_GEMINI_MODEL
+    ) {
+      return DEFAULT_GEMINI_FLASH_MODEL;
+    }
+    if (
+      requestedModel === PREVIEW_GEMINI_MODEL_AUTO ||
+      requestedModel === PREVIEW_GEMINI_MODEL
+    ) {
+      return PREVIEW_GEMINI_FLASH_MODEL;
+    }
+    return resolveModel(GEMINI_MODEL_ALIAS_FLASH, previewFeaturesEnabled);
+  }
+  return resolveModel(requestedModel, previewFeaturesEnabled);
+}
+
+/**
+ * Determines the effective model to use.
  *
  * @param requestedModel The model that was originally requested.
- * @param isInFallbackMode Whether the application is in fallback mode.
+ * @param previewFeaturesEnabled A boolean indicating if preview features are enabled.
  * @returns The effective model name.
  */
 export function getEffectiveModel(
   requestedModel: string,
-  useFallbackModel: boolean,
+  previewFeaturesEnabled: boolean | undefined,
 ): string {
-  // If we are not in fallback mode, simply use the resolved model.
-  if (!useFallbackModel) {
-    switch (requestedModel) {
-      case PREVIEW_GEMINI_MODEL_AUTO:
-        return PREVIEW_GEMINI_MODEL;
-      case DEFAULT_GEMINI_MODEL_AUTO:
-        return DEFAULT_GEMINI_MODEL;
-      default:
-        return requestedModel;
-    }
-  }
-
-  // Fallback model for corresponding model family. We are doing fallback only
-  // for Auto modes
-  switch (requestedModel) {
-    case PREVIEW_GEMINI_MODEL_AUTO:
-      return PREVIEW_GEMINI_FLASH_MODEL;
-    case DEFAULT_GEMINI_MODEL_AUTO:
-      return DEFAULT_GEMINI_FLASH_MODEL;
-    default:
-      return requestedModel;
-  }
+  return resolveModel(requestedModel, previewFeaturesEnabled);
 }
 
 export function getDisplayString(model: string) {

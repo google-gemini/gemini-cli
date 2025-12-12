@@ -39,7 +39,7 @@ export class OverrideStrategy implements RoutingStrategy {
 
     // Return the overridden model name.
     return {
-      model: getEffectiveModel(overrideModel, false),
+      model: getEffectiveModel(overrideModel, config.getPreviewFeatures()),
       metadata: {
         source: this.name,
         latencyMs: 0,

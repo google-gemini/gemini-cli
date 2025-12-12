@@ -257,7 +257,7 @@ export class Session {
       try {
         const model = getEffectiveModel(
           this.config.getModel(),
-          this.config.isInFallbackMode(),
+          this.config.getPreviewFeatures(),
         );
         const responseStream = await chat.sendMessageStream(
           { model },
