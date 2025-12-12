@@ -449,6 +449,7 @@ export class Session {
             );
           case ToolConfirmationOutcome.ProceedOnce:
           case ToolConfirmationOutcome.ProceedAlways:
+          case ToolConfirmationOutcome.ProceedAlwaysAndSave:
           case ToolConfirmationOutcome.ProceedAlwaysServer:
           case ToolConfirmationOutcome.ProceedAlwaysTool:
           case ToolConfirmationOutcome.ModifyWithEditor:
