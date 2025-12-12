@@ -55,7 +55,7 @@ export function ApiAuthDialog({
 
   useKeypress(
     async (key) => {
-      if (key.ctrl && key.name === 'k') {
+      if (key.ctrl && key.name === 'c') {
         await handleClear();
       }
     },
@@ -107,7 +107,7 @@ export function ApiAuthDialog({
       )}
       <Box marginTop={1}>
         <Text color={theme.text.secondary}>
-          (Press Enter to submit, Esc to cancel, Ctrl+K to clear stored key)
+          (Press Enter to submit, Esc to cancel, Ctrl+C to clear stored key)
         </Text>
       </Box>
     </Box>
