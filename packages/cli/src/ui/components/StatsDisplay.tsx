@@ -65,7 +65,7 @@ interface SectionProps {
 }
 
 const Section: React.FC<SectionProps> = ({ title, children }) => (
-  <Box flexDirection="column" width="100%" marginBottom={1}>
+  <Box flexDirection="column" marginBottom={1}>
     <Text bold color={theme.text.primary}>
       {title}
     </Text>
@@ -174,11 +174,18 @@ const ModelUsageTable: React.FC<{
     yellow: CACHE_EFFICIENCY_MEDIUM,
   });
 
+  const totalWidth =
+    nameWidth +
+    requestsWidth +
+    (showQuotaColumn
+      ? usageLimitWidth
+      : uncachedWidth + cachedWidth + outputTokensWidth);
+
   return (
     <Box flexDirection="column" marginTop={1}>
       {/* Header */}
       <Box alignItems="flex-end">
-        <Box width={nameWidth} flexGrow={1}>
+        <Box width={nameWidth}>
           <Text bold color={theme.text.primary} wrap="truncate-end">
             Model Usage
           </Text>
@@ -248,12 +255,12 @@ const ModelUsageTable: React.FC<{
         borderLeft={false}
         borderRight={false}
         borderColor={theme.border.default}
-        width="100%"
+        width={totalWidth}
       ></Box>
 
       {rows.map((row) => (
         <Box key={row.key}>
-          <Box width={nameWidth} flexGrow={1}>
+          <Box width={nameWidth}>
             <Text color={theme.text.primary} wrap="truncate-end">
               {row.modelName}
             </Text>
