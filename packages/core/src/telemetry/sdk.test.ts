@@ -19,7 +19,7 @@ import { OTLPLogExporter as OTLPLogExporterHttp } from '@opentelemetry/exporter-
 import { OTLPMetricExporter as OTLPMetricExporterHttp } from '@opentelemetry/exporter-metrics-otlp-http';
 import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node';
 import { NodeSDK } from '@opentelemetry/sdk-node';
-import { GoogleAuth } from 'google-auth-library';
+import { GoogleAuth, type JWTInput } from 'google-auth-library';
 import {
   GcpTraceExporter,
   GcpLogExporter,
@@ -327,8 +327,7 @@ describe('Telemetry SDK', () => {
     await vi.waitFor(() => {
       // Check if debugLogger was called, which indicates the listener ran
       expect(debugLogger.log).toHaveBeenCalledWith(
-        'Telemetry reinit with credentials: ',
-        mockCredentials,
+        'Telemetry reinit with credentials.',
       );
 
       // Should use GCP exporters now with the project ID
@@ -369,5 +368,37 @@ describe('Telemetry SDK', () => {
       ),
     );
     expect(NodeSDK.prototype.start).not.toHaveBeenCalled();
+  });
+  it('should log error when re-initializing with different credentials', async () => {
+    const creds1 = { client_email: 'user1@example.com' };
+    const creds2 = { client_email: 'user2@example.com' };
+
+    // 1. Initialize with first account
+    await initializeTelemetry(mockConfig, creds1 as JWTInput);
+
+    // 2. Attempt to initialize with second account
+    await initializeTelemetry(mockConfig, creds2 as JWTInput);
+
+    // 3. Verify error log
+    expect(debugLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Telemetry credentials have changed (from user1@example.com to user2@example.com)',
+      ),
+    );
+  });
+
+  it('should NOT log error when re-initializing with SAME credentials', async () => {
+    const creds1 = { client_email: 'user1@example.com' };
+
+    // 1. Initialize with first account
+    await initializeTelemetry(mockConfig, creds1 as JWTInput);
+
+    // 2. Attempt to initialize with same account
+    await initializeTelemetry(mockConfig, creds1 as JWTInput);
+
+    // 3. Verify NO error log
+    expect(debugLogger.error).not.toHaveBeenCalledWith(
+      expect.stringContaining('Telemetry credentials have changed'),
+    );
   });
 });
