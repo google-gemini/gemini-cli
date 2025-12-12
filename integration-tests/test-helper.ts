@@ -159,6 +159,14 @@ interface ParsedLog {
     success?: boolean;
     duration_ms?: number;
     request_text?: string;
+    hook_event_name?: string;
+    hook_name?: string;
+    hook_input?: Record<string, unknown>;
+    hook_output?: Record<string, unknown>;
+    exit_code?: number;
+    stdout?: string;
+    stderr?: string;
+    error?: string;
   };
   scopeMetrics?: {
     metrics: {
@@ -192,7 +200,12 @@ export class InteractiveRun {
       timeout,
       200,
     );
-    expect(found, `Did not find expected text: "${text}"`).toBe(true);
+    expect(
+      found,
+      `Did not find expected text: "${text}". Output was:\n${stripAnsi(
+        this.output,
+      )}`,
+    ).toBe(true);
   }
 
   // This types slowly to make sure command is correct, but only work for short
@@ -218,6 +231,13 @@ export class InteractiveRun {
         );
       }
     }
+  }
+
+  // Types an entire string at once, necessary for some things like commands
+  // but may run into paste detection issues for larger strings.
+  async sendText(text: string) {
+    this.ptyProcess.write(text);
+    await new Promise((resolve) => setTimeout(resolve, 5));
   }
 
   // Simulates typing a string one character at a time to avoid paste detection.
@@ -255,7 +275,10 @@ export class TestRig {
   testDir: string | null;
   testName?: string;
   _lastRunStdout?: string;
+  // Path to the copied fake responses file for this test.
   fakeResponsesPath?: string;
+  // Original fake responses file path for rewriting goldens in record mode.
+  originalFakeResponsesPath?: string;
 
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
@@ -275,7 +298,10 @@ export class TestRig {
     mkdirSync(this.testDir, { recursive: true });
     if (options.fakeResponsesPath) {
       this.fakeResponsesPath = join(this.testDir, 'fake-responses.json');
-      fs.copyFileSync(options.fakeResponsesPath, this.fakeResponsesPath);
+      this.originalFakeResponsesPath = options.fakeResponsesPath;
+      if (process.env['REGENERATE_MODEL_GOLDENS'] !== 'true') {
+        fs.copyFileSync(options.fakeResponsesPath, this.fakeResponsesPath);
+      }
     }
 
     // Create a settings file to point the CLI to the local collector
@@ -290,6 +316,7 @@ export class TestRig {
         // Nightly releases sometimes becomes out of sync with local code and
         // triggers auto-update, which causes tests to fail.
         disableAutoUpdate: true,
+        previewFeatures: false,
       },
       telemetry: {
         enabled: true,
@@ -302,9 +329,14 @@ export class TestRig {
           selectedType: 'gemini-api-key',
         },
       },
+      ui: {
+        useAlternateBuffer: true,
+      },
       model: DEFAULT_GEMINI_MODEL,
       sandbox:
         env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
+      // Don't show the IDE connection dialog when running from VsCode
+      ide: { enabled: false, hasSeenNudge: true },
       ...options.settings, // Allow tests to override/add settings
     };
     writeFileSync(
@@ -344,7 +376,11 @@ export class TestRig {
       ? extraInitialArgs
       : [this.bundlePath, ...extraInitialArgs];
     if (this.fakeResponsesPath) {
-      initialArgs.push('--fake-responses', this.fakeResponsesPath);
+      if (process.env['REGENERATE_MODEL_GOLDENS'] === 'true') {
+        initialArgs.push('--record-responses', this.fakeResponsesPath);
+      } else {
+        initialArgs.push('--fake-responses', this.fakeResponsesPath);
+      }
     }
     return { command, initialArgs };
   }
@@ -376,13 +412,13 @@ export class TestRig {
     };
 
     if (typeof promptOrOptions === 'string') {
-      commandArgs.push('--prompt', promptOrOptions);
+      commandArgs.push(promptOrOptions);
     } else if (
       typeof promptOrOptions === 'object' &&
       promptOrOptions !== null
     ) {
       if (promptOrOptions.prompt) {
-        commandArgs.push('--prompt', promptOrOptions.prompt);
+        commandArgs.push(promptOrOptions.prompt);
       }
       if (promptOrOptions.stdin) {
         execOptions.input = promptOrOptions.stdin;
@@ -555,6 +591,12 @@ export class TestRig {
   }
 
   async cleanup() {
+    if (
+      process.env['REGENERATE_MODEL_GOLDENS'] === 'true' &&
+      this.fakeResponsesPath
+    ) {
+      fs.copyFileSync(this.fakeResponsesPath, this.originalFakeResponsesPath!);
+    }
     // Clean up test directory
     if (this.testDir && !env['KEEP_OUTPUT']) {
       try {
@@ -918,6 +960,16 @@ export class TestRig {
     return logs;
   }
 
+  readAllApiRequest(): ParsedLog[] {
+    const logs = this._readAndParseTelemetryLog();
+    const apiRequests = logs.filter(
+      (logData) =>
+        logData.attributes &&
+        logData.attributes['event.name'] === 'gemini_cli.api_request',
+    );
+    return apiRequests;
+  }
+
   readLastApiRequest(): ParsedLog | null {
     const logs = this._readAndParseTelemetryLog();
     const apiRequests = logs.filter(
@@ -972,14 +1024,31 @@ export class TestRig {
     return null;
   }
 
-  async runInteractive(...args: string[]): Promise<InteractiveRun> {
-    const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
-    const commandArgs = [...initialArgs, ...args];
+  async runInteractive(
+    options?: { yolo?: boolean } | string,
+    ...args: string[]
+  ): Promise<InteractiveRun> {
+    // Handle backward compatibility: if first param is a string, treat as arg
+    let yolo = true; // Default to YOLO mode
+    let additionalArgs: string[] = args;
 
-    const options: pty.IPtyForkOptions = {
+    if (typeof options === 'string') {
+      // Old-style call: runInteractive('--debug')
+      additionalArgs = [options, ...args];
+    } else if (typeof options === 'object' && options !== null) {
+      // New-style call: runInteractive({ yolo: false })
+      yolo = options.yolo !== false;
+    }
+
+    const { command, initialArgs } = this._getCommandAndArgs(
+      yolo ? ['--yolo'] : [],
+    );
+    const commandArgs = [...initialArgs, ...additionalArgs];
+
+    const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
-      rows: 24,
+      rows: 80,
       cwd: this.testDir!,
       env: Object.fromEntries(
         Object.entries(env).filter(([, v]) => v !== undefined),
@@ -987,11 +1056,73 @@ export class TestRig {
     };
 
     const executable = command === 'node' ? process.execPath : command;
-    const ptyProcess = pty.spawn(executable, commandArgs, options);
+    const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
 
     const run = new InteractiveRun(ptyProcess);
     // Wait for the app to be ready
-    await run.expectText('Type your message', 30000);
+    await run.expectText('  Type your message or @path/to/file', 30000);
     return run;
+  }
+
+  readHookLogs() {
+    const parsedLogs = this._readAndParseTelemetryLog();
+    const logs: {
+      hookCall: {
+        hook_event_name: string;
+        hook_name: string;
+        hook_input: Record<string, unknown>;
+        hook_output: Record<string, unknown>;
+        exit_code: number;
+        stdout: string;
+        stderr: string;
+        duration_ms: number;
+        success: boolean;
+        error: string;
+      };
+    }[] = [];
+
+    for (const logData of parsedLogs) {
+      // Look for tool call logs
+      if (
+        logData.attributes &&
+        logData.attributes['event.name'] === 'gemini_cli.hook_call'
+      ) {
+        logs.push({
+          hookCall: {
+            hook_event_name: logData.attributes.hook_event_name ?? '',
+            hook_name: logData.attributes.hook_name ?? '',
+            hook_input: logData.attributes.hook_input ?? {},
+            hook_output: logData.attributes.hook_output ?? {},
+            exit_code: logData.attributes.exit_code ?? 0,
+            stdout: logData.attributes.stdout ?? '',
+            stderr: logData.attributes.stderr ?? '',
+            duration_ms: logData.attributes.duration_ms ?? 0,
+            success: logData.attributes.success ?? false,
+            error: logData.attributes.error ?? '',
+          },
+        });
+      }
+    }
+
+    return logs;
+  }
+
+  async pollCommand(
+    commandFn: () => Promise<void>,
+    predicateFn: () => boolean,
+    timeout: number = 30000,
+    interval: number = 1000,
+  ) {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      await commandFn();
+      // Give it a moment to process
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      if (predicateFn()) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+    throw new Error(`pollCommand timed out after ${timeout}ms`);
   }
 }

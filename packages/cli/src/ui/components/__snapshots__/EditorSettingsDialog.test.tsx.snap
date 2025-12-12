@@ -1,0 +1,18 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`EditorSettingsDialog > renders correctly 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ > Select Editor                              Editor Preference                                   │
+│ ● 1. VS Code                                                                                     │
+│   2. Vim                                     These editors are currently supported. Please note  │
+│                                              that some editors cannot be used in sandbox mode.   │
+│   Apply To                                                                                       │
+│ ● 1. User Settings                           Your preferred editor is: VS Code.                  │
+│   2. Workspace Settings                                                                          │
+│                                                                                                  │
+│ (Use Enter to select, Tab to change                                                              │
+│ focus, Esc to close)                                                                             │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;

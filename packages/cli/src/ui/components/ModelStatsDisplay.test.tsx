@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
@@ -116,7 +116,7 @@ describe('<ModelStatsDisplay />', () => {
     });
 
     const output = lastFrame();
-    expect(output).not.toContain('Cached');
+    expect(output).not.toContain('Cache Reads');
     expect(output).not.toContain('Thoughts');
     expect(output).not.toContain('Tool');
     expect(output).toMatchSnapshot();
@@ -168,7 +168,7 @@ describe('<ModelStatsDisplay />', () => {
     });
 
     const output = lastFrame();
-    expect(output).toContain('Cached');
+    expect(output).toContain('Cache Reads');
     expect(output).toContain('Thoughts');
     expect(output).toContain('Tool');
     expect(output).toMatchSnapshot();

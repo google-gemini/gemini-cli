@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
-import { act, renderHook } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { useInputHistoryStore } from './useInputHistoryStore.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 describe('useInputHistoryStore', () => {
   beforeEach(() => {
@@ -109,7 +109,9 @@ describe('useInputHistoryStore', () => {
         .mockRejectedValue(new Error('Logger error')),
     };
 
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const consoleSpy = vi
+      .spyOn(debugLogger, 'warn')
+      .mockImplementation(() => {});
 
     const { result } = renderHook(() => useInputHistoryStore());
 

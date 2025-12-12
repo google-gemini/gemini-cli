@@ -6,6 +6,8 @@
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
+import { join } from 'node:path';
+import { ExitCodes } from '@google/gemini-cli-core/src/index.js';
 
 describe('JSON output', () => {
   let rig: TestRig;
@@ -33,6 +35,15 @@ describe('JSON output', () => {
 
     expect(parsed).toHaveProperty('stats');
     expect(typeof parsed.stats).toBe('object');
+  });
+
+  it('should return a valid JSON with a session ID', async () => {
+    const result = await rig.run('Hello', '--output-format', 'json');
+    const parsed = JSON.parse(result);
+
+    expect(parsed).toHaveProperty('session_id');
+    expect(typeof parsed.session_id).toBe('string');
+    expect(parsed.session_id).not.toBe('');
   });
 
   it('should return a JSON error for sd auth mismatch before running', async () => {
@@ -80,14 +91,23 @@ describe('JSON output', () => {
 
     expect(payload.error).toBeDefined();
     expect(payload.error.type).toBe('Error');
-    expect(payload.error.code).toBe(1);
+    expect(payload.error.code).toBe(ExitCodes.FATAL_AUTHENTICATION_ERROR);
     expect(payload.error.message).toContain(
       "enforced authentication type is 'gemini-api-key'",
     );
     expect(payload.error.message).toContain("current type is 'oauth-personal'");
+    expect(payload).toHaveProperty('session_id');
+    expect(typeof payload.session_id).toBe('string');
+    expect(payload.session_id).not.toBe('');
   });
 
-  it.skip('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
+  it('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
+    rig.setup('json-output-error', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'json-output.error.responses',
+      ),
+    });
     const result = await rig.run(
       `Read the contents of ${rig.testDir}/path/to/nonexistent/file.txt and tell me what it says. ` +
         'On error, respond to the user with exactly the text "File not found".',
@@ -121,5 +141,9 @@ describe('JSON output', () => {
 
     // Should NOT have an error field at the top level
     expect(parsed.error).toBeUndefined();
+
+    expect(parsed).toHaveProperty('session_id');
+    expect(typeof parsed.session_id).toBe('string');
+    expect(parsed.session_id).not.toBe('');
   });
 });

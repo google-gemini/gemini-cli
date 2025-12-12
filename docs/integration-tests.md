@@ -1,4 +1,4 @@
-# Integration Tests
+# Integration tests
 
 This document provides information about the integration testing framework used
 in this project.
@@ -56,6 +56,25 @@ To run a single test by its name, use the `--test-name-pattern` flag:
 npm run test:e2e -- --test-name-pattern "reads a file"
 ```
 
+### Regenerating model responses
+
+Some integration tests use faked out model responses, which may need to be
+regenerated from time to time as the implementations change.
+
+To regenerate these golden files, set the REGENERATE_MODEL_GOLDENS environment
+variable to "true" when running the tests, for example:
+
+**WARNING**: If running locally you should review these updated responses for
+any information about yourself or your system that gemini may have included in
+these responses.
+
+```bash
+REGENERATE_MODEL_GOLDENS="true" npm run test:e2e
+```
+
+**WARNING**: Make sure you run **await rig.cleanup()** at the end of your test,
+else the golden files will not be updated.
+
 ### Deflaking a test
 
 Before adding a **new** integration test, you should test it at least 5 times
@@ -67,7 +86,7 @@ with the deflake script or workflow to make sure that it is not flaky.
 npm run deflake -- --runs=5 --command="npm run test:e2e -- -- --test-name-pattern '<your-new-test-name>'"
 ```
 
-#### Deflake Workflow
+#### Deflake workflow
 
 ```bash
 gh workflow run deflake.yml --ref <your-branch> -f test_name_pattern="<your-test-name-pattern>"
@@ -180,9 +199,9 @@ file, or case.
 ## Continuous integration
 
 To ensure the integration tests are always run, a GitHub Actions workflow is
-defined in `.github/workflows/e2e.yml`. This workflow automatically runs the
-integrations tests for pull requests against the `main` branch, or when a pull
-request is added to a merge queue.
+defined in `.github/workflows/chained_e2e.yml`. This workflow automatically runs
+the integrations tests for pull requests against the `main` branch, or when a
+pull request is added to a merge queue.
 
 The workflow runs the tests in different sandboxing environments to ensure
 Gemini CLI is tested across each:

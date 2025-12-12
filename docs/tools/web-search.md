@@ -1,4 +1,4 @@
-# Web Search Tool (`google_web_search`)
+# Web search tool (`google_web_search`)
 
 This document describes the `google_web_search` tool.
 

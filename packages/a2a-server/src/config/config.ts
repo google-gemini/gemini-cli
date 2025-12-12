@@ -20,9 +20,8 @@ import {
   GEMINI_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_MODEL,
-  type GeminiCLIExtension,
   type ExtensionLoader,
-  debugLogger,
+  startupProfiler,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -34,7 +33,6 @@ export async function loadConfig(
   extensionLoader: ExtensionLoader,
   taskId: string,
 ): Promise<Config> {
-  const mcpServers = mergeMcpServers(settings, extensionLoader.getExtensions());
   const workspaceDir = process.cwd();
   const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
 
@@ -54,7 +52,7 @@ export async function loadConfig(
       process.env['GEMINI_YOLO_MODE'] === 'true'
         ? ApprovalMode.YOLO
         : ApprovalMode.DEFAULT,
-    mcpServers,
+    mcpServers: settings.mcpServers,
     cwd: workspaceDir,
     telemetry: {
       enabled: settings.telemetry?.enabled,
@@ -73,6 +71,10 @@ export async function loadConfig(
     ideMode: false,
     folderTrust: settings.folderTrust === true,
     extensionLoader,
+    checkpointing: process.env['CHECKPOINTING']
+      ? process.env['CHECKPOINTING'] === 'true'
+      : settings.checkpointing?.enabled,
+    previewFeatures: settings.general?.previewFeatures,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
@@ -91,6 +93,7 @@ export async function loadConfig(
   });
   // Needed to initialize ToolRegistry, and git checkpointing if enabled
   await config.initialize();
+  startupProfiler.flush(config);
 
   if (process.env['USE_CCPA']) {
     logger.info('[Config] Using CCPA Auth:');
@@ -118,25 +121,6 @@ export async function loadConfig(
   }
 
   return config;
-}
-
-export function mergeMcpServers(
-  settings: Settings,
-  extensions: GeminiCLIExtension[],
-) {
-  const mcpServers = { ...(settings.mcpServers || {}) };
-  for (const extension of extensions) {
-    Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
-      if (mcpServers[key]) {
-        debugLogger.warn(
-          `Skipping extension MCP config for server with key "${key}" as it already exists.`,
-        );
-        return;
-      }
-      mcpServers[key] = server;
-    });
-  }
-  return mcpServers;
 }
 
 export function setTargetDir(agentSettings: AgentSettings | undefined): string {

@@ -12,7 +12,9 @@ import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 describe('file-system', () => {
   it('should be able to read a file', async () => {
     const rig = new TestRig();
-    await rig.setup('should be able to read a file');
+    await rig.setup('should be able to read a file', {
+      settings: { tools: { core: ['read_file'] } },
+    });
     rig.createFile('test.txt', 'hello world');
 
     const result = await rig.run(
@@ -40,7 +42,9 @@ describe('file-system', () => {
 
   it('should be able to write a file', async () => {
     const rig = new TestRig();
-    await rig.setup('should be able to write a file');
+    await rig.setup('should be able to write a file', {
+      settings: { tools: { core: ['write_file', 'replace', 'read_file'] } },
+    });
     rig.createFile('test.txt', '');
 
     const result = await rig.run(`edit test.txt to have a hello world message`);
@@ -95,10 +99,14 @@ describe('file-system', () => {
 
   it('should correctly handle file paths with spaces', async () => {
     const rig = new TestRig();
-    await rig.setup('should correctly handle file paths with spaces');
+    await rig.setup('should correctly handle file paths with spaces', {
+      settings: { tools: { core: ['write_file', 'read_file'] } },
+    });
     const fileName = 'my test file.txt';
 
-    const result = await rig.run(`write "hello" to "${fileName}"`);
+    const result = await rig.run(
+      `write "hello" to "${fileName}" and then stop. Do not perform any other actions.`,
+    );
 
     const foundToolCall = await rig.waitForToolCall('write_file');
     if (!foundToolCall) {
@@ -115,7 +123,9 @@ describe('file-system', () => {
 
   it('should perform a read-then-write sequence', async () => {
     const rig = new TestRig();
-    await rig.setup('should perform a read-then-write sequence');
+    await rig.setup('should perform a read-then-write sequence', {
+      settings: { tools: { core: ['read_file', 'replace', 'write_file'] } },
+    });
     const fileName = 'version.txt';
     rig.createFile(fileName, '1.0.0');
 
@@ -150,44 +160,53 @@ describe('file-system', () => {
 
   it.skip('should replace multiple instances of a string', async () => {
     const rig = new TestRig();
-    await rig.setup('should replace multiple instances of a string');
+    rig.setup('should replace multiple instances of a string');
     const fileName = 'ambiguous.txt';
     const fileContent = 'Hey there, \ntest line\ntest line';
     const expectedContent = 'Hey there, \nnew line\nnew line';
     rig.createFile(fileName, fileContent);
 
     const result = await rig.run(
-      `replace "test line" with "new line" in ${fileName}`,
+      `rewrite the file ${fileName} to replace all instances of "test line" with "new line"`,
     );
 
-    const foundToolCall = await rig.waitForAnyToolCall([
-      'replace',
-      'write_file',
-    ]);
+    const validTools = ['write_file', 'edit'];
+    const foundToolCall = await rig.waitForAnyToolCall(validTools);
     if (!foundToolCall) {
-      printDebugInfo(rig, result);
+      printDebugInfo(rig, result, {
+        'Tool call found': foundToolCall,
+        'Tool logs': rig.readToolLogs(),
+      });
     }
     expect(
       foundToolCall,
-      'Expected to find a replace or write_file tool call',
+      `Expected to find one of ${validTools.join(', ')} tool calls`,
     ).toBeTruthy();
 
     const toolLogs = rig.readToolLogs();
     const successfulEdit = toolLogs.some(
       (log) =>
-        (log.toolRequest.name === 'replace' ||
-          log.toolRequest.name === 'write_file') &&
-        log.toolRequest.success,
+        validTools.includes(log.toolRequest.name) && log.toolRequest.success,
     );
     if (!successfulEdit) {
       console.error(
-        'Expected a successful edit tool call, but none was found.',
+        `Expected a successful edit tool call (${validTools.join(', ')}), but none was found.`,
       );
       printDebugInfo(rig, result);
     }
-    expect(successfulEdit, 'Expected a successful edit tool call').toBeTruthy();
+    expect(
+      successfulEdit,
+      `Expected a successful edit tool call (${validTools.join(', ')})`,
+    ).toBeTruthy();
 
     const newFileContent = rig.readFile(fileName);
+    if (newFileContent !== expectedContent) {
+      printDebugInfo(rig, result, {
+        'Final file content': newFileContent,
+        'Expected file content': expectedContent,
+        'Tool logs': rig.readToolLogs(),
+      });
+    }
     expect(newFileContent).toBe(expectedContent);
   });
 
@@ -195,6 +214,7 @@ describe('file-system', () => {
     const rig = new TestRig();
     await rig.setup(
       'should fail safely when trying to edit a non-existent file',
+      { settings: { tools: { core: ['read_file', 'replace'] } } },
     );
     const fileName = 'non_existent.txt';
 

@@ -40,6 +40,7 @@ function addShellCommandToGeminiHistory(
       ? resultText.substring(0, MAX_OUTPUT_LENGTH) + '\n... (truncated)'
       : resultText;
 
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
   geminiClient.addHistory({
     role: 'user',
     parts: [
@@ -76,6 +77,8 @@ export const useShellCommandProcessor = (
   terminalHeight?: number,
 ) => {
   const [activeShellPtyId, setActiveShellPtyId] = useState<number | null>(null);
+  const [lastShellOutputTime, setLastShellOutputTime] = useState<number>(0);
+
   const handleShellCommand = useCallback(
     (rawQuery: PartListUnion, abortSignal: AbortSignal): boolean => {
       if (typeof rawQuery !== 'string' || rawQuery.trim() === '') {
@@ -202,6 +205,7 @@ export const useShellCommandProcessor = (
 
               // Throttle pending UI updates, but allow forced updates.
               if (shouldUpdate) {
+                setLastShellOutputTime(Date.now());
                 setPendingHistoryItem((prevItem) => {
                   if (prevItem?.type === 'tool_group') {
                     return {
@@ -284,13 +288,17 @@ export const useShellCommandProcessor = (
               };
 
               // Add the complete, contextual result to the local UI history.
-              addItemToHistory(
-                {
-                  type: 'tool_group',
-                  tools: [finalToolDisplay],
-                } as HistoryItemWithoutId,
-                userMessageTimestamp,
-              );
+              // We skip this for cancelled commands because useGeminiStream handles the
+              // immediate addition of the cancelled item to history to prevent flickering/duplicates.
+              if (finalStatus !== ToolCallStatus.Canceled) {
+                addItemToHistory(
+                  {
+                    type: 'tool_group',
+                    tools: [finalToolDisplay],
+                  } as HistoryItemWithoutId,
+                  userMessageTimestamp,
+                );
+              }
 
               // Add the same complete, contextual result to the LLM's history.
               addShellCommandToGeminiHistory(
@@ -343,6 +351,7 @@ export const useShellCommandProcessor = (
       };
 
       const execPromise = new Promise<void>((resolve) => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         executeCommand(resolve);
       });
 
@@ -362,5 +371,5 @@ export const useShellCommandProcessor = (
     ],
   );
 
-  return { handleShellCommand, activeShellPtyId };
+  return { handleShellCommand, activeShellPtyId, lastShellOutputTime };
 };

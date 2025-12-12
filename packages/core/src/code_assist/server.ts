@@ -13,7 +13,14 @@ import type {
   LongRunningOperationResponse,
   OnboardUserRequest,
   SetCodeAssistGlobalUserSettingRequest,
+  ClientMetadata,
+  RetrieveUserQuotaRequest,
+  RetrieveUserQuotaResponse,
 } from './types.js';
+import type {
+  ListExperimentsRequest,
+  ListExperimentsResponse,
+} from './experiments/types.js';
 import type {
   CountTokensParameters,
   CountTokensResponse,
@@ -95,10 +102,7 @@ export class CodeAssistServer implements ContentGenerator {
   async onboardUser(
     req: OnboardUserRequest,
   ): Promise<LongRunningOperationResponse> {
-    return await this.requestPost<LongRunningOperationResponse>(
-      'onboardUser',
-      req,
-    );
+    return this.requestPost<LongRunningOperationResponse>('onboardUser', req);
   }
 
   async loadCodeAssist(
@@ -121,7 +125,7 @@ export class CodeAssistServer implements ContentGenerator {
   }
 
   async getCodeAssistGlobalUserSetting(): Promise<CodeAssistGlobalUserSettingResponse> {
-    return await this.requestGet<CodeAssistGlobalUserSettingResponse>(
+    return this.requestGet<CodeAssistGlobalUserSettingResponse>(
       'getCodeAssistGlobalUserSetting',
     );
   }
@@ -129,7 +133,7 @@ export class CodeAssistServer implements ContentGenerator {
   async setCodeAssistGlobalUserSetting(
     req: SetCodeAssistGlobalUserSettingRequest,
   ): Promise<CodeAssistGlobalUserSettingResponse> {
-    return await this.requestPost<CodeAssistGlobalUserSettingResponse>(
+    return this.requestPost<CodeAssistGlobalUserSettingResponse>(
       'setCodeAssistGlobalUserSetting',
       req,
     );
@@ -147,6 +151,29 @@ export class CodeAssistServer implements ContentGenerator {
     _req: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
     throw Error();
+  }
+
+  async listExperiments(
+    metadata: ClientMetadata,
+  ): Promise<ListExperimentsResponse> {
+    if (!this.projectId) {
+      throw new Error('projectId is not defined for CodeAssistServer.');
+    }
+    const projectId = this.projectId;
+    const req: ListExperimentsRequest = {
+      project: projectId,
+      metadata: { ...metadata, duetProject: projectId },
+    };
+    return this.requestPost<ListExperimentsResponse>('listExperiments', req);
+  }
+
+  async retrieveUserQuota(
+    req: RetrieveUserQuotaRequest,
+  ): Promise<RetrieveUserQuotaResponse> {
+    return this.requestPost<RetrieveUserQuotaResponse>(
+      'retrieveUserQuota',
+      req,
+    );
   }
 
   async requestPost<T>(
@@ -210,18 +237,16 @@ export class CodeAssistServer implements ContentGenerator {
 
       let bufferedLines: string[] = [];
       for await (const line of rl) {
-        // blank lines are used to separate JSON objects in the stream
-        if (line === '') {
+        if (line.startsWith('data: ')) {
+          bufferedLines.push(line.slice(6).trim());
+        } else if (line === '') {
           if (bufferedLines.length === 0) {
             continue; // no data to yield
           }
           yield JSON.parse(bufferedLines.join('\n')) as T;
           bufferedLines = []; // Reset the buffer after yielding
-        } else if (line.startsWith('data: ')) {
-          bufferedLines.push(line.slice(6).trim());
-        } else {
-          throw new Error(`Unexpected line format in response: ${line}`);
         }
+        // Ignore other lines like comments or id fields
       }
     })();
   }

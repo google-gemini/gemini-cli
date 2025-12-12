@@ -14,13 +14,14 @@ import {
   getErrorMessage,
 } from '@google/gemini-cli-core';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 interface EnableArgs {
   name: string;
   scope?: string;
 }
 
-export function handleEnable(args: EnableArgs) {
+export async function handleEnable(args: EnableArgs) {
   const workingDir = process.cwd();
   const extensionManager = new ExtensionManager({
     workspaceDir: workingDir,
@@ -28,13 +29,13 @@ export function handleEnable(args: EnableArgs) {
     requestSetting: promptForSetting,
     settings: loadSettings(workingDir).merged,
   });
-  extensionManager.loadExtensions();
+  await extensionManager.loadExtensions();
 
   try {
     if (args.scope?.toLowerCase() === 'workspace') {
-      extensionManager.enableExtension(args.name, SettingScope.Workspace);
+      await extensionManager.enableExtension(args.name, SettingScope.Workspace);
     } else {
-      extensionManager.enableExtension(args.name, SettingScope.User);
+      await extensionManager.enableExtension(args.name, SettingScope.User);
     }
     if (args.scope) {
       debugLogger.log(
@@ -81,10 +82,11 @@ export const enableCommand: CommandModule = {
         }
         return true;
       }),
-  handler: (argv) => {
-    handleEnable({
+  handler: async (argv) => {
+    await handleEnable({
       name: argv['name'] as string,
       scope: argv['scope'] as string,
     });
+    await exitCli();
   },
 };

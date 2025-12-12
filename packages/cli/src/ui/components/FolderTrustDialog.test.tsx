@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
 import { renderWithProviders } from '../../test-utils/render.js';
-import { waitFor, act } from '@testing-library/react';
+import { waitFor } from '../../test-utils/async.js';
+import { act } from 'react';
 import { vi } from 'vitest';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
+import { ExitCodes } from '@google/gemini-cli-core';
 import * as processUtils from '../../utils/processUtils.js';
 
 vi.mock('../../utils/processUtils.js', () => ({
@@ -62,7 +62,9 @@ describe('FolderTrustDialog', () => {
       );
     });
     await waitFor(() => {
-      expect(mockedExit).toHaveBeenCalledWith(1);
+      expect(mockedExit).toHaveBeenCalledWith(
+        ExitCodes.FATAL_CANCELLATION_ERROR,
+      );
     });
     expect(onSelect).not.toHaveBeenCalled();
   });

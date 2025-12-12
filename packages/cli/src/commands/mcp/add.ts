@@ -8,6 +8,7 @@
 import type { CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
 import { debugLogger, type MCPServerConfig } from '@google/gemini-cli-core';
+import { exitCli } from '../utils.js';
 
 async function addMcpServer(
   name: string,
@@ -68,6 +69,7 @@ async function addMcpServer(
     case 'sse':
       newServer = {
         url: commandOrUrl,
+        type: 'sse',
         headers,
         timeout,
         trust,
@@ -78,7 +80,8 @@ async function addMcpServer(
       break;
     case 'http':
       newServer = {
-        httpUrl: commandOrUrl,
+        url: commandOrUrl,
+        type: 'http',
         headers,
         timeout,
         trust,
@@ -162,7 +165,7 @@ export const addCommand: CommandModule = {
         choices: ['user', 'project'],
       })
       .option('transport', {
-        alias: 't',
+        alias: ['t', 'type'],
         describe: 'Transport type (stdio, sse, http)',
         type: 'string',
         default: 'stdio',
@@ -230,5 +233,6 @@ export const addCommand: CommandModule = {
         excludeTools: argv['excludeTools'] as string[] | undefined,
       },
     );
+    await exitCli();
   },
 };
