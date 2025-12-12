@@ -129,7 +129,7 @@ export function getCoreSystemPrompt(
     .getAllToolNames()
     .includes(WriteTodosTool.Name);
 
-  const interactiveMode = config.isInteractiveShellEnabled();
+  const interactiveMode = config.isInteractive();
 
   let basePrompt: string;
   if (systemMdEnabled) {
