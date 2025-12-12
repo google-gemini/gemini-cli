@@ -23,6 +23,7 @@ import {
   FileExclusions,
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
+import { GeminiIgnoreParser } from '../utils/geminiIgnoreParser.js';
 
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
 
@@ -189,6 +190,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 > {
   constructor(
     private readonly config: Config,
+    private readonly geminiIgnoreParser: GeminiIgnoreParser,
     params: RipGrepToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
@@ -387,6 +389,12 @@ class GrepToolInvocation extends BaseToolInvocation<
       excludes.forEach((exclude) => {
         rgArgs.push('--glob', `!${exclude}`);
       });
+
+      // Add .geminiignore support (ripgrep natively handles .gitignore)
+      const geminiIgnorePath = this.geminiIgnoreParser.getIgnoreFilePath();
+      if (geminiIgnorePath) {
+        rgArgs.push('--ignore-file', geminiIgnorePath);
+      }
     }
 
     rgArgs.push('--threads', '4');
@@ -479,6 +487,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = GREP_TOOL_NAME;
+  private readonly geminiIgnoreParser: GeminiIgnoreParser;
 
   constructor(
     private readonly config: Config,
@@ -544,6 +553,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
       false, // canUpdateOutput
       messageBus,
     );
+    this.geminiIgnoreParser = new GeminiIgnoreParser(config.getTargetDir());
   }
 
   /**
@@ -580,6 +590,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
   ): ToolInvocation<RipGrepToolParams, ToolResult> {
     return new GrepToolInvocation(
       this.config,
+      this.geminiIgnoreParser,
       params,
       messageBus,
       _toolName,
