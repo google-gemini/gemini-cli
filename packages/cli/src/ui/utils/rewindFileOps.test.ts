@@ -135,7 +135,7 @@ describe('rewindFileOps', () => {
             args: {},
             resultDisplay: {
               fileName: 'file.txt',
-              filePath: '/root/file.txt',
+              filePath: path.resolve('/root/file.txt'),
               originalContent: 'old',
               newContent: 'new',
               isNewFile: false,
@@ -187,7 +187,7 @@ describe('rewindFileOps', () => {
             args: {},
             resultDisplay: {
               fileName: 'file.txt',
-              filePath: '/root/file.txt',
+              filePath: path.resolve('/root/file.txt'),
               originalContent: null,
               newContent: 'content',
               isNewFile: true,
