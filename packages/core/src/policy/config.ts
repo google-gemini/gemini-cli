@@ -291,11 +291,6 @@ export function createPolicyUpdater(
             const fileContent = await fs.readFile(policyFile, 'utf-8');
             existingData = toml.parse(fileContent) as { rule?: TomlRule[] };
           } catch (error) {
-            // If file doesn't exist or is invalid, start with empty object
-            // (or maybe preserve invalid content? For auto-save, overwriting invalid might be safer than crashing,
-            // but let's assume if it fails to parse we just append to a fresh structure to avoid data loss)
-            // Actually, if it fails to parse, we probably shouldn't blindly overwrite.
-            // But for this "auto-saved.toml", it's managed by this tool.
             if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
               console.warn(
                 `Failed to parse ${policyFile}, overwriting with new policy.`,
