@@ -1,6 +1,10 @@
 {
   "name": "@google/gemini-cli",
+<<<<<<< HEAD
   "version": "0.21.0-nightly.20251213.977248e09",
+=======
+  "version": "0.21.0-nightly.20251212.54de67536",
+>>>>>>> 50c36b234 (chore: Automated version bump for nightly release 0.21.0-nightly.20251212.54de67536)
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,6 +18,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
+<<<<<<< HEAD
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.21.0-nightly.20251213.977248e09"
   },
   "scripts": {
@@ -78,6 +83,7 @@
   ],
   "devDependencies": {
     "@octokit/rest": "^22.0.0",
+    "@types/js-yaml": "^4.0.9",
     "@types/marked": "^5.0.2",
     "@types/mime-types": "^3.0.1",
     "@types/minimatch": "^5.1.2",
