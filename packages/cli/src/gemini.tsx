@@ -419,24 +419,65 @@ export async function main() {
         stdinData = await readStdin();
       }
 
-      // This function is a copy of the one from sandbox.ts
-      // It is moved here to decouple sandbox.ts from the CLI's argument structure.
+      // This function injects stdin data into the CLI arguments for sandbox mode.
+      // It handles both --prompt/-p flags and positional prompt arguments.
       const injectStdinIntoArgs = (
         args: string[],
         stdinData?: string,
       ): string[] => {
         const finalArgs = [...args];
         if (stdinData) {
-          const promptIndex = finalArgs.findIndex(
+          // First, look for --prompt or -p flags
+          const promptFlagIndex = finalArgs.findIndex(
             (arg) => arg === '--prompt' || arg === '-p',
           );
-          if (promptIndex > -1 && finalArgs.length > promptIndex + 1) {
-            // If there's a prompt argument, prepend stdin to it
-            finalArgs[promptIndex + 1] =
-              `${stdinData}\n\n${finalArgs[promptIndex + 1]}`;
+          if (promptFlagIndex > -1 && finalArgs.length > promptFlagIndex + 1) {
+            // If there's a prompt flag, prepend stdin to its value
+            finalArgs[promptFlagIndex + 1] =
+              `${stdinData}\n\n${finalArgs[promptFlagIndex + 1]}`;
           } else {
-            // If there's no prompt argument, add stdin as the prompt
-            finalArgs.push('--prompt', stdinData);
+            // Look for positional prompt (first non-flag argument after script path)
+            // Skip: [0] node, [1] script path, then find first non-flag arg
+            // Boolean flags that don't take a value
+            const booleanFlags = new Set([
+              '--yolo',
+              '-y',
+              '--debug',
+              '--help',
+              '-h',
+              '--version',
+              '-v',
+              '--list-sessions',
+              '--list-extensions',
+              '--sandbox',
+              '--check-only',
+              '--prompt-interactive',
+            ]);
+
+            let positionalIndex = -1;
+            for (let i = 2; i < finalArgs.length; i++) {
+              const arg = finalArgs[i];
+              // Skip flags
+              if (arg.startsWith('-')) {
+                // If this is NOT a boolean flag, skip the next arg (the flag's value)
+                if (!booleanFlags.has(arg) && !arg.startsWith('--no-')) {
+                  i++;
+                }
+                continue;
+              }
+              // This is a positional argument (likely the prompt)
+              positionalIndex = i;
+              break;
+            }
+
+            if (positionalIndex > -1) {
+              // Prepend stdin to the positional prompt
+              finalArgs[positionalIndex] =
+                `${stdinData}\n\n${finalArgs[positionalIndex]}`;
+            } else {
+              // If there's no prompt at all, add stdin as the prompt
+              finalArgs.push('--prompt', stdinData);
+            }
           }
         }
         return finalArgs;

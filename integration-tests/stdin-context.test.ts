@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
-describe.skip('stdin context', () => {
+describe('stdin context', () => {
   it('should be able to use stdin as context for a prompt', async () => {
     const rig = new TestRig();
     await rig.setup('should be able to use stdin as context for a prompt');
@@ -24,9 +24,9 @@ describe.skip('stdin context', () => {
     expect(lastRequest?.attributes?.request_text).toBeDefined();
     const historyString = lastRequest!.attributes!.request_text!;
 
-    // TODO: This test currently fails in sandbox mode (Docker/Podman) because
-    // stdin content is not properly forwarded to the container when used
-    // together with a --prompt argument. The test passes in non-sandbox mode.
+    // This test works in both sandbox and non-sandbox modes.
+    // The stdin content is injected into the positional prompt argument
+    // via injectStdinIntoArgs in gemini.tsx before launching the sandbox.
 
     expect(historyString).toContain(randomString);
     expect(historyString).toContain(prompt);
