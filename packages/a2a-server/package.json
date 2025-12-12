@@ -17,8 +17,8 @@
     "start": "node dist/src/http/server.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
-    "test": "vitest run",
-    "test:ci": "vitest run --coverage",
+    "test": "cross-env LC_ALL=C vitest run",
+    "test:ci": "cross-env LC_ALL=C vitest run --coverage",
     "typecheck": "tsc --noEmit"
   },
   "files": [
