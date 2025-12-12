@@ -81,6 +81,14 @@ export function getCoreSystemPrompt(
   config: Config,
   userMemory?: string,
 ): string {
+  if (config.isMonkMode()) {
+    const memorySuffix =
+      userMemory && userMemory.trim().length > 0
+        ? `\n\n---\n\n${userMemory.trim()}`
+        : '';
+    return `You are a helpful assistant. You only have access to the ${SHELL_TOOL_NAME} tool. Use it to fulfill the user's request. Be concise.${memorySuffix}`;
+  }
+
   // A flag to indicate whether the system prompt override is active.
   let systemMdEnabled = false;
   // The default path for the system prompt file. This can be overridden.

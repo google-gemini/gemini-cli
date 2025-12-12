@@ -85,7 +85,10 @@ import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { DelegateToAgentTool } from '../agents/delegate-to-agent-tool.js';
-import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  DELEGATE_TO_AGENT_TOOL_NAME,
+  SHELL_TOOL_NAME,
+} from '../tools/tool-names.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -324,6 +327,7 @@ export interface ConfigParameters {
   enableAgents?: boolean;
   enableModelAvailabilityService?: boolean;
   experimentalJitContext?: boolean;
+  monkMode?: boolean;
 }
 
 export class Config {
@@ -449,6 +453,7 @@ export class Config {
 
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
+  private readonly monkMode: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -597,6 +602,7 @@ export class Config {
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
     this.experiments = params.experiments;
+    this.monkMode = params.monkMode ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -1384,6 +1390,10 @@ export class Config {
     return this.interactive;
   }
 
+  isMonkMode(): boolean {
+    return this.monkMode;
+  }
+
   getUseRipgrep(): boolean {
     return this.useRipgrep;
   }
@@ -1510,6 +1520,11 @@ export class Config {
     const registerCoreTool = (ToolClass: any, ...args: unknown[]) => {
       const className = ToolClass.name;
       const toolName = ToolClass.Name || className;
+
+      if (this.isMonkMode() && toolName !== SHELL_TOOL_NAME) {
+        return;
+      }
+
       const coreTools = this.getCoreTools();
       // On some platforms, the className can be minified to _ClassName.
       const normalizedClassName = className.replace(/^_+/, '');

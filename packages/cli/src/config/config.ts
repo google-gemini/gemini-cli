@@ -74,6 +74,7 @@ export interface CliArgs {
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
+  monkMode: boolean | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -237,6 +238,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
           hidden: true,
+        })
+        .option('monk-mode', {
+          type: 'boolean',
+          description:
+            'Disables all tools other than run_shell_command and simplifies the system instruction.',
         })
         .deprecateOption(
           'prompt',
@@ -676,6 +682,7 @@ export async function loadCliConfig(
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.tools?.enableHooks ?? false,
     hooks: settings.hooks || {},
+    monkMode: argv.monkMode || false,
   });
 }
 
