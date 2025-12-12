@@ -177,12 +177,12 @@ export interface HelpLinkUrl {
 
 export interface SetCodeAssistGlobalUserSettingRequest {
   cloudaicompanionProject?: string;
-  freeTierDataCollectionOption: boolean;
+  freeTierDataCollectionOptin: boolean;
 }
 
 export interface CodeAssistGlobalUserSettingResponse {
   cloudaicompanionProject?: string;
-  freeTierDataCollectionOption: boolean;
+  freeTierDataCollectionOptin: boolean;
 }
 
 /**
