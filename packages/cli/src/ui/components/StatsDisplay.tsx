@@ -22,6 +22,19 @@ import {
 } from '../utils/displayUtils.js';
 import { computeSessionStats } from '../utils/computeStats.js';
 import type { RetrieveUserQuotaResponse } from '@google/gemini-cli-core';
+import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL,
+} from '@google/gemini-cli-core';
+
+const VALID_GEMINI_MODELS = new Set([
+  PREVIEW_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+]);
 
 // A more flexible and powerful StatRow component
 interface StatRowProps {
@@ -70,8 +83,6 @@ const Section: React.FC<SectionProps> = ({ title, children }) => (
   </Box>
 );
 
-<<<<<<< HEAD
-=======
 // Logic for building the unified list of table rows
 const buildModelRows = (
   models: Record<string, ModelMetrics>,
@@ -123,7 +134,6 @@ const buildModelRows = (
   return [...activeRows, ...quotaRows];
 };
 
->>>>>>> 54de67536 (feat(cli): polish cached token stats and simplify stats display when quota is present. (#14961))
 const formatResetTime = (resetTime: string): string => {
   const diff = new Date(resetTime).getTime() - Date.now();
   if (diff <= 0) return '';
@@ -151,9 +161,6 @@ const formatResetTime = (resetTime: string): string => {
 const ModelUsageTable: React.FC<{
   models: Record<string, ModelMetrics>;
   quotas?: RetrieveUserQuotaResponse;
-<<<<<<< HEAD
-}> = ({ models, totalCachedTokens, cacheEfficiency, quotas }) => {
-=======
   cacheEfficiency: number;
   totalCachedTokens: number;
 }> = ({ models, quotas, cacheEfficiency, totalCachedTokens }) => {
@@ -165,7 +172,6 @@ const ModelUsageTable: React.FC<{
 
   const showQuotaColumn = !!quotas && rows.some((row) => !!row.bucket);
 
->>>>>>> 54de67536 (feat(cli): polish cached token stats and simplify stats display when quota is present. (#14961))
   const nameWidth = 25;
   const requestsWidth = 7;
   const uncachedWidth = 15;
@@ -254,47 +260,6 @@ const ModelUsageTable: React.FC<{
         width="100%"
       ></Box>
 
-<<<<<<< HEAD
-      {/* Rows */}
-      {Object.entries(models).map(([name, modelMetrics]) => {
-        const modelName = name.replace('-001', '');
-        const bucket = quotas?.buckets?.find((b) => b.modelId === modelName);
-
-        return (
-          <Box key={name}>
-            <Box width={nameWidth}>
-              <Text color={theme.text.primary}>{modelName}</Text>
-            </Box>
-            <Box width={requestsWidth} justifyContent="flex-end">
-              <Text color={theme.text.primary}>
-                {modelMetrics.api.totalRequests}
-              </Text>
-            </Box>
-            <Box width={inputTokensWidth} justifyContent="flex-end">
-              <Text color={theme.status.warning}>
-                {modelMetrics.tokens.prompt.toLocaleString()}
-              </Text>
-            </Box>
-            <Box width={outputTokensWidth} justifyContent="flex-end">
-              <Text color={theme.status.warning}>
-                {modelMetrics.tokens.candidates.toLocaleString()}
-              </Text>
-            </Box>
-            <Box width={usageLimitWidth} justifyContent="flex-end">
-              {bucket &&
-                bucket.remainingFraction != null &&
-                bucket.resetTime && (
-                  <Text color={theme.text.secondary}>
-                    {(bucket.remainingFraction * 100).toFixed(1)}%{' '}
-                    {formatResetTime(bucket.resetTime)}
-                  </Text>
-                )}
-            </Box>
-          </Box>
-        );
-      })}
-      {cacheEfficiency > 0 && (
-=======
       {rows.map((row) => (
         <Box key={row.key}>
           <Box width={nameWidth} flexGrow={1}>
@@ -372,7 +337,6 @@ const ModelUsageTable: React.FC<{
       ))}
 
       {cacheEfficiency > 0 && !showQuotaColumn && (
->>>>>>> 54de67536 (feat(cli): polish cached token stats and simplify stats display when quota is present. (#14961))
         <Box flexDirection="column" marginTop={1}>
           <Text color={theme.text.primary}>
             <Text color={theme.status.success}>Savings Highlight:</Text>{' '}
@@ -384,12 +348,8 @@ const ModelUsageTable: React.FC<{
           </Text>
         </Box>
       )}
-<<<<<<< HEAD
-      {models && (
-=======
 
       {showQuotaColumn && (
->>>>>>> 54de67536 (feat(cli): polish cached token stats and simplify stats display when quota is present. (#14961))
         <>
           <Box marginTop={1} marginBottom={2}>
             <Text color={theme.text.primary}>
@@ -523,24 +483,12 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
           </Text>
         </SubStatRow>
       </Section>
-<<<<<<< HEAD
-
-      {Object.keys(models).length > 0 && (
-        <ModelUsageTable
-          models={models}
-          totalCachedTokens={computed.totalCachedTokens}
-          cacheEfficiency={computed.cacheEfficiency}
-          quotas={quotas}
-        />
-      )}
-=======
       <ModelUsageTable
         models={models}
         quotas={quotas}
         cacheEfficiency={computed.cacheEfficiency}
         totalCachedTokens={computed.totalCachedTokens}
       />
->>>>>>> 54de67536 (feat(cli): polish cached token stats and simplify stats display when quota is present. (#14961))
     </Box>
   );
 };
