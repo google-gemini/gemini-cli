@@ -43,8 +43,8 @@ const IDE_AUTH_TOKEN_ENV_VAR = 'GEMINI_CLI_IDE_AUTH_TOKEN';
 interface WritePortAndWorkspaceArgs {
   context: vscode.ExtensionContext;
   port: number;
+  authToken: string;
   portFile: string | undefined;
-  authToken: string | undefined;
   log: (message: string) => void;
 }
 
@@ -74,8 +74,8 @@ async function writePortAndWorkspace({
     authToken,
   );
 
-  if (!portFile || !authToken) {
-    log('Missing portFile or authToken, cannot write port and workspace info.');
+  if (!portFile) {
+    log('Missing portFile, cannot write port and workspace info.');
     return;
   }
 
@@ -390,7 +390,7 @@ export class IDEServer {
   }
 
   async syncEnvVars(): Promise<void> {
-    if (this.context && this.server && this.port) {
+    if (this.context && this.server && this.port && this.authToken) {
       await writePortAndWorkspace({
         context: this.context,
         port: this.port,
