@@ -359,7 +359,7 @@ export class IDEServer {
             context,
             port: this.port,
             portFile: this.portFile,
-            authToken: this.authToken,
+            authToken: this.authToken ?? '',
             log: this.log,
           });
         }
