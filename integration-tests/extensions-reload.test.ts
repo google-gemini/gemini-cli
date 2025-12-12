@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, it, describe } from 'vitest';
+import { expect, it, describe, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 import { TestMcpServer } from './test-mcp-server.js';
 import { writeFileSync } from 'node:fs';
@@ -18,6 +18,12 @@ import stripAnsi from 'strip-ansi';
 const itIf = (condition: boolean) => (condition ? it : it.skip);
 
 describe('extension reloading', () => {
+  let rig: TestRig;
+
+  beforeEach(() => (rig = new TestRig()));
+
+  afterEach(async () => await rig?.cleanup());
+
   const sandboxEnv = env['GEMINI_SANDBOX'];
   // Fails in linux non-sandbox e2e tests
   // TODO(#14527): Re-enable this once fixed
@@ -43,23 +49,16 @@ describe('extension reloading', () => {
         },
       };
 
-      const rig = new TestRig();
       rig.setup('extension reload test', {
         settings: {
           experimental: { extensionReloading: true },
         },
       });
-      const testServerPath = join(rig.testDir!, 'gemini-extension.json');
+      const testServerPath = join(rig.workDir!, 'gemini-extension.json');
       writeFileSync(testServerPath, safeJsonStringify(extension, 2));
-      // defensive cleanup from previous tests.
-      try {
-        await rig.runCommand(['extensions', 'uninstall', 'test-extension']);
-      } catch {
-        /* empty */
-      }
 
       const result = await rig.runCommand(
-        ['extensions', 'install', `${rig.testDir!}`],
+        ['extensions', 'install', `${rig.workDir!}`],
         { stdin: 'y\n' },
       );
       expect(result).toContain('test-extension');
@@ -77,16 +76,17 @@ describe('extension reloading', () => {
       // Start the CLI.
       const run = await rig.runInteractive('--debug');
       await run.expectText('You have 1 extension with an update available');
-      // See the outdated extension
-      await run.sendText('/extensions list');
-      await run.type('\r');
-      await run.expectText(
-        'test-extension (v0.0.1) - active (update available)',
-      );
-      // Wait for the UI to settle and retry the command until we see the update
-      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Poll for the updated list
+      // See the outdated extension
+      await rig.pollCommand(
+        () => run.sendKeys('\u0015/extensions list\r'),
+        () =>
+          stripAnsi(run.output).includes(
+            'test-extension (v0.0.1) - active (update available)',
+          ),
+      );
+
+      // Poll for the outdated mcp tool
       await rig.pollCommand(
         () => run.sendKeys('\u0015/mcp list\r'),
         () => {
@@ -97,7 +97,6 @@ describe('extension reloading', () => {
             ) && output.includes('- hello')
           );
         },
-        30000, // 30s timeout
       );
 
       // Update the extension, expect the list to update, and mcp servers as well.
@@ -121,7 +120,6 @@ describe('extension reloading', () => {
           stripAnsi(run.output).includes(
             'test-extension (v0.0.2) - active (updated)',
           ),
-        30000,
       );
 
       // Poll for the updated mcp tool
@@ -135,7 +133,6 @@ describe('extension reloading', () => {
             ) && output.includes('- goodbye')
           );
         },
-        30000,
       );
 
       await run.sendText('/quit');
@@ -144,8 +141,6 @@ describe('extension reloading', () => {
       // Clean things up.
       await serverA.stop();
       await serverB.stop();
-      await rig.runCommand(['extensions', 'uninstall', 'test-extension']);
-      await rig.cleanup();
     },
   );
 });

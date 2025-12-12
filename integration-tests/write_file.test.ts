@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import { join } from 'node:path';
 import {
   TestRig,
   createToolCallErrorMessage,
@@ -18,7 +19,7 @@ describe('write_file', () => {
     await rig.setup('should be able to write a file', {
       settings: { tools: { core: ['write_file', 'read_file'] } },
     });
-    const prompt = `show me an example of using the write tool. put a dad joke in dad.txt`;
+    const prompt = `show me an example of using the write tool. put a dad joke in ${join(rig.workDir!, 'dad.txt')}`;
 
     const result = await rig.run(prompt);
 

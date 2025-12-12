@@ -48,7 +48,6 @@ const utf32BE = (s: string) => {
 };
 
 let rig: TestRig;
-let dir: string;
 
 describe('BOM end-to-end integraion', () => {
   beforeAll(async () => {
@@ -56,7 +55,6 @@ describe('BOM end-to-end integraion', () => {
     await rig.setup('bom-integration', {
       settings: { tools: { core: ['read_file'] } },
     });
-    dir = rig.testDir!;
   });
 
   afterAll(async () => {
@@ -68,7 +66,7 @@ describe('BOM end-to-end integraion', () => {
     content: Buffer,
     expectedText: string | null,
   ) {
-    writeFileSync(join(dir, filename), content);
+    writeFileSync(join(rig.workDir!, filename), content);
     const prompt = `read the file ${filename} and output its exact contents`;
     const output = await rig.run(prompt);
     await rig.waitForToolCall('read_file');
@@ -128,7 +126,7 @@ describe('BOM end-to-end integraion', () => {
     );
     const imageContent = readFileSync(imagePath);
     const filename = 'gemini-screenshot.png';
-    writeFileSync(join(dir, filename), imageContent);
+    writeFileSync(join(rig.workDir!, filename), imageContent);
     const prompt = `What is shown in the image ${filename}?`;
     const output = await rig.run(prompt);
     await rig.waitForToolCall('read_file');

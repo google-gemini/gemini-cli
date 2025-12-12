@@ -7,6 +7,7 @@
 import { expect } from 'vitest';
 import { execSync, spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
@@ -18,6 +19,7 @@ import * as os from 'node:os';
 import { GEMINI_DIR } from '../packages/core/src/utils/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const BUNDLE_PATH = join(__dirname, '..', 'bundle/gemini.js');
 
 // Get timeout based on environment
 function getDefaultTimeout() {
@@ -271,19 +273,17 @@ export class InteractiveRun {
 }
 
 export class TestRig {
-  bundlePath: string;
-  testDir: string | null;
+  workDir: string | null = null;
+  homeDir: string | null = null;
+  testDir: string | null = null;
+  envOverrides: Record<string, string> = {};
   testName?: string;
   _lastRunStdout?: string;
   // Path to the copied fake responses file for this test.
   fakeResponsesPath?: string;
   // Original fake responses file path for rewriting goldens in record mode.
   originalFakeResponsesPath?: string;
-
-  constructor() {
-    this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
-    this.testDir = null;
-  }
+  private activeRuns: InteractiveRun[] = [];
 
   setup(
     testName: string,
@@ -294,10 +294,38 @@ export class TestRig {
   ) {
     this.testName = testName;
     const sanitizedName = sanitizeTestName(testName);
-    this.testDir = join(env['INTEGRATION_TEST_FILE_DIR']!, sanitizedName);
-    mkdirSync(this.testDir, { recursive: true });
+    const randomId = randomUUID().substring(0, 8);
+    this.testDir = join(
+      env['INTEGRATION_TEST_FILE_DIR']!,
+      sanitizedName,
+      randomId,
+    );
+    this.workDir = join(this.testDir, 'workingdir');
+    this.homeDir = join(this.testDir, 'home');
+
+    mkdirSync(this.workDir, { recursive: true });
+    mkdirSync(this.homeDir, { recursive: true });
+
+    // Create a dummy package.json to prevent npm from traversing up to the root
+    // and corrupting the project's node_modules during the test.
+    writeFileSync(
+      join(this.testDir, 'package.json'),
+      JSON.stringify({
+        name: 'test-boundary',
+        version: '0.0.0',
+        private: true,
+        type: 'module',
+      }),
+    );
+
+    this.envOverrides = {
+      HOME: this.homeDir,
+      USERPROFILE: this.homeDir,
+      GEMINI_CONFIG_DIR: join(this.homeDir, '.gemini'),
+    } as Record<string, string>;
+
     if (options.fakeResponsesPath) {
-      this.fakeResponsesPath = join(this.testDir, 'fake-responses.json');
+      this.fakeResponsesPath = join(this.workDir, 'fake-responses.json');
       this.originalFakeResponsesPath = options.fakeResponsesPath;
       if (process.env['REGENERATE_MODEL_GOLDENS'] !== 'true') {
         fs.copyFileSync(options.fakeResponsesPath, this.fakeResponsesPath);
@@ -305,11 +333,11 @@ export class TestRig {
     }
 
     // Create a settings file to point the CLI to the local collector
-    const geminiDir = join(this.testDir, GEMINI_DIR);
+    const geminiDir = join(this.homeDir, GEMINI_DIR);
     mkdirSync(geminiDir, { recursive: true });
     // In sandbox mode, use an absolute path for telemetry inside the container
     // The container mounts the test directory at the same path as the host
-    const telemetryPath = join(this.testDir, 'telemetry.log'); // Always use test directory for telemetry
+    const telemetryPath = join(this.workDir, 'telemetry.log'); // Always use test directory for telemetry
 
     const settings = {
       general: {
@@ -332,9 +360,13 @@ export class TestRig {
       ui: {
         useAlternateBuffer: true,
       },
-      model: DEFAULT_GEMINI_MODEL,
-      sandbox:
-        env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
+      model: {
+        name: DEFAULT_GEMINI_MODEL,
+      },
+      tools: {
+        sandbox:
+          env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
+      },
       // Don't show the IDE connection dialog when running from VsCode
       ide: { enabled: false, hasSeenNudge: true },
       ...options.settings, // Allow tests to override/add settings
@@ -346,18 +378,18 @@ export class TestRig {
   }
 
   createFile(fileName: string, content: string) {
-    const filePath = join(this.testDir!, fileName);
+    const filePath = join(this.workDir!, fileName);
     writeFileSync(filePath, content);
     return filePath;
   }
 
   mkdir(dir: string) {
-    mkdirSync(join(this.testDir!, dir), { recursive: true });
+    mkdirSync(join(this.workDir!, dir), { recursive: true });
   }
 
   sync() {
     // ensure file system is done before spawning
-    execSync('sync', { cwd: this.testDir! });
+    execSync('sync', { cwd: this.workDir! });
   }
 
   /**
@@ -374,7 +406,7 @@ export class TestRig {
     const command = isNpmReleaseTest ? 'gemini' : 'node';
     const initialArgs = isNpmReleaseTest
       ? extraInitialArgs
-      : [this.bundlePath, ...extraInitialArgs];
+      : [BUNDLE_PATH, ...extraInitialArgs];
     if (this.fakeResponsesPath) {
       if (process.env['REGENERATE_MODEL_GOLDENS'] === 'true') {
         initialArgs.push('--record-responses', this.fakeResponsesPath);
@@ -407,7 +439,7 @@ export class TestRig {
       encoding: 'utf-8';
       input?: string;
     } = {
-      cwd: this.testDir!,
+      cwd: this.workDir!,
       encoding: 'utf-8',
     };
 
@@ -428,9 +460,9 @@ export class TestRig {
     commandArgs.push(...args);
 
     const child = spawn(command, commandArgs, {
-      cwd: this.testDir!,
+      cwd: this.workDir!,
       stdio: 'pipe',
-      env: env,
+      env: { ...env, ...this.envOverrides },
     });
 
     let stdout = '';
@@ -535,8 +567,9 @@ export class TestRig {
     const commandArgs = [...initialArgs, ...args];
 
     const child = spawn(command, commandArgs, {
-      cwd: this.testDir!,
+      cwd: this.workDir!,
       stdio: 'pipe',
+      env: { ...env, ...this.envOverrides },
     });
 
     let stdout = '';
@@ -580,7 +613,7 @@ export class TestRig {
   }
 
   readFile(fileName: string) {
-    const filePath = join(this.testDir!, fileName);
+    const filePath = join(this.workDir!, fileName);
     const content = readFileSync(filePath, 'utf-8');
     if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
       console.log(`--- FILE: ${filePath} ---`);
@@ -591,6 +624,16 @@ export class TestRig {
   }
 
   async cleanup() {
+    // Kill any active interactive runs
+    for (const run of this.activeRuns) {
+      try {
+        await run.kill();
+      } catch {
+        // Ignore errors if process is already dead
+      }
+    }
+    this.activeRuns = [];
+
     if (
       process.env['REGENERATE_MODEL_GOLDENS'] === 'true' &&
       this.fakeResponsesPath
@@ -612,7 +655,7 @@ export class TestRig {
 
   async waitForTelemetryReady() {
     // Telemetry is always written to the test directory
-    const logFilePath = join(this.testDir!, 'telemetry.log');
+    const logFilePath = join(this.workDir!, 'telemetry.log');
 
     if (!logFilePath) return;
 
@@ -863,7 +906,7 @@ export class TestRig {
 
   private _readAndParseTelemetryLog(): ParsedLog[] {
     // Telemetry is always written to the test directory
-    const logFilePath = join(this.testDir!, 'telemetry.log');
+    const logFilePath = join(this.workDir!, 'telemetry.log');
 
     if (!logFilePath || !fs.existsSync(logFilePath)) {
       return [];
@@ -905,7 +948,7 @@ export class TestRig {
     // If not, fall back to parsing from stdout
     if (env['GEMINI_SANDBOX'] === 'podman') {
       // Try reading from file first
-      const logFilePath = join(this.testDir!, 'telemetry.log');
+      const logFilePath = join(this.workDir!, 'telemetry.log');
 
       if (fs.existsSync(logFilePath)) {
         try {
@@ -1049,9 +1092,11 @@ export class TestRig {
       name: 'xterm-color',
       cols: 80,
       rows: 80,
-      cwd: this.testDir!,
+      cwd: this.workDir!,
       env: Object.fromEntries(
-        Object.entries(env).filter(([, v]) => v !== undefined),
+        Object.entries({ ...env, ...this.envOverrides }).filter(
+          ([, v]) => v !== undefined,
+        ),
       ) as { [key: string]: string },
     };
 
@@ -1059,6 +1104,7 @@ export class TestRig {
     const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
 
     const run = new InteractiveRun(ptyProcess);
+    this.activeRuns.push(run);
     // Wait for the app to be ready
     await run.expectText('  Type your message or @path/to/file', 30000);
     return run;
