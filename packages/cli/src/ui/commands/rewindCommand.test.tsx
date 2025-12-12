@@ -98,7 +98,6 @@ describe('rewindCommand', () => {
         loadHistory: mockLoadHistory,
         addItem: mockAddItem,
         setPendingItem: mockSetPendingItem,
-        setInput: mockSetInput,
       },
     }) as unknown as CommandContext;
   });
@@ -126,14 +125,17 @@ describe('rewindCommand', () => {
     expect(mockRewindTo).toHaveBeenCalledWith('msg-id-123');
     expect(mockSetHistory).toHaveBeenCalled();
     expect(mockResetContext).toHaveBeenCalled();
-    expect(mockLoadHistory).toHaveBeenCalledWith([
-      expect.objectContaining({ text: 'old user', id: 1 }),
-      expect.objectContaining({ text: 'old gemini', id: 2 }),
-    ]);
+    expect(mockLoadHistory).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({ text: 'old user', id: 1 }),
+        expect.objectContaining({ text: 'old gemini', id: 2 }),
+      ],
+      'New Prompt',
+    );
     expect(mockRemoveComponent).toHaveBeenCalled();
 
-    // Verify setInput was called with the new text
-    expect(mockSetInput).toHaveBeenCalledWith('New Prompt');
+    // Verify setInput was NOT called directly (it's handled via loadHistory now)
+    expect(mockSetInput).not.toHaveBeenCalled();
   });
 
   it('should handle RewindAndRevert correctly', async () => {
@@ -152,7 +154,11 @@ describe('rewindCommand', () => {
       '/mock/root',
     );
     expect(mockRewindTo).toHaveBeenCalledWith('msg-id-123');
-    expect(mockSetInput).toHaveBeenCalledWith('New Prompt');
+    expect(mockSetInput).not.toHaveBeenCalled();
+    expect(mockLoadHistory).toHaveBeenCalledWith(
+      expect.any(Array),
+      'New Prompt',
+    );
   });
 
   it('should handle RevertOnly correctly', async () => {

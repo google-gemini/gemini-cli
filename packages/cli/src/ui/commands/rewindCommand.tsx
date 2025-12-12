@@ -117,14 +117,8 @@ export const rewindCommand: SlashCommand = {
               // 1. Remove component FIRST to avoid flicker and clear the stage
               context.ui.removeComponent();
 
-              // 2. Load the rewound history
-              context.ui.loadHistory(historyWithIds);
-
-              // Wait a tick for Ink to clear the screen
-              await new Promise((resolve) => setTimeout(resolve, 50));
-
-              // Submit the new text as a prompt to the main loop.
-              context.ui.setInput(newText);
+              // 2. Load the rewound history and set the input
+              context.ui.loadHistory(historyWithIds, newText);
             } catch (error) {
               // If an error occurs, we still want to remove the component if possible
               context.ui.removeComponent();
