@@ -280,16 +280,16 @@ Save output to files or pipe to other commands:
 
 ```bash
 # Save to file
-gemini -p "Explain Docker" > docker-explanation.txt
-gemini -p "Explain Docker" --output-format json > docker-explanation.json
+gemini "Explain Docker" > docker-explanation.txt
+gemini "Explain Docker" --output-format json > docker-explanation.json
 
 # Append to file
-gemini -p "Add more details" >> docker-explanation.txt
+gemini "Add more details" >> docker-explanation.txt
 
 # Pipe to other tools
-gemini -p "What is Kubernetes?" --output-format json | jq '.response'
-gemini -p "Explain microservices" | wc -w
-gemini -p "List programming languages" | grep -i "python"
+gemini "What is Kubernetes?" --output-format json | jq '.response'
+gemini "Explain microservices" | wc -w
+gemini "List programming languages" | grep -i "python"
 ```
 
 ## Configuration options
@@ -298,13 +298,13 @@ Key command-line options for headless usage:
 
 | Option                  | Description                        | Example                                            |
 | ----------------------- | ---------------------------------- | -------------------------------------------------- |
-| `--prompt`, `-p`        | Run in headless mode               | `gemini -p "query"`                                |
-| `--output-format`       | Specify output format (text, json) | `gemini -p "query" --output-format json`           |
-| `--model`, `-m`         | Specify the Gemini model           | `gemini -p "query" -m gemini-2.5-flash`            |
-| `--debug`, `-d`         | Enable debug mode                  | `gemini -p "query" --debug`                        |
-| `--include-directories` | Include additional directories     | `gemini -p "query" --include-directories src,docs` |
-| `--yolo`, `-y`          | Auto-approve all actions           | `gemini -p "query" --yolo`                         |
-| `--approval-mode`       | Set approval mode                  | `gemini -p "query" --approval-mode auto_edit`      |
+| `[query]`               | Positional prompt (headless mode)  | `gemini "query"`                                   |
+| `--output-format`       | Specify output format (text, json) | `gemini "query" --output-format json`              |
+| `--model`, `-m`         | Specify the Gemini model           | `gemini "query" -m gemini-2.5-flash`               |
+| `--debug`, `-d`         | Enable debug mode                  | `gemini "query" --debug`                           |
+| `--include-directories` | Include additional directories     | `gemini "query" --include-directories src,docs`    |
+| `--yolo`, `-y`          | Auto-approve all actions           | `gemini "query" --yolo`                            |
+| `--approval-mode`       | Set approval mode                  | `gemini "query" --approval-mode auto_edit`         |
 
 For complete details on all available configuration options, settings files, and
 environment variables, see the
@@ -315,20 +315,20 @@ environment variables, see the
 #### Code review
 
 ```bash
-cat src/auth.py | gemini -p "Review this authentication code for security issues" > security-review.txt
+cat src/auth.py | gemini "Review this authentication code for security issues" > security-review.txt
 ```
 
 #### Generate commit messages
 
 ```bash
-result=$(git diff --cached | gemini -p "Write a concise commit message for these changes" --output-format json)
+result=$(git diff --cached | gemini "Write a concise commit message for these changes" --output-format json)
 echo "$result" | jq -r '.response'
 ```
 
 #### API documentation
 
 ```bash
-result=$(cat api/routes.js | gemini -p "Generate OpenAPI spec for these routes" --output-format json)
+result=$(cat api/routes.js | gemini "Generate OpenAPI spec for these routes" --output-format json)
 echo "$result" | jq -r '.response' > openapi.json
 ```
 
@@ -337,7 +337,7 @@ echo "$result" | jq -r '.response' > openapi.json
 ```bash
 for file in src/*.py; do
     echo "Analyzing $file..."
-    result=$(cat "$file" | gemini -p "Find potential bugs and suggest improvements" --output-format json)
+    result=$(cat "$file" | gemini "Find potential bugs and suggest improvements" --output-format json)
     echo "$result" | jq -r '.response' > "reports/$(basename "$file").analysis"
     echo "Completed analysis for $(basename "$file")" >> reports/progress.log
 done
@@ -346,20 +346,20 @@ done
 #### Code review
 
 ```bash
-result=$(git diff origin/main...HEAD | gemini -p "Review these changes for bugs, security issues, and code quality" --output-format json)
+result=$(git diff origin/main...HEAD | gemini "Review these changes for bugs, security issues, and code quality" --output-format json)
 echo "$result" | jq -r '.response' > pr-review.json
 ```
 
 #### Log analysis
 
 ```bash
-grep "ERROR" /var/log/app.log | tail -20 | gemini -p "Analyze these errors and suggest root cause and fixes" > error-analysis.txt
+grep "ERROR" /var/log/app.log | tail -20 | gemini "Analyze these errors and suggest root cause and fixes" > error-analysis.txt
 ```
 
 #### Release notes generation
 
 ```bash
-result=$(git log --oneline v1.0.0..HEAD | gemini -p "Generate release notes from these commits" --output-format json)
+result=$(git log --oneline v1.0.0..HEAD | gemini "Generate release notes from these commits" --output-format json)
 response=$(echo "$result" | jq -r '.response')
 echo "$response"
 echo "$response" >> CHANGELOG.md
@@ -368,7 +368,7 @@ echo "$response" >> CHANGELOG.md
 #### Model and tool usage tracking
 
 ```bash
-result=$(gemini -p "Explain this database schema" --include-directories db --output-format json)
+result=$(gemini "Explain this database schema" --include-directories db --output-format json)
 total_tokens=$(echo "$result" | jq -r '.stats.models // {} | to_entries | map(.value.tokens.total) | add // 0')
 models_used=$(echo "$result" | jq -r '.stats.models // {} | keys | join(", ") | if . == "" then "none" else . end')
 tool_calls=$(echo "$result" | jq -r '.stats.tools.totalCalls // 0')
