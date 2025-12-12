@@ -173,7 +173,7 @@ export function checkCommandPermissions(
           blockReason: `Command(s) not in the allowed commands list. Disallowed commands: ${disallowedCommands
             .map((c) => JSON.stringify(c))
             .join(', ')}`,
-          isHardDenial: false, // This is a soft denial.
+          isHardDenial: false,
         };
       }
     }
