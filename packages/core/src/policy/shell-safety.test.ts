@@ -70,4 +70,15 @@ describe('Shell Safety Policy', () => {
     const result = await policyEngine.check(toolCall, undefined);
     expect(result.decision).toBe(PolicyDecision.ASK_USER);
   });
+  it('SHOULD NOT allow "git log &&& rm -rf /" when prefix is "git log" (parse failure)', async () => {
+    const toolCall: FunctionCall = {
+      name: 'run_shell_command',
+      args: { command: 'git log &&& rm -rf /' },
+    };
+
+    // Desired behavior: Should fail safe (ASK_USER or DENY) because parsing failed.
+    // If we let it pass as "single command" that matches prefix, it's dangerous.
+    const result = await policyEngine.check(toolCall, undefined);
+    expect(result.decision).toBe(PolicyDecision.ASK_USER);
+  });
 });

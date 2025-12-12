@@ -165,7 +165,16 @@ export class PolicyEngine {
             // If any sub-command results in DENY -> the whole thing is DENY.
             // If any sub-command results in ASK_USER -> the whole thing is ASK_USER (unless one is DENY).
             // Only if ALL sub-commands are ALLOW do we proceed with ALLOW.
-            if (subCommands.length > 1) {
+            if (subCommands.length === 0) {
+              // This case occurs if the command is non-empty but parsing fails.
+              // An ALLOW rule for a prefix might have matched, but since the rest of
+              // the command is un-parseable, it's unsafe to proceed.
+              // Fall back to a safe decision.
+              debugLogger.debug(
+                `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to safe decision because implicit ALLOW is unsafe.`,
+              );
+              decision = this.applyNonInteractiveMode(PolicyDecision.ASK_USER);
+            } else if (subCommands.length > 1) {
               debugLogger.debug(
                 `[PolicyEngine.check] Compound command detected: ${subCommands.length} parts`,
               );
@@ -191,7 +200,7 @@ export class PolicyEngine {
 
               decision = aggregateDecision;
             } else {
-              // Single command (or parser failure fallback), rule match is valid
+              // Single command, rule match is valid
               decision = this.applyNonInteractiveMode(rule.decision);
             }
           } else {
