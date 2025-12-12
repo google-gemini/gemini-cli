@@ -20,7 +20,7 @@ vi.mock('../tools/memoryTool.js', () => ({
 describe('FileExclusions', () => {
   describe('getCoreIgnorePatterns', () => {
     it('should return basic ignore patterns', () => {
-      const excluder = new FileExclusions();
+      const excluded = new FileExclusions();
       const patterns = excluder.getCoreIgnorePatterns();
 
       expect(patterns).toContain('**/node_modules/**');
