@@ -102,6 +102,8 @@ describe('ApiAuthDialog', () => {
     ({ keyName, sequence, expectedCall, args }) => {
       mockBuffer.text = 'submitted-key'; // Set for the onSubmit case
       render(<ApiAuthDialog onSubmit={onSubmit} onCancel={onCancel} />);
+      // calls[0] is the ApiAuthDialog's useKeypress (Ctrl+C handler)
+      // calls[1] is the TextInput's useKeypress (typing handler)
       const keypressHandler = mockedUseKeypress.mock.calls[1][0];
 
       keypressHandler({
@@ -131,6 +133,7 @@ describe('ApiAuthDialog', () => {
 
   it('calls clearApiKey and clears buffer when Ctrl+C is pressed', async () => {
     render(<ApiAuthDialog onSubmit={onSubmit} onCancel={onCancel} />);
+    // calls[0] is the ApiAuthDialog's useKeypress (Ctrl+C handler)
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
     await keypressHandler({

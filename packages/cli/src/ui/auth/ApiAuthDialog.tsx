@@ -5,6 +5,7 @@
  */
 
 import type React from 'react';
+import { useRef, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { TextInput } from '../components/shared/TextInput.js';
@@ -29,7 +30,13 @@ export function ApiAuthDialog({
   const { mainAreaWidth } = useUIState();
   const viewportWidth = mainAreaWidth - 8;
 
-  const initialApiKey = process.env['GEMINI_API_KEY'] || defaultValue;
+  const isMounted = useRef(true);
+
+  useEffect(() => () => {
+      isMounted.current = false;
+    }, []);
+
+  const initialApiKey = defaultValue;
 
   const buffer = useTextBuffer({
     initialText: initialApiKey || '',
@@ -50,7 +57,9 @@ export function ApiAuthDialog({
 
   const handleClear = async () => {
     await clearApiKey();
-    buffer.setText('');
+    if (isMounted.current) {
+      buffer.setText('');
+    }
   };
 
   useKeypress(
