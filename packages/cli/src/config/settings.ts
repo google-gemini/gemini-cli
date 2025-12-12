@@ -861,3 +861,17 @@ export function saveSettings(settingsFile: SettingsFile): void {
     );
   }
 }
+
+export function addToAllowedTools(
+  loadedSettings: LoadedSettings,
+  toolName: string,
+): void {
+  const userSettingsFile = loadedSettings.forScope(SettingScope.User);
+  const allowedTools =
+    (userSettingsFile.settings.tools?.allowed as string[]) || [];
+
+  if (!allowedTools.includes(toolName)) {
+    allowedTools.push(toolName);
+    loadedSettings.setValue(SettingScope.User, 'tools.allowed', allowedTools);
+  }
+}
