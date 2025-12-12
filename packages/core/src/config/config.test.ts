@@ -142,6 +142,10 @@ vi.mock('../agents/delegate-to-agent-tool.js', () => ({
   DelegateToAgentTool: vi.fn(),
 }));
 
+vi.mock('../agents/subagent-tool-wrapper.js', () => ({
+  SubagentToolWrapper: vi.fn(),
+}));
+
 vi.mock('../resources/resource-registry.js', () => ({
   ResourceRegistry: vi.fn(),
 }));

@@ -9,6 +9,7 @@ import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
 import { ShellConfirmationDialog } from './ShellConfirmationDialog.js';
+import { ToolConfirmationMessage } from './messages/ToolConfirmationMessage.js';
 import { ConsentPrompt } from './ConsentPrompt.js';
 import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
@@ -31,6 +32,10 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
+import {
+  type ToolCallConfirmationDetails,
+  ToolConfirmationOutcome,
+} from '@google/gemini-cli-core';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -95,6 +100,38 @@ export const DialogManager = ({
     );
   }
   if (uiState.confirmationRequest) {
+    const details = uiState.confirmationRequest.toolConfirmationDetails;
+
+    // If we have rich confirmation details from a subagent tool,
+    // render the standard ToolConfirmationMessage for consistent UI
+    if (details) {
+      // Reconstruct ToolCallConfirmationDetails from serialized data
+      // Create an onConfirm callback that maps outcome to boolean
+      const onConfirm = (outcome: ToolConfirmationOutcome) => {
+        const confirmed = outcome !== ToolConfirmationOutcome.Cancel;
+        uiState.confirmationRequest!.onConfirm(confirmed);
+      };
+
+      // Build the full confirmation details object with the onConfirm callback
+      const confirmationDetails = {
+        ...details,
+        onConfirm,
+      } as ToolCallConfirmationDetails;
+
+      return (
+        <ToolConfirmationMessage
+          confirmationDetails={confirmationDetails}
+          config={config}
+          isFocused={true}
+          availableTerminalHeight={
+            constrainHeight ? terminalHeight - staticExtraHeight : undefined
+          }
+          terminalWidth={mainAreaWidth}
+        />
+      );
+    }
+
+    // Fallback to ConsentPrompt for simple confirmations without details
     return (
       <ConsentPrompt
         prompt={uiState.confirmationRequest.prompt}
