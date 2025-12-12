@@ -11,8 +11,9 @@ import { theme } from '../semantic-colors.js';
 import { TextInput } from '../components/shared/TextInput.js';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { clearApiKey } from '@google/gemini-cli-core';
+import { clearApiKey, debugLogger } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
 
 interface ApiAuthDialogProps {
   onSubmit: (apiKey: string) => void;
@@ -30,14 +31,11 @@ export function ApiAuthDialog({
   const { mainAreaWidth } = useUIState();
   const viewportWidth = mainAreaWidth - 8;
 
-  const isMounted = useRef(true);
+  const pendingPromise = useRef<{ cancel: () => void } | null>(null);
 
-  useEffect(
-    () => () => {
-      isMounted.current = false;
-    },
-    [],
-  );
+  useEffect(() => () => {
+      pendingPromise.current?.cancel();
+    }, []);
 
   const initialApiKey = defaultValue;
 
@@ -58,16 +56,35 @@ export function ApiAuthDialog({
     onSubmit(value);
   };
 
-  const handleClear = async () => {
-    await clearApiKey();
-    if (isMounted.current) {
-      buffer.setText('');
-    }
+  const handleClear = () => {
+    pendingPromise.current?.cancel();
+
+    let isCancelled = false;
+    const wrappedPromise = new Promise<void>((resolve, reject) => {
+      clearApiKey().then(
+        () => !isCancelled && resolve(),
+        (error) => !isCancelled && reject(error),
+      );
+    });
+
+    pendingPromise.current = {
+      cancel: () => {
+        isCancelled = true;
+      },
+    };
+
+    wrappedPromise
+      .then(() => {
+        buffer.setText('');
+      })
+      .catch((err) => {
+        debugLogger.debug('Failed to clear API key:', err);
+      });
   };
 
   useKeypress(
     async (key) => {
-      if (key.ctrl && key.name === 'c') {
+      if (keyMatchers[Command.CLEAR_INPUT](key)) {
         await handleClear();
       }
     },
