@@ -842,3 +842,18 @@ export function saveSettings(settingsFile: SettingsFile): void {
     );
   }
 }
+
+export async function saveModelChange(
+  loadedSettings: LoadedSettings,
+  model: string,
+): Promise<void> {
+  try {
+    loadedSettings.setValue(SettingScope.User, 'model.name', model);
+  } catch (error) {
+    coreEvents.emitFeedback(
+      'error',
+      'There was an error saving your preferred model.',
+      error,
+    );
+  }
+}

@@ -6,12 +6,14 @@
 
 import { render } from '../../test-utils/render.js';
 import { cleanup } from 'ink-testing-library';
+import { act } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   GEMINI_MODEL_ALIAS_FLASH_LITE,
   GEMINI_MODEL_ALIAS_FLASH,
   GEMINI_MODEL_ALIAS_PRO,
   DEFAULT_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 import { ModelDialog } from './ModelDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -89,6 +91,9 @@ describe('<ModelDialog />', () => {
     expect(lastFrame()).toContain(
       'To use a specific Gemini model on startup, use the --model flag.',
     );
+    expect(lastFrame()).toContain(
+      'Applies to this session and future Gemini CLI sessions.',
+    );
     unmount();
   });
 
@@ -140,7 +145,7 @@ describe('<ModelDialog />', () => {
 
     expect(mockGetModel).toHaveBeenCalled();
 
-    // When getModel returns undefined, preferredModel falls back to DEFAULT_GEMINI_MODEL_AUTO
+    // When getModel returns undefined, it falls back to DEFAULT_GEMINI_MODEL_AUTO
     // which has index 0, so initialIndex should be 0
     expect(mockedSelect).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -152,16 +157,19 @@ describe('<ModelDialog />', () => {
     unmount();
   });
 
-  it('calls config.setModel and onClose when DescriptiveRadioButtonSelect.onSelect is triggered', () => {
-    const { props, mockConfig, unmount } = renderComponent({}, {}); // Pass empty object for contextValue
+  it('calls config.setModel and onClose when a model is selected', async () => {
+    const { props, mockConfig, unmount } = renderComponent({}, {});
 
-    const childOnSelect = mockedSelect.mock.calls[0][0].onSelect;
-    expect(childOnSelect).toBeDefined();
+    // Simulate model selection
+    const onSelect = mockedSelect.mock.calls[0][0].onSelect;
+    expect(onSelect).toBeDefined();
+    await act(async () => {
+      onSelect(DEFAULT_GEMINI_MODEL);
+    });
 
-    childOnSelect(GEMINI_MODEL_ALIAS_PRO);
-
-    // Assert against the default mock provided by renderComponent
-    expect(mockConfig?.setModel).toHaveBeenCalledWith(GEMINI_MODEL_ALIAS_PRO);
+    // Assert that config.setModel was called with just the model (no persist parameter)
+    expect(mockConfig?.setModel).toHaveBeenCalledTimes(1);
+    expect(mockConfig?.setModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
     expect(props.onClose).toHaveBeenCalledTimes(1);
     unmount();
   });
