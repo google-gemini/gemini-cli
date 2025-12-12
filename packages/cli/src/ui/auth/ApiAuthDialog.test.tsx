@@ -129,12 +129,12 @@ describe('ApiAuthDialog', () => {
     expect(lastFrame()).toContain('Invalid API Key');
   });
 
-  it('calls clearApiKey and clears buffer when Ctrl+K is pressed', async () => {
+  it('calls clearApiKey and clears buffer when Ctrl+C is pressed', async () => {
     render(<ApiAuthDialog onSubmit={onSubmit} onCancel={onCancel} />);
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
     await keypressHandler({
-      name: 'k',
+      name: 'c',
       ctrl: true,
       meta: false,
       shift: false,

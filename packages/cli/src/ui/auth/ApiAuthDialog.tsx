@@ -29,7 +29,7 @@ export function ApiAuthDialog({
   const { mainAreaWidth } = useUIState();
   const viewportWidth = mainAreaWidth - 8;
 
-  const initialApiKey = process.env['GEMINI_API_KEY'] ?? defaultValue;
+  const initialApiKey = process.env['GEMINI_API_KEY'] || defaultValue;
 
   const buffer = useTextBuffer({
     initialText: initialApiKey || '',
