@@ -257,6 +257,7 @@ describe('StreamJsonFormatter', () => {
               totalLatencyMs: 1000,
             },
             tokens: {
+              input: 50,
               prompt: 50,
               candidates: 30,
               total: 80,
@@ -306,6 +307,7 @@ describe('StreamJsonFormatter', () => {
               totalLatencyMs: 1000,
             },
             tokens: {
+              input: 50,
               prompt: 50,
               candidates: 30,
               total: 80,
@@ -321,6 +323,7 @@ describe('StreamJsonFormatter', () => {
               totalLatencyMs: 2000,
             },
             tokens: {
+              input: 100,
               prompt: 100,
               candidates: 70,
               total: 170,
