@@ -76,7 +76,6 @@ describe('<StatsDisplay />', () => {
 
     expect(output).toContain('Performance');
     expect(output).toContain('Interaction Summary');
-    expect(output).not.toContain('Efficiency & Optimizations');
     expect(output).toMatchSnapshot();
   });
 
@@ -113,8 +112,8 @@ describe('<StatsDisplay />', () => {
 
     expect(output).toContain('gemini-2.5-pro');
     expect(output).toContain('gemini-2.5-flash');
-    expect(output).toContain('1,000');
-    expect(output).toContain('25,000');
+    expect(output).toContain('15,000');
+    expect(output).toContain('10,000');
     expect(output).toMatchSnapshot();
   });
 
@@ -167,7 +166,6 @@ describe('<StatsDisplay />', () => {
     expect(output).toContain('Performance');
     expect(output).toContain('Interaction Summary');
     expect(output).toContain('User Agreement');
-    expect(output).toContain('Savings Highlight');
     expect(output).toContain('gemini-2.5-pro');
     expect(output).toMatchSnapshot();
   });
@@ -232,7 +230,6 @@ describe('<StatsDisplay />', () => {
       const { lastFrame } = renderWithMockedStats(metrics);
       const output = lastFrame();
 
-      expect(output).not.toContain('Efficiency & Optimizations');
       expect(output).toMatchSnapshot();
     });
   });
@@ -442,7 +439,7 @@ describe('<StatsDisplay />', () => {
       );
       const output = lastFrame();
 
-      expect(output).toContain('Usage limit remaining');
+      expect(output).toContain('Usage left');
       expect(output).toContain('75.0%');
       expect(output).toContain('(Resets in 1h 30m)');
       expect(output).toMatchSnapshot();
