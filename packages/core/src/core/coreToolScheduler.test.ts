@@ -787,7 +787,7 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { content: [llmContent] },
+          response: { output: 'Text from Part object' },
         },
       },
     ]);
@@ -801,7 +801,7 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { content: llmContent },
+          response: { output: 'Text from array' },
         },
       },
     ]);
@@ -814,7 +814,7 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { content: llmContent },
+          response: { output: 'part1\npart2' },
         },
       },
     ]);
@@ -830,20 +830,26 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { content: [llmContent] },
+          response: {},
+          parts: [llmContent],
         },
       },
     ]);
   });
 
-  it('should preserve inner functionResponse id and name when flattening', () => {
+  it('should preserve existing functionResponse metadata', () => {
     const innerId = 'inner-call-id';
     const innerName = 'inner-tool-name';
+    const responseMetadata = {
+      flags: ['flag1'],
+      isError: false,
+      customData: { key: 'value' },
+    };
     const input: Part = {
       functionResponse: {
         id: innerId,
         name: innerName,
-        response: { content: [{ text: 'inner content' }] },
+        response: responseMetadata,
       },
     };
 
@@ -851,9 +857,9 @@ describe('convertToFunctionResponse', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].functionResponse).toEqual({
-      id: innerId,
-      name: innerName,
-      response: { output: 'inner content' },
+      id: callId,
+      name: toolName,
+      response: responseMetadata,
     });
   });
 
@@ -869,7 +875,12 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { content: llmContent },
+          response: {
+            output: 'Some textual description\nAnother text part',
+          },
+          parts: [
+            { inlineData: { mimeType: 'image/jpeg', data: 'base64data...' } },
+          ],
         },
       },
     ]);
@@ -885,7 +896,8 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { content: llmContent },
+          response: {},
+          parts: llmContent,
         },
       },
     ]);
@@ -899,7 +911,7 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { content: [llmContent] },
+          response: {},
         },
       },
     ]);
@@ -927,7 +939,7 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { content: [] },
+          response: {},
         },
       },
     ]);
@@ -941,7 +953,7 @@ describe('convertToFunctionResponse', () => {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { content: [llmContent] },
+          response: {},
         },
       },
     ]);

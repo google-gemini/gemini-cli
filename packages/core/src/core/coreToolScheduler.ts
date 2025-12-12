@@ -29,7 +29,6 @@ import {
 } from '../index.js';
 import { READ_FILE_TOOL_NAME, SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import type { Part, PartListUnion } from '@google/genai';
-import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
 import type { ModifyContext } from '../tools/modifiable-tool.js';
 import {
   isModifiableDeclarativeTool,
@@ -172,48 +171,50 @@ export function convertToFunctionResponse(
   callId: string,
   llmContent: PartListUnion,
 ): Part[] {
-  const contentToProcess =
-    Array.isArray(llmContent) && llmContent.length === 1
-      ? llmContent[0]
-      : llmContent;
-
-  if (typeof contentToProcess === 'string') {
-    return [createFunctionResponsePart(callId, toolName, contentToProcess)];
+  if (typeof llmContent === 'string') {
+    return [createFunctionResponsePart(callId, toolName, llmContent)];
   }
 
-  // contentToProcess is either a single Part or an array of Parts, so we wrap
-  // everything into a single functionResponse with a 'content' field.
-  const parts = toParts(contentToProcess);
+  const parts = toParts(llmContent);
 
-  if (parts.length === 1 && parts[0].functionResponse) {
-    const singlePart = parts[0];
-    if (singlePart.functionResponse?.response?.['content']) {
-      const stringifiedOutput =
-        getResponseTextFromParts(
-          singlePart.functionResponse.response['content'] as Part[],
-        ) || '';
+  // Separate text from binary
+  const textParts: string[] = [];
+  const binaryParts: Part[] = [];
+
+  for (const part of parts) {
+    if (part.text !== undefined) {
+      textParts.push(part.text);
+    } else if (part.inlineData || part.fileData) {
+      binaryParts.push(part);
+    } else if (part.functionResponse) {
+      // Handle passthrough case
       return [
-        createFunctionResponsePart(
-          singlePart.functionResponse.id ?? callId,
-          singlePart.functionResponse.name ?? toolName,
-          stringifiedOutput,
-        ),
+        {
+          functionResponse: {
+            id: callId,
+            name: toolName,
+            response: part.functionResponse.response,
+          },
+        },
       ];
     }
-    return [singlePart];
+    // Ignore other part types
   }
 
-  return [
-    {
-      functionResponse: {
-        id: callId,
-        name: toolName,
-        response: {
-          content: parts,
-        },
-      },
+  // Build the response
+  const part: Part = {
+    functionResponse: {
+      id: callId,
+      name: toolName,
+      response: textParts.length > 0 ? { output: textParts.join('\n') } : {},
     },
-  ];
+  };
+
+  if (binaryParts.length > 0) {
+    (part.functionResponse as unknown as { parts: Part[] }).parts = binaryParts;
+  }
+
+  return [part];
 }
 
 function toParts(input: PartListUnion): Part[] {

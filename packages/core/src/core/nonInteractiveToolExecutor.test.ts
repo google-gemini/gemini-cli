@@ -321,9 +321,8 @@ describe('executeToolCall', () => {
           functionResponse: {
             name: 'testTool',
             id: 'call6',
-            response: {
-              content: [imageDataPart],
-            },
+            response: {},
+            parts: [imageDataPart],
           },
         },
       ],
