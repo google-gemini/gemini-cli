@@ -31,7 +31,7 @@ export async function fetchJson<T>(
           if (!res.headers.location) {
             return reject(new Error('No location header in redirect response'));
           }
-          fetchJson<T>(res.headers.location!, redirectCount++)
+          fetchJson<T>(res.headers.location, redirectCount++)
             .then(resolve)
             .catch(reject);
           return;
