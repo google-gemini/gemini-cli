@@ -36,10 +36,9 @@ vi.mock('@lydell/node-pty', () => ({
   spawn: mockPtySpawn,
 }));
 vi.mock('node:child_process', async (importOriginal) => {
-  const actual =
-    (await importOriginal()) as typeof import('node:child_process');
+  const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as object),
     spawn: mockCpSpawn,
   };
 });
@@ -70,6 +69,9 @@ vi.mock('../utils/getPty.js', () => ({
 vi.mock('../utils/terminalSerializer.js', () => ({
   serializeTerminalToObject: mockSerializeTerminalToObject,
 }));
+vi.mock('../utils/systemEncoding.js', () => ({
+  getCachedEncodingForBuffer: vi.fn().mockReturnValue('utf-8'),
+}));
 
 const mockProcessKill = vi
   .spyOn(process, 'kill')
@@ -87,7 +89,7 @@ const createMockSerializeTerminalToObjectReturnValue = (
   text: string | string[],
 ): AnsiOutput => {
   const lines = Array.isArray(text) ? text : text.split('\n');
-  const len = (shellExecutionConfig.terminalHeight ?? 24) as number;
+  const len = shellExecutionConfig.terminalHeight ?? 24;
   const expected: AnsiOutput = Array.from({ length: len }, (_, i) => [
     {
       text: (lines[i] || '').trim(),
@@ -105,7 +107,7 @@ const createMockSerializeTerminalToObjectReturnValue = (
 
 const createExpectedAnsiOutput = (text: string | string[]): AnsiOutput => {
   const lines = Array.isArray(text) ? text : text.split('\n');
-  const len = (shellExecutionConfig.terminalHeight ?? 24) as number;
+  const len = shellExecutionConfig.terminalHeight ?? 24;
   const expected: AnsiOutput = Array.from({ length: len }, (_, i) => [
     {
       text: expect.stringMatching((lines[i] || '').trim()),
@@ -416,7 +418,7 @@ describe('ShellExecutionService', () => {
     it('should write to the pty and trigger a render', async () => {
       vi.useFakeTimers();
       await simulateExecution('interactive-app', (pty) => {
-        ShellExecutionService.writeToPty(pty.pid!, 'input');
+        ShellExecutionService.writeToPty(pty.pid, 'input');
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 
@@ -431,7 +433,7 @@ describe('ShellExecutionService', () => {
     it('should resize the pty and the headless terminal', async () => {
       await simulateExecution('ls -l', (pty) => {
         pty.onData.mock.calls[0][0]('file1.txt\n');
-        ShellExecutionService.resizePty(pty.pid!, 100, 40);
+        ShellExecutionService.resizePty(pty.pid, 100, 40);
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 
@@ -445,7 +447,7 @@ describe('ShellExecutionService', () => {
         .mockReturnValue(false);
 
       await simulateExecution('ls -l', (pty) => {
-        ShellExecutionService.resizePty(pty.pid!, 100, 40);
+        ShellExecutionService.resizePty(pty.pid, 100, 40);
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 
@@ -465,7 +467,7 @@ describe('ShellExecutionService', () => {
       // We don't expect this test to throw an error
       await expect(
         simulateExecution('ls -l', (pty) => {
-          ShellExecutionService.resizePty(pty.pid!, 100, 40);
+          ShellExecutionService.resizePty(pty.pid, 100, 40);
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
         }),
       ).resolves.not.toThrow();
@@ -481,7 +483,7 @@ describe('ShellExecutionService', () => {
 
       await expect(
         simulateExecution('ls -l', (pty) => {
-          ShellExecutionService.resizePty(pty.pid!, 100, 40);
+          ShellExecutionService.resizePty(pty.pid, 100, 40);
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
         }),
       ).rejects.toThrow('Some other error');
@@ -490,7 +492,7 @@ describe('ShellExecutionService', () => {
     it('should scroll the headless terminal', async () => {
       await simulateExecution('ls -l', (pty) => {
         pty.onData.mock.calls[0][0]('file1.txt\n');
-        ShellExecutionService.scrollPty(pty.pid!, 10);
+        ShellExecutionService.scrollPty(pty.pid, 10);
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 

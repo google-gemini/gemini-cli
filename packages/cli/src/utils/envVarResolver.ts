@@ -25,10 +25,10 @@ export function resolveEnvVarsInString(
   return value.replace(envVarRegex, (match, varName1, varName2) => {
     const varName = varName1 || varName2;
     if (customEnv && typeof customEnv[varName] === 'string') {
-      return customEnv[varName]!;
+      return customEnv[varName];
     }
     if (process && process.env && typeof process.env[varName] === 'string') {
-      return process.env[varName]!;
+      return process.env[varName];
     }
     return match;
   });
