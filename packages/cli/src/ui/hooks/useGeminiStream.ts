@@ -483,7 +483,8 @@ export const useGeminiStream = (
             userMessageTimestamp,
           );
 
-          if (!atCommandResult.shouldProceed) {
+          if (atCommandResult.error) {
+            onDebugMessage(atCommandResult.error);
             return { queryToSend: null, shouldProceed: false };
           }
           localQueryToSendToGemini = atCommandResult.processedQuery;
