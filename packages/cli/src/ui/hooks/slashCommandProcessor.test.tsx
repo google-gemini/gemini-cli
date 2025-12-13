@@ -531,6 +531,7 @@ describe('useSlashCommandProcessor', () => {
       const mockClient = {
         setHistory: vi.fn(),
         stripThoughtsFromHistory: vi.fn(),
+        getChatRecordingService: vi.fn(),
       } as unknown as GeminiClient;
       vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(mockClient);
 

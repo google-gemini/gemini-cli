@@ -30,11 +30,12 @@ vi.mock('../core/baseLlmClient.js', () => ({
 // Helper to create a session with N user messages
 function createSessionWithUserMessages(
   count: number,
-  options: { summary?: string; sessionId?: string } = {},
+  options: { summary?: string; sessionId?: string; displayName?: string } = {},
 ) {
   return JSON.stringify({
     sessionId: options.sessionId ?? 'session-id',
     summary: options.summary,
+    displayName: options.displayName,
     messages: Array.from({ length: count }, (_, i) => ({
       id: String(i + 1),
       type: 'user',
@@ -159,6 +160,20 @@ describe('sessionSummaryUtils', () => {
           'session-2024-01-02T10-00-newer000.json',
         ),
       );
+    });
+
+    it('should return null if most recent session already has display name', async () => {
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
+      vi.mocked(fs.readFile).mockResolvedValue(
+        createSessionWithUserMessages(5, {
+          displayName: 'User Renamed Session',
+        }),
+      );
+
+      const result = await getPreviousSession(mockConfig);
+
+      expect(result).toBeNull();
     });
 
     it('should return null if most recent session file is corrupted', async () => {
