@@ -458,6 +458,15 @@ const SETTINGS_SCHEMA = {
             description: 'Hides the context window remaining percentage.',
             showInDialog: true,
           },
+          hideMemoryUsage: {
+            type: 'boolean',
+            label: 'Hide Memory Usage',
+            category: 'UI',
+            requiresRestart: false,
+            default: true,
+            description: 'Hide memory usage information in the footer.',
+            showInDialog: true,
+          },
         },
       },
       hideFooter: {
@@ -467,15 +476,6 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description: 'Hide the footer from the UI',
-        showInDialog: true,
-      },
-      showMemoryUsage: {
-        type: 'boolean',
-        label: 'Show Memory Usage',
-        category: 'UI',
-        requiresRestart: false,
-        default: false,
-        description: 'Display memory usage information in the UI',
         showInDialog: true,
       },
       showLineNumbers: {

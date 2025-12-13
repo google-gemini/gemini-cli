@@ -378,11 +378,13 @@ describe('AppContainer State Management', () => {
         hideBanner: false,
         hideFooter: false,
         hideTips: false,
-        showMemoryUsage: false,
         theme: 'default',
         ui: {
           showStatusInTitle: false,
           hideWindowTitle: false,
+          footer: {
+            hideMemoryUsage: true,
+          },
         },
         useAlternateBuffer: false,
       },
@@ -476,7 +478,11 @@ describe('AppContainer State Management', () => {
           hideBanner: true,
           hideFooter: true,
           hideTips: true,
-          showMemoryUsage: false,
+          ui: {
+            footer: {
+              hideMemoryUsage: true,
+            },
+          },
         },
       } as unknown as LoadedSettings;
 
@@ -491,7 +497,11 @@ describe('AppContainer State Management', () => {
           hideBanner: false,
           hideFooter: false,
           hideTips: false,
-          showMemoryUsage: true,
+          ui: {
+            footer: {
+              hideMemoryUsage: false,
+            },
+          },
         },
       } as unknown as LoadedSettings;
 

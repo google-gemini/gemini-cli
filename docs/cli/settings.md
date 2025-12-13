@@ -49,8 +49,8 @@ they appear in the UI.
 | Hide Sandbox Status            | `ui.footer.hideSandboxStatus`            | Hide the sandbox status indicator in the footer.                     | `false` |
 | Hide Model Info                | `ui.footer.hideModelInfo`                | Hide the model name and context usage in the footer.                 | `false` |
 | Hide Context Window Percentage | `ui.footer.hideContextPercentage`        | Hides the context window remaining percentage.                       | `true`  |
+| Hide Memory Usage              | `ui.footer.hideMemoryUsage`              | Hide memory usage information in the UI footer.                      | `true`  |
 | Hide Footer                    | `ui.hideFooter`                          | Hide the footer from the UI.                                         | `false` |
-| Show Memory Usage              | `ui.showMemoryUsage`                     | Display memory usage information in the UI.                          | `false` |
 | Show Line Numbers              | `ui.showLineNumbers`                     | Show line numbers in the chat.                                       | `false` |
 | Show Citations                 | `ui.showCitations`                       | Show citations for generated text in the chat.                       | `false` |
 | Use Full Width                 | `ui.useFullWidth`                        | Use the entire width of the terminal for output.                     | `true`  |

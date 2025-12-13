@@ -54,8 +54,8 @@ export const Footer: React.FC = () => {
     mainAreaWidth: uiState.mainAreaWidth,
   };
 
-  const showMemoryUsage =
-    config.getDebugMode() || settings.merged.ui?.showMemoryUsage || false;
+  const hideMemoryUsage = settings.merged.ui?.footer?.hideMemoryUsage ?? true;
+  const showMemoryUsage = config.getDebugMode() || hideMemoryUsage === false;
   const hideCWD = settings.merged.ui?.footer?.hideCWD || false;
   const hideSandboxStatus =
     settings.merged.ui?.footer?.hideSandboxStatus || false;

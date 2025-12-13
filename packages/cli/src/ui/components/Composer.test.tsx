@@ -154,7 +154,11 @@ const createMockConfig = (overrides = {}) => ({
 const createMockSettings = (merged = {}) => ({
   merged: {
     hideFooter: false,
-    showMemoryUsage: false,
+    ui: {
+      footer: {
+        hideMemoryUsage: true,
+      },
+    },
     ...merged,
   },
 });
@@ -222,7 +226,11 @@ describe('Composer', () => {
       });
       const settings = createMockSettings({
         hideFooter: false,
-        showMemoryUsage: true,
+        ui: {
+          footer: {
+            hideMemoryUsage: false,
+          },
+        },
       });
       // Mock vim mode for this test
       const { useVimMode } = await import('../contexts/VimModeContext.js');

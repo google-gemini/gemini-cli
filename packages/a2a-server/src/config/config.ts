@@ -47,7 +47,9 @@ export async function loadConfig(
 
     coreTools: settings.coreTools || undefined,
     excludeTools: settings.excludeTools || undefined,
-    showMemoryUsage: settings.showMemoryUsage || false,
+    showMemoryUsage:
+      settings.ui?.footer?.hideMemoryUsage === false ||
+      settings.showMemoryUsage === true,
     approvalMode:
       process.env['GEMINI_YOLO_MODE'] === 'true'
         ? ApprovalMode.YOLO

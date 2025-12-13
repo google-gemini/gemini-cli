@@ -1247,7 +1247,9 @@ describe('SettingsDialog', () => {
           ui: {
             hideWindowTitle: true,
             hideTips: true,
-            showMemoryUsage: true,
+            footer: {
+              hideMemoryUsage: false,
+            },
             showLineNumbers: true,
             showCitations: true,
             accessibility: {
@@ -1290,7 +1292,9 @@ describe('SettingsDialog', () => {
             disableAutoUpdate: true,
           },
           ui: {
-            showMemoryUsage: true,
+            footer: {
+              hideMemoryUsage: false,
+            },
             hideWindowTitle: false,
           },
           tools: {
@@ -1328,7 +1332,9 @@ describe('SettingsDialog', () => {
               disableLoadingPhrases: true,
               screenReader: true,
             },
-            showMemoryUsage: true,
+            footer: {
+              hideMemoryUsage: false,
+            },
             showLineNumbers: true,
           },
           general: {
@@ -1393,7 +1399,9 @@ describe('SettingsDialog', () => {
           ui: {
             hideWindowTitle: false,
             hideTips: false,
-            showMemoryUsage: false,
+            footer: {
+              hideMemoryUsage: true,
+            },
             showLineNumbers: false,
             showCitations: false,
             accessibility: {
