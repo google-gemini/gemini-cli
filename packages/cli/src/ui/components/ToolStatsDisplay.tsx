@@ -144,7 +144,7 @@ export const ToolStatsDisplay: React.FC = () => {
 
       {/* Tool Rows */}
       {activeTools.map(([name, stats]) => (
-        <StatRow key={name} name={name} stats={stats as ToolCallStats} />
+        <StatRow key={name} name={name} stats={stats} />
       ))}
 
       <Box height={1} />
