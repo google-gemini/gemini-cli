@@ -876,7 +876,7 @@ function isSshConnected() {
 }
 
 function isDevContainer() {
-  return (
+  return !!(
     process.env['VSCODE_REMOTE_CONTAINERS_SESSION'] ||
     process.env['REMOTE_CONTAINERS']
   );
