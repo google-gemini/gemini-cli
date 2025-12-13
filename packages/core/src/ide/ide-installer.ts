@@ -51,71 +51,48 @@ async function findCommand(
   const locations: string[] = [];
   const homeDir = os.homedir();
 
+  let appname: string = "";
+
   if (command === 'code' || command === 'code.cmd') {
-    if (platform === 'darwin') {
-      // macOS
-      locations.push(
-        '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
-        path.join(homeDir, 'Library/Application Support/Code/bin/code'),
-      );
-    } else if (platform === 'linux') {
-      // Linux
-      locations.push(
-        '/usr/share/code/bin/code',
-        '/snap/bin/code',
-        path.join(homeDir, '.local/share/code/bin/code'),
-      );
-    } else if (platform === 'win32') {
-      // Windows
-      locations.push(
-        path.join(
-          process.env['ProgramFiles'] || 'C:\\Program Files',
-          'Microsoft VS Code',
-          'bin',
-          'code.cmd',
-        ),
-        path.join(
-          homeDir,
-          'AppData',
-          'Local',
-          'Programs',
-          'Microsoft VS Code',
-          'bin',
-          'code.cmd',
-        ),
-      );
-    }
+    appname = "code";
   } else if (command === 'positron' || command === 'positron.cmd') {
+    appname = "positron";
+  }
+
+  if (appname !== "") {
     if (platform === 'darwin') {
       // macOS
+      const mac_app = appname === 'positron' ? 'Positron' : 'Visual Studio Code';
+      const appname_uppercase = appname === 'positron' ? 'Positron' : 'Code';
       locations.push(
-        '/Applications/Positron.app/Contents/Resources/app/bin/positron',
-        path.join(homeDir, 'Library/Application Support/Positron/bin/positron'),
+        `/Applications/${mac_app}.app/Contents/Resources/app/bin/${appname}`,
+        path.join(homeDir, `Library/Application Support/${appname_uppercase}/bin/${appname}`),
       );
     } else if (platform === 'linux') {
       // Linux
       locations.push(
-        '/usr/share/positron/bin/positron',
-        '/snap/bin/positron',
-        path.join(homeDir, '.local/share/positron/bin/positron'),
+        `/usr/share/${appname}/bin/${appname}`,
+        `/snap/bin/${appname}`,
+        path.join(homeDir, `.local/share/${appname}/bin/${appname}`),
       );
     } else if (platform === 'win32') {
       // Windows
+      const win_app = appname === 'positron' ? 'Positron' : 'Microsoft VS Code';
       locations.push(
         path.join(
           process.env['ProgramFiles'] || 'C:\\Program Files',
-          'Positron',
+          `${win_app}`,
           'bin',
-          'positron.cmd',
+          `{appname}` + '.cmd',
         ),
         path.join(
           homeDir,
           'AppData',
           'Local',
           'Programs',
-          'Positron',
+          `${win_app}`,
           'bin',
-          'positron.cmd',
+          `{appname}` + '.cmd',
         ),
       );
     }
@@ -132,13 +109,14 @@ async function findCommand(
 
 class VsCodeInstaller implements IdeInstaller {
   private vsCodeCommand: Promise<string | null>;
+  private vscodeexec: string | undefined;
 
   constructor(
     readonly ideInfo: IdeInfo,
     readonly platform = process.platform,
   ) {
-    const vscodeexec = ideInfo.name === 'positron' ? 'positron' : 'code';
-    const command = platform === 'win32' ? vscodeexec + '.cmd' : vscodeexec;
+    this.vscodeexec = ideInfo.name === 'positron' ? 'positron' : 'code';
+    const command = platform === 'win32' ? this.vscodeexec + '.cmd' : this.vscodeexec;
     this.vsCodeCommand = findCommand(command, platform);
   }
 
@@ -156,7 +134,7 @@ class VsCodeInstaller implements IdeInstaller {
     if (!commandPath) {
       return {
         success: false,
-        message: `${this.ideInfo.displayName} CLI not found. Please ensure '${this.ideInfo.name === 'positron' ? 'positron' : 'code'}' is in your system's PATH. For help, see ${helpurl}. You can also install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the VS Code marketplace / Open VSX registry.`,
+        message: `${this.ideInfo.displayName} CLI not found. Please ensure '${this.vscodeexec}' is in your system's PATH. For help, see ${helpurl}. You can also install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the VS Code marketplace / Open VSX registry.`,
       };
     }
 
