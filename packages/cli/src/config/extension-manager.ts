@@ -123,7 +123,7 @@ export class ExtensionManager extends ExtensionLoader {
         'Extensions not yet loaded, must call `loadExtensions` first',
       );
     }
-    return this.loadedExtensions!;
+    return this.loadedExtensions;
   }
 
   async installOrUpdateExtension(
@@ -319,7 +319,7 @@ export class ExtensionManager extends ExtensionLoader {
 
         // TODO: Gracefully handle this call failing, we should back up the old
         // extension prior to overwriting it and then restore and restart it.
-        extension = await this.loadExtension(destinationPath)!;
+        extension = await this.loadExtension(destinationPath);
         if (!extension) {
           throw new Error(`Extension not found`);
         }
@@ -346,8 +346,10 @@ export class ExtensionManager extends ExtensionLoader {
               'success',
             ),
           );
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          this.enableExtension(newExtensionConfig.name, SettingScope.User);
+          await this.enableExtension(
+            newExtensionConfig.name,
+            SettingScope.User,
+          );
         }
       } finally {
         if (tempDir) {

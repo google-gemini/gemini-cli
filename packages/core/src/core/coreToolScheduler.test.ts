@@ -41,7 +41,7 @@ import {
 import * as modifiableToolModule from '../tools/modifiable-tool.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { isShellInvocationAllowlisted } from '../utils/shell-utils.js';
+import { isShellInvocationAllowlisted } from '../utils/shell-permissions.js';
 
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
@@ -1531,7 +1531,7 @@ describe('CoreToolScheduler request queueing', () => {
         // Capture confirmation handlers for awaiting_approval tools
         toolCalls.forEach((call) => {
           if (call.status === 'awaiting_approval') {
-            const waitingCall = call as WaitingToolCall;
+            const waitingCall = call;
             if (waitingCall.confirmationDetails?.onConfirm) {
               const originalHandler = pendingConfirmations.find(
                 (h) => h === waitingCall.confirmationDetails.onConfirm,
