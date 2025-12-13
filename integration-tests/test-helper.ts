@@ -195,17 +195,12 @@ export class InteractiveRun {
     if (!timeout) {
       timeout = getDefaultTimeout();
     }
-    const found = await poll(
+    await poll(
       () => stripAnsi(this.output).toLowerCase().includes(text.toLowerCase()),
       timeout,
       200,
     );
-    expect(
-      found,
-      `Did not find expected text: "${text}". Output was:\n${stripAnsi(
-        this.output,
-      )}`,
-    ).toBe(true);
+    expect(stripAnsi(this.output).toLowerCase()).toContain(text.toLowerCase());
   }
 
   // This types slowly to make sure command is correct, but only work for short
