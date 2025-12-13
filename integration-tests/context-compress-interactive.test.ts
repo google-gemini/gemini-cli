@@ -85,12 +85,7 @@ describe('Interactive Mode', () => {
   });
 
   it('should handle /compress command on empty history', async () => {
-    rig.setup('interactive-compress-empty', {
-      fakeResponsesPath: join(
-        import.meta.dirname,
-        'context-compress-interactive.compress-empty.responses',
-      ),
-    });
+    rig.setup('interactive-compress-empty');
 
     const run = await rig.runInteractive();
     await run.type('/compress');

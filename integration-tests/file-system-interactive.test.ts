@@ -5,6 +5,7 @@
  */
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
+import { join } from 'node:path';
 import { TestRig } from './test-helper.js';
 
 describe('Interactive file system', () => {
@@ -35,17 +36,17 @@ describe('Interactive file system', () => {
     const run = await rig.runInteractive();
 
     // Step 1: Read the file
-    const readPrompt = `Read the version from ${fileName}`;
-    await run.type(readPrompt);
-    await run.sendKeys('\r');
+    const readPrompt = `Read the version from ${join(rig.workDir!, fileName)}`;
+    await run.sendText(readPrompt);
+    await run.sendText('\r');
 
     const readCall = await rig.waitForToolCall('read_file', 30000);
     expect(readCall, 'Expected to find a read_file tool call').toBe(true);
 
     // Step 2: Write the file
-    const writePrompt = `now change the version to 1.0.1 in the file`;
-    await run.type(writePrompt);
-    await run.sendKeys('\r');
+    const writePrompt = `now change the version to 1.0.1 in the file ${join(rig.workDir!, fileName)}`;
+    await run.sendText(writePrompt);
+    await run.sendText('\r');
 
     // Check tool calls made with right args
     await rig.expectToolCallSuccess(

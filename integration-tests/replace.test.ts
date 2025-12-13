@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { join } from 'node:path';
 import { TestRig } from './test-helper.js';
 
 describe('replace', () => {
@@ -20,7 +21,9 @@ describe('replace', () => {
 
     rig.createFile(fileName, originalContent);
 
-    await rig.run(`Replace 'foo' with 'bar' in the file 'file_to_replace.txt'`);
+    await rig.run(
+      `Replace 'foo' with 'bar' in the file '${join(rig.workDir!, fileName)}'`,
+    );
 
     const foundToolCall = await rig.waitForToolCall('replace');
     expect(foundToolCall, 'Expected to find a replace tool call').toBeTruthy();

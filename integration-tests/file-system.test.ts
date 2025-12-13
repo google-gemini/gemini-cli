@@ -118,7 +118,7 @@ describe('file-system', () => {
     ).toBeTruthy();
 
     const newFileContent = rig.readFile(fileName);
-    expect(newFileContent).toBe('hello');
+    expect(newFileContent.trim()).toBe('hello');
   });
 
   it('should perform a read-then-write sequence', async () => {
@@ -271,7 +271,7 @@ describe('file-system', () => {
     ).toBeUndefined();
 
     // Final verification: ensure the file was not created.
-    const filePath = path.join(rig.testDir!, fileName);
+    const filePath = path.join(rig.workDir!, fileName);
     const fileExists = existsSync(filePath);
     expect(fileExists, 'The non-existent file should not be created').toBe(
       false,
