@@ -96,6 +96,8 @@ export class Connection {
   #peerInput: WritableStream<Uint8Array>;
   #writeQueue: Promise<void> = Promise.resolve();
   #textEncoder: TextEncoder;
+  #closedPromise: Promise<void>;
+  #resolveClosedPromise!: () => void;
 
   constructor(
     handler: MethodHandler,
@@ -105,8 +107,15 @@ export class Connection {
     this.#handler = handler;
     this.#peerInput = peerInput;
     this.#textEncoder = new TextEncoder();
+    this.#closedPromise = new Promise((resolve) => {
+      this.#resolveClosedPromise = resolve;
+    });
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    this.#receive(peerOutput);
+    this.#receive(peerOutput).finally(() => this.#resolveClosedPromise());
+  }
+
+  get closed(): Promise<void> {
+    return this.#closedPromise;
   }
 
   async #receive(output: ReadableStream<Uint8Array>) {
