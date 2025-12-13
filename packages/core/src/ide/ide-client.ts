@@ -794,7 +794,7 @@ export class IdeClient {
           headers: this.authToken
             ? { Authorization: `Bearer ${this.authToken}` }
             : {},
-         },
+        },
       });
       await this.client.connect(transport);
       this.registerClientHandlers();

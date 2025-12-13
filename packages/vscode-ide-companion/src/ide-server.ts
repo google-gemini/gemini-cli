@@ -48,10 +48,6 @@ interface WritePortAndWorkspaceArgs {
   log: (message: string) => void;
 }
 
-async function createDirectory(path: string) {
-  await fs.mkdir(path, { recursive: true });
-}
-
 async function writePortAndWorkspace({
   context,
   port,
