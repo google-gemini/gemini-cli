@@ -414,9 +414,24 @@ describe('FileCommandLoader', () => {
     expect(commands).toHaveLength(1);
     const command = commands[0];
     expect(command).toBeDefined();
-
-    // Verify that the ':' in the filename was replaced with an '_'
     expect(command.name).toBe('legacy_command');
+  });
+
+  it('parses the optional model field correctly', async () => {
+    const userCommandsDir = Storage.getUserCommandsDir();
+    mock({
+      [userCommandsDir]: {
+        'model_command.toml': 'prompt = "Prompt"\nmodel = "gemini-2.5-flash"',
+      },
+    });
+
+    const loader = new FileCommandLoader(null);
+    const commands = await loader.loadCommands(signal);
+
+    expect(commands).toHaveLength(1);
+    const command = commands[0];
+    expect(command).toBeDefined();
+    expect(command.model).toBe('gemini-2.5-flash');
   });
 
   describe('Processor Instantiation Logic', () => {

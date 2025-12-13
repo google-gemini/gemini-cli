@@ -34,6 +34,7 @@ import type { ContentGenerator } from './contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
   getEffectiveModel,
+  resolveModel,
 } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
@@ -63,7 +64,7 @@ import {
 } from '../availability/policyHelpers.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 
-const MAX_TURNS = 100;
+export const MAX_TURNS = 100;
 
 export class GeminiClient {
   private chat?: GeminiChat;
@@ -403,12 +404,30 @@ export class GeminiClient {
     );
   }
 
+  private _resolveModelOverride(modelOverride: string): string | undefined {
+    const trimmedModel = modelOverride.trim();
+    if (!trimmedModel) {
+      return undefined;
+    }
+
+    const resolvedModelAlias = resolveModel(
+      trimmedModel,
+      this.config.getPreviewFeatures(),
+    );
+    const resolvedConfig = this.config.modelConfigService.getResolvedConfig({
+      model: resolvedModelAlias,
+    });
+
+    return resolvedConfig.model;
+  }
+
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
     prompt_id: string,
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
+    modelOverride?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
@@ -534,10 +553,17 @@ export class GeminiClient {
       signal,
     };
 
+    debugLogger.log(`[GeminiClient] Sending message with ${modelOverride}"`);
+
     let modelToUse: string;
+    const resolvedOverrideModel = modelOverride
+      ? this._resolveModelOverride(modelOverride)
+      : undefined;
 
     // Determine Model (Stickiness vs. Routing)
-    if (this.currentSequenceModel) {
+    if (resolvedOverrideModel) {
+      modelToUse = resolvedOverrideModel;
+    } else if (this.currentSequenceModel) {
       modelToUse = this.currentSequenceModel;
     } else {
       const router = await this.config.getModelRouterService();
