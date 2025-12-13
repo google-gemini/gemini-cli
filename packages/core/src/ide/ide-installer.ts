@@ -63,7 +63,7 @@ async function findCommand(
   };
 
 
-  type AppName = keyof typeof appConfigs;                                                                    █
+  type AppName = keyof typeof appConfigs;
   let appname: AppName | undefined;                                                                          
 
   if (command === 'code' || command === 'code.cmd') {
