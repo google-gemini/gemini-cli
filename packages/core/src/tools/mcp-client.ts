@@ -24,6 +24,7 @@ import type {
   Resource,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
+  CreateMessageRequestSchema,
   ListResourcesResultSchema,
   ListRootsRequestSchema,
   ReadResourceResultSchema,
@@ -34,6 +35,10 @@ import {
 import { parse } from 'shell-quote';
 import type { Config, MCPServerConfig } from '../config/config.js';
 import { AuthProviderType } from '../config/config.js';
+import {
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+} from '../config/models.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
@@ -58,7 +63,7 @@ import type {
 import type { ToolRegistry } from './tool-registry.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { coreEvents } from '../utils/events.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
@@ -137,6 +142,7 @@ export class McpClient {
         this.serverConfig,
         this.debugMode,
         this.workspaceContext,
+        this.cliConfig,
       );
 
       this.registerNotificationHandlers();
@@ -820,6 +826,7 @@ export async function connectAndDiscover(
       mcpServerConfig,
       debugMode,
       workspaceContext,
+      cliConfig,
     );
 
     mcpClient.onerror = (error) => {
@@ -1321,7 +1328,7 @@ async function retryWithOAuth(
  *
  * @param mcpServerName The name of the MCP server, used for logging and identification.
  * @param mcpServerConfig The configuration specifying how to connect to the server.
- * @returns A promise that resolves to a connected MCP `Client` instance.
+ * @returns A promise that resolves to a connected MCP `Client` instance and its `Transport`.
  * @throws An error if the connection fails or the configuration is invalid.
  */
 export async function connectToMcpServer(
@@ -1329,6 +1336,7 @@ export async function connectToMcpServer(
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
+  cliConfig: Config,
 ): Promise<Client> {
   const mcpClient = new Client(
     {
@@ -1345,6 +1353,7 @@ export async function connectToMcpServer(
     roots: {
       listChanged: true,
     },
+    sampling: {},
   });
 
   mcpClient.setRequestHandler(ListRootsRequestSchema, async () => {
@@ -1358,6 +1367,170 @@ export async function connectToMcpServer(
     return {
       roots,
     };
+  });
+
+  // Timeout for sampling consent dialog (5 minutes)
+  const SAMPLING_CONSENT_TIMEOUT_MS = 5 * 60 * 1000;
+
+  mcpClient.setRequestHandler(CreateMessageRequestSchema, async (req) => {
+    const autoConfirm = cliConfig.getAutoConfirmMcpSampling();
+
+    let rejectSampling: ((reason?: unknown) => void) | undefined;
+
+    if (!autoConfirm) {
+      const consentPromise = new Promise<void>((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error('Sampling consent request timed out'));
+        }, SAMPLING_CONSENT_TIMEOUT_MS);
+
+        rejectSampling = (reason) => {
+          clearTimeout(timeoutId);
+          reject(reason);
+        };
+
+        coreEvents.emit(CoreEvent.McpSamplingRequest, {
+          serverName: mcpServerName,
+          prompt: req.params.messages,
+          resolve: () => {
+            clearTimeout(timeoutId);
+            resolve();
+          },
+          reject: (_reason?: unknown) => {
+            clearTimeout(timeoutId);
+            reject(new Error('User rejected sampling request'));
+          },
+        });
+      });
+
+      await consentPromise;
+    }
+
+    try {
+      const geminiClient = cliConfig.getGeminiClient();
+      const contents = req.params.messages.map((message) => {
+        // MCP spec: message.content is a single object (not an array)
+        const content = message.content as {
+          type: string;
+          text?: string;
+          data?: string;
+          mimeType?: string;
+        };
+
+        let parts;
+        if (content.type === 'text' && content.text) {
+          parts = [{ text: content.text }];
+        } else if (
+          content.type === 'image' &&
+          content.data &&
+          content.mimeType
+        ) {
+          // For image content, convert to Gemini format
+          parts = [
+            {
+              inlineData: {
+                mimeType: content.mimeType,
+                data: content.data,
+              },
+            },
+          ];
+        } else if (
+          content.type === 'audio' &&
+          content.data &&
+          content.mimeType
+        ) {
+          // For audio content, convert to Gemini format
+          parts = [
+            {
+              inlineData: {
+                mimeType: content.mimeType,
+                data: content.data,
+              },
+            },
+          ];
+        } else {
+          throw new Error(
+            `Unsupported or invalid content type: ${content.type}`,
+          );
+        }
+
+        // Map MCP roles to Gemini roles
+        // MCP: 'user' | 'assistant'
+        // Gemini: 'user' | 'model'
+        const geminiRole =
+          message.role === 'assistant' ? 'model' : message.role;
+
+        return {
+          role: geminiRole,
+          parts,
+        };
+      });
+
+      // Resolve the model to use for sampling
+      // If the config model is "auto", use flash as it's faster and cheaper for sampling
+      let modelToUse = cliConfig.getModel();
+      if (modelToUse === DEFAULT_GEMINI_MODEL_AUTO) {
+        modelToUse = DEFAULT_GEMINI_FLASH_MODEL;
+      }
+
+      // TODO: Consider req.params.modelPreferences to select model based on server hints
+      // For now, we just use the resolved model from config
+
+      const result = await geminiClient.generateContent(
+        { model: modelToUse },
+        contents,
+        new AbortController().signal,
+      );
+
+      const firstCandidate = result.candidates?.[0];
+      if (
+        !firstCandidate ||
+        !firstCandidate.content ||
+        !firstCandidate.content.parts
+      ) {
+        throw new Error('No response from Gemini');
+      }
+
+      // MCP spec: response content should be a single object (not an array)
+      // Gemini can return multiple parts, so we'll concatenate text parts
+      const textParts: string[] = [];
+      for (const part of firstCandidate.content.parts) {
+        if ('text' in part && part.text) {
+          textParts.push(part.text);
+        } else {
+          throw new Error(
+            'Unsupported response part type - only text parts are supported',
+          );
+        }
+      }
+
+      const responseContent = {
+        type: 'text' as const,
+        text: textParts.join(''),
+      };
+
+      // Map Gemini's finish reason to MCP's stopReason
+      // Gemini: STOP, MAX_TOKENS, SAFETY, RECITATION, OTHER, BLOCKLIST, PROHIBITED_CONTENT, SPII
+      // MCP: endTurn, maxTokens, stopSequence (we'll map to endTurn or maxTokens)
+      let stopReason: 'endTurn' | 'maxTokens' | 'stopSequence' = 'endTurn';
+      if (firstCandidate.finishReason === 'MAX_TOKENS') {
+        stopReason = 'maxTokens';
+      }
+
+      // MCP spec: return role, content, model, and stopReason at top level (not wrapped in "message")
+      return {
+        role: 'assistant' as const,
+        content: responseContent,
+        model: modelToUse,
+        stopReason,
+      };
+    } catch (error) {
+      // Close the dialog with an error message if consent was required
+      if (rejectSampling) {
+        rejectSampling(error);
+      }
+      // Re-throw to propagate to MCP server
+      throw error;
+    }
   });
 
   let unlistenDirectories: Unsubscribe | undefined =

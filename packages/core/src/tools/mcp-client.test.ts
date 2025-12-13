@@ -1585,6 +1585,13 @@ describe('connectToMcpServer with OAuth', () => {
   let testWorkspace: string;
   let mockAuthProvider: MCPOAuthProvider;
   let mockTokenStorage: MCPOAuthTokenStorage;
+  const mockConfig = {
+    getAutoConfirmMcpSampling: () => false,
+    getGeminiClient: () => ({
+      generateContent: vi.fn(),
+    }),
+    getModel: () => 'gemini-2.0-flash',
+  } as unknown as Config;
 
   beforeEach(() => {
     mockedClient = {
@@ -1656,6 +1663,7 @@ describe('connectToMcpServer with OAuth', () => {
       { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
       workspaceContext,
+      mockConfig,
     );
 
     expect(client).toBe(mockedClient);
@@ -1700,6 +1708,7 @@ describe('connectToMcpServer with OAuth', () => {
       { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
       workspaceContext,
+      mockConfig,
     );
 
     expect(client).toBe(mockedClient);
@@ -1717,6 +1726,13 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
   let mockedClient: ClientLib.Client;
   let workspaceContext: WorkspaceContext;
   let testWorkspace: string;
+  const mockConfig = {
+    getAutoConfirmMcpSampling: () => false,
+    getGeminiClient: () => ({
+      generateContent: vi.fn(),
+    }),
+    getModel: () => 'gemini-2.0-flash',
+  } as unknown as Config;
 
   beforeEach(() => {
     mockedClient = {
@@ -1754,6 +1770,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
         { url: 'http://test-server', type: 'http' },
         false,
         workspaceContext,
+        mockConfig,
       ),
     ).rejects.toThrow('Connection failed');
 
@@ -1772,6 +1789,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
         { url: 'http://test-server', type: 'sse' },
         false,
         workspaceContext,
+        mockConfig,
       ),
     ).rejects.toThrow('Connection failed');
 
@@ -1789,6 +1807,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       { url: 'http://test-server' },
       false,
       workspaceContext,
+      mockConfig,
     );
 
     expect(client).toBe(mockedClient);
@@ -1810,6 +1829,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
         { url: 'http://test-server' },
         false,
         workspaceContext,
+        mockConfig,
       ),
     ).rejects.toThrow('Server error');
 
@@ -1826,6 +1846,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       { url: 'http://test-server' },
       false,
       workspaceContext,
+      mockConfig,
     );
 
     expect(client).toBe(mockedClient);
@@ -1839,6 +1860,13 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
   let testWorkspace: string;
   let mockAuthProvider: MCPOAuthProvider;
   let mockTokenStorage: MCPOAuthTokenStorage;
+  const mockConfig = {
+    getAutoConfirmMcpSampling: () => false,
+    getGeminiClient: () => ({
+      generateContent: vi.fn(),
+    }),
+    getModel: () => 'gemini-2.0-flash',
+  } as unknown as Config;
 
   beforeEach(() => {
     mockedClient = {
@@ -1895,6 +1923,7 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
       { url: 'http://test-server', oauth: { enabled: true } },
       false,
       workspaceContext,
+      mockConfig,
     );
 
     expect(client).toBe(mockedClient);

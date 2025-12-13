@@ -14,6 +14,7 @@ import type {
   LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
   StreamingState,
+  AuthState,
 } from '../types.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
@@ -36,6 +37,13 @@ export interface ProQuotaDialogRequest {
   isTerminalQuotaError: boolean;
   isModelNotFoundError?: boolean;
   resolve: (intent: FallbackIntent) => void;
+}
+
+export interface McpSamplingRequest {
+  serverName: string;
+  prompt: unknown;
+  resolve: () => void;
+  reject: (reason?: unknown) => void;
 }
 
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
@@ -129,6 +137,7 @@ export interface UIState {
   showDebugProfiler: boolean;
   showFullTodos: boolean;
   copyModeEnabled: boolean;
+  mcpSamplingRequest: McpSamplingRequest | null;
   warningMessage: string | null;
   bannerData: {
     defaultText: string;
@@ -136,6 +145,7 @@ export interface UIState {
   };
   bannerVisible: boolean;
   customDialog: React.ReactNode | null;
+  authState: AuthState;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

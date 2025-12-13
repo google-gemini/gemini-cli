@@ -51,6 +51,7 @@ export const Scrollable: React.FC<ScrollableProps> = ({
   }, [size]);
 
   const childrenCountRef = useRef(0);
+  const hasInitializedRef = useRef(false);
 
   // This effect needs to run on every render to correctly measure the container
   // and scroll to the bottom if new children are added. The if conditions
@@ -70,7 +71,9 @@ export const Scrollable: React.FC<ScrollableProps> = ({
       size.scrollHeight !== scrollHeight
     ) {
       setSize({ innerHeight, scrollHeight });
-      if (isAtBottom) {
+      // Only maintain scroll position at bottom after initial render.
+      // On initial render, start at top unless scrollToBottom is explicitly set.
+      if (isAtBottom && hasInitializedRef.current) {
         setScrollTop(Math.max(0, scrollHeight - innerHeight));
       }
     }
@@ -80,6 +83,7 @@ export const Scrollable: React.FC<ScrollableProps> = ({
       setScrollTop(Math.max(0, scrollHeight - innerHeight));
     }
     childrenCountRef.current = childCountCurrent;
+    hasInitializedRef.current = true;
   });
 
   const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);

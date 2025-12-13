@@ -76,6 +76,16 @@ export interface OutputPayload {
  */
 export type MemoryChangedPayload = LoadServerHierarchicalMemoryResponse;
 
+/**
+ * Payload for the 'mcp-sampling-request' event.
+ */
+export interface McpSamplingRequestPayload {
+  serverName: string;
+  prompt: unknown;
+  resolve: () => void;
+  reject: (reason?: unknown) => void;
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   FallbackModeChanged = 'fallback-mode-changed',
@@ -83,6 +93,7 @@ export enum CoreEvent {
   ConsoleLog = 'console-log',
   Output = 'output',
   MemoryChanged = 'memory-changed',
+  McpSamplingRequest = 'mcp-sampling-request',
   ExternalEditorClosed = 'external-editor-closed',
 }
 
@@ -93,6 +104,7 @@ export interface CoreEvents {
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
+  [CoreEvent.McpSamplingRequest]: [McpSamplingRequestPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
 }
 
