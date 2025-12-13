@@ -11,6 +11,8 @@ import type { Content } from '@google/genai';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 
+const PROMPT_COMPLETION_OVERRIDE_SCOPE = 'prompt-completion';
+
 export const PROMPT_COMPLETION_MIN_LENGTH = 5;
 export const PROMPT_COMPLETION_DEBOUNCE_MS = 250;
 
@@ -67,6 +69,7 @@ export function usePromptCompletion({
   const generatePromptSuggestions = useCallback(async () => {
     const trimmedText = buffer.text.trim();
     const geminiClient = config?.getGeminiClient();
+    const selectedModel = config?.getModel?.() ?? 'auto';
 
     if (trimmedText === lastRequestedTextRef.current) {
       return;
@@ -107,7 +110,10 @@ export function usePromptCompletion({
       ];
 
       const response = await geminiClient.generateContent(
-        { model: 'prompt-completion' },
+        {
+          model: selectedModel,
+          overrideScope: PROMPT_COMPLETION_OVERRIDE_SCOPE,
+        },
         contents,
         signal,
       );
