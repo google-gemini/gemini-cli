@@ -25,6 +25,11 @@ describe('Interactive Mode', () => {
         import.meta.dirname,
         'context-compress-interactive.compress.responses',
       ),
+      settings: {
+        experimental: {
+          useModelRouter: false,
+        },
+      },
     });
 
     const run = await rig.runInteractive();
@@ -90,6 +95,11 @@ describe('Interactive Mode', () => {
         import.meta.dirname,
         'context-compress-interactive.compress-empty.responses',
       ),
+      settings: {
+        experimental: {
+          useModelRouter: false,
+        },
+      },
     });
 
     const run = await rig.runInteractive();
