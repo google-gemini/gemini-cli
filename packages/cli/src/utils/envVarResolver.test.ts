@@ -240,7 +240,7 @@ describe('resolveEnvVarsInObject', () => {
     // Create circular reference
     arr.push(arr);
 
-    const result = resolveEnvVarsInObject(arr) as ArrayWithCircularRef;
+    const result = resolveEnvVarsInObject(arr);
 
     expect(result[0]).toBe('array-value');
     expect(result[1]).toBe(123);

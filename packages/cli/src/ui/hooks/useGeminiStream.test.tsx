@@ -24,7 +24,6 @@ import { useReactToolScheduler } from './useReactToolScheduler.js';
 import type {
   Config,
   EditorType,
-  GeminiClient,
   AnyToolInvocation,
 } from '@google/gemini-cli-core';
 import {
@@ -813,8 +812,8 @@ describe('useGeminiStream', () => {
       expect(client.addHistory).toHaveBeenCalledWith({
         role: 'user',
         parts: [
-          ...(cancelledToolCall1.response.responseParts as Part[]),
-          ...(cancelledToolCall2.response.responseParts as Part[]),
+          ...cancelledToolCall1.response.responseParts,
+          ...cancelledToolCall2.response.responseParts,
         ],
       });
 
@@ -2093,7 +2092,7 @@ describe('useGeminiStream', () => {
 
     const { result } = renderHook(() =>
       useGeminiStream(
-        mockConfig.getGeminiClient() as GeminiClient,
+        mockConfig.getGeminiClient(),
         [],
         mockAddItem,
         mockConfig,

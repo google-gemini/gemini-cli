@@ -48,7 +48,7 @@ export function getToolCallDataSchema(historyItemSchema?: z.ZodTypeAny) {
 export function generateCheckpointFileName(
   toolCall: ToolCallRequestInfo,
 ): string | null {
-  const toolArgs = toolCall.args as Record<string, unknown>;
+  const toolArgs = toolCall.args;
   const toolFilePath = toolArgs['file_path'] as string;
 
   if (!toolFilePath) {
