@@ -640,6 +640,14 @@ describe('loadCliConfig', () => {
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config['enableMessageBusIntegration']).toBe(true);
   });
+
+  it('should disable enableMessageBusIntegration when experimentalAcp is true', async () => {
+    process.argv = ['node', 'script.js', '--experimental-acp'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config['enableMessageBusIntegration']).toBe(false);
+  });
 });
 
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
