@@ -33,7 +33,7 @@ All checkpoint data, including the Git snapshot and conversation history, is
 stored locally on your machine. The Git snapshot is stored in the shadow
 repository while the conversation history and tool calls are saved in a JSON
 file in your project's temporary directory, typically located at
-`~/.gemini/tmp/<project_hash>/checkpoints`.
+`~/.gemini/data/<project_hash>/checkpoints`.
 
 ## Enabling the feature
 

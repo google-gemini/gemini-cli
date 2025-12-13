@@ -15,7 +15,7 @@ This happens in the background without any manual intervention.
   - All tool executions (inputs and outputs).
   - Token usage statistics (input/output/cached, etc.).
   - Assistant thoughts/reasoning summaries (when available).
-- **Location:** Sessions are stored in `~/.gemini/tmp/<project_hash>/chats/`.
+- **Location:** Sessions are stored in `~/.gemini/data/<project_hash>/chats/`.
 - **Scope:** Sessions are project-specific. Switching directories to a different
   project will switch to that project's session history.
 
