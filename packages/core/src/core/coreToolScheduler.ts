@@ -29,7 +29,6 @@ import {
 } from '../index.js';
 import { READ_FILE_TOOL_NAME, SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import type { Part, PartListUnion } from '@google/genai';
-import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
 import type { ModifyContext } from '../tools/modifiable-tool.js';
 import {
   isModifiableDeclarativeTool,
@@ -50,6 +49,7 @@ import {
   fireToolNotificationHook,
   executeToolWithHooks,
 } from './coreToolHookTriggers.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -172,60 +172,55 @@ export function convertToFunctionResponse(
   callId: string,
   llmContent: PartListUnion,
 ): Part[] {
-  const contentToProcess =
-    Array.isArray(llmContent) && llmContent.length === 1
-      ? llmContent[0]
-      : llmContent;
-
-  if (typeof contentToProcess === 'string') {
-    return [createFunctionResponsePart(callId, toolName, contentToProcess)];
+  if (typeof llmContent === 'string') {
+    return [createFunctionResponsePart(callId, toolName, llmContent)];
   }
 
-  if (Array.isArray(contentToProcess)) {
-    const functionResponse = createFunctionResponsePart(
-      callId,
-      toolName,
-      'Tool execution succeeded.',
-    );
-    return [functionResponse, ...toParts(contentToProcess)];
-  }
+  const parts = toParts(llmContent);
 
-  // After this point, contentToProcess is a single Part object.
-  if (contentToProcess.functionResponse) {
-    if (contentToProcess.functionResponse.response?.['content']) {
-      const stringifiedOutput =
-        getResponseTextFromParts(
-          contentToProcess.functionResponse.response['content'] as Part[],
-        ) || '';
-      return [createFunctionResponsePart(callId, toolName, stringifiedOutput)];
+  // Separate text from binary
+  const textParts: string[] = [];
+  const binaryParts: Part[] = [];
+
+  for (const part of parts) {
+    if (part.text !== undefined) {
+      textParts.push(part.text);
+    } else if (part.inlineData || part.fileData) {
+      binaryParts.push(part);
+    } else if (part.functionResponse) {
+      if (parts.length > 1) {
+        debugLogger.warn(
+          'convertToFunctionResponse received multiple parts with a functionResponse. Only the functionResponse will be used, other parts will be ignored',
+        );
+      }
+      // Handle passthrough case
+      return [
+        {
+          functionResponse: {
+            id: callId,
+            name: toolName,
+            response: part.functionResponse.response,
+          },
+        },
+      ];
     }
-    // It's a functionResponse that we should pass through as is.
-    return [contentToProcess];
+    // Ignore other part types
   }
 
-  if (contentToProcess.inlineData || contentToProcess.fileData) {
-    const mimeType =
-      contentToProcess.inlineData?.mimeType ||
-      contentToProcess.fileData?.mimeType ||
-      'unknown';
-    const functionResponse = createFunctionResponsePart(
-      callId,
-      toolName,
-      `Binary content of type ${mimeType} was processed.`,
-    );
-    return [functionResponse, contentToProcess];
+  // Build the response
+  const part: Part = {
+    functionResponse: {
+      id: callId,
+      name: toolName,
+      response: textParts.length > 0 ? { output: textParts.join('\n') } : {},
+    },
+  };
+
+  if (binaryParts.length > 0) {
+    (part.functionResponse as unknown as { parts: Part[] }).parts = binaryParts;
   }
 
-  if (contentToProcess.text !== undefined) {
-    return [
-      createFunctionResponsePart(callId, toolName, contentToProcess.text),
-    ];
-  }
-
-  // Default case for other kinds of parts.
-  return [
-    createFunctionResponsePart(callId, toolName, 'Tool execution succeeded.'),
-  ];
+  return [part];
 }
 
 function toParts(input: PartListUnion): Part[] {
