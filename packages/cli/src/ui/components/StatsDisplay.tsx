@@ -85,15 +85,13 @@ const buildModelRows = (
   const activeRows = Object.entries(models).map(([name, metrics]) => {
     const modelName = getBaseModelName(name);
     const cachedTokens = metrics.tokens.cached;
-    const totalInputTokens = metrics.tokens.prompt;
-    const uncachedTokens = Math.max(0, totalInputTokens - cachedTokens);
+    const inputTokens = metrics.tokens.input;
     return {
       key: name,
       modelName,
       requests: metrics.api.totalRequests,
       cachedTokens: cachedTokens.toLocaleString(),
-      uncachedTokens: uncachedTokens.toLocaleString(),
-      totalInputTokens: totalInputTokens.toLocaleString(),
+      inputTokens: inputTokens.toLocaleString(),
       outputTokens: metrics.tokens.candidates.toLocaleString(),
       bucket: quotas?.buckets?.find((b) => b.modelId === modelName),
       isActive: true,
@@ -114,8 +112,7 @@ const buildModelRows = (
         modelName: bucket.modelId!,
         requests: '-',
         cachedTokens: '-',
-        uncachedTokens: '-',
-        totalInputTokens: '-',
+        inputTokens: '-',
         outputTokens: '-',
         bucket,
         isActive: false,
@@ -290,7 +287,7 @@ const ModelUsageTable: React.FC<{
                     row.isActive ? theme.text.primary : theme.text.secondary
                   }
                 >
-                  {row.uncachedTokens}
+                  {row.inputTokens}
                 </Text>
               </Box>
               <Box
