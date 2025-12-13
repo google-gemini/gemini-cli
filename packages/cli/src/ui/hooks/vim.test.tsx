@@ -64,6 +64,7 @@ const createMockTextBufferState = (
       logicalToVisualMap: lines.map((_, i) => [[i, 0]]),
       visualToLogicalMap: lines.map((_, i) => [i, 0]),
     },
+    pendingPastes: [],
     ...partial,
   };
 };

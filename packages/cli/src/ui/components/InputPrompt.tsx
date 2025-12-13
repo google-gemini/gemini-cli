@@ -28,7 +28,7 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
   buildSegmentsForVisualSlice,
-} from '../utils/highlight.js';
+} from '../utils/parse.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import {
   clipboardHasImage,
@@ -312,6 +312,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     return false;
   }, [buffer, popAllMessages, inputHistory]);
 
+  const insertAtOffsetWithAutoSpaces = useCallback(
+    (offset: number, insertText: string): void => {
+      const cpsAround = toCodePoints(buffer.text);
+      let textToInsert = insertText;
+      const charBefore = offset > 0 ? cpsAround[offset - 1] : '';
+      const charAfter = offset < cpsAround.length ? cpsAround[offset] : '';
+      if (charBefore && charBefore !== ' ' && charBefore !== '\n')
+        textToInsert = ' ' + textToInsert;
+      if (!charAfter || (charAfter !== ' ' && charAfter !== '\n'))
+        textToInsert = textToInsert + ' ';
+      buffer.replaceRangeByOffset(offset, offset, textToInsert);
+    },
+    [buffer],
+  );
+
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardPaste = useCallback(async () => {
     try {
@@ -328,24 +343,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
           // Insert @path reference at cursor position
           const insertText = `@${relativePath}`;
-          const currentText = buffer.text;
-          const offset = buffer.getOffset();
+          const [row, col] = buffer.cursor;
 
-          // Add spaces around the path if needed
-          let textToInsert = insertText;
-          const charBefore = offset > 0 ? currentText[offset - 1] : '';
-          const charAfter =
-            offset < currentText.length ? currentText[offset] : '';
+          // Calculate offset from row/col
+          const offset = logicalPosToOffset(buffer.lines, row, col);
 
-          if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
-            textToInsert = ' ' + textToInsert;
-          }
-          if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
-            textToInsert = textToInsert + ' ';
-          }
-
-          // Insert at cursor position
-          buffer.replaceRangeByOffset(offset, offset, textToInsert);
+          // Insert at cursor position with auto spaces
+          insertAtOffsetWithAutoSpaces(offset, insertText);
           return;
         }
       }
@@ -356,7 +360,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     } catch (error) {
       console.error('Error handling clipboard image:', error);
     }
-  }, [buffer, config]);
+  }, [buffer, config, insertAtOffsetWithAutoSpaces]);
 
   useMouseClick(
     innerBoxRef,
@@ -758,7 +762,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.backspace();
             buffer.newline();
           } else {
-            handleSubmit(buffer.text);
+            const expanded = buffer.expandPlaceholders(buffer.text);
+            buffer.clearPendingPastes();
+            handleSubmit(expanded);
           }
         }
         return;
@@ -785,6 +791,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           buffer.setText('');
           resetCompletionState();
         }
+        buffer.clearPendingPastes();
         return;
       }
 
@@ -817,7 +824,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
 
       // Clear ghost text when user types regular characters (not navigation/control keys)
@@ -1101,6 +1107,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 const tokens = parseInputForHighlighting(
                   logicalLine,
                   logicalLineIdx,
+                  buffer.pastePlaceholders,
                 );
 
                 const visualStart = logicalStartCol;
@@ -1149,9 +1156,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   }
 
                   const color =
-                    seg.type === 'command' || seg.type === 'file'
-                      ? theme.text.accent
-                      : theme.text.primary;
+                    seg.type === 'placeholder'
+                      ? theme.status.success
+                      : seg.type === 'command' || seg.type === 'file'
+                        ? theme.text.accent
+                        : theme.text.primary;
 
                   renderedLine.push(
                     <Text key={`token-${segIdx}`} color={color}>
