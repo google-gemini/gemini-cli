@@ -51,14 +51,7 @@ vi.mock('../utils/gitUtils.js', () => ({
   isGitRepository: hoistedIsGitRepositoryMock,
 }));
 
-const hoistedMockHomedir = vi.hoisted(() => vi.fn());
-vi.mock('os', async (importOriginal) => {
-  const actual = await importOriginal<typeof os>();
-  return {
-    ...actual,
-    homedir: hoistedMockHomedir,
-  };
-});
+vi.mock('../config/storage.js');
 
 describe('GitService', () => {
   let testRootDir: string;
@@ -66,6 +59,7 @@ describe('GitService', () => {
   let homedir: string;
   let hash: string;
   let storage: Storage;
+  let mockGetHistoryDir: Mock;
 
   beforeEach(async () => {
     testRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'git-service-test-'));
@@ -76,14 +70,19 @@ describe('GitService', () => {
 
     hash = getProjectHash(projectRoot);
 
+    const repoDir = path.join(homedir, GEMINI_DIR, 'history', hash);
+    mockGetHistoryDir = vi.fn().mockReturnValue(repoDir);
+
+    (Storage as unknown as Mock).mockImplementation(() => ({
+      getHistoryDir: mockGetHistoryDir,
+    }));
+
     vi.clearAllMocks();
     hoistedIsGitRepositoryMock.mockReturnValue(true);
     (spawnAsync as Mock).mockResolvedValue({
       stdout: 'git version 2.0.0',
       stderr: '',
     });
-
-    hoistedMockHomedir.mockReturnValue(homedir);
 
     hoistedMockEnv.mockImplementation(() => ({
       checkIsRepo: hoistedMockCheckIsRepo,
@@ -162,7 +161,7 @@ describe('GitService', () => {
     let gitConfigPath: string;
 
     beforeEach(() => {
-      repoDir = path.join(homedir, GEMINI_DIR, 'history', hash);
+      repoDir = storage.getHistoryDir();
       gitConfigPath = path.join(repoDir, '.gitconfig');
     });
 
@@ -216,7 +215,7 @@ describe('GitService', () => {
       await service.setupShadowGitRepository();
 
       const hiddenGitIgnorePath = path.join(repoDir, '.gitignore');
-      // An empty string is written if the file doesn't exist.
+      // An empty string is written if the file does not exist in the project root.
       const content = await fs.readFile(hiddenGitIgnorePath, 'utf-8');
       expect(content).toBe('');
     });
@@ -233,7 +232,7 @@ describe('GitService', () => {
       );
     });
 
-    it('should make an initial commit if no commits exist in history repo', async () => {
+    it('should make an initial commit if no commit exists in the history repo', async () => {
       hoistedMockCheckIsRepo.mockResolvedValue(false);
       const service = new GitService(projectRoot, storage);
       await service.setupShadowGitRepository();
@@ -242,7 +241,7 @@ describe('GitService', () => {
       });
     });
 
-    it('should not make an initial commit if commits already exist', async () => {
+    it('should not make an initial commit if commits exist in the history repo', async () => {
       hoistedMockCheckIsRepo.mockResolvedValue(true);
       const service = new GitService(projectRoot, storage);
       await service.setupShadowGitRepository();

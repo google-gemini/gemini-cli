@@ -6,19 +6,19 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { homedir } from 'node:os';
 
 import type { MCPServerConfig } from '@google/gemini-cli-core';
 import {
   debugLogger,
-  GEMINI_DIR,
   getErrorMessage,
+  Storage,
   type TelemetrySettings,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 
-export const USER_SETTINGS_DIR = path.join(homedir(), GEMINI_DIR);
+export const USER_SETTINGS_DIR = Storage.getConfigDir();
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
+export const WORKSPACE_SETTINGS_DIR = Storage.getWorkspaceGeminiDir();
 
 // TODO: Ensure full compatibility with V2 nested settings structure (settings.schema.json).
 // This involves updating the interface and implementing migration logic to support legacy V1 (flat) settings,
@@ -66,6 +66,18 @@ export function loadSettings(workspaceDir: string): Settings {
 
   // Load user settings
   try {
+    if (fs.existsSync(workspaceDir || WORKSPACE_SETTINGS_DIR)) {
+      const workspaceSettingsPath = path.join(
+        workspaceDir || WORKSPACE_SETTINGS_DIR,
+        'settings.json',
+      );
+      const userContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
+      const parsedUserSettings = JSON.parse(
+        stripJsonComments(userContent),
+      ) as Settings;
+      userSettings = resolveEnvVarsInObject(parsedUserSettings);
+    }
+
     if (fs.existsSync(USER_SETTINGS_PATH)) {
       const userContent = fs.readFileSync(USER_SETTINGS_PATH, 'utf-8');
       const parsedUserSettings = JSON.parse(
@@ -81,8 +93,7 @@ export function loadSettings(workspaceDir: string): Settings {
   }
 
   const workspaceSettingsPath = path.join(
-    workspaceDir,
-    GEMINI_DIR,
+    Storage.getWorkspaceGeminiDir(),
     'settings.json',
   );
 
