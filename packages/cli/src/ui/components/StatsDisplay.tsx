@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import Gradient from 'ink-gradient';
+import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
 import { formatDuration } from '../utils/formatters.js';
 import type { ModelMetrics } from '../contexts/SessionContext.js';
@@ -17,8 +17,14 @@ import {
   TOOL_SUCCESS_RATE_MEDIUM,
   USER_AGREEMENT_RATE_HIGH,
   USER_AGREEMENT_RATE_MEDIUM,
+  CACHE_EFFICIENCY_HIGH,
+  CACHE_EFFICIENCY_MEDIUM,
 } from '../utils/displayUtils.js';
 import { computeSessionStats } from '../utils/computeStats.js';
+import {
+  type RetrieveUserQuotaResponse,
+  VALID_GEMINI_MODELS,
+} from '@google/gemini-cli-core';
 
 // A more flexible and powerful StatRow component
 interface StatRowProps {
@@ -32,8 +38,7 @@ const StatRow: React.FC<StatRowProps> = ({ title, children }) => (
     <Box width={28}>
       <Text color={theme.text.link}>{title}</Text>
     </Box>
-    {/* FIX: Wrap children in a Box that can grow to fill remaining space */}
-    <Box flexGrow={1}>{children}</Box>
+    {children}
   </Box>
 );
 
@@ -49,8 +54,7 @@ const SubStatRow: React.FC<SubStatRowProps> = ({ title, children }) => (
     <Box width={26}>
       <Text color={theme.text.secondary}>» {title}</Text>
     </Box>
-    {/* FIX: Apply the same flexGrow fix here */}
-    <Box flexGrow={1}>{children}</Box>
+    {children}
   </Box>
 );
 
@@ -61,7 +65,7 @@ interface SectionProps {
 }
 
 const Section: React.FC<SectionProps> = ({ title, children }) => (
-  <Box flexDirection="column" width="100%" marginBottom={1}>
+  <Box flexDirection="column" marginBottom={1}>
     <Text bold color={theme.text.primary}>
       {title}
     </Text>
@@ -69,41 +73,180 @@ const Section: React.FC<SectionProps> = ({ title, children }) => (
   </Box>
 );
 
+// Logic for building the unified list of table rows
+const buildModelRows = (
+  models: Record<string, ModelMetrics>,
+  quotas?: RetrieveUserQuotaResponse,
+) => {
+  const getBaseModelName = (name: string) => name.replace('-001', '');
+  const usedModelNames = new Set(Object.keys(models).map(getBaseModelName));
+
+  // 1. Models with active usage
+  const activeRows = Object.entries(models).map(([name, metrics]) => {
+    const modelName = getBaseModelName(name);
+    const cachedTokens = metrics.tokens.cached;
+    const totalInputTokens = metrics.tokens.prompt;
+    const uncachedTokens = Math.max(0, totalInputTokens - cachedTokens);
+    return {
+      key: name,
+      modelName,
+      requests: metrics.api.totalRequests,
+      cachedTokens: cachedTokens.toLocaleString(),
+      uncachedTokens: uncachedTokens.toLocaleString(),
+      totalInputTokens: totalInputTokens.toLocaleString(),
+      outputTokens: metrics.tokens.candidates.toLocaleString(),
+      bucket: quotas?.buckets?.find((b) => b.modelId === modelName),
+      isActive: true,
+    };
+  });
+
+  // 2. Models with quota only
+  const quotaRows =
+    quotas?.buckets
+      ?.filter(
+        (b) =>
+          b.modelId &&
+          VALID_GEMINI_MODELS.has(b.modelId) &&
+          !usedModelNames.has(b.modelId),
+      )
+      .map((bucket) => ({
+        key: bucket.modelId!,
+        modelName: bucket.modelId!,
+        requests: '-',
+        cachedTokens: '-',
+        uncachedTokens: '-',
+        totalInputTokens: '-',
+        outputTokens: '-',
+        bucket,
+        isActive: false,
+      })) || [];
+
+  return [...activeRows, ...quotaRows];
+};
+
+const formatResetTime = (resetTime: string): string => {
+  const diff = new Date(resetTime).getTime() - Date.now();
+  if (diff <= 0) return '';
+
+  const totalMinutes = Math.ceil(diff / (1000 * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  const fmt = (val: number, unit: 'hour' | 'minute') =>
+    new Intl.NumberFormat('en', {
+      style: 'unit',
+      unit,
+      unitDisplay: 'narrow',
+    }).format(val);
+
+  if (hours > 0 && minutes > 0) {
+    return `(Resets in ${fmt(hours, 'hour')} ${fmt(minutes, 'minute')})`;
+  } else if (hours > 0) {
+    return `(Resets in ${fmt(hours, 'hour')})`;
+  }
+
+  return `(Resets in ${fmt(minutes, 'minute')})`;
+};
+
 const ModelUsageTable: React.FC<{
   models: Record<string, ModelMetrics>;
-  totalCachedTokens: number;
+  quotas?: RetrieveUserQuotaResponse;
   cacheEfficiency: number;
-}> = ({ models, totalCachedTokens, cacheEfficiency }) => {
+  totalCachedTokens: number;
+}> = ({ models, quotas, cacheEfficiency, totalCachedTokens }) => {
+  const rows = buildModelRows(models, quotas);
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const showQuotaColumn = !!quotas && rows.some((row) => !!row.bucket);
+
   const nameWidth = 25;
-  const requestsWidth = 8;
-  const inputTokensWidth = 15;
+  const requestsWidth = 7;
+  const uncachedWidth = 15;
+  const cachedWidth = 14;
   const outputTokensWidth = 15;
+  const usageLimitWidth = showQuotaColumn ? 28 : 0;
+
+  const cacheEfficiencyColor = getStatusColor(cacheEfficiency, {
+    green: CACHE_EFFICIENCY_HIGH,
+    yellow: CACHE_EFFICIENCY_MEDIUM,
+  });
+
+  const totalWidth =
+    nameWidth +
+    requestsWidth +
+    (showQuotaColumn
+      ? usageLimitWidth
+      : uncachedWidth + cachedWidth + outputTokensWidth);
 
   return (
     <Box flexDirection="column" marginTop={1}>
       {/* Header */}
-      <Box>
+      <Box alignItems="flex-end">
         <Box width={nameWidth}>
-          <Text bold color={theme.text.primary}>
+          <Text bold color={theme.text.primary} wrap="truncate-end">
             Model Usage
           </Text>
         </Box>
-        <Box width={requestsWidth} justifyContent="flex-end">
+        <Box
+          width={requestsWidth}
+          flexDirection="column"
+          alignItems="flex-end"
+          flexShrink={0}
+        >
           <Text bold color={theme.text.primary}>
             Reqs
           </Text>
         </Box>
-        <Box width={inputTokensWidth} justifyContent="flex-end">
-          <Text bold color={theme.text.primary}>
-            Input Tokens
-          </Text>
-        </Box>
-        <Box width={outputTokensWidth} justifyContent="flex-end">
-          <Text bold color={theme.text.primary}>
-            Output Tokens
-          </Text>
-        </Box>
+        {!showQuotaColumn && (
+          <>
+            <Box
+              width={uncachedWidth}
+              flexDirection="column"
+              alignItems="flex-end"
+              flexShrink={0}
+            >
+              <Text bold color={theme.text.primary}>
+                Input Tokens
+              </Text>
+            </Box>
+            <Box
+              width={cachedWidth}
+              flexDirection="column"
+              alignItems="flex-end"
+              flexShrink={0}
+            >
+              <Text bold color={theme.text.primary}>
+                Cache Reads
+              </Text>
+            </Box>
+            <Box
+              width={outputTokensWidth}
+              flexDirection="column"
+              alignItems="flex-end"
+              flexShrink={0}
+            >
+              <Text bold color={theme.text.primary}>
+                Output Tokens
+              </Text>
+            </Box>
+          </>
+        )}
+        {showQuotaColumn && (
+          <Box
+            width={usageLimitWidth}
+            flexDirection="column"
+            alignItems="flex-end"
+          >
+            <Text bold color={theme.text.primary}>
+              Usage left
+            </Text>
+          </Box>
+        )}
       </Box>
+
       {/* Divider */}
       <Box
         borderStyle="round"
@@ -112,44 +255,109 @@ const ModelUsageTable: React.FC<{
         borderLeft={false}
         borderRight={false}
         borderColor={theme.border.default}
-        width={nameWidth + requestsWidth + inputTokensWidth + outputTokensWidth}
+        width={totalWidth}
       ></Box>
 
-      {/* Rows */}
-      {Object.entries(models).map(([name, modelMetrics]) => (
-        <Box key={name}>
+      {rows.map((row) => (
+        <Box key={row.key}>
           <Box width={nameWidth}>
-            <Text color={theme.text.primary}>{name.replace('-001', '')}</Text>
-          </Box>
-          <Box width={requestsWidth} justifyContent="flex-end">
-            <Text color={theme.text.primary}>
-              {modelMetrics.api.totalRequests}
+            <Text color={theme.text.primary} wrap="truncate-end">
+              {row.modelName}
             </Text>
           </Box>
-          <Box width={inputTokensWidth} justifyContent="flex-end">
-            <Text color={theme.status.warning}>
-              {modelMetrics.tokens.prompt.toLocaleString()}
+          <Box
+            width={requestsWidth}
+            flexDirection="column"
+            alignItems="flex-end"
+            flexShrink={0}
+          >
+            <Text
+              color={row.isActive ? theme.text.primary : theme.text.secondary}
+            >
+              {row.requests}
             </Text>
           </Box>
-          <Box width={outputTokensWidth} justifyContent="flex-end">
-            <Text color={theme.status.warning}>
-              {modelMetrics.tokens.candidates.toLocaleString()}
-            </Text>
+          {!showQuotaColumn && (
+            <>
+              <Box
+                width={uncachedWidth}
+                flexDirection="column"
+                alignItems="flex-end"
+                flexShrink={0}
+              >
+                <Text
+                  color={
+                    row.isActive ? theme.text.primary : theme.text.secondary
+                  }
+                >
+                  {row.uncachedTokens}
+                </Text>
+              </Box>
+              <Box
+                width={cachedWidth}
+                flexDirection="column"
+                alignItems="flex-end"
+                flexShrink={0}
+              >
+                <Text color={theme.text.secondary}>{row.cachedTokens}</Text>
+              </Box>
+              <Box
+                width={outputTokensWidth}
+                flexDirection="column"
+                alignItems="flex-end"
+                flexShrink={0}
+              >
+                <Text
+                  color={
+                    row.isActive ? theme.text.primary : theme.text.secondary
+                  }
+                >
+                  {row.outputTokens}
+                </Text>
+              </Box>
+            </>
+          )}
+          <Box
+            width={usageLimitWidth}
+            flexDirection="column"
+            alignItems="flex-end"
+          >
+            {row.bucket &&
+              row.bucket.remainingFraction != null &&
+              row.bucket.resetTime && (
+                <Text color={theme.text.secondary} wrap="truncate-end">
+                  {(row.bucket.remainingFraction * 100).toFixed(1)}%{' '}
+                  {formatResetTime(row.bucket.resetTime)}
+                </Text>
+              )}
           </Box>
         </Box>
       ))}
-      {cacheEfficiency > 0 && (
+
+      {cacheEfficiency > 0 && !showQuotaColumn && (
         <Box flexDirection="column" marginTop={1}>
           <Text color={theme.text.primary}>
             <Text color={theme.status.success}>Savings Highlight:</Text>{' '}
-            {totalCachedTokens.toLocaleString()} ({cacheEfficiency.toFixed(1)}
-            %) of input tokens were served from the cache, reducing costs.
+            {totalCachedTokens.toLocaleString()} (
+            <Text color={cacheEfficiencyColor}>
+              {cacheEfficiency.toFixed(1)}%
+            </Text>
+            ) of input tokens were served from the cache, reducing costs.
           </Text>
-          <Box height={1} />
+        </Box>
+      )}
+
+      {showQuotaColumn && (
+        <>
+          <Box marginTop={1} marginBottom={2}>
+            <Text color={theme.text.primary}>
+              {`Usage limits span all sessions and reset daily.\n/auth to upgrade or switch to API key.`}
+            </Text>
+          </Box>
           <Text color={theme.text.secondary}>
             » Tip: For a full token breakdown, run `/stats model`.
           </Text>
-        </Box>
+        </>
       )}
     </Box>
   );
@@ -158,11 +366,13 @@ const ModelUsageTable: React.FC<{
 interface StatsDisplayProps {
   duration: string;
   title?: string;
+  quotas?: RetrieveUserQuotaResponse;
 }
 
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   duration,
   title,
+  quotas,
 }) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
@@ -185,17 +395,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
 
   const renderTitle = () => {
     if (title) {
-      return theme.ui.gradient && theme.ui.gradient.length > 0 ? (
-        <Gradient colors={theme.ui.gradient}>
-          <Text bold color={theme.text.primary}>
-            {title}
-          </Text>
-        </Gradient>
-      ) : (
-        <Text bold color={theme.text.accent}>
-          {title}
-        </Text>
-      );
+      return <ThemedGradient bold>{title}</ThemedGradient>;
     }
     return (
       <Text bold color={theme.text.accent}>
@@ -211,6 +411,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
       flexDirection="column"
       paddingY={1}
       paddingX={2}
+      overflow="hidden"
     >
       {renderTitle()}
       <Box height={1} />
@@ -280,14 +481,12 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
           </Text>
         </SubStatRow>
       </Section>
-
-      {Object.keys(models).length > 0 && (
-        <ModelUsageTable
-          models={models}
-          totalCachedTokens={computed.totalCachedTokens}
-          cacheEfficiency={computed.cacheEfficiency}
-        />
-      )}
+      <ModelUsageTable
+        models={models}
+        quotas={quotas}
+        cacheEfficiency={computed.cacheEfficiency}
+        totalCachedTokens={computed.totalCachedTokens}
+      />
     </Box>
   );
 };

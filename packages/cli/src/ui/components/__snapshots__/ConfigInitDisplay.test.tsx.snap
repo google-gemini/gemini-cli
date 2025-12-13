@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ConfigInitDisplay > handles empty clients map 1`] = `
+"
+Spinner Initializing..."
+`;
+
+exports[`ConfigInitDisplay > renders initial state 1`] = `
+"
+Spinner Initializing..."
+`;
+
+exports[`ConfigInitDisplay > truncates list of waiting servers if too many 1`] = `
+"
+Spinner Connecting to MCP servers... (0/5) - Waiting for: s1, s2, s3, +2 more"
+`;
+
+exports[`ConfigInitDisplay > updates message on McpClientUpdate event 1`] = `
+"
+Spinner Connecting to MCP servers... (1/2) - Waiting for: server2"
+`;

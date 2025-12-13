@@ -12,6 +12,7 @@ import { Text } from 'ink';
 import { StreamingContext } from '../../contexts/StreamingContext.js';
 import type { AnsiOutput } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../TerminalOutput.js', () => ({
   TerminalOutput: function MockTerminalOutput({
@@ -66,19 +67,6 @@ vi.mock('../../utils/MarkdownDisplay.js', () => ({
   },
 }));
 
-// Helper to render with context
-const renderWithContext = (
-  ui: React.ReactElement,
-  streamingState: StreamingState,
-) => {
-  const contextValue: StreamingState = streamingState;
-  return renderWithProviders(
-    <StreamingContext.Provider value={contextValue}>
-      {ui}
-    </StreamingContext.Provider>,
-  );
-};
-
 describe('<ToolMessage />', () => {
   const baseProps: ToolMessageProps = {
     callId: 'tool-123',
@@ -94,16 +82,32 @@ describe('<ToolMessage />', () => {
     borderDimColor: false,
   };
 
+  const mockSetEmbeddedShellFocused = vi.fn();
+  const uiActions = {
+    setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
+  };
+
+  // Helper to render with context
+  const renderWithContext = (
+    ui: React.ReactElement,
+    streamingState: StreamingState,
+  ) =>
+    renderWithProviders(ui, {
+      uiActions,
+      uiState: { streamingState },
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('renders basic tool information', () => {
     const { lastFrame } = renderWithContext(
       <ToolMessage {...baseProps} />,
       StreamingState.Idle,
     );
     const output = lastFrame();
-    expect(output).toContain('✓'); // Success indicator
-    expect(output).toContain('test-tool');
-    expect(output).toContain('A tool for testing');
-    expect(output).toContain('MockMarkdown:Test result');
+    expect(output).toMatchSnapshot();
   });
 
   describe('ToolStatusIndicator rendering', () => {
@@ -112,7 +116,7 @@ describe('<ToolMessage />', () => {
         <ToolMessage {...baseProps} status={ToolCallStatus.Success} />,
         StreamingState.Idle,
       );
-      expect(lastFrame()).toContain('✓');
+      expect(lastFrame()).toMatchSnapshot();
     });
 
     it('shows o for Pending status', () => {
@@ -120,7 +124,7 @@ describe('<ToolMessage />', () => {
         <ToolMessage {...baseProps} status={ToolCallStatus.Pending} />,
         StreamingState.Idle,
       );
-      expect(lastFrame()).toContain('o');
+      expect(lastFrame()).toMatchSnapshot();
     });
 
     it('shows ? for Confirming status', () => {
@@ -128,7 +132,7 @@ describe('<ToolMessage />', () => {
         <ToolMessage {...baseProps} status={ToolCallStatus.Confirming} />,
         StreamingState.Idle,
       );
-      expect(lastFrame()).toContain('?');
+      expect(lastFrame()).toMatchSnapshot();
     });
 
     it('shows - for Canceled status', () => {
@@ -136,7 +140,7 @@ describe('<ToolMessage />', () => {
         <ToolMessage {...baseProps} status={ToolCallStatus.Canceled} />,
         StreamingState.Idle,
       );
-      expect(lastFrame()).toContain('-');
+      expect(lastFrame()).toMatchSnapshot();
     });
 
     it('shows x for Error status', () => {
@@ -144,7 +148,7 @@ describe('<ToolMessage />', () => {
         <ToolMessage {...baseProps} status={ToolCallStatus.Error} />,
         StreamingState.Idle,
       );
-      expect(lastFrame()).toContain('x');
+      expect(lastFrame()).toMatchSnapshot();
     });
 
     it('shows paused spinner for Executing status when streamingState is Idle', () => {
@@ -152,9 +156,7 @@ describe('<ToolMessage />', () => {
         <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
         StreamingState.Idle,
       );
-      expect(lastFrame()).toContain('⊷');
-      expect(lastFrame()).not.toContain('MockRespondingSpinner');
-      expect(lastFrame()).not.toContain('✓');
+      expect(lastFrame()).toMatchSnapshot();
     });
 
     it('shows paused spinner for Executing status when streamingState is WaitingForConfirmation', () => {
@@ -162,9 +164,7 @@ describe('<ToolMessage />', () => {
         <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
         StreamingState.WaitingForConfirmation,
       );
-      expect(lastFrame()).toContain('⊷');
-      expect(lastFrame()).not.toContain('MockRespondingSpinner');
-      expect(lastFrame()).not.toContain('✓');
+      expect(lastFrame()).toMatchSnapshot();
     });
 
     it('shows MockRespondingSpinner for Executing status when streamingState is Responding', () => {
@@ -172,8 +172,7 @@ describe('<ToolMessage />', () => {
         <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
         StreamingState.Responding, // Simulate app still responding
       );
-      expect(lastFrame()).toContain('MockRespondingSpinner');
-      expect(lastFrame()).not.toContain('✓');
+      expect(lastFrame()).toMatchSnapshot();
     });
   });
 
@@ -189,7 +188,7 @@ describe('<ToolMessage />', () => {
       StreamingState.Idle,
     );
     // Check that the output contains the MockDiff content as part of the whole message
-    expect(lastFrame()).toMatch(/MockDiff:--- a\/file\.txt/);
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders emphasis correctly', () => {
@@ -198,7 +197,7 @@ describe('<ToolMessage />', () => {
       StreamingState.Idle,
     );
     // Check for trailing indicator or specific color if applicable (Colors are not easily testable here)
-    expect(highEmphasisFrame()).toContain('←'); // Trailing indicator for high emphasis
+    expect(highEmphasisFrame()).toMatchSnapshot();
 
     const { lastFrame: lowEmphasisFrame } = renderWithContext(
       <ToolMessage {...baseProps} emphasis="low" />,
@@ -207,7 +206,7 @@ describe('<ToolMessage />', () => {
     // For low emphasis, the name and description might be dimmed (check for dimColor if possible)
     // This is harder to assert directly in text output without color checks.
     // We can at least ensure it doesn't have the high emphasis indicator.
-    expect(lowEmphasisFrame()).not.toContain('←');
+    expect(lowEmphasisFrame()).toMatchSnapshot();
   });
 
   it('renders AnsiOutputText for AnsiOutput results', () => {
@@ -229,6 +228,6 @@ describe('<ToolMessage />', () => {
       <ToolMessage {...baseProps} resultDisplay={ansiResult} />,
       StreamingState.Idle,
     );
-    expect(lastFrame()).toContain('MockAnsiOutput:hello');
+    expect(lastFrame()).toMatchSnapshot();
   });
 });

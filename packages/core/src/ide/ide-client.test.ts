@@ -59,6 +59,7 @@ describe('IdeClient', () => {
     delete process.env['GEMINI_CLI_IDE_SERVER_PORT'];
     delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'];
     delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'];
+    delete process.env['GEMINI_CLI_IDE_AUTH_TOKEN'];
 
     // Mock dependencies
     vi.spyOn(process, 'cwd').mockReturnValue('/test/workspace/sub-dir');
@@ -915,6 +916,36 @@ describe('IdeClient', () => {
           requestInit: {
             headers: {
               Authorization: `Bearer ${authToken}`,
+            },
+          },
+        }),
+      );
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Connected,
+      );
+    });
+
+    it('should connect with an auth token from environment variable if config file is missing', async () => {
+      vi.mocked(fs.promises.readFile).mockRejectedValue(
+        new Error('File not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue([]);
+      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '9090';
+      process.env['GEMINI_CLI_IDE_AUTH_TOKEN'] = 'env-auth-token';
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
+        new URL('http://127.0.0.1:9090/mcp'),
+        expect.objectContaining({
+          requestInit: {
+            headers: {
+              Authorization: 'Bearer env-auth-token',
             },
           },
         }),

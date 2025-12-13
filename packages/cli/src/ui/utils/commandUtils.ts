@@ -5,8 +5,10 @@
  */
 
 import { debugLogger } from '@google/gemini-cli-core';
-import type { SpawnOptions } from 'node:child_process';
-import { spawn } from 'node:child_process';
+import clipboardy from 'clipboardy';
+import type { SlashCommand } from '../commands/types.js';
+import fs from 'node:fs';
+import type { Writable } from 'node:stream';
 
 /**
  * Checks if a query string potentially represents an '@' command.
@@ -45,109 +47,147 @@ export const isSlashCommand = (query: string): boolean => {
   return true;
 };
 
-// Copies a string snippet to the clipboard for different platforms
-export const copyToClipboard = async (text: string): Promise<void> => {
-  const run = (cmd: string, args: string[], options?: SpawnOptions) =>
-    new Promise<void>((resolve, reject) => {
-      const child = options ? spawn(cmd, args, options) : spawn(cmd, args);
-      let stderr = '';
-      if (child.stderr) {
-        child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
-      }
-      const copyResult = (code: number | null) => {
-        if (code === 0) return resolve();
-        const errorMsg = stderr.trim();
-        reject(
-          new Error(
-            `'${cmd}' exited with code ${code}${errorMsg ? `: ${errorMsg}` : ''}`,
-          ),
-        );
-      };
+const ESC = '\u001B';
+const BEL = '\u0007';
+const ST = '\u001B\\';
 
-      // The 'exit' event workaround is only needed for the specific stdio
-      // configuration used on Linux.
-      if (process.platform === 'linux') {
-        child.on('exit', (code) => {
-          child.stdin?.destroy();
-          child.stdout?.destroy();
-          child.stderr?.destroy();
-          copyResult(code);
-        });
-      }
+const MAX_OSC52_SEQUENCE_BYTES = 100_000;
+const OSC52_HEADER = `${ESC}]52;c;`;
+const OSC52_FOOTER = BEL;
+const MAX_OSC52_BODY_B64_BYTES =
+  MAX_OSC52_SEQUENCE_BYTES -
+  Buffer.byteLength(OSC52_HEADER) -
+  Buffer.byteLength(OSC52_FOOTER);
+const MAX_OSC52_DATA_BYTES = Math.floor(MAX_OSC52_BODY_B64_BYTES / 4) * 3;
 
-      child.on('error', reject);
+// Conservative chunk size for GNU screen DCS passthrough.
+const SCREEN_DCS_CHUNK_SIZE = 240;
 
-      // For win32/darwin, 'close' is the safest event, guaranteeing all I/O is flushed.
-      // For Linux, this acts as a fallback. This is safe because the promise
-      // can only be settled once.
-      child.on('close', (code) => {
-        copyResult(code);
-      });
+type TtyTarget = { stream: Writable; closeAfter: boolean } | null;
 
-      if (child.stdin) {
-        child.stdin.on('error', reject);
-        child.stdin.write(text);
-        child.stdin.end();
-      } else {
-        reject(new Error('Child process has no stdin stream to write to.'));
-      }
-    });
-
-  // Configure stdio for Linux clipboard commands.
-  // - stdin: 'pipe' to write the text that needs to be copied.
-  // - stdout: 'inherit' since we don't need to capture the command's output on success.
-  // - stderr: 'pipe' to capture error messages (e.g., "command not found") for better error handling.
-  const linuxOptions: SpawnOptions = { stdio: ['pipe', 'inherit', 'pipe'] };
-
-  switch (process.platform) {
-    case 'win32':
-      return run('clip', []);
-    case 'darwin':
-      return run('pbcopy', []);
-    case 'linux':
-      try {
-        await run('xclip', ['-selection', 'clipboard'], linuxOptions);
-      } catch (primaryError) {
-        try {
-          // If xclip fails for any reason, try xsel as a fallback.
-          await run('xsel', ['--clipboard', '--input'], linuxOptions);
-        } catch (fallbackError) {
-          const xclipNotFound =
-            primaryError instanceof Error &&
-            (primaryError as NodeJS.ErrnoException).code === 'ENOENT';
-          const xselNotFound =
-            fallbackError instanceof Error &&
-            (fallbackError as NodeJS.ErrnoException).code === 'ENOENT';
-          if (xclipNotFound && xselNotFound) {
-            throw new Error(
-              'Please ensure xclip or xsel is installed and configured.',
-            );
-          }
-
-          let primaryMsg =
-            primaryError instanceof Error
-              ? primaryError.message
-              : String(primaryError);
-          if (xclipNotFound) {
-            primaryMsg = `xclip not found`;
-          }
-          let fallbackMsg =
-            fallbackError instanceof Error
-              ? fallbackError.message
-              : String(fallbackError);
-          if (xselNotFound) {
-            fallbackMsg = `xsel not found`;
-          }
-
-          throw new Error(
-            `All copy commands failed. "${primaryMsg}", "${fallbackMsg}". `,
-          );
-        }
-      }
-      return;
-    default:
-      throw new Error(`Unsupported platform: ${process.platform}`);
+const pickTty = (): TtyTarget => {
+  // Prefer the controlling TTY to avoid interleaving escape sequences with piped stdout.
+  try {
+    const devTty = fs.createWriteStream('/dev/tty');
+    return { stream: devTty, closeAfter: true };
+  } catch {
+    // fall through
   }
+  if (process.stderr?.isTTY)
+    return { stream: process.stderr, closeAfter: false };
+  if (process.stdout?.isTTY)
+    return { stream: process.stdout, closeAfter: false };
+  return null;
+};
+
+const inTmux = (): boolean =>
+  Boolean(
+    process.env['TMUX'] || (process.env['TERM'] ?? '').startsWith('tmux'),
+  );
+
+const inScreen = (): boolean =>
+  Boolean(
+    process.env['STY'] || (process.env['TERM'] ?? '').startsWith('screen'),
+  );
+
+const isSSH = (): boolean =>
+  Boolean(
+    process.env['SSH_TTY'] ||
+      process.env['SSH_CONNECTION'] ||
+      process.env['SSH_CLIENT'],
+  );
+
+const isWSL = (): boolean =>
+  Boolean(
+    process.env['WSL_DISTRO_NAME'] ||
+      process.env['WSLENV'] ||
+      process.env['WSL_INTEROP'],
+  );
+
+const isDumbTerm = (): boolean => (process.env['TERM'] ?? '') === 'dumb';
+
+const shouldUseOsc52 = (tty: TtyTarget): boolean =>
+  Boolean(tty) &&
+  !isDumbTerm() &&
+  (isSSH() || inTmux() || inScreen() || isWSL());
+
+const safeUtf8Truncate = (buf: Buffer, maxBytes: number): Buffer => {
+  if (buf.length <= maxBytes) return buf;
+  let end = maxBytes;
+  // Back up to the start of a UTF-8 code point if we cut through a continuation byte (10xxxxxx).
+  while (end > 0 && (buf[end - 1] & 0b1100_0000) === 0b1000_0000) end--;
+  return buf.subarray(0, end);
+};
+
+const buildOsc52 = (text: string): string => {
+  const raw = Buffer.from(text, 'utf8');
+  const safe = safeUtf8Truncate(raw, MAX_OSC52_DATA_BYTES);
+  const b64 = safe.toString('base64');
+  return `${OSC52_HEADER}${b64}${OSC52_FOOTER}`;
+};
+
+const wrapForTmux = (seq: string): string => {
+  // Double ESC bytes in payload without a control-character regex.
+  const doubledEsc = seq.split(ESC).join(ESC + ESC);
+  return `${ESC}Ptmux;${doubledEsc}${ST}`;
+};
+
+const wrapForScreen = (seq: string): string => {
+  let out = '';
+  for (let i = 0; i < seq.length; i += SCREEN_DCS_CHUNK_SIZE) {
+    out += `${ESC}P${seq.slice(i, i + SCREEN_DCS_CHUNK_SIZE)}${ST}`;
+  }
+  return out;
+};
+
+const writeAll = (stream: Writable, data: string): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
+    const onError = (err: unknown) => {
+      cleanup();
+      reject(err as Error);
+    };
+    const onDrain = () => {
+      cleanup();
+      resolve();
+    };
+    const cleanup = () => {
+      stream.off('error', onError);
+      stream.off('drain', onDrain);
+      // Writable.write() handlers may not emit 'drain' if the first write succeeded.
+    };
+    stream.once('error', onError);
+    if (stream.write(data)) {
+      cleanup();
+      resolve();
+    } else {
+      stream.once('drain', onDrain);
+    }
+  });
+
+// Copies a string snippet to the clipboard with robust OSC-52 support.
+export const copyToClipboard = async (text: string): Promise<void> => {
+  if (!text) return;
+
+  const tty = pickTty();
+
+  if (shouldUseOsc52(tty)) {
+    const osc = buildOsc52(text);
+    const payload = inTmux()
+      ? wrapForTmux(osc)
+      : inScreen()
+        ? wrapForScreen(osc)
+        : osc;
+
+    await writeAll(tty!.stream, payload);
+
+    if (tty!.closeAfter) {
+      (tty!.stream as fs.WriteStream).end();
+    }
+    return;
+  }
+
+  // Local / non-TTY fallback
+  await clipboardy.write(text);
 };
 
 export const getUrlOpenCommand = (): string => {
@@ -173,3 +213,24 @@ export const getUrlOpenCommand = (): string => {
   }
   return openCmd;
 };
+
+/**
+ * Determines if a slash command should auto-execute when selected.
+ *
+ * All built-in commands have autoExecute explicitly set to true or false.
+ * Custom commands (.toml files) and extension commands without this flag
+ * will default to false (safe default - won't auto-execute).
+ *
+ * @param command The slash command to check
+ * @returns true if the command should auto-execute on Enter
+ */
+export function isAutoExecutableCommand(
+  command: SlashCommand | undefined | null,
+): boolean {
+  if (!command) {
+    return false;
+  }
+
+  // Simply return the autoExecute flag value, defaulting to false if undefined
+  return command.autoExecute ?? false;
+}

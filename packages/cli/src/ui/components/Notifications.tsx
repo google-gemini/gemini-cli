@@ -39,7 +39,7 @@ export const Notifications = () => {
   >(undefined);
 
   useEffect(() => {
-    const checkScreenReaderNudge = async () => {
+    const checkScreenReader = async () => {
       try {
         await fs.access(screenReaderNudgeFilePath);
         setHasSeenScreenReaderNudge(true);
@@ -47,8 +47,12 @@ export const Notifications = () => {
         setHasSeenScreenReaderNudge(false);
       }
     };
-    checkScreenReaderNudge();
-  }, []);
+
+    if (isScreenReaderEnabled) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      checkScreenReader();
+    }
+  }, [isScreenReaderEnabled]);
 
   const showScreenReaderNudge =
     isScreenReaderEnabled && hasSeenScreenReaderNudge === false;
@@ -66,6 +70,7 @@ export const Notifications = () => {
         }
       }
     };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     writeScreenReaderNudgeFile();
   }, [showScreenReaderNudge]);
 

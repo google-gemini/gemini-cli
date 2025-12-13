@@ -4,22 +4,71 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { EventEmitter } from 'node:events';
 import type { LoadServerHierarchicalMemoryResponse } from './memoryDiscovery.js';
 
+/**
+ * Defines the severity level for user-facing feedback.
+ * This maps loosely to UI `MessageType`
+ */
+export type FeedbackSeverity = 'info' | 'warning' | 'error';
+
+/**
+ * Payload for the 'user-feedback' event.
+ */
 export interface UserFeedbackPayload {
+  /**
+   * The severity level determines how the message is rendered in the UI
+   * (e.g. colored text, specific icon).
+   */
+  severity: FeedbackSeverity;
+  /**
+   * The main message to display to the user in the chat history or stdout.
+   */
   message: string;
-  severity: 'error' | 'warning' | 'info';
+  /**
+   * The original error object, if applicable.
+   * Listeners can use this to extract stack traces for debug logging
+   * or verbose output, while keeping the 'message' field clean for end users.
+   */
   error?: unknown;
 }
 
+/**
+ * Payload for the 'fallback-mode-changed' event.
+ */
 export interface FallbackModeChangedPayload {
+  /**
+   * Whether fallback mode is now active.
+   */
   isInFallbackMode: boolean;
 }
 
+/**
+ * Payload for the 'model-changed' event.
+ */
 export interface ModelChangedPayload {
+  /**
+   * The new model that was set.
+   */
   model: string;
+}
+
+/**
+ * Payload for the 'console-log' event.
+ */
+export interface ConsoleLogPayload {
+  type: 'log' | 'warn' | 'error' | 'debug' | 'info';
+  content: string;
+}
+
+/**
+ * Payload for the 'output' event.
+ */
+export interface OutputPayload {
+  isStderr: boolean;
+  chunk: Uint8Array | string;
+  encoding?: BufferEncoding;
 }
 
 /**
@@ -27,6 +76,9 @@ export interface ModelChangedPayload {
  */
 export type MemoryChangedPayload = LoadServerHierarchicalMemoryResponse;
 
+/**
+ * Payload for the 'mcp-sampling-request' event.
+ */
 export interface McpSamplingRequestPayload {
   serverName: string;
   prompt: unknown;
@@ -38,159 +90,127 @@ export enum CoreEvent {
   UserFeedback = 'user-feedback',
   FallbackModeChanged = 'fallback-mode-changed',
   ModelChanged = 'model-changed',
+  ConsoleLog = 'console-log',
+  Output = 'output',
   MemoryChanged = 'memory-changed',
   McpSamplingRequest = 'mcp-sampling-request',
+  ExternalEditorClosed = 'external-editor-closed',
 }
 
 export interface CoreEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
   [CoreEvent.FallbackModeChanged]: [FallbackModeChangedPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
+  [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
+  [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
   [CoreEvent.McpSamplingRequest]: [McpSamplingRequestPayload];
+  [CoreEvent.ExternalEditorClosed]: never[];
 }
 
+type EventBacklogItem = {
+  [K in keyof CoreEvents]: {
+    event: K;
+    args: CoreEvents[K];
+  };
+}[keyof CoreEvents];
+
 export class CoreEventEmitter extends EventEmitter<CoreEvents> {
-  private _feedbackBacklog: UserFeedbackPayload[] = [];
+  private _eventBacklog: EventBacklogItem[] = [];
   private static readonly MAX_BACKLOG_SIZE = 10000;
 
   constructor() {
     super();
   }
 
-  override on(
-    event: CoreEvent.UserFeedback,
-    listener: (payload: UserFeedbackPayload) => void,
-  ): this;
-  override on(
-    event: CoreEvent.FallbackModeChanged,
-    listener: (payload: FallbackModeChangedPayload) => void,
-  ): this;
-  override on(
-    event: CoreEvent.ModelChanged,
-    listener: (payload: ModelChangedPayload) => void,
-  ): this;
-  override on(
-    event: CoreEvent.MemoryChanged,
-    listener: (payload: MemoryChangedPayload) => void,
-  ): this;
-  override on(
-    event: CoreEvent.McpSamplingRequest,
-    listener: (payload: McpSamplingRequestPayload) => void,
-  ): this;
-  override on(
-    event: string | symbol,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    listener: (...args: any[]) => void,
-  ): this {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return super.on(event as any, listener as any);
-  }
-
-  override off(
-    event: CoreEvent.UserFeedback,
-    listener: (payload: UserFeedbackPayload) => void,
-  ): this;
-  override off(
-    event: CoreEvent.FallbackModeChanged,
-    listener: (payload: FallbackModeChangedPayload) => void,
-  ): this;
-  override off(
-    event: CoreEvent.ModelChanged,
-    listener: (payload: ModelChangedPayload) => void,
-  ): this;
-  override off(
-    event: CoreEvent.MemoryChanged,
-    listener: (payload: MemoryChangedPayload) => void,
-  ): this;
-  override off(
-    event: CoreEvent.McpSamplingRequest,
-    listener: (payload: McpSamplingRequestPayload) => void,
-  ): this;
-  override off(
-    event: string | symbol,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    listener: (...args: any[]) => void,
-  ): this {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return super.off(event as any, listener as any);
-  }
-
-  override emit(
-    event: CoreEvent.UserFeedback,
-    payload: UserFeedbackPayload,
-  ): boolean;
-  override emit(
-    event: CoreEvent.FallbackModeChanged,
-    payload: FallbackModeChangedPayload,
-  ): boolean;
-  override emit(
-    event: CoreEvent.ModelChanged,
-    payload: ModelChangedPayload,
-  ): boolean;
-  override emit(
-    event: CoreEvent.MemoryChanged,
-    payload: MemoryChangedPayload,
-  ): boolean;
-  override emit(
-    event: CoreEvent.McpSamplingRequest,
-    payload: McpSamplingRequestPayload,
-  ): boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  override emit(event: string | symbol, ...args: any[]): boolean {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return super.emit(event as any, ...(args as any));
+  private _emitOrQueue<K extends keyof CoreEvents>(
+    event: K,
+    ...args: CoreEvents[K]
+  ): void {
+    if (this.listenerCount(event) === 0) {
+      if (this._eventBacklog.length >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
+        this._eventBacklog.shift();
+      }
+      this._eventBacklog.push({ event, args } as EventBacklogItem);
+    } else {
+      (
+        this.emit as <K extends keyof CoreEvents>(
+          event: K,
+          ...args: CoreEvents[K]
+        ) => boolean
+      )(event, ...args);
+    }
   }
 
   /**
-   * Emits a user feedback event with the given severity and message.
+   * Sends actionable feedback to the user.
+   * Buffers automatically if the UI hasn't subscribed yet.
    */
   emitFeedback(
-    severity: 'error' | 'warning' | 'info',
+    severity: FeedbackSeverity,
     message: string,
     error?: unknown,
   ): void {
     const payload: UserFeedbackPayload = { severity, message, error };
-    if (this.listenerCount(CoreEvent.UserFeedback) === 0) {
-      // If no listeners are attached yet, store in backlog
-      if (this._feedbackBacklog.length >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
-        this._feedbackBacklog.shift(); // Remove oldest item to maintain FIFO
-      }
-      this._feedbackBacklog.push(payload);
-    } else {
-      this.emit(CoreEvent.UserFeedback, payload);
-    }
+    this._emitOrQueue(CoreEvent.UserFeedback, payload);
   }
 
   /**
-   * Emits a fallback mode changed event.
+   * Broadcasts a console log message.
+   */
+  emitConsoleLog(
+    type: 'log' | 'warn' | 'error' | 'debug' | 'info',
+    content: string,
+  ): void {
+    const payload: ConsoleLogPayload = { type, content };
+    this._emitOrQueue(CoreEvent.ConsoleLog, payload);
+  }
+
+  /**
+   * Broadcasts stdout/stderr output.
+   */
+  emitOutput(
+    isStderr: boolean,
+    chunk: Uint8Array | string,
+    encoding?: BufferEncoding,
+  ): void {
+    const payload: OutputPayload = { isStderr, chunk, encoding };
+    this._emitOrQueue(CoreEvent.Output, payload);
+  }
+
+  /**
+   * Notifies subscribers that fallback mode has changed.
+   * This is synchronous and doesn't use backlog (UI should already be initialized).
    */
   emitFallbackModeChanged(isInFallbackMode: boolean): void {
-    this.emit(CoreEvent.FallbackModeChanged, { isInFallbackMode });
+    const payload: FallbackModeChangedPayload = { isInFallbackMode };
+    this.emit(CoreEvent.FallbackModeChanged, payload);
   }
 
   /**
-   * Emits a model changed event.
+   * Notifies subscribers that the model has changed.
    */
   emitModelChanged(model: string): void {
-    this.emit(CoreEvent.ModelChanged, { model });
+    const payload: ModelChangedPayload = { model };
+    this.emit(CoreEvent.ModelChanged, payload);
   }
 
   /**
-   * Drains the backlog of user feedback events that were emitted before a
-   * listener was attached.
-   *
-   * This is useful for ensuring that feedback emitted during application
-   * startup is not lost.
+   * Flushes buffered messages. Call this immediately after primary UI listener
+   * subscribes.
    */
-  drainFeedbackBacklog() {
-    for (const payload of this._feedbackBacklog) {
-      this.emit(CoreEvent.UserFeedback, payload);
+  drainBacklogs(): void {
+    const backlog = [...this._eventBacklog];
+    this._eventBacklog.length = 0; // Clear in-place
+    for (const item of backlog) {
+      (
+        this.emit as <K extends keyof CoreEvents>(
+          event: K,
+          ...args: CoreEvents[K]
+        ) => boolean
+      )(item.event, ...item.args);
     }
-    this._feedbackBacklog = [];
   }
 }
 
 export const coreEvents = new CoreEventEmitter();
-
-export type { Client };

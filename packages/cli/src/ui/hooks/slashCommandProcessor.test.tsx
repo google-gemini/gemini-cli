@@ -190,6 +190,7 @@ describe('useSlashCommandProcessor', () => {
             openEditorDialog: vi.fn(),
             openPrivacyNotice: vi.fn(),
             openSettingsDialog: vi.fn(),
+            openSessionBrowser: vi.fn(),
             openModelDialog: mockOpenModelDialog,
             openPermissionsDialog: vi.fn(),
             quit: mockSetQuittingMessages,
@@ -201,6 +202,7 @@ describe('useSlashCommandProcessor', () => {
           },
           new Map(), // extensionsUpdateState
           true, // isConfigInitialized
+          vi.fn(), // setBannerVisible
           vi.fn(), // setCustomDialog
         ),
       );

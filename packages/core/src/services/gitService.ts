@@ -112,7 +112,14 @@ export class GitService {
     try {
       const repo = this.shadowGitRepository;
       await repo.add('.');
-      const commitResult = await repo.commit(message);
+      const status = await repo.status();
+      if (status.isClean()) {
+        // If no changes are staged, return the current HEAD commit hash
+        return await this.getCurrentCommitHash();
+      }
+      const commitResult = await repo.commit(message, {
+        '--no-verify': null,
+      });
       return commitResult.commit;
     } catch (error) {
       throw new Error(
