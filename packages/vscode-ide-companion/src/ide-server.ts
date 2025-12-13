@@ -48,6 +48,10 @@ interface WritePortAndWorkspaceArgs {
   log: (message: string) => void;
 }
 
+async function createDirectory(path: string) {
+  await fs.mkdir(path, { recursive: true });
+}
+
 async function writePortAndWorkspace({
   context,
   port,
@@ -78,10 +82,12 @@ async function writePortAndWorkspace({
     authToken,
   });
 
+  log(`Creating dicrectory: ${path.dirname(portFile)}`);
   log(`Writing port file to: ${portFile}`);
   log(`Writing ppid port file to: ${ppidPortFile}`);
 
   try {
+    await createDirectory(path.dirname(portFile));
     await Promise.all([
       fs.writeFile(portFile, content).then(() => fs.chmod(portFile, 0o600)),
       fs
@@ -341,10 +347,14 @@ export class IDEServer {
           this.port = address.port;
           this.portFile = path.join(
             os.tmpdir(),
+            'gemini',
+            'ide',
             `gemini-ide-server-${this.port}.json`,
           );
           this.ppidPortFile = path.join(
             os.tmpdir(),
+            'gemini',
+            'ide',
             `gemini-ide-server-${process.ppid}.json`,
           );
           this.log(`IDE server listening on http://127.0.0.1:${this.port}`);
