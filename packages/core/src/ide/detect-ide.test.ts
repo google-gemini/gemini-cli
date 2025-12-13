@@ -28,6 +28,7 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PRODUCT', '');
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('REPLIT_USER', '');
+    vi.stubEnv('POSITRON', '');
     vi.stubEnv('__COG_BASHRC_SOURCED', '');
   });
 
@@ -99,6 +100,7 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.vscode);
   });
 
@@ -106,11 +108,21 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '');
     expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.vscodefork);
+  });
+
+  it('should detect positron when POSITRON is set', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('MONOSPACE_ENV', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '1');
+    expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.positron);
   });
 
   it('should detect AntiGravity', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('POSITRON', '');
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.antigravity);
   });
@@ -134,6 +146,7 @@ describe('detectIde with ideInfoFromFile', () => {
     vi.stubEnv('TERM_PRODUCT', '');
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('REPLIT_USER', '');
+    vi.stubEnv('POSITRON', '');
     vi.stubEnv('__COG_BASHRC_SOURCED', '');
   });
 
@@ -149,6 +162,7 @@ describe('detectIde with ideInfoFromFile', () => {
     const ideInfoFromFile = { displayName: 'Custom IDE' };
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '');
     expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(
       IDE_DEFINITIONS.vscode,
     );
@@ -158,6 +172,7 @@ describe('detectIde with ideInfoFromFile', () => {
     const ideInfoFromFile = { name: 'custom-ide' };
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '');
     expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(
       IDE_DEFINITIONS.vscode,
     );
