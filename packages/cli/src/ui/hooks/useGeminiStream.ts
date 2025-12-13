@@ -69,6 +69,7 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import { getRequestSize } from '../../utils/oversized.js';
 
 enum StreamProcessingStatus {
   Completed,
@@ -1153,6 +1154,8 @@ export const useGeminiStream = (
         (tc) => tc.status === 'cancelled',
       );
 
+      const truncateThreshold = config.getTruncateToolOutputThreshold();
+
       if (allToolsCancelled) {
         // If the turn was cancelled via the imperative escape key flow,
         // the cancellation message is added there. We check the ref to avoid duplication.
@@ -1187,9 +1190,61 @@ export const useGeminiStream = (
         return;
       }
 
-      const responsesToSend: Part[] = geminiTools.flatMap(
-        (toolCall) => toolCall.response.responseParts,
+      const getPartsArray = (plu: PartListUnion): Part[] => {
+        if (typeof plu === 'string') {
+          return [{ text: plu }];
+        }
+        if (Array.isArray(plu)) {
+          return plu.map((p) => (typeof p === 'string' ? { text: p } : p));
+        }
+        // It's a single Part object.
+        return [plu];
+      };
+
+      const { parts: responsesToSend } = geminiTools.reduce(
+        ({ parts, size }, toolCall) => {
+          const responsePartsUnion = toolCall.response.responseParts;
+          const responseParts = getPartsArray(responsePartsUnion);
+          const partSize = getRequestSize(responseParts);
+
+          if (
+            toolCall.request.name === 'run_shell_command' &&
+            truncateThreshold > 0 &&
+            (partSize > truncateThreshold ||
+              size + partSize > truncateThreshold)
+          ) {
+            const originalCommand = toolCall.request.args?.['command'];
+            if (typeof originalCommand !== 'string') {
+              return {
+                parts: [...parts, ...responseParts],
+                size: size + partSize,
+              };
+            }
+
+            const instructionalPart: Part = {
+              functionResponse: {
+                name: 'run_shell_command',
+                response: {
+                  stdout: `[INFO] The output of the previous 'run_shell_command' (${JSON.stringify(originalCommand)}) was too large to be displayed. Please run the command again and redirect the output to a temporary file.`,
+                },
+              },
+            };
+            const instructionalPartSize = getRequestSize([instructionalPart]);
+            if (size + instructionalPartSize > truncateThreshold) {
+              // If even the instructional part would overflow, add nothing for this tool.
+              return { parts, size };
+            }
+            return {
+              parts: [...parts, instructionalPart],
+              size: size + instructionalPartSize,
+            };
+          }
+
+          return { parts: [...parts, ...responseParts], size: size + partSize };
+        },
+        { parts: [] as Part[], size: 0 },
       );
+
       const callIdsToMarkAsSubmitted = geminiTools.map(
         (toolCall) => toolCall.request.callId,
       );
@@ -1221,6 +1276,7 @@ export const useGeminiStream = (
       performMemoryRefresh,
       modelSwitchedFromQuotaError,
       addItem,
+      config,
     ],
   );
 
