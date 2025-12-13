@@ -582,6 +582,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settings.merged.security?.auth?.selectedType &&
       !settings.merged.security?.auth?.useExternal
     ) {
+      // We skip validation for Gemini API key here because it might be stored
+      // in the keychain, which we can't check synchronously.
+      // The useAuth hook handles validation for this case.
+      if (settings.merged.security.auth.selectedType === AuthType.USE_GEMINI) {
+        return;
+      }
+
       const error = validateAuthMethod(
         settings.merged.security.auth.selectedType,
       );
