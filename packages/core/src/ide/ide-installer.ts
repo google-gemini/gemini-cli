@@ -122,7 +122,7 @@ class VsCodeInstaller implements IdeInstaller {
     if (!commandPath) {
       return {
         success: false,
-        message: `${this.ideInfo.displayName} CLI not found. Please ensure 'code' is in your system's PATH. For help, see ${helpurl}. You can also install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the VS Code marketplace / Open VSX registry.`,
+        message: `${this.ideInfo.displayName} CLI not found. Please ensure '${this.ideInfo.name === 'positron' ? 'positron' : 'code'}' is in your system's PATH. For help, see ${helpurl}. You can also install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the VS Code marketplace / Open VSX registry.`,
       };
     }
 
