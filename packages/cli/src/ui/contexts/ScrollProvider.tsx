@@ -80,7 +80,17 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const register = useCallback((entry: ScrollableEntry) => {
-    setScrollables((prev) => new Map(prev).set(entry.id, entry));
+    setScrollables((prev) => {
+      // Check if entry already exists with same id - if so, just update the reference
+      // without creating a new Map to avoid unnecessary re-renders
+      const existing = prev.get(entry.id);
+      if (existing) {
+        // Update the existing entry in place to avoid Map recreation
+        prev.set(entry.id, entry);
+        return prev;
+      }
+      return new Map(prev).set(entry.id, entry);
+    });
   }, []);
 
   const unregister = useCallback((id: string) => {
