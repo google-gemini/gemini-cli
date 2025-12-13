@@ -85,6 +85,40 @@ async function findCommand(
         ),
       );
     }
+  } else if (command === 'positron' || command === 'positron.cmd') {
+    if (platform === 'darwin') {
+      // macOS
+      locations.push(
+        '/Applications/Positron.app/Contents/Resources/app/bin/positron',
+        path.join(homeDir, 'Library/Application Support/Positron/bin/positron'),
+      );
+    } else if (platform === 'linux') {
+      // Linux
+      locations.push(
+        '/usr/share/positron/bin/positron',
+        '/snap/bin/positron',
+        path.join(homeDir, '.local/share/positron/bin/positron'),
+      );
+    } else if (platform === 'win32') {
+      // Windows
+      locations.push(
+        path.join(
+          process.env['ProgramFiles'] || 'C:\\Program Files',
+          'Positron',
+          'bin',
+          'positron.cmd',
+        ),
+        path.join(
+          homeDir,
+          'AppData',
+          'Local',
+          'Programs',
+          'Positron',
+          'bin',
+          'positron.cmd',
+        ),
+      );
+    }
   }
 
   for (const location of locations) {
