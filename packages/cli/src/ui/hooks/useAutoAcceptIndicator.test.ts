@@ -26,9 +26,7 @@ import { MessageType } from '../types.js';
 vi.mock('./useKeypress.js');
 
 vi.mock('@google/gemini-cli-core', async () => {
-  const actualServerModule = (await vi.importActual(
-    '@google/gemini-cli-core',
-  )) as Record<string, unknown>;
+  const actualServerModule = await vi.importActual('@google/gemini-cli-core');
   return {
     ...actualServerModule,
     Config: vi.fn(),

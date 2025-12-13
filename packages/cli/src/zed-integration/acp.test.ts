@@ -121,8 +121,7 @@ describe('acp', () => {
         authMethods: [],
         protocolVersion: 1,
       };
-      const handler = mockConnectionConstructor.mock
-        .calls[0][0]! as MethodHandler;
+      const handler = mockConnectionConstructor.mock.calls[0][0];
       const result = await handler('initialize', initializeParams);
 
       expect(mockAgent.initialize).toHaveBeenCalledWith(initializeParams);
@@ -132,8 +131,7 @@ describe('acp', () => {
     it('should call agent.newSession when Connection handler receives session_new method', async () => {
       const newSessionParams = { cwd: '/tmp', mcpServers: [] };
       const newSessionResponse = { sessionId: 'session-1' };
-      const handler = mockConnectionConstructor.mock
-        .calls[0][0]! as MethodHandler;
+      const handler = mockConnectionConstructor.mock.calls[0][0];
       const result = await handler('session/new', newSessionParams);
 
       expect(mockAgent.newSession).toHaveBeenCalledWith(newSessionParams);
@@ -147,8 +145,7 @@ describe('acp', () => {
         sessionId: 'session-1',
       };
       const loadSessionResponse = { sessionId: 'session-1' };
-      const handler = mockConnectionConstructor.mock
-        .calls[0][0]! as MethodHandler;
+      const handler = mockConnectionConstructor.mock.calls[0][0];
       const result = await handler('session/load', loadSessionParams);
 
       expect(mockAgent.loadSession).toHaveBeenCalledWith(loadSessionParams);
@@ -162,8 +159,7 @@ describe('acp', () => {
         mcpServers: [],
         sessionId: 'session-1',
       };
-      const handler = mockConnectionConstructor.mock
-        .calls[0][0]! as MethodHandler;
+      const handler = mockConnectionConstructor.mock.calls[0][0];
       await expect(handler('session/load', loadSessionParams)).rejects.toThrow(
         RequestError.methodNotFound().message,
       );
@@ -173,8 +169,7 @@ describe('acp', () => {
       const authenticateParams = {
         methodId: 'test-auth-method',
       };
-      const handler = mockConnectionConstructor.mock
-        .calls[0][0]! as MethodHandler;
+      const handler = mockConnectionConstructor.mock.calls[0][0];
       const result = await handler('authenticate', authenticateParams);
 
       expect(mockAgent.authenticate).toHaveBeenCalledWith(authenticateParams);
@@ -191,8 +186,7 @@ describe('acp', () => {
         traceId: 'trace-1',
       };
       (mockAgent.prompt as Mock).mockResolvedValue(promptResponse);
-      const handler = mockConnectionConstructor.mock
-        .calls[0][0]! as MethodHandler;
+      const handler = mockConnectionConstructor.mock.calls[0][0];
       const result = await handler('session/prompt', promptParams);
 
       expect(mockAgent.prompt).toHaveBeenCalledWith(promptParams);
@@ -201,8 +195,7 @@ describe('acp', () => {
 
     it('should call agent.cancel when Connection handler receives session_cancel method', async () => {
       const cancelParams = { sessionId: 'session-1' };
-      const handler = mockConnectionConstructor.mock
-        .calls[0][0]! as MethodHandler;
+      const handler = mockConnectionConstructor.mock.calls[0][0];
       const result = await handler('session/cancel', cancelParams);
 
       expect(mockAgent.cancel).toHaveBeenCalledWith(cancelParams);
@@ -210,8 +203,7 @@ describe('acp', () => {
     });
 
     it('should throw methodNotFound for unknown methods', async () => {
-      const handler = mockConnectionConstructor.mock
-        .calls[0][0]! as MethodHandler;
+      const handler = mockConnectionConstructor.mock.calls[0][0];
       await expect(handler('unknown_method', {})).rejects.toThrow(
         RequestError.methodNotFound().message,
       );
@@ -248,7 +240,7 @@ describe('acp', () => {
       const response = {
         outcome: { outcome: 'selected', optionId: 'option-1' },
       };
-      (connectionInstance.sendRequest as Mock).mockResolvedValue(response);
+      connectionInstance.sendRequest.mockResolvedValue(response);
 
       const result = await agentSideConnection.requestPermission(params);
       expect(connectionInstance.sendRequest).toHaveBeenCalledWith(
@@ -261,7 +253,7 @@ describe('acp', () => {
     it('should send readTextFile request via connection', async () => {
       const params = { path: '/a/b.txt', sessionId: 'session-1' };
       const response = { content: 'file content' };
-      (connectionInstance.sendRequest as Mock).mockResolvedValue(response);
+      connectionInstance.sendRequest.mockResolvedValue(response);
 
       const result = await agentSideConnection.readTextFile(params);
       expect(connectionInstance.sendRequest).toHaveBeenCalledWith(
@@ -278,7 +270,7 @@ describe('acp', () => {
         sessionId: 'session-1',
       };
       const response = { success: true };
-      (connectionInstance.sendRequest as Mock).mockResolvedValue(response);
+      connectionInstance.sendRequest.mockResolvedValue(response);
 
       const result = await agentSideConnection.writeTextFile(params);
       expect(connectionInstance.sendRequest).toHaveBeenCalledWith(

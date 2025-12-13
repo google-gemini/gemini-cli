@@ -231,7 +231,7 @@ describe('commandUtils', () => {
       const expected = `${ESC}]52;c;${b64}${BEL}`;
 
       expect(tty.write).toHaveBeenCalledTimes(1);
-      expect((tty.write as Mock).mock.calls[0][0]).toBe(expected);
+      expect(tty.write.mock.calls[0][0]).toBe(expected);
       expect(tty.end).toHaveBeenCalledTimes(1); // /dev/tty closed after write
       expect(mockClipboardyWrite).not.toHaveBeenCalled();
     });
@@ -245,7 +245,7 @@ describe('commandUtils', () => {
 
       await copyToClipboard(testText);
 
-      const written = (tty.write as Mock).mock.calls[0][0] as string;
+      const written = tty.write.mock.calls[0][0] as string;
       // Starts with tmux DCS wrapper and ends with ST
       expect(written.startsWith(`${ESC}Ptmux;`)).toBe(true);
       expect(written.endsWith(ST)).toBe(true);
@@ -264,7 +264,7 @@ describe('commandUtils', () => {
 
       await copyToClipboard(testText);
 
-      const written = (tty.write as Mock).mock.calls[0][0] as string;
+      const written = tty.write.mock.calls[0][0] as string;
       const chunkStarts = (written.match(new RegExp(`${ESC}P`, 'g')) || [])
         .length;
       const chunkEnds = written.split(ST).length - 1;

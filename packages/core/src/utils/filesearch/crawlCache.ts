@@ -40,7 +40,7 @@ export const read = (key: string): string[] | undefined => crawlCache.get(key);
 export const write = (key: string, results: string[], ttlMs: number): void => {
   // Clear any existing timer for this key to prevent premature deletion
   if (cacheTimers.has(key)) {
-    clearTimeout(cacheTimers.get(key)!);
+    clearTimeout(cacheTimers.get(key));
   }
 
   // Store the new data

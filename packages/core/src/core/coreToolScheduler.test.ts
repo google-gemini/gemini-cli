@@ -1531,7 +1531,7 @@ describe('CoreToolScheduler request queueing', () => {
         // Capture confirmation handlers for awaiting_approval tools
         toolCalls.forEach((call) => {
           if (call.status === 'awaiting_approval') {
-            const waitingCall = call as WaitingToolCall;
+            const waitingCall = call;
             if (waitingCall.confirmationDetails?.onConfirm) {
               const originalHandler = pendingConfirmations.find(
                 (h) => h === waitingCall.confirmationDetails.onConfirm,

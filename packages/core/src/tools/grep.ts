@@ -523,7 +523,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const allMatches: GrepMatch[] = [];
 
       for await (const filePath of filesStream) {
-        const fileAbsolutePath = filePath as string;
+        const fileAbsolutePath = filePath;
         try {
           const content = await fsPromises.readFile(fileAbsolutePath, 'utf8');
           const lines = content.split(/\r?\n/);

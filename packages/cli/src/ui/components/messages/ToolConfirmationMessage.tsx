@@ -11,8 +11,6 @@ import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import type {
   ToolCallConfirmationDetails,
-  ToolExecuteConfirmationDetails,
-  ToolMcpConfirmationDetails,
   Config,
 } from '@google/gemini-cli-core';
 import { IdeClient, ToolConfirmationOutcome } from '@google/gemini-cli-core';
@@ -135,8 +133,7 @@ export const ToolConfirmationMessage: React.FC<
         });
       }
     } else if (confirmationDetails.type === 'exec') {
-      const executionProps =
-        confirmationDetails as ToolExecuteConfirmationDetails;
+      const executionProps = confirmationDetails;
 
       question = `Allow execution of: '${executionProps.rootCommand}'?`;
       options.push({
@@ -187,7 +184,7 @@ export const ToolConfirmationMessage: React.FC<
       });
     } else {
       // mcp tool confirmation
-      const mcpProps = confirmationDetails as ToolMcpConfirmationDetails;
+      const mcpProps = confirmationDetails;
       question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
       options.push({
         label: 'Yes, allow once',
@@ -258,8 +255,7 @@ export const ToolConfirmationMessage: React.FC<
         );
       }
     } else if (confirmationDetails.type === 'exec') {
-      const executionProps =
-        confirmationDetails as ToolExecuteConfirmationDetails;
+      const executionProps = confirmationDetails;
       let bodyContentHeight = availableBodyContentHeight();
       if (bodyContentHeight !== undefined) {
         bodyContentHeight -= 2; // Account for padding;
@@ -312,7 +308,7 @@ export const ToolConfirmationMessage: React.FC<
       );
     } else {
       // mcp tool confirmation
-      const mcpProps = confirmationDetails as ToolMcpConfirmationDetails;
+      const mcpProps = confirmationDetails;
 
       bodyContent = (
         <Box flexDirection="column">

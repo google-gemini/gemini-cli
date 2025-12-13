@@ -747,8 +747,8 @@ export class Task {
       return false;
     }
 
-    const callId = part.data['callId'] as string;
-    const outcomeString = part.data['outcome'] as string;
+    const callId = part.data['callId'];
+    const outcomeString = part.data['outcome'];
     let confirmationOutcome: ToolConfirmationOutcome | undefined;
 
     if (outcomeString === 'proceed_once') {
