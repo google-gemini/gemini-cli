@@ -5,7 +5,7 @@
  */
 
 /**
- * Parses custom headers and returns a map of key and vallues
+ * Parses custom headers and returns a map of key and values
  */
 export function parseCustomHeaders(
   envValue: string | undefined,

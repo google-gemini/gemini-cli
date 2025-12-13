@@ -64,7 +64,7 @@ Follow these steps:
       state from within a `setState`. Make sure to comment about absolutely
       every case like this as these cases have introduced multiple bugs in the
       past. Typically these cases should be resolved using a reducer although
-      occassionally other techniques such as useRef are appropriate. Consider
+      occasionally other techniques such as useRef are appropriate. Consider
       suggesting that jacob314@ be tagged on the code review if the solution is
       not 100% obvious.
     * Whether code might introduce an infinite rendering loop in React.
