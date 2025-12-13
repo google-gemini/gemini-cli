@@ -24,7 +24,6 @@ export class HookSystem {
   private readonly hookAggregator: HookAggregator;
   private readonly hookPlanner: HookPlanner;
   private readonly hookEventHandler: HookEventHandler;
-  private initialized = false;
 
   constructor(config: Config) {
     const logger: Logger = logs.getLogger(SERVICE_NAME);
@@ -49,12 +48,7 @@ export class HookSystem {
    * Initialize the hook system
    */
   async initialize(): Promise<void> {
-    if (this.initialized) {
-      return;
-    }
-
     await this.hookRegistry.initialize();
-    this.initialized = true;
     debugLogger.debug('Hook system initialized successfully');
   }
 
@@ -62,9 +56,6 @@ export class HookSystem {
    * Get the hook event bus for firing events
    */
   getEventHandler(): HookEventHandler {
-    if (!this.initialized) {
-      throw new Error('Hook system not initialized');
-    }
     return this.hookEventHandler;
   }
 
@@ -87,20 +78,5 @@ export class HookSystem {
    */
   getAllHooks(): HookRegistryEntry[] {
     return this.hookRegistry.getAllHooks();
-  }
-
-  /**
-   * Get hook system status for debugging
-   */
-  getStatus(): {
-    initialized: boolean;
-    totalHooks: number;
-  } {
-    const allHooks = this.initialized ? this.hookRegistry.getAllHooks() : [];
-
-    return {
-      initialized: this.initialized,
-      totalHooks: allHooks.length,
-    };
   }
 }
