@@ -357,8 +357,19 @@ describe('ClearcutLogger', () => {
           TERM_PROGRAM: 'vscode',
           GITHUB_SHA: undefined,
           MONOSPACE_ENV: '',
+          POSITRON: '',
         },
         expected: 'vscode',
+      },
+      {
+        name: 'Positron via TERM_PROGRAM',
+        env: {
+          TERM_PROGRAM: 'vscode',
+          GITHUB_SHA: undefined,
+          MONOSPACE_ENV: '',
+          POSITRON: '1',
+        },
+        expected: 'positron',
       },
       {
         name: 'SURFACE env var',
