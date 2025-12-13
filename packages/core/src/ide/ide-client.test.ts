@@ -959,16 +959,15 @@ describe('IdeClient', () => {
 });
 
 describe('getIdeServerHost', () => {
-  let existsSyncMock: Mock;
   let originalSshConnection: string | undefined;
   let originalVscodeRemoteSession: string | undefined;
   let originalRemoteContainers: string | undefined;
 
   beforeEach(() => {
-    existsSyncMock = vi.mocked(fs.existsSync);
     vi.mocked(fs.existsSync).mockClear();
     originalSshConnection = process.env['SSH_CONNECTION'];
-    originalVscodeRemoteSession = process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
+    originalVscodeRemoteSession =
+      process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
     originalRemoteContainers = process.env['REMOTE_CONTAINERS'];
 
     delete process.env['SSH_CONNECTION'];
@@ -984,7 +983,8 @@ describe('getIdeServerHost', () => {
       delete process.env['SSH_CONNECTION'];
     }
     if (originalVscodeRemoteSession !== undefined) {
-      process.env['VSCODE_REMOTE_CONTAINERS_SESSION'] = originalVscodeRemoteSession;
+      process.env['VSCODE_REMOTE_CONTAINERS_SESSION'] =
+        originalVscodeRemoteSession;
     } else {
       delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
     }
@@ -1038,7 +1038,9 @@ describe('getIdeServerHost', () => {
     delete process.env['REMOTE_CONTAINERS'];
     expect(getIdeServerHost()).toBe('host.docker.internal');
     expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
-    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith('/run/.containerenv'); // Short-circuiting
+    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
+      '/run/.containerenv',
+    ); // Short-circuiting
   });
 
   it('should return 127.0.0.1 when in .dockerenv container and SSH_CONNECTION is set', () => {
@@ -1048,7 +1050,9 @@ describe('getIdeServerHost', () => {
     delete process.env['REMOTE_CONTAINERS'];
     expect(getIdeServerHost()).toBe('127.0.0.1');
     expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
-    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith('/run/.containerenv'); // Short-circuiting
+    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
+      '/run/.containerenv',
+    ); // Short-circuiting
   });
 
   it('should return 127.0.0.1 when in .dockerenv container and VSCODE_REMOTE_CONTAINERS_SESSION is set', () => {
@@ -1057,7 +1061,9 @@ describe('getIdeServerHost', () => {
     process.env['VSCODE_REMOTE_CONTAINERS_SESSION'] = 'some_session_id';
     expect(getIdeServerHost()).toBe('127.0.0.1');
     expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
-    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith('/run/.containerenv'); // Short-circuiting
+    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
+      '/run/.containerenv',
+    ); // Short-circuiting
   });
 
   it('should return host.docker.internal when in .containerenv container and no SSH_CONNECTION or Dev Container env vars', () => {
@@ -1096,7 +1102,9 @@ describe('getIdeServerHost', () => {
     delete process.env['REMOTE_CONTAINERS'];
     expect(getIdeServerHost()).toBe('host.docker.internal');
     expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
-    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith('/run/.containerenv'); // Short-circuiting
+    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
+      '/run/.containerenv',
+    ); // Short-circuiting
   });
 
   it('should return 127.0.0.1 when in both containers and SSH_CONNECTION is set', () => {
@@ -1106,7 +1114,9 @@ describe('getIdeServerHost', () => {
     delete process.env['REMOTE_CONTAINERS'];
     expect(getIdeServerHost()).toBe('127.0.0.1');
     expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
-    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith('/run/.containerenv'); // Short-circuiting
+    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
+      '/run/.containerenv',
+    ); // Short-circuiting
   });
 
   it('should return 127.0.0.1 when in both containers and VSCODE_REMOTE_CONTAINERS_SESSION is set', () => {
@@ -1115,6 +1125,8 @@ describe('getIdeServerHost', () => {
     process.env['VSCODE_REMOTE_CONTAINERS_SESSION'] = 'some_session_id';
     expect(getIdeServerHost()).toBe('127.0.0.1');
     expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
-    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith('/run/.containerenv'); // Short-circuiting
+    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
+      '/run/.containerenv',
+    ); // Short-circuiting
   });
 });
