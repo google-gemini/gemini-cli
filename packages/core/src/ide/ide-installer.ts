@@ -51,39 +51,88 @@ async function findCommand(
   const locations: string[] = [];
   const homeDir = os.homedir();
 
+  interface AppConfigEntry {
+    mac?: { appName: string; supportDirName: string };
+    win?: { appName: string; appBinary: string };
+    linux?: { appBinary: string };
+  }
+
+  interface AppConfigs {
+    code: AppConfigEntry;
+    positron: AppConfigEntry;
+  }
+
+  const appConfigs: AppConfigs = {
+    code: {
+      mac: { appName: 'Visual Studio Code', supportDirName: 'Code' },
+      win: { appName: 'Microsoft VS Code', appBinary: 'code.cmd' },
+      linux: { appBinary: 'code' },
+    },
+    positron: {
+      mac: { appName: 'Positron', supportDirName: 'Positron' },
+      win: { appName: 'Positron', appBinary: 'positron.cmd' },
+      linux: { appBinary: 'positron' },
+    },
+  };
+
+  type AppName = keyof typeof appConfigs;
+  let appname: AppName | undefined;
+
   if (command === 'code' || command === 'code.cmd') {
+    appname = 'code';
+  } else if (command === 'positron' || command === 'positron.cmd') {
+    appname = 'positron';
+  }
+
+  if (appname) {
     if (platform === 'darwin') {
       // macOS
-      locations.push(
-        '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
-        path.join(homeDir, 'Library/Application Support/Code/bin/code'),
-      );
+      const macConfig = appConfigs[appname].mac;
+      if (macConfig) {
+        locations.push(
+          `/Applications/${macConfig.appName}.app/Contents/Resources/app/bin/${appname}`,
+          path.join(
+            homeDir,
+            `Library/Application Support/${macConfig.supportDirName}/bin/${appname}`,
+          ),
+        );
+      }
     } else if (platform === 'linux') {
       // Linux
-      locations.push(
-        '/usr/share/code/bin/code',
-        '/snap/bin/code',
-        path.join(homeDir, '.local/share/code/bin/code'),
-      );
+      const linuxConfig = appConfigs[appname]?.linux;
+      if (linuxConfig) {
+        locations.push(
+          `/usr/share/${linuxConfig.appBinary}/bin/${linuxConfig.appBinary}`,
+          `/snap/bin/${linuxConfig.appBinary}`,
+          path.join(
+            homeDir,
+            `.local/share/${linuxConfig.appBinary}/bin/${linuxConfig.appBinary}`,
+          ),
+        );
+      }
     } else if (platform === 'win32') {
       // Windows
-      locations.push(
-        path.join(
-          process.env['ProgramFiles'] || 'C:\\Program Files',
-          'Microsoft VS Code',
-          'bin',
-          'code.cmd',
-        ),
-        path.join(
-          homeDir,
-          'AppData',
-          'Local',
-          'Programs',
-          'Microsoft VS Code',
-          'bin',
-          'code.cmd',
-        ),
-      );
+      const winConfig = appConfigs[appname].win;
+      if (winConfig) {
+        const winAppName = winConfig.appName;
+        locations.push(
+          path.join(
+            process.env['ProgramFiles'] || 'C:\\Program Files',
+            winAppName,
+            'bin',
+            winConfig.appBinary,
+          ),
+          path.join(
+            homeDir,
+            'AppData',
+            'Local',
+            'Programs',
+            winAppName,
+            'bin',
+            winConfig.appBinary,
+          ),
+        );
+      }
     }
   }
 
@@ -96,23 +145,35 @@ async function findCommand(
   return null;
 }
 
-class VsCodeInstaller implements IdeInstaller {
+class VscodeFamilyInstaller implements IdeInstaller {
   private vsCodeCommand: Promise<string | null>;
+  private readonly vscodeexec: string;
 
   constructor(
     readonly ideInfo: IdeInfo,
     readonly platform = process.platform,
   ) {
-    const command = platform === 'win32' ? 'code.cmd' : 'code';
+    this.vscodeexec = ideInfo.name === 'positron' ? 'positron' : 'code';
+    const command =
+      platform === 'win32' ? this.vscodeexec + '.cmd' : this.vscodeexec;
     this.vsCodeCommand = findCommand(command, platform);
   }
 
   async install(): Promise<InstallResult> {
     const commandPath = await this.vsCodeCommand;
+
+    let helpurl: string;
+    if (this.ideInfo.name === 'positron') {
+      helpurl = 'https://positron.posit.co/add-to-path.html';
+    } else {
+      helpurl =
+        'https://code.visualstudio.com/docs/configure/command-line#_code-is-not-recognized-as-an-internal-or-external-command';
+    }
+
     if (!commandPath) {
       return {
         success: false,
-        message: `${this.ideInfo.displayName} CLI not found. Please ensure 'code' is in your system's PATH. For help, see https://code.visualstudio.com/docs/configure/command-line#_code-is-not-recognized-as-an-internal-or-external-command. You can also install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the VS Code marketplace.`,
+        message: `${this.ideInfo.displayName} CLI not found. Please ensure '${this.vscodeexec}' is in your system's PATH. For help, see ${helpurl}. You can also install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the VS Code marketplace / Open VSX registry.`,
       };
     }
 
@@ -206,7 +267,9 @@ export function getIdeInstaller(
   switch (ide.name) {
     case IDE_DEFINITIONS.vscode.name:
     case IDE_DEFINITIONS.firebasestudio.name:
-      return new VsCodeInstaller(ide, platform);
+      return new VscodeFamilyInstaller(ide, platform);
+    case IDE_DEFINITIONS.positron.name:
+      return new VscodeFamilyInstaller(ide, platform);
     case IDE_DEFINITIONS.antigravity.name:
       return new AntigravityInstaller(ide, platform);
     default:
