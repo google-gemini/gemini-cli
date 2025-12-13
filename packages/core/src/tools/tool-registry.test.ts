@@ -14,6 +14,8 @@ import { ApprovalMode } from '../policy/types.js';
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
+import { ListResourcesTool } from './mcp-list-resources-tool.js';
+import { ReadResourceTool } from './mcp-read-resource-tool.js';
 import type { FunctionDeclaration, CallableTool } from '@google/genai';
 import { mcpToTool } from '@google/genai';
 import { spawn } from 'node:child_process';
@@ -22,6 +24,8 @@ import fs from 'node:fs';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { ResourceRegistry } from '../resources/resource-registry.js';
+import type { Resource } from '@modelcontextprotocol/sdk/types.js';
 
 vi.mock('node:fs');
 
@@ -338,6 +342,39 @@ describe('ToolRegistry', () => {
 
       // Assert that the returned array contains all tool names
       expect(toolNames).toEqual(['c-tool', 'a-tool', 'b-tool']);
+    });
+  });
+
+  describe('MCP resource tools', () => {
+    it('should only expose resource tools when MCP resources exist', () => {
+      const resourceRegistry = new ResourceRegistry();
+      vi.spyOn(config, 'getResourceRegistry').mockReturnValue(resourceRegistry);
+
+      const listResourcesTool = new ListResourcesTool(config);
+      const readResourceTool = new ReadResourceTool(config);
+      toolRegistry.registerTool(listResourcesTool);
+      toolRegistry.registerTool(readResourceTool);
+
+      expect(toolRegistry.getTool('list_resources')).toBeUndefined();
+      expect(toolRegistry.getTool('read_resource')).toBeUndefined();
+      expect(toolRegistry.getAllToolNames()).not.toContain('list_resources');
+      expect(toolRegistry.getAllToolNames()).not.toContain('read_resource');
+
+      const testResource: Resource = {
+        uri: 'file:///tmp/foo.txt',
+        name: 'foo',
+      };
+      resourceRegistry.setResourcesForServer('server-a', [testResource]);
+
+      expect(toolRegistry.getTool('list_resources')).toBeDefined();
+      expect(toolRegistry.getTool('read_resource')).toBeDefined();
+      expect(toolRegistry.getAllToolNames()).toContain('list_resources');
+      expect(toolRegistry.getAllToolNames()).toContain('read_resource');
+
+      resourceRegistry.clear();
+
+      expect(toolRegistry.getTool('list_resources')).toBeUndefined();
+      expect(toolRegistry.getTool('read_resource')).toBeUndefined();
     });
   });
 
