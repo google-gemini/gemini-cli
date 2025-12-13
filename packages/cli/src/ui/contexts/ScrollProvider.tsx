@@ -135,40 +135,47 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-  const handleScroll = (direction: 'up' | 'down', mouseEvent: MouseEvent) => {
-    const delta = direction === 'up' ? -1 : 1;
-    const candidates = findScrollableCandidates(
-      mouseEvent,
-      scrollablesRef.current,
-    );
+  // Scroll 3 lines per scroll event for smoother trackpad/mouse wheel scrolling
+  const SCROLL_LINES_PER_EVENT = 3;
 
-    for (const candidate of candidates) {
-      const { scrollTop, scrollHeight, innerHeight } =
-        candidate.getScrollState();
-      const pendingDelta = pendingScrollsRef.current.get(candidate.id) || 0;
-      const effectiveScrollTop = scrollTop + pendingDelta;
+  const handleScroll = useCallback(
+    (direction: 'up' | 'down', mouseEvent: MouseEvent) => {
+      const delta =
+        direction === 'up' ? -SCROLL_LINES_PER_EVENT : SCROLL_LINES_PER_EVENT;
+      const candidates = findScrollableCandidates(
+        mouseEvent,
+        scrollablesRef.current,
+      );
 
-      // Epsilon to handle floating point inaccuracies.
-      const canScrollUp = effectiveScrollTop > 0.001;
-      const canScrollDown =
-        effectiveScrollTop < scrollHeight - innerHeight - 0.001;
+      for (const candidate of candidates) {
+        const { scrollTop, scrollHeight, innerHeight } =
+          candidate.getScrollState();
+        const pendingDelta = pendingScrollsRef.current.get(candidate.id) || 0;
+        const effectiveScrollTop = scrollTop + pendingDelta;
 
-      if (direction === 'up' && canScrollUp) {
-        pendingScrollsRef.current.set(candidate.id, pendingDelta + delta);
-        scheduleFlush();
-        return true;
+        // Epsilon to handle floating point inaccuracies.
+        const canScrollUp = effectiveScrollTop > 0.001;
+        const canScrollDown =
+          effectiveScrollTop < scrollHeight - innerHeight - 0.001;
+
+        if (direction === 'up' && canScrollUp) {
+          pendingScrollsRef.current.set(candidate.id, pendingDelta + delta);
+          scheduleFlush();
+          return true;
+        }
+
+        if (direction === 'down' && canScrollDown) {
+          pendingScrollsRef.current.set(candidate.id, pendingDelta + delta);
+          scheduleFlush();
+          return true;
+        }
       }
+      return false;
+    },
+    [scheduleFlush],
+  );
 
-      if (direction === 'down' && canScrollDown) {
-        pendingScrollsRef.current.set(candidate.id, pendingDelta + delta);
-        scheduleFlush();
-        return true;
-      }
-    }
-    return false;
-  };
-
-  const handleLeftPress = (mouseEvent: MouseEvent) => {
+  const handleLeftPress = useCallback((mouseEvent: MouseEvent) => {
     // Check for scrollbar interaction first
     for (const entry of scrollablesRef.current.values()) {
       if (!entry.ref.current || !entry.hasFocus()) {
@@ -268,9 +275,9 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       return false;
     }
     return false;
-  };
+  }, []);
 
-  const handleMove = (mouseEvent: MouseEvent) => {
+  const handleMove = useCallback((mouseEvent: MouseEvent) => {
     const state = dragStateRef.current;
     if (!state.active || !state.id) return false;
 
@@ -313,9 +320,9 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       entry.scrollBy(targetScrollTop - scrollTop);
     }
     return true;
-  };
+  }, []);
 
-  const handleLeftRelease = () => {
+  const handleLeftRelease = useCallback(() => {
     if (dragStateRef.current.active) {
       dragStateRef.current = {
         active: false,
@@ -325,9 +332,9 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       return true;
     }
     return false;
-  };
+  }, []);
 
-  useMouse(
+  const mouseHandler = useCallback(
     (event: MouseEvent) => {
       if (event.name === 'scroll-up') {
         return handleScroll('up', event);
@@ -342,8 +349,10 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       return false;
     },
-    { isActive: true },
+    [handleScroll, handleLeftPress, handleMove, handleLeftRelease],
   );
+
+  useMouse(mouseHandler, { isActive: true });
 
   const contextValue = useMemo(
     () => ({ register, unregister }),
