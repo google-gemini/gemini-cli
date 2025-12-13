@@ -85,7 +85,6 @@ async function writePortAndWorkspace({
     authToken,
   });
 
-  log(`Creating dicrectory: ${path.dirname(portFile)}`);
   log(`Writing port file to: ${portFile}`);
 
   try {
