@@ -11,6 +11,7 @@ import { getProjectHash } from '../utils/paths.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import writeFileAtomic from 'write-file-atomic';
 import type {
   PartListUnion,
   GenerateContentResponseUsageMetadata,
@@ -418,7 +419,9 @@ export class ChatRecordingService {
         conversation.lastUpdated = new Date().toISOString();
         const newContent = JSON.stringify(conversation, null, 2);
         this.cachedLastConvData = newContent;
-        fs.writeFileSync(this.conversationFile, newContent);
+        // Use atomic write (temp file + rename) to prevent partial reads
+        // by external tools polling this file during active sessions
+        writeFileAtomic.sync(this.conversationFile, newContent);
       }
     } catch (error) {
       debugLogger.error('Error writing conversation file.', error);
