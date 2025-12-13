@@ -264,7 +264,7 @@ export class Turn {
         }
 
         // Assuming other events are chunks with a `value` property
-        const resp = streamEvent.value as GenerateContentResponse;
+        const resp = streamEvent.value;
         if (!resp) continue; // Skip if there's no response body
 
         this.debugResponses.push(resp);
@@ -374,7 +374,7 @@ export class Turn {
       fnCall.id ??
       `${fnCall.name}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const name = fnCall.name || 'undefined_tool_name';
-    const args = (fnCall.args || {}) as Record<string, unknown>;
+    const args = fnCall.args || {};
 
     const toolCallRequest: ToolCallRequestInfo = {
       callId,
