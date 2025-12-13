@@ -5,9 +5,8 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
-import Gradient from 'ink-gradient';
-import { theme } from '../semantic-colors.js';
+import { Box } from 'ink';
+import { ThemedGradient } from './ThemedGradient.js';
 import {
   shortAsciiLogo,
   longAsciiLogo,
@@ -25,26 +24,6 @@ interface HeaderProps {
   version: string;
   nightly: boolean;
 }
-
-const ThemedGradient: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
-  const gradient = theme.ui.gradient;
-
-  if (gradient && gradient.length >= 2) {
-    return (
-      <Gradient colors={gradient}>
-        <Text>{children}</Text>
-      </Gradient>
-    );
-  }
-
-  if (gradient && gradient.length === 1) {
-    return <Text color={gradient[0]}>{children}</Text>;
-  }
-
-  return <Text>{children}</Text>;
-};
 
 export const Header: React.FC<HeaderProps> = ({
   customAsciiArt,

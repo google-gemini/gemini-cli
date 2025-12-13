@@ -1,28 +1,28 @@
-# IDE Integration
+# IDE integration
 
 Gemini CLI can integrate with your IDE to provide a more seamless and
 context-aware experience. This integration allows the CLI to understand your
 workspace better and enables powerful features like native in-editor diffing.
 
-Currently, the only supported IDE is
-[Visual Studio Code](https://code.visualstudio.com/) and other editors that
+Currently, the supported IDEs are [Antigravity](https://antigravity.google),
+[Visual Studio Code](https://code.visualstudio.com/), and other editors that
 support VS Code extensions. To build support for other editors, see the
 [IDE Companion Extension Spec](./ide-companion-spec.md).
 
 ## Features
 
-- **Workspace Context:** The CLI automatically gains awareness of your workspace
+- **Workspace context:** The CLI automatically gains awareness of your workspace
   to provide more relevant and accurate responses. This context includes:
   - The **10 most recently accessed files** in your workspace.
   - Your active cursor position.
   - Any text you have selected (up to a 16KB limit; longer selections will be
     truncated).
 
-- **Native Diffing:** When Gemini suggests code modifications, you can view the
+- **Native diffing:** When Gemini suggests code modifications, you can view the
   changes directly within your IDE's native diff viewer. This allows you to
   review, edit, and accept or reject the suggested changes seamlessly.
 
-- **VS Code Commands:** You can access Gemini CLI features directly from the VS
+- **VS Code commands:** You can access Gemini CLI features directly from the VS
   Code Command Palette (`Cmd+Shift+P` or `Ctrl+Shift+P`):
   - `Gemini CLI: Run`: Starts a new Gemini CLI session in the integrated
     terminal.
@@ -32,18 +32,18 @@ support VS Code extensions. To build support for other editors, see the
   - `Gemini CLI: View Third-Party Notices`: Displays the third-party notices for
     the extension.
 
-## Installation and Setup
+## Installation and setup
 
 There are three ways to set up the IDE integration:
 
-### 1. Automatic Nudge (Recommended)
+### 1. Automatic nudge (recommended)
 
 When you run Gemini CLI inside a supported editor, it will automatically detect
 your environment and prompt you to connect. Answering "Yes" will automatically
 run the necessary setup, which includes installing the companion extension and
 enabling the connection.
 
-### 2. Manual Installation from CLI
+### 2. Manual installation from CLI
 
 If you previously dismissed the prompt or want to install the extension
 manually, you can run the following command inside Gemini CLI:
@@ -54,13 +54,13 @@ manually, you can run the following command inside Gemini CLI:
 
 This will find the correct extension for your IDE and install it.
 
-### 3. Manual Installation from a Marketplace
+### 3. Manual installation from a marketplace
 
 You can also install the extension directly from a marketplace.
 
 - **For Visual Studio Code:** Install from the
   [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=google.gemini-cli-vscode-ide-companion).
-- **For VS Code Forks:** To support forks of VS Code, the extension is also
+- **For VS Code forks:** To support forks of VS Code, the extension is also
   published on the
   [Open VSX Registry](https://open-vsx.org/extension/google/gemini-cli-vscode-ide-companion).
   Follow your editor's instructions for installing extensions from this
@@ -75,7 +75,7 @@ You can also install the extension directly from a marketplace.
 
 ## Usage
 
-### Enabling and Disabling
+### Enabling and disabling
 
 You can control the IDE integration from within the CLI:
 
@@ -91,7 +91,7 @@ You can control the IDE integration from within the CLI:
 When enabled, Gemini CLI will automatically attempt to connect to the IDE
 companion extension.
 
-### Checking the Status
+### Checking the status
 
 To check the connection status and see the context the CLI has received from the
 IDE, run:
@@ -106,7 +106,7 @@ recently opened files it is aware of.
 > [!NOTE] The file list is limited to 10 recently accessed files within your
 > workspace and only includes local files on disk.)
 
-### Working with Diffs
+### Working with diffs
 
 When you ask Gemini to modify a file, it can open a diff view directly in your
 editor.
@@ -131,14 +131,14 @@ accepting them.
 If you select ‘Yes, allow always’ in the CLI, changes will no longer show up in
 the IDE as they will be auto-accepted.
 
-## Using with Sandboxing
+## Using with sandboxing
 
 If you are using Gemini CLI within a sandbox, please be aware of the following:
 
 - **On macOS:** The IDE integration requires network access to communicate with
   the IDE companion extension. You must use a Seatbelt profile that allows
   network access.
-- **In a Docker Container:** If you run Gemini CLI inside a Docker (or Podman)
+- **In a Docker container:** If you run Gemini CLI inside a Docker (or Podman)
   container, the IDE integration can still connect to the VS Code extension
   running on your host machine. The CLI is configured to automatically find the
   IDE server on `host.docker.internal`. No special configuration is usually
@@ -150,7 +150,7 @@ If you are using Gemini CLI within a sandbox, please be aware of the following:
 If you encounter issues with IDE integration, here are some common error
 messages and how to resolve them.
 
-### Connection Errors
+### Connection errors
 
 - **Message:**
   `🔴 Disconnected: Failed to connect to IDE companion extension in [IDE Name]. Please ensure the extension is running. To install the extension, run /ide install.`
@@ -170,7 +170,7 @@ messages and how to resolve them.
   - **Solution:** Run `/ide enable` to try and reconnect. If the issue
     continues, open a new terminal window or restart your IDE.
 
-### Configuration Errors
+### Configuration errors
 
 - **Message:**
   `🔴 Disconnected: Directory mismatch. Gemini CLI is running in a different location than the open workspace in [IDE Name]. Please run the CLI from one of the following directories: [List of directories]`
@@ -184,14 +184,14 @@ messages and how to resolve them.
   - **Cause:** You have no workspace open in your IDE.
   - **Solution:** Open a workspace in your IDE and restart the CLI.
 
-### General Errors
+### General errors
 
 - **Message:**
   `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: [List of IDEs]`
   - **Cause:** You are running Gemini CLI in a terminal or environment that is
     not a supported IDE.
   - **Solution:** Run Gemini CLI from the integrated terminal of a supported
-    IDE, like VS Code.
+    IDE, like Antigravity or VS Code.
 
 - **Message:**
   `No installer is available for IDE. Please install the Gemini CLI Companion extension manually from the marketplace.`

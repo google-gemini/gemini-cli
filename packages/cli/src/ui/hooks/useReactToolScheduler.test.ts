@@ -29,7 +29,6 @@ describe('useReactToolScheduler', () => {
   it('only creates one instance of CoreToolScheduler even if props change', () => {
     const onComplete = vi.fn();
     const getPreferredEditor = vi.fn();
-    const onEditorClose = vi.fn();
     const config = {} as Config;
 
     const { rerender } = renderHook(
@@ -38,14 +37,12 @@ describe('useReactToolScheduler', () => {
           props.onComplete,
           props.config,
           props.getPreferredEditor,
-          props.onEditorClose,
         ),
       {
         initialProps: {
           onComplete,
           config,
           getPreferredEditor,
-          onEditorClose,
         },
       },
     );
@@ -58,7 +55,6 @@ describe('useReactToolScheduler', () => {
       onComplete: newOnComplete,
       config,
       getPreferredEditor,
-      onEditorClose,
     });
     expect(mockCoreToolScheduler).toHaveBeenCalledTimes(1);
 
@@ -68,17 +64,13 @@ describe('useReactToolScheduler', () => {
       onComplete: newOnComplete,
       config,
       getPreferredEditor: newGetPreferredEditor,
-      onEditorClose,
     });
     expect(mockCoreToolScheduler).toHaveBeenCalledTimes(1);
 
-    // Rerender with a new onEditorClose function
-    const newOnEditorClose = vi.fn();
     rerender({
       onComplete: newOnComplete,
       config,
       getPreferredEditor: newGetPreferredEditor,
-      onEditorClose: newOnEditorClose,
     });
     expect(mockCoreToolScheduler).toHaveBeenCalledTimes(1);
   });

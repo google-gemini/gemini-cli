@@ -62,7 +62,7 @@ export async function runInDevTraceSpan<R>(
   const { name: spanName, noAutoEnd, ...restOfSpanOpts } = opts;
   if (process.env['GEMINI_DEV_TRACING'] !== 'true') {
     // If GEMINI_DEV_TRACING env var not set, we do not trace.
-    return await fn({
+    return fn({
       metadata: {
         name: spanName,
         attributes: {},
@@ -74,66 +74,62 @@ export async function runInDevTraceSpan<R>(
   }
 
   const tracer = trace.getTracer(TRACER_NAME, TRACER_VERSION);
-  return await tracer.startActiveSpan(
-    opts.name,
-    restOfSpanOpts,
-    async (span) => {
-      const meta: SpanMetadata = {
-        name: spanName,
-        attributes: {},
-      };
-      const endSpan = () => {
-        try {
-          if (meta.input !== undefined) {
-            span.setAttribute('input-json', safeJsonStringify(meta.input));
-          }
-          if (meta.output !== undefined) {
-            span.setAttribute('output-json', safeJsonStringify(meta.output));
-          }
-          for (const [key, value] of Object.entries(meta.attributes)) {
-            span.setAttribute(key, value as AttributeValue);
-          }
-          if (meta.error) {
-            span.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: getErrorMessage(meta.error),
-            });
-            if (meta.error instanceof Error) {
-              span.recordException(meta.error);
-            }
-          } else {
-            span.setStatus({ code: SpanStatusCode.OK });
-          }
-        } catch (e) {
-          // Log the error but don't rethrow, to ensure span.end() is called.
-          diag.error('Error setting span attributes in endSpan', e);
+  return tracer.startActiveSpan(opts.name, restOfSpanOpts, async (span) => {
+    const meta: SpanMetadata = {
+      name: spanName,
+      attributes: {},
+    };
+    const endSpan = () => {
+      try {
+        if (meta.input !== undefined) {
+          span.setAttribute('input-json', safeJsonStringify(meta.input));
+        }
+        if (meta.output !== undefined) {
+          span.setAttribute('output-json', safeJsonStringify(meta.output));
+        }
+        for (const [key, value] of Object.entries(meta.attributes)) {
+          span.setAttribute(key, value);
+        }
+        if (meta.error) {
           span.setStatus({
             code: SpanStatusCode.ERROR,
-            message: `Error in endSpan: ${getErrorMessage(e)}`,
+            message: getErrorMessage(meta.error),
           });
-        } finally {
-          span.end();
+          if (meta.error instanceof Error) {
+            span.recordException(meta.error);
+          }
+        } else {
+          span.setStatus({ code: SpanStatusCode.OK });
         }
-      };
-      try {
-        return await fn({ metadata: meta, endSpan });
       } catch (e) {
-        meta.error = e;
-        if (noAutoEnd) {
-          // For streaming operations, the delegated endSpan call will not be reached
-          // on an exception, so we must end the span here to prevent a leak.
-          endSpan();
-        }
-        throw e;
+        // Log the error but don't rethrow, to ensure span.end() is called.
+        diag.error('Error setting span attributes in endSpan', e);
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: `Error in endSpan: ${getErrorMessage(e)}`,
+        });
       } finally {
-        if (!noAutoEnd) {
-          // For non-streaming operations, this ensures the span is always closed,
-          // and if an error occurred, it will be recorded correctly by endSpan.
-          endSpan();
-        }
+        span.end();
       }
-    },
-  );
+    };
+    try {
+      return await fn({ metadata: meta, endSpan });
+    } catch (e) {
+      meta.error = e;
+      if (noAutoEnd) {
+        // For streaming operations, the delegated endSpan call will not be reached
+        // on an exception, so we must end the span here to prevent a leak.
+        endSpan();
+      }
+      throw e;
+    } finally {
+      if (!noAutoEnd) {
+        // For non-streaming operations, this ensures the span is always closed,
+        // and if an error occurred, it will be recorded correctly by endSpan.
+        endSpan();
+      }
+    }
+  });
 }
 
 /**

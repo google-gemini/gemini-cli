@@ -4,7 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, type MockedFunction } from 'vitest';
+import {
+  vi,
+  type MockedFunction,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -623,82 +632,60 @@ describe('extension tests', () => {
     });
 
     describe('id generation', () => {
-      it('should generate id from source for non-github git urls', async () => {
-        createExtension({
-          extensionsDir: userExtensionsDir,
-          name: 'my-ext',
-          version: '1.0.0',
+      it.each([
+        {
+          description: 'should generate id from source for non-github git urls',
           installMetadata: {
-            type: 'git',
+            type: 'git' as const,
             source: 'http://somehost.com/foo/bar',
           },
-        });
-        const extensions = await extensionManager.loadExtensions();
-        const extension = extensions.find((e) => e.name === 'my-ext');
-        expect(extension?.id).toBe(hashValue('http://somehost.com/foo/bar'));
-      });
-
-      it('should generate id from owner/repo for github http urls', async () => {
-        createExtension({
-          extensionsDir: userExtensionsDir,
-          name: 'my-ext',
-          version: '1.0.0',
+          expectedIdSource: 'http://somehost.com/foo/bar',
+        },
+        {
+          description:
+            'should generate id from owner/repo for github http urls',
           installMetadata: {
-            type: 'git',
+            type: 'git' as const,
             source: 'http://github.com/foo/bar',
           },
-        });
-
-        const extensions = await extensionManager.loadExtensions();
-        const extension = extensions.find((e) => e.name === 'my-ext');
-        expect(extension?.id).toBe(hashValue('https://github.com/foo/bar'));
-      });
-
-      it('should generate id from owner/repo for github ssh urls', async () => {
-        createExtension({
-          extensionsDir: userExtensionsDir,
-          name: 'my-ext',
-          version: '1.0.0',
+          expectedIdSource: 'https://github.com/foo/bar',
+        },
+        {
+          description: 'should generate id from owner/repo for github ssh urls',
           installMetadata: {
-            type: 'git',
+            type: 'git' as const,
             source: 'git@github.com:foo/bar',
           },
-        });
-
-        const extensions = await extensionManager.loadExtensions();
-        const extension = extensions.find((e) => e.name === 'my-ext');
-        expect(extension?.id).toBe(hashValue('https://github.com/foo/bar'));
-      });
-
-      it('should generate id from source for github-release extension', async () => {
+          expectedIdSource: 'https://github.com/foo/bar',
+        },
+        {
+          description:
+            'should generate id from source for github-release extension',
+          installMetadata: {
+            type: 'github-release' as const,
+            source: 'https://github.com/foo/bar',
+          },
+          expectedIdSource: 'https://github.com/foo/bar',
+        },
+        {
+          description:
+            'should generate id from the original source for local extension',
+          installMetadata: {
+            type: 'local' as const,
+            source: '/some/path',
+          },
+          expectedIdSource: '/some/path',
+        },
+      ])('$description', async ({ installMetadata, expectedIdSource }) => {
         createExtension({
           extensionsDir: userExtensionsDir,
           name: 'my-ext',
           version: '1.0.0',
-          installMetadata: {
-            type: 'github-release',
-            source: 'https://github.com/foo/bar',
-          },
+          installMetadata,
         });
         const extensions = await extensionManager.loadExtensions();
         const extension = extensions.find((e) => e.name === 'my-ext');
-        expect(extension?.id).toBe(hashValue('https://github.com/foo/bar'));
-      });
-
-      it('should generate id from the original source for local extension', async () => {
-        createExtension({
-          extensionsDir: userExtensionsDir,
-          name: 'local-ext-name',
-          version: '1.0.0',
-          installMetadata: {
-            type: 'local',
-            source: '/some/path',
-          },
-        });
-
-        const extensions = await extensionManager.loadExtensions();
-        const extension = extensions.find((e) => e.name === 'local-ext-name');
-        expect(extension?.id).toBe(hashValue('/some/path'));
+        expect(extension?.id).toBe(hashValue(expectedIdSource));
       });
 
       it('should generate id from the original source for linked extensions', async () => {
@@ -726,10 +713,128 @@ describe('extension tests', () => {
           name: 'no-meta-name',
           version: '1.0.0',
         });
-
         const extensions = await extensionManager.loadExtensions();
         const extension = extensions.find((e) => e.name === 'no-meta-name');
         expect(extension?.id).toBe(hashValue('no-meta-name'));
+      });
+
+      it('should load extension hooks and hydrate variables', async () => {
+        const extDir = createExtension({
+          extensionsDir: userExtensionsDir,
+          name: 'hook-extension',
+          version: '1.0.0',
+        });
+
+        const hooksDir = path.join(extDir, 'hooks');
+        fs.mkdirSync(hooksDir);
+
+        const hooksConfig = {
+          hooks: {
+            BeforeTool: [
+              {
+                matcher: '.*',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: 'echo ${extensionPath}',
+                  },
+                ],
+              },
+            ],
+          },
+        };
+
+        fs.writeFileSync(
+          path.join(hooksDir, 'hooks.json'),
+          JSON.stringify(hooksConfig),
+        );
+
+        const settings = loadSettings(tempWorkspaceDir).merged;
+        if (!settings.tools) settings.tools = {};
+        settings.tools.enableHooks = true;
+
+        extensionManager = new ExtensionManager({
+          workspaceDir: tempWorkspaceDir,
+          requestConsent: mockRequestConsent,
+          requestSetting: mockPromptForSettings,
+          settings,
+        });
+
+        const extensions = await extensionManager.loadExtensions();
+        expect(extensions).toHaveLength(1);
+        const extension = extensions[0];
+
+        expect(extension.hooks).toBeDefined();
+        expect(extension.hooks?.BeforeTool).toHaveLength(1);
+        expect(extension.hooks?.BeforeTool?.[0].hooks[0].command).toBe(
+          `echo ${extDir}`,
+        );
+      });
+
+      it('should not load hooks if enableHooks is false', async () => {
+        const extDir = createExtension({
+          extensionsDir: userExtensionsDir,
+          name: 'hook-extension-disabled',
+          version: '1.0.0',
+        });
+
+        const hooksDir = path.join(extDir, 'hooks');
+        fs.mkdirSync(hooksDir);
+        fs.writeFileSync(
+          path.join(hooksDir, 'hooks.json'),
+          JSON.stringify({ hooks: { BeforeTool: [] } }),
+        );
+
+        const settings = loadSettings(tempWorkspaceDir).merged;
+        if (!settings.tools) settings.tools = {};
+        settings.tools.enableHooks = false;
+
+        extensionManager = new ExtensionManager({
+          workspaceDir: tempWorkspaceDir,
+          requestConsent: mockRequestConsent,
+          requestSetting: mockPromptForSettings,
+          settings,
+        });
+
+        const extensions = await extensionManager.loadExtensions();
+        expect(extensions).toHaveLength(1);
+        expect(extensions[0].hooks).toBeUndefined();
+      });
+
+      it('should warn about hooks during installation', async () => {
+        const requestConsentSpy = vi.fn().mockResolvedValue(true);
+        extensionManager.setRequestConsent(requestConsentSpy);
+
+        const sourceExtDir = path.join(
+          tempWorkspaceDir,
+          'hook-extension-source',
+        );
+        fs.mkdirSync(sourceExtDir, { recursive: true });
+
+        const hooksDir = path.join(sourceExtDir, 'hooks');
+        fs.mkdirSync(hooksDir);
+        fs.writeFileSync(
+          path.join(hooksDir, 'hooks.json'),
+          JSON.stringify({ hooks: {} }),
+        );
+
+        fs.writeFileSync(
+          path.join(sourceExtDir, 'gemini-extension.json'),
+          JSON.stringify({
+            name: 'hook-extension-install',
+            version: '1.0.0',
+          }),
+        );
+
+        await extensionManager.loadExtensions();
+        await extensionManager.installOrUpdateExtension({
+          source: sourceExtDir,
+          type: 'local',
+        });
+
+        expect(requestConsentSpy).toHaveBeenCalledWith(
+          expect.stringContaining('⚠️  This extension contains Hooks'),
+        );
       });
     });
   });
@@ -1809,12 +1914,8 @@ This extension will run the following MCP servers:
     });
 
     it('should throw an error if you request system scope', async () => {
-      await expect(
-        async () =>
-          await extensionManager.disableExtension(
-            'my-extension',
-            SettingScope.System,
-          ),
+      await expect(async () =>
+        extensionManager.disableExtension('my-extension', SettingScope.System),
       ).rejects.toThrow('System and SystemDefaults scopes are not supported.');
     });
 

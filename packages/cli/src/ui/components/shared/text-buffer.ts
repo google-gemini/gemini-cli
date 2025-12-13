@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import pathMod from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
-import { unescapePath } from '@google/gemini-cli-core';
+import { coreEvents, CoreEvent } from '@google/gemini-cli-core';
 import {
   toCodePoints,
   cpLen,
@@ -17,9 +17,11 @@ import {
   stripUnsafeCharacters,
   getCachedStringWidth,
 } from '../../utils/textUtils.js';
+import { parsePastedPaths } from '../../utils/clipboardUtils.js';
 import type { Key } from '../../contexts/KeypressContext.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
+import { enableSupportedProtocol } from '../../utils/kittyProtocolDetector.js';
 
 export type Direction =
   | 'left'
@@ -30,14 +32,6 @@ export type Direction =
   | 'wordRight'
   | 'home'
   | 'end';
-
-// Simple helper for word‑wise ops.
-function isWordChar(ch: string | undefined): boolean {
-  if (ch === undefined) {
-    return false;
-  }
-  return !/[\s,.;!?]/.test(ch);
-}
 
 // Helper functions for line-based word navigation
 export const isWordCharStrict = (char: string): boolean =>
@@ -247,6 +241,51 @@ export const findWordEndInLine = (line: string, col: number): number | null => {
 
   return null;
 };
+
+// Initialize segmenter for word boundary detection
+const segmenter = new Intl.Segmenter(undefined, { granularity: 'word' });
+
+function findPrevWordBoundary(line: string, cursorCol: number): number {
+  const codePoints = toCodePoints(line);
+  // Convert cursorCol (CP index) to string index
+  const prefix = codePoints.slice(0, cursorCol).join('');
+  const cursorIdx = prefix.length;
+
+  let targetIdx = 0;
+
+  for (const seg of segmenter.segment(line)) {
+    // We want the last word start strictly before the cursor.
+    // If we've reached or passed the cursor, we stop.
+    if (seg.index >= cursorIdx) break;
+
+    if (seg.isWordLike) {
+      targetIdx = seg.index;
+    }
+  }
+
+  return toCodePoints(line.slice(0, targetIdx)).length;
+}
+
+function findNextWordBoundary(line: string, cursorCol: number): number {
+  const codePoints = toCodePoints(line);
+  const prefix = codePoints.slice(0, cursorCol).join('');
+  const cursorIdx = prefix.length;
+
+  let targetIdx = line.length;
+
+  for (const seg of segmenter.segment(line)) {
+    const segEnd = seg.index + seg.segment.length;
+
+    if (segEnd > cursorIdx) {
+      if (seg.isWordLike) {
+        targetIdx = segEnd;
+        break;
+      }
+    }
+  }
+
+  return toCodePoints(line.slice(0, targetIdx)).length;
+}
 
 // Find next word across lines
 export const findNextWordAcrossLines = (
@@ -852,7 +891,7 @@ export interface TextBufferState {
   lines: string[];
   cursorRow: number;
   cursorCol: number;
-  preferredCol: number | null; // This is visual preferred col
+  preferredCol: number | null; // This is the logical character offset in the visual line
   undoStack: UndoHistoryEntry[];
   redoStack: UndoHistoryEntry[];
   clipboard: string | null;
@@ -1200,22 +1239,7 @@ function textBufferReducerLogic(
             newCursorCol = cpLen(lines[newCursorRow] ?? '');
           } else {
             const lineContent = lines[cursorRow];
-            const arr = toCodePoints(lineContent);
-            let start = cursorCol;
-            let onlySpaces = true;
-            for (let i = 0; i < start; i++) {
-              if (isWordChar(arr[i])) {
-                onlySpaces = false;
-                break;
-              }
-            }
-            if (onlySpaces && start > 0) {
-              start--;
-            } else {
-              while (start > 0 && !isWordChar(arr[start - 1])) start--;
-              while (start > 0 && isWordChar(arr[start - 1])) start--;
-            }
-            newCursorCol = start;
+            newCursorCol = findPrevWordBoundary(lineContent, cursorCol);
           }
           return {
             ...state,
@@ -1225,26 +1249,23 @@ function textBufferReducerLogic(
           };
         }
         case 'wordRight': {
+          const lineContent = lines[cursorRow] ?? '';
           if (
             cursorRow === lines.length - 1 &&
-            cursorCol === cpLen(lines[cursorRow] ?? '')
+            cursorCol === cpLen(lineContent)
           ) {
             return state;
           }
 
           let newCursorRow = cursorRow;
           let newCursorCol = cursorCol;
-          const lineContent = lines[cursorRow] ?? '';
-          const arr = toCodePoints(lineContent);
+          const lineLen = cpLen(lineContent);
 
-          if (cursorCol >= arr.length) {
+          if (cursorCol >= lineLen) {
             newCursorRow++;
             newCursorCol = 0;
           } else {
-            let end = cursorCol;
-            while (end < arr.length && !isWordChar(arr[end])) end++;
-            while (end < arr.length && isWordChar(arr[end])) end++;
-            newCursorCol = end;
+            newCursorCol = findNextWordBoundary(lineContent, cursorCol);
           }
           return {
             ...state,
@@ -1655,8 +1676,10 @@ export function useTextBuffer({
         }
 
         potentialPath = potentialPath.trim();
-        if (isValidPath(unescapePath(potentialPath))) {
-          ch = `@${potentialPath} `;
+
+        const processed = parsePastedPaths(potentialPath, isValidPath);
+        if (processed) {
+          ch = processed;
         }
       }
 
@@ -1891,6 +1914,8 @@ export function useTextBuffer({
       } catch (err) {
         console.error('[useTextBuffer] external editor error', err);
       } finally {
+        enableSupportedProtocol();
+        coreEvents.emit(CoreEvent.ExternalEditorClosed);
         if (wasRaw) setRawMode?.(true);
         try {
           fs.unlinkSync(filePath);
@@ -2019,25 +2044,50 @@ export function useTextBuffer({
         Math.min(visRow, visualLines.length - 1),
       );
       const visualLine = visualLines[clampedVisRow] || '';
-      // Clamp visCol to the length of the visual line
-      const clampedVisCol = Math.max(0, Math.min(visCol, cpLen(visualLine)));
 
       if (visualToLogicalMap[clampedVisRow]) {
         const [logRow, logStartCol] = visualToLogicalMap[clampedVisRow];
+
+        const codePoints = toCodePoints(visualLine);
+        let currentVisX = 0;
+        let charOffset = 0;
+
+        for (const char of codePoints) {
+          const charWidth = getCachedStringWidth(char);
+          // If the click is within this character
+          if (visCol < currentVisX + charWidth) {
+            // Check if we clicked the second half of a wide character
+            if (charWidth > 1 && visCol >= currentVisX + charWidth / 2) {
+              charOffset++;
+            }
+            break;
+          }
+          currentVisX += charWidth;
+          charOffset++;
+        }
+
+        // Clamp charOffset to length
+        charOffset = Math.min(charOffset, codePoints.length);
+
         const newCursorRow = logRow;
-        const newCursorCol = logStartCol + clampedVisCol;
+        const newCursorCol = logStartCol + charOffset;
 
         dispatch({
           type: 'set_cursor',
           payload: {
             cursorRow: newCursorRow,
             cursorCol: newCursorCol,
-            preferredCol: clampedVisCol,
+            preferredCol: charOffset,
           },
         });
       }
     },
     [visualLayout],
+  );
+
+  const getOffset = useCallback(
+    (): number => logicalPosToOffset(lines, cursorRow, cursorCol),
+    [lines, cursorRow, cursorCol],
   );
 
   const returnValue: TextBuffer = useMemo(
@@ -2065,6 +2115,7 @@ export function useTextBuffer({
       replaceRange,
       replaceRangeByOffset,
       moveToOffset,
+      getOffset,
       moveToVisualPosition,
       deleteWordLeft,
       deleteWordRight,
@@ -2129,6 +2180,7 @@ export function useTextBuffer({
       replaceRange,
       replaceRangeByOffset,
       moveToOffset,
+      getOffset,
       moveToVisualPosition,
       deleteWordLeft,
       deleteWordRight,
@@ -2283,6 +2335,7 @@ export interface TextBuffer {
     endOffset: number,
     replacementText: string,
   ) => void;
+  getOffset: () => number;
   moveToOffset(offset: number): void;
   moveToVisualPosition(visualRow: number, visualCol: number): void;
 

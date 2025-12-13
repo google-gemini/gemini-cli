@@ -52,6 +52,7 @@ interface SlashCommandProcessorActions {
   openEditorDialog: () => void;
   openPrivacyNotice: () => void;
   openSettingsDialog: () => void;
+  openSessionBrowser: () => void;
   openModelDialog: () => void;
   openPermissionsDialog: (props?: { targetDirectory?: string }) => void;
   quit: (messages: HistoryItem[]) => void;
@@ -77,6 +78,7 @@ export const useSlashCommandProcessor = (
   actions: SlashCommandProcessorActions,
   extensionsUpdateState: Map<string, ExtensionUpdateStatus>,
   isConfigInitialized: boolean,
+  setBannerVisible: (visible: boolean) => void,
   setCustomDialog: (dialog: React.ReactNode | null) => void,
 ) => {
   const session = useSessionStats();
@@ -203,6 +205,7 @@ export const useSlashCommandProcessor = (
             console.clear();
           }
           refreshStatic();
+          setBannerVisible(false);
         },
         loadHistory,
         setDebugMessage: actions.setDebugMessage,
@@ -241,6 +244,7 @@ export const useSlashCommandProcessor = (
       sessionShellAllowlist,
       reloadCommands,
       extensionsUpdateState,
+      setBannerVisible,
       setCustomDialog,
     ],
   );
@@ -254,6 +258,7 @@ export const useSlashCommandProcessor = (
       reloadCommands();
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
       const ideClient = await IdeClient.getInstance();
       ideClient.addStatusChangeListener(listener);
@@ -274,6 +279,7 @@ export const useSlashCommandProcessor = (
     appEvents.on('extensionsStopping', extensionEventListener);
 
     return () => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       (async () => {
         const ideClient = await IdeClient.getInstance();
         ideClient.removeStatusChangeListener(listener);
@@ -286,6 +292,7 @@ export const useSlashCommandProcessor = (
   useEffect(() => {
     const controller = new AbortController();
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
       const commandService = await CommandService.create(
         [
@@ -308,6 +315,7 @@ export const useSlashCommandProcessor = (
       rawQuery: PartListUnion,
       oneTimeShellAllowlist?: Set<string>,
       overwriteConfirmed?: boolean,
+      addToHistory: boolean = true,
     ): Promise<SlashCommandProcessorResult | false> => {
       if (!commands) {
         return false;
@@ -323,8 +331,13 @@ export const useSlashCommandProcessor = (
 
       setIsProcessing(true);
 
-      const userMessageTimestamp = Date.now();
-      addItem({ type: MessageType.USER, text: trimmed }, userMessageTimestamp);
+      if (addToHistory) {
+        const userMessageTimestamp = Date.now();
+        addItem(
+          { type: MessageType.USER, text: trimmed },
+          userMessageTimestamp,
+        );
+      }
 
       let hasError = false;
       const {
@@ -400,6 +413,9 @@ export const useSlashCommandProcessor = (
                       return { type: 'handled' };
                     case 'privacy':
                       actions.openPrivacyNotice();
+                      return { type: 'handled' };
+                    case 'sessionBrowser':
+                      actions.openSessionBrowser();
                       return { type: 'handled' };
                     case 'settings':
                       actions.openSettingsDialog();

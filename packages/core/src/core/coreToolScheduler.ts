@@ -38,16 +38,18 @@ import {
 import * as Diff from 'diff';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import {
-  isShellInvocationAllowlisted,
-  SHELL_TOOL_NAMES,
-} from '../utils/shell-utils.js';
+import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
 import { doesToolInvocationMatch } from '../utils/tool-utils.js';
+import { isShellInvocationAllowlisted } from '../utils/shell-permissions.js';
 import levenshtein from 'fast-levenshtein';
 import { ShellToolInvocation } from '../tools/shell.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import {
+  fireToolNotificationHook,
+  executeToolWithHooks,
+} from './coreToolHookTriggers.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -329,7 +331,6 @@ interface CoreToolSchedulerOptions {
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
   getPreferredEditor: () => EditorType | undefined;
-  onEditorClose: () => void;
 }
 
 export class CoreToolScheduler {
@@ -346,7 +347,6 @@ export class CoreToolScheduler {
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
-  private onEditorClose: () => void;
   private isFinalizingToolCalls = false;
   private isScheduling = false;
   private isCancelling = false;
@@ -365,7 +365,6 @@ export class CoreToolScheduler {
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
-    this.onEditorClose = options.onEditorClose;
 
     // Subscribe to message bus for ASK_USER policy decisions
     // Use a static WeakMap to ensure we only subscribe ONCE per MessageBus instance
@@ -380,6 +379,7 @@ export class CoreToolScheduler {
         const sharedHandler = (request: ToolConfirmationRequest) => {
           // When ASK_USER policy decision is made, respond with requiresUserConfirmation=true
           // to tell tools to use their legacy confirmation flow
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           messageBus.publish({
             type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
             correlationId: request.correlationId,
@@ -506,7 +506,7 @@ export class CoreToolScheduler {
           // Preserve diff for cancelled edit operations
           let resultDisplay: ToolResultDisplay | undefined = undefined;
           if (currentCall.status === 'awaiting_approval') {
-            const waitingCall = currentCall as WaitingToolCall;
+            const waitingCall = currentCall;
             if (waitingCall.confirmationDetails.type === 'edit') {
               resultDisplay = {
                 fileDiff: waitingCall.confirmationDetails.fileDiff,
@@ -870,13 +870,22 @@ export class CoreToolScheduler {
             );
             this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
           } else {
+            // Fire Notification hook before showing confirmation to user
+            const messageBus = this.config.getMessageBus();
+            const hooksEnabled = this.config.getEnableHooks();
+            if (hooksEnabled && messageBus) {
+              await fireToolNotificationHook(messageBus, confirmationDetails);
+            }
+
             // Allow IDE to resolve confirmation
             if (
               confirmationDetails.type === 'edit' &&
               confirmationDetails.ideConfirmation
             ) {
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
               confirmationDetails.ideConfirmation.then((resolution) => {
                 if (resolution.status === 'accepted') {
+                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
                   this.handleConfirmationResponse(
                     reqInfo.callId,
                     confirmationDetails.onConfirm,
@@ -884,6 +893,7 @@ export class CoreToolScheduler {
                     signal,
                   );
                 } else {
+                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
                   this.handleConfirmationResponse(
                     reqInfo.callId,
                     confirmationDetails.onConfirm,
@@ -995,7 +1005,6 @@ export class CoreToolScheduler {
           modifyContext as ModifyContext<typeof waitingToolCall.request.args>,
           editorType,
           signal,
-          this.onEditorClose,
           contentOverrides,
         );
         this.setArgsInternal(callId, updatedParams);
@@ -1107,6 +1116,8 @@ export class CoreToolScheduler {
             : undefined;
 
         const shellExecutionConfig = this.config.getShellExecutionConfig();
+        const hooksEnabled = this.config.getEnableHooks();
+        const messageBus = this.config.getMessageBus();
 
         await runInDevTraceSpan(
           {
@@ -1131,15 +1142,23 @@ export class CoreToolScheduler {
                 );
                 this.notifyToolCallsUpdate();
               };
-              promise = invocation.execute(
+              promise = executeToolWithHooks(
+                invocation,
+                toolName,
                 signal,
+                messageBus,
+                hooksEnabled,
                 liveOutputCallback,
                 shellExecutionConfig,
                 setPidCallback,
               );
             } else {
-              promise = invocation.execute(
+              promise = executeToolWithHooks(
+                invocation,
+                toolName,
                 signal,
+                messageBus,
+                hooksEnabled,
                 liveOutputCallback,
                 shellExecutionConfig,
               );

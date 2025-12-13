@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { WritableStream, ReadableStream } from 'node:stream/web';
+import type { ReadableStream } from 'node:stream/web';
 
 import type {
   Config,
@@ -27,10 +27,11 @@ import {
   DiscoveredMCPTool,
   StreamEventType,
   ToolCallEvent,
-  DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
-  DEFAULT_GEMINI_FLASH_MODEL,
   debugLogger,
+  ReadManyFilesTool,
+  getEffectiveModel,
+  createWorkingStdio,
+  startupProfiler,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -46,32 +47,14 @@ import { randomUUID } from 'node:crypto';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
 
-/**
- * Resolves the model to use based on the current configuration.
- *
- * If the model is set to "auto", it will use the flash model if in fallback
- * mode, otherwise it will use the default model.
- */
-export function resolveModel(model: string, isInFallbackMode: boolean): string {
-  if (model === DEFAULT_GEMINI_MODEL_AUTO) {
-    return isInFallbackMode ? DEFAULT_GEMINI_FLASH_MODEL : DEFAULT_GEMINI_MODEL;
-  }
-  return model;
-}
-
 export async function runZedIntegration(
   config: Config,
   settings: LoadedSettings,
   argv: CliArgs,
 ) {
-  const stdout = Writable.toWeb(process.stdout) as WritableStream;
+  const { stdout: workingStdout } = createWorkingStdio();
+  const stdout = Writable.toWeb(workingStdout);
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
-
-  // Stdout is used to send messages to the client, so console.log/console.info
-  // messages to stderr so that they don't interfere with ACP.
-  console.log = console.error;
-  console.info = console.error;
-  console.debug = console.error;
 
   new acp.AgentSideConnection(
     (client: acp.Client) => new GeminiAgent(config, settings, argv, client),
@@ -80,7 +63,7 @@ export async function runZedIntegration(
   );
 }
 
-class GeminiAgent {
+export class GeminiAgent {
   private sessions: Map<string, Session> = new Map();
   private clientCapabilities: acp.ClientCapabilities | undefined;
 
@@ -130,8 +113,16 @@ class GeminiAgent {
 
   async authenticate({ methodId }: acp.AuthenticateRequest): Promise<void> {
     const method = z.nativeEnum(AuthType).parse(methodId);
+    const selectedAuthType = this.settings.merged.security?.auth?.selectedType;
 
-    await clearCachedCredentialFile();
+    // Only clear credentials when switching to a different auth method
+    if (selectedAuthType && selectedAuthType !== method) {
+      await clearCachedCredentialFile();
+    }
+
+    // Refresh auth with the requested method
+    // This will reuse existing credentials if they're valid,
+    // or perform new authentication if needed
     await this.config.refreshAuth(method);
     this.settings.setValue(
       SettingScope.User,
@@ -203,6 +194,7 @@ class GeminiAgent {
     const config = await loadCliConfig(settings, sessionId, this.argv, cwd);
 
     await config.initialize();
+    startupProfiler.flush(config);
     return config;
   }
 
@@ -223,7 +215,7 @@ class GeminiAgent {
   }
 }
 
-class Session {
+export class Session {
   private pendingPrompt: AbortController | null = null;
 
   constructor(
@@ -263,15 +255,16 @@ class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
+        const model = getEffectiveModel(
+          this.config.isInFallbackMode(),
+          this.config.getModel(),
+          this.config.getPreviewFeatures(),
+        );
         const responseStream = await chat.sendMessageStream(
-          resolveModel(this.config.getModel(), this.config.isInFallbackMode()),
-          {
-            message: nextMessage?.parts ?? [],
-            config: {
-              abortSignal: pendingSend.signal,
-            },
-          },
+          { model },
+          nextMessage?.parts ?? [],
           promptId,
+          pendingSend.signal,
         );
         nextMessage = null;
 
@@ -296,6 +289,7 @@ class Session {
                 text: part.text,
               };
 
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
               this.sendUpdate({
                 sessionUpdate: part.thought
                   ? 'agent_thought_chunk'
@@ -309,12 +303,23 @@ class Session {
             functionCalls.push(...resp.value.functionCalls);
           }
         }
+
+        if (pendingSend.signal.aborted) {
+          return { stopReason: 'cancelled' };
+        }
       } catch (error) {
         if (getErrorStatus(error) === 429) {
           throw new acp.RequestError(
             429,
             'Rate limit exceeded. Try again later.',
           );
+        }
+
+        if (
+          pendingSend.signal.aborted ||
+          (error instanceof Error && error.name === 'AbortError')
+        ) {
+          return { stopReason: 'cancelled' };
         }
 
         throw error;
@@ -350,7 +355,7 @@ class Session {
     fc: FunctionCall,
   ): Promise<Part[]> {
     const callId = fc.id ?? `${fc.name}-${Date.now()}`;
-    const args = (fc.args ?? {}) as Record<string, unknown>;
+    const args = fc.args ?? {};
 
     const startTime = Date.now();
 
@@ -388,7 +393,7 @@ class Session {
     }
 
     const toolRegistry = this.config.getToolRegistry();
-    const tool = toolRegistry.getTool(fc.name as string);
+    const tool = toolRegistry.getTool(fc.name);
 
     if (!tool) {
       return errorResponse(
@@ -444,6 +449,7 @@ class Session {
             );
           case ToolConfirmationOutcome.ProceedOnce:
           case ToolConfirmationOutcome.ProceedAlways:
+          case ToolConfirmationOutcome.ProceedAlwaysAndSave:
           case ToolConfirmationOutcome.ProceedAlwaysServer:
           case ToolConfirmationOutcome.ProceedAlwaysTool:
           case ToolConfirmationOutcome.ModifyWithEditor:
@@ -570,7 +576,7 @@ class Session {
     const ignoredPaths: string[] = [];
 
     const toolRegistry = this.config.getToolRegistry();
-    const readManyFilesTool = toolRegistry.getTool('read_many_files');
+    const readManyFilesTool = new ReadManyFilesTool(this.config);
     const globTool = toolRegistry.getTool('glob');
 
     if (!readManyFilesTool) {
@@ -734,7 +740,7 @@ class Session {
 
     if (pathSpecsToRead.length > 0) {
       const toolArgs = {
-        paths: pathSpecsToRead,
+        include: pathSpecsToRead,
       };
 
       const callId = `${readManyFilesTool.name}-${Date.now()}`;
