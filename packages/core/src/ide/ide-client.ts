@@ -776,22 +776,22 @@ export class IdeClient {
   private async establishHttpConnection(port: string): Promise<boolean> {
     let transport: StreamableHTTPClientTransport | undefined;
     try {
-      const ide_server_host = getIdeServerHost();
+      const ideServerHost = getIdeServerHost();
       const portNumber = parseInt(port, 10);
       // validate port to prevent Server-Side Request Forgery (SSRF) vulnerability
       if (isNaN(portNumber) || portNumber <= 0 || portNumber > 65535) {
         return false;
       }
-      const server_url = `http://${ide_server_host}:${portNumber}/mcp`;
+      const serverUrl = `http://${ideServerHost}:${portNumber}/mcp`;
       logger.debug('Attempting to connect to IDE via HTTP SSE');
-      logger.debug(`Server URL: ${server_url}`);
+      logger.debug(`Server URL: ${serverUrl}`);
       this.client = new Client({
         name: 'streamable-http-client',
         // TODO(#3487): use the CLI version here.
         version: '1.0.0',
       });
-      transport = new StreamableHTTPClientTransport(new URL(server_url), {
-        fetch: await this.createProxyAwareFetch(ide_server_host),
+      transport = new StreamableHTTPClientTransport(new URL(serverUrl), {
+        fetch: await this.createProxyAwareFetch(ideServerHost),
         requestInit: {
           headers: this.authToken
             ? { Authorization: `Bearer ${this.authToken}` }
