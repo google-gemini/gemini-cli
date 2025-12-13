@@ -41,7 +41,7 @@ import {
 import * as modifiableToolModule from '../tools/modifiable-tool.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { isShellInvocationAllowlisted } from '../utils/shell-utils.js';
+import { isShellInvocationAllowlisted } from '../utils/shell-permissions.js';
 
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
