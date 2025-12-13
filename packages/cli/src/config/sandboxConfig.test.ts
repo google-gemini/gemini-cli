@@ -88,11 +88,12 @@ describe('loadSandboxConfig', () => {
       expect(mockedCommandExistsSync).toHaveBeenCalledWith('docker');
     });
 
-    it('should throw if GEMINI_SANDBOX is an invalid command', async () => {
-      process.env['GEMINI_SANDBOX'] = 'invalid-command';
-      await expect(loadSandboxConfig({}, {})).rejects.toThrow(
-        "Invalid sandbox command 'invalid-command'. Must be one of docker, podman, sandbox-exec",
-      );
+    it('should use custom command if GEMINI_SANDBOX is a custom string and it exists', async () => {
+      process.env['GEMINI_SANDBOX'] = 'nerdctl';
+      mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'nerdctl');
+      const config = await loadSandboxConfig({}, {});
+      expect(config).toEqual({ command: 'nerdctl', image: 'default/image' });
+      expect(mockedCommandExistsSync).toHaveBeenCalledWith('nerdctl');
     });
 
     it('should throw if GEMINI_SANDBOX command does not exist', async () => {
@@ -159,20 +160,18 @@ describe('loadSandboxConfig', () => {
       expect(mockedCommandExistsSync).toHaveBeenCalledWith('podman');
     });
 
+    it('should use custom command if specified and it exists', async () => {
+      mockedCommandExistsSync.mockReturnValue(true);
+      const config = await loadSandboxConfig({}, { sandbox: 'nerdctl' });
+      expect(config).toEqual({ command: 'nerdctl', image: 'default/image' });
+    });
+
     it('should throw if the specified command does not exist', async () => {
       mockedCommandExistsSync.mockReturnValue(false);
       await expect(
         loadSandboxConfig({}, { sandbox: 'podman' }),
       ).rejects.toThrow(
         "Missing sandbox command 'podman' (from GEMINI_SANDBOX)",
-      );
-    });
-
-    it('should throw if the specified command is invalid', async () => {
-      await expect(
-        loadSandboxConfig({}, { sandbox: 'invalid-command' }),
-      ).rejects.toThrow(
-        "Invalid sandbox command 'invalid-command'. Must be one of docker, podman, sandbox-exec",
       );
     });
   });
