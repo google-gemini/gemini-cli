@@ -216,6 +216,9 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         generateContentConfig: {
           temperature: 0.3,
           maxOutputTokens: 16000,
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
         },
       },
     },
