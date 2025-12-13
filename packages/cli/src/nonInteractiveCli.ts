@@ -230,7 +230,7 @@ export async function runNonInteractive({
       }
 
       if (!query) {
-        const { processedQuery, shouldProceed } = await handleAtCommand({
+        const { processedQuery, error } = await handleAtCommand({
           query: input,
           config,
           addItem: (_item, _timestamp) => 0,
@@ -239,11 +239,11 @@ export async function runNonInteractive({
           signal: abortController.signal,
         });
 
-        if (!shouldProceed || !processedQuery) {
+        if (error || !processedQuery) {
           // An error occurred during @include processing (e.g., file not found).
           // The error message is already logged by handleAtCommand.
           throw new FatalInputError(
-            'Exiting due to an error processing the @ command.',
+            error || 'Exiting due to an error processing the @ command.',
           );
         }
         query = processedQuery as Part[];
