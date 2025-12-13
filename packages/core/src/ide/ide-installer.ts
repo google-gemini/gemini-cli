@@ -83,7 +83,7 @@ async function findCommand(
           process.env['ProgramFiles'] || 'C:\\Program Files',
           `${win_app}`,
           'bin',
-          `{appname}` + '.cmd',
+          `${appname}.cmd`,
         ),
         path.join(
           homeDir,
@@ -92,7 +92,7 @@ async function findCommand(
           'Programs',
           `${win_app}`,
           'bin',
-          `{appname}` + '.cmd',
+          `${appname}.cmd`,
         ),
       );
     }
