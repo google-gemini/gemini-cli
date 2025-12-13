@@ -149,10 +149,7 @@ describe('createContentGenerator', () => {
       },
     });
     expect(generator).toEqual(
-      new LoggingContentGenerator(
-        (mockGenerator as GoogleGenAI).models,
-        mockConfig,
-      ),
+      new LoggingContentGenerator(mockGenerator.models, mockConfig),
     );
   });
 
@@ -342,10 +339,7 @@ describe('createContentGenerator', () => {
       },
     });
     expect(generator).toEqual(
-      new LoggingContentGenerator(
-        (mockGenerator as GoogleGenAI).models,
-        mockConfig,
-      ),
+      new LoggingContentGenerator(mockGenerator.models, mockConfig),
     );
   });
 });
