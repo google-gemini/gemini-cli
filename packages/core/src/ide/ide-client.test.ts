@@ -959,12 +959,14 @@ describe('IdeClient', () => {
 });
 
 describe('getIdeServerHost', () => {
+  let existsSyncMock: Mock;
   let originalSshConnection: string | undefined;
   let originalVscodeRemoteSession: string | undefined;
   let originalRemoteContainers: string | undefined;
 
   beforeEach(() => {
-    vi.mocked(fs.existsSync).mockClear();
+    existsSyncMock = vi.mocked(fs.existsSync);
+    existsSyncMock.mockClear();
     originalSshConnection = process.env['SSH_CONNECTION'];
     originalVscodeRemoteSession =
       process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
@@ -1000,7 +1002,7 @@ describe('getIdeServerHost', () => {
     dockerenvExists: boolean,
     containerenvExists: boolean,
   ) => {
-    vi.mocked(fs.existsSync).mockImplementation((path: string) => {
+    existsSyncMock.mockImplementation((path: string) => {
       if (path === '/.dockerenv') {
         return dockerenvExists;
       }
