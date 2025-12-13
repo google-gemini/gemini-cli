@@ -161,9 +161,9 @@ export class AgentRegistry {
 
       // Validate each input has required fields
       for (const [key, inputDef] of Object.entries(inputs)) {
-        if (!inputDef.type || !inputDef.description) {
+        if (!inputDef || typeof inputDef !== 'object' || !inputDef.type || !inputDef.description) {
           debugLogger.warn(
-            `[AgentRegistry] Skipping agent '${definition.name}': input '${key}' missing required 'type' or 'description'.`,
+            `[AgentRegistry] Skipping agent '${definition.name}': input '${key}' is invalid or missing required 'type' or 'description'.`,
           );
           return;
         }
