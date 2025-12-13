@@ -780,7 +780,12 @@ export class IdeClient {
     let transport: StreamableHTTPClientTransport | undefined;
     try {
       const ide_server_host = getIdeServerHost();
-      const server_url = `http://${ide_server_host}:${port}/mcp`;
+      const portNumber = parseInt(port, 10);
+      // validate port to prevent Server-Side Request Forgery (SSRF) vulnerability
+      if (isNaN(portNumber) || portNumber <= 0 || portNumber > 65535) {
+        return false;
+      }
+      const server_url = `http://${ide_server_host}:${portNumber}/mcp`;
       logger.debug('Attempting to connect to IDE via HTTP SSE');
       logger.debug(`Server URL: ${server_url}`);
       this.client = new Client({
