@@ -34,7 +34,9 @@ function ruleMatches(
   // Check tool name if specified
   if (rule.toolName) {
     // Support wildcard patterns: "serverName__*" matches "serverName__anyTool"
-    if (rule.toolName.endsWith('__*')) {
+    if (rule.toolName === '*') {
+      // Match all tools
+    } else if (rule.toolName.endsWith('__*')) {
       const prefix = rule.toolName.slice(0, -3); // Remove "__*"
       if (serverName !== undefined) {
         // Robust check: if serverName is provided, it MUST match the prefix exactly.
