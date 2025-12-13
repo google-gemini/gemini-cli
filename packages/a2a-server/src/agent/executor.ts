@@ -12,11 +12,7 @@ import type {
   RequestContext,
   ExecutionEventBus,
 } from '@a2a-js/sdk/server';
-import type {
-  ToolCallRequestInfo,
-  ServerGeminiToolCallRequestEvent,
-  Config,
-} from '@google/gemini-cli-core';
+import type { ToolCallRequestInfo, Config } from '@google/gemini-cli-core';
 import {
   GeminiEventType,
   SimpleExtensionLoader,
@@ -287,8 +283,8 @@ export class CoderAgentExecutor implements AgentExecutor {
     requestContext: RequestContext,
     eventBus: ExecutionEventBus,
   ): Promise<void> {
-    const userMessage = requestContext.userMessage as Message;
-    const sdkTask = requestContext.task as SDKTask | undefined;
+    const userMessage = requestContext.userMessage;
+    const sdkTask = requestContext.task;
 
     const taskId = sdkTask?.id || userMessage.taskId || uuidv4();
     const contextId: string =
@@ -485,9 +481,7 @@ export class CoderAgentExecutor implements AgentExecutor {
             throw new Error('Execution aborted');
           }
           if (event.type === GeminiEventType.ToolCallRequest) {
-            toolCallRequests.push(
-              (event as ServerGeminiToolCallRequestEvent).value,
-            );
+            toolCallRequests.push(event.value);
             continue;
           }
           await currentTask.acceptAgentMessage(event);
