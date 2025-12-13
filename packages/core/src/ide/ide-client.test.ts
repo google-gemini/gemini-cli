@@ -23,6 +23,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { detectIde, IDE_DEFINITIONS } from './detect-ide.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { getIdeServerHost } from './ide-client.js';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof fs>();
@@ -34,7 +35,7 @@ vi.mock('node:fs', async (importOriginal) => {
       readdir: vi.fn(),
     },
     realpathSync: (p: string) => p,
-    existsSync: () => false,
+    existsSync: vi.fn(() => false),
   };
 });
 vi.mock('./process-utils.js');
@@ -110,7 +111,7 @@ describe('IdeClient', () => {
       await ideClient.connect();
 
       expect(fs.promises.readFile).toHaveBeenCalledWith(
-        path.join('/tmp/', 'gemini-ide-server-12345.json'),
+        path.join('/tmp', 'gemini', 'ide', 'gemini-ide-server-12345.json'),
         'utf8',
       );
       expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
@@ -277,7 +278,7 @@ describe('IdeClient', () => {
 
       expect(result).toEqual(config);
       expect(fs.promises.readFile).toHaveBeenCalledWith(
-        path.join('/tmp', 'gemini-ide-server-12345.json'),
+        path.join('/tmp', 'gemini', 'ide', 'gemini-ide-server-12345.json'),
         'utf8',
       );
     });
@@ -324,7 +325,7 @@ describe('IdeClient', () => {
 
       expect(result).toEqual(config);
       expect(fs.promises.readFile).toHaveBeenCalledWith(
-        path.join('/tmp/gemini/ide', 'gemini-ide-server-12345-123.json'),
+        path.join('/tmp', 'gemini', 'ide', 'gemini-ide-server-12345-123.json'),
         'utf8',
       );
     });
@@ -517,11 +518,11 @@ describe('IdeClient', () => {
 
       expect(result).toEqual(validConfig);
       expect(fs.promises.readFile).toHaveBeenCalledWith(
-        path.join('/tmp/gemini/ide', 'gemini-ide-server-12345-111.json'),
+        path.join('/tmp', 'gemini', 'ide', 'gemini-ide-server-12345-111.json'),
         'utf8',
       );
       expect(fs.promises.readFile).not.toHaveBeenCalledWith(
-        path.join('/tmp/gemini/ide', 'not-a-config-file.txt'),
+        path.join('/tmp', 'gemini', 'ide', 'not-a-config-file.txt'),
         'utf8',
       );
     });
@@ -954,5 +955,106 @@ describe('IdeClient', () => {
         IDEConnectionStatus.Connected,
       );
     });
+  });
+});
+
+describe('getIdeServerHost', () => {
+  let existsSyncMock: Mock;
+  let originalSshConnection: string | undefined;
+
+  beforeEach(() => {
+    existsSyncMock = vi.mocked(fs.existsSync);
+    existsSyncMock.mockClear();
+    originalSshConnection = process.env['SSH_CONNECTION'];
+    delete process.env['SSH_CONNECTION'];
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    if (originalSshConnection !== undefined) {
+      process.env['SSH_CONNECTION'] = originalSshConnection;
+    } else {
+      delete process.env['SSH_CONNECTION'];
+    }
+  });
+
+  // Helper to set existsSync mock behavior
+  const setupFsMocks = (
+    dockerenvExists: boolean,
+    containerenvExists: boolean,
+  ) => {
+    existsSyncMock.mockImplementation((path: string) => {
+      if (path === '/.dockerenv') {
+        return dockerenvExists;
+      }
+      if (path === '/run/.containerenv') {
+        return containerenvExists;
+      }
+      return false;
+    });
+  };
+
+  it('should return 127.0.0.1 when not in container and no SSH_CONNECTION', () => {
+    setupFsMocks(false, false);
+    delete process.env['SSH_CONNECTION'];
+    expect(getIdeServerHost()).toBe('127.0.0.1');
+    expect(existsSyncMock).toHaveBeenCalledWith('/.dockerenv');
+    expect(existsSyncMock).toHaveBeenCalledWith('/run/.containerenv');
+  });
+
+  it('should return 127.0.0.1 when not in container but SSH_CONNECTION is set', () => {
+    setupFsMocks(false, false);
+    process.env['SSH_CONNECTION'] = 'some_ssh_value';
+    expect(getIdeServerHost()).toBe('127.0.0.1');
+    expect(existsSyncMock).toHaveBeenCalledWith('/.dockerenv');
+    expect(existsSyncMock).toHaveBeenCalledWith('/run/.containerenv');
+  });
+
+  it('should return host.docker.internal when in .dockerenv container and no SSH_CONNECTION', () => {
+    setupFsMocks(true, false);
+    delete process.env['SSH_CONNECTION'];
+    expect(getIdeServerHost()).toBe('host.docker.internal');
+    expect(existsSyncMock).toHaveBeenCalledWith('/.dockerenv');
+    expect(existsSyncMock).not.toHaveBeenCalledWith('/run/.containerenv'); // Short-circuiting
+  });
+
+  it('should return 127.0.0.1 when in .dockerenv container and SSH_CONNECTION is set', () => {
+    setupFsMocks(true, false);
+    process.env['SSH_CONNECTION'] = 'some_ssh_value';
+    expect(getIdeServerHost()).toBe('127.0.0.1');
+    expect(existsSyncMock).toHaveBeenCalledWith('/.dockerenv');
+    expect(existsSyncMock).not.toHaveBeenCalledWith('/run/.containerenv'); // Short-circuiting
+  });
+
+  it('should return host.docker.internal when in .containerenv container and no SSH_CONNECTION', () => {
+    setupFsMocks(false, true);
+    delete process.env['SSH_CONNECTION'];
+    expect(getIdeServerHost()).toBe('host.docker.internal');
+    expect(existsSyncMock).toHaveBeenCalledWith('/.dockerenv');
+    expect(existsSyncMock).toHaveBeenCalledWith('/run/.containerenv');
+  });
+
+  it('should return 127.0.0.1 when in .containerenv container and SSH_CONNECTION is set', () => {
+    setupFsMocks(false, true);
+    process.env['SSH_CONNECTION'] = 'some_ssh_value';
+    expect(getIdeServerHost()).toBe('127.0.0.1');
+    expect(existsSyncMock).toHaveBeenCalledWith('/.dockerenv');
+    expect(existsSyncMock).toHaveBeenCalledWith('/run/.containerenv');
+  });
+
+  it('should return host.docker.internal when in both containers and no SSH_CONNECTION', () => {
+    setupFsMocks(true, true);
+    delete process.env['SSH_CONNECTION'];
+    expect(getIdeServerHost()).toBe('host.docker.internal');
+    expect(existsSyncMock).toHaveBeenCalledWith('/.dockerenv');
+    expect(existsSyncMock).not.toHaveBeenCalledWith('/run/.containerenv'); // Short-circuiting
+  });
+
+  it('should return 127.0.0.1 when in both containers and SSH_CONNECTION is set', () => {
+    setupFsMocks(true, true);
+    process.env['SSH_CONNECTION'] = 'some_ssh_value';
+    expect(getIdeServerHost()).toBe('127.0.0.1');
+    expect(existsSyncMock).toHaveBeenCalledWith('/.dockerenv');
+    expect(existsSyncMock).not.toHaveBeenCalledWith('/run/.containerenv'); // Short-circuiting
   });
 });
