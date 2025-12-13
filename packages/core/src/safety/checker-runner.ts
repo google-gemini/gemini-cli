@@ -17,7 +17,7 @@ import type { CheckerRegistry } from './registry.js';
 import type { ContextBuilder } from './context-builder.js';
 import { z } from 'zod';
 
-const SafetyCheckResultSchema = z.discriminatedUnion('decision', [
+const SafetyCheckResultSchema: z.ZodType<SafetyCheckResult> = z.discriminatedUnion('decision', [
   z.object({
     decision: z.literal(SafetyCheckDecision.ALLOW),
     reason: z.string().optional(),
