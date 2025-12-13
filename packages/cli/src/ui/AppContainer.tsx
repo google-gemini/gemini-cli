@@ -63,7 +63,7 @@ import {
   SessionEndReason,
   fireSessionStartHook,
   fireSessionEndHook,
-  generateAndSaveSummary,
+  generateSummary,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -312,9 +312,13 @@ export const AppContainer = (props: AppContainerProps) => {
           : SessionStartSource.Startup;
         await fireSessionStartHook(hookMessageBus, sessionStartSource);
       }
+
+      // Fire-and-forget: generate summary for previous session in background
+      generateSummary(config).catch((e) => {
+        debugLogger.warn('Background summary generation failed:', e);
+      });
     })();
     registerCleanup(async () => {
-      await generateAndSaveSummary(config);
       // Turn off mouse scroll.
       disableMouseEvents();
       const ideClient = await IdeClient.getInstance();
@@ -578,6 +582,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settings.merged.security?.auth?.selectedType &&
       !settings.merged.security?.auth?.useExternal
     ) {
+      // We skip validation for Gemini API key here because it might be stored
+      // in the keychain, which we can't check synchronously.
+      // The useAuth hook handles validation for this case.
+      if (settings.merged.security.auth.selectedType === AuthType.USE_GEMINI) {
+        return;
+      }
+
       const error = validateAuthMethod(
         settings.merged.security.auth.selectedType,
       );

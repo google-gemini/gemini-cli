@@ -69,6 +69,9 @@ describe('Core System Prompt (prompts.ts)', () => {
       getModel: vi.fn().mockReturnValue('auto'),
       getPreviewFeatures: vi.fn().mockReturnValue(false),
       isInFallbackMode: vi.fn().mockReturnValue(false),
+      getAgentRegistry: vi.fn().mockReturnValue({
+        getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
+      }),
     } as unknown as Config;
     vi.mocked(getEffectiveModel).mockReturnValue(DEFAULT_GEMINI_MODEL);
   });
@@ -162,22 +165,23 @@ describe('Core System Prompt (prompts.ts)', () => {
         getModel: vi.fn().mockReturnValue('auto'),
         getPreviewFeatures: vi.fn().mockReturnValue(false),
         isInFallbackMode: vi.fn().mockReturnValue(false),
+        getAgentRegistry: vi.fn().mockReturnValue({
+          getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
+        }),
       } as unknown as Config;
 
       const prompt = getCoreSystemPrompt(testConfig);
       if (expectCodebaseInvestigator) {
         expect(prompt).toContain(
-          `your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'`,
+          `your **first and primary action** must be to delegate to the '${CodebaseInvestigatorAgent.name}' agent`,
         );
-        expect(prompt).toContain(
-          `do not ignore the output of '${CodebaseInvestigatorAgent.name}'`,
-        );
+        expect(prompt).toContain(`do not ignore the output of the agent`);
         expect(prompt).not.toContain(
           "Use 'search_file_content' and 'glob' search tools extensively",
         );
       } else {
         expect(prompt).not.toContain(
-          `your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'`,
+          `your **first and primary action** must be to delegate to the '${CodebaseInvestigatorAgent.name}' agent`,
         );
         expect(prompt).toContain(
           "Use 'search_file_content' and 'glob' search tools extensively",

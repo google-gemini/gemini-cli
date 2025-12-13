@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { performRestore, type ToolCallData } from './restore.js';
+import { performRestore } from './restore.js';
+import { type ToolCallData } from '../utils/checkpointUtils.js';
 import type { GitService } from '../services/gitService.js';
 
 describe('performRestore', () => {
