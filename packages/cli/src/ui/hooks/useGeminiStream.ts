@@ -16,6 +16,7 @@ import type {
   ThoughtSummary,
   ToolCallRequestInfo,
   GeminiErrorEventValue,
+  ToolCallResponseInfo,
 } from '@google/gemini-cli-core';
 import {
   GeminiEventType as ServerGeminiEventType,
@@ -69,6 +70,16 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+
+type ToolResponseWithParts = ToolCallResponseInfo & {
+  llmContent?: PartListUnion;
+};
+
+interface ShellToolData {
+  pid?: number;
+  command?: string;
+  initialOutput?: string;
+}
 
 enum StreamProcessingStatus {
   Completed,
@@ -211,18 +222,29 @@ export const useGeminiStream = (
     await done;
     setIsResponding(false);
   }, []);
-  const { handleShellCommand, activeShellPtyId, lastShellOutputTime } =
-    useShellCommandProcessor(
-      addItem,
-      setPendingHistoryItem,
-      onExec,
-      onDebugMessage,
-      config,
-      geminiClient,
-      setShellInputFocused,
-      terminalWidth,
-      terminalHeight,
-    );
+  const {
+    handleShellCommand,
+    activeShellPtyId,
+    backgroundShellCount,
+    isBackgroundShellVisible,
+    toggleBackgroundShell,
+    backgroundCurrentShell,
+    backgroundShells,
+    registerBackgroundShell,
+    dismissBackgroundShell,
+    lastShellOutputTime,
+  } = useShellCommandProcessor(
+    addItem,
+    setPendingHistoryItem,
+    onExec,
+    onDebugMessage,
+    config,
+    geminiClient,
+    setShellInputFocused,
+    terminalWidth,
+    terminalHeight,
+    activeToolPtyId,
+  );
 
   const activePtyId = activeShellPtyId || activeToolPtyId;
 
@@ -1110,8 +1132,11 @@ export const useGeminiStream = (
               const completedOrCancelledCall = tc as
                 | TrackedCompletedToolCall
                 | TrackedCancelledToolCall;
+              const response =
+                completedOrCancelledCall.response as ToolResponseWithParts;
               return (
-                completedOrCancelledCall.response?.responseParts !== undefined
+                response?.responseParts !== undefined ||
+                response?.llmContent !== undefined
               );
             }
             return false;
@@ -1133,6 +1158,25 @@ export const useGeminiStream = (
           t.status === 'success' &&
           !processedMemoryToolsRef.current.has(t.request.callId),
       );
+
+      // Handle backgrounded shell tools
+      completedAndReadyToSubmitTools.forEach((t) => {
+        const isShell = t.request.name === 'run_shell_command';
+        // Access result from the tracked tool call response
+        const response = t.response as ToolResponseWithParts;
+        const data = response?.data as unknown as ShellToolData;
+
+        // Use data.pid or fallback to t.pid (preserved from executing state)
+        const pid = data?.pid ?? (t as { pid?: number }).pid;
+
+        if (isShell && pid) {
+          registerBackgroundShell(
+            pid,
+            data?.command || 'shell',
+            data?.initialOutput || '',
+          );
+        }
+      });
 
       if (newSuccessfulMemorySaves.length > 0) {
         // Perform the refresh only if there are new ones.
@@ -1173,9 +1217,18 @@ export const useGeminiStream = (
         if (geminiClient) {
           // We need to manually add the function responses to the history
           // so the model knows the tools were cancelled.
-          const combinedParts = geminiTools.flatMap(
-            (toolCall) => toolCall.response.responseParts,
-          );
+          const combinedParts = geminiTools.flatMap((toolCall) => {
+            const response = toolCall.response as ToolResponseWithParts;
+            if (response.responseParts) {
+              return response.responseParts as Part[];
+            }
+            const content = response.llmContent;
+            if (typeof content === 'string') {
+              return [{ text: content }];
+            }
+            return content as Part[];
+          });
+
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
           geminiClient.addHistory({
             role: 'user',
@@ -1190,9 +1243,21 @@ export const useGeminiStream = (
         return;
       }
 
-      const responsesToSend: Part[] = geminiTools.flatMap(
-        (toolCall) => toolCall.response.responseParts,
-      );
+      const responsesToSend: Part[] = geminiTools.flatMap((toolCall) => {
+        const response = toolCall.response as ToolResponseWithParts;
+        if (response.responseParts) {
+          return response.responseParts as Part[];
+        }
+        const content = response.llmContent;
+        if (typeof content === 'string') {
+          return [{ text: content }];
+        }
+        // PartListUnion can be string | Array<string | Part>.
+        // We need to normalize to Part[].
+        return (content as Array<string | Part>).map((item) =>
+          typeof item === 'string' ? { text: item } : item,
+        );
+      });
       const callIdsToMarkAsSubmitted = geminiTools.map(
         (toolCall) => toolCall.request.callId,
       );
@@ -1224,6 +1289,7 @@ export const useGeminiStream = (
       performMemoryRefresh,
       modelSwitchedFromQuotaError,
       addItem,
+      registerBackgroundShell,
     ],
   );
 
@@ -1308,6 +1374,12 @@ export const useGeminiStream = (
     handleApprovalModeChange,
     activePtyId,
     loopDetectionConfirmationRequest,
+    backgroundShellCount,
+    isBackgroundShellVisible,
+    toggleBackgroundShell,
+    backgroundCurrentShell,
+    backgroundShells,
+    dismissBackgroundShell,
     lastOutputTime,
   };
 };

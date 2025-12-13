@@ -120,6 +120,7 @@ export const Composer = () => {
                 blockedMcpServers={
                   config.getMcpClientManager()?.getBlockedMcpServers() ?? []
                 }
+                backgroundProcessCount={uiState.backgroundShellCount}
               />
             )
           )}

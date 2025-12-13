@@ -118,6 +118,10 @@ export interface ToolCallResponseInfo {
   errorType: ToolErrorType | undefined;
   outputFile?: string | undefined;
   contentLength?: number;
+  /**
+   * Optional data payload for passing structured information back to the caller.
+   */
+  data?: Record<string, unknown>;
 }
 
 export interface ServerToolCallConfirmationDetails {

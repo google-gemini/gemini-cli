@@ -9,7 +9,7 @@ import type {
   IndividualToolCallDisplay,
 } from '../types.js';
 import { ToolCallStatus } from '../types.js';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import type {
   AnsiOutput,
   Config,
@@ -29,6 +29,16 @@ import { themeManager } from '../../ui/themes/theme-manager.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const MAX_OUTPUT_LENGTH = 10000;
+
+export interface BackgroundShell {
+  pid: number;
+  command: string;
+  output: string | AnsiOutput;
+  isBinary: boolean;
+  binaryBytesReceived: number;
+  status: 'running' | 'exited';
+  exitCode?: number;
+}
 
 function addShellCommandToGeminiHistory(
   geminiClient: GeminiClient,
@@ -75,8 +85,94 @@ export const useShellCommandProcessor = (
   setShellInputFocused: (value: boolean) => void,
   terminalWidth?: number,
   terminalHeight?: number,
+  activeToolPtyId?: number,
 ) => {
   const [activeShellPtyId, setActiveShellPtyId] = useState<number | null>(null);
+
+  // Background shell state management
+  const backgroundShellsRef = useRef<Map<number, BackgroundShell>>(new Map());
+  const [backgroundShellCount, setBackgroundShellCount] = useState(0);
+  const [isBackgroundShellVisible, setIsBackgroundShellVisible] =
+    useState(false);
+  // Used to force re-render when background shell output updates while visible
+  const [, setTick] = useState(0);
+
+  const toggleBackgroundShell = useCallback(() => {
+    if (backgroundShellsRef.current.size > 0) {
+      setIsBackgroundShellVisible((prev) => !prev);
+    }
+  }, []);
+
+  const backgroundCurrentShell = useCallback(() => {
+    const pidToBackground = activeShellPtyId || activeToolPtyId;
+    if (pidToBackground) {
+      ShellExecutionService.background(pidToBackground);
+    }
+  }, [activeShellPtyId, activeToolPtyId]);
+
+  const dismissBackgroundShell = useCallback((pid: number) => {
+    const shell = backgroundShellsRef.current.get(pid);
+    if (shell) {
+      if (shell.status === 'running') {
+        ShellExecutionService.kill(pid);
+      }
+      // Always remove from UI list when dismissed, whether running (killed) or exited
+      backgroundShellsRef.current.delete(pid);
+      setBackgroundShellCount(backgroundShellsRef.current.size);
+      if (backgroundShellsRef.current.size === 0) {
+        setIsBackgroundShellVisible(false);
+      }
+    }
+  }, []);
+
+  const registerBackgroundShell = useCallback(
+    (pid: number, command: string, initialOutput: string | AnsiOutput) => {
+      if (backgroundShellsRef.current.has(pid)) {
+        return;
+      }
+
+      // Initialize background shell state
+      backgroundShellsRef.current.set(pid, {
+        pid,
+        command,
+        output: initialOutput,
+        isBinary: false,
+        binaryBytesReceived: 0,
+        status: 'running',
+      });
+
+      // Subscribe to process exit directly
+      ShellExecutionService.onExit(pid, (code) => {
+        if (backgroundShellsRef.current.has(pid)) {
+          const shell = backgroundShellsRef.current.get(pid);
+          if (shell) {
+            shell.status = 'exited';
+            shell.exitCode = code;
+          }
+          setTick((t) => t + 1);
+        }
+      });
+
+      // Subscribe to future updates (data only)
+      ShellExecutionService.subscribe(pid, (event) => {
+        const shell = backgroundShellsRef.current.get(pid);
+        if (!shell) return;
+
+        if (event.type === 'data') {
+          shell.output = event.chunk;
+        } else if (event.type === 'binary_detected') {
+          shell.isBinary = true;
+        } else if (event.type === 'binary_progress') {
+          shell.isBinary = true;
+          shell.binaryBytesReceived = event.bytesReceived;
+        }
+        setTick((t) => t + 1);
+      });
+
+      setBackgroundShellCount(backgroundShellsRef.current.size);
+    },
+    [],
+  );
   const [lastShellOutputTime, setLastShellOutputTime] = useState<number>(0);
 
   const handleShellCommand = useCallback(
@@ -156,6 +252,7 @@ export const useShellCommandProcessor = (
             targetDir,
             (event) => {
               let shouldUpdate = false;
+
               switch (event.type) {
                 case 'data':
                   // Do not process text data if we've already switched to binary mode.
@@ -186,6 +283,25 @@ export const useShellCommandProcessor = (
                 default: {
                   throw new Error('An unhandled ShellOutputEvent was found.');
                 }
+              }
+
+              if (
+                executionPid &&
+                backgroundShellsRef.current.has(executionPid)
+              ) {
+                const existingShell =
+                  backgroundShellsRef.current.get(executionPid)!;
+                backgroundShellsRef.current.set(executionPid, {
+                  pid: executionPid,
+                  command: rawQuery as string,
+                  output: cumulativeStdout,
+                  isBinary: isBinaryStream,
+                  binaryBytesReceived,
+                  status: existingShell.status,
+                  exitCode: existingShell.exitCode,
+                });
+                setTick((t) => t + 1);
+                return;
               }
 
               // Compute the display string based on the *current* state.
@@ -246,6 +362,30 @@ export const useShellCommandProcessor = (
             .then((result: ShellExecutionResult) => {
               setPendingHistoryItem(null);
 
+              if (result.backgrounded && result.pid) {
+                backgroundShellsRef.current.set(result.pid, {
+                  pid: result.pid,
+                  command: rawQuery as string,
+                  output: cumulativeStdout,
+                  isBinary: isBinaryStream,
+                  binaryBytesReceived,
+                  status: 'running',
+                });
+                setBackgroundShellCount(backgroundShellsRef.current.size);
+                setActiveShellPtyId(null);
+
+                ShellExecutionService.onExit(result.pid, (code) => {
+                  if (backgroundShellsRef.current.has(result.pid!)) {
+                    const shell = backgroundShellsRef.current.get(result.pid!);
+                    if (shell) {
+                      shell.status = 'exited';
+                      shell.exitCode = code;
+                    }
+                    setTick((t) => t + 1);
+                  }
+                });
+              }
+
               let mainContent: string;
 
               if (isBinary(result.rawOutput)) {
@@ -265,6 +405,9 @@ export const useShellCommandProcessor = (
               } else if (result.aborted) {
                 finalStatus = ToolCallStatus.Canceled;
                 finalOutput = `Command was cancelled.\n${finalOutput}`;
+              } else if (result.backgrounded) {
+                finalStatus = ToolCallStatus.Success;
+                finalOutput = `Command moved to background (PID: ${result.pid}). Output hidden.`;
               } else if (result.signal) {
                 finalStatus = ToolCallStatus.Error;
                 finalOutput = `Command terminated by signal: ${result.signal}.\n${finalOutput}`;
@@ -324,6 +467,7 @@ export const useShellCommandProcessor = (
               if (pwdFilePath && fs.existsSync(pwdFilePath)) {
                 fs.unlinkSync(pwdFilePath);
               }
+
               setActiveShellPtyId(null);
               setShellInputFocused(false);
               resolve();
@@ -371,5 +515,17 @@ export const useShellCommandProcessor = (
     ],
   );
 
-  return { handleShellCommand, activeShellPtyId, lastShellOutputTime };
+  const backgroundShells = backgroundShellsRef.current;
+  return {
+    handleShellCommand,
+    activeShellPtyId,
+    backgroundShellCount,
+    isBackgroundShellVisible,
+    toggleBackgroundShell,
+    backgroundCurrentShell,
+    registerBackgroundShell,
+    dismissBackgroundShell,
+    backgroundShells,
+    lastShellOutputTime,
+  };
 };

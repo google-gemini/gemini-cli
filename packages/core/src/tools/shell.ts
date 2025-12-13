@@ -48,11 +48,13 @@ import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+const BACKGROUND_DELAY_MS = 200;
 
 export interface ShellToolParams {
   command: string;
   description?: string;
   dir_path?: string;
+  is_background?: boolean;
 }
 
 export class ShellToolInvocation extends BaseToolInvocation<
@@ -82,6 +84,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     // append optional (description), replacing any line breaks with spaces
     if (this.params.description) {
       description += ` (${this.params.description.replace(/\n/g, ' ')})`;
+    }
+    if (this.params.is_background) {
+      description += ' [background]';
     }
     return description;
   }
@@ -257,8 +262,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
           { ...shellExecutionConfig, pager: 'cat' },
         );
 
-      if (pid && setPidCallback) {
-        setPidCallback(pid);
+      if (pid) {
+        if (setPidCallback) {
+          setPidCallback(pid);
+        }
+
+        // If the model requested to run in the background, do so after a short delay.
+        if (this.params.is_background) {
+          setTimeout(() => {
+            ShellExecutionService.background(pid);
+          }, BACKGROUND_DELAY_MS);
+        }
       }
 
       const result = await resultPromise;
@@ -286,6 +300,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
       }
 
+      let data: Record<string, unknown> | undefined;
+
       let llmContent = '';
       let timeoutMessage = '';
       if (result.aborted) {
@@ -303,6 +319,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
+      } else if (this.params.is_background) {
+        llmContent = `Command moved to background (PID: ${result.pid}). Output is hidden from this conversation but continues in the background.`;
+        data = {
+          pid: result.pid,
+          command: this.params.command,
+          initialOutput: result.output,
+        };
       } else {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
@@ -328,7 +351,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (this.config.getDebugMode()) {
         returnDisplayMessage = llmContent;
       } else {
-        if (result.output.trim()) {
+        if (this.params.is_background) {
+          returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden.`;
+        } else if (result.output.trim()) {
           returnDisplayMessage = result.output;
         } else {
           if (result.aborted) {
@@ -378,6 +403,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return {
         llmContent,
         returnDisplay: returnDisplayMessage,
+        data,
         ...executionError,
       };
     } finally {
@@ -401,7 +427,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 }
 
-function getShellToolDescription(): string {
+function getShellToolDescription(enableInteractiveShell: boolean): string {
   const returnedInfo = `
 
       The following information is returned:
@@ -417,9 +443,15 @@ function getShellToolDescription(): string {
       Process Group PGID: Process group started or \`(none)\``;
 
   if (os.platform() === 'win32') {
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${returnedInfo}`;
+    const backgroundInstructions = enableInteractiveShell
+      ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use PowerShell background constructs.'
+      : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
+    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${returnedInfo}`;
   } else {
-    return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
+    const backgroundInstructions = enableInteractiveShell
+      ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use `&` to background commands.'
+      : 'Command can start background processes using `&`.';
+    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
   }
 }
 
@@ -449,7 +481,7 @@ export class ShellTool extends BaseDeclarativeTool<
     super(
       ShellTool.Name,
       'Shell',
-      getShellToolDescription(),
+      getShellToolDescription(config.getEnableInteractiveShell()),
       Kind.Execute,
       {
         type: 'object',
@@ -467,6 +499,11 @@ export class ShellTool extends BaseDeclarativeTool<
             type: 'string',
             description:
               '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
+          },
+          is_background: {
+            type: 'boolean',
+            description:
+              'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
           },
         },
         required: ['command'],

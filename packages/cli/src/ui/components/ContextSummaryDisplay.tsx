@@ -17,6 +17,7 @@ interface ContextSummaryDisplayProps {
   mcpServers?: Record<string, MCPServerConfig>;
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   ideContext?: IdeContext;
+  backgroundProcessCount?: number;
 }
 
 export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
@@ -25,6 +26,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   mcpServers,
   blockedMcpServers,
   ideContext,
+  backgroundProcessCount = 0,
 }) => {
   const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
@@ -36,7 +38,8 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     geminiMdFileCount === 0 &&
     mcpServerCount === 0 &&
     blockedMcpServerCount === 0 &&
-    openFileCount === 0
+    openFileCount === 0 &&
+    backgroundProcessCount === 0
   ) {
     return <Text> </Text>; // Render an empty space to reserve height
   }
@@ -83,7 +86,21 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     return parts.join(', ');
   })();
 
-  const summaryParts = [openFilesText, geminiMdText, mcpText].filter(Boolean);
+  const backgroundText = (() => {
+    if (backgroundProcessCount === 0) {
+      return '';
+    }
+    return `${backgroundProcessCount} Background process${
+      backgroundProcessCount > 1 ? 'es' : ''
+    }`;
+  })();
+
+  const summaryParts = [
+    openFilesText,
+    geminiMdText,
+    mcpText,
+    backgroundText,
+  ].filter(Boolean);
 
   if (isNarrow) {
     return (
