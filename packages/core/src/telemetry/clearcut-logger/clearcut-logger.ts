@@ -1214,7 +1214,7 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
-        value: event.extension_name,
+        value: event.hashed_extension_name,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,

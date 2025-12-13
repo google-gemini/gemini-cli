@@ -1558,17 +1558,20 @@ export class ExtensionDisableEvent implements BaseTelemetryEvent {
   'event.name': 'extension_disable';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   setting_scope: string;
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     settingScope: string,
   ) {
     this['event.name'] = 'extension_disable';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.setting_scope = settingScope;
   }

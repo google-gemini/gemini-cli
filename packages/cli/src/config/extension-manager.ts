@@ -719,7 +719,7 @@ export class ExtensionManager extends ExtensionLoader {
     }
     await logExtensionDisable(
       this.telemetryConfig,
-      new ExtensionDisableEvent(hashValue(name), extension.id, scope),
+      new ExtensionDisableEvent(name, hashValue(name), extension.id, scope),
     );
     if (!this.config || this.config.getEnableExtensionReloading()) {
       // Only toggle the isActive state if we are actually going to disable it

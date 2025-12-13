@@ -1951,7 +1951,12 @@ describe('loggers', () => {
     });
 
     it('should log extension disable event', async () => {
-      const event = new ExtensionDisableEvent('testing', 'testing-id', 'user');
+      const event = new ExtensionDisableEvent(
+        'testing',
+        'testing-hash',
+        'testing-id',
+        'user',
+      );
 
       await logExtensionDisable(mockConfig, event);
 
