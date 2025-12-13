@@ -79,6 +79,7 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.vscode);
   });
 
@@ -86,11 +87,21 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '');
     expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.vscodefork);
+  });
+
+  it('should detect positron when POSITRON is set', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('MONOSPACE_ENV', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '1');
+    expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.positron);
   });
 
   it('should detect AntiGravity', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('POSITRON', '');
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.antigravity);
   });
@@ -114,6 +125,7 @@ describe('detectIde with ideInfoFromFile', () => {
   it('should fall back to env detection if name is missing', () => {
     const ideInfoFromFile = { displayName: 'Custom IDE' };
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('POSITRON', '');
     vi.stubEnv('CURSOR_TRACE_ID', '');
     expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(
       IDE_DEFINITIONS.vscode,
@@ -123,6 +135,7 @@ describe('detectIde with ideInfoFromFile', () => {
   it('should fall back to env detection if displayName is missing', () => {
     const ideInfoFromFile = { name: 'custom-ide' };
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('POSITRON', '');
     vi.stubEnv('CURSOR_TRACE_ID', '');
     expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(
       IDE_DEFINITIONS.vscode,

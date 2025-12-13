@@ -251,3 +251,48 @@ describe('AntigravityInstaller', () => {
     expect(result.message).toContain('not-a-command not found');
   });
 });
+
+describe('PositronInstaller', () => {
+  function setup({
+    execSync = () => '',
+    platform = 'linux' as NodeJS.Platform,
+  }: {
+    execSync?: () => string;
+    platform?: NodeJS.Platform;
+  } = {}) {
+    vi.spyOn(child_process, 'execSync').mockImplementation(execSync);
+    const installer = getIdeInstaller(IDE_DEFINITIONS.positron, platform)!;
+
+    return { installer };
+  }
+
+  it('installs the extension', async () => {
+    vi.stubEnv('POSITRON', '1');
+    const { installer } = setup({});
+    const result = await installer.install();
+
+    expect(result.success).toBe(true);
+    expect(child_process.spawnSync).toHaveBeenCalledWith(
+      'positron',
+      [
+        '--install-extension',
+        'google.gemini-cli-vscode-ide-companion',
+        '--force',
+      ],
+      { stdio: 'pipe', shell: false },
+    );
+  });
+
+  it('returns a failure message if the alias is not set', async () => {
+    vi.stubEnv('POSITRON', '');
+    const { installer } = setup({
+      execSync: () => {
+        throw new Error('Command not found');
+      },
+    });
+    const result = await installer.install();
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Positron CLI not found');
+  });
+});
