@@ -332,26 +332,11 @@ export async function loadPoliciesFromToml(
             return rule.modes.includes(approvalMode);
           })
           .flatMap((rule) => {
-            // Transform commandPrefix/commandRegex to argsPattern
-            let effectiveArgsPattern = rule.argsPattern;
-            const commandPrefixes: string[] = [];
-
-            if (rule.commandPrefix) {
-              const prefixes = Array.isArray(rule.commandPrefix)
-                ? rule.commandPrefix
-                : [rule.commandPrefix];
-              commandPrefixes.push(...prefixes);
-            } else if (rule.commandRegex) {
-              effectiveArgsPattern = `"command":"${rule.commandRegex}`;
-            }
-
-            // Expand command prefixes to multiple patterns
-            const argsPatterns: Array<string | undefined> =
-              commandPrefixes.length > 0
-                ? commandPrefixes.map(
-                    (prefix) => `"command":"${escapeRegex(prefix)}(?:[\\s"]|$)`,
-                  )
-                : [effectiveArgsPattern];
+            const argsPatterns = buildArgsPatterns(
+              rule.argsPattern,
+              rule.commandPrefix,
+              rule.commandRegex,
+            );
 
             // For each argsPattern, expand toolName arrays
             return argsPatterns.flatMap((argsPattern) => {
@@ -419,24 +404,11 @@ export async function loadPoliciesFromToml(
             return checker.modes.includes(approvalMode);
           })
           .flatMap((checker) => {
-            let effectiveArgsPattern = checker.argsPattern;
-            const commandPrefixes: string[] = [];
-
-            if (checker.commandPrefix) {
-              const prefixes = Array.isArray(checker.commandPrefix)
-                ? checker.commandPrefix
-                : [checker.commandPrefix];
-              commandPrefixes.push(...prefixes);
-            } else if (checker.commandRegex) {
-              effectiveArgsPattern = `"command":"${checker.commandRegex}`;
-            }
-
-            const argsPatterns: Array<string | undefined> =
-              commandPrefixes.length > 0
-                ? commandPrefixes.map(
-                    (prefix) => `"command":"${escapeRegex(prefix)}(?:[\\s"]|$)`,
-                  )
-                : [effectiveArgsPattern];
+            const argsPatterns = buildArgsPatterns(
+              checker.argsPattern,
+              checker.commandPrefix,
+              checker.commandRegex,
+            );
 
             return argsPatterns.flatMap((argsPattern) => {
               const toolNames: Array<string | undefined> = checker.toolName
@@ -503,4 +475,33 @@ export async function loadPoliciesFromToml(
   }
 
   return { rules, checkers, errors };
+}
+
+/**
+ * Helper to build arg patterns from configuration.
+ * Extracted to reduce duplication and allow testing.
+ */
+export function buildArgsPatterns(
+  argsPattern?: string,
+  commandPrefix?: string | string[],
+  commandRegex?: string,
+): Array<string | undefined> {
+  let effectiveArgsPattern = argsPattern;
+  const commandPrefixes: string[] = [];
+
+  if (commandPrefix) {
+    const prefixes = Array.isArray(commandPrefix)
+      ? commandPrefix
+      : [commandPrefix];
+    commandPrefixes.push(...prefixes);
+  } else if (commandRegex) {
+    effectiveArgsPattern = `"command":"${commandRegex}`;
+  }
+
+  // Expand command prefixes to multiple patterns.
+  // We append [\s"] to ensure we match whole words only (e.g., "git" but not "github").
+  // Since we match against JSON stringified args, the value is always followed by a space or a closing quote.
+  return commandPrefixes.length > 0
+    ? commandPrefixes.map((prefix) => `"command":"${escapeRegex(prefix)}[\\s"]`)
+    : [effectiveArgsPattern];
 }

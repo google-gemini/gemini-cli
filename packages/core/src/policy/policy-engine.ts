@@ -140,7 +140,37 @@ export class PolicyEngine {
       `[PolicyEngine.check] toolCall.name: ${toolCall.name}, stringifiedArgs: ${stringifiedArgs}`,
     );
 
-    // Find the first matching rule (already sorted by priority)
+    // Check for shell commands upfront to handle splitting
+    let subCommands: string[] | undefined;
+    let isShellCommand = false;
+    let command: string | undefined;
+
+    if (toolCall.name && SHELL_TOOL_NAMES.includes(toolCall.name)) {
+      isShellCommand = true;
+      command = (toolCall.args as { command?: string })?.command;
+      if (command) {
+        // Initialize parser if needed (lazy load)
+        await initializeShellParsers();
+        subCommands = splitCommands(command);
+
+        if (subCommands.length === 0) {
+          // Parsing failed or empty command -> Unsafe to rely on prefix matching
+          debugLogger.debug(
+            `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to default/safe decision.`,
+          );
+          // If parsing fails, we cannot safely decompose the command.
+          // We force an ASK_USER decision (or DENY in non-interactive) regardless of rules,
+          // because we can't guarantee a rule matches the *actual* executed logic if we can't parse it.
+          // Using defaultDecision might be too lenient if default is ALLOW (though it shouldn't be).
+          // Safest is ASK_USER.
+          return {
+            decision: this.applyNonInteractiveMode(PolicyDecision.ASK_USER),
+            rule: undefined,
+          };
+        }
+      }
+    }
+
     let matchedRule: PolicyRule | undefined;
     let decision: PolicyDecision | undefined;
 
@@ -150,38 +180,31 @@ export class PolicyEngine {
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
 
-        // Special handling for shell commands: check sub-commands if present
-        if (
-          toolCall.name &&
-          SHELL_TOOL_NAMES.includes(toolCall.name) &&
-          rule.decision === PolicyDecision.ALLOW
-        ) {
-          const command = (toolCall.args as { command?: string })?.command;
-          if (command) {
-            await initializeShellParsers();
-            const subCommands = splitCommands(command);
-
-            // If there are multiple sub-commands, we must verify EACH of them matches an ALLOW rule.
-            // If any sub-command results in DENY -> the whole thing is DENY.
-            // If any sub-command results in ASK_USER -> the whole thing is ASK_USER (unless one is DENY).
-            // Only if ALL sub-commands are ALLOW do we proceed with ALLOW.
-            if (subCommands.length === 0) {
-              // This case occurs if the command is non-empty but parsing fails.
-              // An ALLOW rule for a prefix might have matched, but since the rest of
-              // the command is un-parseable, it's unsafe to proceed.
-              // Fall back to a safe decision.
-              debugLogger.debug(
-                `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to safe decision because implicit ALLOW is unsafe.`,
-              );
-              decision = this.applyNonInteractiveMode(PolicyDecision.ASK_USER);
-            } else if (subCommands.length > 1) {
+        if (isShellCommand && rule.decision === PolicyDecision.ALLOW) {
+          // For shell commands, if the matching rule is ALLOW, we must verify ALL subcommands allow it.
+          // If subsCommands is set (length > 0), we check them.
+          if (subCommands && subCommands.length > 0) {
+            if (subCommands.length > 1) {
               debugLogger.debug(
                 `[PolicyEngine.check] Compound command detected: ${subCommands.length} parts`,
               );
               let aggregateDecision = PolicyDecision.ALLOW;
+              // We need to check if *any* subcommand fails the check.
+              // Note: We are recursively checking subcommands against the FULL rule set.
+              // This ensures that "git log" matches the "git log" rule,
+              // and "rm -rf /" matches (or doesn't match) its own rules.
 
               for (const subCmd of subCommands) {
-                // Recursively check each sub-command
+                // Prevent infinite recursion if the subcommand is identical to the original command.
+                // This happens when splitCommands returns the root command along with its children.
+                // We use trimmed comparison to be robust against whitespace differences.
+                if (command && subCmd.trim() === command.trim()) {
+                  debugLogger.debug(
+                    `[PolicyEngine.check] Skipping recursion for self-referential command: "${subCmd.trim()}" vs original: "${command.trim()}"`,
+                  );
+                  continue;
+                }
+
                 const subCall = {
                   name: toolCall.name,
                   args: { command: subCmd },
@@ -190,37 +213,42 @@ export class PolicyEngine {
 
                 if (subResult.decision === PolicyDecision.DENY) {
                   aggregateDecision = PolicyDecision.DENY;
-                  break; // Fail fast
+                  matchedRule = subResult.rule ?? rule; // Blame the rule that denied it
+                  break;
                 } else if (subResult.decision === PolicyDecision.ASK_USER) {
                   aggregateDecision = PolicyDecision.ASK_USER;
-                  // efficient: we can only strictly downgrade from ALLOW to ASK_USER,
-                  // but we must continue looking for DENY.
+                  if (!matchedRule) matchedRule = subResult.rule ?? rule;
                 }
               }
-
               decision = aggregateDecision;
             } else {
-              // Single command, rule match is valid
-              decision = this.applyNonInteractiveMode(rule.decision);
+              // Single command found. Rely on the initial rule match.
+              decision = rule.decision;
             }
           } else {
-            decision = this.applyNonInteractiveMode(rule.decision);
+            // No subcommands found (should have been caught by generic check above unless command was empty)
+            decision = rule.decision;
           }
         } else {
-          decision = this.applyNonInteractiveMode(rule.decision);
+          // Not a shell command OR decision is not ALLOW (DENY/ASK_USER apply immediately)
+          decision = rule.decision;
         }
+
         matchedRule = rule;
         break;
       }
     }
 
     if (!decision) {
-      // No matching rule found, use default decision
+      // No matching rule found
       debugLogger.debug(
         `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
       );
-      decision = this.applyNonInteractiveMode(this.defaultDecision);
+      decision = this.defaultDecision;
     }
+
+    // Apply non-interactive mode constraint to the final decision
+    decision = this.applyNonInteractiveMode(decision);
 
     // If decision is not DENY, run safety checkers
     if (decision !== PolicyDecision.DENY && this.checkerRunner) {
@@ -247,7 +275,7 @@ export class PolicyEngine {
               debugLogger.debug(
                 `[PolicyEngine.check] Safety checker requested ASK_USER: ${result.reason}`,
               );
-              decision = PolicyDecision.ASK_USER;
+              decision = this.applyNonInteractiveMode(PolicyDecision.ASK_USER);
             }
           } catch (error) {
             debugLogger.debug(
@@ -263,7 +291,7 @@ export class PolicyEngine {
     }
 
     return {
-      decision: this.applyNonInteractiveMode(decision),
+      decision,
       rule: matchedRule,
     };
   }
