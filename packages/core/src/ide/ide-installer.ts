@@ -53,7 +53,8 @@ async function findCommand(
 
   interface AppConfigEntry {
     mac?: { appName: string; supportDirName: string };
-    win?: { appName: string };
+    win?: { appName: string; appBinary: string };
+    linux?: { appBinary: string };
   }
 
   interface AppConfigs {
@@ -64,11 +65,13 @@ async function findCommand(
   const appConfigs: AppConfigs = {
     code: {
       mac: { appName: 'Visual Studio Code', supportDirName: 'Code' },
-      win: { appName: 'Microsoft VS Code' },
+      win: { appName: 'Microsoft VS Code', appBinary: 'code.cmd' },
+      linux: { appBinary: 'code' },
     },
     positron: {
       mac: { appName: 'Positron', supportDirName: 'Positron' },
-      win: { appName: 'Positron' },
+      win: { appName: 'Positron', appBinary: 'positron.cmd' },
+      linux: { appBinary: 'positron' },
     },
   };
 
@@ -96,11 +99,17 @@ async function findCommand(
       }
     } else if (platform === 'linux') {
       // Linux
-      locations.push(
-        `/usr/share/${appname}/bin/${appname}`,
-        `/snap/bin/${appname}`,
-        path.join(homeDir, `.local/share/${appname}/bin/${appname}`),
-      );
+      const linuxConfig = appConfigs[appname]?.linux;
+      if (linuxConfig) {
+        locations.push(
+          `/usr/share/${linuxConfig.appBinary}/bin/${linuxConfig.appBinary}`,
+          `/snap/bin/${linuxConfig.appBinary}`,
+          path.join(
+            homeDir,
+            `.local/share/${linuxConfig.appBinary}/bin/${linuxConfig.appBinary}`,
+          ),
+        );
+      }
     } else if (platform === 'win32') {
       // Windows
       const winConfig = appConfigs[appname].win;
@@ -111,7 +120,7 @@ async function findCommand(
             process.env['ProgramFiles'] || 'C:\\Program Files',
             winAppName,
             'bin',
-            `${appname}.cmd`,
+            winConfig.appBinary,
           ),
           path.join(
             homeDir,
@@ -120,7 +129,7 @@ async function findCommand(
             'Programs',
             winAppName,
             'bin',
-            `${appname}.cmd`,
+            winConfig.appBinary,
           ),
         );
       }
@@ -136,7 +145,7 @@ async function findCommand(
   return null;
 }
 
-class VsCodeInstaller implements IdeInstaller {
+class VscodeFamilyInstaller implements IdeInstaller {
   private vsCodeCommand: Promise<string | null>;
   private readonly vscodeexec: string;
 
@@ -258,9 +267,9 @@ export function getIdeInstaller(
   switch (ide.name) {
     case IDE_DEFINITIONS.vscode.name:
     case IDE_DEFINITIONS.firebasestudio.name:
-      return new VsCodeInstaller(ide, platform);
+      return new VscodeFamilyInstaller(ide, platform);
     case IDE_DEFINITIONS.positron.name:
-      return new VsCodeInstaller(ide, platform);
+      return new VscodeFamilyInstaller(ide, platform);
     case IDE_DEFINITIONS.antigravity.name:
       return new AntigravityInstaller(ide, platform);
     default:

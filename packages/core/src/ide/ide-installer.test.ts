@@ -40,7 +40,7 @@ describe('ide-installer', () => {
     it.each([
       { ide: IDE_DEFINITIONS.vscode },
       { ide: IDE_DEFINITIONS.firebasestudio },
-    ])('returns a VsCodeInstaller for "$ide.name"', ({ ide }) => {
+    ])('returns a VsCodeFamilyInstaller for "$ide.name"', ({ ide }) => {
       const installer = getIdeInstaller(ide);
 
       expect(installer).not.toBeNull();
@@ -55,7 +55,7 @@ describe('ide-installer', () => {
     });
   });
 
-  describe('VsCodeInstaller', () => {
+  describe('VsCodeFamilyInstaller for VS Code', () => {
     function setup({
       ide = IDE_DEFINITIONS.vscode,
       existsResult = false,
@@ -251,7 +251,7 @@ describe('AntigravityInstaller', () => {
   });
 });
 
-describe('PositronInstaller', () => {
+describe('VsCodeFamilyInstaller for Positron', () => {
   function setup({
     execSync = () => '',
     platform = 'linux' as NodeJS.Platform,
