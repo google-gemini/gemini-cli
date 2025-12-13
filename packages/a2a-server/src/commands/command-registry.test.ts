@@ -8,6 +8,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Command } from './types.js';
 
 describe('CommandRegistry', () => {
+  let commandRegistry: CommandRegistry;
+
   const mockListExtensionsCommandInstance: Command = {
     name: 'extensions list',
     description: 'Lists all installed extensions.',
@@ -45,38 +47,28 @@ describe('CommandRegistry', () => {
         execute = vi.fn();
       },
     }));
+
+    const { CommandRegistry: Registry } = await import('./command-registry.js');
+    commandRegistry = new Registry();
   });
 
   it('should register ExtensionsCommand on initialization', async () => {
-    // Re-import CommandRegistry after mocking dependencies
-    const { CommandRegistry } = await import('./command-registry.js');
-    const commandRegistry = new CommandRegistry();
-
     expect(mockExtensionsCommand).toHaveBeenCalled();
     const command = commandRegistry.get('extensions');
     expect(command).toBe(mockExtensionsCommandInstance);
   });
 
   it('should register sub commands on initialization', async () => {
-    const { CommandRegistry } = await import('./command-registry.js');
-    const commandRegistry = new CommandRegistry();
-
     const command = commandRegistry.get('extensions list');
     expect(command).toBe(mockListExtensionsCommandInstance);
   });
 
   it('get() should return undefined for a non-existent command', async () => {
-    const { CommandRegistry } = await import('./command-registry.js');
-    const commandRegistry = new CommandRegistry();
-
     const command = commandRegistry.get('non-existent');
     expect(command).toBeUndefined();
   });
 
   it('register() should register a new command', async () => {
-    const { CommandRegistry } = await import('./command-registry.js');
-    const commandRegistry = new CommandRegistry();
-
     const mockCommand: Command = {
       name: 'test-command',
       description: '',
@@ -88,9 +80,6 @@ describe('CommandRegistry', () => {
   });
 
   it('register() should register a nested command', async () => {
-    const { CommandRegistry } = await import('./command-registry.js');
-    const commandRegistry = new CommandRegistry();
-
     const mockSubSubCommand: Command = {
       name: 'test-command-sub-sub',
       description: '',
@@ -121,8 +110,6 @@ describe('CommandRegistry', () => {
 
   it('register() should not enter an infinite loop with a cyclic command', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { CommandRegistry } = await import('./command-registry.js');
-    const commandRegistry = new CommandRegistry();
 
     const mockCommand: Command = {
       name: 'cyclic-command',
