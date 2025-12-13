@@ -8,6 +8,23 @@ import { Box, Text } from 'ink';
 import type { SamplingMessage } from '@modelcontextprotocol/sdk/types.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { Scrollable } from './shared/Scrollable.js';
+import { theme } from '../semantic-colors.js';
+
+/**
+ * Extract text content from an MCP message content object.
+ */
+function getMessageText(content: SamplingMessage['content']): string {
+  if (typeof content === 'object' && content !== null) {
+    if ('text' in content && typeof content.text === 'string') {
+      return content.text;
+    }
+    if ('type' in content) {
+      // For non-text content types (image, audio), show the type
+      return `[${content.type} content]`;
+    }
+  }
+  return JSON.stringify(content);
+}
 
 export function McpSamplingDialog({
   serverName,
@@ -29,8 +46,17 @@ export function McpSamplingDialog({
     : undefined;
 
   const content = (
-    <Box borderStyle="round" padding={1}>
-      <Text>{JSON.stringify(prompt, null, 2)}</Text>
+    <Box flexDirection="column" borderStyle="round" padding={1}>
+      {prompt.map((message, index) => (
+        <Box key={index} flexDirection="column" marginBottom={1}>
+          <Text bold color={theme.text.secondary}>
+            {message.role === 'user' ? 'User' : 'Assistant'}:
+          </Text>
+          <Text color={theme.text.primary}>
+            {getMessageText(message.content)}
+          </Text>
+        </Box>
+      ))}
     </Box>
   );
 

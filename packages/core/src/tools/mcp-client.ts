@@ -1369,6 +1369,9 @@ export async function connectToMcpServer(
     };
   });
 
+  // Timeout for sampling consent dialog (5 minutes)
+  const SAMPLING_CONSENT_TIMEOUT_MS = 5 * 60 * 1000;
+
   mcpClient.setRequestHandler(CreateMessageRequestSchema, async (req) => {
     const autoConfirm = cliConfig.getAutoConfirmMcpSampling();
 
@@ -1376,13 +1379,26 @@ export async function connectToMcpServer(
 
     if (!autoConfirm) {
       const consentPromise = new Promise<void>((resolve, reject) => {
-        rejectSampling = reject; // Store for error handling
+        const timeoutId = setTimeout(() => {
+          reject(new Error('Sampling consent request timed out'));
+        }, SAMPLING_CONSENT_TIMEOUT_MS);
+
+        rejectSampling = (reason) => {
+          clearTimeout(timeoutId);
+          reject(reason);
+        };
+
         coreEvents.emit(CoreEvent.McpSamplingRequest, {
           serverName: mcpServerName,
           prompt: req.params.messages,
-          resolve,
-          reject: (_reason?: unknown) =>
-            reject(new Error('User rejected sampling request')),
+          resolve: () => {
+            clearTimeout(timeoutId);
+            resolve();
+          },
+          reject: (_reason?: unknown) => {
+            clearTimeout(timeoutId);
+            reject(new Error('User rejected sampling request'));
+          },
         });
       });
 
@@ -1437,8 +1453,14 @@ export async function connectToMcpServer(
           );
         }
 
+        // Map MCP roles to Gemini roles
+        // MCP: 'user' | 'assistant'
+        // Gemini: 'user' | 'model'
+        const geminiRole =
+          message.role === 'assistant' ? 'model' : message.role;
+
         return {
-          role: message.role as 'user' | 'model',
+          role: geminiRole,
           parts,
         };
       });

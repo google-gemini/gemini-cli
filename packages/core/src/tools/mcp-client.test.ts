@@ -1590,6 +1590,7 @@ describe('connectToMcpServer with OAuth', () => {
     getGeminiClient: () => ({
       generateContent: vi.fn(),
     }),
+    getModel: () => 'gemini-2.0-flash',
   } as unknown as Config;
 
   beforeEach(() => {
@@ -1725,7 +1726,13 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
   let mockedClient: ClientLib.Client;
   let workspaceContext: WorkspaceContext;
   let testWorkspace: string;
-  const mockConfig = {} as Config;
+  const mockConfig = {
+    getAutoConfirmMcpSampling: () => false,
+    getGeminiClient: () => ({
+      generateContent: vi.fn(),
+    }),
+    getModel: () => 'gemini-2.0-flash',
+  } as unknown as Config;
 
   beforeEach(() => {
     mockedClient = {
@@ -1853,7 +1860,13 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
   let testWorkspace: string;
   let mockAuthProvider: MCPOAuthProvider;
   let mockTokenStorage: MCPOAuthTokenStorage;
-  const mockConfig = {} as Config;
+  const mockConfig = {
+    getAutoConfirmMcpSampling: () => false,
+    getGeminiClient: () => ({
+      generateContent: vi.fn(),
+    }),
+    getModel: () => 'gemini-2.0-flash',
+  } as unknown as Config;
 
   beforeEach(() => {
     mockedClient = {
