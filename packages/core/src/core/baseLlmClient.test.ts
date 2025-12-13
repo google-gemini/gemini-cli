@@ -299,7 +299,7 @@ describe('BaseLlmClient', () => {
       // Validate the telemetry event content - find the most recent call
       const calls = vi.mocked(logMalformedJsonResponse).mock.calls;
       const lastCall = calls[calls.length - 1];
-      const event = lastCall[1] as MalformedJsonResponseEvent;
+      const event = lastCall[1];
       expect(event.model).toBe(defaultOptions.modelConfigKey.model);
     });
 
@@ -347,7 +347,7 @@ describe('BaseLlmClient', () => {
       expect(logMalformedJsonResponse).toHaveBeenCalled();
       const calls = vi.mocked(logMalformedJsonResponse).mock.calls;
       const lastCall = calls[calls.length - 1];
-      const event = lastCall[1] as MalformedJsonResponseEvent;
+      const event = lastCall[1];
 
       // This is the key assertion: it should be the resolved model, not the alias
       expect(event.model).toBe(resolvedModel);
