@@ -51,7 +51,20 @@ async function findCommand(
   const locations: string[] = [];
   const homeDir = os.homedir();
 
-  let appname: string = "";
+  const appConfigs = {
+    code: {
+      mac: { appName: 'Visual Studio Code', supportDirName: 'Code' },
+      win: { appName: 'Microsoft VS Code' },
+    },
+    positron: {
+      mac: { appName: 'Positron', supportDirName: 'Positron' },
+      win: { appName: 'Positron' },
+    },
+  };
+
+
+  type AppName = keyof typeof appConfigs;                                                                    █
+  let appname: AppName | undefined;                                                                          
 
   if (command === 'code' || command === 'code.cmd') {
     appname = "code";
@@ -59,14 +72,13 @@ async function findCommand(
     appname = "positron";
   }
 
-  if (appname !== "") {
+  if (appname) {
     if (platform === 'darwin') {
       // macOS
-      const mac_app = appname === 'positron' ? 'Positron' : 'Visual Studio Code';
-      const appname_uppercase = appname === 'positron' ? 'Positron' : 'Code';
+      const macConfig = appConfigs[appname].mac; 
       locations.push(
-        `/Applications/${mac_app}.app/Contents/Resources/app/bin/${appname}`,
-        path.join(homeDir, `Library/Application Support/${appname_uppercase}/bin/${appname}`),
+        `/Applications/${macConfig.appName}.app/Contents/Resources/app/bin/${appname}`,
+        path.join(homeDir, `Library/Application Support/${macConfig.supportDirName}/bin/${appname}`),
       );
     } else if (platform === 'linux') {
       // Linux
@@ -77,11 +89,11 @@ async function findCommand(
       );
     } else if (platform === 'win32') {
       // Windows
-      const win_app = appname === 'positron' ? 'Positron' : 'Microsoft VS Code';
+      const winAppName = appConfigs[appname].win.appName;
       locations.push(
         path.join(
           process.env['ProgramFiles'] || 'C:\\Program Files',
-          `${win_app}`,
+          winAppName,
           'bin',
           `${appname}.cmd`,
         ),
@@ -90,7 +102,7 @@ async function findCommand(
           'AppData',
           'Local',
           'Programs',
-          `${win_app}`,
+          winAppName,
           'bin',
           `${appname}.cmd`,
         ),
@@ -109,7 +121,7 @@ async function findCommand(
 
 class VsCodeInstaller implements IdeInstaller {
   private vsCodeCommand: Promise<string | null>;
-  private vscodeexec: string | undefined;
+  private readonly vscodeexec: string;
 
   constructor(
     readonly ideInfo: IdeInfo,
