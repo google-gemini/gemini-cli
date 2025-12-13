@@ -16,6 +16,11 @@ import type {
   ClientMetadata,
   RetrieveUserQuotaRequest,
   RetrieveUserQuotaResponse,
+  RecordCodeAssistMetricsRequest,
+  CodeAssistMetric,
+  ConversationOffered,
+  ConversationInteraction,
+  StreamingLatency,
 } from './types.js';
 import type {
   ListExperimentsRequest,
@@ -42,6 +47,11 @@ import {
   toCountTokenRequest,
   toGenerateContentRequest,
 } from './converter.js';
+import {
+  createConversationOffered,
+  formatProtoJsonDuration,
+} from './telemetry.js';
+import { getClientMetadata } from './experiments/client_metadata.js';
 
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
@@ -65,27 +75,62 @@ export class CodeAssistServer implements ContentGenerator {
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    const resps = await this.requestStreamingPost<CaGenerateContentResponse>(
-      'streamGenerateContent',
-      toGenerateContentRequest(
-        req,
-        userPromptId,
-        this.projectId,
-        this.sessionId,
-      ),
-      req.config?.abortSignal,
-    );
-    return (async function* (): AsyncGenerator<GenerateContentResponse> {
-      for await (const resp of resps) {
-        yield fromGenerateContentResponse(resp);
+    const responses =
+      await this.requestStreamingPost<CaGenerateContentResponse>(
+        'streamGenerateContent',
+        toGenerateContentRequest(
+          req,
+          userPromptId,
+          this.projectId,
+          this.sessionId,
+        ),
+        req.config?.abortSignal,
+      );
+
+    const streamingLatency: StreamingLatency = {};
+    const start = Date.now();
+    let isFirst = true;
+
+    return (async function* (
+      server: CodeAssistServer,
+    ): AsyncGenerator<GenerateContentResponse> {
+      for await (const response of responses) {
+        if (isFirst) {
+          streamingLatency.firstMessageLatency = formatProtoJsonDuration(
+            Date.now() - start,
+          );
+          isFirst = false;
+        }
+
+        streamingLatency.totalLatency = formatProtoJsonDuration(
+          Date.now() - start,
+        );
+
+        const translatedResponse = fromGenerateContentResponse(response);
+
+        if (response.traceId) {
+          // TODO: figure out how to tell if there's an error.
+          const hasError = false;
+          const offered = createConversationOffered(
+            translatedResponse,
+            hasError,
+            response.traceId,
+            req.config?.abortSignal,
+            streamingLatency,
+          );
+          await server.recordConversationOffered(offered);
+        }
+
+        yield translatedResponse;
       }
-    })();
+    })(this);
   }
 
   async generateContent(
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<GenerateContentResponse> {
+    const start = Date.now();
     const resp = await this.requestPost<CaGenerateContentResponse>(
       'generateContent',
       toGenerateContentRequest(
@@ -96,7 +141,26 @@ export class CodeAssistServer implements ContentGenerator {
       ),
       req.config?.abortSignal,
     );
-    return fromGenerateContentResponse(resp);
+    const streamingLatency: StreamingLatency = {
+      totalLatency: formatProtoJsonDuration(Date.now() - start),
+    };
+
+    const translatedResponse = fromGenerateContentResponse(resp);
+
+    if (resp.traceId) {
+      // TODO: figure out how to tell if there's an error.
+      const hasError = false;
+      const offered = createConversationOffered(
+        translatedResponse,
+        hasError,
+        resp.traceId,
+        req.config?.abortSignal,
+        streamingLatency,
+      );
+      await this.recordConversationOffered(offered);
+    }
+
+    return translatedResponse;
   }
 
   async onboardUser(
@@ -174,6 +238,48 @@ export class CodeAssistServer implements ContentGenerator {
       'retrieveUserQuota',
       req,
     );
+  }
+
+  async recordConversationOffered(
+    conversationOffered: ConversationOffered,
+  ): Promise<void> {
+    if (!this.projectId) {
+      return;
+    }
+
+    const metric: CodeAssistMetric = {
+      conversationOffered,
+    };
+
+    await this.recordCodeAssistMetrics({
+      project: this.projectId,
+      metadata: await getClientMetadata(),
+      metrics: [metric],
+    });
+  }
+
+  async recordConversationInteraction(
+    interaction: ConversationInteraction,
+  ): Promise<void> {
+    if (!this.projectId) {
+      return;
+    }
+
+    const metric: CodeAssistMetric = {
+      conversationInteraction: interaction,
+    };
+
+    await this.recordCodeAssistMetrics({
+      project: this.projectId,
+      metadata: await getClientMetadata(),
+      metrics: [metric],
+    });
+  }
+
+  async recordCodeAssistMetrics(
+    req: RecordCodeAssistMetricsRequest,
+  ): Promise<void> {
+    return this.requestPost<void>('recordCodeAssistMetrics', req);
   }
 
   async requestPost<T>(

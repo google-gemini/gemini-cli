@@ -177,7 +177,7 @@ export interface HelpLinkUrl {
 
 export interface SetCodeAssistGlobalUserSettingRequest {
   cloudaicompanionProject?: string;
-  freeTierDataCollectionOptin: boolean;
+  freeTierDataCollectionOptin?: boolean;
 }
 
 export interface CodeAssistGlobalUserSettingResponse {
@@ -216,4 +216,156 @@ export interface BucketInfo {
 
 export interface RetrieveUserQuotaResponse {
   buckets?: BucketInfo[];
+}
+
+export interface RecordCodeAssistMetricsRequest {
+  project: string;
+  requestId?: string;
+  metadata?: ClientMetadata;
+  metrics?: CodeAssistMetric[];
+}
+
+export interface CodeAssistMetric {
+  timestamp?: string;
+  metricMetadata?: Map<string, string>;
+
+  // The event tied to this metric. Only one of these should be set.
+  inlineCompletionAccepted?: InlineCompletionAccepted;
+  inlineCompletionOffered?: InlineCompletionOffered;
+  conversationOffered?: ConversationOffered;
+  generateCodeUI?: GenerateCodeUI;
+  conversationExplainUI?: ConversationExplainUI;
+  conversationGenerateTestUI?: ConversationGenerateTestUI;
+  conversationInteraction?: ConversationInteraction;
+  aiCharactersReports?: AiCharactersReports;
+}
+
+export enum ConversationInteractionType {
+  UNSPECIFIED = 'INTERACTION_TYPE_UNSPECIFIED',
+  ACCEPTANCE = 'ACCEPTANCE',
+  DISMISSAL = 'DISMISSAL',
+}
+
+export enum InlineCompletionAcceptedCompletionMethod {
+  UNKNOWN = 0,
+  GENERATE_CODE = 1,
+  COMPLETE_CODE = 2,
+  TRANSFORM_CODE = 3,
+  AUTOMATIC_GENERATION = 4,
+}
+
+export enum InlineCompletionOfferedCompletionMode {
+  UNKNOWN = 0,
+  LANGUAGE_CLIENT = 1,
+  TYPEOVER = 2,
+  TYPEOVER_NEWLINE = 3,
+  TRANSFORM_CODE = 4,
+}
+
+export enum InlineCompletionOfferedCompletionMethod {
+  COMPLETION_METHOD_UNKNOWN = 0,
+  COMPLETION_METHOD_GENERATE_CODE = 1,
+  COMPLETION_METHOD_COMPLETE_CODE = 2,
+  COMPLETION_METHOD_TRANSFORM_CODE = 3,
+  COMPLETION_METHOD_AUTOMATIC_GENERATION = 4,
+}
+
+export enum ConversationInteractionInteraction {
+  UNKNOWN = 0,
+  THUMBSUP = 1,
+  THUMBSDOWN = 2,
+  COPY = 3,
+  INSERT = 4,
+  ACCEPT_CODE_BLOCK = 5,
+  ACCEPT_ALL = 6,
+  ACCEPT_FILE = 7,
+  DIFF = 8,
+  ACCEPT_RANGE = 9,
+}
+
+export enum AiCharactersReportEditType {
+  EDIT_TYPE_UNSPECIFIED = 0,
+  USER_ADD = 1,
+  PASTE = 2,
+  DELETE = 3,
+  OTHER = 4,
+  AI_COMPLETION = 5,
+  AI_COMPLETION_PARTIAL = 6,
+  AI_GENERATION = 7,
+  AI_GENERATION_PARTIAL = 8,
+}
+
+export enum ActionStatus {
+  ACTION_STATUS_UNSPECIFIED = 0,
+  ACTION_STATUS_NO_ERROR = 1,
+  ACTION_STATUS_ERROR_UNKNOWN = 2,
+  ACTION_STATUS_CANCELLED = 3,
+  ACTION_STATUS_EMPTY = 4,
+}
+
+export interface InlineCompletionAccepted {
+  traceId?: string;
+  score?: number;
+  responseSize?: string;
+  responseLines?: string;
+  language?: string;
+  completionMethod?: InlineCompletionAcceptedCompletionMethod;
+  partialAcceptedCharacters?: string;
+  partialAcceptedLines?: string;
+  acceptedCommentLines?: string;
+  status?: ActionStatus;
+  responseAcceptedIndex?: string;
+}
+
+export interface InlineCompletionOffered {
+  traceId?: string;
+  resultCount?: string;
+  language?: string;
+  completionMode?: InlineCompletionOfferedCompletionMode;
+  displayLength?: string;
+  status?: ActionStatus;
+  completionMethod?: InlineCompletionOfferedCompletionMethod;
+  responseLatency?: string;
+  responseReceivedIndex?: string;
+}
+
+export interface ConversationOffered {
+  citationCount?: string;
+  includedCode?: boolean;
+  status?: ActionStatus;
+  traceId?: string;
+  streamingLatency?: StreamingLatency;
+  isAgentic?: boolean;
+}
+
+export interface StreamingLatency {
+  firstMessageLatency?: string;
+  totalLatency?: string;
+}
+
+export interface ConversationInteraction {
+  traceId: string;
+  status?: ActionStatus;
+  interaction?: ConversationInteractionInteraction;
+  acceptedLines?: string;
+  language?: string;
+  isAgentic?: boolean;
+}
+
+export type GenerateCodeUI = Record<string, never>;
+
+export type ConversationExplainUI = Record<string, never>;
+
+export type ConversationGenerateTestUI = Record<string, never>;
+
+export interface AiCharactersReports {
+  reports: AiCharactersReport[];
+}
+
+export interface AiCharactersReport {
+  language: string;
+  editType: AiCharactersReportEditType;
+  totalChars: string;
+  whitespaceChars: string;
+  timeIntervalIndex: string;
 }
