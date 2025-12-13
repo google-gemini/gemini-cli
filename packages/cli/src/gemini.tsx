@@ -26,6 +26,7 @@ import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
+import { startSimpleInteractive } from './simpleInteractiveCli.js';
 import {
   cleanupCheckpoints,
   registerCleanup,
@@ -319,10 +320,14 @@ export async function main() {
   const argv = await parseArguments(settings.merged);
   parseArgsHandle?.end();
 
+  // Determine if interactive mode is allowed (either real TTY or forced via flag)
+  const isInteractiveModeAllowed = process.stdin.isTTY || argv.forceInteractive;
+
   // Check for invalid input combinations early to prevent crashes
-  if (argv.promptInteractive && !process.stdin.isTTY) {
+  if (argv.promptInteractive && !isInteractiveModeAllowed) {
     writeToStderr(
-      'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.\n',
+      'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.\n' +
+        'Use --force-interactive to override this check for programmatic usage.\n',
     );
     await runExitCleanup();
     process.exit(ExitCodes.FATAL_INPUT_ERROR);
@@ -415,7 +420,7 @@ export async function main() {
         }
       }
       let stdinData = '';
-      if (!process.stdin.isTTY) {
+      if (!isInteractiveModeAllowed) {
         stdinData = await readStdin();
       }
 
@@ -526,9 +531,15 @@ export async function main() {
     }
 
     const wasRaw = process.stdin.isRaw;
-    if (config.isInteractive() && !wasRaw && process.stdin.isTTY) {
+    if (
+      config.isInteractive() &&
+      !wasRaw &&
+      isInteractiveModeAllowed &&
+      process.stdin.isTTY
+    ) {
       // Set this as early as possible to avoid spurious characters from
       // input showing up in the output.
+      // Only set raw mode if we have an actual TTY (not just forced interactive)
       process.stdin.setRawMode(true);
 
       if (
@@ -603,14 +614,29 @@ export async function main() {
     cliStartupHandle?.end();
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
-      await startInteractiveUI(
-        config,
-        settings,
-        startupWarnings,
-        process.cwd(),
-        resumedSessionData,
-        initializationResult,
-      );
+      // Determine if we should use simple mode (non-TTY with --force-interactive)
+      const useSimpleMode = !process.stdin.isTTY && argv.forceInteractive;
+
+      if (useSimpleMode) {
+        // Use simple line-based I/O for non-TTY environments
+        await startSimpleInteractive({
+          config,
+          settings,
+          workspaceRoot: process.cwd(),
+          resumedSessionData,
+          initializationResult,
+        });
+      } else {
+        // Use full Ink terminal UI for TTY environments
+        await startInteractiveUI(
+          config,
+          settings,
+          startupWarnings,
+          process.cwd(),
+          resumedSessionData,
+          initializationResult,
+        );
+      }
       return;
     }
 
@@ -633,9 +659,9 @@ export async function main() {
       });
     }
 
-    // If not a TTY, read from stdin
+    // If not a TTY (and not forced interactive), read from stdin
     // This is for cases where the user pipes input directly into the command
-    if (!process.stdin.isTTY) {
+    if (!isInteractiveModeAllowed) {
       const stdinData = await readStdin();
       if (stdinData) {
         input = `${stdinData}\n\n${input}`;
