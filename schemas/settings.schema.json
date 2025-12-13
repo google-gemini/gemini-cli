@@ -342,6 +342,13 @@
             }
           },
           "additionalProperties": false
+        },
+        "enableNotifications": {
+          "title": "Enable Desktop Notifications",
+          "description": "Enable desktop notifications for user permission prompts when the CLI is not in focus.",
+          "markdownDescription": "Enable desktop notifications for user permission prompts when the CLI is not in focus.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
