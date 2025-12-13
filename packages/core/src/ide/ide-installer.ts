@@ -51,7 +51,17 @@ async function findCommand(
   const locations: string[] = [];
   const homeDir = os.homedir();
 
-  const appConfigs = {
+  interface AppConfigEntry {
+    mac?: { appName: string; supportDirName: string };
+    win?: { appName: string };
+  }
+
+  interface AppConfigs {
+    code: AppConfigEntry;
+    positron: AppConfigEntry;
+  }
+
+  const appConfigs: AppConfigs = {
     code: {
       mac: { appName: 'Visual Studio Code', supportDirName: 'Code' },
       win: { appName: 'Microsoft VS Code' },
@@ -75,11 +85,13 @@ async function findCommand(
   if (appname) {
     if (platform === 'darwin') {
       // macOS
-      const macConfig = appConfigs[appname].mac; 
-      locations.push(
-        `/Applications/${macConfig.appName}.app/Contents/Resources/app/bin/${appname}`,
-        path.join(homeDir, `Library/Application Support/${macConfig.supportDirName}/bin/${appname}`),
-      );
+      const macConfig = appConfigs[appname].mac;
+      if (macConfig) {
+        locations.push(
+          `/Applications/${macConfig.appName}.app/Contents/Resources/app/bin/${appname}`,
+          path.join(homeDir, `Library/Application Support/${macConfig.supportDirName}/bin/${appname}`),
+        );
+      }
     } else if (platform === 'linux') {
       // Linux
       locations.push(
@@ -89,24 +101,27 @@ async function findCommand(
       );
     } else if (platform === 'win32') {
       // Windows
-      const winAppName = appConfigs[appname].win.appName;
-      locations.push(
-        path.join(
-          process.env['ProgramFiles'] || 'C:\\Program Files',
-          winAppName,
-          'bin',
-          `${appname}.cmd`,
-        ),
-        path.join(
-          homeDir,
-          'AppData',
-          'Local',
-          'Programs',
-          winAppName,
-          'bin',
-          `${appname}.cmd`,
-        ),
-      );
+      const winConfig = appConfigs[appname].win;
+      if (winConfig) {
+        const winAppName = winConfig.appName;
+        locations.push(
+          path.join(
+            process.env['ProgramFiles'] || 'C:\\Program Files',
+            winAppName,
+            'bin',
+            `${appname}.cmd`,
+          ),
+          path.join(
+            homeDir,
+            'AppData',
+            'Local',
+            'Programs',
+            winAppName,
+            'bin',
+            `${appname}.cmd`,
+          ),
+        );
+      }
     }
   }
 
