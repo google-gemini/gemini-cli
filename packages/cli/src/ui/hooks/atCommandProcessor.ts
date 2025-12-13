@@ -433,7 +433,7 @@ export async function handleAtCommand({
   const processedQueryParts: PartListUnion = [{ text: initialQueryText }];
 
   const resourcePromises = resourceAttachments.map(async (resource) => {
-    const uri = resource.uri!;
+    const uri = resource.uri;
     const client = mcpClientManager?.getClient(resource.serverName);
     try {
       if (!client) {

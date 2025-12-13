@@ -357,9 +357,7 @@ export class GeminiChat {
               // Check if we have more attempts left.
               if (attempt < maxAttempts - 1) {
                 const delayMs = INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs;
-                const retryType = isContentError
-                  ? (error as InvalidStreamError).type
-                  : 'NETWORK_ERROR';
+                const retryType = isContentError ? error.type : 'NETWORK_ERROR';
 
                 logContentRetry(
                   this.config,
@@ -382,11 +380,7 @@ export class GeminiChat {
           ) {
             logContentRetryFailure(
               this.config,
-              new ContentRetryFailureEvent(
-                maxAttempts,
-                (lastError as InvalidStreamError).type,
-                model,
-              ),
+              new ContentRetryFailureEvent(maxAttempts, lastError.type, model),
             );
           }
           throw lastError;
@@ -712,7 +706,7 @@ export class GeminiChat {
       if (content.role === 'model' && content.parts) {
         const newParts = content.parts.slice();
         for (let j = 0; j < newParts.length; j++) {
-          const part = newParts[j]!;
+          const part = newParts[j];
           if (part.functionCall) {
             if (!part.thoughtSignature) {
               newParts[j] = {
@@ -913,7 +907,7 @@ export class GeminiChat {
         name: call.request.name,
         args: call.request.args,
         result: call.response?.responseParts || null,
-        status: call.status as 'error' | 'success' | 'cancelled',
+        status: call.status,
         timestamp: new Date().toISOString(),
         resultDisplay,
       };
