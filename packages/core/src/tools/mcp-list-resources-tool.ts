@@ -47,6 +47,8 @@ class ListResourcesToolInvocation extends BaseToolInvocation<
       return 'No MCP resources are currently available.';
     }
 
+    //Todo: handle MCP servers with many resources
+    //https://github.com/google-gemini/gemini-cli/issues/15061
     const lines = resources.map((resource) => {
       const qualifiedUri = resource.uri
         ? `${resource.serverName}:${resource.uri}`
