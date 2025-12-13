@@ -122,4 +122,64 @@ describe('SchemaValidator', () => {
     };
     expect(SchemaValidator.validate(schema, params)).not.toBeNull();
   });
+
+  it('allows schemas with draft-2020-12 $schema property', () => {
+    // Schema compilation may fail for 2020-12, but validation should pass
+    // (skip validation) rather than throwing an error
+    const schema = {
+      type: 'object',
+      properties: {
+        message: {
+          description: 'hello world',
+          type: 'string',
+        },
+      },
+      required: ['message'],
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      title: 'GetMsgRequest',
+    };
+    const params = { message: 'greetings from earth' };
+    expect(SchemaValidator.validate(schema, params)).toBeNull();
+  });
+
+  it('allows schemas with draft-07 $schema property', () => {
+    const schema = {
+      type: 'object',
+      properties: { name: { type: 'string' } },
+      $schema: 'http://json-schema.org/draft-07/schema#',
+    };
+    const params = { name: 'test' };
+    expect(SchemaValidator.validate(schema, params)).toBeNull();
+  });
+
+  it('allows schemas with unrecognized $schema versions', () => {
+    // Future-proof: any unrecognized schema version should skip validation
+    const schema = {
+      type: 'object',
+      properties: { name: { type: 'string' } },
+      $schema: 'https://json-schema.org/draft/2030-99/schema',
+    };
+    const params = { name: 'test' };
+    expect(SchemaValidator.validate(schema, params)).toBeNull();
+  });
+
+  it('allows schemas with $defs (may skip validation)', () => {
+    // draft-2020-12 uses $defs instead of definitions
+    const schema = {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      $defs: {
+        ChatRole: {
+          type: 'string',
+          enum: ['System', 'User', 'Assistant'],
+        },
+      },
+      properties: {
+        role: { $ref: '#/$defs/ChatRole' },
+      },
+      required: ['role'],
+    };
+    const params = { role: 'User' };
+    expect(SchemaValidator.validate(schema, params)).toBeNull();
+  });
 });

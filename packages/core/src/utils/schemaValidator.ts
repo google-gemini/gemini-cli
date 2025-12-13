@@ -40,7 +40,20 @@ export class SchemaValidator {
     if (typeof data !== 'object' || data === null) {
       return 'Value of params must be an object';
     }
-    const validate = ajValidator.compile(schema);
+
+    // Try to compile and validate; skip validation if schema can't be compiled.
+    // This handles schemas using JSON Schema versions AJV doesn't support
+    // (e.g., draft-2020-12, draft-2019-09, future versions).
+    // This matches LenientJsonSchemaValidator behavior in mcp-client.ts.
+    let validate;
+    try {
+      validate = ajValidator.compile(schema);
+    } catch {
+      // Schema compilation failed (unsupported version, invalid $ref, etc.)
+      // Skip validation rather than blocking tool usage
+      return null;
+    }
+
     const valid = validate(data);
     if (!valid && validate.errors) {
       return ajValidator.errorsText(validate.errors, { dataVar: 'params' });
