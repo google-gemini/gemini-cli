@@ -232,6 +232,21 @@ describe('AuthDialog', () => {
       );
     });
 
+    it('skips API key dialog if env var is present but empty', async () => {
+      mockedValidateAuthMethod.mockReturnValue(null);
+      process.env['GEMINI_API_KEY'] = ''; // Empty string
+      // props.settings.merged.security.auth.selectedType is undefined here
+
+      renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+      await handleAuthSelect(AuthType.USE_GEMINI);
+
+      expect(props.setAuthState).toHaveBeenCalledWith(
+        AuthState.Unauthenticated,
+      );
+    });
+
     it('shows API key dialog on initial setup if no env var is present', async () => {
       mockedValidateAuthMethod.mockReturnValue(null);
       // process.env['GEMINI_API_KEY'] is not set
@@ -247,7 +262,7 @@ describe('AuthDialog', () => {
       );
     });
 
-    it('shows API key dialog on re-auth to allow editing', async () => {
+    it('skips API key dialog on re-auth if env var is present (cannot edit)', async () => {
       mockedValidateAuthMethod.mockReturnValue(null);
       process.env['GEMINI_API_KEY'] = 'test-key-from-env';
       // Simulate that the user has already authenticated once
@@ -260,7 +275,7 @@ describe('AuthDialog', () => {
       await handleAuthSelect(AuthType.USE_GEMINI);
 
       expect(props.setAuthState).toHaveBeenCalledWith(
-        AuthState.AwaitingApiKeyInput,
+        AuthState.Unauthenticated,
       );
     });
 

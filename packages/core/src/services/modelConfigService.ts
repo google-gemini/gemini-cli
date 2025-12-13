@@ -258,10 +258,7 @@ export class ModelConfigService {
         // TODO(joshualitt): Consider knobs here, i.e. opt-in to deep merging
         // arrays on a case-by-case basis.
         if (this.isObject(accValue) && this.isObject(objValue)) {
-          acc[key] = this.deepMerge(
-            accValue as Record<string, unknown>,
-            objValue as Record<string, unknown>,
-          );
+          acc[key] = this.deepMerge(accValue, objValue);
         } else {
           acc[key] = objValue;
         }
