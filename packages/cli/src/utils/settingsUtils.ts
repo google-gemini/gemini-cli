@@ -315,7 +315,7 @@ export function settingExistsInScope(
 /**
  * Recursively sets a value in a nested object using a key path array.
  */
-function setNestedValue(
+export function setNestedValue(
   obj: Record<string, unknown>,
   path: string[],
   value: unknown,

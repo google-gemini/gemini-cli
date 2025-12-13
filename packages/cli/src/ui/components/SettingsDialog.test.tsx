@@ -231,6 +231,32 @@ const TOOLS_SHELL_FAKE_SCHEMA: SettingsSchemaType = {
   },
 } as unknown as SettingsSchemaType;
 
+// Schema with a restart-required boolean setting that has an undefined default
+// This isolates the bug where resetting a restart-required setting with
+// default === undefined is not tracked in globalPendingChanges
+const RESTART_REQUIRED_UNDEFINED_DEFAULT_SCHEMA: SettingsSchemaType = {
+  testFlags: {
+    type: 'object',
+    label: 'Test Flags',
+    category: 'General',
+    requiresRestart: false,
+    default: {},
+    description: 'Temporary test flags.',
+    showInDialog: false,
+    properties: {
+      restartFlag: {
+        type: 'boolean',
+        label: 'Restart Flag Without Default',
+        category: 'General',
+        requiresRestart: true,
+        default: undefined as boolean | undefined,
+        description: 'Restart-required flag lacking an explicit default.',
+        showInDialog: true,
+      },
+    },
+  },
+} as unknown as SettingsSchemaType;
+
 // Helper function to render SettingsDialog with standard wrapper
 const renderDialog = (
   settings: LoadedSettings,
@@ -899,6 +925,43 @@ describe('SettingsDialog', () => {
         unmount();
       },
     );
+
+    it('should track reset for restart-required boolean with undefined default (regression test)', async () => {
+      // This test demonstrates the bug where resetting a restart-required setting
+      // with an undefined default value is not tracked in globalPendingChanges
+      const { getSettingsSchema } = await import(
+        '../../config/settingsSchema.js'
+      );
+      const mockGetSettingsSchema = vi.mocked(getSettingsSchema);
+
+      // Mock the schema to include our problematic setting
+      mockGetSettingsSchema.mockReturnValue(
+        RESTART_REQUIRED_UNDEFINED_DEFAULT_SCHEMA,
+      );
+
+      const settings = createMockSettings();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, vi.fn());
+
+      // Reset to default using Ctrl+L (no editing needed—the value is already set)
+      act(() => {
+        stdin.write('\u000C'); // Ctrl+L
+      });
+
+      // EXPECTED BEHAVIOR: Resetting a restart-required setting should cause the
+      // restart banner ("press r to restart") to appear because the reset is tracked
+      // in globalPendingChanges, even if the schema default is undefined.
+      // CURRENT BUG: Because defaultValue is undefined, ADD_PENDING_CHANGE is never
+      // dispatched, so the banner never shows. Once the bug is fixed, this waitFor
+      // will pass.
+      await waitFor(() => {
+        expect(lastFrame()).toContain(
+          'To see changes, Gemini CLI must be restarted',
+        );
+      });
+
+      unmount();
+    });
 
     it('should handle navigation when only one setting exists', async () => {
       const settings = createMockSettings();
