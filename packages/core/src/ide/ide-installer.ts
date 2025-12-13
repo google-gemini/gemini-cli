@@ -72,14 +72,13 @@ async function findCommand(
     },
   };
 
-
   type AppName = keyof typeof appConfigs;
-  let appname: AppName | undefined;                                                                          
+  let appname: AppName | undefined;
 
   if (command === 'code' || command === 'code.cmd') {
-    appname = "code";
+    appname = 'code';
   } else if (command === 'positron' || command === 'positron.cmd') {
-    appname = "positron";
+    appname = 'positron';
   }
 
   if (appname) {
@@ -89,7 +88,10 @@ async function findCommand(
       if (macConfig) {
         locations.push(
           `/Applications/${macConfig.appName}.app/Contents/Resources/app/bin/${appname}`,
-          path.join(homeDir, `Library/Application Support/${macConfig.supportDirName}/bin/${appname}`),
+          path.join(
+            homeDir,
+            `Library/Application Support/${macConfig.supportDirName}/bin/${appname}`,
+          ),
         );
       }
     } else if (platform === 'linux') {
@@ -143,7 +145,8 @@ class VsCodeInstaller implements IdeInstaller {
     readonly platform = process.platform,
   ) {
     this.vscodeexec = ideInfo.name === 'positron' ? 'positron' : 'code';
-    const command = platform === 'win32' ? this.vscodeexec + '.cmd' : this.vscodeexec;
+    const command =
+      platform === 'win32' ? this.vscodeexec + '.cmd' : this.vscodeexec;
     this.vsCodeCommand = findCommand(command, platform);
   }
 
