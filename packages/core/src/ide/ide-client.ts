@@ -673,12 +673,11 @@ export class IdeClient {
     return validWorkspaces[0];
   }
 
-  private async createProxyAwareFetch() {
-    logger.debug('createProxyAwareFetch invoked.');
+  private async createProxyAwareFetch(ideServerHost: string) {
     // ignore proxy for the IDE server host to allow connecting to the ide mcp server
     const existingNoProxy = process.env['NO_PROXY'] || '';
     const agent = new EnvHttpProxyAgent({
-      noProxy: [existingNoProxy, '127.0.0.1', 'host.docker.internal']
+      noProxy: [existingNoProxy, ideServerHost]
         .filter(Boolean)
         .join(','),
     });
@@ -794,7 +793,7 @@ export class IdeClient {
         version: '1.0.0',
       });
       transport = new StreamableHTTPClientTransport(new URL(server_url), {
-        fetch: await this.createProxyAwareFetch(),
+        fetch: await this.createProxyAwareFetch(ide_server_host),
         requestInit: {
           headers: this.authToken
             ? { Authorization: `Bearer ${this.authToken}` }
