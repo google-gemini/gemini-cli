@@ -22,6 +22,7 @@ import {
   StreamEventType,
   isWithinRoot,
   ReadManyFilesTool,
+  InvalidStreamError,
   type GeminiChat,
   type Config,
 } from '@google/gemini-cli-core';
@@ -760,4 +761,47 @@ describe('Session', () => {
       ].value;
     expect(mockInstance.build).toHaveBeenCalled();
   });
+
+  it.each([
+    { errorType: 'NO_RESPONSE_TEXT' },
+    {
+      errorType: 'MALFORMED_FUNCTION_CALL',
+      expectedError: 'MALFORMED_FUNCTION_CALL',
+    },
+    { errorType: 'NO_FINISH_REASON', expectedError: 'NO_FINISH_REASON' },
+  ])(
+    'InvalidStreamError($errorType) after function call',
+    async ({ errorType, expectedError }) => {
+      // First stream returns a function call
+      const stream1 = createMockStream([
+        {
+          type: StreamEventType.CHUNK,
+          value: {
+            functionCalls: [{ name: 'test_tool', args: {} }],
+          },
+        },
+      ]);
+
+      // Second stream throws InvalidStreamError
+      mockChat.sendMessageStream
+        .mockResolvedValueOnce(stream1)
+        .mockRejectedValueOnce(new InvalidStreamError(errorType, errorType));
+
+      if (expectedError) {
+        await expect(
+          session.prompt({
+            sessionId: 'session-1',
+            prompt: [{ type: 'text', text: 'Call tool' }],
+          }),
+        ).rejects.toThrow(expectedError);
+      } else {
+        // NO_RESPONSE_TEXT is treated as successful end_turn after function call
+        const result = await session.prompt({
+          sessionId: 'session-1',
+          prompt: [{ type: 'text', text: 'Call tool' }],
+        });
+        expect(result).toEqual({ stopReason: 'end_turn' });
+      }
+    },
+  );
 });
