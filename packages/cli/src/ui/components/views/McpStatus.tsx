@@ -22,6 +22,9 @@ interface McpStatusProps {
   prompts: JsonMcpPrompt[];
   resources: JsonMcpResource[];
   blockedServers: Array<{ name: string; extensionName: string }>;
+  disabledServers: string[];
+  sessionMountedServers: string[];
+  sessionUnmountedServers: string[];
   serverStatus: (serverName: string) => MCPServerStatus;
   authStatus: HistoryItemMcpStatus['authStatus'];
   discoveryInProgress: boolean;
@@ -36,6 +39,9 @@ export const McpStatus: React.FC<McpStatusProps> = ({
   prompts,
   resources,
   blockedServers,
+  disabledServers,
+  sessionMountedServers,
+  sessionUnmountedServers,
   serverStatus,
   authStatus,
   discoveryInProgress,
@@ -45,7 +51,12 @@ export const McpStatus: React.FC<McpStatusProps> = ({
 }) => {
   const serverNames = Object.keys(servers);
 
-  if (serverNames.length === 0 && blockedServers.length === 0) {
+  if (
+    serverNames.length === 0 &&
+    blockedServers.length === 0 &&
+    disabledServers.length === 0 &&
+    sessionUnmountedServers.length === 0
+  ) {
     return (
       <Box flexDirection="column">
         <Text>No MCP servers configured.</Text>
@@ -159,6 +170,12 @@ export const McpStatus: React.FC<McpStatusProps> = ({
           );
         }
 
+        // Show session-mounted indicator for servers temporarily enabled this session
+        const isSessionMounted = sessionMountedServers.includes(serverName);
+        const sessionMountedNode = isSessionMounted ? (
+          <Text color={theme.text.secondary}> [session-mounted]</Text>
+        ) : null;
+
         return (
           <Box key={serverName} flexDirection="column" marginBottom={1}>
             <Box>
@@ -172,6 +189,7 @@ export const McpStatus: React.FC<McpStatusProps> = ({
                   ` (${parts.join(', ')})`}
               </Text>
               {authStatusNode}
+              {sessionMountedNode}
             </Box>
             {status === MCPServerStatus.CONNECTING && (
               <Text> (tools and prompts will appear when ready)</Text>
@@ -289,6 +307,41 @@ export const McpStatus: React.FC<McpStatusProps> = ({
           <Text> - Blocked</Text>
         </Box>
       ))}
+
+      {disabledServers.length > 0 && (
+        <>
+          <Box height={1} />
+          <Text bold color={theme.text.secondary}>
+            Disabled servers (use /mcp enable to re-enable):
+          </Text>
+          {disabledServers.map((serverName) => (
+            <Box key={serverName} marginBottom={1}>
+              <Text color={theme.status.warning}>⏸️ </Text>
+              <Text bold>{serverName}</Text>
+              <Text color={theme.text.secondary}> - Disabled</Text>
+            </Box>
+          ))}
+        </>
+      )}
+
+      {sessionUnmountedServers.length > 0 && (
+        <>
+          <Box height={1} />
+          <Text bold color={theme.text.secondary}>
+            Session unmounted servers (use /mcp mount to reconnect):
+          </Text>
+          {sessionUnmountedServers.map((serverName) => (
+            <Box key={serverName} marginBottom={1}>
+              <Text color={theme.text.secondary}>⏸️ </Text>
+              <Text bold>{serverName}</Text>
+              <Text color={theme.text.secondary}>
+                {' '}
+                - Unmounted (this session)
+              </Text>
+            </Box>
+          ))}
+        </>
+      )}
     </Box>
   );
 };

@@ -71,6 +71,10 @@ export const handleSlashCommand = async (
         session: {
           stats: sessionStats,
           sessionShellAllowlist: new Set(),
+          sessionMountedMcpServers: new Set(),
+          sessionUnmountedMcpServers: new Set(),
+          setSessionMountedMcpServers: () => {},
+          setSessionUnmountedMcpServers: () => {},
         },
         invocation: {
           raw: trimmed,

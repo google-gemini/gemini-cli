@@ -19,6 +19,18 @@ import type { CallableTool } from '@google/genai';
 import { Type } from '@google/genai';
 import { MessageType } from '../types.js';
 
+// Define a type for the mocked parts of McpClientManager
+type MockMcpClientManager = {
+  getMcpServers: ReturnType<typeof vi.fn>;
+  getAllMcpServerNames: ReturnType<typeof vi.fn>;
+  getBlockedMcpServers: ReturnType<typeof vi.fn>;
+  getServerConfig: ReturnType<typeof vi.fn>;
+  disconnectServer: ReturnType<typeof vi.fn>;
+  maybeDiscoverMcpServer: ReturnType<typeof vi.fn>;
+  restart: ReturnType<typeof vi.fn>;
+  restartServer: ReturnType<typeof vi.fn>;
+};
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -53,6 +65,30 @@ const createMockMCPTool = (
     description || `Description for ${name}`,
     { type: Type.OBJECT, properties: {} },
   );
+
+// Define a type for the mocked parts of SettingsService
+type MockSettings = {
+  merged: {
+    mcp: {
+      disabled: string[];
+    };
+  };
+  user: {
+    settings: {
+      mcp: {
+        disabled: string[];
+      };
+    };
+  };
+  workspace: {
+    settings: {
+      mcp: {
+        disabled: string[];
+      };
+    };
+  };
+  setValue: ReturnType<typeof vi.fn>;
+};
 
 describe('mcpCommand', () => {
   let mockContext: ReturnType<typeof createMockCommandContext>;
@@ -132,6 +168,368 @@ describe('mcpCommand', () => {
         type: 'message',
         messageType: 'error',
         content: 'Could not retrieve tool registry.',
+      });
+    });
+  });
+
+  describe('server management actions', () => {
+    let mockMcpClientManager: MockMcpClientManager;
+    let mockSettings: MockSettings;
+
+    beforeEach(() => {
+      mockMcpClientManager = {
+        getMcpServers: vi.fn().mockReturnValue({}),
+        getAllMcpServerNames: vi.fn().mockReturnValue(['server1', 'server2']),
+        getBlockedMcpServers: vi.fn().mockReturnValue([]),
+        getServerConfig: vi.fn(),
+        disconnectServer: vi.fn(),
+        maybeDiscoverMcpServer: vi.fn(),
+        restart: vi.fn(),
+        restartServer: vi.fn(),
+      };
+
+      mockConfig.getMcpClientManager = vi
+        .fn()
+        .mockReturnValue(mockMcpClientManager);
+
+      mockSettings = {
+        merged: {
+          mcp: {
+            disabled: [],
+          },
+        },
+        user: {
+          settings: {
+            mcp: {
+              disabled: [],
+            },
+          },
+        },
+        workspace: {
+          settings: {
+            mcp: {
+              disabled: [],
+            },
+          },
+        },
+        setValue: vi.fn(),
+      };
+      mockContext.services.settings =
+        mockSettings as unknown as typeof mockContext.services.settings;
+    });
+
+    describe('enableAction', () => {
+      const enableCommand = mcpCommand.subCommands!.find(
+        (c) => c.name === 'enable',
+      )!;
+
+      it('should enable a disabled server in User scope', async () => {
+        mockSettings.merged.mcp.disabled = ['server1'];
+        mockSettings.user.settings.mcp.disabled = ['server1'];
+        mockMcpClientManager.getServerConfig.mockReturnValue({
+          command: 'cmd',
+        });
+
+        const result = await enableCommand.action!(mockContext, 'server1');
+
+        expect(mockSettings.setValue).toHaveBeenCalledWith(
+          'User',
+          'mcp.disabled',
+          [],
+        );
+        expect(
+          mockMcpClientManager.maybeDiscoverMcpServer,
+        ).toHaveBeenCalledWith('server1', expect.any(Object), {
+          forceConnect: true,
+        });
+        expect(result).toEqual(
+          expect.objectContaining({
+            messageType: 'info',
+            content: expect.stringContaining('enabled successfully'),
+          }),
+        );
+      });
+
+      it('should enable a disabled server in Workspace scope', async () => {
+        mockSettings.merged.mcp.disabled = ['server1'];
+        mockSettings.workspace.settings.mcp.disabled = ['server1'];
+        mockMcpClientManager.getServerConfig.mockReturnValue({
+          command: 'cmd',
+        });
+
+        const result = await enableCommand.action!(mockContext, 'server1');
+
+        expect(mockSettings.setValue).toHaveBeenCalledWith(
+          'Workspace',
+          'mcp.disabled',
+          [],
+        );
+        expect(
+          mockMcpClientManager.maybeDiscoverMcpServer,
+        ).toHaveBeenCalledWith('server1', expect.any(Object), {
+          forceConnect: true,
+        });
+        expect(result).toEqual(
+          expect.objectContaining({
+            messageType: 'info',
+            content: expect.stringContaining('enabled successfully'),
+          }),
+        );
+      });
+
+      it('should enable a disabled server in BOTH scopes', async () => {
+        mockSettings.merged.mcp.disabled = ['server1'];
+        mockSettings.user.settings.mcp.disabled = ['server1'];
+        mockSettings.workspace.settings.mcp.disabled = ['server1'];
+        mockMcpClientManager.getServerConfig.mockReturnValue({
+          command: 'cmd',
+        });
+
+        const result = await enableCommand.action!(mockContext, 'server1');
+
+        expect(mockSettings.setValue).toHaveBeenCalledWith(
+          'User',
+          'mcp.disabled',
+          [],
+        );
+        expect(mockSettings.setValue).toHaveBeenCalledWith(
+          'Workspace',
+          'mcp.disabled',
+          [],
+        );
+        expect(
+          mockMcpClientManager.maybeDiscoverMcpServer,
+        ).toHaveBeenCalledWith('server1', expect.any(Object), {
+          forceConnect: true,
+        });
+        expect(result).toEqual(
+          expect.objectContaining({
+            messageType: 'info',
+            content: expect.stringContaining('enabled successfully'),
+          }),
+        );
+      });
+
+      it('should warn if server is not disabled', async () => {
+        mockSettings.merged.mcp.disabled = [];
+
+        const result = await enableCommand.action!(mockContext, 'server1');
+
+        expect(result).toEqual(
+          expect.objectContaining({
+            messageType: 'info',
+            content: expect.stringContaining('is not disabled'),
+          }),
+        );
+        expect(mockSettings.setValue).not.toHaveBeenCalled();
+      });
+
+      it('should warn if server is blocked', async () => {
+        mockSettings.merged.mcp.disabled = ['server1'];
+        mockSettings.user.settings.mcp.disabled = ['server1'];
+        mockMcpClientManager.getServerConfig.mockReturnValue({
+          command: 'cmd',
+        });
+        mockMcpClientManager.getBlockedMcpServers.mockReturnValue([
+          { name: 'server1' },
+        ]);
+
+        const result = await enableCommand.action!(mockContext, 'server1');
+
+        expect(result).toEqual(
+          expect.objectContaining({
+            content: expect.stringContaining(
+              'Warning: This server appears to be blocked',
+            ),
+          }),
+        );
+      });
+    });
+
+    describe('disableAction', () => {
+      const disableCommand = mcpCommand.subCommands!.find(
+        (c) => c.name === 'disable',
+      )!;
+
+      it('should disable an enabled server', async () => {
+        mockSettings.merged.mcp.disabled = [];
+
+        const result = await disableCommand.action!(mockContext, 'server1');
+
+        expect(mockSettings.setValue).toHaveBeenCalledWith(
+          expect.any(String),
+          'mcp.disabled',
+          ['server1'],
+        );
+        expect(mockMcpClientManager.disconnectServer).toHaveBeenCalledWith(
+          'server1',
+        );
+        expect(result).toEqual(
+          expect.objectContaining({
+            messageType: 'info',
+            content: expect.stringContaining('disabled successfully'),
+          }),
+        );
+      });
+
+      it('should warn if server is already disabled', async () => {
+        mockSettings.merged.mcp.disabled = ['server1'];
+
+        const result = await disableCommand.action!(mockContext, 'server1');
+
+        expect(result).toEqual(
+          expect.objectContaining({
+            messageType: 'info',
+            content: expect.stringContaining('is already disabled'),
+          }),
+        );
+        expect(mockSettings.setValue).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('mountAction', () => {
+      const mountCommand = mcpCommand.subCommands!.find(
+        (c) => c.name === 'mount',
+      )!;
+
+      it('should mount a server', async () => {
+        mockMcpClientManager.getServerConfig.mockReturnValue({
+          command: 'cmd',
+        });
+
+        const result = await mountCommand.action!(mockContext, 'server1');
+
+        expect(
+          mockContext.session.setSessionMountedMcpServers,
+        ).toHaveBeenCalled();
+        expect(
+          mockMcpClientManager.maybeDiscoverMcpServer,
+        ).toHaveBeenCalledWith('server1', expect.any(Object), {
+          forceConnect: true,
+        });
+        expect(result).toEqual(
+          expect.objectContaining({
+            messageType: 'info',
+            content: expect.stringContaining('mounted for this session'),
+          }),
+        );
+      });
+
+      it('should mount a disabled server', async () => {
+        mockSettings.merged.mcp.disabled = ['server1'];
+        mockMcpClientManager.getServerConfig.mockReturnValue({
+          command: 'cmd',
+        });
+
+        const result = await mountCommand.action!(mockContext, 'server1');
+
+        expect(
+          mockContext.session.setSessionMountedMcpServers,
+        ).toHaveBeenCalled();
+        expect(
+          mockMcpClientManager.maybeDiscoverMcpServer,
+        ).toHaveBeenCalledWith('server1', expect.any(Object), {
+          forceConnect: true,
+        });
+        expect(result).toEqual(
+          expect.objectContaining({
+            content: expect.stringContaining(
+              'will return to disabled on restart',
+            ),
+          }),
+        );
+      });
+
+      it('should warn if server is blocked', async () => {
+        mockMcpClientManager.getServerConfig.mockReturnValue({
+          command: 'cmd',
+        });
+        mockMcpClientManager.getBlockedMcpServers.mockReturnValue([
+          { name: 'server1' },
+        ]);
+
+        const result = await mountCommand.action!(mockContext, 'server1');
+
+        expect(result).toEqual(
+          expect.objectContaining({
+            content: expect.stringContaining('Warning: This server is blocked'),
+          }),
+        );
+      });
+
+      it('should warn if server is already connected', async () => {
+        mockMcpClientManager.getServerConfig.mockReturnValue({
+          command: 'cmd',
+        });
+        mockMcpClientManager.getMcpServers.mockReturnValue({
+          server1: {},
+        });
+
+        const result = await mountCommand.action!(mockContext, 'server1');
+
+        expect(result).toEqual(
+          expect.objectContaining({
+            messageType: 'info',
+            content: expect.stringContaining('is already connected'),
+          }),
+        );
+        expect(
+          mockMcpClientManager.maybeDiscoverMcpServer,
+        ).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('unmountAction', () => {
+      const unmountCommand = mcpCommand.subCommands!.find(
+        (c) => c.name === 'unmount',
+      )!;
+
+      it('should unmount a connected server', async () => {
+        mockMcpClientManager.getMcpServers.mockReturnValue({
+          server1: {},
+        });
+
+        const result = await unmountCommand.action!(mockContext, 'server1');
+
+        expect(
+          mockContext.session.setSessionUnmountedMcpServers,
+        ).toHaveBeenCalled();
+        expect(mockMcpClientManager.disconnectServer).toHaveBeenCalledWith(
+          'server1',
+        );
+        expect(result).toEqual(
+          expect.objectContaining({
+            messageType: 'info',
+            content: expect.stringContaining('unmounted for this session'),
+          }),
+        );
+      });
+
+      it('should warn if server is already unmounted', async () => {
+        mockContext.session.sessionUnmountedMcpServers.add('server1');
+
+        const result = await unmountCommand.action!(mockContext, 'server1');
+
+        expect(result).toEqual(
+          expect.objectContaining({
+            messageType: 'info',
+            content: expect.stringContaining('already unmounted'),
+          }),
+        );
+        expect(mockMcpClientManager.disconnectServer).not.toHaveBeenCalled();
+      });
+
+      it('should warn if server is not connected', async () => {
+        mockMcpClientManager.getMcpServers.mockReturnValue({});
+
+        const result = await unmountCommand.action!(mockContext, 'server1');
+
+        expect(result).toEqual(
+          expect.objectContaining({
+            messageType: 'info',
+            content: expect.stringContaining('not currently connected'),
+          }),
+        );
       });
     });
   });

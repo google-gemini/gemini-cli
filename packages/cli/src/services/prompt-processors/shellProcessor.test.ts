@@ -82,6 +82,8 @@ describe('ShellProcessor', () => {
       },
       session: {
         sessionShellAllowlist: new Set(),
+        sessionMountedMcpServers: new Set(),
+        sessionUnmountedMcpServers: new Set(),
       },
     });
 
