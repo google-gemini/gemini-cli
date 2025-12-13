@@ -10,7 +10,7 @@ import { bugCommand } from './bugCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { getVersion } from '@google/gemini-cli-core';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
-import { formatMemoryUsage } from '../utils/formatters.js';
+import { formatBytes } from '../utils/formatters.js';
 
 // Mock dependencies
 vi.mock('open');
@@ -42,7 +42,7 @@ vi.mock('node:process', () => ({
 describe('bugCommand', () => {
   beforeEach(() => {
     vi.mocked(getVersion).mockResolvedValue('0.1.0');
-    vi.mocked(formatMemoryUsage).mockReturnValue('100 MB');
+    vi.mocked(formatBytes).mockReturnValue('100 MB');
     vi.stubEnv('SANDBOX', 'gemini-test');
   });
 
