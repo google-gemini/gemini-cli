@@ -677,9 +677,7 @@ export class IdeClient {
     // ignore proxy for the IDE server host to allow connecting to the ide mcp server
     const existingNoProxy = process.env['NO_PROXY'] || '';
     const agent = new EnvHttpProxyAgent({
-      noProxy: [existingNoProxy, ideServerHost]
-        .filter(Boolean)
-        .join(','),
+      noProxy: [existingNoProxy, ideServerHost].filter(Boolean).join(','),
     });
     const undiciPromise = import('undici');
     return async (url: string | URL, init?: RequestInit): Promise<Response> => {
