@@ -6,6 +6,26 @@
 
 import { z } from 'zod';
 
+export const FileDiagnosticSchema = z.object({
+  // the range of the diagnostic in the file
+  range: z.object({
+    start: z.object({
+      // 1-based line and character numbers
+      line: z.number(),
+      character: z.number(),
+    }),
+    end: z.object({
+      // 1-based line and character numbers
+      line: z.number(),
+      character: z.number(),
+    }),
+  }),
+  // the diagnostic message
+  message: z.string(),
+  // the severity of the diagnostic (Error, Warning, Information, Hint)
+  severity: z.string(),
+});
+
 /**
  * A file that is open in the IDE.
  */
@@ -41,8 +61,11 @@ export const FileSchema = z.object({
       character: z.number(),
     })
     .optional(),
+  diagnostics: z.array(FileDiagnosticSchema).optional(),
 });
 export type File = z.infer<typeof FileSchema>;
+
+export type FileDiagnostic = z.infer<typeof FileDiagnosticSchema>;
 
 /**
  * The context of the IDE.
