@@ -238,7 +238,7 @@ describe('FileCommandLoader', () => {
     const loader = new FileCommandLoader(mockConfig);
     const commands = await loader.loadCommands(signal);
     expect(commands).toHaveLength(1);
-    expect(commands[0]!.name).toBe('gcp:pipelines:run');
+    expect(commands[0].name).toBe('gcp:pipelines:run');
   });
 
   it('creates namespaces from nested directories', async () => {

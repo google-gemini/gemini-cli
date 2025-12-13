@@ -715,9 +715,7 @@ export class ShellExecutionService {
                 error,
                 aborted: abortSignal.aborted,
                 pid: ptyProcess.pid,
-                executionMethod:
-                  (ptyInfo?.name as 'node-pty' | 'lydell-node-pty') ??
-                  'node-pty',
+                executionMethod: ptyInfo?.name ?? 'node-pty',
               });
             };
 

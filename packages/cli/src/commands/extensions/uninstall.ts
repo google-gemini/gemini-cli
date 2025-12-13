@@ -62,7 +62,7 @@ export const uninstallCommand: CommandModule = {
         array: true,
       })
       .check((argv) => {
-        if (!argv.names || (argv.names as string[]).length === 0) {
+        if (!argv.names || argv.names.length === 0) {
           throw new Error(
             'Please include at least one extension name to uninstall as a positional argument.',
           );

@@ -536,7 +536,7 @@ describe('WriteFileTool', () => {
         expect(confirmation.onConfirm).toBeDefined();
 
         // Call `onConfirm` to trigger the logic that updates the content
-        await confirmation.onConfirm!(ToolConfirmationOutcome.ProceedOnce);
+        await confirmation.onConfirm(ToolConfirmationOutcome.ProceedOnce);
 
         // Now, check if the original `params` object (captured by the invocation) was modified
         expect(invocation.params.content).toBe('ide-modified-content');

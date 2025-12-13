@@ -147,7 +147,7 @@ export class Connection {
       await this.#tryCallHandler(message.method, message.params);
     } else if ('id' in message) {
       // It's a response
-      this.#handleResponse(message as AnyResponse);
+      this.#handleResponse(message);
     }
   }
 

@@ -519,7 +519,7 @@ export class LoopDetectionService {
     signal: AbortSignal,
   ): Promise<Record<string, unknown> | null> {
     try {
-      const result = (await this.config.getBaseLlmClient().generateJson({
+      const result = await this.config.getBaseLlmClient().generateJson({
         modelConfigKey: { model },
         contents,
         schema: LOOP_DETECTION_SCHEMA,
@@ -527,7 +527,7 @@ export class LoopDetectionService {
         abortSignal: signal,
         promptId: this.promptId,
         maxAttempts: 2,
-      })) as Record<string, unknown>;
+      });
 
       if (
         result &&

@@ -14,7 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import { format } from 'node:util';
-import { type CommandModule, type Argv } from 'yargs';
+import { type Argv } from 'yargs';
 import { handleUninstall, uninstallCommand } from './uninstall.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
@@ -233,7 +233,7 @@ describe('extensions uninstall command', () => {
   });
 
   describe('uninstallCommand', () => {
-    const command = uninstallCommand as CommandModule;
+    const command = uninstallCommand;
 
     it('should have correct command and describe', () => {
       expect(command.command).toBe('uninstall <names..>');

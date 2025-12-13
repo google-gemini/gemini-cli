@@ -317,7 +317,7 @@ describe('AgentExecutor', () => {
         onActivity,
       );
 
-      const agentRegistry = executor['toolRegistry'] as ToolRegistry;
+      const agentRegistry = executor['toolRegistry'];
 
       expect(agentRegistry).not.toBe(parentToolRegistry);
       expect(agentRegistry.getAllToolNames()).toEqual(
@@ -754,7 +754,7 @@ describe('AgentExecutor', () => {
       expect(turn2Parts).toBeDefined();
       expect(turn2Parts).toHaveLength(1);
 
-      expect((turn2Parts as Part[])![0]).toEqual(
+      expect((turn2Parts as Part[])[0]).toEqual(
         expect.objectContaining({
           functionResponse: expect.objectContaining({
             name: TASK_COMPLETE_TOOL_NAME,
@@ -944,7 +944,7 @@ describe('AgentExecutor', () => {
       const turn2Params = getMockMessageParams(1);
       const parts = turn2Params.message;
       expect(parts).toBeDefined();
-      expect((parts as Part[])![0]).toEqual(
+      expect((parts as Part[])[0]).toEqual(
         expect.objectContaining({
           functionResponse: expect.objectContaining({
             id: badCallId,

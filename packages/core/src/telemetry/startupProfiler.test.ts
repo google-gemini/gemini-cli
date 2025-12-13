@@ -291,8 +291,7 @@ describe('StartupProfiler', () => {
 
       profiler.flush(mockConfig);
 
-      const calls = (recordStartupPerformance as ReturnType<typeof vi.fn>).mock
-        .calls;
+      const calls = recordStartupPerformance.mock.calls;
       const outerCall = calls.find((call) => call[2].phase === 'outer');
       const innerCall = calls.find((call) => call[2].phase === 'inner');
 

@@ -326,7 +326,7 @@ describe('SettingsDialog', () => {
 
       // Navigate down
       act(() => {
-        stdin.write(down as string);
+        stdin.write(down);
       });
 
       await waitFor(() => {
@@ -335,7 +335,7 @@ describe('SettingsDialog', () => {
 
       // Navigate up
       act(() => {
-        stdin.write(up as string);
+        stdin.write(up);
       });
 
       await waitFor(() => {
