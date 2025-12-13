@@ -24,11 +24,11 @@ const SafetyCheckResultSchema = z.discriminatedUnion('decision', [
   }),
   z.object({
     decision: z.literal(SafetyCheckDecision.DENY),
-    reason: z.string(),
+    reason: z.string().min(1),
   }),
   z.object({
     decision: z.literal(SafetyCheckDecision.ASK_USER),
-    reason: z.string(),
+    reason: z.string().min(1),
   }),
 ]);
 
