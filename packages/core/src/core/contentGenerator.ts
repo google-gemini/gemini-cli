@@ -59,6 +59,8 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
+  googleCloudProject?: string;
+  googleCloudLocation?: string;
 };
 
 export async function createContentGeneratorConfig(
@@ -66,7 +68,7 @@ export async function createContentGeneratorConfig(
   authType: AuthType | undefined,
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey =
-    process.env['GEMINI_API_KEY'] || (await loadApiKey()) || undefined;
+main
   const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
   const googleCloudProject =
     process.env['GOOGLE_CLOUD_PROJECT'] ||
@@ -100,6 +102,8 @@ export async function createContentGeneratorConfig(
   ) {
     contentGeneratorConfig.apiKey = googleApiKey;
     contentGeneratorConfig.vertexai = true;
+    contentGeneratorConfig.googleCloudProject = googleCloudProject;
+    contentGeneratorConfig.googleCloudLocation = googleCloudLocation;
 
     return contentGeneratorConfig;
   }
@@ -176,6 +180,8 @@ export async function createContentGenerator(
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
         vertexai: config.vertexai,
+        project: config.googleCloudProject,
+        location: config.googleCloudLocation,
         httpOptions,
       });
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
