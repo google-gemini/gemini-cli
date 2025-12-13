@@ -7,10 +7,9 @@
 import { vi } from 'vitest';
 
 vi.mock('node:child_process', async (importOriginal) => {
-  const actual =
-    (await importOriginal()) as typeof import('node:child_process');
+  const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as object),
     execSync: vi.fn(),
     spawnSync: vi.fn(() => ({ status: 0 })),
   };

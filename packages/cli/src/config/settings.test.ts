@@ -2231,7 +2231,7 @@ describe('Settings Loading and Merging', () => {
     beforeEach(() => {
       vi.resetAllMocks();
       mockFsExistsSync = vi.mocked(fs.existsSync);
-      (mockFsExistsSync as Mock).mockReturnValue(true);
+      mockFsExistsSync.mockReturnValue(true);
       mockFsReadFileSync = vi.mocked(fs.readFileSync);
       mockFsReadFileSync.mockReturnValue('{}');
       vi.mocked(isWorkspaceTrusted).mockReturnValue({
@@ -2256,15 +2256,13 @@ describe('Settings Loading and Merging', () => {
         },
       };
 
-      (mockFsReadFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
-            return JSON.stringify(workspaceSettingsContent);
-          return '{}';
-        },
-      );
+      mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
+        if (p === USER_SETTINGS_PATH)
+          return JSON.stringify(userSettingsContent);
+        if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+          return JSON.stringify(workspaceSettingsContent);
+        return '{}';
+      });
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
       const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
@@ -2329,15 +2327,13 @@ describe('Settings Loading and Merging', () => {
         someOtherSetting: 'value',
       };
 
-      (mockFsReadFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
-            return JSON.stringify(workspaceSettingsContent);
-          return '{}';
-        },
-      );
+      mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
+        if (p === USER_SETTINGS_PATH)
+          return JSON.stringify(userSettingsContent);
+        if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+          return JSON.stringify(workspaceSettingsContent);
+        return '{}';
+      });
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
       const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
