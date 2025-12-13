@@ -59,6 +59,7 @@ export enum Command {
   // App level bindings
   SHOW_ERROR_DETAILS = 'showErrorDetails',
   SHOW_FULL_TODOS = 'showFullTodos',
+  SHOW_FULL_OUTPUT = 'showFullOutput',
   TOGGLE_IDE_CONTEXT_DETAIL = 'toggleIDEContextDetail',
   TOGGLE_MARKDOWN = 'toggleMarkdown',
   TOGGLE_COPY_MODE = 'toggleCopyMode',
@@ -197,6 +198,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // App level bindings
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
   [Command.SHOW_FULL_TODOS]: [{ key: 't', ctrl: true }],
+  [Command.SHOW_FULL_OUTPUT]: [{ key: 'o', ctrl: true }],
   [Command.TOGGLE_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
   [Command.TOGGLE_MARKDOWN]: [{ key: 'm', command: true }],
   [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
@@ -299,6 +301,7 @@ export const commandCategories: readonly CommandCategory[] = [
     commands: [
       Command.SHOW_ERROR_DETAILS,
       Command.SHOW_FULL_TODOS,
+      Command.SHOW_FULL_OUTPUT,
       Command.TOGGLE_IDE_CONTEXT_DETAIL,
       Command.TOGGLE_MARKDOWN,
       Command.TOGGLE_COPY_MODE,
@@ -347,6 +350,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
   [Command.SHOW_ERROR_DETAILS]: 'Toggle detailed error information.',
   [Command.SHOW_FULL_TODOS]: 'Toggle the full TODO list.',
+  [Command.SHOW_FULL_OUTPUT]:
+    'Toggle display of full tool output when truncated.',
   [Command.TOGGLE_IDE_CONTEXT_DETAIL]: 'Toggle IDE context details.',
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
   [Command.TOGGLE_COPY_MODE]:

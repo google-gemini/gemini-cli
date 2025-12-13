@@ -128,6 +128,7 @@ export interface UIState {
   embeddedShellFocused: boolean;
   showDebugProfiler: boolean;
   showFullTodos: boolean;
+  showFullOutput: boolean;
   copyModeEnabled: boolean;
   warningMessage: string | null;
   bannerData: {
