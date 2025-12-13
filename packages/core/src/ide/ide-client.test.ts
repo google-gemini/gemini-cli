@@ -984,12 +984,12 @@ describe('getIdeServerHost', () => {
       delete process.env['SSH_CONNECTION'];
     }
     if (originalVscodeRemoteSession !== undefined) {
-      process.env['SSH_CONNECTION'] = originalVscodeRemoteSession;
+      process.env['VSCODE_REMOTE_CONTAINERS_SESSION'] = originalVscodeRemoteSession;
     } else {
       delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
     }
     if (originalRemoteContainers !== undefined) {
-      process.env['SSH_CONNECTION'] = originalRemoteContainers;
+      process.env['REMOTE_CONTAINERS'] = originalRemoteContainers;
     } else {
       delete process.env['REMOTE_CONTAINERS'];
     }
