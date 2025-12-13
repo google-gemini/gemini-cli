@@ -76,7 +76,7 @@ export function ApiAuthDialog({
       },
     };
 
-    wrappedPromise
+    return wrappedPromise
       .then(() => {
         buffer.setText('');
       })
