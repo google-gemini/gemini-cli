@@ -15,8 +15,6 @@ import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
 import {
   executeToolCall,
-  shutdownTelemetry,
-  isTelemetrySdkInitialized,
   GeminiEventType,
   FatalInputError,
   promptIdContext,
@@ -28,6 +26,7 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
+  createWorkingStdio,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -70,7 +69,8 @@ export async function runNonInteractive({
         coreEvents.emitConsoleLog(msg.type, msg.content);
       },
     });
-    const textOutput = new TextOutput();
+    const { stdout: workingStdout } = createWorkingStdio();
+    const textOutput = new TextOutput(workingStdout);
 
     const handleUserFeedback = (payload: UserFeedbackPayload) => {
       const prefix = payload.severity.toUpperCase();
@@ -222,7 +222,7 @@ export async function runNonInteractive({
           settings,
         );
         // If a slash command is found and returns a prompt, use it.
-        // Otherwise, slashCommandResult fall through to the default prompt
+        // Otherwise, slashCommandResult falls through to the default prompt
         // handling.
         if (slashCommandResult) {
           query = slashCommandResult as Part[];
@@ -230,7 +230,7 @@ export async function runNonInteractive({
       }
 
       if (!query) {
-        const { processedQuery, shouldProceed } = await handleAtCommand({
+        const { processedQuery, error } = await handleAtCommand({
           query: input,
           config,
           addItem: (_item, _timestamp) => 0,
@@ -239,11 +239,11 @@ export async function runNonInteractive({
           signal: abortController.signal,
         });
 
-        if (!shouldProceed || !processedQuery) {
+        if (error || !processedQuery) {
           // An error occurred during @include processing (e.g., file not found).
           // The error message is already logged by handleAtCommand.
           throw new FatalInputError(
-            'Exiting due to an error processing the @ command.',
+            error || 'Exiting due to an error processing the @ command.',
           );
         }
         query = processedQuery as Part[];
@@ -428,7 +428,9 @@ export async function runNonInteractive({
           } else if (config.getOutputFormat() === OutputFormat.JSON) {
             const formatter = new JsonFormatter();
             const stats = uiTelemetryService.getMetrics();
-            textOutput.write(formatter.format(responseText, stats));
+            textOutput.write(
+              formatter.format(config.getSessionId(), responseText, stats),
+            );
           } else {
             textOutput.ensureTrailingNewline(); // Ensure a final newline
           }
@@ -443,9 +445,6 @@ export async function runNonInteractive({
 
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
-      if (isTelemetrySdkInitialized()) {
-        await shutdownTelemetry(config);
-      }
     }
 
     if (errorToHandle) {

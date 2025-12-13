@@ -160,4 +160,43 @@ describe('customDeepMerge', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(({} as any).polluted).toBeUndefined();
   });
+
+  it('should use additionalProperties merge strategy for dynamic properties', () => {
+    // Simulates how hooks work: hooks.disabled uses UNION, but hooks.BeforeTool (dynamic) uses CONCAT
+    const target = {
+      hooks: {
+        BeforeTool: [{ command: 'user-hook-1' }, { command: 'user-hook-2' }],
+        disabled: ['hook-a'],
+      },
+    };
+    const source = {
+      hooks: {
+        BeforeTool: [{ command: 'workspace-hook-1' }],
+        disabled: ['hook-b'],
+      },
+    };
+
+    // Mock the getMergeStrategyForPath behavior for hooks
+    const getMergeStrategy = (path: string[]) => {
+      const p = path.join('.');
+      // hooks.disabled uses UNION strategy (explicitly defined in schema)
+      if (p === 'hooks.disabled') return MergeStrategy.UNION;
+      // hooks.BeforeTool uses CONCAT strategy (via additionalProperties)
+      if (p === 'hooks.BeforeTool') return MergeStrategy.CONCAT;
+      return undefined;
+    };
+
+    const result = customDeepMerge(getMergeStrategy, target, source);
+
+    // BeforeTool should concatenate
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((result as any)['hooks']['BeforeTool']).toEqual([
+      { command: 'user-hook-1' },
+      { command: 'user-hook-2' },
+      { command: 'workspace-hook-1' },
+    ]);
+    // disabled should union (deduplicate)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((result as any)['hooks']['disabled']).toEqual(['hook-a', 'hook-b']);
+  });
 });

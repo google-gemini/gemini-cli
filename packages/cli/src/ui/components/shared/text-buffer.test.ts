@@ -637,6 +637,46 @@ describe('useTextBuffer', () => {
       act(() => result.current.insert(shortText, { paste: true }));
       expect(getBufferState(result).text).toBe(shortText);
     });
+
+    it('should prepend @ to multiple valid file paths on insert', () => {
+      // Use Set to model reality: individual paths exist, combined string doesn't
+      const validPaths = new Set(['/path/to/file1.txt', '/path/to/file2.txt']);
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: (p) => validPaths.has(p) }),
+      );
+      const filePaths = '/path/to/file1.txt /path/to/file2.txt';
+      act(() => result.current.insert(filePaths, { paste: true }));
+      expect(getBufferState(result).text).toBe(
+        '@/path/to/file1.txt @/path/to/file2.txt ',
+      );
+    });
+
+    it('should handle multiple paths with escaped spaces', () => {
+      // Use Set to model reality: individual paths exist, combined string doesn't
+      const validPaths = new Set(['/path/to/my file.txt', '/other/path.txt']);
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: (p) => validPaths.has(p) }),
+      );
+      const filePaths = '/path/to/my\\ file.txt /other/path.txt';
+      act(() => result.current.insert(filePaths, { paste: true }));
+      expect(getBufferState(result).text).toBe(
+        '@/path/to/my\\ file.txt @/other/path.txt ',
+      );
+    });
+
+    it('should only prepend @ to valid paths in multi-path paste', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: (p) => p.endsWith('.txt'),
+        }),
+      );
+      const filePaths = '/valid/file.txt /invalid/file.jpg';
+      act(() => result.current.insert(filePaths, { paste: true }));
+      expect(getBufferState(result).text).toBe(
+        '@/valid/file.txt /invalid/file.jpg ',
+      );
+    });
   });
 
   describe('Shell Mode Behavior', () => {
@@ -2239,6 +2279,105 @@ describe('Unicode helper functions', () => {
     it('should handle Chinese and Arabic text', () => {
       expect(cpLen('hello 你好 world')).toBe(14); // 5 + 1 + 2 + 1 + 5 = 14
       expect(cpLen('hello مرحبا world')).toBe(17);
+    });
+  });
+
+  describe('useTextBuffer CJK Navigation', () => {
+    const viewport = { width: 80, height: 24 };
+
+    it('should navigate by word in Chinese', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: '你好世界',
+          initialCursorOffset: 4, // End of string
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      // Initial state: cursor at end (index 2 in code points if 4 is length? wait. length is 2 code points? No. '你好世界' length is 4.)
+      // '你好世界' length is 4. Code points length is 4.
+
+      // Move word left
+      act(() => {
+        result.current.move('wordLeft');
+      });
+
+      // Should be at start of "世界" (index 2)
+      // "你好世界" -> "你好" | "世界"
+      expect(result.current.cursor[1]).toBe(2);
+
+      // Move word left again
+      act(() => {
+        result.current.move('wordLeft');
+      });
+
+      // Should be at start of "你好" (index 0)
+      expect(result.current.cursor[1]).toBe(0);
+
+      // Move word left again (should stay at 0)
+      act(() => {
+        result.current.move('wordLeft');
+      });
+      expect(result.current.cursor[1]).toBe(0);
+
+      // Move word right
+      act(() => {
+        result.current.move('wordRight');
+      });
+
+      // Should be at end of "你好" (index 2)
+      expect(result.current.cursor[1]).toBe(2);
+
+      // Move word right again
+      act(() => {
+        result.current.move('wordRight');
+      });
+
+      // Should be at end of "世界" (index 4)
+      expect(result.current.cursor[1]).toBe(4);
+
+      // Move word right again (should stay at end)
+      act(() => {
+        result.current.move('wordRight');
+      });
+      expect(result.current.cursor[1]).toBe(4);
+    });
+
+    it('should navigate mixed English and Chinese', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'Hello你好World',
+          initialCursorOffset: 10, // End
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      // Hello (5) + 你好 (2) + World (5) = 12 chars.
+      // initialCursorOffset 10? 'Hello你好World'.length is 12.
+      // Let's set it to end.
+
+      act(() => {
+        result.current.move('end');
+      });
+      expect(result.current.cursor[1]).toBe(12);
+
+      // wordLeft -> start of "World" (index 7)
+      act(() => result.current.move('wordLeft'));
+      expect(result.current.cursor[1]).toBe(7);
+
+      // wordLeft -> start of "你好" (index 5)
+      act(() => result.current.move('wordLeft'));
+      expect(result.current.cursor[1]).toBe(5);
+
+      // wordLeft -> start of "Hello" (index 0)
+      act(() => result.current.move('wordLeft'));
+      expect(result.current.cursor[1]).toBe(0);
+
+      // wordLeft -> start of line (should stay at 0)
+      act(() => result.current.move('wordLeft'));
+      expect(result.current.cursor[1]).toBe(0);
     });
   });
 });

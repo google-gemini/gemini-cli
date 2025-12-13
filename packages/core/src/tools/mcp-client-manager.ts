@@ -15,7 +15,7 @@ import {
   MCPDiscoveryState,
   populateMcpServerCommand,
 } from './mcp-client.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage, isAuthenticationError } from '../utils/errors.js';
 import type { EventEmitter } from 'node:events';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -50,6 +50,10 @@ export class McpClientManager {
 
   getBlockedMcpServers() {
     return this.blockedMcpServers;
+  }
+
+  getClient(serverName: string): McpClient | undefined {
+    return this.clients.get(serverName);
   }
 
   /**
@@ -160,6 +164,7 @@ export class McpClientManager {
     }
 
     const currentDiscoveryPromise = new Promise<void>((resolve, _reject) => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       (async () => {
         try {
           if (existing) {
@@ -173,8 +178,17 @@ export class McpClientManager {
               config,
               this.toolRegistry,
               this.cliConfig.getPromptRegistry(),
+              this.cliConfig.getResourceRegistry(),
               this.cliConfig.getWorkspaceContext(),
+              this.cliConfig,
               this.cliConfig.getDebugMode(),
+              async () => {
+                debugLogger.log('Tools changed, updating Gemini context...');
+                const geminiClient = this.cliConfig.getGeminiClient();
+                if (geminiClient.isInitialized()) {
+                  await geminiClient.setTools();
+                }
+              },
             );
           if (!existing) {
             this.clients.set(name, client);
@@ -186,14 +200,17 @@ export class McpClientManager {
             this.eventEmitter?.emit('mcp-client-update', this.clients);
           } catch (error) {
             this.eventEmitter?.emit('mcp-client-update', this.clients);
-            // Log the error but don't let a single failed server stop the others
-            coreEvents.emitFeedback(
-              'error',
-              `Error during discovery for server '${name}': ${getErrorMessage(
+            // Check if this is a 401/auth error - if so, don't show as red error
+            // (the info message was already shown in mcp-client.ts)
+            if (!isAuthenticationError(error)) {
+              // Log the error but don't let a single failed server stop the others
+              const errorMessage = getErrorMessage(error);
+              coreEvents.emitFeedback(
+                'error',
+                `Error during discovery for MCP server '${name}': ${errorMessage}`,
                 error,
-              )}`,
-              error,
-            );
+              );
+            }
           }
         } finally {
           // This is required to update the content generator configuration with the
@@ -217,6 +234,7 @@ export class McpClientManager {
     }
     this.eventEmitter?.emit('mcp-client-update', this.clients);
     const currentPromise = this.discoveryPromise;
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     currentPromise.then((_) => {
       // If we are the last recorded discoveryPromise, then we are done, reset
       // the world.
@@ -327,14 +345,11 @@ export class McpClientManager {
   getMcpInstructions(): string {
     const instructions: string[] = [];
     for (const [name, client] of this.clients) {
-      // Only include instructions if explicitly enabled in config
-      if (client.getServerConfig().useInstructions) {
-        const clientInstructions = client.getInstructions();
-        if (clientInstructions) {
-          instructions.push(
-            `# Instructions for MCP Server '${name}'\n${clientInstructions}`,
-          );
-        }
+      const clientInstructions = client.getInstructions();
+      if (clientInstructions) {
+        instructions.push(
+          `# Instructions for MCP Server '${name}'\n${clientInstructions}`,
+        );
       }
     }
     return instructions.join('\n\n');

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { WritableStream, ReadableStream } from 'node:stream/web';
+import type { ReadableStream } from 'node:stream/web';
 
 import type {
   Config,
@@ -30,6 +30,8 @@ import {
   debugLogger,
   ReadManyFilesTool,
   getEffectiveModel,
+  createWorkingStdio,
+  startupProfiler,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -50,14 +52,9 @@ export async function runZedIntegration(
   settings: LoadedSettings,
   argv: CliArgs,
 ) {
-  const stdout = Writable.toWeb(process.stdout) as WritableStream;
+  const { stdout: workingStdout } = createWorkingStdio();
+  const stdout = Writable.toWeb(workingStdout);
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
-
-  // Stdout is used to send messages to the client, so console.log/console.info
-  // messages to stderr so that they don't interfere with ACP.
-  console.log = console.error;
-  console.info = console.error;
-  console.debug = console.error;
 
   new acp.AgentSideConnection(
     (client: acp.Client) => new GeminiAgent(config, settings, argv, client),
@@ -116,8 +113,16 @@ export class GeminiAgent {
 
   async authenticate({ methodId }: acp.AuthenticateRequest): Promise<void> {
     const method = z.nativeEnum(AuthType).parse(methodId);
+    const selectedAuthType = this.settings.merged.security?.auth?.selectedType;
 
-    await clearCachedCredentialFile();
+    // Only clear credentials when switching to a different auth method
+    if (selectedAuthType && selectedAuthType !== method) {
+      await clearCachedCredentialFile();
+    }
+
+    // Refresh auth with the requested method
+    // This will reuse existing credentials if they're valid,
+    // or perform new authentication if needed
     await this.config.refreshAuth(method);
     this.settings.setValue(
       SettingScope.User,
@@ -189,6 +194,7 @@ export class GeminiAgent {
     const config = await loadCliConfig(settings, sessionId, this.argv, cwd);
 
     await config.initialize();
+    startupProfiler.flush(config);
     return config;
   }
 
@@ -283,6 +289,7 @@ export class Session {
                 text: part.text,
               };
 
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
               this.sendUpdate({
                 sessionUpdate: part.thought
                   ? 'agent_thought_chunk'
@@ -348,7 +355,7 @@ export class Session {
     fc: FunctionCall,
   ): Promise<Part[]> {
     const callId = fc.id ?? `${fc.name}-${Date.now()}`;
-    const args = (fc.args ?? {}) as Record<string, unknown>;
+    const args = fc.args ?? {};
 
     const startTime = Date.now();
 
@@ -386,7 +393,7 @@ export class Session {
     }
 
     const toolRegistry = this.config.getToolRegistry();
-    const tool = toolRegistry.getTool(fc.name as string);
+    const tool = toolRegistry.getTool(fc.name);
 
     if (!tool) {
       return errorResponse(
@@ -442,6 +449,7 @@ export class Session {
             );
           case ToolConfirmationOutcome.ProceedOnce:
           case ToolConfirmationOutcome.ProceedAlways:
+          case ToolConfirmationOutcome.ProceedAlwaysAndSave:
           case ToolConfirmationOutcome.ProceedAlwaysServer:
           case ToolConfirmationOutcome.ProceedAlwaysTool:
           case ToolConfirmationOutcome.ModifyWithEditor:

@@ -33,16 +33,26 @@ import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge, type MergeableObject } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import type { ExtensionManager } from './extension-manager.js';
+import {
+  validateSettings,
+  formatValidationError,
+} from './settings-validation.js';
 import { SettingPaths } from './settingPaths.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
   let currentSchema: SettingsSchema | undefined = getSettingsSchema();
+  let parent: SettingDefinition | undefined = undefined;
 
   for (const key of path) {
     if (!currentSchema || !currentSchema[key]) {
+      // Key not found in schema - check if parent has additionalProperties
+      if (parent?.additionalProperties?.mergeStrategy) {
+        return parent.additionalProperties.mergeStrategy;
+      }
       return undefined;
     }
+    parent = current;
     current = currentSchema[key];
     currentSchema = current.properties;
   }
@@ -264,7 +274,7 @@ export function needsMigration(settings: Record<string, unknown>): boolean {
     if (v1Key === v2Path || !(v1Key in settings)) {
       return false;
     }
-    // If a key exists that is both a V1 key and a V2 container (like 'model'),
+    // If a key exists that is a V1 key and a V2 container (like 'model'),
     // we need to check the type. If it's an object, it's a V2 container and not
     // a V1 key that needs migration.
     if (
@@ -664,9 +674,24 @@ export function loadSettings(
             settingsObject = migratedSettings;
           }
         }
+
+        // Validate settings structure with Zod after migration
+        const validationResult = validateSettings(settingsObject);
+        if (!validationResult.success && validationResult.error) {
+          const errorMessage = formatValidationError(
+            validationResult.error,
+            filePath,
+          );
+          throw new FatalConfigError(errorMessage);
+        }
+
         return { settings: settingsObject as Settings, rawJson: content };
       }
     } catch (error: unknown) {
+      // Preserve FatalConfigError with formatted validation messages
+      if (error instanceof FatalConfigError) {
+        throw error;
+      }
       settingsErrors.push({
         message: getErrorMessage(error),
         path: filePath,
@@ -793,6 +818,7 @@ export function migrateDeprecatedSettings(
         `Migrating deprecated extensions.disabled settings from ${scope} settings...`,
       );
       for (const extension of settings.extensions.disabled ?? []) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         extensionManager.disableExtension(extension, scope);
       }
 
