@@ -11,6 +11,7 @@
 import type { Content, FunctionDeclaration } from '@google/genai';
 import type { AnyDeclarativeTool } from '../tools/tools.js';
 import { type z } from 'zod';
+import type { JSONSchema7 } from 'json-schema';
 
 /**
  * Describes the possible termination modes for an agent.
@@ -103,12 +104,27 @@ export interface ToolConfig {
 }
 
 /**
- * Configures the expected inputs (parameters) for the agent.
+ * New format: Uses standard JSONSchema7 for validation and tool generation.
+ * This is the preferred format going forward.
  */
-export interface InputConfig {
+export interface InputConfigNew {
   /**
-   * Defines the parameters the agent accepts.
+   * Standard JSON Schema (draft-07) for validation and tool generation.
+   * Supports advanced features like enum, oneOf, nested objects, etc.
+   */
+  inputSchema: JSONSchema7;
+}
+
+/**
+ * Legacy format: Uses custom type descriptors.
+ * @deprecated Use InputConfigNew with inputSchema instead. This format will be
+ * removed in a future version.
+ */
+export interface InputConfigLegacy {
+  /**
+   * Defines the parameters the agent accepts using a simplified type system.
    * This is vital for generating the tool wrapper schema.
+   * @deprecated Use inputSchema with JSONSchema7 instead.
    */
   inputs: Record<
     string,
@@ -125,6 +141,12 @@ export interface InputConfig {
     }
   >;
 }
+
+/**
+ * Configures the expected inputs (parameters) for the agent.
+ * Supports both the new JSONSchema7 format and the legacy format for backward compatibility.
+ */
+export type InputConfig = InputConfigNew | InputConfigLegacy;
 
 /**
  * Configures the expected outputs for the agent.

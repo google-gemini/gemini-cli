@@ -389,7 +389,8 @@ describe('AgentExecutor', () => {
     it('should log AgentFinish with error if run throws', async () => {
       const definition = createTestDefinition();
       // Make the definition invalid to cause an error during run
-      definition.inputConfig.inputs = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (definition.inputConfig as any).inputs = {
         goal: { type: 'string', required: true, description: 'goal' },
       };
       const executor = await AgentExecutor.create(

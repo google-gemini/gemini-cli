@@ -48,16 +48,6 @@ describe('AgentRegistry', () => {
   });
 
   describe('initialize', () => {
-    // TODO: Add this test once we actually have a built-in agent configured.
-    // it('should load built-in agents upon initialization', async () => {
-    //   expect(registry.getAllDefinitions()).toHaveLength(0);
-
-    //   await registry.initialize();
-
-    //   // There are currently no built-in agents.
-    //   expect(registry.getAllDefinitions()).toEqual([]);
-    // });
-
     it('should log the count of loaded agents in debug mode', async () => {
       const debugConfig = makeFakeConfig({ debugMode: true });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
@@ -90,6 +80,94 @@ describe('AgentRegistry', () => {
       );
       expect(investigatorDef).toBeDefined();
       expect(investigatorDef?.modelConfig.model).toBe('gemini-3-pro-preview');
+    });
+
+    it('should respect legacy codebase_investigator settings', async () => {
+      const legacyConfig = makeFakeConfig({
+        codebaseInvestigatorSettings: {
+          enabled: true,
+          model: 'legacy-model',
+          maxTimeMinutes: 10,
+          maxNumTurns: 20,
+          thinkingBudget: 1000,
+        },
+        agents: {}, // Empty new settings
+      });
+      const legacyRegistry = new TestableAgentRegistry(legacyConfig);
+      await legacyRegistry.initialize();
+
+      const investigatorDef = legacyRegistry.getDefinition(
+        'codebase_investigator',
+      );
+      expect(investigatorDef).toBeDefined();
+      expect(investigatorDef?.modelConfig.model).toBe('legacy-model');
+      expect(investigatorDef?.runConfig.max_time_minutes).toBe(10);
+      expect(investigatorDef?.runConfig.max_turns).toBe(20);
+      expect(investigatorDef?.modelConfig.thinkingBudget).toBe(1000);
+    });
+
+    it('should prefer new agents settings over legacy settings', async () => {
+      const mixedConfig = makeFakeConfig({
+        codebaseInvestigatorSettings: {
+          enabled: true,
+          model: 'legacy-model',
+          maxTimeMinutes: 10,
+        },
+        agents: {
+          codebase_investigator: {
+            enabled: true,
+            model: 'new-model',
+            maxTimeMinutes: 5,
+          },
+        },
+      });
+      const mixedRegistry = new TestableAgentRegistry(mixedConfig);
+      await mixedRegistry.initialize();
+
+      const investigatorDef = mixedRegistry.getDefinition(
+        'codebase_investigator',
+      );
+      expect(investigatorDef).toBeDefined();
+      expect(investigatorDef?.modelConfig.model).toBe('new-model');
+      expect(investigatorDef?.runConfig.max_time_minutes).toBe(5);
+    });
+  });
+
+  describe('isAgentEnabled', () => {
+    it('should return true by default if not configured', () => {
+      expect(registry.isAgentEnabled('some_random_agent')).toBe(true);
+    });
+
+    it('should return false if explicitly disabled in agents config', () => {
+      const disabledConfig = makeFakeConfig({
+        agents: {
+          disabled_agent: { enabled: false },
+        },
+      });
+      const disabledRegistry = new TestableAgentRegistry(disabledConfig);
+      expect(disabledRegistry.isAgentEnabled('disabled_agent')).toBe(false);
+    });
+
+    it('should respect legacy enabled setting for codebase_investigator', () => {
+      const legacyDisabledConfig = makeFakeConfig({
+        codebaseInvestigatorSettings: { enabled: false },
+        agents: {},
+      });
+      const legacyRegistry = new TestableAgentRegistry(legacyDisabledConfig);
+      expect(legacyRegistry.isAgentEnabled('codebase_investigator')).toBe(
+        false,
+      );
+    });
+
+    it('should prefer new enabled setting over legacy for codebase_investigator', () => {
+      const mixedConfig = makeFakeConfig({
+        codebaseInvestigatorSettings: { enabled: false },
+        agents: {
+          codebase_investigator: { enabled: true },
+        },
+      });
+      const mixedRegistry = new TestableAgentRegistry(mixedConfig);
+      expect(mixedRegistry.isAgentEnabled('codebase_investigator')).toBe(true);
     });
   });
 
@@ -207,6 +285,160 @@ describe('AgentRegistry', () => {
       await Promise.all(promises);
       expect(registry.getAllDefinitions()).toHaveLength(100);
     });
+
+    /*
+     * Testing strategy for legacy format validation
+     *
+     * partition on inputs field:
+     *    inputs is valid object with valid fields
+     *    inputs is null/undefined
+     *    inputs is not an object
+     *    inputs is empty object (valid - no inputs required)
+     *
+     * partition on input definitions:
+     *    input has type and description (valid)
+     *    input missing type
+     *    input missing description
+     *    input with empty type (invalid)
+     *    input with empty description (invalid)
+     */
+    describe('legacy format validation', () => {
+      it('should accept valid legacy format with proper inputs', () => {
+        const validLegacyAgent: AgentDefinition = {
+          ...MOCK_AGENT_V1,
+          name: 'ValidLegacyAgent',
+          inputConfig: {
+            inputs: {
+              task: {
+                type: 'string',
+                description: 'The task to perform',
+                required: true,
+              },
+            },
+          },
+        };
+
+        registry.testRegisterAgent(validLegacyAgent);
+        expect(registry.getDefinition('ValidLegacyAgent')).toEqual(
+          validLegacyAgent,
+        );
+      });
+
+      it('should accept legacy format with empty inputs object', () => {
+        const emptyInputsAgent: AgentDefinition = {
+          ...MOCK_AGENT_V1,
+          name: 'EmptyInputsAgent',
+          inputConfig: { inputs: {} },
+        };
+
+        registry.testRegisterAgent(emptyInputsAgent);
+        expect(registry.getDefinition('EmptyInputsAgent')).toEqual(
+          emptyInputsAgent,
+        );
+      });
+
+      it('should reject legacy format with null inputs', () => {
+        const nullInputsAgent = {
+          ...MOCK_AGENT_V1,
+          name: 'NullInputsAgent',
+          inputConfig: { inputs: null },
+        };
+        const debugWarnSpy = vi
+          .spyOn(debugLogger, 'warn')
+          .mockImplementation(() => {});
+
+        registry.testRegisterAgent(
+          nullInputsAgent as unknown as AgentDefinition,
+        );
+
+        expect(registry.getDefinition('NullInputsAgent')).toBeUndefined();
+        expect(debugWarnSpy).toHaveBeenCalledWith(
+          "[AgentRegistry] Skipping agent 'NullInputsAgent': legacy inputs must be an object.",
+        );
+      });
+
+      it('should reject legacy format with input missing type', () => {
+        const missingTypeAgent = {
+          ...MOCK_AGENT_V1,
+          name: 'MissingTypeAgent',
+          inputConfig: {
+            inputs: {
+              task: {
+                description: 'The task',
+                required: true,
+              },
+            },
+          },
+        };
+        const debugWarnSpy = vi
+          .spyOn(debugLogger, 'warn')
+          .mockImplementation(() => {});
+
+        registry.testRegisterAgent(
+          missingTypeAgent as unknown as AgentDefinition,
+        );
+
+        expect(registry.getDefinition('MissingTypeAgent')).toBeUndefined();
+        expect(debugWarnSpy).toHaveBeenCalledWith(
+          "[AgentRegistry] Skipping agent 'MissingTypeAgent': input 'task' missing required 'type' or 'description'.",
+        );
+      });
+
+      it('should reject legacy format with input missing description', () => {
+        const missingDescAgent = {
+          ...MOCK_AGENT_V1,
+          name: 'MissingDescAgent',
+          inputConfig: {
+            inputs: {
+              task: {
+                type: 'string',
+                required: true,
+              },
+            },
+          },
+        };
+        const debugWarnSpy = vi
+          .spyOn(debugLogger, 'warn')
+          .mockImplementation(() => {});
+
+        registry.testRegisterAgent(
+          missingDescAgent as unknown as AgentDefinition,
+        );
+
+        expect(registry.getDefinition('MissingDescAgent')).toBeUndefined();
+        expect(debugWarnSpy).toHaveBeenCalledWith(
+          "[AgentRegistry] Skipping agent 'MissingDescAgent': input 'task' missing required 'type' or 'description'.",
+        );
+      });
+
+      it('should reject legacy format with input having empty type', () => {
+        const emptyTypeAgent = {
+          ...MOCK_AGENT_V1,
+          name: 'EmptyTypeAgent',
+          inputConfig: {
+            inputs: {
+              task: {
+                type: '',
+                description: 'The task',
+                required: true,
+              },
+            },
+          },
+        };
+        const debugWarnSpy = vi
+          .spyOn(debugLogger, 'warn')
+          .mockImplementation(() => {});
+
+        registry.testRegisterAgent(
+          emptyTypeAgent as unknown as AgentDefinition,
+        );
+
+        expect(registry.getDefinition('EmptyTypeAgent')).toBeUndefined();
+        expect(debugWarnSpy).toHaveBeenCalledWith(
+          "[AgentRegistry] Skipping agent 'EmptyTypeAgent': input 'task' missing required 'type' or 'description'.",
+        );
+      });
+    });
   });
 
   describe('accessors', () => {
@@ -264,6 +496,22 @@ describe('AgentRegistry', () => {
       expect(description).toContain(
         `- **AnotherAgent**: Another agent description`,
       );
+    });
+
+    it('should exclude disabled agents from directory context', async () => {
+      const configWithDisabled = makeFakeConfig({
+        codebaseInvestigatorSettings: { enabled: true },
+        agents: {
+          codebase_investigator: { enabled: false },
+        },
+      });
+      const registryWithDisabled = new TestableAgentRegistry(
+        configWithDisabled,
+      );
+      await registryWithDisabled.initialize();
+
+      const context = registryWithDisabled.getDirectoryContext();
+      expect(context).toContain('No sub-agents are currently available');
     });
   });
 });

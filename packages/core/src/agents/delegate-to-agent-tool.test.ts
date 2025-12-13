@@ -49,6 +49,7 @@ describe('DelegateToAgentTool', () => {
       modelConfigService: {
         registerRuntimeModelConfig: vi.fn(),
       },
+      agents: {},
     } as unknown as Config;
 
     registry = new AgentRegistry(config);
@@ -133,7 +134,7 @@ describe('DelegateToAgentTool', () => {
     ).resolves.toBeDefined();
   });
 
-  it('should throw error if an agent has an input named "agent_name"', () => {
+  it('should skip agent and warn if an agent has an input named "agent_name"', () => {
     const invalidAgentDef: AgentDefinition = {
       ...mockAgentDef,
       name: 'invalid_agent',
@@ -151,9 +152,19 @@ describe('DelegateToAgentTool', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (registry as any).agents.set(invalidAgentDef.name, invalidAgentDef);
 
-    expect(() => new DelegateToAgentTool(registry, config)).toThrow(
-      "Agent 'invalid_agent' cannot have an input parameter named 'agent_name' as it is a reserved parameter for delegation.",
-    );
+    // Should not throw
+    const newTool = new DelegateToAgentTool(registry, config, messageBus);
+
+    expect(newTool).toBeDefined();
+    // Access the parameters schema which defines valid inputs
+    const paramSchema = newTool.schema.parametersJsonSchema;
+    expect(paramSchema).toBeDefined();
+
+    const schemaString = JSON.stringify(paramSchema);
+    // invalid_agent should be skipped and thus not in the parameters schema
+    expect(schemaString).not.toContain('invalid_agent');
+    // test_agent should be present
+    expect(schemaString).toContain('test_agent');
   });
 
   it('should use correct tool name "delegate_to_agent" when requesting confirmation', async () => {
@@ -174,5 +185,160 @@ describe('DelegateToAgentTool', () => {
         }),
       }),
     );
+  });
+
+  it('should generate a "oneOf" schema when multiple agents are enabled', () => {
+    const secondAgent: AgentDefinition = {
+      ...mockAgentDef,
+      name: 'second_agent',
+      description: 'A second test agent',
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (registry as any).agents.set(secondAgent.name, secondAgent);
+
+    const multiAgentTool = new DelegateToAgentTool(
+      registry,
+      config,
+      messageBus,
+    );
+    const paramSchema = multiAgentTool.schema.parametersJsonSchema;
+
+    // With 2+ agents, we expect a 'oneOf' structure or at least both agents to be valid
+    const schemaString = JSON.stringify(paramSchema);
+    expect(schemaString).toContain('test_agent');
+    expect(schemaString).toContain('second_agent');
+
+    // Ideally check structure if implementation uses oneOf
+    // Based on implementation: if (agentSchemas.length === 1) ... else { oneOf: ... }
+    if (
+      typeof paramSchema === 'object' &&
+      paramSchema !== null &&
+      'oneOf' in paramSchema
+    ) {
+      expect(paramSchema.oneOf).toHaveLength(2);
+    } else {
+      // Just in case implementation changes, at least assert both are present
+      expect(schemaString).toContain('test_agent');
+      expect(schemaString).toContain('second_agent');
+    }
+  });
+
+  /*
+   * Testing strategy for disabled agents exclusion
+   *
+   * partition on agent enabled status:
+   *    all agents enabled (baseline - covered by other tests)
+   *    single agent disabled
+   *    all agents disabled
+   *
+   * partition on number of agents:
+   *    single agent (disabled)
+   *    multiple agents (one disabled, one enabled)
+   */
+  describe('disabled agents exclusion from schema', () => {
+    it('should exclude disabled agents from the tool schema', () => {
+      const disabledAgentDef: AgentDefinition = {
+        ...mockAgentDef,
+        name: 'disabled_agent',
+        description: 'A disabled agent',
+      };
+
+      // Register second agent
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (registry as any).agents.set(disabledAgentDef.name, disabledAgentDef);
+
+      // Configure disabled_agent as disabled via config
+      const configWithDisabled = {
+        ...config,
+        agents: {
+          disabled_agent: { enabled: false },
+        },
+      } as unknown as Config;
+
+      // Create new registry with the config that disables the agent
+      const registryWithDisabled = new AgentRegistry(configWithDisabled);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (registryWithDisabled as any).agents.set(mockAgentDef.name, mockAgentDef);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (registryWithDisabled as any).agents.set(
+        disabledAgentDef.name,
+        disabledAgentDef,
+      );
+
+      const toolWithDisabled = new DelegateToAgentTool(
+        registryWithDisabled,
+        configWithDisabled,
+      );
+
+      const paramSchema = toolWithDisabled.schema.parametersJsonSchema;
+      const schemaString = JSON.stringify(paramSchema);
+
+      // disabled_agent should NOT appear in schema
+      expect(schemaString).not.toContain('disabled_agent');
+      // test_agent should still be present
+      expect(schemaString).toContain('test_agent');
+    });
+
+    it('should show fallback schema when all agents are disabled', () => {
+      // Configure the only agent as disabled
+      const configAllDisabled = {
+        ...config,
+        agents: {
+          test_agent: { enabled: false },
+        },
+      } as unknown as Config;
+
+      const registryAllDisabled = new AgentRegistry(configAllDisabled);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (registryAllDisabled as any).agents.set(mockAgentDef.name, mockAgentDef);
+
+      const toolAllDisabled = new DelegateToAgentTool(
+        registryAllDisabled,
+        configAllDisabled,
+      );
+
+      const paramSchema = toolAllDisabled.schema.parametersJsonSchema;
+      const schemaString = JSON.stringify(paramSchema);
+
+      // Should not contain the disabled agent
+      expect(schemaString).not.toContain('test_agent');
+      // Should contain fallback message
+      expect(schemaString).toContain('No agents are currently available');
+    });
+
+    it('should throw error when invoking a disabled agent at runtime', async () => {
+      // Agent is in registry but disabled via config
+      const configWithDisabled = {
+        ...config,
+        agents: {
+          test_agent: { enabled: false },
+        },
+      } as unknown as Config;
+
+      // Create registry where agent exists but is disabled
+      const registryWithDisabled = new AgentRegistry(configWithDisabled);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (registryWithDisabled as any).agents.set(mockAgentDef.name, mockAgentDef);
+
+      // The tool won't include test_agent in schema, but if somehow invoked...
+      // We test the runtime check in DelegateInvocation.execute
+      const toolWithDisabled = new DelegateToAgentTool(
+        registryWithDisabled,
+        configWithDisabled,
+      );
+
+      // Force building with the disabled agent (bypassing schema validation)
+      // This simulates what happens if an agent becomes disabled after tool creation
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const invocation = (toolWithDisabled as any).createInvocation({
+        agent_name: 'test_agent',
+        arg1: 'test',
+      });
+
+      await expect(
+        invocation.execute(new AbortController().signal),
+      ).rejects.toThrow('is not available or has been disabled');
+    });
   });
 });

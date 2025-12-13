@@ -129,6 +129,14 @@ export interface CodebaseInvestigatorSettings {
   model?: string;
 }
 
+export interface AgentConfig {
+  enabled?: boolean;
+  model?: string;
+  maxTimeMinutes?: number;
+  maxTurns?: number;
+  thinkingBudget?: number;
+}
+
 /**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
@@ -324,6 +332,7 @@ export interface ConfigParameters {
   enableAgents?: boolean;
   enableModelAvailabilityService?: boolean;
   experimentalJitContext?: boolean;
+  agents?: Record<string, AgentConfig>;
 }
 
 export class Config {
@@ -449,6 +458,7 @@ export class Config {
 
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
+  readonly agents: Record<string, AgentConfig>;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -597,6 +607,7 @@ export class Config {
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
     this.experiments = params.experiments;
+    this.agents = params.agents ?? {};
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
