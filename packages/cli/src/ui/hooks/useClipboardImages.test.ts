@@ -161,4 +161,59 @@ describe('useClipboardImages', () => {
       expect(parts.length).toBe(1);
     });
   });
+
+  describe('validateImage', () => {
+    it('should return valid for supported image under size limit', async () => {
+      const fs = await import('node:fs/promises');
+      const statMock = vi.mocked(fs.stat);
+      statMock.mockResolvedValueOnce({ size: 1024 } as Awaited<
+        ReturnType<typeof fs.stat>
+      >);
+
+      const { result } = renderHook(() => useClipboardImages());
+      const validation =
+        await result.current.validateImage('/path/to/image.png');
+
+      expect(validation.valid).toBe(true);
+      expect(validation.error).toBeUndefined();
+    });
+
+    it('should return error for unsupported image format', async () => {
+      const { result } = renderHook(() => useClipboardImages());
+      const validation =
+        await result.current.validateImage('/path/to/image.gif');
+
+      expect(validation.valid).toBe(false);
+      expect(validation.error).toContain('Unsupported image format');
+    });
+
+    it('should return error for image exceeding 20MB', async () => {
+      const fs = await import('node:fs/promises');
+      const statMock = vi.mocked(fs.stat);
+      statMock.mockResolvedValueOnce({ size: 25 * 1024 * 1024 } as Awaited<
+        ReturnType<typeof fs.stat>
+      >);
+
+      const { result } = renderHook(() => useClipboardImages());
+      const validation =
+        await result.current.validateImage('/path/to/huge.png');
+
+      expect(validation.valid).toBe(false);
+      expect(validation.error).toContain('exceeds 20MB limit');
+    });
+
+    it('should return error when file cannot be read', async () => {
+      const fs = await import('node:fs/promises');
+      const statMock = vi.mocked(fs.stat);
+      statMock.mockRejectedValueOnce(new Error('ENOENT: no such file'));
+
+      const { result } = renderHook(() => useClipboardImages());
+      const validation = await result.current.validateImage(
+        '/path/to/missing.png',
+      );
+
+      expect(validation.valid).toBe(false);
+      expect(validation.error).toContain('Cannot read image');
+    });
+  });
 });

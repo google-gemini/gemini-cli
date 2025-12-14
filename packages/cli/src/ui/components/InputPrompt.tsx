@@ -38,6 +38,7 @@ import {
   categorizePathsByType,
 } from '../utils/clipboardUtils.js';
 import type { UseClipboardImagesReturn } from '../hooks/useClipboardImages.js';
+import { appEvents, AppEvent } from '../../utils/events.js';
 import {
   isAutoExecutableCommand,
   isSlashCommand,
@@ -332,6 +333,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           // If clipboardImages is not provided, fall back to the old @path behavior
           let insertText: string;
           if (clipboardImages) {
+            // Validate image before registration
+            const validation = await clipboardImages.validateImage(imagePath);
+            if (!validation.valid) {
+              appEvents.emit(
+                AppEvent.ImageWarning,
+                validation.error ?? 'Invalid image',
+              );
+              return;
+            }
             insertText = clipboardImages.registerImage(imagePath);
           } else {
             const relativePath = path.relative(
@@ -435,50 +445,79 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           key.sequence &&
           mayContainImagePaths(key.sequence)
         ) {
-          // Only go async for potential image paths to verify file existence
+          // Capture state at paste time to handle the async operation correctly
           const sequence = key.sequence;
+          const pasteOffset = buffer.getOffset();
+          const currentText = buffer.text;
+
+          // Only go async for potential image paths to verify file existence
           void (async () => {
             try {
               const { imagePaths, nonImagePaths } =
                 await categorizePathsByType(sequence);
 
               if (imagePaths.length > 0 || nonImagePaths.length > 0) {
-                // Register each image and collect placeholders
-                const placeholders = imagePaths.map((p) =>
-                  clipboardImages.registerImage(p),
-                );
+                // Validate and register each image, collecting placeholders
+                const placeholders: string[] = [];
+                const skippedImages: string[] = [];
+
+                for (const imagePath of imagePaths) {
+                  const validation =
+                    await clipboardImages.validateImage(imagePath);
+                  if (validation.valid) {
+                    placeholders.push(clipboardImages.registerImage(imagePath));
+                  } else {
+                    skippedImages.push(validation.error ?? 'Invalid image');
+                  }
+                }
+
+                // Show warnings for skipped images
+                for (const error of skippedImages) {
+                  appEvents.emit(AppEvent.ImageWarning, error);
+                }
 
                 // Non-image files use @path syntax for file references
                 const atPrefixedPaths = nonImagePaths.map((p) => `@${p}`);
 
                 // Build insertion text: image placeholders + @path references
                 const insertParts = [...placeholders, ...atPrefixedPaths];
-                const insertText = insertParts.join(' ');
 
-                // Insert at cursor position with proper spacing
-                const offset = buffer.getOffset();
-                const currentText = buffer.text;
-                let textToInsert = insertText;
+                // If all images were invalid but we have non-image paths, still insert those
+                if (insertParts.length === 0) {
+                  // All paths were invalid images with no non-image files
+                  return;
+                }
 
-                const charBefore = offset > 0 ? currentText[offset - 1] : '';
+                let insertText = insertParts.join(' ');
+
+                // Add spacing around the insert text based on context at paste time
+                const charBefore =
+                  pasteOffset > 0 ? currentText[pasteOffset - 1] : '';
                 const charAfter =
-                  offset < currentText.length ? currentText[offset] : '';
+                  pasteOffset < currentText.length
+                    ? currentText[pasteOffset]
+                    : '';
 
                 if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
-                  textToInsert = ' ' + textToInsert;
+                  insertText = ' ' + insertText;
                 }
                 if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
-                  textToInsert = textToInsert + ' ';
+                  insertText = insertText + ' ';
                 }
 
-                buffer.replaceRangeByOffset(offset, offset, textToInsert);
+                // Insert at the original paste position
+                buffer.replaceRangeByOffset(
+                  pasteOffset,
+                  pasteOffset,
+                  insertText,
+                );
               } else {
-                // No valid paths found, treat as normal paste
-                buffer.handleInput(key);
+                // No valid paths found, insert as normal text
+                buffer.replaceRangeByOffset(pasteOffset, pasteOffset, sequence);
               }
             } catch {
-              // On error, fall back to normal paste behavior
-              buffer.handleInput(key);
+              // On error, insert as normal text
+              buffer.replaceRangeByOffset(pasteOffset, pasteOffset, sequence);
             }
           })();
           return;

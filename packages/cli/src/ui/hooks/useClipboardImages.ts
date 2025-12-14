@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import type { PartUnion } from '@google/genai';
 import { debugLogger } from '@google/gemini-cli-core';
 import { IMAGE_EXTENSIONS } from '../utils/clipboardUtils.js';
+import { appEvents, AppEvent } from '../../utils/events.js';
 
 /**
  * Represents a clipboard image that has been pasted into the input.
@@ -46,11 +47,23 @@ const createEmptyRegistry = (): ImageRegistry => ({
 });
 
 /**
+ * Result of image validation.
+ */
+export interface ImageValidationResult {
+  /** Whether the image is valid and can be registered */
+  valid: boolean;
+  /** Error message if validation failed */
+  error?: string;
+}
+
+/**
  * Return type for the useClipboardImages hook.
  */
 export interface UseClipboardImagesReturn {
   /** Array of registered clipboard images for the current message */
   images: ClipboardImage[];
+  /** Validate an image before registration. Returns error message if invalid. */
+  validateImage: (absolutePath: string) => Promise<ImageValidationResult>;
   /** Register a new image and return its display text (e.g., "[Image #1]") */
   registerImage: (absolutePath: string) => string;
   /** Clear all images (called after message submission) */
@@ -95,9 +108,9 @@ async function readImageAsPart(
   const mimeType = getMimeType(imagePath);
   if (!mimeType) {
     const ext = path.extname(imagePath);
-    debugLogger.warn(
-      `Unsupported image format ${ext} for ${displayText}, skipping. Supported: ${IMAGE_EXTENSIONS.join(', ')}`,
-    );
+    const message = `Unsupported image format ${ext} for ${displayText}`;
+    debugLogger.warn(`${message}. Supported: ${IMAGE_EXTENSIONS.join(', ')}`);
+    appEvents.emit(AppEvent.ImageWarning, message);
     return null;
   }
 
@@ -106,9 +119,9 @@ async function readImageAsPart(
     const stats = await fs.stat(imagePath);
     if (stats.size > MAX_IMAGE_SIZE_BYTES) {
       const sizeMB = (stats.size / (1024 * 1024)).toFixed(1);
-      debugLogger.warn(
-        `${displayText} exceeds 20MB limit (${sizeMB}MB), skipping. Consider using a smaller image.`,
-      );
+      const message = `${displayText} exceeds 20MB limit (${sizeMB}MB)`;
+      debugLogger.warn(`${message}. Consider using a smaller image.`);
+      appEvents.emit(AppEvent.ImageWarning, message);
       return null;
     }
 
@@ -151,6 +164,45 @@ export function useClipboardImages(): UseClipboardImagesReturn {
     registryRef.current = newRegistry;
     setRegistryState(newRegistry);
   }, []);
+
+  /**
+   * Validate an image before registration.
+   * Checks file size and MIME type support.
+   */
+  const validateImage = useCallback(
+    async (absolutePath: string): Promise<ImageValidationResult> => {
+      // Check MIME type
+      const mimeType = getMimeType(absolutePath);
+      if (!mimeType) {
+        const ext = path.extname(absolutePath);
+        return {
+          valid: false,
+          error: `Unsupported image format ${ext}`,
+        };
+      }
+
+      // Check file size
+      try {
+        const stats = await fs.stat(absolutePath);
+        if (stats.size > MAX_IMAGE_SIZE_BYTES) {
+          const sizeMB = (stats.size / (1024 * 1024)).toFixed(1);
+          return {
+            valid: false,
+            error: `Image exceeds 20MB limit (${sizeMB}MB)`,
+          };
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          valid: false,
+          error: `Cannot read image: ${message}`,
+        };
+      }
+
+      return { valid: true };
+    },
+    [],
+  );
 
   /**
    * Register a new image and return its display text.
@@ -223,6 +275,7 @@ export function useClipboardImages(): UseClipboardImagesReturn {
 
   return {
     images: registry.images,
+    validateImage,
     registerImage,
     clear,
     getImagePartsForText,

@@ -130,6 +130,7 @@ import { enableBracketedPaste } from './utils/bracketedPaste.js';
 import { useBanner } from './hooks/useBanner.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
+const IMAGE_WARNING_DURATION_MS = 3000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
@@ -1041,14 +1042,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
 
-    const handleWarning = (message: string) => {
+    const handleWarning = (
+      message: string,
+      durationMs = WARNING_PROMPT_DURATION_MS,
+    ) => {
       setWarningMessage(message);
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
       timeoutId = setTimeout(() => {
         setWarningMessage(null);
-      }, WARNING_PROMPT_DURATION_MS);
+      }, durationMs);
     };
 
     const handleSelectionWarning = () => {
@@ -1057,11 +1061,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
     const handlePasteTimeout = () => {
       handleWarning('Paste Timed out. Possibly due to slow connection.');
     };
+    const handleImageWarning = (message: string) => {
+      handleWarning(message, IMAGE_WARNING_DURATION_MS);
+    };
     appEvents.on(AppEvent.SelectionWarning, handleSelectionWarning);
     appEvents.on(AppEvent.PasteTimeout, handlePasteTimeout);
+    appEvents.on(AppEvent.ImageWarning, handleImageWarning);
     return () => {
       appEvents.off(AppEvent.SelectionWarning, handleSelectionWarning);
       appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
+      appEvents.off(AppEvent.ImageWarning, handleImageWarning);
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
