@@ -358,7 +358,7 @@ contain other project-specific files related to Gemini CLI's operation, such as:
     "excludedProjectEnvVars": ["DEBUG", "DEBUG_MODE", "NODE_ENV"]
     ```
 
-- **`includeDirectories`** (array of strings):
+- **`context.includeDirectories`** (array of strings):
   - **Description:** Specifies an array of additional absolute or relative paths
     to include in the workspace context. This allows you to work with files
     across multiple directories as if they were one. Paths can use `~` to refer
@@ -367,14 +367,16 @@ contain other project-specific files related to Gemini CLI's operation, such as:
   - **Default:** `[]`
   - **Example:**
     ```json
-    "includeDirectories": [
-      "/path/to/another/project",
-      "../shared-library",
-      "~/common-utils"
-    ]
+    "context": {
+      "includeDirectories": [
+        "/path/to/another/project",
+        "../shared-library",
+        "~/common-utils"
+      ]
+    }
     ```
 
-- **`loadMemoryFromIncludeDirectories`** (boolean):
+- **`context.loadMemoryFromIncludeDirectories`** (boolean):
   - **Description:** Controls the behavior of the `/memory refresh` command. If
     set to `true`, `GEMINI.md` files should be loaded from all directories that
     are added. If set to `false`, `GEMINI.md` should only be loaded from the
@@ -382,7 +384,9 @@ contain other project-specific files related to Gemini CLI's operation, such as:
   - **Default:** `false`
   - **Example:**
     ```json
-    "loadMemoryFromIncludeDirectories": true
+    "context": {
+      "loadMemoryFromIncludeDirectories": true
+    }
     ```
 
 ### Example `settings.json`:
@@ -418,8 +422,10 @@ contain other project-specific files related to Gemini CLI's operation, such as:
     }
   },
   "excludedProjectEnvVars": ["DEBUG", "DEBUG_MODE", "NODE_ENV"],
-  "includeDirectories": ["path/to/dir1", "~/path/to/dir2", "../path/to/dir3"],
-  "loadMemoryFromIncludeDirectories": true
+  "context": {
+    "includeDirectories": ["path/to/dir1", "~/path/to/dir2", "../path/to/dir3"],
+    "loadMemoryFromIncludeDirectories": true
+  }
 }
 ```
 
