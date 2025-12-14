@@ -21,9 +21,9 @@ type MockChildProcessWithoutNullStreams = ChildProcessWithoutNullStreams & {
 
 // Mock child_process with importOriginal for partial mocking
 vi.mock('node:child_process', async (importOriginal) => {
-  const actual = (await importOriginal()) as object;
+  const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as object),
     spawn: vi.fn(),
   };
 });
@@ -127,10 +127,7 @@ describe('HookSystem Integration', () => {
         'Hook system initialized successfully',
       );
 
-      // Verify system is initialized
-      const status = hookSystem.getStatus();
-      expect(status.initialized).toBe(true);
-      // Note: totalHooks might be 0 if hook validation rejects the test hooks
+      expect(hookSystem.getAllHooks().length).toBe(1);
     });
 
     it('should not initialize twice', async () => {
@@ -204,12 +201,6 @@ describe('HookSystem Integration', () => {
       });
       expect(result.success).toBe(true);
     });
-
-    it('should throw error when not initialized', () => {
-      expect(() => hookSystem.getEventHandler()).toThrow(
-        'Hook system not initialized',
-      );
-    });
   });
 
   describe('hook execution', () => {
@@ -258,24 +249,6 @@ describe('HookSystem Integration', () => {
       expect(result.success).toBe(true);
       expect(result.allOutputs).toHaveLength(0);
       expect(result.finalOutput).toBeUndefined();
-    });
-  });
-
-  describe('system management', () => {
-    it('should return correct status when initialized', async () => {
-      await hookSystem.initialize();
-
-      const status = hookSystem.getStatus();
-
-      expect(status.initialized).toBe(true);
-      // Note: totalHooks might be 0 if hook validation rejects the test hooks
-      expect(typeof status.totalHooks).toBe('number');
-    });
-
-    it('should return uninitialized status', () => {
-      const status = hookSystem.getStatus();
-
-      expect(status.initialized).toBe(false);
     });
   });
 
