@@ -39,7 +39,12 @@ import {
   EDIT_TOOL_NAMES,
   processRestorableToolCalls,
 } from '@google/gemini-cli-core';
-import { type Part, type PartListUnion, FinishReason } from '@google/genai';
+import {
+  type Part,
+  type PartListUnion,
+  type PartUnion,
+  FinishReason,
+} from '@google/genai';
 import type {
   HistoryItem,
   HistoryItemWithoutId,
@@ -109,6 +114,10 @@ export const useGeminiStream = (
   terminalWidth: number,
   terminalHeight: number,
   isShellFocused?: boolean,
+  clipboardImages?: {
+    getImagePartsForText: (text: string) => Promise<PartUnion[]>;
+    clear: () => void;
+  },
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -507,6 +516,69 @@ export const useGeminiStream = (
         );
         return { queryToSend: null, shouldProceed: false };
       }
+
+      // Inject clipboard images into the query
+      // Only include images whose [Image #N] tags are still present in the text
+      if (clipboardImages) {
+        // Extract query text to check which image tags are present
+        const queryText =
+          typeof localQueryToSendToGemini === 'string'
+            ? localQueryToSendToGemini
+            : Array.isArray(localQueryToSendToGemini)
+              ? localQueryToSendToGemini
+                  .filter(
+                    (p): p is { text: string } =>
+                      p !== null &&
+                      typeof p === 'object' &&
+                      'text' in p &&
+                      typeof p.text === 'string',
+                  )
+                  .map((p) => p.text)
+                  .join(' ')
+              : '';
+
+        const imageParts =
+          await clipboardImages.getImagePartsForText(queryText);
+        if (imageParts.length > 0) {
+          onDebugMessage(`Injecting ${imageParts.length} clipboard image(s)`);
+
+          // Strip [Image #N] references from the text since we're injecting the actual images
+          const stripImageReferences = (text: string): string =>
+            text.replace(/\[Image #\d+\]\s*/g, '').trim();
+
+          if (typeof localQueryToSendToGemini === 'string') {
+            const cleanedText = stripImageReferences(localQueryToSendToGemini);
+            localQueryToSendToGemini = [
+              ...imageParts,
+              ...(cleanedText ? [{ text: cleanedText }] : []),
+            ];
+          } else if (Array.isArray(localQueryToSendToGemini)) {
+            // Clean text parts in the array
+            const cleanedParts = localQueryToSendToGemini
+              .map((part) => {
+                if (typeof part === 'string') {
+                  const cleaned = stripImageReferences(part);
+                  return cleaned ? cleaned : null;
+                }
+                if (
+                  part &&
+                  typeof part === 'object' &&
+                  'text' in part &&
+                  typeof part.text === 'string'
+                ) {
+                  const cleaned = stripImageReferences(part.text);
+                  return cleaned ? { ...part, text: cleaned } : null;
+                }
+                return part;
+              })
+              .filter(
+                (part): part is NonNullable<typeof part> => part !== null,
+              );
+            localQueryToSendToGemini = [...imageParts, ...cleanedParts];
+          }
+        }
+      }
+
       return { queryToSend: localQueryToSendToGemini, shouldProceed: true };
     },
     [
@@ -518,6 +590,7 @@ export const useGeminiStream = (
       logger,
       shellModeActive,
       scheduleToolCalls,
+      clipboardImages,
     ],
   );
 
@@ -921,6 +994,11 @@ export const useGeminiStream = (
               return;
             }
 
+            // Clear clipboard images after they've been injected into the query
+            if (clipboardImages && !options?.isContinuation) {
+              clipboardImages.clear();
+            }
+
             if (!options?.isContinuation) {
               if (typeof queryToSend === 'string') {
                 // logging the text prompts only for now
@@ -1049,6 +1127,7 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
+      clipboardImages,
     ],
   );
 

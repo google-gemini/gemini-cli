@@ -107,6 +107,7 @@ import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
+import { useClipboardImages } from './hooks/useClipboardImages.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
@@ -359,6 +360,9 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();
+
+  // Clipboard images for pasted images in the input
+  const clipboardImages = useClipboardImages();
 
   const mainAreaWidth = calculateMainAreaWidth(terminalWidth, settings);
   // Derive widths for InputPrompt using shared helper
@@ -793,6 +797,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     terminalWidth,
     terminalHeight,
     embeddedShellFocused,
+    clipboardImages,
   );
 
   // Auto-accept indicator
@@ -1543,6 +1548,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       warningMessage,
       bannerData,
       bannerVisible,
+      clipboardImages,
     }),
     [
       isThemeDialogOpen,
@@ -1634,6 +1640,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       warningMessage,
       bannerData,
       bannerVisible,
+      clipboardImages,
     ],
   );
 

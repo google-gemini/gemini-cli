@@ -133,4 +133,44 @@ describe('parseInputForHighlighting', () => {
       { text: '@/my\\ path/file.txt', type: 'file' },
     ]);
   });
+
+  it('should highlight image placeholders', () => {
+    const text = 'Check this [Image #1] please';
+    expect(parseInputForHighlighting(text, 0)).toEqual([
+      { text: 'Check this ', type: 'default' },
+      { text: '[Image #1]', type: 'image' },
+      { text: ' please', type: 'default' },
+    ]);
+  });
+
+  it('should highlight multiple image placeholders', () => {
+    const text = '[Image #1] and [Image #2]';
+    expect(parseInputForHighlighting(text, 0)).toEqual([
+      { text: '[Image #1]', type: 'image' },
+      { text: ' and ', type: 'default' },
+      { text: '[Image #2]', type: 'image' },
+    ]);
+  });
+
+  it('should highlight image placeholders with double digits', () => {
+    const text = 'See [Image #12] for details';
+    expect(parseInputForHighlighting(text, 0)).toEqual([
+      { text: 'See ', type: 'default' },
+      { text: '[Image #12]', type: 'image' },
+      { text: ' for details', type: 'default' },
+    ]);
+  });
+
+  it('should highlight mixed files and images', () => {
+    const text = '@file.txt [Image #1] @another.jpg [Image #2]';
+    expect(parseInputForHighlighting(text, 0)).toEqual([
+      { text: '@file.txt', type: 'file' },
+      { text: ' ', type: 'default' },
+      { text: '[Image #1]', type: 'image' },
+      { text: ' ', type: 'default' },
+      { text: '@another.jpg', type: 'file' },
+      { text: ' ', type: 'default' },
+      { text: '[Image #2]', type: 'image' },
+    ]);
+  });
 });

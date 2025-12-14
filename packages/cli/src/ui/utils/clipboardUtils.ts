@@ -244,3 +244,80 @@ export function parsePastedPaths(
 
   return anyValidPath ? processedPaths.join(' ') + ' ' : null;
 }
+
+/**
+ * Quick synchronous check if text could contain image file paths.
+ * Used as a fast heuristic before async validation.
+ */
+export function mayContainImagePaths(text: string): boolean {
+  if (!PATH_PREFIX_PATTERN.test(text)) {
+    return false;
+  }
+  const lowerText = text.toLowerCase();
+  return IMAGE_EXTENSIONS.some((ext) => lowerText.includes(ext));
+}
+
+/**
+ * Result of categorizing pasted/dropped paths.
+ */
+export interface CategorizedPaths {
+  /** Absolute paths to existing image files */
+  imagePaths: string[];
+  /** Absolute paths to existing non-image files */
+  nonImagePaths: string[];
+  /** Segments that don't exist or aren't valid paths */
+  invalidSegments: string[];
+}
+
+/**
+ * Categorizes pasted/dropped paths into images, non-images, and invalid.
+ * Validates that files exist on disk before categorizing.
+ *
+ * @param text The pasted text (potentially space-separated paths)
+ * @returns Categorized paths by type
+ */
+export async function categorizePathsByType(
+  text: string,
+): Promise<CategorizedPaths> {
+  const result: CategorizedPaths = {
+    imagePaths: [],
+    nonImagePaths: [],
+    invalidSegments: [],
+  };
+
+  const segments = splitEscapedPaths(text);
+  if (segments.length === 0) {
+    return result;
+  }
+
+  const validationResults = await Promise.all(
+    segments.map(async (segment) => {
+      if (!PATH_PREFIX_PATTERN.test(segment)) {
+        return { segment, type: 'invalid' as const, unescaped: segment };
+      }
+      const unescaped = unescapePath(segment);
+      try {
+        await fs.access(unescaped);
+        const ext = path.extname(unescaped).toLowerCase();
+        const type: 'image' | 'non-image' = IMAGE_EXTENSIONS.includes(ext)
+          ? 'image'
+          : 'non-image';
+        return { segment, type, unescaped };
+      } catch {
+        return { segment, type: 'invalid' as const, unescaped };
+      }
+    }),
+  );
+
+  for (const { type, unescaped, segment } of validationResults) {
+    if (type === 'image') {
+      result.imagePaths.push(unescaped);
+    } else if (type === 'non-image') {
+      result.nonImagePaths.push(unescaped);
+    } else {
+      result.invalidSegments.push(segment);
+    }
+  }
+
+  return result;
+}
