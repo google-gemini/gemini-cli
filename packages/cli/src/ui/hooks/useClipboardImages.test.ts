@@ -12,6 +12,7 @@ import { useClipboardImages } from './useClipboardImages.js';
 // Mock the fs module to avoid actual file system operations
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn().mockResolvedValue(Buffer.from('fake image data')),
+  stat: vi.fn().mockResolvedValue({ size: 1024 }), // Default: 1KB (under limit)
 }));
 
 describe('useClipboardImages', () => {
@@ -130,6 +131,34 @@ describe('useClipboardImages', () => {
       );
 
       expect(parts).toEqual([]);
+    });
+
+    it('should skip images exceeding 20MB size limit', async () => {
+      const fs = await import('node:fs/promises');
+      const statMock = vi.mocked(fs.stat);
+
+      // First image: 25MB (over limit), Second image: 1KB (under limit)
+      statMock
+        .mockResolvedValueOnce({ size: 25 * 1024 * 1024 } as Awaited<
+          ReturnType<typeof fs.stat>
+        >)
+        .mockResolvedValueOnce({ size: 1024 } as Awaited<
+          ReturnType<typeof fs.stat>
+        >);
+
+      const { result } = renderHook(() => useClipboardImages());
+
+      act(() => {
+        result.current.registerImage('/path/to/huge-image.png');
+        result.current.registerImage('/path/to/small-image.png');
+      });
+
+      const parts = await result.current.getImagePartsForText(
+        '[Image #1] [Image #2]',
+      );
+
+      // Only the small image should be included
+      expect(parts.length).toBe(1);
     });
   });
 });

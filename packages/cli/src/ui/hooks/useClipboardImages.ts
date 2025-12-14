@@ -60,6 +60,12 @@ export interface UseClipboardImagesReturn {
 }
 
 /**
+ * Maximum file size for inline image data (20MB).
+ * See: https://ai.google.dev/gemini-api/docs/image-understanding
+ */
+const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
+
+/**
  * MIME types supported by Gemini API for image inputs.
  * See: https://ai.google.dev/gemini-api/docs/image-understanding
  */
@@ -79,7 +85,8 @@ function getMimeType(filePath: string): string | null {
 
 /**
  * Reads an image file and returns it as a base64-encoded PartUnion.
- * Returns null if the file cannot be read or has an unsupported format.
+ * Returns null if the file cannot be read, has an unsupported format,
+ * or exceeds the 20MB size limit.
  */
 async function readImageAsPart(
   imagePath: string,
@@ -95,6 +102,16 @@ async function readImageAsPart(
   }
 
   try {
+    // Check file size before reading to avoid loading huge files into memory
+    const stats = await fs.stat(imagePath);
+    if (stats.size > MAX_IMAGE_SIZE_BYTES) {
+      const sizeMB = (stats.size / (1024 * 1024)).toFixed(1);
+      debugLogger.warn(
+        `${displayText} exceeds 20MB limit (${sizeMB}MB), skipping. Consider using a smaller image.`,
+      );
+      return null;
+    }
+
     const fileContent = await fs.readFile(imagePath);
     return {
       inlineData: {
