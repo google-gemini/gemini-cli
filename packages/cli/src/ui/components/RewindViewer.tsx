@@ -59,6 +59,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   const {
     interactions,
     selectedMessageId,
+    getStats,
     confirmationStats,
     selectMessage,
     clearSelection,
@@ -157,6 +158,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
           maxItemsToShow={maxItemsToShow}
           renderItem={(itemWrapper, { isSelected }) => {
             const userPrompt = itemWrapper.value;
+            const stats = getStats(userPrompt);
 
             const originalUserText = userPrompt.content
               ? partToString(userPrompt.content)
@@ -174,6 +176,25 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
                     {truncate(cleanedText, isSelected)}
                   </Text>
                 </Box>
+                {stats ? (
+                  <Box flexDirection="row">
+                    <Text color={theme.text.secondary}>
+                      {stats.fileCount === 1
+                        ? stats.firstFileName
+                        : `${stats.fileCount} files changed`}{' '}
+                    </Text>
+                    {stats.addedLines > 0 && (
+                      <Text color="green">+{stats.addedLines} </Text>
+                    )}
+                    {stats.removedLines > 0 && (
+                      <Text color="red">-{stats.removedLines}</Text>
+                    )}
+                  </Box>
+                ) : (
+                  <Text color={theme.text.secondary}>
+                    No files have been changed
+                  </Text>
+                )}
               </Box>
             );
           }}
