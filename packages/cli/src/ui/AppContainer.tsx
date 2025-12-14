@@ -1064,13 +1064,22 @@ Logging in with Google... Restarting Gemini CLI to continue.
     const handleImageWarning = (message: string) => {
       handleWarning(message, IMAGE_WARNING_DURATION_MS);
     };
+    const handleImageProcessing = (message: string) => {
+      if (message) {
+        setWarningMessage(message);
+      } else {
+        setWarningMessage(null);
+      }
+    };
     appEvents.on(AppEvent.SelectionWarning, handleSelectionWarning);
     appEvents.on(AppEvent.PasteTimeout, handlePasteTimeout);
     appEvents.on(AppEvent.ImageWarning, handleImageWarning);
+    appEvents.on(AppEvent.ImageProcessing, handleImageProcessing);
     return () => {
       appEvents.off(AppEvent.SelectionWarning, handleSelectionWarning);
       appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
       appEvents.off(AppEvent.ImageWarning, handleImageWarning);
+      appEvents.off(AppEvent.ImageProcessing, handleImageProcessing);
       if (timeoutId) {
         clearTimeout(timeoutId);
       }

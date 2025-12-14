@@ -322,7 +322,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const handleClipboardPaste = useCallback(async () => {
     try {
       if (await clipboardHasImage()) {
+        // Show processing indicator immediately
+        appEvents.emit(AppEvent.ImageProcessing, 'Processing image...');
+
         const imagePath = await saveClipboardImage(config.getTargetDir());
+
+        // Clear processing indicator
+        appEvents.emit(AppEvent.ImageProcessing, '');
+
         if (imagePath) {
           // Clean up old images
           cleanupOldClipboardImages(config.getTargetDir()).catch(() => {
