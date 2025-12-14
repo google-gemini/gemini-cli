@@ -24,6 +24,28 @@ export interface ClipboardImage {
 }
 
 /**
+ * Internal registry for tracking clipboard images.
+ * Uses a Map for O(1) path lookup to prevent race conditions.
+ */
+interface ImageRegistry {
+  /** Map from absolute path to ClipboardImage for O(1) duplicate detection */
+  pathToImage: Map<string, ClipboardImage>;
+  /** Ordered array of images for iteration */
+  images: ClipboardImage[];
+  /** Next sequential ID to assign */
+  nextId: number;
+}
+
+/**
+ * Creates an empty image registry.
+ */
+const createEmptyRegistry = (): ImageRegistry => ({
+  pathToImage: new Map(),
+  images: [],
+  nextId: 1,
+});
+
+/**
  * Return type for the useClipboardImages hook.
  */
 export interface UseClipboardImagesReturn {
@@ -96,39 +118,63 @@ async function readImageAsPart(
  * to base64-encoded parts for injection into the Gemini prompt.
  *
  * The image counter resets after each message submission.
+ *
+ * Uses a Map-based registry with synchronized ref/state to prevent race conditions
+ * when multiple images are registered rapidly (e.g., multi-file drag-and-drop).
  */
 export function useClipboardImages(): UseClipboardImagesReturn {
-  const [images, setImages] = useState<ClipboardImage[]>([]);
-  const nextIdRef = useRef(1);
+  const [registry, setRegistryState] =
+    useState<ImageRegistry>(createEmptyRegistry);
+  const registryRef = useRef<ImageRegistry>(registry);
 
-  const registerImage = useCallback((absolutePath: string): string => {
-    // Generate ID atomically with state update to prevent race conditions
-    // when multiple images are registered rapidly (e.g., multi-file drag-and-drop)
-    const id = nextIdRef.current++;
-    const displayText = `[Image #${id}]`;
-
-    setImages((prev) => {
-      // Check if this path is already registered to prevent duplicates
-      if (prev.some((img) => img.path === absolutePath)) {
-        return prev;
-      }
-      return [
-        ...prev,
-        {
-          id,
-          path: absolutePath,
-          displayText,
-        },
-      ];
-    });
-
-    return displayText;
+  // Custom setter that syncs ref and state atomically.
+  // The ref is updated synchronously for immediate reads,
+  // while state update is queued for React re-renders.
+  const setRegistry = useCallback((newRegistry: ImageRegistry) => {
+    registryRef.current = newRegistry;
+    setRegistryState(newRegistry);
   }, []);
+
+  /**
+   * Register a new image and return its display text.
+   * This function is idempotent: registering the same path twice returns
+   * the same display text without creating a duplicate entry.
+   */
+  const registerImage = useCallback(
+    (absolutePath: string): string => {
+      // Read from ref for synchronous access to latest state
+      const current = registryRef.current;
+
+      // O(1) check for existing registration - makes this idempotent
+      const existing = current.pathToImage.get(absolutePath);
+      if (existing) {
+        return existing.displayText;
+      }
+
+      // Assign ID and create image atomically
+      const id = current.nextId;
+      const displayText = `[Image #${id}]`;
+      const newImage: ClipboardImage = { id, path: absolutePath, displayText };
+
+      // Immutable Map update
+      const newPathToImage = new Map(current.pathToImage);
+      newPathToImage.set(absolutePath, newImage);
+
+      const newRegistry: ImageRegistry = {
+        pathToImage: newPathToImage,
+        images: [...current.images, newImage],
+        nextId: id + 1,
+      };
+
+      setRegistry(newRegistry);
+      return displayText;
+    },
+    [setRegistry],
+  );
 
   const clear = useCallback(() => {
-    setImages([]);
-    nextIdRef.current = 1;
-  }, []);
+    setRegistry(createEmptyRegistry());
+  }, [setRegistry]);
 
   /**
    * Get image parts only for images whose [Image #N] tags are present in the text.
@@ -136,11 +182,13 @@ export function useClipboardImages(): UseClipboardImagesReturn {
    */
   const getImagePartsForText = useCallback(
     async (text: string): Promise<PartUnion[]> => {
+      // Use ref for synchronous access to current state
+      const current = registryRef.current;
       const parts: PartUnion[] = [];
 
-      for (const image of images) {
+      for (const image of current.images) {
         // Use String.includes for faster tag checking (no regex compilation)
-        if (!text.includes(`[Image #${image.id}]`)) {
+        if (!text.includes(image.displayText)) {
           // Tag was deleted - skip this image
           continue;
         }
@@ -153,11 +201,11 @@ export function useClipboardImages(): UseClipboardImagesReturn {
 
       return parts;
     },
-    [images],
+    [], // No dependencies - reads from ref for consistent access
   );
 
   return {
-    images,
+    images: registry.images,
     registerImage,
     clear,
     getImagePartsForText,
