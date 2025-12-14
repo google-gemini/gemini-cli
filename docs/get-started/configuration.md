@@ -1123,7 +1123,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Any other string: Treat as a path (relative/absolute supported, `~`
     expands).
   - `false`/`0` or unset: Use the built‑in prompt. See
-    [System Prompt Override](../core/system-prompt.md).
+    [System Prompt Override](../cli/system-prompt.md).
 - **`GEMINI_WRITE_SYSTEM_MD`**:
   - Writes the current built‑in system prompt to a file for review.
   - `true`/`1`: Write to `./.gemini/system.md`. Otherwise treat the value as a
