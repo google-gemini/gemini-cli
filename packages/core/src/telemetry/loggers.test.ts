@@ -1760,6 +1760,7 @@ describe('loggers', () => {
     it('should log extension install event', async () => {
       const event = new ExtensionInstallEvent(
         'testing',
+        'testing-hash',
         'testing-id',
         '0.1.0',
         'git',
@@ -1810,6 +1811,7 @@ describe('loggers', () => {
     it('should log extension update event', async () => {
       const event = new ExtensionUpdateEvent(
         'testing',
+        'testing-hash',
         'testing-id',
         '0.1.0',
         '0.1.1',
@@ -1861,6 +1863,7 @@ describe('loggers', () => {
     it('should log extension uninstall event', async () => {
       const event = new ExtensionUninstallEvent(
         'testing',
+        'testing-hash',
         'testing-id',
         'success',
       );
@@ -1903,7 +1906,12 @@ describe('loggers', () => {
     });
 
     it('should log extension enable event', async () => {
-      const event = new ExtensionEnableEvent('testing', 'testing-id', 'user');
+      const event = new ExtensionEnableEvent(
+        'testing',
+        'testing-hash',
+        'testing-id',
+        'user',
+      );
 
       await logExtensionEnable(mockConfig, event);
 
@@ -1943,7 +1951,12 @@ describe('loggers', () => {
     });
 
     it('should log extension disable event', async () => {
-      const event = new ExtensionDisableEvent('testing', 'testing-id', 'user');
+      const event = new ExtensionDisableEvent(
+        'testing',
+        'testing-hash',
+        'testing-id',
+        'user',
+      );
 
       await logExtensionDisable(mockConfig, event);
 
