@@ -66,7 +66,7 @@ describe('BOM end-to-end integraion', () => {
   ) {
     writeFileSync(join(rig.testDir!, filename), content);
     const prompt = `read the file ${filename} and output its exact contents`;
-    const output = await rig.run(prompt);
+    const output = await rig.run({ args: prompt });
     await rig.waitForToolCall('read_file');
     const lower = output.toLowerCase();
     if (expectedText === null) {
@@ -126,7 +126,7 @@ describe('BOM end-to-end integraion', () => {
     const filename = 'gemini-screenshot.png';
     writeFileSync(join(rig.testDir!, filename), imageContent);
     const prompt = `What is shown in the image ${filename}?`;
-    const output = await rig.run(prompt);
+    const output = await rig.run({ args: prompt });
     await rig.waitForToolCall('read_file');
     const lower = output.toLowerCase();
     // The response is non-deterministic, so we just check for some

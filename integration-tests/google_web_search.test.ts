@@ -24,7 +24,7 @@ describe('web search tool', () => {
 
     let result;
     try {
-      result = await rig.run(`what is the weather in London`);
+      result = await rig.run({ args: `what is the weather in London` });
     } catch (error) {
       // Network errors can occur in CI environments
       if (

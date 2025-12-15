@@ -55,8 +55,9 @@ describe('Hooks System Integration', () => {
         },
       );
 
-      const prompt = 'Create a file called test.txt with content "Hello World"';
-      const result = await rig.run(prompt);
+      const result = await rig.run({
+        args: 'Create a file called test.txt with content "Hello World"',
+      });
 
       // The hook should block the write_file tool
       const toolLogs = rig.readToolLogs();
@@ -107,9 +108,9 @@ describe('Hooks System Integration', () => {
         },
       );
 
-      const prompt =
-        'Create a file called approved.txt with content "Approved content"';
-      await rig.run(prompt);
+      await rig.run({
+        args: 'Create a file called approved.txt with content "Approved content"',
+      });
 
       // The hook should allow the write_file tool
       const foundWriteFile = await rig.waitForToolCall('write_file');
@@ -158,9 +159,9 @@ describe('Hooks System Integration', () => {
       // Create a test file to read
       rig.createFile('test-file.txt', 'This is test content');
 
-      const prompt =
-        'Read the contents of test-file.txt and tell me what it contains';
-      await rig.run(prompt);
+      await rig.run({
+        args: 'Read the contents of test-file.txt and tell me what it contains',
+      });
 
       // Should find read_file tool call
       const foundReadFile = await rig.waitForToolCall('read_file');
@@ -232,8 +233,7 @@ echo '{
         },
       });
 
-      const prompt = 'Tell me a story';
-      const result = await rig.run(prompt);
+      const result = await rig.run({ args: 'Tell me a story' });
 
       // The hook should have replaced the request entirely
       // Verify that the model responded to the modified request, not the original
@@ -316,8 +316,7 @@ echo '{
           },
         });
 
-        const prompt = 'What is 2 + 2?';
-        const result = await rig.run(prompt);
+        const result = await rig.run({ args: 'What is 2 + 2?' });
 
         // The hook should have replaced the model response
         expect(result).toContain(
@@ -374,9 +373,9 @@ echo '{
       // Create a test file
       rig.createFile('new_file_data.txt', 'test data');
 
-      const prompt =
-        'Check the content of new_file_data.txt, after that run echo command to see the content';
-      await rig.run(prompt);
+      await rig.run({
+        args: 'Check the content of new_file_data.txt, after that run echo command to see the content',
+      });
 
       // Should use read_file (allowed) but not run_shell_command (not in allowed list)
       const foundReadFile = await rig.waitForToolCall('read_file');
@@ -440,8 +439,7 @@ echo '{
         },
       });
 
-      const prompt = 'Hello, how are you?';
-      const result = await rig.run(prompt);
+      const result = await rig.run({ args: 'Hello, how are you?' });
 
       // The hook should have added security context, which should influence the response
       expect(result).toContain('security');
@@ -585,8 +583,7 @@ echo '{
         },
       });
 
-      const prompt = 'Hello, please help me with a task';
-      await rig.run(prompt);
+      await rig.run({ args: 'Hello, please help me with a task' });
 
       // Should generate hook telemetry
       const hookTelemetryFound = await rig.waitForTelemetryEvent('hook_call');
@@ -663,8 +660,9 @@ fi`;
         },
       });
 
-      const prompt = 'Create a file called input-test.txt with content "test"';
-      await rig.run(prompt);
+      await rig.run({
+        args: 'Create a file called input-test.txt with content "test"',
+      });
 
       // Hook should validate input format successfully
       const foundWriteFile = await rig.waitForToolCall('write_file');
@@ -739,11 +737,12 @@ fi`;
         },
       });
 
-      const prompt =
-        'Create a file called multi-event-test.txt with content ' +
-        '"testing multiple events", and then please reply with ' +
-        'everything I say just after this:"';
-      const result = await rig.run(prompt);
+      const result = await rig.run({
+        args:
+          'Create a file called multi-event-test.txt with content ' +
+          '"testing multiple events", and then please reply with ' +
+          'everything I say just after this:"',
+      });
 
       // Should execute write_file tool
       const foundWriteFile = await rig.waitForToolCall('write_file');
@@ -834,9 +833,9 @@ fi`;
         },
       });
 
-      const prompt =
-        'Create a file called error-test.txt with content "testing error handling"';
-      await rig.run(prompt);
+      await rig.run({
+        args: 'Create a file called error-test.txt with content "testing error handling"',
+      });
 
       // Despite one hook failing, the working hook should still allow the operation
       const foundWriteFile = await rig.waitForToolCall('write_file');
@@ -883,8 +882,7 @@ fi`;
         },
       });
 
-      const prompt = 'Create a file called telemetry-test.txt';
-      await rig.run(prompt);
+      await rig.run({ args: 'Create a file called telemetry-test.txt' });
 
       // Should execute the tool
       const foundWriteFile = await rig.waitForToolCall('write_file');
@@ -929,8 +927,7 @@ fi`;
       });
 
       // Run a simple query - the SessionStart hook will fire during app initialization
-      const prompt = 'Say hello';
-      await rig.run(prompt);
+      await rig.run({ args: 'Say hello' });
 
       // Verify hook executed with correct parameters
       const hookLogs = rig.readHookLogs();
@@ -1174,8 +1171,7 @@ fi`;
       });
 
       // Run a simple query that will trigger automatic compression
-      const prompt = 'Say hello in exactly 5 words';
-      await rig.run(prompt);
+      await rig.run({ args: 'Say hello in exactly 5 words' });
 
       // Verify hook executed with correct parameters
       const hookLogs = rig.readHookLogs();
@@ -1236,8 +1232,7 @@ fi`;
       });
 
       // Run in non-interactive mode with a simple prompt
-      const prompt = 'Hello';
-      await rig.run(prompt);
+      await rig.run({ args: 'Hello' });
 
       // The process should exit gracefully, firing the SessionEnd hook
       // Wait for telemetry to be written to disk
@@ -1344,9 +1339,9 @@ echo '{"decision": "block", "systemMessage": "Disabled hook should not execute",
         },
       });
 
-      const prompt =
-        'Create a file called disabled-test.txt with content "test"';
-      const result = await rig.run(prompt);
+      const result = await rig.run({
+        args: 'Create a file called disabled-test.txt with content "test"',
+      });
 
       // Tool should execute (enabled hook allows it)
       const foundWriteFile = await rig.waitForToolCall('write_file');
@@ -1431,8 +1426,9 @@ echo '{"decision": "block", "systemMessage": "Disabled hook should not execute",
       );
 
       // First run - only active hook should execute
-      const prompt1 = 'Create a file called first-run.txt with "test1"';
-      const result1 = await rig.run(prompt1);
+      const result1 = await rig.run({
+        args: 'Create a file called first-run.txt with "test1"',
+      });
 
       // Tool should execute (active hook allows it)
       const foundWriteFile1 = await rig.waitForToolCall('write_file');
@@ -1455,8 +1451,9 @@ echo '{"decision": "block", "systemMessage": "Disabled hook should not execute",
       expect(disabledHookLog1).toBeUndefined();
 
       // Second run - verify disabled hook stays disabled
-      const prompt2 = 'Create a file called second-run.txt with "test2"';
-      const result2 = await rig.run(prompt2);
+      const result2 = await rig.run({
+        args: 'Create a file called second-run.txt with "test2"',
+      });
 
       const foundWriteFile2 = await rig.waitForToolCall('write_file');
       expect(foundWriteFile2).toBeTruthy();

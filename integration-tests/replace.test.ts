@@ -26,7 +26,9 @@ describe('replace', () => {
 
     rig.createFile(fileName, originalContent);
 
-    await rig.run(`Replace 'foo' with 'bar' in the file 'file_to_replace.txt'`);
+    await rig.run({
+      args: `Replace 'foo' with 'bar' in the file 'file_to_replace.txt'`,
+    });
 
     const foundToolCall = await rig.waitForToolCall('replace');
     expect(foundToolCall, 'Expected to find a replace tool call').toBeTruthy();
@@ -46,9 +48,9 @@ describe('replace', () => {
 
     rig.createFile(fileName, originalContent);
 
-    await rig.run(
-      "Open regex.yml and append ' # updated' after the line containing ^[sv]d[a-z]$ without breaking the $ character.",
-    );
+    await rig.run({
+      args: "Open regex.yml and append ' # updated' after the line containing ^[sv]d[a-z]$ without breaking the $ character.",
+    });
 
     const foundToolCall = await rig.waitForToolCall('replace');
     expect(foundToolCall, 'Expected to find a replace tool call').toBeTruthy();
@@ -68,7 +70,7 @@ describe('replace', () => {
     rig.createFile(fileName, originalContent);
 
     const prompt = `In ${fileName}, replace "<INSERT_TEXT_HERE>" with:\n${newBlock}. Use unix style line endings.`;
-    await rig.run(prompt);
+    await rig.run({ args: prompt });
 
     const foundToolCall = await rig.waitForToolCall('replace');
     expect(foundToolCall, 'Expected to find a replace tool call').toBeTruthy();
@@ -87,9 +89,9 @@ describe('replace', () => {
     const expectedContent = 'Hello\nWorld';
     rig.createFile(fileName, originalContent);
 
-    await rig.run(
-      `In ${fileName}, delete the entire block from "## DELETE THIS ##" to "## END DELETE ##" including the markers and the newline that follows it.`,
-    );
+    await rig.run({
+      args: `In ${fileName}, delete the entire block from "## DELETE THIS ##" to "## END DELETE ##" including the markers and the newline that follows it.`,
+    });
 
     const foundToolCall = await rig.waitForToolCall('replace');
     expect(foundToolCall, 'Expected to find a replace tool call').toBeTruthy();
