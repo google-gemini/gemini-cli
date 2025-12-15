@@ -47,13 +47,15 @@ export const LogoutConfirmationDialog: React.FC<
   ];
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="row" width="100%">
       <Box
         flexDirection="column"
         borderStyle="round"
         borderColor={theme.border.focused}
         padding={1}
+        flexGrow={1}
         marginLeft={1}
+        marginRight={1}
       >
         <Box flexDirection="column" marginBottom={1}>
           <Text bold color={theme.text.primary}>
