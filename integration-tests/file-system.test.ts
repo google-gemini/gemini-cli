@@ -24,9 +24,9 @@ describe('file-system', () => {
     });
     rig.createFile('test.txt', 'hello world');
 
-    const result = await rig.run(
-      `read the file test.txt and show me its contents`,
-    );
+    const result = await rig.run({
+      args: `read the file test.txt and show me its contents`,
+    });
 
     const foundToolCall = await rig.waitForToolCall('read_file');
 
@@ -53,7 +53,9 @@ describe('file-system', () => {
     });
     rig.createFile('test.txt', '');
 
-    const result = await rig.run(`edit test.txt to have a hello world message`);
+    const result = await rig.run({
+      args: `edit test.txt to have a hello world message`,
+    });
 
     // Accept multiple valid tools for editing files
     const foundToolCall = await rig.waitForAnyToolCall([
@@ -109,9 +111,9 @@ describe('file-system', () => {
     });
     const fileName = 'my test file.txt';
 
-    const result = await rig.run(
-      `write "hello" to "${fileName}" and then stop. Do not perform any other actions.`,
-    );
+    const result = await rig.run({
+      args: `write "hello" to "${fileName}" and then stop. Do not perform any other actions.`,
+    });
 
     const foundToolCall = await rig.waitForToolCall('write_file');
     if (!foundToolCall) {
@@ -134,7 +136,7 @@ describe('file-system', () => {
     rig.createFile(fileName, '1.0.0');
 
     const prompt = `Read the version from ${fileName} and write the next version 1.0.1 back to the file.`;
-    const result = await rig.run(prompt);
+    const result = await rig.run({ args: prompt });
 
     await rig.waitForTelemetryReady();
     const toolLogs = rig.readToolLogs();
@@ -169,9 +171,9 @@ describe('file-system', () => {
     const expectedContent = 'Hey there, \nnew line\nnew line';
     rig.createFile(fileName, fileContent);
 
-    const result = await rig.run(
-      `rewrite the file ${fileName} to replace all instances of "test line" with "new line"`,
-    );
+    const result = await rig.run({
+      args: `rewrite the file ${fileName} to replace all instances of "test line" with "new line"`,
+    });
 
     const validTools = ['write_file', 'edit'];
     const foundToolCall = await rig.waitForAnyToolCall(validTools);
@@ -220,7 +222,9 @@ describe('file-system', () => {
     );
     const fileName = 'non_existent.txt';
 
-    const result = await rig.run(`In ${fileName}, replace "a" with "b"`);
+    const result = await rig.run({
+      args: `In ${fileName}, replace "a" with "b"`,
+    });
 
     await rig.waitForTelemetryReady();
     const toolLogs = rig.readToolLogs();

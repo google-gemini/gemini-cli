@@ -218,9 +218,9 @@ describe('simple-mcp-server', () => {
 
     // Test directory is already set up in before hook
     // Just run the command - MCP server config is in settings.json
-    const output = await rig.run(
-      'Use the `add` tool to calculate 5+10 and output only the resulting number.',
-    );
+    const output = await rig.run({
+      args: 'Use the `add` tool to calculate 5+10 and output only the resulting number.',
+    });
 
     const foundToolCall = await rig.waitForToolCall('add');
 

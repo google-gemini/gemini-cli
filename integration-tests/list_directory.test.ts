@@ -45,7 +45,7 @@ describe('list_directory', () => {
 
     const prompt = `Can you list the files in the current directory.`;
 
-    const result = await rig.run(prompt);
+    const result = await rig.run({ args: prompt });
 
     try {
       await rig.expectToolCallSuccess(['list_directory']);

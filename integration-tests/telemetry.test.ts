@@ -20,7 +20,7 @@ describe('telemetry', () => {
     rig.setup('should emit a metric and a log event');
 
     // Run a simple command that should trigger telemetry
-    await rig.run('just saying hi');
+    await rig.run({ args: 'just saying hi' });
 
     // Verify that a user_prompt event was logged
     const hasUserPromptEvent = await rig.waitForTelemetryEvent('user_prompt');

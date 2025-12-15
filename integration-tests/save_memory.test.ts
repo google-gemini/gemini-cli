@@ -24,7 +24,7 @@ describe('save_memory', () => {
     const prompt = `remember that my favorite color is  blue.
 
   what is my favorite color? tell me that and surround it with $ symbol`;
-    const result = await rig.run(prompt);
+    const result = await rig.run({ args: prompt });
 
     const foundToolCall = await rig.waitForToolCall('save_memory');
 
