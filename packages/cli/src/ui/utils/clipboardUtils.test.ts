@@ -15,34 +15,34 @@ import {
 
 describe('clipboardUtils', () => {
   describe('clipboardHasImage', () => {
-    it('should return false on non-macOS platforms', async () => {
-      if (process.platform !== 'darwin') {
+    it('should return false on unsupported platforms', async () => {
+      if (process.platform !== 'darwin' && process.platform !== 'win32') {
         const result = await clipboardHasImage();
         expect(result).toBe(false);
       } else {
-        // Skip on macOS as it would require actual clipboard state
+        // Skip on macOS/Windows as it would require actual clipboard state
         expect(true).toBe(true);
       }
     });
 
-    it('should return boolean on macOS', async () => {
-      if (process.platform === 'darwin') {
+    it('should return boolean on macOS or Windows', async () => {
+      if (process.platform === 'darwin' || process.platform === 'win32') {
         const result = await clipboardHasImage();
         expect(typeof result).toBe('boolean');
       } else {
-        // Skip on non-macOS
+        // Skip on unsupported platforms
         expect(true).toBe(true);
       }
-    });
+    }, 10000);
   });
 
   describe('saveClipboardImage', () => {
-    it('should return null on non-macOS platforms', async () => {
-      if (process.platform !== 'darwin') {
+    it('should return null on unsupported platforms', async () => {
+      if (process.platform !== 'darwin' && process.platform !== 'win32') {
         const result = await saveClipboardImage();
         expect(result).toBe(null);
       } else {
-        // Skip on macOS
+        // Skip on macOS/Windows
         expect(true).toBe(true);
       }
     });
@@ -53,8 +53,8 @@ describe('clipboardUtils', () => {
         '/invalid/path/that/does/not/exist',
       );
 
-      if (process.platform === 'darwin') {
-        // On macOS, might return null due to various errors
+      if (process.platform === 'darwin' || process.platform === 'win32') {
+        // On macOS/Windows, might return null due to various errors
         expect(result === null || typeof result === 'string').toBe(true);
       } else {
         // On other platforms, should always return null
