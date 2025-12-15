@@ -115,6 +115,7 @@ Every hook receives these base fields:
 ```json
 {
   "session_id": "abc123",
+  "transcript_path": "/path/to/transcript.jsonl",
   "cwd": "/path/to/project",
   "hook_event_name": "BeforeTool",
   "timestamp": "2025-12-01T10:30:00Z"
@@ -142,7 +143,7 @@ Every hook receives these base fields:
 
 ```json
 {
-  "decision": "allow|deny|ask|block",
+  "decision": "allow|deny|ask|block|approve",
   "reason": "Explanation shown to agent",
   "systemMessage": "Message shown to user"
 }
@@ -161,7 +162,11 @@ Or simple exit codes:
 {
   "tool_name": "ReadFile",
   "tool_input": { "file_path": "..." },
-  "tool_response": "file contents..."
+  "tool_response": {
+    "llmContent": "file contents...",
+    "returnDisplay": "Read 1234 bytes from file.txt",
+    "error": null
+  }
 }
 ```
 
@@ -524,7 +529,7 @@ This command:
 
 - Reads `.claude/settings.json`
 - Converts event names (`PreToolUse` → `BeforeTool`, etc.)
-- Translates tool names (`Bash` → `RunShellCommand`, `Edit` → `Edit`)
+- Translates tool names (`Bash` → `run_shell_command`, `Edit` → `replace`)
 - Updates matcher patterns
 - Writes to `.gemini/settings.json`
 
@@ -543,12 +548,58 @@ This command:
 
 ### Tool name mapping
 
-| Claude Code | Gemini CLI        |
-| ----------- | ----------------- |
-| `Bash`      | `RunShellCommand` |
-| `Edit`      | `Edit`            |
-| `Read`      | `ReadFile`        |
-| `Write`     | `WriteFile`       |
+| Claude Code | Gemini CLI           |
+| ----------- | -------------------- |
+| `Bash`      | `run_shell_command`  |
+| `Edit`      | `replace`            |
+| `Read`      | `read_file`          |
+| `Write`     | `write_file`         |
+| `Glob`      | `glob`               |
+| `Grep`      | `grep`               |
+| `LS`        | `ls`                 |
+
+
+### Gemini CLI-specific matchers
+
+The following matchers are available in Gemini CLI but do not have Claude Code
+equivalents:
+
+#### Additional tool matchers
+
+These tools can be used in `BeforeTool` and `AfterTool` hook matchers:
+
+- `write_todos` - Write TODO items
+- `google_web_search` - Google Search grounding
+- `web_fetch` - Fetch web content
+- `search_file_content` - Search within file contents
+- `read_many_files` - Read multiple files at once
+- `list_directory` - List directory contents
+- `save_memory` - Save information to memory
+- `delegate_to_agent` - Delegate tasks to sub-agents
+
+#### SessionStart event matchers
+
+- `startup` - Fresh session start
+- `resume` - Resuming a previous session
+- `clear` - Session cleared
+
+#### SessionEnd event matchers
+
+- `exit` - Normal exit
+- `clear` - Session cleared
+- `logout` - User logged out
+- `prompt_input_exit` - Exit from prompt input
+- `other` - Other reasons
+
+#### PreCompress event matchers
+
+- `manual` - Manually triggered compression
+- `auto` - Automatically triggered compression
+
+#### Notification event matchers
+
+- `ToolPermission` - Tool permission notifications
+
 
 ## Learn more
 
