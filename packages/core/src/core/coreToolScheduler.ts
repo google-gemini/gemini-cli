@@ -506,7 +506,7 @@ export class CoreToolScheduler {
           // Preserve diff for cancelled edit operations
           let resultDisplay: ToolResultDisplay | undefined = undefined;
           if (currentCall.status === 'awaiting_approval') {
-            const waitingCall = currentCall as WaitingToolCall;
+            const waitingCall = currentCall;
             if (waitingCall.confirmationDetails.type === 'edit') {
               resultDisplay = {
                 fileDiff: waitingCall.confirmationDetails.fileDiff,
