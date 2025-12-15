@@ -31,6 +31,12 @@ const mockSetInput = vi.fn();
 const mockRevertFileChanges = vi.fn();
 const mockGetProjectRoot = vi.fn().mockReturnValue('/mock/root');
 
+vi.mock('@google/gemini-cli-core', () => ({
+  uiTelemetryService: {
+    recordRewind: vi.fn(),
+  },
+}));
+
 vi.mock('../components/RewindViewer.js', () => ({
   RewindViewer: () => null,
 }));

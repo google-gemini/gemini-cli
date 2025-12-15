@@ -12,6 +12,7 @@ import { revertFileChanges } from '../utils/rewindFileOps.js';
 import { RewindOutcome } from '../components/RewindConfirmation.js';
 
 import type { Content } from '@google/genai';
+import { uiTelemetryService } from '@google/gemini-cli-core';
 
 export const rewindCommand: SlashCommand = {
   name: 'rewind',
@@ -85,6 +86,7 @@ export const rewindCommand: SlashCommand = {
                 return;
               }
 
+              uiTelemetryService.recordRewind();
               // Proceed with Rewind (for RewindOnly and RewindAndRevert)
               const updatedConversation = recordingService.rewindTo(messageId);
               // Convert to UI and Client formats
