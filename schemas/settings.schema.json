@@ -249,6 +249,13 @@
               "markdownDescription": "Hides the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
+            },
+            "hideMemoryUsage": {
+              "title": "Hide Memory Usage",
+              "description": "Hide memory usage information in the footer.",
+              "markdownDescription": "Hide memory usage information in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -257,13 +264,6 @@
           "title": "Hide Footer",
           "description": "Hide the footer from the UI",
           "markdownDescription": "Hide the footer from the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
-        "showMemoryUsage": {
-          "title": "Show Memory Usage",
-          "description": "Display memory usage information in the UI",
-          "markdownDescription": "Display memory usage information in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },

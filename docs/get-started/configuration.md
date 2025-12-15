@@ -213,12 +213,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hides the context window remaining percentage.
   - **Default:** `true`
 
+- **`ui.footer.hideMemoryUsage`** (boolean):
+  - **Description:** Hide memory usage information in the footer.
+  - **Default:** `true`
+
 - **`ui.hideFooter`** (boolean):
   - **Description:** Hide the footer from the UI
-  - **Default:** `false`
-
-- **`ui.showMemoryUsage`** (boolean):
-  - **Description:** Display memory usage information in the UI
   - **Default:** `false`
 
 - **`ui.showLineNumbers`** (boolean):

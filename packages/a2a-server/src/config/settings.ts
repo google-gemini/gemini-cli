@@ -28,12 +28,19 @@ export interface Settings {
   coreTools?: string[];
   excludeTools?: string[];
   telemetry?: TelemetrySettings;
-  showMemoryUsage?: boolean;
   checkpointing?: CheckpointingSettings;
   folderTrust?: boolean;
   general?: {
     previewFeatures?: boolean;
   };
+
+  ui?: {
+    footer?: {
+      hideMemoryUsage?: boolean;
+    };
+  };
+
+  showMemoryUsage?: boolean;
 
   // Git-aware file filtering settings
   fileFiltering?: {
