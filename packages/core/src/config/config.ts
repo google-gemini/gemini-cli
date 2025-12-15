@@ -49,6 +49,7 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_THINKING_MODE,
+  isPreviewModel,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -550,7 +551,10 @@ export class Config {
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
-    this.useWriteTodos = params.useWriteTodos ?? true;
+    // // TODO(joshualitt): Re-evaluate the todo tool for 3 family.
+    this.useWriteTodos = isPreviewModel(this.model)
+      ? false
+      : (params.useWriteTodos ?? true);
     this.enableHooks = params.enableHooks ?? false;
     this.disabledHooks =
       (params.hooks && 'disabled' in params.hooks

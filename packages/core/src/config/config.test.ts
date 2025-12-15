@@ -770,6 +770,40 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('UseWriteTodos Configuration', () => {
+    it('should default useWriteTodos to true when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getUseWriteTodos()).toBe(true);
+    });
+
+    it('should set useWriteTodos to false when provided as false', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        useWriteTodos: false,
+      };
+      const config = new Config(params);
+      expect(config.getUseWriteTodos()).toBe(false);
+    });
+
+    it('should disable useWriteTodos for preview models', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        model: 'gemini-3-pro-preview',
+      };
+      const config = new Config(params);
+      expect(config.getUseWriteTodos()).toBe(false);
+    });
+
+    it('should NOT disable useWriteTodos for non-preview models', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        model: 'gemini-2.5-pro',
+      };
+      const config = new Config(params);
+      expect(config.getUseWriteTodos()).toBe(true);
+    });
+  });
+
   describe('Shell Tool Inactivity Timeout', () => {
     it('should default to 300000ms (300 seconds) when not provided', () => {
       const config = new Config(baseParams);
