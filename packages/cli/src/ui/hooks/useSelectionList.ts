@@ -106,7 +106,7 @@ const computeInitialIndex = (
 
   if (initialKey !== undefined) {
     for (let i = 0; i < items.length; i++) {
-      if (items[i]!.key === initialKey && !items[i]!.disabled) {
+      if (items[i].key === initialKey && !items[i].disabled) {
         return i;
       }
     }
@@ -212,7 +212,7 @@ function areBaseItemsEqual(
   if (a.length !== b.length) return false;
 
   for (let i = 0; i < a.length; i++) {
-    if (a[i]!.key !== b[i]!.key || a[i]!.disabled !== b[i]!.disabled) {
+    if (a[i].key !== b[i].key || a[i].disabled !== b[i].disabled) {
       return false;
     }
   }
@@ -283,7 +283,7 @@ export function useSelectionList<T>({
     let needsClear = false;
 
     if (state.pendingHighlight && items[state.activeIndex]) {
-      onHighlight?.(items[state.activeIndex]!.value);
+      onHighlight?.(items[state.activeIndex].value);
       needsClear = true;
     }
 

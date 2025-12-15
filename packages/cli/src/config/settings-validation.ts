@@ -18,7 +18,7 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
   if (def.anyOf) {
     return z.union(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      def.anyOf.map((d: any) => buildZodSchemaFromJsonSchema(d)) as any,
+      def.anyOf.map((d: any) => buildZodSchemaFromJsonSchema(d)),
     );
   }
 
