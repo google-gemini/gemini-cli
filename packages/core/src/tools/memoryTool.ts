@@ -43,7 +43,7 @@ const memoryToolSchemaData: FunctionDeclaration = {
         type: 'string',
         enum: ['project', 'global'],
         description:
-          "The scope of the memory. 'project' saves to the current project's context, 'global' saves to the user's shared context. Defaults to 'project' if inside a project.",
+          "The scope of the memory. 'project' saves to the current project's context and is the default. Use 'global' when the user specifically intends the memory to be global or the rule transcends the current project scope.",
       },
     },
     required: ['fact'],
@@ -67,7 +67,7 @@ Do NOT use this tool:
 ## Parameters
 
 - \`fact\` (string, required): The specific fact or piece of information to remember. This should be a clear, self-contained statement. For example, if the user says "My favorite color is blue", the fact would be "My favorite color is blue".
-- \`scope\` (string, optional): The scope of the memory. 'project' saves to the current project's context, 'global' saves to the user's shared context. Defaults to 'project' if inside a project.`;
+- \`scope\` (string, optional): The scope of the memory. 'project' saves to the current project's context and is the default. Use 'global' when the user specifically intends the memory to be global or the rule transcends the current project scope.`;
 
 export const DEFAULT_CONTEXT_FILENAME = 'GEMINI.md';
 export const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
