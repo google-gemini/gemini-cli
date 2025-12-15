@@ -31,7 +31,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return `Calling remote agent ${this.definition.displayName}`;
+    return `Calling remote agent ${this.definition.displayName ?? this.definition.name}`;
   }
 
   protected override async getConfirmationDetails(
