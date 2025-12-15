@@ -88,6 +88,10 @@ const mockConfig = {
 mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
 mockConfig.getHookSystem = vi.fn().mockReturnValue(new HookSystem(mockConfig));
 
+function createMockConfigOverride(overrides: Partial<Config> = {}): Config {
+  return { ...mockConfig, ...overrides } as Config;
+}
+
 const mockTool = new MockTool({
   name: 'mockTool',
   displayName: 'Mock Tool',
@@ -262,13 +266,9 @@ describe('useReactToolScheduler', () => {
     vi.useRealTimers();
   });
 
-  const renderScheduler = () =>
+  const renderScheduler = (config: Config = mockConfig) =>
     renderHook(() =>
-      useReactToolScheduler(
-        onComplete,
-        mockConfig as unknown as Config,
-        () => undefined,
-      ),
+      useReactToolScheduler(onComplete, config, () => undefined),
     );
 
   it('initial state should be empty', () => {
@@ -494,13 +494,16 @@ describe('useReactToolScheduler', () => {
 
   it('should handle tool requiring confirmation - approved', async () => {
     mockToolRegistry.getTool.mockReturnValue(mockToolRequiresConfirmation);
+    const config = createMockConfigOverride({
+      isInteractive: () => true,
+    });
     const expectedOutput = 'Confirmed output';
     (mockToolRequiresConfirmation.execute as Mock).mockResolvedValue({
       llmContent: expectedOutput,
       returnDisplay: 'Confirmed display',
     } as ToolResult);
 
-    const { result } = renderScheduler();
+    const { result } = renderScheduler(config);
     const schedule = result.current[1];
     const request: ToolCallRequestInfo = {
       callId: 'callConfirm',
@@ -544,7 +547,10 @@ describe('useReactToolScheduler', () => {
 
   it('should handle tool requiring confirmation - cancelled by user', async () => {
     mockToolRegistry.getTool.mockReturnValue(mockToolRequiresConfirmation);
-    const { result } = renderScheduler();
+    const config = createMockConfigOverride({
+      isInteractive: () => true,
+    });
+    const { result } = renderScheduler(config);
     const schedule = result.current[1];
     const request: ToolCallRequestInfo = {
       callId: 'callConfirmCancel',
