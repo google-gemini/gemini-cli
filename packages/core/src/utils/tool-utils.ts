@@ -29,7 +29,7 @@ export function doesToolInvocationMatch(
   if (isTool(toolOrToolName)) {
     toolNames = [toolOrToolName.name, toolOrToolName.constructor.name];
   } else {
-    toolNames = [toolOrToolName as string];
+    toolNames = [toolOrToolName];
   }
 
   if (toolNames.some((name) => SHELL_TOOL_NAMES.includes(name))) {

@@ -76,8 +76,6 @@ describe('<StatsDisplay />', () => {
 
     expect(output).toContain('Performance');
     expect(output).toContain('Interaction Summary');
-    expect(output).not.toContain('Efficiency & Optimizations');
-    expect(output).not.toContain('Model'); // The table header
     expect(output).toMatchSnapshot();
   });
 
@@ -114,8 +112,8 @@ describe('<StatsDisplay />', () => {
 
     expect(output).toContain('gemini-2.5-pro');
     expect(output).toContain('gemini-2.5-flash');
-    expect(output).toContain('1,000');
-    expect(output).toContain('25,000');
+    expect(output).toContain('15,000');
+    expect(output).toContain('10,000');
     expect(output).toMatchSnapshot();
   });
 
@@ -168,7 +166,6 @@ describe('<StatsDisplay />', () => {
     expect(output).toContain('Performance');
     expect(output).toContain('Interaction Summary');
     expect(output).toContain('User Agreement');
-    expect(output).toContain('Savings Highlight');
     expect(output).toContain('gemini-2.5-pro');
     expect(output).toMatchSnapshot();
   });
@@ -233,7 +230,6 @@ describe('<StatsDisplay />', () => {
       const { lastFrame } = renderWithMockedStats(metrics);
       const output = lastFrame();
 
-      expect(output).not.toContain('Efficiency & Optimizations');
       expect(output).toMatchSnapshot();
     });
   });
@@ -443,9 +439,55 @@ describe('<StatsDisplay />', () => {
       );
       const output = lastFrame();
 
-      expect(output).toContain('Usage limit remaining');
+      expect(output).toContain('Usage left');
       expect(output).toContain('75.0%');
       expect(output).toContain('(Resets in 1h 30m)');
+      expect(output).toMatchSnapshot();
+
+      vi.useRealTimers();
+    });
+
+    it('renders quota information for unused models', () => {
+      const now = new Date('2025-01-01T12:00:00Z');
+      vi.useFakeTimers();
+      vi.setSystemTime(now);
+
+      // No models in metrics, but a quota for gemini-2.5-flash
+      const metrics = createTestMetrics();
+
+      const resetTime = new Date(now.getTime() + 1000 * 60 * 120).toISOString(); // 2 hours from now
+
+      const quotas: RetrieveUserQuotaResponse = {
+        buckets: [
+          {
+            modelId: 'gemini-2.5-flash',
+            remainingFraction: 0.5,
+            resetTime,
+          },
+        ],
+      };
+
+      useSessionStatsMock.mockReturnValue({
+        stats: {
+          sessionId: 'test-session-id',
+          sessionStartTime: new Date(),
+          metrics,
+          lastPromptTokenCount: 0,
+          promptCount: 5,
+        },
+        getPromptCount: () => 5,
+        startNewPrompt: vi.fn(),
+      });
+
+      const { lastFrame } = render(
+        <StatsDisplay duration="1s" quotas={quotas} />,
+      );
+      const output = lastFrame();
+
+      expect(output).toContain('gemini-2.5-flash');
+      expect(output).toContain('-'); // for requests
+      expect(output).toContain('50.0%');
+      expect(output).toContain('(Resets in 2h)');
       expect(output).toMatchSnapshot();
 
       vi.useRealTimers();
