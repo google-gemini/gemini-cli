@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, it, describe } from 'vitest';
+import { expect, it, describe, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 import { TestMcpServer } from './test-mcp-server.js';
 import { writeFileSync } from 'node:fs';
@@ -18,6 +18,14 @@ import stripAnsi from 'strip-ansi';
 const itIf = (condition: boolean) => (condition ? it : it.skip);
 
 describe('extension reloading', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
   const sandboxEnv = env['GEMINI_SANDBOX'];
   // Fails in linux non-sandbox e2e tests
   // TODO(#14527): Re-enable this once fixed
@@ -43,7 +51,6 @@ describe('extension reloading', () => {
         },
       };
 
-      const rig = new TestRig();
       rig.setup('extension reload test', {
         settings: {
           experimental: { extensionReloading: true },
@@ -75,7 +82,7 @@ describe('extension reloading', () => {
       writeFileSync(testServerPath, safeJsonStringify(extension, 2));
 
       // Start the CLI.
-      const run = await rig.runInteractive('--debug');
+      const run = await rig.runInteractive({ args: '--debug' });
       await run.expectText('You have 1 extension with an update available');
       // See the outdated extension
       await run.sendText('/extensions list');
@@ -145,7 +152,6 @@ describe('extension reloading', () => {
       await serverA.stop();
       await serverB.stop();
       await rig.runCommand(['extensions', 'uninstall', 'test-extension']);
-      await rig.cleanup();
     },
   );
 });

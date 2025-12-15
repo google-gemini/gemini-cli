@@ -29,7 +29,7 @@ import {
 } from '../index.js';
 import { READ_FILE_TOOL_NAME, SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import type { Part, PartListUnion } from '@google/genai';
-import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
+import { supportsMultimodalFunctionResponse } from '../config/models.js';
 import type { ModifyContext } from '../tools/modifiable-tool.js';
 import {
   isModifiableDeclarativeTool,
@@ -50,6 +50,7 @@ import {
   fireToolNotificationHook,
   executeToolWithHooks,
 } from './coreToolHookTriggers.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -171,61 +172,85 @@ export function convertToFunctionResponse(
   toolName: string,
   callId: string,
   llmContent: PartListUnion,
+  model: string,
 ): Part[] {
-  const contentToProcess =
-    Array.isArray(llmContent) && llmContent.length === 1
-      ? llmContent[0]
-      : llmContent;
-
-  if (typeof contentToProcess === 'string') {
-    return [createFunctionResponsePart(callId, toolName, contentToProcess)];
+  if (typeof llmContent === 'string') {
+    return [createFunctionResponsePart(callId, toolName, llmContent)];
   }
 
-  if (Array.isArray(contentToProcess)) {
-    const functionResponse = createFunctionResponsePart(
-      callId,
-      toolName,
-      'Tool execution succeeded.',
-    );
-    return [functionResponse, ...toParts(contentToProcess)];
-  }
+  const parts = toParts(llmContent);
 
-  // After this point, contentToProcess is a single Part object.
-  if (contentToProcess.functionResponse) {
-    if (contentToProcess.functionResponse.response?.['content']) {
-      const stringifiedOutput =
-        getResponseTextFromParts(
-          contentToProcess.functionResponse.response['content'] as Part[],
-        ) || '';
-      return [createFunctionResponsePart(callId, toolName, stringifiedOutput)];
+  // Separate text from binary types
+  const textParts: string[] = [];
+  const inlineDataParts: Part[] = [];
+  const fileDataParts: Part[] = [];
+
+  for (const part of parts) {
+    if (part.text !== undefined) {
+      textParts.push(part.text);
+    } else if (part.inlineData) {
+      inlineDataParts.push(part);
+    } else if (part.fileData) {
+      fileDataParts.push(part);
+    } else if (part.functionResponse) {
+      if (parts.length > 1) {
+        debugLogger.warn(
+          'convertToFunctionResponse received multiple parts with a functionResponse. Only the functionResponse will be used, other parts will be ignored',
+        );
+      }
+      // Handle passthrough case
+      return [
+        {
+          functionResponse: {
+            id: callId,
+            name: toolName,
+            response: part.functionResponse.response,
+          },
+        },
+      ];
     }
-    // It's a functionResponse that we should pass through as is.
-    return [contentToProcess];
+    // Ignore other part types
   }
 
-  if (contentToProcess.inlineData || contentToProcess.fileData) {
-    const mimeType =
-      contentToProcess.inlineData?.mimeType ||
-      contentToProcess.fileData?.mimeType ||
-      'unknown';
-    const functionResponse = createFunctionResponsePart(
-      callId,
-      toolName,
-      `Binary content of type ${mimeType} was processed.`,
-    );
-    return [functionResponse, contentToProcess];
+  // Build the primary response part
+  const part: Part = {
+    functionResponse: {
+      id: callId,
+      name: toolName,
+      response: textParts.length > 0 ? { output: textParts.join('\n') } : {},
+    },
+  };
+
+  const isMultimodalFRSupported = supportsMultimodalFunctionResponse(model);
+  const siblingParts: Part[] = [...fileDataParts];
+
+  if (inlineDataParts.length > 0) {
+    if (isMultimodalFRSupported) {
+      // Nest inlineData if supported by the model
+      (part.functionResponse as unknown as { parts: Part[] }).parts =
+        inlineDataParts;
+    } else {
+      // Otherwise treat as siblings
+      siblingParts.push(...inlineDataParts);
+    }
   }
 
-  if (contentToProcess.text !== undefined) {
-    return [
-      createFunctionResponsePart(callId, toolName, contentToProcess.text),
-    ];
+  // Add descriptive text if the response object is empty but we have binary content
+  if (
+    textParts.length === 0 &&
+    (inlineDataParts.length > 0 || fileDataParts.length > 0)
+  ) {
+    const totalBinaryItems = inlineDataParts.length + fileDataParts.length;
+    part.functionResponse!.response = {
+      output: `Binary content provided (${totalBinaryItems} item(s)).`,
+    };
   }
 
-  // Default case for other kinds of parts.
-  return [
-    createFunctionResponsePart(callId, toolName, 'Tool execution succeeded.'),
-  ];
+  if (siblingParts.length > 0) {
+    return [part, ...siblingParts];
+  }
+
+  return [part];
 }
 
 function toParts(input: PartListUnion): Part[] {
@@ -870,6 +895,13 @@ export class CoreToolScheduler {
             );
             this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
           } else {
+            if (!this.config.isInteractive()) {
+              throw new Error(
+                `Tool execution for "${
+                  toolCall.tool.displayName || toolCall.tool.name
+                }" requires user confirmation, which is not supported in non-interactive mode.`,
+              );
+            }
             // Fire Notification hook before showing confirmation to user
             const messageBus = this.config.getMessageBus();
             const hooksEnabled = this.config.getEnableHooks();
@@ -1221,6 +1253,7 @@ export class CoreToolScheduler {
                   toolName,
                   callId,
                   content,
+                  this.config.getActiveModel(),
                 );
                 const successResponse: ToolCallResponseInfo = {
                   callId,

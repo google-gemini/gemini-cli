@@ -4,24 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 
 describe('mixed input crash prevention', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
   it('should not crash when using mixed prompt inputs', async () => {
-    const rig = new TestRig();
     rig.setup('should not crash when using mixed prompt inputs');
 
     // Test: echo "say '1'." | gemini --prompt-interactive="say '2'." say '3'.
     const stdinContent = "say '1'.";
 
     try {
-      await rig.run(
-        { stdin: stdinContent },
-        '--prompt-interactive',
-        "say '2'.",
-        "say '3'.",
-      );
+      await rig.run({
+        args: ['--prompt-interactive', "say '2'.", "say '3'."],
+        stdin: stdinContent,
+      });
       throw new Error('Expected the command to fail, but it succeeded');
     } catch (error: unknown) {
       expect(error).toBeInstanceOf(Error);
@@ -40,15 +45,13 @@ describe('mixed input crash prevention', () => {
   });
 
   it('should provide clear error message for mixed input', async () => {
-    const rig = new TestRig();
     rig.setup('should provide clear error message for mixed input');
 
     try {
-      await rig.run(
-        { stdin: 'test input' },
-        '--prompt-interactive',
-        'test prompt',
-      );
+      await rig.run({
+        args: ['--prompt-interactive', 'test prompt'],
+        stdin: 'test input',
+      });
       throw new Error('Expected the command to fail, but it succeeded');
     } catch (error: unknown) {
       expect(error).toBeInstanceOf(Error);
