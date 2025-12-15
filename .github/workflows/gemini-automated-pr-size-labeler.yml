@@ -1,0 +1,127 @@
+name: 'Gemini Automated PR Labeler'
+
+on:
+  pull_request_target:
+    types: ['opened', 'reopened', 'synchronize']
+
+jobs:
+  label-pr:
+    timeout-minutes: 10
+    if: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' }}
+    permissions:
+      pull-requests: 'write'
+      contents: 'read'
+      id-token: 'write'
+
+    concurrency:
+      group: '${{ github.workflow }}-${{ github.event.pull_request.number }}'
+      cancel-in-progress: true
+
+    runs-on: 'ubuntu-latest'
+
+    steps:
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e' # v2
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-pull-requests: 'write'
+
+      - name: 'Run Gemini PR size and complexity labeller'
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # Use the specific commit SHA
+        env:
+          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          PR_NUMBER: '${{ github.event.pull_request.number }}'
+          REPOSITORY: '${{ github.repository }}'
+        with:
+          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
+          settings: |
+            {
+              "coreTools": [
+                "run_shell_command(gh pr diff)",
+                "run_shell_command(gh pr edit)",
+                "run_shell_command(gh pr comment)",
+                "run_shell_command(gh pr view)"
+              ],
+              "telemetry": {
+                "enabled": true,
+                "target": "gcp"
+              },
+              "sandbox": false
+            }
+          prompt: |
+            You are a Pull Request labeller and Feedback Assistant. Your primary goal is to improve review velocity and help maintainers prioritize their work by automatically labeling pull requests based on size and complexity, and providing guidance for overly large PRs.
+
+            Steps:
+            1. Retrieve Pull Request Information:
+               - Use `gh pr diff ${{ env.PR_NUMBER }} --repo ${{ env.REPOSITORY }}` to get the diff content.
+               - Parse the output from `gh pr diff` to determine the total lines of code added and deleted. Calculate `TOTAL_LINES_CHANGED`.
+
+            2. Determine Pull Request Size:
+               - Use `gh pr view ${{ env.PR_NUMBER }} --repo ${{ env.REPOSITORY }} --json labels` to get the current labels on the PR.
+               - Check the current labels and identify if any `size/*` labels already exist (e.g., `size/xs`, `size/s`, etc.).
+               - If an old `size/*` label is found and it is different from the newly calculated size, remove it using:
+                 `gh pr edit ${{ env.PR_NUMBER }} --repo ${{ env.REPOSITORY }} --remove-label "size-label-to-remove"`
+               - Based on `TOTAL_LINES_CHANGED`, select the appropriate new size label:
+                 - `size/xs`: < 10 lines changed
+                 - `size/s`: 10-50 lines changed
+                 - `size/m`: 51-200 lines changed
+                 - `size/l`: 201-1000 lines changed
+                 - `size/xl`: > 1000 lines changed
+               - Do not invent new size labels.
+               - Apply the newly determined `size/*` label to the pull request using:
+                 `gh pr edit ${{ env.PR_NUMBER }} --repo ${{ env.REPOSITORY }} --add-label "your-new-size-label"`
+
+            3. Analyze Pull Request Complexity:
+                - Perform Code Change Analysis: Examine the content of the code changes obtained from `gh pr diff ${{ env.PR_NUMBER }} --repo ${{ env.REPOSITORY }}`. Look for indicators of complexity such as:
+                 - Number of files changed (can be inferred from the diff headers).
+                 - Diversity of file types (e.g., changes across different languages, configuration files, documentation).
+                 - Presence of new external dependencies.
+                 - Introduction of new architectural components or significant refactoring.
+                 - Complexity of individual code changes (e.g., deeply nested logic, complex algorithms, extensive conditional statements).
+               - Apply Heuristic-based Complexity Assessment:
+                 - If the PR touches a small number of files with minor changes (e.g., typos, simple bug fixes, small feature additions), categorize it as `review/quick`.
+                 - If the PR involves changes across multiple files, introduces new features, significantly refactors existing code, or has a high line count (even within `size/l`), categorize it as `review/involved`.
+                 - Pay close attention to changes in critical or core modules as these inherently increase complexity.
+               - **Only use the labels `review/quick` or `review/involved` for complexity. Do not invent new complexity labels.**
+               - **Remove any previous `review/*` labels if they no longer apply, similar to the size label process.**
+               - Apply the determined `review/*` label to the pull request using:
+                 `gh pr edit ${{ env.PR_NUMBER }} --repo ${{ env.REPOSITORY }} --add-label "your-complexity-label"`
+
+            4. Handle Overly Large Pull Requests (`size/xl`):
+               - **Conditional Check:** If the pull request has been labeled `size/xl` (i.e., > 1000 lines of code changed) in Step 2, proceed to the next sub-step.
+               - **Post Constructive Comment:** Post a polite and helpful comment on the pull request using:
+                 `gh pr comment ${{ env.PR_NUMBER }} --repo ${{ env.REPOSITORY }} --body "Your comment here"`
+                 The comment body should be:
+                 """
+                 Thanks for your hard work on this pull request!
+
+                 This pull request is quite large, which can make it challenging and time-consuming for reviewers to go through thoroughly.
+
+                 To help us review it more efficiently and get your changes merged faster, we kindly request you consider breaking this into smaller, more focused pull requests. Each smaller PR should ideally address a single logical change or a small set of related changes.
+
+                 For example, you could separate out refactoring, new feature additions, and bug fixes into individual PRs. This makes it easier to understand, review, and test each component independently.
+
+                 We appreciate your understanding and cooperation. Feel free to reach out if you need any assistance with this!
+                 """
+
+            Guidelines:
+            - Automation Focus: All actions should be automated and not require manual intervention.
+            - Non-intrusive: The system should add labels and comments but not modify the code or close the pull request.
+            - Polite and Constructive: All communication, especially for large PRs, must be polite, encouraging, and constructive.
+            - Prioritize Clarity: The labels applied should clearly convey the PR's size and complexity to reviewers.
+            - Adhere to Defined Labels: Only use the specified `size/*` and `review/*` labels. Do not create or apply any other labels.
+            - Utilize `gh CLI`: Interact with GitHub using the `gh` command-line tool for diffing, label management, and commenting.
+            - Execute commands strictly as described in the steps. Do not invent new commands.
+            - In no case should you change other pull request that are not the one you are working on. Which can be found by using env.PR_NUMBER
+            - Execute each step that is defined in the steps section.
+            - In no case should you execute code from the pull request because this could be malicious code.
+            - If you fail to do this step log the errors you received

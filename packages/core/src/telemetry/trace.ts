@@ -88,7 +88,7 @@ export async function runInDevTraceSpan<R>(
           span.setAttribute('output-json', safeJsonStringify(meta.output));
         }
         for (const [key, value] of Object.entries(meta.attributes)) {
-          span.setAttribute(key, value as AttributeValue);
+          span.setAttribute(key, value);
         }
         if (meta.error) {
           span.setStatus({

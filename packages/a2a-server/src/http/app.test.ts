@@ -36,7 +36,7 @@ import {
   createMockConfig,
 } from '../utils/testing_utils.js';
 import { MockTool } from '@google/gemini-cli-core';
-import type { Command } from '../commands/types.js';
+import type { Command, CommandContext } from '../commands/types.js';
 
 const mockToolConfirmationFn = async () =>
   ({}) as unknown as ToolCallConfirmationDetails;
@@ -97,6 +97,7 @@ vi.mock('@google/gemini-cli-core', async () => {
       getUserTier: vi.fn().mockReturnValue('free'),
       initialize: vi.fn(),
     })),
+    performRestore: vi.fn(),
   };
 });
 
@@ -939,6 +940,17 @@ describe('E2E Tests', () => {
     });
 
     it('should return extensions for valid command', async () => {
+      const mockExtensionsCommand = {
+        name: 'extensions list',
+        description: 'a mock command',
+        execute: vi.fn(async (context: CommandContext) => {
+          // Simulate the actual command's behavior
+          const extensions = context.config.getExtensions();
+          return { name: 'extensions list', data: extensions };
+        }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockExtensionsCommand);
+
       const agent = request.agent(app);
       const res = await agent
         .post('/executeCommand')
@@ -954,6 +966,8 @@ describe('E2E Tests', () => {
     });
 
     it('should return 404 for invalid command', async () => {
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(undefined);
+
       const agent = request.agent(app);
       const res = await agent
         .post('/executeCommand')
@@ -985,6 +999,180 @@ describe('E2E Tests', () => {
 
       expect(res.body.error).toBe('"args" field must be an array.');
       expect(getExtensionsSpy).not.toHaveBeenCalled();
+    });
+
+    it('should execute a command that does not require a workspace when CODER_AGENT_WORKSPACE_PATH is not set', async () => {
+      const mockCommand = {
+        name: 'test-command',
+        description: 'a mock command',
+        execute: vi
+          .fn()
+          .mockResolvedValue({ name: 'test-command', data: 'success' }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockCommand);
+
+      delete process.env['CODER_AGENT_WORKSPACE_PATH'];
+      const response = await request(app)
+        .post('/executeCommand')
+        .send({ command: 'test-command', args: [] });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toBe('success');
+    });
+
+    it('should return 400 for a command that requires a workspace when CODER_AGENT_WORKSPACE_PATH is not set', async () => {
+      const mockWorkspaceCommand = {
+        name: 'workspace-command',
+        description: 'A command that requires a workspace',
+        requiresWorkspace: true,
+        execute: vi
+          .fn()
+          .mockResolvedValue({ name: 'workspace-command', data: 'success' }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
+
+      delete process.env['CODER_AGENT_WORKSPACE_PATH'];
+      const response = await request(app)
+        .post('/executeCommand')
+        .send({ command: 'workspace-command', args: [] });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe(
+        'Command "workspace-command" requires a workspace, but CODER_AGENT_WORKSPACE_PATH is not set.',
+      );
+    });
+
+    it('should execute a command that requires a workspace when CODER_AGENT_WORKSPACE_PATH is set', async () => {
+      const mockWorkspaceCommand = {
+        name: 'workspace-command',
+        description: 'A command that requires a workspace',
+        requiresWorkspace: true,
+        execute: vi
+          .fn()
+          .mockResolvedValue({ name: 'workspace-command', data: 'success' }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
+
+      process.env['CODER_AGENT_WORKSPACE_PATH'] = '/tmp/test-workspace';
+      const response = await request(app)
+        .post('/executeCommand')
+        .send({ command: 'workspace-command', args: [] });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toBe('success');
+    });
+
+    it('should include agentExecutor in context', async () => {
+      const mockCommand = {
+        name: 'context-check-command',
+        description: 'checks context',
+        execute: vi.fn(async (context: CommandContext) => {
+          if (!context.agentExecutor) {
+            throw new Error('agentExecutor missing');
+          }
+          return { name: 'context-check-command', data: 'success' };
+        }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockCommand);
+
+      const agent = request.agent(app);
+      const res = await agent
+        .post('/executeCommand')
+        .send({ command: 'context-check-command', args: [] })
+        .set('Content-Type', 'application/json')
+        .expect(200);
+
+      expect(res.body.data).toBe('success');
+    });
+
+    describe('/executeCommand streaming', () => {
+      it('should execute a streaming command and stream back events', (done: (
+        err?: unknown,
+      ) => void) => {
+        const executeSpy = vi.fn(async (context: CommandContext) => {
+          context.eventBus?.publish({
+            kind: 'status-update',
+            status: { state: 'working' },
+            taskId: 'test-task',
+            contextId: 'test-context',
+            final: false,
+          });
+          context.eventBus?.publish({
+            kind: 'status-update',
+            status: { state: 'completed' },
+            taskId: 'test-task',
+            contextId: 'test-context',
+            final: true,
+          });
+          return { name: 'stream-test', data: 'done' };
+        });
+
+        const mockStreamCommand = {
+          name: 'stream-test',
+          description: 'A test streaming command',
+          streaming: true,
+          execute: executeSpy,
+        };
+        vi.spyOn(commandRegistry, 'get').mockReturnValue(mockStreamCommand);
+
+        const agent = request.agent(app);
+        agent
+          .post('/executeCommand')
+          .send({ command: 'stream-test', args: [] })
+          .set('Content-Type', 'application/json')
+          .set('Accept', 'text/event-stream')
+          .on('response', (res) => {
+            let data = '';
+            res.on('data', (chunk: Buffer) => {
+              data += chunk.toString();
+            });
+            res.on('end', () => {
+              try {
+                const events = streamToSSEEvents(data);
+                expect(events.length).toBe(2);
+                expect(events[0].result).toEqual({
+                  kind: 'status-update',
+                  status: { state: 'working' },
+                  taskId: 'test-task',
+                  contextId: 'test-context',
+                  final: false,
+                });
+                expect(events[1].result).toEqual({
+                  kind: 'status-update',
+                  status: { state: 'completed' },
+                  taskId: 'test-task',
+                  contextId: 'test-context',
+                  final: true,
+                });
+                expect(executeSpy).toHaveBeenCalled();
+                done();
+              } catch (e) {
+                done(e);
+              }
+            });
+          })
+          .end();
+      });
+
+      it('should handle non-streaming commands gracefully', async () => {
+        const mockNonStreamCommand = {
+          name: 'non-stream-test',
+          description: 'A test non-streaming command',
+          execute: vi
+            .fn()
+            .mockResolvedValue({ name: 'non-stream-test', data: 'done' }),
+        };
+        vi.spyOn(commandRegistry, 'get').mockReturnValue(mockNonStreamCommand);
+
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'non-stream-test', args: [] })
+          .set('Content-Type', 'application/json')
+          .expect(200);
+
+        expect(res.body).toEqual({ name: 'non-stream-test', data: 'done' });
+      });
     });
   });
 });
