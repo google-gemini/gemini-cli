@@ -508,7 +508,7 @@ describe('IDEServer HTTP endpoints', () => {
     expect(response.statusCode).toBe(403);
   });
 
-  it('should allow requests with a valid host header', async () => {
+  it('should allow requests with a valid host header - localhost', async () => {
     const response = await request(
       port,
       {
@@ -516,6 +516,25 @@ describe('IDEServer HTTP endpoints', () => {
         method: 'POST',
         headers: {
           Host: `localhost:${port}`,
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test-auth-token',
+        },
+      },
+      JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
+    );
+    // We expect a 400 here because we are not sending a valid MCP request,
+    // but it's not a host error, which is what we are testing.
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('should allow requests with a valid host header - docker', async () => {
+    const response = await request(
+      port,
+      {
+        path: '/mcp',
+        method: 'POST',
+        headers: {
+          Host: `host.docker.internal:${port}`,
           'Content-Type': 'application/json',
           Authorization: 'Bearer test-auth-token',
         },
