@@ -126,7 +126,7 @@ export interface PolicyLoadResult {
  * @param str The string to escape
  * @returns The escaped string safe for use in a regex
  */
-function escapeRegex(str: string): string {
+export function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
@@ -349,7 +349,7 @@ export async function loadPoliciesFromToml(
             const argsPatterns: Array<string | undefined> =
               commandPrefixes.length > 0
                 ? commandPrefixes.map(
-                    (prefix) => `"command":"${escapeRegex(prefix)}`,
+                    (prefix) => `"command":"${escapeRegex(prefix)}(?:[\\s"]|$)`,
                   )
                 : [effectiveArgsPattern];
 
@@ -434,7 +434,7 @@ export async function loadPoliciesFromToml(
             const argsPatterns: Array<string | undefined> =
               commandPrefixes.length > 0
                 ? commandPrefixes.map(
-                    (prefix) => `"command":"${escapeRegex(prefix)}`,
+                    (prefix) => `"command":"${escapeRegex(prefix)}(?:[\\s"]|$)`,
                   )
                 : [effectiveArgsPattern];
 

@@ -707,7 +707,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
-      const args = (functionCall.args ?? {}) as Record<string, unknown>;
+      const args = functionCall.args ?? {};
 
       this.emitActivity('TOOL_CALL_START', {
         name: functionCall.name,
@@ -918,10 +918,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           toolNamesToLoad.push(toolRef);
         } else if (typeof toolRef === 'object' && 'schema' in toolRef) {
           // Tool instance with an explicit schema property.
-          toolsList.push(toolRef.schema as FunctionDeclaration);
+          toolsList.push(toolRef.schema);
         } else {
           // Raw `FunctionDeclaration` object.
-          toolsList.push(toolRef as FunctionDeclaration);
+          toolsList.push(toolRef);
         }
       }
       // Add schemas from tools that were registered by name.

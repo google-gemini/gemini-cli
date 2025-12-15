@@ -55,11 +55,15 @@ export const useAuthCommand = (settings: LoadedSettings, config: Config) => {
   );
 
   const reloadApiKey = useCallback(async () => {
+    const envKey = process.env['GEMINI_API_KEY'];
+    if (envKey !== undefined) {
+      setApiKeyDefaultValue(envKey);
+      return envKey;
+    }
+
     const storedKey = (await loadApiKey()) ?? '';
-    const envKey = process.env['GEMINI_API_KEY'] ?? '';
-    const key = envKey || storedKey;
-    setApiKeyDefaultValue(key);
-    return key; // Return the key for immediate use
+    setApiKeyDefaultValue(storedKey);
+    return storedKey;
   }, []);
 
   useEffect(() => {
