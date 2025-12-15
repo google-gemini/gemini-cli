@@ -25,6 +25,7 @@ import type {
 import { ToolErrorType } from './tool-error.js';
 import { MEMORY_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { Config } from '../config/config.js';
 
 const memoryToolSchemaData: FunctionDeclaration = {
   name: MEMORY_TOOL_NAME,
@@ -37,6 +38,12 @@ const memoryToolSchemaData: FunctionDeclaration = {
         type: 'string',
         description:
           'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
+      },
+      scope: {
+        type: 'string',
+        enum: ['project', 'global'],
+        description:
+          "The scope of the memory. 'project' saves to the current project's context, 'global' saves to the user's shared context. Defaults to 'project' if inside a project.",
       },
     },
     required: ['fact'],
@@ -59,7 +66,8 @@ Do NOT use this tool:
 
 ## Parameters
 
-- \`fact\` (string, required): The specific fact or piece of information to remember. This should be a clear, self-contained statement. For example, if the user says "My favorite color is blue", the fact would be "My favorite color is blue".`;
+- \`fact\` (string, required): The specific fact or piece of information to remember. This should be a clear, self-contained statement. For example, if the user says "My favorite color is blue", the fact would be "My favorite color is blue".
+- \`scope\` (string, optional): The scope of the memory. 'project' saves to the current project's context, 'global' saves to the user's shared context. Defaults to 'project' if inside a project.`;
 
 export const DEFAULT_CONTEXT_FILENAME = 'GEMINI.md';
 export const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
@@ -94,12 +102,34 @@ export function getAllGeminiMdFilenames(): string[] {
 
 interface SaveMemoryParams {
   fact: string;
+  scope?: 'project' | 'global';
   modified_by_user?: boolean;
   modified_content?: string;
 }
 
 export function getGlobalMemoryFilePath(): string {
   return path.join(Storage.getGlobalGeminiDir(), getCurrentGeminiMdFilename());
+}
+
+/**
+ * Determines the file path for the memory based on the scope and configuration.
+ */
+export function getMemoryFilePath(
+  config: Config | undefined,
+  scope?: 'project' | 'global',
+): string {
+  if (scope === 'global') {
+    return getGlobalMemoryFilePath();
+  }
+
+  // If scope is explicitly project, or undefined (defaulting to project behavior)
+  // If projectRoot is a valid directory, use it.
+  if (config?.getProjectRoot()) {
+    return path.join(config.getProjectRoot(), getCurrentGeminiMdFilename());
+  }
+
+  // Fallback to global if no config or project root
+  return getGlobalMemoryFilePath();
 }
 
 /**
@@ -117,9 +147,9 @@ function ensureNewlineSeparation(currentContent: string): string {
 /**
  * Reads the current content of the memory file
  */
-async function readMemoryFileContent(): Promise<string> {
+async function readMemoryFileContent(memoryFilePath: string): Promise<string> {
   try {
-    return await fs.readFile(getGlobalMemoryFilePath(), 'utf-8');
+    return await fs.readFile(memoryFilePath, 'utf-8');
   } catch (err) {
     const error = err as Error & { code?: string };
     if (!(error instanceof Error) || error.code !== 'ENOENT') throw err;
@@ -176,32 +206,35 @@ class MemoryToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   private static readonly allowlist: Set<string> = new Set();
+  private readonly config?: Config;
 
   constructor(
     params: SaveMemoryParams,
+    config?: Config,
     messageBus?: MessageBus,
     toolName?: string,
     displayName?: string,
   ) {
     super(params, messageBus, toolName, displayName);
+    this.config = config;
   }
 
   getDescription(): string {
-    const memoryFilePath = getGlobalMemoryFilePath();
+    const memoryFilePath = getMemoryFilePath(this.config, this.params.scope);
     return `in ${tildeifyPath(memoryFilePath)}`;
   }
 
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolEditConfirmationDetails | false> {
-    const memoryFilePath = getGlobalMemoryFilePath();
+    const memoryFilePath = getMemoryFilePath(this.config, this.params.scope);
     const allowlistKey = memoryFilePath;
 
     if (MemoryToolInvocation.allowlist.has(allowlistKey)) {
       return false;
     }
 
-    const currentContent = await readMemoryFileContent();
+    const currentContent = await readMemoryFileContent(memoryFilePath);
     const newContent = computeNewContent(currentContent, this.params.fact);
 
     const fileName = path.basename(memoryFilePath);
@@ -233,19 +266,16 @@ class MemoryToolInvocation extends BaseToolInvocation<
   }
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {
-    const { fact, modified_by_user, modified_content } = this.params;
+    const { fact, scope, modified_by_user, modified_content } = this.params;
+    const memoryFilePath = getMemoryFilePath(this.config, scope);
 
     try {
       if (modified_by_user && modified_content !== undefined) {
         // User modified the content in external editor, write it directly
-        await fs.mkdir(path.dirname(getGlobalMemoryFilePath()), {
+        await fs.mkdir(path.dirname(memoryFilePath), {
           recursive: true,
         });
-        await fs.writeFile(
-          getGlobalMemoryFilePath(),
-          modified_content,
-          'utf-8',
-        );
+        await fs.writeFile(memoryFilePath, modified_content, 'utf-8');
         const successMessage = `Okay, I've updated the memory file with your modifications.`;
         return {
           llmContent: JSON.stringify({
@@ -256,15 +286,11 @@ class MemoryToolInvocation extends BaseToolInvocation<
         };
       } else {
         // Use the normal memory entry logic
-        await MemoryTool.performAddMemoryEntry(
-          fact,
-          getGlobalMemoryFilePath(),
-          {
-            readFile: fs.readFile,
-            writeFile: fs.writeFile,
-            mkdir: fs.mkdir,
-          },
-        );
+        await MemoryTool.performAddMemoryEntry(fact, memoryFilePath, {
+          readFile: fs.readFile,
+          writeFile: fs.writeFile,
+          mkdir: fs.mkdir,
+        });
         const successMessage = `Okay, I've remembered that: "${fact}"`;
         return {
           llmContent: JSON.stringify({
@@ -300,8 +326,9 @@ export class MemoryTool
   implements ModifiableDeclarativeTool<SaveMemoryParams>
 {
   static readonly Name = MEMORY_TOOL_NAME;
+  private readonly config?: Config;
 
-  constructor(messageBus?: MessageBus) {
+  constructor(config?: Config, messageBus?: MessageBus) {
     super(
       MemoryTool.Name,
       'SaveMemory',
@@ -312,6 +339,7 @@ export class MemoryTool
       false,
       messageBus,
     );
+    this.config = config;
   }
 
   protected override validateToolParamValues(
@@ -332,6 +360,7 @@ export class MemoryTool
   ) {
     return new MemoryToolInvocation(
       params,
+      this.config,
       messageBus ?? this.messageBus,
       toolName ?? this.name,
       displayName ?? this.displayName,
@@ -379,11 +408,15 @@ export class MemoryTool
 
   getModifyContext(_abortSignal: AbortSignal): ModifyContext<SaveMemoryParams> {
     return {
-      getFilePath: (_params: SaveMemoryParams) => getGlobalMemoryFilePath(),
-      getCurrentContent: async (_params: SaveMemoryParams): Promise<string> =>
-        readMemoryFileContent(),
+      getFilePath: (params: SaveMemoryParams) =>
+        getMemoryFilePath(this.config, params.scope),
+      getCurrentContent: async (params: SaveMemoryParams): Promise<string> => {
+        const memoryFilePath = getMemoryFilePath(this.config, params.scope);
+        return readMemoryFileContent(memoryFilePath);
+      },
       getProposedContent: async (params: SaveMemoryParams): Promise<string> => {
-        const currentContent = await readMemoryFileContent();
+        const memoryFilePath = getMemoryFilePath(this.config, params.scope);
+        const currentContent = await readMemoryFileContent(memoryFilePath);
         return computeNewContent(currentContent, params.fact);
       },
       createUpdatedParams: (
