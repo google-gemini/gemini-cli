@@ -180,61 +180,8 @@ export class PolicyEngine {
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
 
-        if (isShellCommand && rule.decision === PolicyDecision.ALLOW) {
-          // For shell commands, if the matching rule is ALLOW, we must verify ALL subcommands allow it.
-          // If subsCommands is set (length > 0), we check them.
-          if (subCommands && subCommands.length > 0) {
-            if (subCommands.length > 1) {
-              debugLogger.debug(
-                `[PolicyEngine.check] Compound command detected: ${subCommands.length} parts`,
-              );
-              let aggregateDecision = PolicyDecision.ALLOW;
-              // We need to check if *any* subcommand fails the check.
-              // Note: We are recursively checking subcommands against the FULL rule set.
-              // This ensures that "git log" matches the "git log" rule,
-              // and "rm -rf /" matches (or doesn't match) its own rules.
-
-              for (const subCmd of subCommands) {
-                // Prevent infinite recursion if the subcommand is identical to the original command.
-                // This happens when splitCommands returns the root command along with its children.
-                // We use trimmed comparison to be robust against whitespace differences.
-                if (command && subCmd.trim() === command.trim()) {
-                  debugLogger.debug(
-                    `[PolicyEngine.check] Skipping recursion for self-referential command: "${subCmd.trim()}" vs original: "${command.trim()}"`,
-                  );
-                  continue;
-                }
-
-                const subCall = {
-                  name: toolCall.name,
-                  args: { command: subCmd },
-                };
-                const subResult = await this.check(subCall, serverName);
-
-                if (subResult.decision === PolicyDecision.DENY) {
-                  aggregateDecision = PolicyDecision.DENY;
-                  matchedRule = subResult.rule ?? rule; // Blame the rule that denied it
-                  break;
-                } else if (subResult.decision === PolicyDecision.ASK_USER) {
-                  aggregateDecision = PolicyDecision.ASK_USER;
-                  if (!matchedRule) matchedRule = subResult.rule ?? rule;
-                }
-              }
-              decision = aggregateDecision;
-            } else {
-              // Single command found. Rely on the initial rule match.
-              decision = rule.decision;
-            }
-          } else {
-            // No subcommands found (should have been caught by generic check above unless command was empty)
-            decision = rule.decision;
-          }
-        } else {
-          // Not a shell command OR decision is not ALLOW (DENY/ASK_USER apply immediately)
-          decision = rule.decision;
-        }
-
-        if (!matchedRule) matchedRule = rule;
+        matchedRule = rule;
+        decision = rule.decision;
         break;
       }
     }
@@ -245,6 +192,60 @@ export class PolicyEngine {
         `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
       );
       decision = this.defaultDecision;
+    }
+
+    if (isShellCommand && decision !== PolicyDecision.DENY) {
+      // For shell commands, if we are not already denying, we must verify ALL subcommands.
+      // We check subcommands if there's more than one (meaning decomposition happened).
+      // If subsCommands is set (length > 0), we check them.
+      if (subCommands && subCommands.length > 1) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Compound command detected: ${subCommands.length} parts`,
+        );
+        let aggregateDecision: PolicyDecision = decision;
+        // We need to check if *any* subcommand fails the check.
+        // This ensures that "git log" matches the "git log" rule,
+        // and "rm -rf /" matches (or doesn't match) its own rules.
+
+        for (const subCmd of subCommands) {
+          // Prevent infinite recursion if the subcommand is identical to the original command.
+          // This happens when splitCommands returns the root command along with its children.
+          // We use trimmed comparison to be robust against whitespace differences.
+          if (command && subCmd.trim() === command.trim()) {
+            debugLogger.debug(
+              `[PolicyEngine.check] Skipping recursion for self-referential command: "${subCmd.trim()}" vs original: "${command.trim()}"`,
+            );
+            continue;
+          }
+
+          const subCall = {
+            name: toolCall.name,
+            args: { command: subCmd },
+          };
+          const subResult = await this.check(subCall, serverName);
+
+          if (subResult.decision === PolicyDecision.DENY) {
+            aggregateDecision = PolicyDecision.DENY;
+            matchedRule = subResult.rule ?? matchedRule; // Blame the rule that denied it
+            break;
+          } else if (subResult.decision === PolicyDecision.ASK_USER) {
+            // Downgrade ALLOW to ASK_USER, but keep DENY if already denied
+            if (aggregateDecision === PolicyDecision.ALLOW) {
+              aggregateDecision = PolicyDecision.ASK_USER;
+              matchedRule = subResult.rule ?? undefined; // If explicit rule, use it, else undefined
+            } else if (
+              aggregateDecision === PolicyDecision.ASK_USER &&
+              subResult.rule !== undefined &&
+              matchedRule === undefined
+            ) {
+              // If already ASK_USER (e.g., from default), and this subcommand has a specific ASK_USER rule,
+              // and no specific rule has been blamed yet, then blame this specific rule.
+              matchedRule = subResult.rule;
+            }
+          }
+        }
+        decision = aggregateDecision;
+      }
     }
 
     // Apply non-interactive mode constraint to the final decision

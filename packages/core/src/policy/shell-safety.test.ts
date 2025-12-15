@@ -266,4 +266,154 @@ describe('Shell Safety Policy', () => {
     const result = await policyEngine.check(toolCall, undefined);
     expect(result.decision).toBe(PolicyDecision.ASK_USER);
   });
+
+  it('SHOULD match DENY rule even if nested/chained with unknown command', async () => {
+    // Scenario:
+    // git commit -m "..." (Unknown/No Rule -> ASK_USER)
+    // git push (DENY -> DENY)
+    // Overall should be DENY.
+    const argsPatternsPush = buildArgsPatterns(
+      undefined,
+      'git push',
+      undefined,
+    );
+
+    const denyPushPolicy = new PolicyEngine({
+      rules: [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: new RegExp(argsPatternsPush[0]!),
+          decision: PolicyDecision.DENY,
+          priority: 2,
+        },
+      ],
+      defaultDecision: PolicyDecision.ASK_USER,
+    });
+
+    const toolCall: FunctionCall = {
+      name: 'run_shell_command',
+      args: { command: 'git commit -m "msg" && git push' },
+    };
+
+    const result = await denyPushPolicy.check(toolCall, undefined);
+    expect(result.decision).toBe(PolicyDecision.DENY);
+  });
+
+  it('SHOULD aggregate ALLOW + ASK_USER to ASK_USER and blame the ASK_USER part', async () => {
+    // Scenario:
+    // `git status` (ALLOW) && `unknown_command` (ASK_USER by default)
+    // Expected: ASK_USER, and the matched rule should be related to the unknown_command
+    const argsPatternsGitStatus = buildArgsPatterns(
+      undefined,
+      'git status',
+      undefined,
+    );
+
+    const policyEngine = new PolicyEngine({
+      rules: [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: new RegExp(argsPatternsGitStatus[0]!),
+          decision: PolicyDecision.ALLOW,
+          priority: 2,
+          name: 'allow_git_status_rule', // Give a name to easily identify
+        },
+      ],
+      defaultDecision: PolicyDecision.ASK_USER,
+    });
+
+    const toolCall: FunctionCall = {
+      name: 'run_shell_command',
+      args: { command: 'git status && unknown_command' },
+    };
+
+    const result = await policyEngine.check(toolCall, undefined);
+    expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    // Expect the matched rule to be null/undefined since it's the default decision for 'unknown_command'
+    // or the rule that led to the ASK_USER decision. In this case, it should be the rule for 'unknown_command', which is the default decision.
+    // The policy engine's `matchedRule` will be the rule that caused the final decision.
+    // If it's a default ASK_USER, then `result.rule` should be undefined.
+    expect(result.rule).toBeUndefined();
+  });
+
+  it('SHOULD aggregate ASK_USER (default) + ASK_USER (rule) to ASK_USER and blame the specific ASK_USER rule', async () => {
+    // Scenario:
+    // `unknown_command_1` (ASK_USER by default) && `another_unknown_command` (ASK_USER by explicit rule)
+    // Expected: ASK_USER, and the matched rule should be the explicit ASK_USER rule
+    const argsPatternsAnotherUnknown = buildArgsPatterns(
+      undefined,
+      'another_unknown_command',
+      undefined,
+    );
+
+    const policyEngine = new PolicyEngine({
+      rules: [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: new RegExp(argsPatternsAnotherUnknown[0]!),
+          decision: PolicyDecision.ASK_USER,
+          priority: 2,
+          name: 'ask_another_unknown_command_rule',
+        },
+      ],
+      defaultDecision: PolicyDecision.ASK_USER,
+    });
+
+    const toolCall: FunctionCall = {
+      name: 'run_shell_command',
+      args: { command: 'unknown_command_1 && another_unknown_command' },
+    };
+
+    const result = await policyEngine.check(toolCall, undefined);
+    expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    expect(result.rule?.name).toBe('ask_another_unknown_command_rule');
+  });
+
+  it('SHOULD aggregate ASK_USER (rule) + ASK_USER (rule) to ASK_USER and blame the first specific ASK_USER rule in subcommands', async () => {
+    // Scenario:
+    // `known_ask_command_1` (ASK_USER by explicit rule 1) && `known_ask_command_2` (ASK_USER by explicit rule 2)
+    // Expected: ASK_USER, and the matched rule should be explicit ASK_USER rule 1.
+    // The current implementation prioritizes the rule that changes the decision to ASK_USER, if any.
+    // If multiple rules lead to ASK_USER, it takes the first one.
+    const argsPatternsAsk1 = buildArgsPatterns(
+      undefined,
+      'known_ask_command_1',
+      undefined,
+    );
+    const argsPatternsAsk2 = buildArgsPatterns(
+      undefined,
+      'known_ask_command_2',
+      undefined,
+    );
+
+    const policyEngine = new PolicyEngine({
+      rules: [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: new RegExp(argsPatternsAsk1[0]!),
+          decision: PolicyDecision.ASK_USER,
+          priority: 2,
+          name: 'ask_rule_1',
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: new RegExp(argsPatternsAsk2[0]!),
+          decision: PolicyDecision.ASK_USER,
+          priority: 2,
+          name: 'ask_rule_2',
+        },
+      ],
+      defaultDecision: PolicyDecision.ALLOW, // Set default to ALLOW to ensure rules are hit
+    });
+
+    const toolCall: FunctionCall = {
+      name: 'run_shell_command',
+      args: { command: 'known_ask_command_1 && known_ask_command_2' },
+    };
+
+    const result = await policyEngine.check(toolCall, undefined);
+    expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    // Expect the rule that first caused ASK_USER to be blamed
+    expect(result.rule?.name).toBe('ask_rule_1');
+  });
 });
