@@ -234,7 +234,7 @@ export class PolicyEngine {
           decision = rule.decision;
         }
 
-        matchedRule = rule;
+        if (!matchedRule) matchedRule = rule;
         break;
       }
     }
