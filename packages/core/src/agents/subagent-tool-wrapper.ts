@@ -13,7 +13,8 @@ import {
 import type { Config } from '../config/config.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { convertInputConfigToJsonSchema } from './schema-utils.js';
-import { SubagentInvocation } from './invocation.js';
+import { LocalSubagentInvocation } from './local-invocation.js';
+import { RemoteAgentInvocation } from './remote-invocation.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 /**
@@ -39,7 +40,6 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
     private readonly config: Config,
     messageBus?: MessageBus,
   ) {
-    // Dynamically generate the JSON schema required for the tool definition.
     const parameterSchema = convertInputConfigToJsonSchema(
       definition.inputConfig,
     );
@@ -68,10 +68,15 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
   protected createInvocation(
     params: AgentInputs,
   ): ToolInvocation<AgentInputs, ToolResult> {
-    return new SubagentInvocation(
-      params,
-      this.definition,
+    const definition = this.definition;
+    if (definition.kind === 'remote') {
+      return new RemoteAgentInvocation(definition, params, this.messageBus);
+    }
+
+    return new LocalSubagentInvocation(
+      definition,
       this.config,
+      params,
       this.messageBus,
     );
   }

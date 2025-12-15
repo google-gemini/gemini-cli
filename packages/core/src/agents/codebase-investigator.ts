@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AgentDefinition } from './types.js';
+import type { LocalAgentDefinition } from './types.js';
 import {
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
@@ -41,18 +41,19 @@ const CodebaseInvestigationReportSchema = z.object({
  * A Proof-of-Concept subagent specialized in analyzing codebase structure,
  * dependencies, and technologies.
  */
-export const CodebaseInvestigatorAgent: AgentDefinition<
+export const CodebaseInvestigatorAgent: LocalAgentDefinition<
   typeof CodebaseInvestigationReportSchema
 > = {
   name: 'codebase_investigator',
+  kind: 'local',
   displayName: 'Codebase Investigator Agent',
-  description: `The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies. 
-    Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation or to answer questions about the codebase that require investigation. 
+  description: `The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies.
+    Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation or to answer questions about the codebase that require investigation.
     It returns a structured report with key file paths, symbols, and actionable architectural insights.`,
   inputConfig: {
     inputs: {
       objective: {
-        description: `A comprehensive and detailed description of the user's ultimate goal. 
+        description: `A comprehensive and detailed description of the user's ultimate goal.
           You must include original user's objective as well as questions and any extra context and questions you may have.`,
         type: 'string',
         required: true,

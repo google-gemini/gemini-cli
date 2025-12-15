@@ -5,17 +5,16 @@
  */
 
 import type { Config } from '../config/config.js';
-import { AgentExecutor } from './executor.js';
+import { LocalAgentExecutor } from './local-executor.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { BaseToolInvocation, type ToolResult } from '../tools/tools.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import type {
-  AgentDefinition,
+  LocalAgentDefinition,
   AgentInputs,
   SubagentActivityEvent,
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { type z } from 'zod';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -24,28 +23,29 @@ const DESCRIPTION_MAX_LENGTH = 200;
  * Represents a validated, executable instance of a subagent tool.
  *
  * This class orchestrates the execution of a defined agent by:
- * 1. Initializing the {@link AgentExecutor}.
+ * 1. Initializing the {@link LocalAgentExecutor}.
  * 2. Running the agent's execution loop.
  * 3. Bridging the agent's streaming activity (e.g., thoughts) to the tool's
  * live output stream.
  * 4. Formatting the final result into a {@link ToolResult}.
  */
-export class SubagentInvocation<
-  TOutput extends z.ZodTypeAny,
-> extends BaseToolInvocation<AgentInputs, ToolResult> {
+export class LocalSubagentInvocation extends BaseToolInvocation<
+  AgentInputs,
+  ToolResult
+> {
   /**
-   * @param params The validated input parameters for the agent.
    * @param definition The definition object that configures the agent.
    * @param config The global runtime configuration.
+   * @param params The validated input parameters for the agent.
    * @param messageBus Optional message bus for policy enforcement.
    */
   constructor(
-    params: AgentInputs,
-    private readonly definition: AgentDefinition<TOutput>,
+    private readonly definition: LocalAgentDefinition,
     private readonly config: Config,
+    params: AgentInputs,
     messageBus?: MessageBus,
   ) {
-    super(params, messageBus);
+    super(params, messageBus, definition.name, definition.displayName);
   }
 
   /**
@@ -94,7 +94,7 @@ export class SubagentInvocation<
         }
       };
 
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         this.definition,
         this.config,
         onActivity,
