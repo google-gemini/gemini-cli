@@ -115,7 +115,6 @@ Every hook receives these base fields:
 ```json
 {
   "session_id": "abc123",
-  "transcript_path": "/path/to/transcript.jsonl",
   "cwd": "/path/to/project",
   "hook_event_name": "BeforeTool",
   "timestamp": "2025-12-01T10:30:00Z"
@@ -143,7 +142,7 @@ Every hook receives these base fields:
 
 ```json
 {
-  "decision": "allow|deny|ask|block|approve",
+  "decision": "allow|deny|ask|block",
   "reason": "Explanation shown to agent",
   "systemMessage": "Message shown to user"
 }
@@ -162,11 +161,7 @@ Or simple exit codes:
 {
   "tool_name": "ReadFile",
   "tool_input": { "file_path": "..." },
-  "tool_response": {
-    "llmContent": "file contents...",
-    "returnDisplay": "Read 1234 bytes from file.txt",
-    "error": null
-  }
+  "tool_response": "file contents..."
 }
 ```
 
@@ -529,7 +524,7 @@ This command:
 
 - Reads `.claude/settings.json`
 - Converts event names (`PreToolUse` → `BeforeTool`, etc.)
-- Translates tool names (`Bash` → `run_shell_command`, `Edit` → `replace`)
+- Translates tool names (`Bash` → `RunShellCommand`, `Edit` → `Edit`)
 - Updates matcher patterns
 - Writes to `.gemini/settings.json`
 
