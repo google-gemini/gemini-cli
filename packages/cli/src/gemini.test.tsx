@@ -301,7 +301,7 @@ describe('gemini.tsx main function', () => {
     processExitSpy.mockRestore();
   });
 
-  it('should log unhandled promise rejections and open debug console on first error', async () => {
+  it('should log unhandled promise rejections but NOT open debug console', async () => {
     const processExitSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation((code) => {
@@ -320,7 +320,6 @@ describe('gemini.tsx main function', () => {
     // We need to wait for the rejection handler to be called.
     await new Promise(process.nextTick);
 
-    expect(appEventsMock.emit).toHaveBeenCalledWith(AppEvent.OpenDebugConsole);
     expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining('Unhandled Promise Rejection'),
     );
@@ -333,11 +332,11 @@ describe('gemini.tsx main function', () => {
     process.emit('unhandledRejection', secondRejectionError, Promise.resolve());
     await new Promise(process.nextTick);
 
-    // Ensure emit was only called once for OpenDebugConsole
+    // Ensure emit was NOT called for OpenDebugConsole
     const openDebugConsoleCalls = appEventsMock.emit.mock.calls.filter(
       (call) => call[0] === AppEvent.OpenDebugConsole,
     );
-    expect(openDebugConsoleCalls.length).toBe(1);
+    expect(openDebugConsoleCalls.length).toBe(0);
 
     // Avoid the process.exit error from being thrown.
     processExitSpy.mockRestore();

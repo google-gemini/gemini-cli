@@ -1754,6 +1754,35 @@ describe('AppContainer State Management', () => {
       unmount();
     });
 
+    it('adds history item when ConsoleLog event with type "error" is received', async () => {
+      const { unmount } = renderAppContainer();
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      // Get the registered handler for ConsoleLog
+      const handler = mockCoreEvents.on.mock.calls.find(
+        (call: unknown[]) => call[0] === CoreEvent.ConsoleLog,
+      )?.[1];
+      expect(handler).toBeDefined();
+
+      // Simulate an error event
+      const payload = {
+        type: 'error',
+        content: 'Simulated console error',
+      };
+      act(() => {
+        handler(payload);
+      });
+
+      expect(mockedUseHistory().addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'error',
+          text: 'Simulated console error',
+        }),
+        expect.any(Number),
+      );
+      unmount();
+    });
+
     it('updates currentModel when ModelChanged event is received', async () => {
       // Arrange: Mock initial model
       vi.spyOn(mockConfig, 'getModel').mockReturnValue('initial-model');
