@@ -497,7 +497,12 @@ export class Session {
         ),
       );
 
-      return convertToFunctionResponse(fc.name, callId, toolResult.llmContent);
+      return convertToFunctionResponse(
+        fc.name,
+        callId,
+        toolResult.llmContent,
+        this.config.getActiveModel(),
+      );
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
 
