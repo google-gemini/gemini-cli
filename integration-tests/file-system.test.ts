@@ -4,14 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync } from 'node:fs';
 import * as path from 'node:path';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
 describe('file-system', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
   it('should be able to read a file', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to read a file', {
       settings: { tools: { core: ['read_file'] } },
     });
@@ -41,7 +48,6 @@ describe('file-system', () => {
   });
 
   it('should be able to write a file', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to write a file', {
       settings: { tools: { core: ['write_file', 'replace', 'read_file'] } },
     });
@@ -98,7 +104,6 @@ describe('file-system', () => {
   });
 
   it('should correctly handle file paths with spaces', async () => {
-    const rig = new TestRig();
     await rig.setup('should correctly handle file paths with spaces', {
       settings: { tools: { core: ['write_file', 'read_file'] } },
     });
@@ -122,7 +127,6 @@ describe('file-system', () => {
   });
 
   it('should perform a read-then-write sequence', async () => {
-    const rig = new TestRig();
     await rig.setup('should perform a read-then-write sequence', {
       settings: { tools: { core: ['read_file', 'replace', 'write_file'] } },
     });
@@ -159,7 +163,6 @@ describe('file-system', () => {
   });
 
   it.skip('should replace multiple instances of a string', async () => {
-    const rig = new TestRig();
     rig.setup('should replace multiple instances of a string');
     const fileName = 'ambiguous.txt';
     const fileContent = 'Hey there, \ntest line\ntest line';
@@ -211,7 +214,6 @@ describe('file-system', () => {
   });
 
   it('should fail safely when trying to edit a non-existent file', async () => {
-    const rig = new TestRig();
     await rig.setup(
       'should fail safely when trying to edit a non-existent file',
       { settings: { tools: { core: ['read_file', 'replace'] } } },
