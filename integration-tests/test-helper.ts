@@ -274,6 +274,7 @@ export class TestRig {
   fakeResponsesPath?: string;
   // Original fake responses file path for rewriting goldens in record mode.
   originalFakeResponsesPath?: string;
+  private _interactiveRuns: InteractiveRun[] = [];
 
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
@@ -586,6 +587,18 @@ export class TestRig {
   }
 
   async cleanup() {
+    // Kill any interactive runs that are still active
+    for (const run of this._interactiveRuns) {
+      try {
+        await run.kill();
+      } catch (error) {
+        if (env['VERBOSE'] === 'true') {
+          console.warn('Failed to kill interactive run during cleanup:', error);
+        }
+      }
+    }
+    this._interactiveRuns = [];
+
     if (
       process.env['REGENERATE_MODEL_GOLDENS'] === 'true' &&
       this.fakeResponsesPath
@@ -1054,6 +1067,7 @@ export class TestRig {
     const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
 
     const run = new InteractiveRun(ptyProcess);
+    this._interactiveRuns.push(run);
     // Wait for the app to be ready
     await run.expectText('  Type your message or @path/to/file', 30000);
     return run;

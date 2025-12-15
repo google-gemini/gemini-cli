@@ -4,12 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 
 describe('replace', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
   it('should be able to replace content in a file', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to replace content in a file', {
       settings: { tools: { core: ['replace', 'read_file'] } },
     });
@@ -29,7 +35,6 @@ describe('replace', () => {
   });
 
   it.skip('should handle $ literally when replacing text ending with $', async () => {
-    const rig = new TestRig();
     await rig.setup(
       'should handle $ literally when replacing text ending with $',
       { settings: { tools: { core: ['replace', 'read_file'] } } },
@@ -52,7 +57,6 @@ describe('replace', () => {
   });
 
   it.skip('should insert a multi-line block of text', async () => {
-    const rig = new TestRig();
     await rig.setup('should insert a multi-line block of text', {
       settings: { tools: { core: ['replace', 'read_file'] } },
     });
@@ -73,7 +77,6 @@ describe('replace', () => {
   });
 
   it.skip('should delete a block of text', async () => {
-    const rig = new TestRig();
     await rig.setup('should delete a block of text', {
       settings: { tools: { core: ['replace', 'read_file'] } },
     });

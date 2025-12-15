@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 import { getShellConfiguration } from '../packages/core/src/utils/shell-utils.js';
 
@@ -84,8 +84,14 @@ function getChainedEchoCommand(): { allowPattern: string; command: string } {
 }
 
 describe('run_shell_command', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
   it('should be able to run a shell command', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to run a shell command', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
@@ -119,7 +125,6 @@ describe('run_shell_command', () => {
   });
 
   it('should be able to run a shell command via stdin', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to run a shell command via stdin', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
@@ -149,7 +154,6 @@ describe('run_shell_command', () => {
   });
 
   it.skip('should run allowed sub-command in non-interactive mode', async () => {
-    const rig = new TestRig();
     await rig.setup('should run allowed sub-command in non-interactive mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
@@ -196,7 +200,6 @@ describe('run_shell_command', () => {
   });
 
   it.skip('should succeed with no parens in non-interactive mode', async () => {
-    const rig = new TestRig();
     await rig.setup('should succeed with no parens in non-interactive mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
@@ -233,7 +236,6 @@ describe('run_shell_command', () => {
   });
 
   it('should succeed with --yolo mode', async () => {
-    const rig = new TestRig();
     await rig.setup('should succeed with --yolo mode', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
@@ -269,7 +271,6 @@ describe('run_shell_command', () => {
   });
 
   it.skip('should work with ShellTool alias', async () => {
-    const rig = new TestRig();
     await rig.setup('should work with ShellTool alias');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
@@ -317,7 +318,6 @@ describe('run_shell_command', () => {
   // TODO(#11062): Un-skip this once we can make it reliable by using hard coded
   // model responses.
   it.skip('should combine multiple --allowed-tools flags', async () => {
-    const rig = new TestRig();
     await rig.setup('should combine multiple --allowed-tools flags');
 
     const { tool, command } = getLineCountCommand();
@@ -367,7 +367,6 @@ describe('run_shell_command', () => {
   });
 
   it('should reject commands not on the allowlist', async () => {
-    const rig = new TestRig();
     await rig.setup('should reject commands not on the allowlist', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
@@ -437,7 +436,6 @@ describe('run_shell_command', () => {
 
   // TODO(#11966): Deflake this test and re-enable once the underlying race is resolved.
   it.skip('should reject chained commands when only the first segment is allowlisted in non-interactive mode', async () => {
-    const rig = new TestRig();
     await rig.setup(
       'should reject chained commands when only the first segment is allowlisted',
     );
@@ -466,7 +464,6 @@ describe('run_shell_command', () => {
   });
 
   it('should allow all with "ShellTool" and other specific tools', async () => {
-    const rig = new TestRig();
     await rig.setup(
       'should allow all with "ShellTool" and other specific tools',
       {
@@ -516,7 +513,6 @@ describe('run_shell_command', () => {
   });
 
   it('should propagate environment variables to the child process', async () => {
-    const rig = new TestRig();
     await rig.setup('should propagate environment variables', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
@@ -550,7 +546,6 @@ describe('run_shell_command', () => {
   });
 
   it.skip('should run a platform-specific file listing command', async () => {
-    const rig = new TestRig();
     await rig.setup('should run platform-specific file listing');
     const fileName = `test-file-${Math.random().toString(36).substring(7)}.txt`;
     rig.createFile(fileName, 'test content');
@@ -578,7 +573,6 @@ describe('run_shell_command', () => {
   });
 
   it('rejects invalid shell expressions', async () => {
-    const rig = new TestRig();
     await rig.setup('rejects invalid shell expressions', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
