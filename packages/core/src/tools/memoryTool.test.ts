@@ -255,7 +255,7 @@ describe('MemoryTool', () => {
             type: 'string',
             enum: ['project', 'global'],
             description:
-              "The scope of the memory. 'project' saves to the current project's context, 'global' saves to the user's shared context. Defaults to 'project' if inside a project.",
+              "The scope of the memory. 'project' saves to the current project's context and is the default. Use 'global' when the user specifically intends the memory to be global or the rule transcends the current project scope.",
           },
         },
         required: ['fact'],
