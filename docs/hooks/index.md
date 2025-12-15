@@ -115,6 +115,7 @@ Every hook receives these base fields:
 ```json
 {
   "session_id": "abc123",
+  "transcript_path": "/path/to/transcript.jsonl",
   "cwd": "/path/to/project",
   "hook_event_name": "BeforeTool",
   "timestamp": "2025-12-01T10:30:00Z"
@@ -550,8 +551,8 @@ This command:
 | `Read`      | `read_file`          |
 | `Write`     | `write_file`         |
 | `Glob`      | `glob`               |
-| `Grep`      | `grep`               |
-| `LS`        | `ls`                 |
+| `Grep`      | `search_file_content`|
+| `LS`        | `list_directory`     |
 
 
 ### Gemini CLI-specific matchers
