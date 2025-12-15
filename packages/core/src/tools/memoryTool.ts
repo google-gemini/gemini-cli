@@ -100,7 +100,7 @@ export function getAllGeminiMdFilenames(): string[] {
   return [currentGeminiMdFilename];
 }
 
-interface SaveMemoryParams {
+export interface SaveMemoryParams {
   fact: string;
   scope?: 'project' | 'global';
   modified_by_user?: boolean;

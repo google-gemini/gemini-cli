@@ -13,6 +13,7 @@ import {
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
   getMemoryFilePath,
+  type SaveMemoryParams,
 } from './memoryTool.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -289,7 +290,10 @@ describe('MemoryTool', () => {
     });
 
     it('should call performAddMemoryEntry with global scope when specified', async () => {
-      const params = { fact: 'A global fact', scope: 'global' };
+      const params: SaveMemoryParams = {
+        fact: 'A global fact',
+        scope: 'global',
+      };
       const invocation = memoryTool.build(params);
       const expectedFilePath = path.join(
         mockGlobalGeminiDir,
@@ -316,7 +320,10 @@ describe('MemoryTool', () => {
     });
 
     it('should call performAddMemoryEntry with project scope when specified', async () => {
-      const params = { fact: 'A project fact', scope: 'project' };
+      const params: SaveMemoryParams = {
+        fact: 'A project fact',
+        scope: 'project',
+      };
       const invocation = memoryTool.build(params);
       const expectedFilePath = path.join(
         mockProjectRoot,
@@ -419,7 +426,7 @@ describe('MemoryTool', () => {
     });
 
     it('should return confirmation details when memory file is not allowlisted', async () => {
-      const params = { fact: 'Test fact' };
+      const params: SaveMemoryParams = { fact: 'Test fact' };
       const invocation = memoryTool.build(params);
       const result = await invocation.shouldConfirmExecute(mockAbortSignal);
 
@@ -447,7 +454,7 @@ describe('MemoryTool', () => {
     });
 
     it('should return false when memory file is already allowlisted', async () => {
-      const params = { fact: 'Test fact' };
+      const params: SaveMemoryParams = { fact: 'Test fact' };
       const memoryFilePath = getMemoryFilePath(mockConfig, params.scope);
 
       const invocation = memoryTool.build(params);
@@ -461,7 +468,7 @@ describe('MemoryTool', () => {
     });
 
     it('should add memory file to allowlist when ProceedAlways is confirmed', async () => {
-      const params = { fact: 'Test fact' };
+      const params: SaveMemoryParams = { fact: 'Test fact' };
       const memoryFilePath = getMemoryFilePath(mockConfig, params.scope);
 
       const invocation = memoryTool.build(params);
@@ -483,7 +490,7 @@ describe('MemoryTool', () => {
     });
 
     it('should not add memory file to allowlist when other outcomes are confirmed', async () => {
-      const params = { fact: 'Test fact' };
+      const params: SaveMemoryParams = { fact: 'Test fact' };
       const memoryFilePath = getMemoryFilePath(mockConfig, params.scope);
 
       const invocation = memoryTool.build(params);
