@@ -1,2 +1,20 @@
+# Default owners for everything in the repo
 * @google-gemini/gemini-cli-maintainers
 
+# Package files
+package.json @google-gemini/gemini-cli-core-maintainers
+package-lock.json @google-gemini/gemini-cli-core-maintainers
+
+# License
+LICENSE @google-gemini/gemini-cli-legal
+
+# GitHub workflows
+.github/workflows/* @google-gemini/gemini-cli-devops
+
+# Documentation
+docs/* @google-gemini/gemini-cli-docs
+README.md @google-gemini/gemini-cli-docs
+
+# Source code
+packages/* @google-gemini/gemini-cli-core-maintainers
+src/* @google-gemini/gemini-cli-core-maintainers
