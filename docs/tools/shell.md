@@ -135,8 +135,8 @@ user input, such as text editors (`vim`, `nano`), terminal-based UIs (`htop`),
 and interactive version control operations (`git rebase -i`).
 
 When an interactive command is running, you can send input to it from the Gemini
-CLI. To focus on the interactive shell, press `ctrl+f`. The terminal output,
-including complex TUIs, will be rendered correctly.
+CLI. To focus on the interactive shell, press `ctrl+shift+f`. The terminal
+output, including complex TUIs, will be rendered correctly.
 
 ## Important notes
 
