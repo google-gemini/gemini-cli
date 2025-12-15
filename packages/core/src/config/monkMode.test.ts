@@ -82,6 +82,23 @@ vi.mock('../resources/resource-registry.js', () => ({
   ResourceRegistry: vi.fn(),
 }));
 
+// Mock McpClientManager
+const startConfiguredMcpServersMock = vi.fn();
+vi.mock('../tools/mcp-client-manager.js', () => ({
+  McpClientManager: vi.fn().mockImplementation(() => ({
+    startConfiguredMcpServers: startConfiguredMcpServersMock,
+  })),
+}));
+
+// Mock ExtensionLoader
+const startExtensionLoaderMock = vi.fn();
+vi.mock('../utils/extensionLoader.js', () => ({
+  SimpleExtensionLoader: vi.fn().mockImplementation(() => ({
+    start: startExtensionLoaderMock,
+    getExtensions: vi.fn().mockReturnValue([]),
+  })),
+}));
+
 describe('Monk Mode Configuration', () => {
   const baseParams: ConfigParameters = {
     cwd: '/tmp',
@@ -139,18 +156,29 @@ describe('Monk Mode Configuration', () => {
 
     // Check total number of registered tools
     // In monk mode, only ShellTool should be registered.
-    // Wait, createToolRegistry implementation:
-    // registerCoreTool(LSTool, this); // filtered
-    // registerCoreTool(ReadFileTool, this); // filtered
-    // ...
-    // registerCoreTool(ShellTool, this); // ALLOWED
-    // ...
-
-    // So expected calls is 1 (assuming only ShellTool passes the filter)
     expect(calls.length).toBe(1);
   });
 
-  it('should register other tools when monkMode is false', async () => {
+  it('should NOT start MCP servers, extensions, or discover tools in monk mode', async () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      monkMode: true,
+    };
+    const config = new Config(params);
+    await config.initialize();
+
+    const discoverAllToolsMock = (
+      (await vi.importMock('../tools/tool-registry')) as {
+        ToolRegistry: { prototype: { discoverAllTools: Mock } };
+      }
+    ).ToolRegistry.prototype.discoverAllTools;
+
+    expect(startConfiguredMcpServersMock).not.toHaveBeenCalled();
+    expect(startExtensionLoaderMock).not.toHaveBeenCalled();
+    expect(discoverAllToolsMock).not.toHaveBeenCalled();
+  });
+
+  it('should register other tools and start services when monkMode is false', async () => {
     const params: ConfigParameters = {
       ...baseParams,
       monkMode: false,
@@ -164,6 +192,12 @@ describe('Monk Mode Configuration', () => {
         ToolRegistry: { prototype: { registerTool: Mock } };
       }
     ).ToolRegistry.prototype.registerTool;
+
+    const discoverAllToolsMock = (
+      (await vi.importMock('../tools/tool-registry')) as {
+        ToolRegistry: { prototype: { discoverAllTools: Mock } };
+      }
+    ).ToolRegistry.prototype.discoverAllTools;
 
     // DelegateToAgentTool SHOULD be registered
     const DelegateToAgentToolMock = (
@@ -187,5 +221,10 @@ describe('Monk Mode Configuration', () => {
       (call) => call[0].constructor.Name === 'read_file',
     );
     expect(readFileToolRegistered).toBe(true);
+
+    // Services should be started
+    expect(startConfiguredMcpServersMock).toHaveBeenCalled();
+    expect(startExtensionLoaderMock).toHaveBeenCalled();
+    expect(discoverAllToolsMock).toHaveBeenCalled();
   });
 });

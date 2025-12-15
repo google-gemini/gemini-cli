@@ -62,6 +62,7 @@ import {
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
+import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 
 const MAX_TURNS = 100;
 
@@ -138,7 +139,12 @@ export class GeminiClient {
 
   async setTools(): Promise<void> {
     const toolRegistry = this.config.getToolRegistry();
-    const toolDeclarations = toolRegistry.getFunctionDeclarations();
+    let toolDeclarations = toolRegistry.getFunctionDeclarations();
+    if (this.config.isMonkMode()) {
+      toolDeclarations = toolDeclarations.filter(
+        (tool) => tool.name === SHELL_TOOL_NAME,
+      );
+    }
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     this.getChat().setTools(tools);
   }
@@ -196,7 +202,12 @@ export class GeminiClient {
     this.hasFailedCompressionAttempt = false;
 
     const toolRegistry = this.config.getToolRegistry();
-    const toolDeclarations = toolRegistry.getFunctionDeclarations();
+    let toolDeclarations = toolRegistry.getFunctionDeclarations();
+    if (this.config.isMonkMode()) {
+      toolDeclarations = toolDeclarations.filter(
+        (tool) => tool.name === SHELL_TOOL_NAME,
+      );
+    }
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
 
     const history = await getInitialChatHistory(this.config, extraHistory);

@@ -685,10 +685,12 @@ export class Config {
       this.eventEmitter,
     );
     const initMcpHandle = startupProfiler.start('initialize_mcp_clients');
-    await Promise.all([
-      await this.mcpClientManager.startConfiguredMcpServers(),
-      await this.getExtensionLoader().start(this),
-    ]);
+    if (!this.isMonkMode()) {
+      await Promise.all([
+        await this.mcpClientManager.startConfiguredMcpServers(),
+        await this.getExtensionLoader().start(this),
+      ]);
+    }
     initMcpHandle?.end();
 
     // Initialize hook system if enabled
@@ -1613,7 +1615,9 @@ export class Config {
       }
     }
 
-    await registry.discoverAllTools();
+    if (!this.isMonkMode()) {
+      await registry.discoverAllTools();
+    }
     registry.sortTools();
     return registry;
   }
