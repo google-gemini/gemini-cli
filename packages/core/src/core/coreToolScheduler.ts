@@ -29,6 +29,7 @@ import {
 } from '../index.js';
 import { READ_FILE_TOOL_NAME, SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import type { Part, PartListUnion } from '@google/genai';
+import { supportsMultimodalFunctionResponse } from '../config/models.js';
 import type { ModifyContext } from '../tools/modifiable-tool.js';
 import {
   isModifiableDeclarativeTool,
@@ -171,6 +172,7 @@ export function convertToFunctionResponse(
   toolName: string,
   callId: string,
   llmContent: PartListUnion,
+  model: string,
 ): Part[] {
   if (typeof llmContent === 'string') {
     return [createFunctionResponsePart(callId, toolName, llmContent)];
@@ -178,15 +180,18 @@ export function convertToFunctionResponse(
 
   const parts = toParts(llmContent);
 
-  // Separate text from binary
+  // Separate text from binary types
   const textParts: string[] = [];
-  const binaryParts: Part[] = [];
+  const inlineDataParts: Part[] = [];
+  const fileDataParts: Part[] = [];
 
   for (const part of parts) {
     if (part.text !== undefined) {
       textParts.push(part.text);
-    } else if (part.inlineData || part.fileData) {
-      binaryParts.push(part);
+    } else if (part.inlineData) {
+      inlineDataParts.push(part);
+    } else if (part.fileData) {
+      fileDataParts.push(part);
     } else if (part.functionResponse) {
       if (parts.length > 1) {
         debugLogger.warn(
@@ -207,7 +212,7 @@ export function convertToFunctionResponse(
     // Ignore other part types
   }
 
-  // Build the response
+  // Build the primary response part
   const part: Part = {
     functionResponse: {
       id: callId,
@@ -216,8 +221,33 @@ export function convertToFunctionResponse(
     },
   };
 
-  if (binaryParts.length > 0) {
-    (part.functionResponse as unknown as { parts: Part[] }).parts = binaryParts;
+  const isMultimodalFRSupported = supportsMultimodalFunctionResponse(model);
+  const siblingParts: Part[] = [...fileDataParts];
+
+  if (inlineDataParts.length > 0) {
+    if (isMultimodalFRSupported) {
+      // Nest inlineData if supported by the model
+      (part.functionResponse as unknown as { parts: Part[] }).parts =
+        inlineDataParts;
+    } else {
+      // Otherwise treat as siblings
+      siblingParts.push(...inlineDataParts);
+    }
+  }
+
+  // Add descriptive text if the response object is empty but we have binary content
+  if (
+    textParts.length === 0 &&
+    (inlineDataParts.length > 0 || fileDataParts.length > 0)
+  ) {
+    const totalBinaryItems = inlineDataParts.length + fileDataParts.length;
+    part.functionResponse!.response = {
+      output: `Binary content provided (${totalBinaryItems} item(s)).`,
+    };
+  }
+
+  if (siblingParts.length > 0) {
+    return [part, ...siblingParts];
   }
 
   return [part];
@@ -1223,6 +1253,7 @@ export class CoreToolScheduler {
                   toolName,
                   callId,
                   content,
+                  this.config.getActiveModel(),
                 );
                 const successResponse: ToolCallResponseInfo = {
                   callId,
