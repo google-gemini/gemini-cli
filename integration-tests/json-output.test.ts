@@ -110,7 +110,7 @@ describe('JSON output', () => {
     });
     const result = await rig.run({
       args: [
-        `Read the contents of ${rig.testDir}/path/to/nonexistent/file.txt and tell me what it says. ` +
+        `Read the contents of ${rig.workDir}/path/to/nonexistent/file.txt and tell me what it says. ` +
           'On error, respond to the user with exactly the text "File not found".',
         '--output-format',
         'json',

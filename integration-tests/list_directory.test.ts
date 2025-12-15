@@ -35,8 +35,8 @@ describe('list_directory', () => {
     await poll(
       () => {
         // Check if the files exist in the test directory
-        const file1Path = join(rig.testDir!, 'file1.txt');
-        const subdirPath = join(rig.testDir!, 'subdir');
+        const file1Path = join(rig.workDir!, 'file1.txt');
+        const subdirPath = join(rig.workDir!, 'subdir');
         return existsSync(file1Path) && existsSync(subdirPath);
       },
       1000, // 1 second max wait

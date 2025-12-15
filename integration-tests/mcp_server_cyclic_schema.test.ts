@@ -188,7 +188,7 @@ describe('mcp server with cyclic tool schema is detected', () => {
     });
 
     // Create server script in the test directory
-    const testServerPath = join(rig.testDir!, 'mcp-server.cjs');
+    const testServerPath = join(rig.workDir!, 'mcp-server.cjs');
     writeFileSync(testServerPath, serverScript);
 
     // Make the script executable (though running with 'node' should work anyway)

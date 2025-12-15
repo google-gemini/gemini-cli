@@ -30,11 +30,11 @@ describe('extension install', () => {
 
   it('installs a local extension, verifies a command, and updates it', async () => {
     rig.setup('extension install test');
-    const testServerPath = join(rig.testDir!, 'gemini-extension.json');
+    const testServerPath = join(rig.workDir!, 'gemini-extension.json');
     writeFileSync(testServerPath, extension);
     try {
       const result = await rig.runCommand(
-        ['extensions', 'install', `${rig.testDir!}`],
+        ['extensions', 'install', `${rig.workDir!}`],
         { stdin: 'y\n' },
       );
       expect(result).toContain('test-extension-install');

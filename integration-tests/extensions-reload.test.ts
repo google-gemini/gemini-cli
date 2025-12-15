@@ -56,7 +56,7 @@ describe('extension reloading', () => {
           experimental: { extensionReloading: true },
         },
       });
-      const testServerPath = join(rig.testDir!, 'gemini-extension.json');
+      const testServerPath = join(rig.workDir!, 'gemini-extension.json');
       writeFileSync(testServerPath, safeJsonStringify(extension, 2));
       // defensive cleanup from previous tests.
       try {
@@ -66,7 +66,7 @@ describe('extension reloading', () => {
       }
 
       const result = await rig.runCommand(
-        ['extensions', 'install', `${rig.testDir!}`],
+        ['extensions', 'install', `${rig.workDir!}`],
         { stdin: 'y\n' },
       );
       expect(result).toContain('test-extension');

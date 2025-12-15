@@ -206,7 +206,7 @@ echo '{
   }
 }'`;
 
-      const scriptPath = join(rig.testDir!, 'before_model_hook.sh');
+      const scriptPath = join(rig.workDir!, 'before_model_hook.sh');
       writeFileSync(scriptPath, hookScript);
       // Make executable
       const { execSync } = await import('node:child_process');
@@ -290,7 +290,7 @@ echo '{
   }
 }'`;
 
-        const scriptPath = join(rig.testDir!, 'after_model_hook.sh');
+        const scriptPath = join(rig.workDir!, 'after_model_hook.sh');
         writeFileSync(scriptPath, hookScript);
         const { execSync } = await import('node:child_process');
         execSync(`chmod +x "${scriptPath}"`);
@@ -413,7 +413,7 @@ echo '{
   }
 }'`;
 
-      const scriptPath = join(rig.testDir!, 'before_agent_hook.sh');
+      const scriptPath = join(rig.workDir!, 'before_agent_hook.sh');
       writeFileSync(scriptPath, hookScript);
       const { execSync } = await import('node:child_process');
       execSync(`chmod +x "${scriptPath}"`);
@@ -634,7 +634,7 @@ else
   exit 0
 fi`;
 
-      const scriptPath = join(rig.testDir!, 'input_validation_hook.sh');
+      const scriptPath = join(rig.workDir!, 'input_validation_hook.sh');
       writeFileSync(scriptPath, hookScript);
       const { execSync } = await import('node:child_process');
       execSync(`chmod +x "${scriptPath}"`);
@@ -1303,8 +1303,8 @@ echo '{"decision": "allow", "systemMessage": "Enabled hook executed"}'`;
       const disabledHookScript = `#!/bin/bash
 echo '{"decision": "block", "systemMessage": "Disabled hook should not execute", "reason": "This hook should be disabled"}'`;
 
-      const enabledPath = join(rig.testDir!, 'enabled_hook.sh');
-      const disabledPath = join(rig.testDir!, 'disabled_hook.sh');
+      const enabledPath = join(rig.workDir!, 'enabled_hook.sh');
+      const disabledPath = join(rig.workDir!, 'disabled_hook.sh');
 
       writeFileSync(enabledPath, enabledHookScript);
       writeFileSync(disabledPath, disabledHookScript);
@@ -1386,8 +1386,8 @@ echo '{"decision": "allow", "systemMessage": "Active hook executed"}'`;
       const disabledHookScript = `#!/bin/bash
 echo '{"decision": "block", "systemMessage": "Disabled hook should not execute", "reason": "This hook is disabled"}'`;
 
-      const activePath = join(rig.testDir!, 'active_hook.sh');
-      const disabledPath = join(rig.testDir!, 'disabled_hook.sh');
+      const activePath = join(rig.workDir!, 'active_hook.sh');
+      const disabledPath = join(rig.workDir!, 'disabled_hook.sh');
 
       writeFileSync(activePath, activeHookScript);
       writeFileSync(disabledPath, disabledHookScript);
