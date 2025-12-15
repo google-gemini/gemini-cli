@@ -4,7 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// Mock os.platform to return 'linux' so that shell-utils uses the bash parser
+// even when running tests on Windows. The tests below use bash syntax (&&, $())
+// which may fail to parse or parse differently with the PowerShell parser.
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    platform: () => 'linux',
+  };
+});
+
 import { PolicyEngine } from './policy-engine.js';
 import { PolicyDecision } from './types.js';
 import type { FunctionCall } from '@google/genai';
