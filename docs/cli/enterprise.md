@@ -409,7 +409,8 @@ containerized environment.
 
 You can also specify a custom, hardened Docker image for the sandbox by building
 a custom `sandbox.Dockerfile` as described in the
-[Sandboxing documentation](./sandbox.md).
+[Sandboxing documentation](./sandbox.md). Note that this feature is only
+available when running Gemini CLI from source.
 
 ## Controlling network access via proxy
 
