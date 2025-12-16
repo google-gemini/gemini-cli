@@ -4,15 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  type Mock,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -90,7 +82,7 @@ describe('MCP Server Example', () => {
         json: vi.fn().mockResolvedValue(mockPosts),
       });
 
-      const toolFn = (mockRegisterTool as Mock).mock.calls[0][2];
+      const toolFn = mockRegisterTool.mock.calls[0][2];
       const result = await toolFn();
 
       expect(global.fetch).toHaveBeenCalledWith(
@@ -109,7 +101,7 @@ describe('MCP Server Example', () => {
 
   describe('poem-writer prompt implementation', () => {
     it('should generate a prompt with a title', () => {
-      const promptFn = (mockRegisterPrompt as Mock).mock.calls[0][2];
+      const promptFn = mockRegisterPrompt.mock.calls[0][2];
       const result = promptFn({ title: 'My Poem' });
       expect(result).toEqual({
         messages: [
@@ -125,7 +117,7 @@ describe('MCP Server Example', () => {
     });
 
     it('should generate a prompt with a title and mood', () => {
-      const promptFn = (mockRegisterPrompt as Mock).mock.calls[0][2];
+      const promptFn = mockRegisterPrompt.mock.calls[0][2];
       const result = promptFn({ title: 'My Poem', mood: 'sad' });
       expect(result).toEqual({
         messages: [

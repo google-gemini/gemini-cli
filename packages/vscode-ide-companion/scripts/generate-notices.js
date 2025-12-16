@@ -20,19 +20,25 @@ async function getDependencyLicense(depName, depVersion) {
   let repositoryUrl = 'No repository found';
 
   try {
-    depPackageJsonPath = path.join(
+    const localDepPath = path.join(
+      packagePath,
+      'node_modules',
+      depName,
+      'package.json',
+    );
+    const rootDepPath = path.join(
       projectRoot,
       'node_modules',
       depName,
       'package.json',
     );
-    if (!(await fs.stat(depPackageJsonPath).catch(() => false))) {
-      depPackageJsonPath = path.join(
-        packagePath,
-        'node_modules',
-        depName,
-        'package.json',
-      );
+
+    if (await fs.stat(localDepPath).catch(() => false)) {
+      depPackageJsonPath = localDepPath;
+    } else if (await fs.stat(rootDepPath).catch(() => false)) {
+      depPackageJsonPath = rootDepPath;
+    } else {
+      throw new Error(`Package ${depName} not found in node_modules`);
     }
 
     const depPackageJsonContent = await fs.readFile(
@@ -88,12 +94,24 @@ async function getDependencyLicense(depName, depVersion) {
   };
 }
 
-function collectDependencies(packageName, packageLock, dependenciesMap) {
+function collectDependencies(
+  packageName,
+  packageLock,
+  dependenciesMap,
+  workspaceRelativePath,
+) {
   if (dependenciesMap.has(packageName)) {
     return;
   }
 
-  const packageInfo = packageLock.packages[`node_modules/${packageName}`];
+  let packageInfo =
+    packageLock.packages[
+      `${workspaceRelativePath}/node_modules/${packageName}`
+    ];
+  if (!packageInfo) {
+    packageInfo = packageLock.packages[`node_modules/${packageName}`];
+  }
+
   if (!packageInfo) {
     console.warn(
       `Warning: Could not find package info for ${packageName} in package-lock.json.`,
@@ -105,7 +123,12 @@ function collectDependencies(packageName, packageLock, dependenciesMap) {
 
   if (packageInfo.dependencies) {
     for (const depName of Object.keys(packageInfo.dependencies)) {
-      collectDependencies(depName, packageLock, dependenciesMap);
+      collectDependencies(
+        depName,
+        packageLock,
+        dependenciesMap,
+        workspaceRelativePath,
+      );
     }
   }
 }
@@ -123,11 +146,17 @@ async function main() {
     );
     const packageLockJson = JSON.parse(packageLockJsonContent);
 
+    const workspaceRelativePath = path.relative(projectRoot, packagePath);
     const allDependencies = new Map();
     const directDependencies = Object.keys(packageJson.dependencies);
 
     for (const depName of directDependencies) {
-      collectDependencies(depName, packageLockJson, allDependencies);
+      collectDependencies(
+        depName,
+        packageLockJson,
+        allDependencies,
+        workspaceRelativePath,
+      );
     }
 
     const dependencyEntries = Array.from(allDependencies.entries());

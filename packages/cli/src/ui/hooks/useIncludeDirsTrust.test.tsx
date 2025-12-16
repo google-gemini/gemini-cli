@@ -183,7 +183,7 @@ describe('useIncludeDirsTrust', () => {
       ).props;
       expect(dialogProps.folders).toEqual(['/undefined']);
       expect(dialogProps.trustedDirs).toEqual(['/trusted']);
-      expect(dialogProps.errors as string[]).toEqual([
+      expect(dialogProps.errors).toEqual([
         `The following directories are explicitly untrusted and cannot be added to a trusted workspace:\n- /untrusted\nPlease use the permissions command to modify their trust level.`,
       ]);
     });

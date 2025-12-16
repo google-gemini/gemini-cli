@@ -33,6 +33,10 @@ import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge, type MergeableObject } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import type { ExtensionManager } from './extension-manager.js';
+import {
+  validateSettings,
+  formatValidationError,
+} from './settings-validation.js';
 import { SettingPaths } from './settingPaths.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
@@ -270,7 +274,7 @@ export function needsMigration(settings: Record<string, unknown>): boolean {
     if (v1Key === v2Path || !(v1Key in settings)) {
       return false;
     }
-    // If a key exists that is both a V1 key and a V2 container (like 'model'),
+    // If a key exists that is a V1 key and a V2 container (like 'model'),
     // we need to check the type. If it's an object, it's a V2 container and not
     // a V1 key that needs migration.
     if (
@@ -298,6 +302,19 @@ function migrateSettingsToV2(
 
   for (const [oldKey, newPath] of Object.entries(MIGRATION_MAP)) {
     if (flatKeys.has(oldKey)) {
+      // If the key exists and is a V2 container (like 'model'), and the value is an object,
+      // it is likely already migrated or partially migrated. We should not move it
+      // to the mapped V2 path (e.g. 'model' -> 'model.name').
+      // Instead, let it fall through to the "Carry over" section to be merged.
+      if (
+        KNOWN_V2_CONTAINERS.has(oldKey) &&
+        typeof flatSettings[oldKey] === 'object' &&
+        flatSettings[oldKey] !== null &&
+        !Array.isArray(flatSettings[oldKey])
+      ) {
+        continue;
+      }
+
       setNestedProperty(v2Settings, newPath, flatSettings[oldKey]);
       flatKeys.delete(oldKey);
     }
@@ -327,8 +344,8 @@ function migrateSettingsToV2(
       v2Settings[remainingKey] = customDeepMerge(
         pathAwareGetStrategy,
         {},
-        newValue as MergeableObject,
         existingValue as MergeableObject,
+        newValue as MergeableObject,
       );
     } else {
       v2Settings[remainingKey] = newValue;
@@ -670,9 +687,24 @@ export function loadSettings(
             settingsObject = migratedSettings;
           }
         }
+
+        // Validate settings structure with Zod after migration
+        const validationResult = validateSettings(settingsObject);
+        if (!validationResult.success && validationResult.error) {
+          const errorMessage = formatValidationError(
+            validationResult.error,
+            filePath,
+          );
+          throw new FatalConfigError(errorMessage);
+        }
+
         return { settings: settingsObject as Settings, rawJson: content };
       }
     } catch (error: unknown) {
+      // Preserve FatalConfigError with formatted validation messages
+      if (error instanceof FatalConfigError) {
+        throw error;
+      }
       settingsErrors.push({
         message: getErrorMessage(error),
         path: filePath,
