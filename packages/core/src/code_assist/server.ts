@@ -138,8 +138,10 @@ export class CodeAssistServer implements ContentGenerator {
       ),
       req.config?.abortSignal,
     );
+    const duration = formatProtoJsonDuration(Date.now() - start);
     const streamingLatency: StreamingLatency = {
-      totalLatency: formatProtoJsonDuration(Date.now() - start),
+      totalLatency: duration,
+      firstMessageLatency: duration,
     };
 
     const translatedResponse = fromGenerateContentResponse(response);

@@ -173,6 +173,10 @@ describe('CodeAssistServer', () => {
             conversationOffered: expect.objectContaining({
               traceId: 'test-trace-id',
               status: ActionStatus.ACTION_STATUS_NO_ERROR,
+              streamingLatency: expect.objectContaining({
+                totalLatency: expect.stringMatching(/\d+s/),
+                firstMessageLatency: expect.stringMatching(/\d+s/),
+              }),
             }),
           }),
         ]),
