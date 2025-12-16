@@ -36,7 +36,7 @@ describe('LSP Manager', () => {
     });
 
     it('should initialize as disabled when configured', async () => {
-      await lspManager.init({ disabled: true });
+      await lspManager.init({ enabled: false });
       expect(lspManager.isEnabled()).toBe(false);
     });
 
@@ -49,7 +49,7 @@ describe('LSP Manager', () => {
 
   describe('file operations when disabled', () => {
     beforeEach(async () => {
-      await lspManager.init({ disabled: true });
+      await lspManager.init({ enabled: false });
     });
 
     it('should handle touchFile gracefully', async () => {
@@ -274,7 +274,7 @@ describe('collectDiagnosticsForOutput', () => {
   });
 
   it('should return null when LSP is disabled', async () => {
-    await lspManager.init({ disabled: true });
+    await lspManager.init({ enabled: false });
 
     const result = await collectDiagnosticsForOutput(
       '/path/to/file.ts',

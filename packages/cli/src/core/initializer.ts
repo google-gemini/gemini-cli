@@ -62,7 +62,7 @@ export async function initializeApp(
   // Initialize LSP manager for language server support
   const lspSettings = settings.merged.lsp;
   await lspManager.init({
-    disabled: lspSettings?.disabled ?? false,
+    enabled: lspSettings?.enabled ?? true,
   });
 
   return {

@@ -1615,14 +1615,14 @@ const SETTINGS_SCHEMA = {
       'Settings for Language Server Protocol (LSP) integration. LSP provides real-time diagnostics, type information, and code analysis from language servers.',
     showInDialog: false,
     properties: {
-      disabled: {
+      enabled: {
         type: 'boolean',
-        label: 'Disable LSP',
+        label: 'Enable LSP',
         category: 'Advanced',
         requiresRestart: true,
-        default: false,
+        default: true,
         description:
-          'Disable Language Server Protocol support entirely. When disabled, lsp_diagnostics and lsp_hover tools will not function.',
+          'Enable Language Server Protocol support. When enabled, provides real-time diagnostics from language servers like typescript-language-server.',
         showInDialog: true,
       },
     },

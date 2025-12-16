@@ -18,6 +18,7 @@ import { ALL_SERVERS, type ServerInfo } from './server.js';
 import { isLanguageSupported } from './language.js';
 import type { Diagnostic, Hover } from './types.js';
 import { SEVERITY_NAMES } from './types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // Re-export types for consumers
 export { type Diagnostic, type Hover, SEVERITY_NAMES } from './types.js';
@@ -28,10 +29,8 @@ export { extractHoverContent } from './client.js';
  * Configuration for the LSP Manager
  */
 export interface LSPManagerConfig {
-  /** Disable all LSP functionality */
-  disabled?: boolean;
-  /** Custom server configurations (for future extension) */
-  servers?: Record<string, unknown>;
+  /** Enable LSP functionality (default: true) */
+  enabled?: boolean;
 }
 
 /**
@@ -63,6 +62,9 @@ class LSPManager {
   /** Files that have been touched (notified to LSP) */
   private touchedFiles = new Set<string>();
 
+  /** Maximum number of touched files to track before evicting old entries */
+  private static readonly MAX_TOUCHED_FILES = 1000;
+
   /** Whether LSP is disabled globally */
   private disabled = false;
 
@@ -75,7 +77,7 @@ class LSPManager {
    * @param config - Configuration options
    */
   async init(config: LSPManagerConfig = {}): Promise<void> {
-    this.disabled = config.disabled ?? false;
+    this.disabled = !(config.enabled ?? true);
     this.initialized = true;
   }
 
@@ -129,8 +131,7 @@ class LSPManager {
     if (signal?.aborted) return;
 
     // Notify each client
-    const isNewFile = !this.touchedFiles.has(normalizedPath);
-    this.touchedFiles.add(normalizedPath);
+    const isNewFile = this.trackTouchedFile(normalizedPath);
 
     for (const client of clients) {
       if (signal?.aborted) break;
@@ -177,8 +178,7 @@ class LSPManager {
 
     if (signal?.aborted) return;
 
-    const isNewFile = !this.touchedFiles.has(normalizedPath);
-    this.touchedFiles.add(normalizedPath);
+    const isNewFile = this.trackTouchedFile(normalizedPath);
 
     for (const client of clients) {
       if (signal?.aborted) break;
@@ -327,6 +327,26 @@ class LSPManager {
   }
 
   /**
+   * Track a file as touched and evict old entries if needed.
+   */
+  private trackTouchedFile(filePath: string): boolean {
+    const isNewFile = !this.touchedFiles.has(filePath);
+    this.touchedFiles.add(filePath);
+
+    // Evict oldest entries if we exceed the limit
+    if (this.touchedFiles.size > LSPManager.MAX_TOUCHED_FILES) {
+      const iterator = this.touchedFiles.values();
+      for (let i = 0; i < 500; i++) {
+        const next = iterator.next();
+        if (next.done) break;
+        this.touchedFiles.delete(next.value);
+      }
+    }
+
+    return isNewFile;
+  }
+
+  /**
    * Get clients that can handle a file.
    */
   private async getClientsForFile(filePath: string): Promise<LSPClient[]> {
@@ -367,7 +387,7 @@ class LSPManager {
       }
 
       // Spawn new client
-      const spawnPromise = this.spawnClient(server, root, key);
+      const spawnPromise = this.spawnClient(server, root);
       this.pending.set(key, spawnPromise);
 
       try {
@@ -390,7 +410,6 @@ class LSPManager {
   private async spawnClient(
     server: ServerInfo,
     root: string,
-    _key: string,
   ): Promise<LSPClient | undefined> {
     try {
       const handle = await server.spawn(root);
@@ -400,10 +419,10 @@ class LSPManager {
       }
 
       return await createClient(server.id, handle, root);
-    } catch (_error) {
+    } catch (error) {
       // Mark server as broken to avoid repeated failures
       this.brokenServers.add(server.id);
-      console.error(`Failed to spawn LSP server ${server.id}:`, error);
+      debugLogger.debug(`Failed to spawn LSP server ${server.id}:`, error);
       return undefined;
     }
   }

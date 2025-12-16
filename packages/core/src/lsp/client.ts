@@ -16,7 +16,7 @@ import {
   StreamMessageReader,
   StreamMessageWriter,
   type MessageConnection,
-} from 'vscode-jsonrpc/node';
+} from 'vscode-jsonrpc/lib/node/main.js';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import type { ServerHandle } from './server.js';
 import { getLanguageId } from './language.js';
@@ -212,7 +212,7 @@ export async function createClient(
 
   try {
     await Promise.race([initializePromise, timeoutPromise]);
-  } catch (_error) {
+  } catch (error) {
     connection.dispose();
     server.process.kill();
     throw error;

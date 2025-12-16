@@ -13,6 +13,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Handle to a spawned LSP server process
@@ -98,21 +99,22 @@ async function findExecutable(name: string): Promise<string | undefined> {
 /**
  * TypeScript/JavaScript Language Server
  *
- * Requires: typescript-language-server
- * Install: npm install -g typescript-language-server typescript
+ * Uses npx to run typescript-language-server, which will:
+ * 1. Use the local project's version if installed in node_modules
+ * 2. Fall back to a cached version otherwise
  */
 export const TypeScriptServer: ServerInfo = {
   id: 'typescript',
   extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts'],
 
   async spawn(root: string): Promise<ServerHandle | undefined> {
-    const binary = await findExecutable('typescript-language-server');
-    if (!binary) {
-      // Server not found - user needs to install it
+    // Check if npx is available
+    const npx = await findExecutable('npx');
+    if (!npx) {
       return undefined;
     }
 
-    const childProcess = spawn(binary, ['--stdio'], {
+    const childProcess = spawn(npx, ['typescript-language-server', '--stdio'], {
       cwd: root,
       env: {
         ...process.env,
@@ -124,8 +126,8 @@ export const TypeScriptServer: ServerInfo = {
 
     // Handle spawn errors
     childProcess.on('error', (err) => {
-      console.error(
-        `Failed to spawn typescript-language-server: ${err.message}`,
+      debugLogger.debug(
+        `Failed to spawn typescript-language-server via npx: ${err.message}`,
       );
     });
 
