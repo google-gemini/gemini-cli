@@ -5,11 +5,15 @@
  */
 
 import type React from 'react';
+import { useRef, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { TextInput } from '../components/shared/TextInput.js';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { clearApiKey, debugLogger } from '@google/gemini-cli-core';
+import { useKeypress } from '../hooks/useKeypress.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
 
 interface ApiAuthDialogProps {
   onSubmit: (apiKey: string) => void;
@@ -27,9 +31,20 @@ export function ApiAuthDialog({
   const { mainAreaWidth } = useUIState();
   const viewportWidth = mainAreaWidth - 8;
 
+  const pendingPromise = useRef<{ cancel: () => void } | null>(null);
+
+  useEffect(
+    () => () => {
+      pendingPromise.current?.cancel();
+    },
+    [],
+  );
+
+  const initialApiKey = defaultValue;
+
   const buffer = useTextBuffer({
-    initialText: defaultValue || '',
-    initialCursorOffset: defaultValue?.length || 0,
+    initialText: initialApiKey || '',
+    initialCursorOffset: initialApiKey?.length || 0,
     viewport: {
       width: viewportWidth,
       height: 4,
@@ -43,6 +58,41 @@ export function ApiAuthDialog({
   const handleSubmit = (value: string) => {
     onSubmit(value);
   };
+
+  const handleClear = () => {
+    pendingPromise.current?.cancel();
+
+    let isCancelled = false;
+    const wrappedPromise = new Promise<void>((resolve, reject) => {
+      clearApiKey().then(
+        () => !isCancelled && resolve(),
+        (error) => !isCancelled && reject(error),
+      );
+    });
+
+    pendingPromise.current = {
+      cancel: () => {
+        isCancelled = true;
+      },
+    };
+
+    return wrappedPromise
+      .then(() => {
+        buffer.setText('');
+      })
+      .catch((err) => {
+        debugLogger.debug('Failed to clear API key:', err);
+      });
+  };
+
+  useKeypress(
+    async (key) => {
+      if (keyMatchers[Command.CLEAR_INPUT](key)) {
+        await handleClear();
+      }
+    },
+    { isActive: true },
+  );
 
   return (
     <Box
@@ -89,7 +139,7 @@ export function ApiAuthDialog({
       )}
       <Box marginTop={1}>
         <Text color={theme.text.secondary}>
-          (Press Enter to submit, Esc to cancel)
+          (Press Enter to submit, Esc to cancel, Ctrl+C to clear stored key)
         </Text>
       </Box>
     </Box>

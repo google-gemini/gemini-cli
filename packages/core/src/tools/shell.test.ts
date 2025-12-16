@@ -36,10 +36,8 @@ vi.mock('node:os', async (importOriginal) => {
 vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
-import {
-  initializeShellParsers,
-  isCommandAllowed,
-} from '../utils/shell-utils.js';
+import { initializeShellParsers } from '../utils/shell-utils.js';
+import { isCommandAllowed } from '../utils/shell-permissions.js';
 import { ShellTool } from './shell.js';
 import { type Config } from '../config/config.js';
 import {
