@@ -397,6 +397,22 @@ export class SessionSelector {
       return sortedSessions[index - 1];
     }
 
+    // Try to find by display name or summary
+    // Filter sessions where displayName or summary matches identifier
+    const sessionsByName = sortedSessions.filter(
+      (session) =>
+        session.displayName === identifier || session.summary === identifier,
+    );
+
+    if (sessionsByName.length > 0) {
+      // Sort by lastUpdated descending (newest first)
+      sessionsByName.sort(
+        (a, b) =>
+          new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime(),
+      );
+      return sessionsByName[0];
+    }
+
     throw new Error(
       `Invalid session identifier "${identifier}". Use --list-sessions to see available sessions.`,
     );
@@ -431,7 +447,7 @@ export class SessionSelector {
       } catch (error) {
         // Re-throw with more detailed message for resume command
         throw new Error(
-          `Invalid session identifier "${resumeArg}". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.  Error: ${error}`,
+          `Invalid session identifier "${resumeArg}". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, --resume "{name or summary}" or --resume latest.  Error: ${error}`,
         );
       }
     }

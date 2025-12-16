@@ -235,6 +235,166 @@ describe('SessionSelector', () => {
     expect(result.sessionData.messages[0].content).toBe('Latest session');
   });
 
+  it('should resolve session by display name', async () => {
+    const sessionId1 = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const session1 = {
+      sessionId: sessionId1,
+      displayName: 'My Cool Session',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Test message 1',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session1, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+
+    // Test resolving by display name
+    const result = await sessionSelector.resolveSession('My Cool Session');
+    expect(result.sessionData.sessionId).toBe(sessionId1);
+    expect(result.sessionData.displayName).toBe('My Cool Session');
+  });
+
+  it('should resolve most recent session when multiple sessions have same display name', async () => {
+    const sessionId1 = randomUUID();
+    const sessionId2 = randomUUID();
+    const sessionId3 = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const sessionOld = {
+      sessionId: sessionId1,
+      displayName: 'Duplicate Name',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Old',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    const sessionNew = {
+      sessionId: sessionId2,
+      displayName: 'Duplicate Name',
+      startTime: '2024-01-02T10:00:00.000Z',
+      lastUpdated: '2024-01-02T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'New',
+          id: 'msg2',
+          timestamp: '2024-01-02T10:00:00.000Z',
+        },
+      ],
+    };
+
+    // Another session with different name
+    const sessionOther = {
+      sessionId: sessionId3,
+      displayName: 'Other Name',
+      startTime: '2024-01-01T12:00:00.000Z',
+      lastUpdated: '2024-01-01T12:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Other',
+          id: 'msg3',
+          timestamp: '2024-01-01T12:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionOld, null, 2),
+    );
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-02T10-00-${sessionId2.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionNew, null, 2),
+    );
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T12-00-${sessionId3.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionOther, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+
+    // Test resolving by display name with duplicates
+    const result = await sessionSelector.resolveSession('Duplicate Name');
+    expect(result.sessionData.sessionId).toBe(sessionId2);
+    expect(result.sessionData.messages[0].content).toBe('New');
+  });
+
+  it('should resolve session by summary when display name does not match', async () => {
+    const sessionId = randomUUID();
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const session = {
+      sessionId,
+      displayName: 'Renamed Session',
+      summary: 'Original Summary',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Test',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+    const result = await sessionSelector.resolveSession('Original Summary');
+
+    expect(result.sessionData.sessionId).toBe(sessionId);
+  });
+
   it('should deduplicate sessions by ID', async () => {
     const sessionId = randomUUID();
 
@@ -333,10 +493,12 @@ describe('SessionSelector', () => {
 
     await expect(
       sessionSelector.resolveSession('invalid-uuid'),
-    ).rejects.toThrow('Invalid session identifier "invalid-uuid"');
+    ).rejects.toThrow(
+      'Invalid session identifier "invalid-uuid". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, --resume "{name or summary}" or --resume latest.',
+    );
 
     await expect(sessionSelector.resolveSession('999')).rejects.toThrow(
-      'Invalid session identifier "999"',
+      'Invalid session identifier "999". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, --resume "{name or summary}" or --resume latest.',
     );
   });
 
