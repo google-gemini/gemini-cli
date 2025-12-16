@@ -45,11 +45,6 @@ vi.mock('fs', () => ({
 }));
 
 vi.mock('os');
-vi.mock('../config/storage.js', () => ({
-  Storage: {
-    getGlobalGeminiDir: vi.fn(() => path.join('/mock', 'home', GEMINI_DIR)),
-  },
-}));
 
 const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
 

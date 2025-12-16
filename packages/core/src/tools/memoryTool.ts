@@ -108,7 +108,10 @@ export interface SaveMemoryParams {
 }
 
 export function getGlobalMemoryFilePath(): string {
-  return path.join(Storage.getGlobalGeminiDir(), getCurrentGeminiMdFilename());
+  return path.join(
+    Storage.getGlobalGeminiDir(),
+    path.basename(getCurrentGeminiMdFilename()),
+  );
 }
 
 /**
@@ -118,18 +121,21 @@ export function getMemoryFilePath(
   config: Config | undefined,
   scope?: 'project' | 'global',
 ): string {
+  // Sanitize the filename to prevent path traversal.
+  const memoryFilename = path.basename(getCurrentGeminiMdFilename());
+
   if (scope === 'global') {
-    return getGlobalMemoryFilePath();
+    return path.join(Storage.getGlobalGeminiDir(), memoryFilename);
   }
 
   // If scope is explicitly project, or undefined (defaulting to project behavior)
   // If projectRoot is a valid directory, use it.
   if (config?.getProjectRoot()) {
-    return path.join(config.getProjectRoot(), getCurrentGeminiMdFilename());
+    return path.join(config.getProjectRoot(), memoryFilename);
   }
 
   // Fallback to global if no config or project root
-  return getGlobalMemoryFilePath();
+  return path.join(Storage.getGlobalGeminiDir(), memoryFilename);
 }
 
 /**
