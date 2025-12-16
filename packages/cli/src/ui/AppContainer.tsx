@@ -1417,7 +1417,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           authType === AuthType.USE_VERTEX_AI
         ) {
           setDefaultBannerText(
-            'Gemini 3 is now available.\nTo use Gemini 3, enable "Preview features" in /settings\nLearn more at https://goo.gle/enable-preview-features',
+            'Gemini 3 Flash and Pro are now available. \nEnable "Preview features" in /settings. \nLearn more at https://goo.gle/enable-preview-features',
           );
         }
       }
