@@ -12,43 +12,14 @@ available** on Gemini CLI to all of the following subscribers:
 - Paid Gemini API key holders.
 - Paid Vertex API key holders.
 
-For **everyone else**, we're gradually expanding access
-[through a waitlist](https://goo.gle/geminicli-waitlist-signup). If you don't
-have one of the listed subscriptions, sign up for the waitlist to access Gemini
-3 Pro once approved.
-
-**Note:** Whether you’re automatically granted access or accepted from the
-waitlist, you’ll still need to enable Gemini 3 Pro
+**Note:** To use Gemini 3 Pro, you’ll still need to enable **Preview Features**
 [using the `/settings` command](../cli/settings.md).
-
-## How to join the waitlist
-
-Users not automatically granted access will need to join the waitlist. Follow
-these instructions to sign up:
-
-- Install Gemini CLI.
-- Authenticate using the **Login with Google** option. You’ll see a banner that
-  says “Gemini 3 is now available.” If you do not see this banner, update your
-  installation of Gemini CLI to the most recent version.
-- Fill out this Google form:
-  [Access Gemini 3 in Gemini CLI](https://goo.gle/geminicli-waitlist-signup).
-  Provide the email address of the account you used to authenticate with Gemini
-  CLI.
-
-Users will be onboarded in batches, subject to availability. When you’ve been
-granted access to Gemini 3 Pro, you’ll receive an acceptance email to your
-submitted email address.
-
-**Note:** Please wait until you have been approved to use Gemini 3 Pro to enable
-**Preview Features**. If enabled early, the CLI will fallback to Gemini 2.5 Pro.
 
 ## How to use Gemini 3 Pro with Gemini CLI
 
-Once you receive your acceptance email–or if you are automatically granted
-access–you still need to enable Gemini 3 Pro within Gemini CLI.
-
 To enable Gemini 3 Pro, use the `/settings` command in Gemini CLI and set
-**Preview Features** to `true`.
+**Preview Features** to `true`. This will only work if your account type has
+access to Gemini 3 Pro.
 
 For more information, see [Gemini CLI Settings](../cli/settings.md).
 
