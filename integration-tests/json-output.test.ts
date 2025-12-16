@@ -22,11 +22,9 @@ describe('JSON output', () => {
   });
 
   it('should return a valid JSON with response and stats', async () => {
-    const result = await rig.run(
-      'What is the capital of France?',
-      '--output-format',
-      'json',
-    );
+    const result = await rig.run({
+      args: ['What is the capital of France?', '--output-format', 'json'],
+    });
     const parsed = JSON.parse(result);
 
     expect(parsed).toHaveProperty('response');
@@ -38,7 +36,9 @@ describe('JSON output', () => {
   });
 
   it('should return a valid JSON with a session ID', async () => {
-    const result = await rig.run('Hello', '--output-format', 'json');
+    const result = await rig.run({
+      args: ['Hello', '--output-format', 'json'],
+    });
     const parsed = JSON.parse(result);
 
     expect(parsed).toHaveProperty('session_id');
@@ -58,7 +58,7 @@ describe('JSON output', () => {
 
     let thrown: Error | undefined;
     try {
-      await rig.run('Hello', '--output-format', 'json');
+      await rig.run({ args: ['Hello', '--output-format', 'json'] });
       expect.fail('Expected process to exit with error');
     } catch (e) {
       thrown = e as Error;
@@ -108,12 +108,14 @@ describe('JSON output', () => {
         'json-output.error.responses',
       ),
     });
-    const result = await rig.run(
-      `Read the contents of ${rig.testDir}/path/to/nonexistent/file.txt and tell me what it says. ` +
-        'On error, respond to the user with exactly the text "File not found".',
-      '--output-format',
-      'json',
-    );
+    const result = await rig.run({
+      args: [
+        `Read the contents of ${rig.testDir}/path/to/nonexistent/file.txt and tell me what it says. ` +
+          'On error, respond to the user with exactly the text "File not found".',
+        '--output-format',
+        'json',
+      ],
+    });
 
     const parsed = JSON.parse(result);
 
