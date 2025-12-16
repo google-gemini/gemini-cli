@@ -47,7 +47,15 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     })),
     StreamJsonFormatter: vi.fn().mockImplementation(() => ({
       emitEvent: vi.fn(),
-      convertToStreamStats: vi.fn().mockReturnValue({}),
+      convertToStreamStats: vi.fn().mockReturnValue({
+        total_tokens: 0,
+        input_tokens: 0,
+        output_tokens: 0,
+        cached: 0,
+        input: 0,
+        duration_ms: 0,
+        tool_calls: 0,
+      }),
     })),
     uiTelemetryService: {
       getMetrics: vi.fn().mockReturnValue({}),
