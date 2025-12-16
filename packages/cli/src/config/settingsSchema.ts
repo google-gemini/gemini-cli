@@ -1711,6 +1711,12 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         description:
           'Service account email to impersonate (name@project.iam.gserviceaccount.com).',
       },
+      type: {
+        type: 'string',
+        description:
+          'Transport type for use with url field. When set to "http", uses StreamableHTTPClientTransport. When set to "sse", uses SSEClientTransport. When omitted, auto-detects transport type.',
+        enum: ['sse', 'http'],
+      },
     },
   },
   TelemetrySettings: {

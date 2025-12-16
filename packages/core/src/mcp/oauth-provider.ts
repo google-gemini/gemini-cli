@@ -429,17 +429,25 @@ export class MCPOAuthProvider {
 
     // Add resource parameter for MCP OAuth spec compliance
     // Only add if we have an MCP server URL (indicates MCP OAuth flow, not standard OAuth)
+    debugLogger.debug(
+      `buildAuthorizationUrl: mcpServerUrl=${mcpServerUrl}, adding resource parameter: ${!!mcpServerUrl}`,
+    );
     if (mcpServerUrl) {
       try {
-        params.append(
-          'resource',
-          OAuthUtils.buildResourceParameter(mcpServerUrl),
+        const resourceParam = OAuthUtils.buildResourceParameter(mcpServerUrl);
+        params.append('resource', resourceParam);
+        debugLogger.debug(
+          `Added resource parameter to authorization URL: ${resourceParam}`,
         );
       } catch (error) {
         debugLogger.warn(
           `Could not add resource parameter: ${getErrorMessage(error)}`,
         );
       }
+    } else {
+      debugLogger.debug(
+        'No mcpServerUrl provided, skipping resource parameter',
+      );
     }
 
     const url = new URL(config.authorizationUrl!);
@@ -487,18 +495,26 @@ export class MCPOAuthProvider {
 
     // Add resource parameter for MCP OAuth spec compliance
     // Only add if we have an MCP server URL (indicates MCP OAuth flow, not standard OAuth)
+    debugLogger.debug(
+      `exchangeCodeForToken: mcpServerUrl=${mcpServerUrl}, adding resource parameter: ${!!mcpServerUrl}`,
+    );
     if (mcpServerUrl) {
       const resourceUrl = mcpServerUrl;
       try {
-        params.append(
-          'resource',
-          OAuthUtils.buildResourceParameter(resourceUrl),
+        const resourceParam = OAuthUtils.buildResourceParameter(resourceUrl);
+        params.append('resource', resourceParam);
+        debugLogger.debug(
+          `Added resource parameter to token exchange: ${resourceParam}`,
         );
       } catch (error) {
         debugLogger.warn(
           `Could not add resource parameter: ${getErrorMessage(error)}`,
         );
       }
+    } else {
+      debugLogger.debug(
+        'No mcpServerUrl provided to token exchange, skipping resource parameter',
+      );
     }
 
     const response = await fetch(config.tokenUrl!, {
@@ -610,17 +626,25 @@ export class MCPOAuthProvider {
 
     // Add resource parameter for MCP OAuth spec compliance
     // Only add if we have an MCP server URL (indicates MCP OAuth flow, not standard OAuth)
+    debugLogger.debug(
+      `refreshAccessToken: mcpServerUrl=${mcpServerUrl}, adding resource parameter: ${!!mcpServerUrl}`,
+    );
     if (mcpServerUrl) {
       try {
-        params.append(
-          'resource',
-          OAuthUtils.buildResourceParameter(mcpServerUrl),
+        const resourceParam = OAuthUtils.buildResourceParameter(mcpServerUrl);
+        params.append('resource', resourceParam);
+        debugLogger.debug(
+          `Added resource parameter to refresh request: ${resourceParam}`,
         );
       } catch (error) {
         debugLogger.warn(
           `Could not add resource parameter: ${getErrorMessage(error)}`,
         );
       }
+    } else {
+      debugLogger.debug(
+        'No mcpServerUrl provided to refresh, skipping resource parameter',
+      );
     }
 
     const response = await fetch(tokenUrl, {
@@ -712,6 +736,10 @@ export class MCPOAuthProvider {
     mcpServerUrl?: string,
     events?: EventEmitter,
   ): Promise<OAuthToken> {
+    debugLogger.debug(
+      `authenticate called for server '${serverName}' with mcpServerUrl: ${mcpServerUrl}`,
+    );
+
     // Helper function to display messages through handler or fallback to console.log
     const displayMessage = (message: string) => {
       if (events) {

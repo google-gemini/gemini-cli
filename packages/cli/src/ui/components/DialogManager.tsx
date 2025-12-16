@@ -23,6 +23,7 @@ import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
 import { SessionBrowser } from './SessionBrowser.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
+import { McpSamplingDialog } from './McpSamplingDialog.js';
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
@@ -31,6 +32,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
+import type { SamplingMessage } from '@modelcontextprotocol/sdk/types.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -100,6 +102,7 @@ export const DialogManager = ({
         prompt={uiState.confirmationRequest.prompt}
         onConfirm={uiState.confirmationRequest.onConfirm}
         terminalWidth={terminalWidth}
+        availableTerminalHeight={terminalHeight - staticExtraHeight}
       />
     );
   }
@@ -110,6 +113,7 @@ export const DialogManager = ({
         prompt={request.prompt}
         onConfirm={request.onConfirm}
         terminalWidth={terminalWidth}
+        availableTerminalHeight={terminalHeight - staticExtraHeight}
       />
     );
   }
@@ -229,6 +233,18 @@ export const DialogManager = ({
         onExit={uiActions.closePermissionsDialog}
         addItem={addItem}
         targetDirectory={uiState.permissionsDialogProps?.targetDirectory}
+      />
+    );
+  }
+
+  if (uiState.mcpSamplingRequest) {
+    return (
+      <McpSamplingDialog
+        serverName={uiState.mcpSamplingRequest.serverName}
+        prompt={uiState.mcpSamplingRequest.prompt as SamplingMessage[]}
+        onConfirm={uiState.mcpSamplingRequest.resolve}
+        onReject={uiState.mcpSamplingRequest.reject}
+        availableTerminalHeight={terminalHeight - staticExtraHeight}
       />
     );
   }

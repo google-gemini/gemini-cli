@@ -101,20 +101,20 @@ describe('<Scrollable />', () => {
       throw new Error('capturedEntry is undefined');
     }
 
-    // Initial state (starts at bottom because of auto-scroll logic)
-    expect(capturedEntry.getScrollState().scrollTop).toBe(5);
+    // Initial state (starts at top on initial render)
+    expect(capturedEntry.getScrollState().scrollTop).toBe(0);
 
-    // Call scrollBy multiple times (upwards) in the same tick
+    // Call scrollBy multiple times (downwards) in the same tick
     act(() => {
-      capturedEntry!.scrollBy(-1);
-      capturedEntry!.scrollBy(-1);
+      capturedEntry!.scrollBy(1);
+      capturedEntry!.scrollBy(1);
     });
-    // Should have moved up by 2
-    expect(capturedEntry.getScrollState().scrollTop).toBe(3);
+    // Should have moved down by 2
+    expect(capturedEntry.getScrollState().scrollTop).toBe(2);
 
     act(() => {
-      capturedEntry!.scrollBy(-2);
+      capturedEntry!.scrollBy(2);
     });
-    expect(capturedEntry.getScrollState().scrollTop).toBe(1);
+    expect(capturedEntry.getScrollState().scrollTop).toBe(4);
   });
 });
