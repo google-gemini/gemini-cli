@@ -92,6 +92,7 @@ describe('SessionStatsContext', () => {
             totalLatencyMs: 123,
           },
           tokens: {
+            input: 50,
             prompt: 100,
             candidates: 200,
             total: 300,
@@ -171,6 +172,7 @@ describe('SessionStatsContext', () => {
         'gemini-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
           tokens: {
+            input: 10,
             prompt: 10,
             candidates: 20,
             total: 30,
@@ -212,6 +214,7 @@ describe('SessionStatsContext', () => {
         'gemini-pro': {
           api: { totalRequests: 2, totalErrors: 0, totalLatencyMs: 200 },
           tokens: {
+            input: 20,
             prompt: 20,
             candidates: 40,
             total: 60,
