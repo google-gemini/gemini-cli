@@ -1119,7 +1119,7 @@ const SETTINGS_SCHEMA = {
     label: 'Use WriteTodos',
     category: 'Advanced',
     requiresRestart: false,
-    default: false,
+    default: true,
     description: 'Enable the write_todos tool.',
     showInDialog: false,
   },
