@@ -10,6 +10,7 @@ import {
   Storage,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
+  lspManager,
 } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 
@@ -54,6 +55,13 @@ export async function runExitCleanup() {
     }
   }
   cleanupFunctions.length = 0; // Clear the array
+
+  // Shutdown LSP servers
+  try {
+    await lspManager.shutdown();
+  } catch (_) {
+    // Ignore errors during LSP shutdown
+  }
 
   // IMPORTANT: Shutdown telemetry AFTER all other cleanup functions have run
   // This ensures SessionEnd hooks and other telemetry are properly flushed

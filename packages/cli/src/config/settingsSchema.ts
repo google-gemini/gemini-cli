@@ -1604,6 +1604,29 @@ const SETTINGS_SCHEMA = {
       mergeStrategy: MergeStrategy.CONCAT,
     },
   },
+
+  lsp: {
+    type: 'object',
+    label: 'Language Server Protocol',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: {},
+    description:
+      'Settings for Language Server Protocol (LSP) integration. LSP provides real-time diagnostics, type information, and code analysis from language servers.',
+    showInDialog: false,
+    properties: {
+      disabled: {
+        type: 'boolean',
+        label: 'Disable LSP',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Disable Language Server Protocol support entirely. When disabled, lsp_diagnostics and lsp_hover tools will not function.',
+        showInDialog: true,
+      },
+    },
+  },
 } as const satisfies SettingsSchema;
 
 export type SettingsSchemaType = typeof SETTINGS_SCHEMA;

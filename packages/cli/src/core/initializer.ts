@@ -13,6 +13,7 @@ import {
   StartSessionEvent,
   logCliConfiguration,
   startupProfiler,
+  lspManager,
 } from '@google/gemini-cli-core';
 import { type LoadedSettings } from '../config/settings.js';
 import { performInitialAuth } from './auth.js';
@@ -57,6 +58,12 @@ export async function initializeApp(
     await ideClient.connect();
     logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
   }
+
+  // Initialize LSP manager for language server support
+  const lspSettings = settings.merged.lsp;
+  await lspManager.init({
+    disabled: lspSettings?.disabled ?? false,
+  });
 
   return {
     authError,

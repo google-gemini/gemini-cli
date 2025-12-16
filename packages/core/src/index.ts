@@ -129,6 +129,18 @@ export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 export * from './tools/write-todos.js';
 
+// Export LSP support (diagnostics are now auto-injected into file operations)
+export {
+  lspManager,
+  formatDiagnostics,
+  collectDiagnosticsForOutput,
+} from './lsp/index.js';
+export type {
+  LSPManagerConfig,
+  DiagnosticsResult,
+  CollectDiagnosticsOptions,
+} from './lsp/index.js';
+
 // MCP OAuth
 export { MCPOAuthProvider } from './mcp/oauth-provider.js';
 export type {

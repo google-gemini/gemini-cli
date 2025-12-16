@@ -132,6 +132,7 @@ export default tseslint.config(
             'memfs/lib/volume.js',
             'yargs/**',
             'msw/node',
+            'vscode-jsonrpc/node',
           ],
         },
       ],
