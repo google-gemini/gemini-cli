@@ -50,6 +50,10 @@ export const computeSessionStats = (
     (acc, model) => acc + model.tokens.cached,
     0,
   );
+  const totalInputTokens = Object.values(models).reduce(
+    (acc, model) => acc + model.tokens.input,
+    0,
+  );
   const totalPromptTokens = Object.values(models).reduce(
     (acc, model) => acc + model.tokens.prompt,
     0,
@@ -82,6 +86,7 @@ export const computeSessionStats = (
     successRate,
     agreementRate,
     totalCachedTokens,
+    totalInputTokens,
     totalPromptTokens,
     totalLinesAdded: files.totalLinesAdded,
     totalLinesRemoved: files.totalLinesRemoved,
