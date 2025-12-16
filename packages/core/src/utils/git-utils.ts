@@ -6,6 +6,7 @@
 
 import { simpleGit, type SimpleGit, type StatusResult } from 'simple-git';
 import type { Config } from '../config/config.js';
+import { debugLogger } from './debugLogger.js';
 
 export interface GitStatus {
   isRepo: boolean;
@@ -14,8 +15,9 @@ export interface GitStatus {
   unstaged: string[];
   untracked: string[];
   branch?: string;
-  ahead?: number;
-  behind?: number;
+  tracking?: string;
+  ahead: number;
+  behind: number;
 }
 
 /**
@@ -44,11 +46,13 @@ export async function getGitStatus(config: Config): Promise<GitStatus | null> {
       unstaged: status.modified,
       untracked: status.not_added,
       branch: status.current ?? undefined,
-      ahead: status.ahead ?? undefined,
-      behind: status.behind ?? undefined,
+      tracking: status.tracking ?? undefined,
+      ahead: status.ahead,
+      behind: status.behind,
     };
-  } catch {
+  } catch (e) {
     // If git status fails, we're likely not in a repo or git is not available
+    debugLogger.error('Failed to get git status', e);
     return null;
   }
 }

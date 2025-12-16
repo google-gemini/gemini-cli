@@ -56,15 +56,15 @@ class GitStatusToolInvocation extends BaseToolInvocation<
     parts.push(`Git Status: ${status.isClean ? 'Clean' : 'Has changes'}`);
     if (status.branch) {
       parts.push(`Branch: ${status.branch}`);
-      if (status.ahead !== undefined || status.behind !== undefined) {
+      if (status.tracking) {
         if (status.ahead === 0 && status.behind === 0) {
           parts.push(`Remote: up to date`);
         } else {
           const remoteParts: string[] = [];
-          if (status.ahead !== undefined && status.ahead > 0) {
+          if (status.ahead > 0) {
             remoteParts.push(`ahead ${status.ahead}`);
           }
-          if (status.behind !== undefined && status.behind > 0) {
+          if (status.behind > 0) {
             remoteParts.push(`behind ${status.behind}`);
           }
           if (remoteParts.length > 0) {
