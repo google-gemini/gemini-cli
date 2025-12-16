@@ -23,7 +23,7 @@ describe.skip('stdin context', () => {
     const stdinContent = `When I ask you for a token respond with ${randomString}`;
     const prompt = 'Can I please have a token?';
 
-    const result = await rig.run({ prompt, stdin: stdinContent });
+    const result = await rig.run({ args: prompt, stdin: stdinContent });
 
     await rig.waitForTelemetryEvent('api_request');
     const lastRequest = rig.readLastApiRequest();
