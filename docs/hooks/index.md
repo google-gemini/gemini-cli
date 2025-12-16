@@ -83,7 +83,7 @@ trigger the hook:
 **Matcher patterns:**
 
 - **Exact match:** `"read_file"` matches only `read_file`
-- **Regex:** `"write_.*|replace"` matches `write_file`, `write_binary`, `replace`
+- **Regex:** `"write_.*|replace"` matches `write_file`, `replace`
 - **Wildcard:** `"*"` or `""` matches all tools
 
 **Session event matchers:**
@@ -544,16 +544,15 @@ This command:
 
 ### Tool name mapping
 
-| Claude Code | Gemini CLI           |
-| ----------- | -------------------- |
-| `Bash`      | `run_shell_command`  |
-| `Edit`      | `replace`            |
-| `Read`      | `read_file`          |
-| `Write`     | `write_file`         |
-| `Glob`      | `glob`               |
-| `Grep`      | `search_file_content`|
-| `LS`        | `list_directory`     |
-
+| Claude Code | Gemini CLI            |
+| ----------- | --------------------- |
+| `Bash`      | `run_shell_command`   |
+| `Edit`      | `replace`             |
+| `Read`      | `read_file`           |
+| `Write`     | `write_file`          |
+| `Glob`      | `glob`                |
+| `Grep`      | `search_file_content` |
+| `LS`        | `list_directory`      |
 
 ## Tool and Event Matchers Reference
 
@@ -594,25 +593,25 @@ matchers:
 
 ```json
 {
-  "matcher": "write_file|replace"  // File editing tools
+  "matcher": "write_file|replace" // File editing tools
 }
 ```
 
 ```json
 {
-  "matcher": "read_.*"  // All read operations
+  "matcher": "read_.*" // All read operations
 }
 ```
 
 ```json
 {
-  "matcher": "run_shell_command"  // Only shell commands
+  "matcher": "run_shell_command" // Only shell commands
 }
 ```
 
 ```json
 {
-  "matcher": "*"  // All tools
+  "matcher": "*" // All tools
 }
 ```
 
@@ -640,7 +639,6 @@ matchers:
 #### Notification event matchers
 
 - `ToolPermission` - Tool permission notifications
-
 
 ## Learn more
 
