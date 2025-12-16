@@ -75,6 +75,7 @@ export async function loadConfig(
       ? process.env['CHECKPOINTING'] === 'true'
       : settings.checkpointing?.enabled,
     previewFeatures: settings.general?.previewFeatures,
+    interactive: true,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
