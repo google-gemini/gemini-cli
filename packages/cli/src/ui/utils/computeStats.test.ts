@@ -21,6 +21,7 @@ describe('calculateErrorRate', () => {
     const metrics: ModelMetrics = {
       api: { totalRequests: 0, totalErrors: 0, totalLatencyMs: 0 },
       tokens: {
+        input: 0,
         prompt: 0,
         candidates: 0,
         total: 0,
@@ -36,6 +37,7 @@ describe('calculateErrorRate', () => {
     const metrics: ModelMetrics = {
       api: { totalRequests: 10, totalErrors: 2, totalLatencyMs: 0 },
       tokens: {
+        input: 0,
         prompt: 0,
         candidates: 0,
         total: 0,
@@ -53,6 +55,7 @@ describe('calculateAverageLatency', () => {
     const metrics: ModelMetrics = {
       api: { totalRequests: 0, totalErrors: 0, totalLatencyMs: 1000 },
       tokens: {
+        input: 0,
         prompt: 0,
         candidates: 0,
         total: 0,
@@ -68,6 +71,7 @@ describe('calculateAverageLatency', () => {
     const metrics: ModelMetrics = {
       api: { totalRequests: 10, totalErrors: 0, totalLatencyMs: 1500 },
       tokens: {
+        input: 0,
         prompt: 0,
         candidates: 0,
         total: 0,
@@ -85,6 +89,7 @@ describe('calculateCacheHitRate', () => {
     const metrics: ModelMetrics = {
       api: { totalRequests: 0, totalErrors: 0, totalLatencyMs: 0 },
       tokens: {
+        input: 0,
         prompt: 0,
         candidates: 0,
         total: 0,
@@ -100,6 +105,7 @@ describe('calculateCacheHitRate', () => {
     const metrics: ModelMetrics = {
       api: { totalRequests: 0, totalErrors: 0, totalLatencyMs: 0 },
       tokens: {
+        input: 150,
         prompt: 200,
         candidates: 0,
         total: 0,
@@ -143,6 +149,7 @@ describe('computeSessionStats', () => {
       successRate: 0,
       agreementRate: 0,
       totalPromptTokens: 0,
+      totalInputTokens: 0,
       totalCachedTokens: 0,
       totalLinesAdded: 0,
       totalLinesRemoved: 0,
@@ -155,6 +162,7 @@ describe('computeSessionStats', () => {
         'gemini-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 750 },
           tokens: {
+            input: 10,
             prompt: 10,
             candidates: 10,
             total: 20,
@@ -193,6 +201,7 @@ describe('computeSessionStats', () => {
         'gemini-pro': {
           api: { totalRequests: 2, totalErrors: 0, totalLatencyMs: 1000 },
           tokens: {
+            input: 100,
             prompt: 150,
             candidates: 10,
             total: 160,

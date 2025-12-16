@@ -4,16 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 
 describe('telemetry', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
   it('should emit a metric and a log event', async () => {
-    const rig = new TestRig();
     rig.setup('should emit a metric and a log event');
 
     // Run a simple command that should trigger telemetry
-    await rig.run('just saying hi');
+    await rig.run({ args: 'just saying hi' });
 
     // Verify that a user_prompt event was logged
     const hasUserPromptEvent = await rig.waitForTelemetryEvent('user_prompt');
