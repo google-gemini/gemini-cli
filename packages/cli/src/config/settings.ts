@@ -302,6 +302,19 @@ function migrateSettingsToV2(
 
   for (const [oldKey, newPath] of Object.entries(MIGRATION_MAP)) {
     if (flatKeys.has(oldKey)) {
+      // If the key exists and is a V2 container (like 'model'), and the value is an object,
+      // it is likely already migrated or partially migrated. We should not move it
+      // to the mapped V2 path (e.g. 'model' -> 'model.name').
+      // Instead, let it fall through to the "Carry over" section to be merged.
+      if (
+        KNOWN_V2_CONTAINERS.has(oldKey) &&
+        typeof flatSettings[oldKey] === 'object' &&
+        flatSettings[oldKey] !== null &&
+        !Array.isArray(flatSettings[oldKey])
+      ) {
+        continue;
+      }
+
       setNestedProperty(v2Settings, newPath, flatSettings[oldKey]);
       flatKeys.delete(oldKey);
     }
@@ -331,8 +344,8 @@ function migrateSettingsToV2(
       v2Settings[remainingKey] = customDeepMerge(
         pathAwareGetStrategy,
         {},
-        newValue as MergeableObject,
         existingValue as MergeableObject,
+        newValue as MergeableObject,
       );
     } else {
       v2Settings[remainingKey] = newValue;
