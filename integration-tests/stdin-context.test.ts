@@ -4,19 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
 describe.skip('stdin context', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
   it('should be able to use stdin as context for a prompt', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to use stdin as context for a prompt');
 
     const randomString = Math.random().toString(36).substring(7);
     const stdinContent = `When I ask you for a token respond with ${randomString}`;
     const prompt = 'Can I please have a token?';
 
-    const result = await rig.run({ prompt, stdin: stdinContent });
+    const result = await rig.run({ args: prompt, stdin: stdinContent });
 
     await rig.waitForTelemetryEvent('api_request');
     const lastRequest = rig.readLastApiRequest();
@@ -75,7 +82,6 @@ describe.skip('stdin context', () => {
       even though gemini is intended to run interactively.
     */
 
-    const rig = new TestRig();
     await rig.setup('should exit quickly if stdin stream does not end');
 
     try {
