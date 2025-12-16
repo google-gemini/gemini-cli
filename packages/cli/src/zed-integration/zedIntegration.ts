@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ReadableStream } from 'node:stream/web';
-
 import type {
   Config,
   GeminiChat,
@@ -53,7 +51,7 @@ export async function runZedIntegration(
   argv: CliArgs,
 ) {
   const { stdout: workingStdout } = createWorkingStdio();
-  const stdout = Writable.toWeb(workingStdout);
+  const stdout = Writable.toWeb(workingStdout) as WritableStream;
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
   const stream = acp.ndJsonStream(stdout, stdin);
