@@ -284,6 +284,7 @@ export class ClearcutLogger {
     event: LogEvent,
   ): Promise<void> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       this.config?.getExperimentsAsync().then((experiments) => {
         if (experiments) {
           const exp_id_data: EventValue[] = [
@@ -557,6 +558,7 @@ export class ClearcutLogger {
     this.sessionData = data;
 
     // Flush after experiments finish loading from CCPA server
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.enqueueLogEventAfterExperimentsLoadAsync(
       this.createLogEvent(EventNames.START_SESSION, data),
     ).then(() => {
@@ -900,6 +902,7 @@ export class ClearcutLogger {
     ];
 
     // Flush after experiments finish loading from CCPA server
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.enqueueLogEventAfterExperimentsLoadAsync(
       this.createLogEvent(EventNames.START_SESSION, data),
     ).then(() => {
@@ -1014,7 +1017,7 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
-        value: event.extension_name,
+        value: event.hashed_extension_name,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
@@ -1048,7 +1051,7 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
-        value: event.extension_name,
+        value: event.hashed_extension_name,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
@@ -1072,7 +1075,7 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
-        value: event.extension_name,
+        value: event.hashed_extension_name,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
@@ -1172,7 +1175,7 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
-        value: event.extension_name,
+        value: event.hashed_extension_name,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
@@ -1211,7 +1214,7 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
-        value: event.extension_name,
+        value: event.hashed_extension_name,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,

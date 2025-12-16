@@ -16,8 +16,8 @@ An MCP server enables the Gemini CLI to:
   through standardized schema definitions.
 - **Execute tools:** Call specific tools with defined arguments and receive
   structured responses.
-- **Access resources:** Read data from specific resources (though the Gemini CLI
-  primarily focuses on tool execution).
+- **Access resources:** Read data from specific resources that the server
+  exposes (files, API payloads, reports, etc.).
 
 With an MCP server, you can extend the Gemini CLI's capabilities to perform
 actions beyond its built-in features, such as interacting with databases, APIs,
@@ -40,6 +40,7 @@ The discovery process is orchestrated by `discoverMcpTools()`, which:
 4. **Sanitizes and validates** tool schemas for compatibility with the Gemini
    API
 5. **Registers tools** in the global tool registry with conflict resolution
+6. **Fetches and registers resources** if the server exposes any
 
 ### Execution layer (`mcp-tool.ts`)
 
@@ -58,6 +59,32 @@ The Gemini CLI supports three MCP transport types:
 - **Stdio Transport:** Spawns a subprocess and communicates via stdin/stdout
 - **SSE Transport:** Connects to Server-Sent Events endpoints
 - **Streamable HTTP Transport:** Uses HTTP streaming for communication
+
+## Working with MCP resources
+
+Some MCP servers expose contextual “resources” in addition to the tools and
+prompts. Gemini CLI discovers these automatically and gives you the possibility
+to reference them in the chat.
+
+### Discovery and listing
+
+- When discovery runs, the CLI fetches each server’s `resources/list` results.
+- The `/mcp` command displays a Resources section alongside Tools and Prompts
+  for every connected server.
+
+This returns a concise, plain-text list of URIs plus metadata.
+
+### Referencing resources in a conversation
+
+You can use the same `@` syntax already known for referencing local files:
+
+```
+@server://resource/path
+```
+
+Resource URIs appear in the completion menu together with filesystem paths. When
+you submit the message, the CLI calls `resources/read` and injects the content
+in the conversation.
 
 ## How to set up your MCP server
 

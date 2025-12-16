@@ -9,6 +9,13 @@ export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
 
+export const VALID_GEMINI_MODELS = new Set([
+  PREVIEW_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+]);
+
 export const DEFAULT_GEMINI_MODEL_AUTO = 'auto';
 
 // Model aliases for user convenience.
@@ -92,8 +99,19 @@ export function getEffectiveModel(
  * Checks if the model is a Gemini 2.x model.
  *
  * @param model The model name to check.
- * @returns True if the model is a Gemini 2.x model.
+ * @returns True if the model is a Gemini-2.x model.
  */
 export function isGemini2Model(model: string): boolean {
   return /^gemini-2(\.|$)/.test(model);
+}
+
+/**
+ * Checks if the model supports multimodal function responses (multimodal data nested within function response).
+ * This is supported in Gemini 3.
+ *
+ * @param model The model name to check.
+ * @returns True if the model supports multimodal function responses.
+ */
+export function supportsMultimodalFunctionResponse(model: string): boolean {
+  return model.startsWith('gemini-3-');
 }
