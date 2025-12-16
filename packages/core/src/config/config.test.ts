@@ -827,15 +827,15 @@ describe('Server Config (config.ts)', () => {
       ).ToolRegistry.prototype.registerTool;
 
       // Check that registerTool was called for ShellTool
-      const wasShellToolRegistered = (registerToolMock as Mock).mock.calls.some(
+      const wasShellToolRegistered = registerToolMock.mock.calls.some(
         (call) => call[0] instanceof vi.mocked(ShellTool),
       );
       expect(wasShellToolRegistered).toBe(true);
 
       // Check that registerTool was NOT called for ReadFileTool
-      const wasReadFileToolRegistered = (
-        registerToolMock as Mock
-      ).mock.calls.some((call) => call[0] instanceof vi.mocked(ReadFileTool));
+      const wasReadFileToolRegistered = registerToolMock.mock.calls.some(
+        (call) => call[0] instanceof vi.mocked(ReadFileTool),
+      );
       expect(wasReadFileToolRegistered).toBe(false);
     });
 
@@ -948,9 +948,9 @@ describe('Server Config (config.ts)', () => {
           }
         ).ToolRegistry.prototype.registerTool;
 
-        const wasShellToolRegistered = (
-          registerToolMock as Mock
-        ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
+        const wasShellToolRegistered = registerToolMock.mock.calls.some(
+          (call) => call[0] instanceof vi.mocked(ShellTool),
+        );
         expect(wasShellToolRegistered).toBe(true);
       });
 
@@ -968,9 +968,9 @@ describe('Server Config (config.ts)', () => {
           }
         ).ToolRegistry.prototype.registerTool;
 
-        const wasShellToolRegistered = (
-          registerToolMock as Mock
-        ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
+        const wasShellToolRegistered = registerToolMock.mock.calls.some(
+          (call) => call[0] instanceof vi.mocked(ShellTool),
+        );
         expect(wasShellToolRegistered).toBe(true);
       });
     });

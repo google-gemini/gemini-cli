@@ -371,6 +371,37 @@ describe('Settings Loading and Merging', () => {
       expect((settings.merged as TestSettings)['allowedTools']).toBeUndefined();
     });
 
+    it('should allow V2 settings to override V1 settings when both are present (zombie setting fix)', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const mixedSettingsContent = {
+        // V1 setting (migrates to ui.accessibility.screenReader = true)
+        accessibility: {
+          screenReader: true,
+        },
+        // V2 setting (explicitly set to false)
+        ui: {
+          accessibility: {
+            screenReader: false,
+          },
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(mixedSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // We expect the V2 setting (false) to win, NOT the migrated V1 setting (true)
+      expect(settings.merged.ui?.accessibility?.screenReader).toBe(false);
+    });
+
     it('should correctly merge and migrate legacy array properties from multiple scopes', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const legacyUserSettings = {
@@ -2231,7 +2262,7 @@ describe('Settings Loading and Merging', () => {
     beforeEach(() => {
       vi.resetAllMocks();
       mockFsExistsSync = vi.mocked(fs.existsSync);
-      (mockFsExistsSync as Mock).mockReturnValue(true);
+      mockFsExistsSync.mockReturnValue(true);
       mockFsReadFileSync = vi.mocked(fs.readFileSync);
       mockFsReadFileSync.mockReturnValue('{}');
       vi.mocked(isWorkspaceTrusted).mockReturnValue({
@@ -2256,15 +2287,13 @@ describe('Settings Loading and Merging', () => {
         },
       };
 
-      (mockFsReadFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
-            return JSON.stringify(workspaceSettingsContent);
-          return '{}';
-        },
-      );
+      mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
+        if (p === USER_SETTINGS_PATH)
+          return JSON.stringify(userSettingsContent);
+        if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+          return JSON.stringify(workspaceSettingsContent);
+        return '{}';
+      });
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
       const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
@@ -2329,15 +2358,13 @@ describe('Settings Loading and Merging', () => {
         someOtherSetting: 'value',
       };
 
-      (mockFsReadFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
-            return JSON.stringify(workspaceSettingsContent);
-          return '{}';
-        },
-      );
+      mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
+        if (p === USER_SETTINGS_PATH)
+          return JSON.stringify(userSettingsContent);
+        if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+          return JSON.stringify(workspaceSettingsContent);
+        return '{}';
+      });
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
       const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
