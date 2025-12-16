@@ -90,6 +90,7 @@ import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
+import { GitStatusTool } from '../tools/git-status.js';
 
 import { ApprovalMode } from '../policy/types.js';
 
@@ -1571,6 +1572,7 @@ export class Config {
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
+    registerCoreTool(GitStatusTool, this);
     if (this.getUseWriteTodos()) {
       registerCoreTool(WriteTodosTool, this);
     }

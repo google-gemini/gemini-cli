@@ -86,6 +86,8 @@ Gemini CLI's built-in tools can be broadly categorized as follows:
   information across sessions.
 - **[Todo Tool](./todos.md) (`write_todos`):** For managing subtasks of complex
   requests.
+- **[Git Status](./git-status.md) (`get_git_status`):** For inspecting the
+  current Git repository status.
 
 Additionally, these tools incorporate:
 
