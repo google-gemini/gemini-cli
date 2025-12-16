@@ -16,23 +16,22 @@ import type {
   ClientMetadata,
   RetrieveUserQuotaRequest,
   RetrieveUserQuotaResponse,
-  RecordCodeAssistMetricsRequest,
-  CodeAssistMetric,
   ConversationOffered,
   ConversationInteraction,
   StreamingLatency,
+  RecordCodeAssistMetricsRequest,
 } from './types.js';
 import type {
   ListExperimentsRequest,
   ListExperimentsResponse,
 } from './experiments/types.js';
-import {
-  type CountTokensParameters,
-  type CountTokensResponse,
-  type EmbedContentParameters,
-  type EmbedContentResponse,
-  type GenerateContentParameters,
-  type GenerateContentResponse,
+import type {
+  CountTokensParameters,
+  CountTokensResponse,
+  EmbedContentParameters,
+  EmbedContentResponse,
+  GenerateContentParameters,
+  GenerateContentResponse,
 } from '@google/genai';
 import * as readline from 'node:readline';
 import type { ContentGenerator } from '../core/contentGenerator.js';
@@ -243,14 +242,10 @@ export class CodeAssistServer implements ContentGenerator {
       return;
     }
 
-    const metric: CodeAssistMetric = {
-      conversationOffered,
-    };
-
     await this.recordCodeAssistMetrics({
       project: this.projectId,
       metadata: await getClientMetadata(),
-      metrics: [metric],
+      metrics: [{ conversationOffered }],
     });
   }
 
@@ -261,21 +256,17 @@ export class CodeAssistServer implements ContentGenerator {
       return;
     }
 
-    const metric: CodeAssistMetric = {
-      conversationInteraction: interaction,
-    };
-
     await this.recordCodeAssistMetrics({
       project: this.projectId,
       metadata: await getClientMetadata(),
-      metrics: [metric],
+      metrics: [{ conversationInteraction: interaction }],
     });
   }
 
   async recordCodeAssistMetrics(
-    req: RecordCodeAssistMetricsRequest,
+    request: RecordCodeAssistMetricsRequest,
   ): Promise<void> {
-    return this.requestPost<void>('recordCodeAssistMetrics', req);
+    return this.requestPost<void>('recordCodeAssistMetrics', request);
   }
 
   async requestPost<T>(
