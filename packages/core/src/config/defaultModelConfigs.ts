@@ -8,10 +8,6 @@ import { ThinkingLevel } from '@google/genai';
 import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
 import { DEFAULT_THINKING_MODE } from './models.js';
 
-// TODO(joshualitt): This is safe for orions belt, but this change SHOULD NOT
-// be merged when orions belt is merged with it's upstream.
-export const FLASH_PREVIEW_MODEL_REVERT_BEFORE_MERGE = 'fiercefalcon';
-
 // The default model configs. We use `base` as the parent for all of our model
 // configs, while `chat-base`, a child of `base`, is the parent of the models
 // we use in the "chat" experience.
@@ -72,7 +68,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'gemini-3-flash-preview': {
       extends: 'chat-base-3',
       modelConfig: {
-        model: FLASH_PREVIEW_MODEL_REVERT_BEFORE_MERGE,
+        model: 'gemini-3-flash-preview',
       },
     },
     'gemini-2.5-pro': {
@@ -200,7 +196,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     'chat-compression-3-flash': {
       modelConfig: {
-        model: FLASH_PREVIEW_MODEL_REVERT_BEFORE_MERGE,
+        model: 'gemini-3-flash-preview',
       },
     },
     'chat-compression-2.5-pro': {
