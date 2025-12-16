@@ -51,7 +51,7 @@ Example JSON:
 
 ### Guiding Principles:
 1.  **Permissions:**
-    *   **allow:** Required tools for the task. Read-only tools are generally safe.
+    *   **allow:** Required tools for the task.
     *   **deny:** Tools clearly outside the scope.
     *   **ask_user:** Destructive actions or ambiguity.
 
