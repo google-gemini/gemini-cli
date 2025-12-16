@@ -24,7 +24,7 @@ import type { Config } from '../config/config.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
-import { resolveModel, PREVIEW_GEMINI_MODEL } from '../config/models.js';
+import { resolveModel, isPreviewModel } from '../config/models.js';
 
 export function resolvePathFromEnv(envVar?: string): {
   isSwitch: boolean;
@@ -110,7 +110,7 @@ export function getCoreSystemPrompt(
     config.getPreviewFeatures(),
   );
 
-  const isGemini3 = desiredModel === PREVIEW_GEMINI_MODEL;
+  const isGemini3 = isPreviewModel(desiredModel);
 
   const mandatesVariant = isGemini3
     ? `

@@ -15,9 +15,10 @@ import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
-  DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_MODEL,
 } from '../config/models.js';
 
 // Mock tool names if they are dynamically generated or complex
@@ -78,6 +79,14 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
     expect(prompt).not.toContain('No Chitchat:');
     expect(prompt).toMatchSnapshot();
+  });
+
+  it('should use chatty system prompt for preview flash model', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+      PREVIEW_GEMINI_FLASH_MODEL,
+    );
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain('Do not call tools in silence');
   });
 
   it.each([

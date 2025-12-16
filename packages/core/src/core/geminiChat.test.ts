@@ -21,6 +21,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_THINKING_MODE,
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
 } from '../config/models.js';
 import { AuthType } from './contentGenerator.js';
 import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
@@ -565,6 +566,39 @@ describe('GeminiChat', () => {
         { model: PREVIEW_GEMINI_MODEL },
         'test',
         'prompt-id-fast-retry',
+        new AbortController().signal,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(mockRetryWithBackoff).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({
+          maxAttempts: 1,
+        }),
+      );
+    });
+
+    it('should use maxAttempts=1 for retryWithBackoff when in Preview Model Fallback Mode (Flash)', async () => {
+      vi.mocked(mockConfig.isPreviewModelFallbackMode).mockReturnValue(true);
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Success' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: PREVIEW_GEMINI_FLASH_MODEL },
+        'test',
+        'prompt-id-fast-retry-flash',
         new AbortController().signal,
       );
       for await (const _ of stream) {
