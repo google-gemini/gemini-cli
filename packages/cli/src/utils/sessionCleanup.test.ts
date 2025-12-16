@@ -7,7 +7,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { SESSION_FILE_PREFIX, type Config } from '@google/gemini-cli-core';
+import {
+  SESSION_FILE_PREFIX,
+  type Config,
+  debugLogger,
+} from '@google/gemini-cli-core';
 import type { Settings } from '../config/settings.js';
 import { cleanupExpiredSessions } from './sessionCleanup.js';
 import { type SessionInfo, getAllSessionFiles } from './sessionUtils.js';
@@ -48,6 +52,8 @@ function createTestSessions(): SessionInfo[] {
       fileName: `${SESSION_FILE_PREFIX}2025-01-20T10-30-00-current12.json`,
       startTime: now.toISOString(),
       lastUpdated: now.toISOString(),
+      messageCount: 5,
+      displayName: 'Current session',
       firstUserMessage: 'Current session',
       isCurrentSession: true,
       index: 1,
@@ -58,6 +64,8 @@ function createTestSessions(): SessionInfo[] {
       fileName: `${SESSION_FILE_PREFIX}2025-01-18T15-45-00-recent45.json`,
       startTime: oneWeekAgo.toISOString(),
       lastUpdated: oneWeekAgo.toISOString(),
+      messageCount: 10,
+      displayName: 'Recent session',
       firstUserMessage: 'Recent session',
       isCurrentSession: false,
       index: 2,
@@ -68,6 +76,8 @@ function createTestSessions(): SessionInfo[] {
       fileName: `${SESSION_FILE_PREFIX}2025-01-10T09-15-00-old789ab.json`,
       startTime: twoWeeksAgo.toISOString(),
       lastUpdated: twoWeeksAgo.toISOString(),
+      messageCount: 3,
+      displayName: 'Old session',
       firstUserMessage: 'Old session',
       isCurrentSession: false,
       index: 3,
@@ -78,6 +88,8 @@ function createTestSessions(): SessionInfo[] {
       fileName: `${SESSION_FILE_PREFIX}2024-12-25T12-00-00-ancient1.json`,
       startTime: oneMonthAgo.toISOString(),
       lastUpdated: oneMonthAgo.toISOString(),
+      messageCount: 15,
+      displayName: 'Ancient session',
       firstUserMessage: 'Ancient session',
       isCurrentSession: false,
       index: 4,
@@ -389,7 +401,9 @@ describe('Session Cleanup', () => {
       );
       mockFs.unlink.mockResolvedValue(undefined);
 
-      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+      const debugSpy = vi
+        .spyOn(debugLogger, 'debug')
+        .mockImplementation(() => {});
 
       await cleanupExpiredSessions(config, settings);
 
@@ -429,6 +443,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}current.json`,
           startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
+          messageCount: 1,
+          displayName: 'Current',
           firstUserMessage: 'Current',
           isCurrentSession: true,
           index: 1,
@@ -439,6 +455,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}5d.json`,
           startTime: fiveDaysAgo.toISOString(),
           lastUpdated: fiveDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '5 days old',
           firstUserMessage: '5 days',
           isCurrentSession: false,
           index: 2,
@@ -449,6 +467,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}8d.json`,
           startTime: eightDaysAgo.toISOString(),
           lastUpdated: eightDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '8 days old',
           firstUserMessage: '8 days',
           isCurrentSession: false,
           index: 3,
@@ -459,6 +479,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}15d.json`,
           startTime: fifteenDaysAgo.toISOString(),
           lastUpdated: fifteenDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '15 days old',
           firstUserMessage: '15 days',
           isCurrentSession: false,
           index: 4,
@@ -543,6 +565,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}current.json`,
           startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
+          messageCount: 1,
+          displayName: 'Current',
           firstUserMessage: 'Current',
           isCurrentSession: true,
           index: 1,
@@ -553,6 +577,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}1d.json`,
           startTime: oneDayAgo.toISOString(),
           lastUpdated: oneDayAgo.toISOString(),
+          messageCount: 1,
+          displayName: '1 day old',
           firstUserMessage: '1 day',
           isCurrentSession: false,
           index: 2,
@@ -563,6 +589,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}7d.json`,
           startTime: sevenDaysAgo.toISOString(),
           lastUpdated: sevenDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '7 days old',
           firstUserMessage: '7 days',
           isCurrentSession: false,
           index: 3,
@@ -573,6 +601,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}13d.json`,
           startTime: thirteenDaysAgo.toISOString(),
           lastUpdated: thirteenDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '13 days old',
           firstUserMessage: '13 days',
           isCurrentSession: false,
           index: 4,
@@ -631,6 +661,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}current.json`,
           startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
+          messageCount: 1,
+          displayName: 'Current (newest)',
           firstUserMessage: 'Current',
           isCurrentSession: true,
           index: 1,
@@ -646,6 +678,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}${i}d.json`,
           startTime: daysAgo.toISOString(),
           lastUpdated: daysAgo.toISOString(),
+          messageCount: 1,
+          displayName: `${i} days old`,
           firstUserMessage: `${i} days`,
           isCurrentSession: false,
           index: i + 1,
@@ -753,6 +787,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}current.json`,
           startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
+          messageCount: 1,
+          displayName: 'Current',
           firstUserMessage: 'Current',
           isCurrentSession: true,
           index: 1,
@@ -763,6 +799,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}3d.json`,
           startTime: threeDaysAgo.toISOString(),
           lastUpdated: threeDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '3 days old',
           firstUserMessage: '3 days',
           isCurrentSession: false,
           index: 2,
@@ -773,6 +811,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}5d.json`,
           startTime: fiveDaysAgo.toISOString(),
           lastUpdated: fiveDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '5 days old',
           firstUserMessage: '5 days',
           isCurrentSession: false,
           index: 3,
@@ -783,6 +823,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}7d.json`,
           startTime: sevenDaysAgo.toISOString(),
           lastUpdated: sevenDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '7 days old',
           firstUserMessage: '7 days',
           isCurrentSession: false,
           index: 4,
@@ -793,6 +835,8 @@ describe('Session Cleanup', () => {
           fileName: `${SESSION_FILE_PREFIX}12d.json`,
           startTime: twelveDaysAgo.toISOString(),
           lastUpdated: twelveDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '12 days old',
           firstUserMessage: '12 days',
           isCurrentSession: false,
           index: 5,

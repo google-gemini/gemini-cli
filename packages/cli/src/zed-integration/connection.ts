@@ -105,6 +105,7 @@ export class Connection {
     this.#handler = handler;
     this.#peerInput = peerInput;
     this.#textEncoder = new TextEncoder();
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.#receive(peerOutput);
   }
 
@@ -121,6 +122,7 @@ export class Connection {
 
         if (trimmedLine) {
           const message = JSON.parse(trimmedLine);
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           this.#processMessage(message);
         }
       }
@@ -145,7 +147,7 @@ export class Connection {
       await this.#tryCallHandler(message.method, message.params);
     } else if ('id' in message) {
       // It's a response
-      this.#handleResponse(message as AnyResponse);
+      this.#handleResponse(message);
     }
   }
 

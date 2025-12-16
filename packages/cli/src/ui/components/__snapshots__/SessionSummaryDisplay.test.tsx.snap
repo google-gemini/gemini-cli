@@ -18,13 +18,11 @@ exports[`<SessionSummaryDisplay /> > renders the summary display with a title 1`
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
 │                                                                                                  │
-│  Model Usage                  Reqs   Input Tokens  Output Tokens                                 │
-│  ───────────────────────────────────────────────────────────────                                 │
-│  gemini-2.5-pro                 10          1,000          2,000                                 │
+│  Model Usage                 Reqs   Input Tokens   Cache Reads  Output Tokens                    │
+│  ────────────────────────────────────────────────────────────────────────────                    │
+│  gemini-2.5-pro                10            500           500          2,000                    │
 │                                                                                                  │
 │  Savings Highlight: 500 (50.0%) of input tokens were served from the cache, reducing costs.      │
-│                                                                                                  │
-│  » Tip: For a full token breakdown, run \`/stats model\`.                                          │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;

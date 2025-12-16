@@ -1,4 +1,4 @@
-# Get Started with Gemini CLI
+# Get started with Gemini CLI
 
 Welcome to Gemini CLI! This guide will help you install, configure, and start
 using the Gemini CLI to enhance your workflow right from your terminal.
@@ -28,19 +28,24 @@ For more installation options, see [Gemini CLI Installation](./installation.md).
 
 ## Authenticate
 
-To begin using Gemini CLI, you must authenticate with a Google service. The most
-straightforward authentication method uses your existing Google account:
+To begin using Gemini CLI, you must authenticate with a Google service. In most
+cases, you can log in with your existing Google account:
 
 1. Run Gemini CLI after installation:
+
    ```bash
    gemini
    ```
+
 2. When asked "How would you like to authenticate for this project?" select **1.
    Login with Google**.
+
 3. Select your Google account.
+
 4. Click on **Sign in**.
 
-For other authentication options and information, see
+Certain account types may require you to configure a Google Cloud project. For
+more information, including other authentication methods, see
 [Gemini CLI Authentication Setup](./authentication.md).
 
 ## Configure
@@ -63,3 +68,4 @@ To explore the power of Gemini CLI, see [Gemini CLI examples](./examples.md).
 
 - Find out more about [Gemini CLI's tools](../tools/index.md).
 - Review [Gemini CLI's commands](../cli/commands.md).
+- Learn how to [get started with Gemini 3](./gemini-3.md).

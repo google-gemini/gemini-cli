@@ -1,4 +1,4 @@
-# How to Contribute
+# How to contribute
 
 We would love to accept your patches and contributions to this project. This
 document includes:
@@ -41,7 +41,9 @@ This project follows
 
 The process for contributing code is as follows:
 
-1.  **Find an issue** that you want to work on.
+1.  **Find an issue** that you want to work on. If an issue is tagged as
+    "🔒Maintainers only", this means it is reserved for project maintainers. We
+    will not accept pull requests related to these issues.
 2.  **Fork the repository** and create a new branch.
 3.  **Make your changes** in the `packages/` directory.
 4.  **Ensure all checks pass** by running `npm run preflight`.
@@ -69,10 +71,6 @@ run this on their own PRs for self-review, and reviewers should use it to
 augment their manual review process.
 
 ### Self assigning issues
-
-If you're looking for an issue to work on, check out our list of issues that are
-labeled
-["help wanted"](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue+state%3Aopen+label%3A%22help+wanted%22).
 
 To assign an issue to yourself, simply add a comment with the text `/assign`.
 The comment must contain only that text and nothing else. This command will

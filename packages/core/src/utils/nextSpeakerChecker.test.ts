@@ -32,6 +32,10 @@ vi.mock('node:fs', () => {
       });
     }),
     existsSync: vi.fn((path: string) => mockFileSystem.has(path)),
+    createWriteStream: vi.fn(() => ({
+      write: vi.fn(),
+      on: vi.fn(),
+    })),
   };
 
   return {
@@ -82,7 +86,8 @@ describe('checkNextSpeaker', () => {
     // GeminiChat will receive the mocked instances via the mocked GoogleGenAI constructor
     chatInstance = new GeminiChat(
       mockConfig,
-      {},
+      '', // empty system instruction
+      [], // no tools
       [], // initial history
     );
 

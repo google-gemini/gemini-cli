@@ -33,7 +33,7 @@ describe('SettingsSchema', () => {
       ];
 
       expectedSettings.forEach((setting) => {
-        expect(getSettingsSchema()[setting as keyof Settings]).toBeDefined();
+        expect(getSettingsSchema()[setting]).toBeDefined();
       });
     });
 
@@ -66,9 +66,7 @@ describe('SettingsSchema', () => {
       ];
 
       nestedSettings.forEach((setting) => {
-        const definition = getSettingsSchema()[
-          setting as keyof Settings
-        ] as SettingDefinition;
+        const definition = getSettingsSchema()[setting] as SettingDefinition;
         expect(definition.type).toBe('object');
         expect(definition.properties).toBeDefined();
         expect(typeof definition.properties).toBe('object');
@@ -142,7 +140,7 @@ describe('SettingsSchema', () => {
     it('should have consistent default values for boolean settings', () => {
       const checkBooleanDefaults = (schema: SettingsSchema) => {
         Object.entries(schema).forEach(([, definition]) => {
-          const def = definition as SettingDefinition;
+          const def = definition;
           if (def.type === 'boolean') {
             // Boolean settings can have boolean or undefined defaults (for optional settings)
             expect(['boolean', 'undefined']).toContain(typeof def.default);
@@ -322,19 +320,54 @@ describe('SettingsSchema', () => {
       ).toBe('Enable debug logging of keystrokes to the console.');
     });
 
-    it('should have useModelRouter setting in schema', () => {
+    it('should have previewFeatures setting in schema', () => {
       expect(
-        getSettingsSchema().experimental.properties.useModelRouter,
+        getSettingsSchema().general.properties.previewFeatures,
       ).toBeDefined();
+      expect(getSettingsSchema().general.properties.previewFeatures.type).toBe(
+        'boolean',
+      );
       expect(
-        getSettingsSchema().experimental.properties.useModelRouter.type,
-      ).toBe('boolean');
+        getSettingsSchema().general.properties.previewFeatures.category,
+      ).toBe('General');
       expect(
-        getSettingsSchema().experimental.properties.useModelRouter.category,
-      ).toBe('Experimental');
+        getSettingsSchema().general.properties.previewFeatures.default,
+      ).toBe(false);
       expect(
-        getSettingsSchema().experimental.properties.useModelRouter.default,
+        getSettingsSchema().general.properties.previewFeatures.requiresRestart,
+      ).toBe(false);
+      expect(
+        getSettingsSchema().general.properties.previewFeatures.showInDialog,
       ).toBe(true);
+      expect(
+        getSettingsSchema().general.properties.previewFeatures.description,
+      ).toBe('Enable preview features (e.g., preview models).');
+    });
+
+    it('should have enableAgents setting in schema', () => {
+      const setting = getSettingsSchema().experimental.properties.enableAgents;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Experimental');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(false);
+      expect(setting.description).toBe('Enable local and remote subagents.');
+    });
+
+    it('should have isModelAvailabilityServiceEnabled setting in schema', () => {
+      const setting =
+        getSettingsSchema().experimental.properties
+          .isModelAvailabilityServiceEnabled;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Experimental');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(false);
+      expect(setting.description).toBe(
+        'Enable model routing using new availability service.',
+      );
     });
   });
 

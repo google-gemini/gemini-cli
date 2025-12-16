@@ -182,7 +182,7 @@ export class MockModifiableTool
   extends BaseDeclarativeTool<Record<string, unknown>, ToolResult>
   implements ModifiableDeclarativeTool<Record<string, unknown>>
 {
-  // Should be overrided in test file. Functionality will be updated in follow
+  // Should be overridden in test file. Functionality will be updated in follow
   // up PR which has MockModifiableTool expect MockTool
   executeFn: (params: Record<string, unknown>) => ToolResult | undefined = () =>
     undefined;

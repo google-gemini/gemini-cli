@@ -21,6 +21,8 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_MODEL,
   type ExtensionLoader,
+  startupProfiler,
+  PREVIEW_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -37,7 +39,9 @@ export async function loadConfig(
 
   const configParams: ConfigParameters = {
     sessionId: taskId,
-    model: DEFAULT_GEMINI_MODEL,
+    model: settings.general?.previewFeatures
+      ? PREVIEW_GEMINI_MODEL
+      : DEFAULT_GEMINI_MODEL,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: undefined, // Sandbox might not be relevant for a server-side agent
     targetDir: workspaceDir, // Or a specific directory the agent operates on
@@ -70,6 +74,11 @@ export async function loadConfig(
     ideMode: false,
     folderTrust: settings.folderTrust === true,
     extensionLoader,
+    checkpointing: process.env['CHECKPOINTING']
+      ? process.env['CHECKPOINTING'] === 'true'
+      : settings.checkpointing?.enabled,
+    previewFeatures: settings.general?.previewFeatures,
+    interactive: true,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
@@ -88,6 +97,7 @@ export async function loadConfig(
   });
   // Needed to initialize ToolRegistry, and git checkpointing if enabled
   await config.initialize();
+  startupProfiler.flush(config);
 
   if (process.env['USE_CCPA']) {
     logger.info('[Config] Using CCPA Auth:');
