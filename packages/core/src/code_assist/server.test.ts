@@ -7,7 +7,7 @@
 import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
 import { CodeAssistServer } from './server.js';
 import { OAuth2Client } from 'google-auth-library';
-import { UserTierId } from './types.js';
+import { UserTierId, ActionStatus } from './types.js';
 
 vi.mock('google-auth-library');
 
@@ -81,6 +81,54 @@ describe('CodeAssistServer', () => {
 
     expect(response.candidates?.[0]?.content?.parts?.[0]?.text).toBe(
       'response',
+    );
+  });
+
+  it('should detect error in generateContent response', async () => {
+    const mockRequest = vi.fn();
+    const client = { request: mockRequest } as unknown as OAuth2Client;
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
+    const mockResponseData = {
+      traceId: 'test-trace-id',
+      response: {
+        candidates: [
+          {
+            index: 0,
+            content: {
+              role: 'model',
+              parts: [{ text: 'response' }],
+            },
+            finishReason: 'SAFETY',
+            safetyRatings: [],
+          },
+        ],
+      },
+    };
+    mockRequest.mockResolvedValue({ data: mockResponseData });
+
+    const recordConversationOfferedSpy = vi.spyOn(
+      server,
+      'recordConversationOffered',
+    );
+
+    await server.generateContent(
+      {
+        model: 'test-model',
+        contents: [{ role: 'user', parts: [{ text: 'request' }] }],
+      },
+      'user-prompt-id',
+    );
+
+    expect(recordConversationOfferedSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: ActionStatus.ACTION_STATUS_ERROR_UNKNOWN,
+      }),
     );
   });
 

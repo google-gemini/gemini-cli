@@ -26,13 +26,13 @@ import type {
   ListExperimentsRequest,
   ListExperimentsResponse,
 } from './experiments/types.js';
-import type {
-  CountTokensParameters,
-  CountTokensResponse,
-  EmbedContentParameters,
-  EmbedContentResponse,
-  GenerateContentParameters,
-  GenerateContentResponse,
+import {
+  type CountTokensParameters,
+  type CountTokensResponse,
+  type EmbedContentParameters,
+  type EmbedContentResponse,
+  type GenerateContentParameters,
+  type GenerateContentResponse,
 } from '@google/genai';
 import * as readline from 'node:readline';
 import type { ContentGenerator } from '../core/contentGenerator.js';
@@ -109,11 +109,8 @@ export class CodeAssistServer implements ContentGenerator {
         const translatedResponse = fromGenerateContentResponse(response);
 
         if (response.traceId) {
-          // TODO: figure out how to tell if there's an error.
-          const hasError = false;
           const offered = createConversationOffered(
             translatedResponse,
-            hasError,
             response.traceId,
             req.config?.abortSignal,
             streamingLatency,
@@ -131,7 +128,7 @@ export class CodeAssistServer implements ContentGenerator {
     userPromptId: string,
   ): Promise<GenerateContentResponse> {
     const start = Date.now();
-    const resp = await this.requestPost<CaGenerateContentResponse>(
+    const response = await this.requestPost<CaGenerateContentResponse>(
       'generateContent',
       toGenerateContentRequest(
         req,
@@ -145,15 +142,12 @@ export class CodeAssistServer implements ContentGenerator {
       totalLatency: formatProtoJsonDuration(Date.now() - start),
     };
 
-    const translatedResponse = fromGenerateContentResponse(resp);
+    const translatedResponse = fromGenerateContentResponse(response);
 
-    if (resp.traceId) {
-      // TODO: figure out how to tell if there's an error.
-      const hasError = false;
+    if (response.traceId) {
       const offered = createConversationOffered(
         translatedResponse,
-        hasError,
-        resp.traceId,
+        response.traceId,
         req.config?.abortSignal,
         streamingLatency,
       );

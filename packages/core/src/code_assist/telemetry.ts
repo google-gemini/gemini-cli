@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { GenerateContentResponse } from '@google/genai';
+import { FinishReason, type GenerateContentResponse } from '@google/genai';
 import { getCitations } from '../utils/generateContentResponseUtilities.js';
 import {
   ActionStatus,
@@ -14,49 +14,20 @@ import {
 
 export function createConversationOffered(
   response: GenerateContentResponse,
-  hasError: boolean,
   traceId: string,
   signal: AbortSignal | undefined,
   streamingLatency: StreamingLatency,
 ): ConversationOffered {
+  const actionStatus = getStatus(response, signal);
+
   return {
     citationCount: String(getCitations(response).length),
     includedCode: includesCode(response),
-    status: getStatus(hasError, signal),
+    status: actionStatus,
     traceId,
     streamingLatency,
     isAgentic: true,
   };
-}
-
-export function measureStreamingLatency(
-  responses: AsyncGenerator<GenerateContentResponse>,
-): {
-  responses: AsyncGenerator<GenerateContentResponse>;
-  streamingLatency: StreamingLatency;
-} {
-  const start = Date.now();
-
-  const streamingLatency: StreamingLatency = {};
-
-  async function* measureLatency(): AsyncGenerator<GenerateContentResponse> {
-    let isFirst = true;
-    try {
-      for await (const response of responses) {
-        if (isFirst) {
-          isFirst = false;
-          streamingLatency.firstMessageLatency = formatProtoJsonDuration(
-            Date.now() - start,
-          );
-        }
-        yield response;
-      }
-    } finally {
-      streamingLatency.totalLatency = String(Date.now() - start);
-    }
-  }
-
-  return { responses: measureLatency(), streamingLatency };
 }
 
 function includesCode(resp: GenerateContentResponse): boolean {
@@ -77,15 +48,19 @@ function includesCode(resp: GenerateContentResponse): boolean {
 }
 
 function getStatus(
-  hasError: boolean,
+  response: GenerateContentResponse,
   signal: AbortSignal | undefined,
 ): ActionStatus {
   if (signal?.aborted) {
     return ActionStatus.ACTION_STATUS_CANCELLED;
   }
 
-  if (hasError) {
+  if (hasError(response)) {
     return ActionStatus.ACTION_STATUS_ERROR_UNKNOWN;
+  }
+
+  if ((response.candidates?.length ?? 0) <= 0) {
+    return ActionStatus.ACTION_STATUS_EMPTY;
   }
 
   return ActionStatus.ACTION_STATUS_NO_ERROR;
@@ -93,4 +68,23 @@ function getStatus(
 
 export function formatProtoJsonDuration(milliseconds: number): string {
   return `${milliseconds / 1000}s`;
+}
+
+function hasError(response: GenerateContentResponse): boolean {
+  // Non-OK SDK results should be considered an error.
+  if (!response.sdkHttpResponse?.responseInternal?.ok) {
+    return true;
+  }
+
+  for (const candidate of response.candidates || []) {
+    // Treat sanitization, SPII, recitation, and forbidden terms as an error.
+    if (
+      candidate.finishReason &&
+      candidate.finishReason !== FinishReason.STOP &&
+      candidate.finishReason !== FinishReason.MAX_TOKENS
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
