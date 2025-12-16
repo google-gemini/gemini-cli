@@ -72,9 +72,9 @@ Run Gemini CLI and execute any command that uses tools:
 ```
 > Read the README.md file
 
-[Agent uses ReadFile tool]
+[Agent uses read_file tool]
 
-Logged: ReadFile
+Logged: read_file
 ```
 
 Check `.gemini/tool-log.txt` to see the logged tool executions.
@@ -110,7 +110,7 @@ exit 0
   "hooks": {
     "BeforeTool": [
       {
-        "matcher": "WriteFile|Edit",
+        "matcher": "write_file|replace",
         "hooks": [
           {
             "name": "secret-scanner",
@@ -167,7 +167,7 @@ exit 0
   "hooks": {
     "AfterTool": [
       {
-        "matcher": "WriteFile|Edit",
+        "matcher": "write_file|replace",
         "hooks": [
           {
             "name": "auto-test",
@@ -379,7 +379,7 @@ chmod +x .gemini/hooks/*.js
     ],
     "BeforeTool": [
       {
-        "matcher": "WriteFile|Edit",
+        "matcher": "write_file|replace",
         "hooks": [
           {
             "name": "security-check",
@@ -392,7 +392,7 @@ chmod +x .gemini/hooks/*.js
     ],
     "AfterTool": [
       {
-        "matcher": "WriteFile|Edit",
+        "matcher": "write_file|replace",
         "hooks": [
           {
             "name": "auto-test",
@@ -601,7 +601,7 @@ async function main() {
     .map((k) => k.trim());
 
   // Simple keyword-based filtering + core tools
-  const coreTools = ['ReadFile', 'WriteFile', 'Edit', 'RunShellCommand'];
+  const coreTools = ['read_file', 'write_file', 'replace', 'run_shell_command'];
   const filtered = candidateTools.filter((tool) => {
     if (coreTools.includes(tool)) return true;
     const toolLower = tool.toLowerCase();
