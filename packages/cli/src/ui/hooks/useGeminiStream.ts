@@ -483,7 +483,8 @@ export const useGeminiStream = (
             userMessageTimestamp,
           );
 
-          if (!atCommandResult.shouldProceed) {
+          if (atCommandResult.error) {
+            onDebugMessage(atCommandResult.error);
             return { queryToSend: null, shouldProceed: false };
           }
           localQueryToSendToGemini = atCommandResult.processedQuery;
@@ -832,10 +833,7 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.Finished:
-            handleFinishedEvent(
-              event as ServerGeminiFinishedEvent,
-              userMessageTimestamp,
-            );
+            handleFinishedEvent(event, userMessageTimestamp);
             break;
           case ServerGeminiEventType.Citation:
             handleCitationEvent(event.value, userMessageTimestamp);
