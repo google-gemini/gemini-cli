@@ -36,6 +36,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
 
+  const shouldShowPreviewModels =
+    config?.getPreviewFeatures() && config.getHasAccessToPreviewModel();
+
   const manualModelSelected = useMemo(() => {
     const manualModels = [
       DEFAULT_GEMINI_MODEL,
@@ -82,7 +85,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       },
     ];
 
-    if (config?.getPreviewFeatures()) {
+    if (shouldShowPreviewModels) {
       list.unshift({
         value: PREVIEW_GEMINI_MODEL_AUTO,
         title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
@@ -92,7 +95,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       });
     }
     return list;
-  }, [config, manualModelSelected]);
+  }, [shouldShowPreviewModels, manualModelSelected]);
 
   const manualOptions = useMemo(() => {
     const list = [
@@ -113,7 +116,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       },
     ];
 
-    if (config?.getPreviewFeatures()) {
+    if (shouldShowPreviewModels) {
       list.unshift(
         {
           value: PREVIEW_GEMINI_MODEL,
@@ -128,7 +131,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       );
     }
     return list;
-  }, [config]);
+  }, [shouldShowPreviewModels]);
 
   const options = view === 'main' ? mainOptions : manualOptions;
 
@@ -163,13 +166,23 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     [config, onClose],
   );
 
-  const header = config?.getPreviewFeatures()
-    ? 'Gemini 3 is now enabled.'
-    : 'Gemini 3 is now available.';
+  let header;
+  let subheader;
 
-  const subheader = config?.getPreviewFeatures()
-    ? `To disable Gemini 3, disable "Preview features" in /settings.\nLearn more at https://goo.gle/enable-preview-features\n\nWhen you select Auto or Pro, Gemini CLI will attempt to use ${PREVIEW_GEMINI_MODEL} first, before falling back to ${DEFAULT_GEMINI_MODEL}.`
-    : `To use Gemini 3, enable "Preview features" in /settings.\nLearn more at https://goo.gle/enable-preview-features`;
+  // Do not show any header or subheader since it's already showing preview model
+  // options
+  if (shouldShowPreviewModels) {
+    header = undefined;
+    subheader = undefined;
+    // When a user has the access but has not enabled the preview features.
+  } else if (config?.getHasAccessToPreviewModel()) {
+    header = 'Gemini 3 is now available.';
+    subheader =
+      'Enable "Preview features" in /settings.\nLearn more at https://goo.gle/enable-preview-features';
+  } else {
+    header = 'Gemini 3 is coming soon.';
+    subheader = undefined;
+  }
 
   return (
     <Box
@@ -181,11 +194,15 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     >
       <Text bold>Select Model</Text>
 
-      <Box marginTop={1} marginBottom={1} flexDirection="column">
-        <ThemedGradient>
-          <Text>{header}</Text>
-        </ThemedGradient>
-        <Text>{subheader}</Text>
+      <Box flexDirection="column">
+        {header && (
+          <Box marginTop={1}>
+            <ThemedGradient>
+              <Text>{header}</Text>
+            </ThemedGradient>
+          </Box>
+        )}
+        {subheader && <Text>{subheader}</Text>}
       </Box>
 
       <Box marginTop={1}>
