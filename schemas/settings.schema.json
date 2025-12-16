@@ -1133,7 +1133,7 @@
       "title": "Use WriteTodos",
       "description": "Enable the write_todos tool.",
       "markdownDescription": "Enable the write_todos tool.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
-      "default": false,
+      "default": true,
       "type": "boolean"
     },
     "security": {
