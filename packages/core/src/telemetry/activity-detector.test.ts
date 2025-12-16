@@ -136,7 +136,7 @@ describe('Global Activity Detector Functions', () => {
       vi.useRealTimers();
     });
     it('should record activity on existing detector', () => {
-      const detector = getActivityDetector()!;
+      const detector = getActivityDetector();
       const beforeTime = detector.getLastActivityTime();
       vi.advanceTimersByTime(100);
 

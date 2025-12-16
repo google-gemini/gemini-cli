@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { WritableStream, ReadableStream } from 'node:stream/web';
+import type { ReadableStream } from 'node:stream/web';
 
 import type {
   Config,
@@ -53,7 +53,7 @@ export async function runZedIntegration(
   argv: CliArgs,
 ) {
   const { stdout: workingStdout } = createWorkingStdio();
-  const stdout = Writable.toWeb(workingStdout) as WritableStream;
+  const stdout = Writable.toWeb(workingStdout);
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
   new acp.AgentSideConnection(
@@ -355,7 +355,7 @@ export class Session {
     fc: FunctionCall,
   ): Promise<Part[]> {
     const callId = fc.id ?? `${fc.name}-${Date.now()}`;
-    const args = (fc.args ?? {}) as Record<string, unknown>;
+    const args = fc.args ?? {};
 
     const startTime = Date.now();
 
@@ -393,7 +393,7 @@ export class Session {
     }
 
     const toolRegistry = this.config.getToolRegistry();
-    const tool = toolRegistry.getTool(fc.name as string);
+    const tool = toolRegistry.getTool(fc.name);
 
     if (!tool) {
       return errorResponse(
@@ -449,6 +449,7 @@ export class Session {
             );
           case ToolConfirmationOutcome.ProceedOnce:
           case ToolConfirmationOutcome.ProceedAlways:
+          case ToolConfirmationOutcome.ProceedAlwaysAndSave:
           case ToolConfirmationOutcome.ProceedAlwaysServer:
           case ToolConfirmationOutcome.ProceedAlwaysTool:
           case ToolConfirmationOutcome.ModifyWithEditor:
@@ -496,7 +497,12 @@ export class Session {
         ),
       );
 
-      return convertToFunctionResponse(fc.name, callId, toolResult.llmContent);
+      return convertToFunctionResponse(
+        fc.name,
+        callId,
+        toolResult.llmContent,
+        this.config.getActiveModel(),
+      );
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
 
