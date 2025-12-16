@@ -12,11 +12,25 @@ import {
 import { ActionStatus, type StreamingLatency } from './types.js';
 import { FinishReason, GenerateContentResponse } from '@google/genai';
 
+function createMockResponse(
+  candidates: GenerateContentResponse['candidates'] = [],
+  ok = true,
+) {
+  const response = new GenerateContentResponse();
+  response.candidates = candidates;
+  response.sdkHttpResponse = {
+    responseInternal: {
+      ok,
+    } as unknown as Response,
+    json: async () => ({}),
+  };
+  return response;
+}
+
 describe('telemetry', () => {
   describe('createConversationOffered', () => {
     it('should create a ConversationOffered object with correct values', () => {
-      const response = new GenerateContentResponse();
-      response.candidates = [
+      const response = createMockResponse([
         {
           index: 0,
           content: {
@@ -30,13 +44,7 @@ describe('telemetry', () => {
           },
           finishReason: FinishReason.STOP,
         },
-      ];
-      response.sdkHttpResponse = {
-        responseInternal: {
-          ok: true,
-        } as unknown as Response,
-        json: async () => ({}),
-      };
+      ]);
       const traceId = 'test-trace-id';
       const streamingLatency: StreamingLatency = { totalLatency: '1s' };
 
@@ -58,8 +66,7 @@ describe('telemetry', () => {
     });
 
     it('should set status to CANCELLED if signal is aborted', () => {
-      const response = new GenerateContentResponse();
-      response.candidates = [];
+      const response = createMockResponse();
       const signal = new AbortController().signal;
       vi.spyOn(signal, 'aborted', 'get').mockReturnValue(true);
 
@@ -74,13 +81,7 @@ describe('telemetry', () => {
     });
 
     it('should set status to ERROR_UNKNOWN if response has error (non-OK SDK response)', () => {
-      const response = new GenerateContentResponse();
-      response.sdkHttpResponse = {
-        responseInternal: {
-          ok: false,
-        } as unknown as Response,
-        json: async () => ({}),
-      };
+      const response = createMockResponse([], false);
 
       const result = createConversationOffered(
         response,
@@ -93,19 +94,12 @@ describe('telemetry', () => {
     });
 
     it('should set status to ERROR_UNKNOWN if finishReason is not STOP or MAX_TOKENS', () => {
-      const response = new GenerateContentResponse();
-      response.candidates = [
+      const response = createMockResponse([
         {
           index: 0,
           finishReason: FinishReason.SAFETY,
         },
-      ];
-      response.sdkHttpResponse = {
-        responseInternal: {
-          ok: true,
-        } as unknown as Response,
-        json: async () => ({}),
-      };
+      ]);
 
       const result = createConversationOffered(
         response,
@@ -118,14 +112,7 @@ describe('telemetry', () => {
     });
 
     it('should set status to EMPTY if candidates is empty', () => {
-      const response = new GenerateContentResponse();
-      response.candidates = [];
-      response.sdkHttpResponse = {
-        responseInternal: {
-          ok: true,
-        } as unknown as Response,
-        json: async () => ({}),
-      };
+      const response = createMockResponse();
 
       const result = createConversationOffered(
         response,
@@ -138,8 +125,7 @@ describe('telemetry', () => {
     });
 
     it('should detect code in response', () => {
-      const response = new GenerateContentResponse();
-      response.candidates = [
+      const response = createMockResponse([
         {
           index: 0,
           content: {
@@ -148,33 +134,20 @@ describe('telemetry', () => {
             ],
           },
         },
-      ];
-      response.sdkHttpResponse = {
-        responseInternal: {
-          ok: true,
-        } as unknown as Response,
-        json: async () => ({}),
-      };
+      ]);
       const result = createConversationOffered(response, 'id', undefined, {});
       expect(result.includedCode).toBe(true);
     });
 
     it('should not detect code if no backticks', () => {
-      const response = new GenerateContentResponse();
-      response.candidates = [
+      const response = createMockResponse([
         {
           index: 0,
           content: {
             parts: [{ text: 'Here is some text.' }],
           },
         },
-      ];
-      response.sdkHttpResponse = {
-        responseInternal: {
-          ok: true,
-        } as unknown as Response,
-        json: async () => ({}),
-      };
+      ]);
       const result = createConversationOffered(response, 'id', undefined, {});
       expect(result.includedCode).toBe(false);
     });
