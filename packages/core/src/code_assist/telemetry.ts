@@ -72,7 +72,10 @@ export function formatProtoJsonDuration(milliseconds: number): string {
 
 function hasError(response: GenerateContentResponse): boolean {
   // Non-OK SDK results should be considered an error.
-  if (!response.sdkHttpResponse?.responseInternal?.ok) {
+  if (
+    response.sdkHttpResponse &&
+    !response.sdkHttpResponse?.responseInternal?.ok
+  ) {
     return true;
   }
 

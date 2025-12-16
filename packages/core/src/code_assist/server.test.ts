@@ -8,6 +8,7 @@ import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
 import { CodeAssistServer } from './server.js';
 import { OAuth2Client } from 'google-auth-library';
 import { UserTierId, ActionStatus } from './types.js';
+import { FinishReason } from '@google/genai';
 
 vi.mock('google-auth-library');
 
@@ -47,7 +48,7 @@ describe('CodeAssistServer', () => {
               role: 'model',
               parts: [{ text: 'response' }],
             },
-            finishReason: 'STOP',
+            finishReason: FinishReason.STOP,
             safetyRatings: [],
           },
         ],
@@ -104,7 +105,7 @@ describe('CodeAssistServer', () => {
               role: 'model',
               parts: [{ text: 'response' }],
             },
-            finishReason: 'SAFETY',
+            finishReason: FinishReason.SAFETY,
             safetyRatings: [],
           },
         ],
@@ -128,6 +129,177 @@ describe('CodeAssistServer', () => {
     expect(recordConversationOfferedSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         status: ActionStatus.ACTION_STATUS_ERROR_UNKNOWN,
+      }),
+    );
+  });
+
+  it('should record conversation offered on successful generateContent', async () => {
+    const mockRequest = vi.fn();
+    const client = { request: mockRequest } as unknown as OAuth2Client;
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
+    const mockResponseData = {
+      traceId: 'test-trace-id',
+      response: {
+        candidates: [
+          {
+            index: 0,
+            content: {
+              role: 'model',
+              parts: [{ text: 'response' }],
+            },
+            finishReason: FinishReason.STOP,
+            safetyRatings: [],
+          },
+        ],
+        sdkHttpResponse: {
+          responseInternal: {
+            ok: true,
+          },
+        },
+      },
+    };
+    mockRequest.mockResolvedValue({ data: mockResponseData });
+    vi.spyOn(server, 'recordCodeAssistMetrics').mockResolvedValue(undefined);
+
+    await server.generateContent(
+      {
+        model: 'test-model',
+        contents: [{ role: 'user', parts: [{ text: 'request' }] }],
+      },
+      'user-prompt-id',
+    );
+
+    expect(server.recordCodeAssistMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metrics: expect.arrayContaining([
+          expect.objectContaining({
+            conversationOffered: expect.objectContaining({
+              traceId: 'test-trace-id',
+              status: ActionStatus.ACTION_STATUS_NO_ERROR,
+            }),
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('should record conversation offered on generateContentStream', async () => {
+    const mockRequest = vi.fn();
+    const client = { request: mockRequest } as unknown as OAuth2Client;
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
+
+    const { Readable } = await import('node:stream');
+    const mockStream = new Readable({ read() {} });
+    mockRequest.mockResolvedValue({ data: mockStream });
+
+    vi.spyOn(server, 'recordCodeAssistMetrics').mockResolvedValue(undefined);
+
+    const stream = await server.generateContentStream(
+      {
+        model: 'test-model',
+        contents: [{ role: 'user', parts: [{ text: 'request' }] }],
+      },
+      'user-prompt-id',
+    );
+
+    const mockResponseData = {
+      traceId: 'stream-trace-id',
+      response: {
+        candidates: [{ content: { parts: [{ text: 'chunk' }] } }],
+        sdkHttpResponse: {
+          responseInternal: {
+            ok: true,
+          },
+        },
+      },
+    };
+
+    setTimeout(() => {
+      mockStream.push('data: ' + JSON.stringify(mockResponseData) + '\n\n');
+      mockStream.push(null);
+    }, 0);
+
+    for await (const _ of stream) {
+      // Consume stream
+    }
+
+    expect(server.recordCodeAssistMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metrics: expect.arrayContaining([
+          expect.objectContaining({
+            conversationOffered: expect.objectContaining({
+              traceId: 'stream-trace-id',
+            }),
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('should record conversation interaction', async () => {
+    const client = { request: vi.fn() } as unknown as OAuth2Client;
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
+    vi.spyOn(server, 'recordCodeAssistMetrics').mockResolvedValue(undefined);
+
+    const interaction = {
+      traceId: 'test-trace-id',
+    };
+
+    await server.recordConversationInteraction(interaction);
+
+    expect(server.recordCodeAssistMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project: 'test-project',
+        metrics: expect.arrayContaining([
+          expect.objectContaining({
+            conversationInteraction: interaction,
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('should call recordCodeAssistMetrics endpoint', async () => {
+    const mockRequest = vi.fn();
+    const client = { request: mockRequest } as unknown as OAuth2Client;
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
+    mockRequest.mockResolvedValue({ data: {} });
+
+    const req = {
+      project: 'test-project',
+      metrics: [],
+    };
+    await server.recordCodeAssistMetrics(req);
+
+    expect(mockRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: expect.stringContaining(':recordCodeAssistMetrics'),
+        method: 'POST',
+        body: expect.any(String),
       }),
     );
   });
