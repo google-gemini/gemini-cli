@@ -69,6 +69,7 @@ export function useQuotaAndFallback({
           `Usage limit reached for ${usageLimitReachedModel}.`,
           error.retryDelayMs ? getResetTimeMessage(error.retryDelayMs) : null,
           `/stats for usage details`,
+          `/model to switch models.`,
           `/auth to switch to API key.`,
         ].filter(Boolean);
         message = messageLines.join('\n');
@@ -84,7 +85,12 @@ export function useQuotaAndFallback({
         ];
         message = messageLines.join('\n');
       } else {
-        message = `${failedModel} is currently experiencing high demand. We apologize and appreciate your patience.`;
+        const messageLines = [
+          `We are currently experiencing high demand.`,
+          'We apologize and appreciate your patience.',
+          '/model to switch models.',
+        ];
+        message = messageLines.join('\n');
       }
 
       setModelSwitchedFromQuotaError(true);

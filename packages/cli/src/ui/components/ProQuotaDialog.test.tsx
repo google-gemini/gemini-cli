@@ -169,7 +169,7 @@ describe('ProQuotaDialog', () => {
     });
 
     describe('when it is a capacity error', () => {
-      it('should render keep trying, switch, and stop options', () => {
+      it('should render keep trying and stop options', () => {
         const { unmount } = render(
           <ProQuotaDialog
             failedModel="gemini-2.5-pro"
@@ -189,11 +189,6 @@ describe('ProQuotaDialog', () => {
                 label: 'Keep trying',
                 value: 'retry_once',
                 key: 'retry_once',
-              },
-              {
-                label: 'Switch to gemini-2.5-flash',
-                value: 'retry_always',
-                key: 'retry_always',
               },
               { label: 'Stop', value: 'retry_later', key: 'retry_later' },
             ],
@@ -292,46 +287,6 @@ describe('ProQuotaDialog', () => {
       });
 
       expect(mockOnChoice).toHaveBeenCalledWith('retry_always');
-      unmount();
-    });
-  });
-
-  describe('footer note', () => {
-    it('should show a special note for PREVIEW_GEMINI_MODEL', () => {
-      const { lastFrame, unmount } = render(
-        <ProQuotaDialog
-          failedModel={PREVIEW_GEMINI_MODEL}
-          fallbackModel="gemini-2.5-pro"
-          message=""
-          isTerminalQuotaError={false}
-          onChoice={mockOnChoice}
-          userTier={UserTierId.FREE}
-        />,
-      );
-
-      const output = lastFrame();
-      expect(output).toContain(
-        'Note: We will periodically retry Preview Model to see if congestion has cleared.',
-      );
-      unmount();
-    });
-
-    it('should show the default note for other models', () => {
-      const { lastFrame, unmount } = render(
-        <ProQuotaDialog
-          failedModel="gemini-2.5-pro"
-          fallbackModel="gemini-2.5-flash"
-          message=""
-          isTerminalQuotaError={false}
-          onChoice={mockOnChoice}
-          userTier={UserTierId.FREE}
-        />,
-      );
-
-      const output = lastFrame();
-      expect(output).toContain(
-        'Note: You can always use /model to select a different option.',
-      );
       unmount();
     });
   });
