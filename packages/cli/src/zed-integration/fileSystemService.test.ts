@@ -6,21 +6,21 @@
 
 import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
 import { AcpFileSystemService } from './fileSystemService.js';
-import type { Client } from './acp.js';
+import type { AgentSideConnection } from '@agentclientprotocol/sdk';
 import type { FileSystemService } from '@google/gemini-cli-core';
 
 describe('AcpFileSystemService', () => {
-  let mockClient: Mocked<Client>;
+  let mockConnection: Mocked<AgentSideConnection>;
   let mockFallback: Mocked<FileSystemService>;
   let service: AcpFileSystemService;
 
   beforeEach(() => {
-    mockClient = {
+    mockConnection = {
       requestPermission: vi.fn(),
       sessionUpdate: vi.fn(),
       writeTextFile: vi.fn(),
       readTextFile: vi.fn(),
-    };
+    } as unknown as Mocked<AgentSideConnection>;
     mockFallback = {
       readTextFile: vi.fn(),
       writeTextFile: vi.fn(),
@@ -31,16 +31,14 @@ describe('AcpFileSystemService', () => {
     it.each([
       {
         capability: true,
-        desc: 'client if capability exists',
+        desc: 'connection if capability exists',
         setup: () => {
-          mockClient.readTextFile.mockResolvedValue({ content: 'content' });
+          mockConnection.readTextFile.mockResolvedValue({ content: 'content' });
         },
         verify: () => {
-          expect(mockClient.readTextFile).toHaveBeenCalledWith({
+          expect(mockConnection.readTextFile).toHaveBeenCalledWith({
             path: '/path/to/file',
             sessionId: 'session-1',
-            line: null,
-            limit: null,
           });
           expect(mockFallback.readTextFile).not.toHaveBeenCalled();
         },
@@ -55,12 +53,12 @@ describe('AcpFileSystemService', () => {
           expect(mockFallback.readTextFile).toHaveBeenCalledWith(
             '/path/to/file',
           );
-          expect(mockClient.readTextFile).not.toHaveBeenCalled();
+          expect(mockConnection.readTextFile).not.toHaveBeenCalled();
         },
       },
     ])('should use $desc', async ({ capability, setup, verify }) => {
       service = new AcpFileSystemService(
-        mockClient,
+        mockConnection,
         'session-1',
         { readTextFile: capability, writeTextFile: true },
         mockFallback,
@@ -78,9 +76,9 @@ describe('AcpFileSystemService', () => {
     it.each([
       {
         capability: true,
-        desc: 'client if capability exists',
+        desc: 'connection if capability exists',
         verify: () => {
-          expect(mockClient.writeTextFile).toHaveBeenCalledWith({
+          expect(mockConnection.writeTextFile).toHaveBeenCalledWith({
             path: '/path/to/file',
             content: 'content',
             sessionId: 'session-1',
@@ -96,12 +94,12 @@ describe('AcpFileSystemService', () => {
             '/path/to/file',
             'content',
           );
-          expect(mockClient.writeTextFile).not.toHaveBeenCalled();
+          expect(mockConnection.writeTextFile).not.toHaveBeenCalled();
         },
       },
     ])('should use $desc', async ({ capability, verify }) => {
       service = new AcpFileSystemService(
-        mockClient,
+        mockConnection,
         'session-1',
         { writeTextFile: capability, readTextFile: true },
         mockFallback,
