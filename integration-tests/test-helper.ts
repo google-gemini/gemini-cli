@@ -18,6 +18,7 @@ import * as os from 'node:os';
 import { GEMINI_DIR } from '../packages/core/src/utils/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const BUNDLE_PATH = join(__dirname, '..', 'bundle/gemini.js');
 
 // Get timeout based on environment
 function getDefaultTimeout() {
@@ -266,8 +267,7 @@ export class InteractiveRun {
 }
 
 export class TestRig {
-  bundlePath: string;
-  testDir: string | null;
+  testDir: string | null = null;
   testName?: string;
   _lastRunStdout?: string;
   // Path to the copied fake responses file for this test.
@@ -275,11 +275,6 @@ export class TestRig {
   // Original fake responses file path for rewriting goldens in record mode.
   originalFakeResponsesPath?: string;
   private _interactiveRuns: InteractiveRun[] = [];
-
-  constructor() {
-    this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
-    this.testDir = null;
-  }
 
   setup(
     testName: string,
@@ -370,7 +365,7 @@ export class TestRig {
     const command = isNpmReleaseTest ? 'gemini' : 'node';
     const initialArgs = isNpmReleaseTest
       ? extraInitialArgs
-      : [this.bundlePath, ...extraInitialArgs];
+      : [BUNDLE_PATH, ...extraInitialArgs];
     if (this.fakeResponsesPath) {
       if (process.env['REGENERATE_MODEL_GOLDENS'] === 'true') {
         initialArgs.push('--record-responses', this.fakeResponsesPath);
@@ -381,19 +376,13 @@ export class TestRig {
     return { command, initialArgs };
   }
 
-  run(
-    promptOrOptions:
-      | string
-      | {
-          prompt?: string;
-          stdin?: string;
-          stdinDoesNotEnd?: boolean;
-          yolo?: boolean;
-        },
-    ...args: string[]
-  ): Promise<string> {
-    const yolo =
-      typeof promptOrOptions === 'string' || promptOrOptions.yolo !== false;
+  run(options: {
+    args?: string | string[];
+    stdin?: string;
+    stdinDoesNotEnd?: boolean;
+    yolo?: boolean;
+  }): Promise<string> {
+    const yolo = options.yolo !== false;
     const { command, initialArgs } = this._getCommandAndArgs(
       yolo ? ['--yolo'] : [],
     );
@@ -407,21 +396,17 @@ export class TestRig {
       encoding: 'utf-8',
     };
 
-    if (typeof promptOrOptions === 'string') {
-      commandArgs.push(promptOrOptions);
-    } else if (
-      typeof promptOrOptions === 'object' &&
-      promptOrOptions !== null
-    ) {
-      if (promptOrOptions.prompt) {
-        commandArgs.push(promptOrOptions.prompt);
-      }
-      if (promptOrOptions.stdin) {
-        execOptions.input = promptOrOptions.stdin;
+    if (options.args) {
+      if (Array.isArray(options.args)) {
+        commandArgs.push(...options.args);
+      } else {
+        commandArgs.push(options.args);
       }
     }
 
-    commandArgs.push(...args);
+    if (options.stdin) {
+      execOptions.input = options.stdin;
+    }
 
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
@@ -437,10 +422,7 @@ export class TestRig {
       child.stdin!.write(execOptions.input);
     }
 
-    if (
-      typeof promptOrOptions === 'object' &&
-      !promptOrOptions.stdinDoesNotEnd
-    ) {
+    if (!options.stdinDoesNotEnd) {
       child.stdin!.end();
     }
 
@@ -1032,26 +1014,23 @@ export class TestRig {
     return null;
   }
 
-  async runInteractive(
-    options?: { yolo?: boolean } | string,
-    ...args: string[]
-  ): Promise<InteractiveRun> {
-    // Handle backward compatibility: if first param is a string, treat as arg
-    let yolo = true; // Default to YOLO mode
-    let additionalArgs: string[] = args;
-
-    if (typeof options === 'string') {
-      // Old-style call: runInteractive('--debug')
-      additionalArgs = [options, ...args];
-    } else if (typeof options === 'object' && options !== null) {
-      // New-style call: runInteractive({ yolo: false })
-      yolo = options.yolo !== false;
-    }
-
+  async runInteractive(options?: {
+    args?: string | string[];
+    yolo?: boolean;
+  }): Promise<InteractiveRun> {
+    const yolo = options?.yolo !== false;
     const { command, initialArgs } = this._getCommandAndArgs(
       yolo ? ['--yolo'] : [],
     );
-    const commandArgs = [...initialArgs, ...additionalArgs];
+    const commandArgs = [...initialArgs];
+
+    if (options?.args) {
+      if (Array.isArray(options.args)) {
+        commandArgs.push(...options.args);
+      } else {
+        commandArgs.push(options.args);
+      }
+    }
 
     const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',

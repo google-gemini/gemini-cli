@@ -27,7 +27,7 @@ describe('write_file', () => {
     });
     const prompt = `show me an example of using the write tool. put a dad joke in dad.txt`;
 
-    const result = await rig.run(prompt);
+    const result = await rig.run({ args: prompt });
 
     const foundToolCall = await rig.waitForToolCall('write_file');
 
