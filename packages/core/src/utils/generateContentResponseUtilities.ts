@@ -105,3 +105,14 @@ export function getStructuredResponseFromParts(
   }
   return undefined;
 }
+
+export function getCitations(resp: GenerateContentResponse): string[] {
+  return (resp.candidates?.[0]?.citationMetadata?.citations ?? [])
+    .filter((citation) => citation.uri !== undefined)
+    .map((citation) => {
+      if (citation.title) {
+        return `(${citation.title}) ${citation.uri}`;
+      }
+      return citation.uri!;
+    });
+}
