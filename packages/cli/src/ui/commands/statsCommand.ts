@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CodeAssistServer, getCodeAssistServer } from '@google/gemini-cli-core';
 import type { HistoryItemStats } from '../types.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
@@ -35,11 +34,8 @@ async function defaultSessionView(context: CommandContext) {
   };
 
   if (context.services.config) {
-    const server = getCodeAssistServer(context.services.config);
-    if (server instanceof CodeAssistServer && server.projectId) {
-      const quota = await server.retrieveUserQuota({
-        project: server.projectId,
-      });
+    const quota = await context.services.config.refreshUserQuota();
+    if (quota) {
       statsItem.quotas = quota;
     }
   }
