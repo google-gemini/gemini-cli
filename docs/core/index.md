@@ -1,4 +1,4 @@
-# Gemini CLI Core
+# Gemini CLI core
 
 Gemini CLI's core package (`packages/core`) is the backend portion of Gemini
 CLI, handling communication with the Gemini API, managing tools, and processing
@@ -11,6 +11,8 @@ requests sent from `packages/cli`. For a general overview of Gemini CLI, see the
   registered, and used by the core.
 - **[Memory Import Processor](./memport.md):** Documentation for the modular
   GEMINI.md import feature using @file.md syntax.
+- **[Policy Engine](./policy-engine.md):** Use the Policy Engine for
+  fine-grained control over tool execution.
 
 ## Role of the core
 

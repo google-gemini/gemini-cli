@@ -7,14 +7,17 @@
 import { vi, type Mock, type MockInstance } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useFolderTrust } from './useFolderTrust.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
 import { TrustLevel } from '../../config/trustedFolders.js';
 import * as trustedFolders from '../../config/trustedFolders.js';
+import { coreEvents, ExitCodes } from '@google/gemini-cli-core';
 
 const mockedCwd = vi.hoisted(() => vi.fn());
+const mockedExit = vi.hoisted(() => vi.fn());
 
 vi.mock('node:process', async () => {
   const actual =
@@ -22,6 +25,7 @@ vi.mock('node:process', async () => {
   return {
     ...actual,
     cwd: mockedCwd,
+    exit: mockedExit,
     platform: 'linux',
   };
 });
@@ -34,6 +38,7 @@ describe('useFolderTrust', () => {
   let addItem: Mock;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     mockSettings = {
       merged: {
         security: {
@@ -59,6 +64,7 @@ describe('useFolderTrust', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
@@ -88,7 +94,7 @@ describe('useFolderTrust', () => {
     const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(result.current.isFolderTrustDialogOpen).toBe(true);
     });
     expect(onTrustChange).toHaveBeenCalledWith(undefined);
@@ -129,7 +135,7 @@ describe('useFolderTrust', () => {
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(result.current.isTrusted).toBeUndefined();
     });
 
@@ -139,7 +145,7 @@ describe('useFolderTrust', () => {
       );
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockTrustedFolders.setValue).toHaveBeenCalledWith(
         '/test/path',
         TrustLevel.TRUST_FOLDER,
@@ -207,7 +213,7 @@ describe('useFolderTrust', () => {
       );
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockTrustedFolders.setValue).not.toHaveBeenCalled();
       expect(mockSettings.setValue).not.toHaveBeenCalled();
       expect(result.current.isFolderTrustDialogOpen).toBe(true);
@@ -229,7 +235,7 @@ describe('useFolderTrust', () => {
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(result.current.isTrusted).toBe(false);
     });
 
@@ -237,7 +243,7 @@ describe('useFolderTrust', () => {
       result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(result.current.isRestarting).toBe(true);
       expect(result.current.isFolderTrustDialogOpen).toBe(true); // Dialog should stay open
     });
@@ -258,5 +264,31 @@ describe('useFolderTrust', () => {
 
     expect(result.current.isRestarting).toBe(false);
     expect(result.current.isFolderTrustDialogOpen).toBe(false); // Dialog should close
+  });
+
+  it('should emit feedback on failure to set value', async () => {
+    isWorkspaceTrustedSpy.mockReturnValue({
+      isTrusted: undefined,
+      source: undefined,
+    });
+    (mockTrustedFolders.setValue as Mock).mockImplementation(() => {
+      throw new Error('test error');
+    });
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    const { result } = renderHook(() =>
+      useFolderTrust(mockSettings, onTrustChange, addItem),
+    );
+
+    act(() => {
+      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
+    });
+
+    await vi.runAllTimersAsync();
+
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
+      'Failed to save trust settings. Exiting Gemini CLI.',
+    );
+    expect(mockedExit).toHaveBeenCalledWith(ExitCodes.FATAL_CONFIG_ERROR);
   });
 });

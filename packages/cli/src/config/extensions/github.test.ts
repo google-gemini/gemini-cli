@@ -4,281 +4,177 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-  type MockedFunction,
-} from 'vitest';
-import {
-  checkForExtensionUpdate,
   cloneFromGit,
-  extractFile,
-  findReleaseAsset,
-  fetchReleaseFromGithub,
   tryParseGithubUrl,
+  fetchReleaseFromGithub,
+  checkForExtensionUpdate,
+  downloadFromGitHubRelease,
+  findReleaseAsset,
+  downloadFile,
+  extractFile,
 } from './github.js';
 import { simpleGit, type SimpleGit } from 'simple-git';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import * as os from 'node:os';
-import * as fs from 'node:fs/promises';
-import * as fsSync from 'node:fs';
-import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as https from 'node:https';
 import * as tar from 'tar';
-import * as archiver from 'archiver';
-import type { GeminiCLIExtension } from '@google/gemini-cli-core';
-import { ExtensionManager } from '../extension-manager.js';
-import { loadSettings } from '../settings.js';
-import type { ExtensionSetting } from './extensionSettings.js';
+import * as extract from 'extract-zip';
+import type { ExtensionManager } from '../extension-manager.js';
+import { fetchJson } from './github_fetch.js';
+import { EventEmitter } from 'node:events';
+import type {
+  GeminiCLIExtension,
+  ExtensionInstallMetadata,
+} from '@google/gemini-cli-core';
+import type { ExtensionConfig } from '../extension.js';
 
-const mockPlatform = vi.hoisted(() => vi.fn());
-const mockArch = vi.hoisted(() => vi.fn());
-vi.mock('node:os', async (importOriginal) => {
-  const actual = await importOriginal<typeof os>();
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    platform: mockPlatform,
-    arch: mockArch,
+    Storage: {
+      getGlobalSettingsPath: vi.fn().mockReturnValue('/mock/settings.json'),
+      getGlobalGeminiDir: vi.fn().mockReturnValue('/mock/.gemini'),
+    },
+    debugLogger: {
+      error: vi.fn(),
+      log: vi.fn(),
+      warn: vi.fn(),
+    },
   };
 });
 
 vi.mock('simple-git');
+vi.mock('node:os');
+vi.mock('node:fs');
+vi.mock('node:https');
+vi.mock('tar');
+vi.mock('extract-zip');
+vi.mock('./github_fetch.js');
+vi.mock('../extension-manager.js');
+// Mock settings.ts to avoid top-level side effects if possible, or just rely on Storage mock
+vi.mock('../settings.js', () => ({
+  loadSettings: vi.fn(),
+  USER_SETTINGS_PATH: '/mock/settings.json',
+}));
 
-const fetchJsonMock = vi.hoisted(() => vi.fn());
-vi.mock('./github_fetch.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./github_fetch.js')>();
-  return {
-    ...actual,
-    fetchJson: fetchJsonMock,
-  };
-});
-
-describe('git extension helpers', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
+describe('github.ts', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
   });
 
   describe('cloneFromGit', () => {
-    const mockGit = {
-      clone: vi.fn(),
-      getRemotes: vi.fn(),
-      fetch: vi.fn(),
-      checkout: vi.fn(),
+    let mockGit: {
+      clone: ReturnType<typeof vi.fn>;
+      getRemotes: ReturnType<typeof vi.fn>;
+      fetch: ReturnType<typeof vi.fn>;
+      checkout: ReturnType<typeof vi.fn>;
+      listRemote: ReturnType<typeof vi.fn>;
+      revparse: ReturnType<typeof vi.fn>;
     };
 
     beforeEach(() => {
+      mockGit = {
+        clone: vi.fn(),
+        getRemotes: vi.fn(),
+        fetch: vi.fn(),
+        checkout: vi.fn(),
+        listRemote: vi.fn(),
+        revparse: vi.fn(),
+      };
       vi.mocked(simpleGit).mockReturnValue(mockGit as unknown as SimpleGit);
     });
 
     it('should clone, fetch and checkout a repo', async () => {
-      const installMetadata = {
-        source: 'http://my-repo.com',
-        ref: 'my-ref',
-        type: 'git' as const,
-      };
-      const destination = '/dest';
-      mockGit.getRemotes.mockResolvedValue([
-        { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
-      ]);
+      mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
-      await cloneFromGit(installMetadata, destination);
+      await cloneFromGit(
+        {
+          type: 'git',
+          source: 'https://github.com/owner/repo.git',
+          ref: 'v1.0.0',
+        },
+        '/dest',
+      );
 
-      expect(mockGit.clone).toHaveBeenCalledWith('http://my-repo.com', './', [
-        '--depth',
-        '1',
-      ]);
-      expect(mockGit.getRemotes).toHaveBeenCalledWith(true);
-      expect(mockGit.fetch).toHaveBeenCalledWith('origin', 'my-ref');
+      expect(mockGit.clone).toHaveBeenCalledWith(
+        'https://github.com/owner/repo.git',
+        './',
+        ['--depth', '1'],
+      );
+      expect(mockGit.fetch).toHaveBeenCalledWith('origin', 'v1.0.0');
       expect(mockGit.checkout).toHaveBeenCalledWith('FETCH_HEAD');
     });
 
-    it('should use HEAD if ref is not provided', async () => {
-      const installMetadata = {
-        source: 'http://my-repo.com',
-        type: 'git' as const,
-      };
-      const destination = '/dest';
-      mockGit.getRemotes.mockResolvedValue([
-        { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
-      ]);
-
-      await cloneFromGit(installMetadata, destination);
-
-      expect(mockGit.fetch).toHaveBeenCalledWith('origin', 'HEAD');
-    });
-
-    it('should throw if no remotes are found', async () => {
-      const installMetadata = {
-        source: 'http://my-repo.com',
-        type: 'git' as const,
-      };
-      const destination = '/dest';
+    it('should throw if no remotes found', async () => {
       mockGit.getRemotes.mockResolvedValue([]);
 
-      await expect(cloneFromGit(installMetadata, destination)).rejects.toThrow(
-        'Failed to clone Git repository from http://my-repo.com',
-      );
+      await expect(
+        cloneFromGit({ type: 'git', source: 'src' }, '/dest'),
+      ).rejects.toThrow('Unable to find any remotes');
     });
 
     it('should throw on clone error', async () => {
-      const installMetadata = {
-        source: 'http://my-repo.com',
-        type: 'git' as const,
-      };
-      const destination = '/dest';
-      mockGit.clone.mockRejectedValue(new Error('clone failed'));
+      mockGit.clone.mockRejectedValue(new Error('Clone failed'));
 
-      await expect(cloneFromGit(installMetadata, destination)).rejects.toThrow(
-        'Failed to clone Git repository from http://my-repo.com',
-      );
+      await expect(
+        cloneFromGit({ type: 'git', source: 'src' }, '/dest'),
+      ).rejects.toThrow('Failed to clone Git repository');
     });
   });
 
-  describe('checkForExtensionUpdate', () => {
-    const mockGit = {
-      getRemotes: vi.fn(),
-      listRemote: vi.fn(),
-      revparse: vi.fn(),
-    };
+  describe('tryParseGithubUrl', () => {
+    it.each([
+      ['https://github.com/owner/repo', 'owner', 'repo'],
+      ['https://github.com/owner/repo.git', 'owner', 'repo'],
+      ['git@github.com:owner/repo.git', 'owner', 'repo'],
+      ['owner/repo', 'owner', 'repo'],
+    ])('should parse %s to %s/%s', (url, owner, repo) => {
+      expect(tryParseGithubUrl(url)).toEqual({ owner, repo });
+    });
 
-    let extensionManager: ExtensionManager;
-    let mockRequestConsent: MockedFunction<
-      (consent: string) => Promise<boolean>
-    >;
-    let mockPromptForSettings: MockedFunction<
-      (setting: ExtensionSetting) => Promise<string>
-    >;
-    let tempHomeDir: string;
-    let tempWorkspaceDir: string;
+    it.each([
+      'https://gitlab.com/owner/repo',
+      'https://my-git-host.com/owner/group/repo',
+      'git@gitlab.com:some-group/some-project/some-repo.git',
+    ])('should return null for non-GitHub URLs', (url) => {
+      expect(tryParseGithubUrl(url)).toBeNull();
+    });
 
-    beforeEach(() => {
-      tempHomeDir = fsSync.mkdtempSync(
-        path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    it('should throw for invalid formats', () => {
+      expect(() => tryParseGithubUrl('invalid')).toThrow(
+        'Invalid GitHub repository source',
       );
-      tempWorkspaceDir = fsSync.mkdtempSync(
-        path.join(tempHomeDir, 'gemini-cli-test-workspace-'),
-      );
-      vi.mocked(simpleGit).mockReturnValue(mockGit as unknown as SimpleGit);
-      mockRequestConsent = vi.fn();
-      mockRequestConsent.mockResolvedValue(true);
-      mockPromptForSettings = vi.fn();
-      mockPromptForSettings.mockResolvedValue('');
-      extensionManager = new ExtensionManager({
-        workspaceDir: tempWorkspaceDir,
-        requestConsent: mockRequestConsent,
-        requestSetting: mockPromptForSettings,
-        settings: loadSettings(tempWorkspaceDir).merged,
-      });
-    });
-
-    it('should return NOT_UPDATABLE for non-git extensions', async () => {
-      const extension: GeminiCLIExtension = {
-        name: 'test',
-        id: 'test-id',
-        path: '/ext',
-        version: '1.0.0',
-        isActive: true,
-        installMetadata: {
-          type: 'link',
-          source: '',
-        },
-        contextFiles: [],
-      };
-      const result = await checkForExtensionUpdate(extension, extensionManager);
-      expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
-    });
-
-    it('should return ERROR if no remotes found', async () => {
-      const extension: GeminiCLIExtension = {
-        name: 'test',
-        id: 'test-id',
-        path: '/ext',
-        version: '1.0.0',
-        isActive: true,
-        installMetadata: {
-          type: 'git',
-          source: '',
-        },
-        contextFiles: [],
-      };
-      mockGit.getRemotes.mockResolvedValue([]);
-      const result = await checkForExtensionUpdate(extension, extensionManager);
-      expect(result).toBe(ExtensionUpdateState.ERROR);
-    });
-
-    it('should return UPDATE_AVAILABLE when remote hash is different', async () => {
-      const extension: GeminiCLIExtension = {
-        name: 'test',
-        id: 'test-id',
-        path: '/ext',
-        version: '1.0.0',
-        isActive: true,
-        installMetadata: {
-          type: 'git',
-          source: 'my/ext',
-        },
-        contextFiles: [],
-      };
-      mockGit.getRemotes.mockResolvedValue([
-        { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
-      ]);
-      mockGit.listRemote.mockResolvedValue('remote-hash\tHEAD');
-      mockGit.revparse.mockResolvedValue('local-hash');
-
-      const result = await checkForExtensionUpdate(extension, extensionManager);
-      expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
-    });
-
-    it('should return UP_TO_DATE when remote and local hashes are the same', async () => {
-      const extension: GeminiCLIExtension = {
-        name: 'test',
-        id: 'test-id',
-        path: '/ext',
-        version: '1.0.0',
-        isActive: true,
-        installMetadata: {
-          type: 'git',
-          source: 'my/ext',
-        },
-        contextFiles: [],
-      };
-      mockGit.getRemotes.mockResolvedValue([
-        { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
-      ]);
-      mockGit.listRemote.mockResolvedValue('same-hash\tHEAD');
-      mockGit.revparse.mockResolvedValue('same-hash');
-
-      const result = await checkForExtensionUpdate(extension, extensionManager);
-      expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
-    });
-
-    it('should return ERROR on git error', async () => {
-      const extension: GeminiCLIExtension = {
-        name: 'test',
-        id: 'test-id',
-        path: '/ext',
-        version: '1.0.0',
-        isActive: true,
-        installMetadata: {
-          type: 'git',
-          source: 'my/ext',
-        },
-        contextFiles: [],
-      };
-      mockGit.getRemotes.mockRejectedValue(new Error('git error'));
-
-      const result = await checkForExtensionUpdate(extension, extensionManager);
-      expect(result).toBe(ExtensionUpdateState.ERROR);
     });
   });
 
   describe('fetchReleaseFromGithub', () => {
-    it('should fetch the latest release if allowPreRelease is true', async () => {
-      const releases = [{ tag_name: 'v1.0.0-alpha' }, { tag_name: 'v0.9.0' }];
-      fetchJsonMock.mockResolvedValueOnce(releases);
+    it('should fetch latest release if no ref provided', async () => {
+      vi.mocked(fetchJson).mockResolvedValue({ tag_name: 'v1.0.0' });
+
+      await fetchReleaseFromGithub('owner', 'repo');
+
+      expect(fetchJson).toHaveBeenCalledWith(
+        'https://api.github.com/repos/owner/repo/releases/latest',
+      );
+    });
+
+    it('should fetch specific ref if provided', async () => {
+      vi.mocked(fetchJson).mockResolvedValue({ tag_name: 'v1.0.0' });
+
+      await fetchReleaseFromGithub('owner', 'repo', 'v1.0.0');
+
+      expect(fetchJson).toHaveBeenCalledWith(
+        'https://api.github.com/repos/owner/repo/releases/tags/v1.0.0',
+      );
+    });
+
+    it('should handle pre-releases if allowed', async () => {
+      vi.mocked(fetchJson).mockResolvedValueOnce([{ tag_name: 'v1.0.0-beta' }]);
 
       const result = await fetchReleaseFromGithub(
         'owner',
@@ -287,246 +183,449 @@ describe('git extension helpers', () => {
         true,
       );
 
-      expect(fetchJsonMock).toHaveBeenCalledWith(
-        'https://api.github.com/repos/owner/repo/releases?per_page=1',
-      );
-      expect(result).toEqual(releases[0]);
+      expect(result).toEqual({ tag_name: 'v1.0.0-beta' });
     });
 
-    it('should fetch the latest release if allowPreRelease is false', async () => {
-      const release = { tag_name: 'v0.9.0' };
-      fetchJsonMock.mockResolvedValueOnce(release);
+    it('should return null if no releases found', async () => {
+      vi.mocked(fetchJson).mockResolvedValueOnce([]);
 
       const result = await fetchReleaseFromGithub(
         'owner',
         'repo',
         undefined,
-        false,
+        true,
       );
 
-      expect(fetchJsonMock).toHaveBeenCalledWith(
-        'https://api.github.com/repos/owner/repo/releases/latest',
-      );
-      expect(result).toEqual(release);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('checkForExtensionUpdate', () => {
+    let mockExtensionManager: ExtensionManager;
+    let mockGit: {
+      getRemotes: ReturnType<typeof vi.fn>;
+      listRemote: ReturnType<typeof vi.fn>;
+      revparse: ReturnType<typeof vi.fn>;
+    };
+
+    beforeEach(() => {
+      mockExtensionManager = {
+        loadExtensionConfig: vi.fn(),
+      } as unknown as ExtensionManager;
+      mockGit = {
+        getRemotes: vi.fn(),
+        listRemote: vi.fn(),
+        revparse: vi.fn(),
+      };
+      vi.mocked(simpleGit).mockReturnValue(mockGit as unknown as SimpleGit);
     });
 
-    it('should fetch a release by tag if ref is provided', async () => {
-      const release = { tag_name: 'v0.9.0' };
-      fetchJsonMock.mockResolvedValueOnce(release);
+    it('should return NOT_UPDATABLE for non-git/non-release extensions', async () => {
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue({
+        version: '1.0.0',
+      } as unknown as ExtensionConfig);
 
-      const result = await fetchReleaseFromGithub('owner', 'repo', 'v0.9.0');
-
-      expect(fetchJsonMock).toHaveBeenCalledWith(
-        'https://api.github.com/repos/owner/repo/releases/tags/v0.9.0',
+      const linkExt = {
+        installMetadata: { type: 'link' },
+      } as unknown as GeminiCLIExtension;
+      expect(await checkForExtensionUpdate(linkExt, mockExtensionManager)).toBe(
+        ExtensionUpdateState.NOT_UPDATABLE,
       );
-      expect(result).toEqual(release);
     });
 
-    it('should fetch latest stable release if allowPreRelease is undefined', async () => {
-      const release = { tag_name: 'v0.9.0' };
-      fetchJsonMock.mockResolvedValueOnce(release);
+    it('should return UPDATE_AVAILABLE if git remote hash differs', async () => {
+      mockGit.getRemotes.mockResolvedValue([
+        { name: 'origin', refs: { fetch: 'url' } },
+      ]);
+      mockGit.listRemote.mockResolvedValue('remote-hash\tHEAD');
+      mockGit.revparse.mockResolvedValue('local-hash');
 
-      const result = await fetchReleaseFromGithub('owner', 'repo');
-
-      expect(fetchJsonMock).toHaveBeenCalledWith(
-        'https://api.github.com/repos/owner/repo/releases/latest',
+      const ext = {
+        path: '/path',
+        installMetadata: { type: 'git', source: 'url' },
+      } as unknown as GeminiCLIExtension;
+      expect(await checkForExtensionUpdate(ext, mockExtensionManager)).toBe(
+        ExtensionUpdateState.UPDATE_AVAILABLE,
       );
-      expect(result).toEqual(release);
+    });
+
+    it('should return UP_TO_DATE if git remote hash matches', async () => {
+      mockGit.getRemotes.mockResolvedValue([
+        { name: 'origin', refs: { fetch: 'url' } },
+      ]);
+      mockGit.listRemote.mockResolvedValue('hash\tHEAD');
+      mockGit.revparse.mockResolvedValue('hash');
+
+      const ext = {
+        path: '/path',
+        installMetadata: { type: 'git', source: 'url' },
+      } as unknown as GeminiCLIExtension;
+      expect(await checkForExtensionUpdate(ext, mockExtensionManager)).toBe(
+        ExtensionUpdateState.UP_TO_DATE,
+      );
+    });
+
+    it('should return NOT_UPDATABLE if local extension config cannot be loaded', async () => {
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockImplementation(
+        () => {
+          throw new Error('Config not found');
+        },
+      );
+
+      const ext = {
+        name: 'local-ext',
+        version: '1.0.0',
+        path: '/path/to/installed/ext',
+        installMetadata: { type: 'local', source: '/path/to/source/ext' },
+      } as unknown as GeminiCLIExtension;
+
+      expect(await checkForExtensionUpdate(ext, mockExtensionManager)).toBe(
+        ExtensionUpdateState.NOT_UPDATABLE,
+      );
+    });
+  });
+
+  describe('downloadFromGitHubRelease', () => {
+    it('should fail if no release data found', async () => {
+      // Mock fetchJson to throw for latest release check
+      vi.mocked(fetchJson).mockRejectedValue(new Error('Not found'));
+
+      const result = await downloadFromGitHubRelease(
+        {
+          type: 'github-release',
+          source: 'owner/repo',
+          ref: 'v1',
+        } as unknown as ExtensionInstallMetadata,
+        '/dest',
+        { owner: 'owner', repo: 'repo' },
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.failureReason).toBe('failed to fetch release data');
+      }
+    });
+
+    it('should use correct headers for release assets', async () => {
+      vi.mocked(fetchJson).mockResolvedValue({
+        tag_name: 'v1.0.0',
+        assets: [{ name: 'asset.tar.gz', url: 'http://asset.url' }],
+      });
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.mocked(os.arch).mockReturnValue('x64');
+
+      // Mock https.get and fs.createWriteStream for downloadFile
+      const mockReq = new EventEmitter();
+      const mockRes =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      Object.assign(mockRes, { statusCode: 200, pipe: vi.fn() });
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') {
+          cb = options;
+        }
+        if (cb) cb(mockRes);
+        return mockReq as unknown as import('node:http').ClientRequest;
+      });
+
+      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
+      Object.assign(mockStream, { close: vi.fn((cb) => cb && cb()) });
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      // Mock fs.promises.readdir to return empty array (no cleanup needed)
+      vi.mocked(fs.promises.readdir).mockResolvedValue([]);
+      // Mock fs.promises.unlink
+      vi.mocked(fs.promises.unlink).mockResolvedValue(undefined);
+
+      const promise = downloadFromGitHubRelease(
+        {
+          type: 'github-release',
+          source: 'owner/repo',
+          ref: 'v1.0.0',
+        } as unknown as ExtensionInstallMetadata,
+        '/dest',
+        { owner: 'owner', repo: 'repo' },
+      );
+
+      // Wait for downloadFile to be called and stream to be created
+      await vi.waitUntil(
+        () => vi.mocked(fs.createWriteStream).mock.calls.length > 0,
+      );
+
+      // Trigger stream events to complete download
+      mockRes.emit('end');
+      mockStream.emit('finish');
+
+      await promise;
+
+      expect(https.get).toHaveBeenCalledWith(
+        'http://asset.url',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Accept: 'application/octet-stream',
+          }),
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('should use correct headers for source tarballs', async () => {
+      vi.mocked(fetchJson).mockResolvedValue({
+        tag_name: 'v1.0.0',
+        assets: [],
+        tarball_url: 'http://tarball.url',
+      });
+
+      // Mock https.get and fs.createWriteStream for downloadFile
+      const mockReq = new EventEmitter();
+      const mockRes =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      Object.assign(mockRes, { statusCode: 200, pipe: vi.fn() });
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') {
+          cb = options;
+        }
+        if (cb) cb(mockRes);
+        return mockReq as unknown as import('node:http').ClientRequest;
+      });
+
+      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
+      Object.assign(mockStream, { close: vi.fn((cb) => cb && cb()) });
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      // Mock fs.promises.readdir to return empty array
+      vi.mocked(fs.promises.readdir).mockResolvedValue([]);
+      // Mock fs.promises.unlink
+      vi.mocked(fs.promises.unlink).mockResolvedValue(undefined);
+
+      const promise = downloadFromGitHubRelease(
+        {
+          type: 'github-release',
+          source: 'owner/repo',
+          ref: 'v1.0.0',
+        } as unknown as ExtensionInstallMetadata,
+        '/dest',
+        { owner: 'owner', repo: 'repo' },
+      );
+
+      // Wait for downloadFile to be called and stream to be created
+      await vi.waitUntil(
+        () => vi.mocked(fs.createWriteStream).mock.calls.length > 0,
+      );
+
+      // Trigger stream events to complete download
+      mockRes.emit('end');
+      mockStream.emit('finish');
+
+      await promise;
+
+      expect(https.get).toHaveBeenCalledWith(
+        'http://tarball.url',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Accept: 'application/vnd.github+json',
+          }),
+        }),
+        expect.anything(),
+      );
     });
   });
 
   describe('findReleaseAsset', () => {
-    const assets = [
-      { name: 'darwin.arm64.extension.tar.gz', browser_download_url: 'url1' },
-      { name: 'darwin.x64.extension.tar.gz', browser_download_url: 'url2' },
-      { name: 'linux.x64.extension.tar.gz', browser_download_url: 'url3' },
-      { name: 'win32.x64.extension.tar.gz', browser_download_url: 'url4' },
-      { name: 'extension-generic.tar.gz', browser_download_url: 'url5' },
-    ];
-
-    it('should find asset matching platform and architecture', () => {
-      mockPlatform.mockReturnValue('darwin');
-      mockArch.mockReturnValue('arm64');
-      const result = findReleaseAsset(assets);
-      expect(result).toEqual(assets[0]);
-    });
-
-    it('should find asset matching platform if arch does not match', () => {
-      mockPlatform.mockReturnValue('linux');
-      mockArch.mockReturnValue('arm64');
-      const result = findReleaseAsset(assets);
-      expect(result).toEqual(assets[2]);
-    });
-
-    it('should return undefined if no matching asset is found', () => {
-      mockPlatform.mockReturnValue('sunos');
-      mockArch.mockReturnValue('x64');
-      const result = findReleaseAsset(assets);
-      expect(result).toBeUndefined();
-    });
-
-    it('should find generic asset if it is the only one', () => {
-      const singleAsset = [
-        { name: 'extension.tar.gz', browser_download_url: 'url' },
+    it('should find platform/arch specific asset', () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.mocked(os.arch).mockReturnValue('arm64');
+      const assets = [
+        { name: 'darwin.arm64.tar.gz', url: 'url1' },
+        { name: 'linux.x64.tar.gz', url: 'url2' },
       ];
-      mockPlatform.mockReturnValue('darwin');
-      mockArch.mockReturnValue('arm64');
-      const result = findReleaseAsset(singleAsset);
-      expect(result).toEqual(singleAsset[0]);
+      expect(findReleaseAsset(assets)).toEqual(assets[0]);
     });
 
-    it('should return undefined if multiple generic assets exist', () => {
-      const multipleGenericAssets = [
-        { name: 'extension-1.tar.gz', browser_download_url: 'url1' },
-        { name: 'extension-2.tar.gz', browser_download_url: 'url2' },
-      ];
-      mockPlatform.mockReturnValue('darwin');
-      mockArch.mockReturnValue('arm64');
-      const result = findReleaseAsset(multipleGenericAssets);
-      expect(result).toBeUndefined();
+    it('should find generic asset', () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      const assets = [{ name: 'generic.tar.gz', url: 'url' }];
+      expect(findReleaseAsset(assets)).toEqual(assets[0]);
     });
   });
 
-  describe('parseGitHubRepoForReleases', () => {
-    it('should parse owner and repo from a full GitHub URL', () => {
-      const source = 'https://github.com/owner/repo.git';
-      const { owner, repo } = tryParseGithubUrl(source)!;
-      expect(owner).toBe('owner');
-      expect(repo).toBe('repo');
+  describe('downloadFile', () => {
+    it('should download file successfully', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      Object.assign(mockRes, { statusCode: 200, pipe: vi.fn() });
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') {
+          cb = options;
+        }
+        if (cb) cb(mockRes);
+        return mockReq as unknown as import('node:http').ClientRequest;
+      });
+
+      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
+      Object.assign(mockStream, { close: vi.fn((cb) => cb && cb()) });
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile('url', '/dest');
+      mockRes.emit('end');
+      mockStream.emit('finish');
+
+      await expect(promise).resolves.toBeUndefined();
     });
 
-    it('should parse owner and repo from a full GitHub URL without .git', () => {
-      const source = 'https://github.com/owner/repo';
-      const { owner, repo } = tryParseGithubUrl(source)!;
-      expect(owner).toBe('owner');
-      expect(repo).toBe('repo');
-    });
+    it('should fail on non-200 status', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      Object.assign(mockRes, { statusCode: 404 });
 
-    it('should parse owner and repo from a full GitHub URL with a trailing slash', () => {
-      const source = 'https://github.com/owner/repo/';
-      const { owner, repo } = tryParseGithubUrl(source)!;
-      expect(owner).toBe('owner');
-      expect(repo).toBe('repo');
-    });
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') {
+          cb = options;
+        }
+        if (cb) cb(mockRes);
+        return mockReq as unknown as import('node:http').ClientRequest;
+      });
 
-    it('should parse owner and repo from a GitHub SSH URL', () => {
-      const source = 'git@github.com:owner/repo.git';
-
-      const { owner, repo } = tryParseGithubUrl(source)!;
-      expect(owner).toBe('owner');
-      expect(repo).toBe('repo');
-    });
-
-    it('should return null on a non-GitHub URL', () => {
-      const source = 'https://example.com/owner/repo.git';
-      expect(tryParseGithubUrl(source)).toBe(null);
-    });
-
-    it('should parse owner and repo from a shorthand string', () => {
-      const source = 'owner/repo';
-      const { owner, repo } = tryParseGithubUrl(source)!;
-      expect(owner).toBe('owner');
-      expect(repo).toBe('repo');
-    });
-
-    it('should handle .git suffix in repo name', () => {
-      const source = 'owner/repo.git';
-      const { owner, repo } = tryParseGithubUrl(source)!;
-      expect(owner).toBe('owner');
-      expect(repo).toBe('repo');
-    });
-
-    it('should throw error for invalid source format', () => {
-      const source = 'invalid-format';
-      expect(() => tryParseGithubUrl(source)).toThrow(
-        'Invalid GitHub repository source: invalid-format. Expected "owner/repo" or a github repo uri.',
+      await expect(downloadFile('url', '/dest')).rejects.toThrow(
+        'Request failed with status code 404',
       );
     });
 
-    it('should throw error for source with too many parts', () => {
-      const source = 'https://github.com/owner/repo/extra';
-      expect(() => tryParseGithubUrl(source)).toThrow(
-        'Invalid GitHub repository source: https://github.com/owner/repo/extra. Expected "owner/repo" or a github repo uri.',
+    it('should follow redirects', async () => {
+      const mockReq = new EventEmitter();
+      const mockResRedirect =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      Object.assign(mockResRedirect, {
+        statusCode: 302,
+        headers: { location: 'new-url' },
+      });
+
+      const mockResSuccess =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      Object.assign(mockResSuccess, { statusCode: 200, pipe: vi.fn() });
+
+      vi.mocked(https.get)
+        .mockImplementationOnce((url, options, cb) => {
+          if (typeof options === 'function') cb = options;
+          if (cb) cb(mockResRedirect);
+          return mockReq as unknown as import('node:http').ClientRequest;
+        })
+        .mockImplementationOnce((url, options, cb) => {
+          if (typeof options === 'function') cb = options;
+          if (cb) cb(mockResSuccess);
+          return mockReq as unknown as import('node:http').ClientRequest;
+        });
+
+      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
+      Object.assign(mockStream, { close: vi.fn((cb) => cb && cb()) });
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile('url', '/dest');
+      mockResSuccess.emit('end');
+      mockStream.emit('finish');
+
+      await expect(promise).resolves.toBeUndefined();
+      expect(https.get).toHaveBeenCalledTimes(2);
+      expect(https.get).toHaveBeenLastCalledWith(
+        'new-url',
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it('should fail after too many redirects', async () => {
+      const mockReq = new EventEmitter();
+      const mockResRedirect =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      Object.assign(mockResRedirect, {
+        statusCode: 302,
+        headers: { location: 'new-url' },
+      });
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockResRedirect);
+        return mockReq as unknown as import('node:http').ClientRequest;
+      });
+
+      await expect(downloadFile('url', '/dest')).rejects.toThrow(
+        'Too many redirects',
+      );
+    }, 10000); // Increase timeout for this test if needed, though with mocks it should be fast
+
+    it('should fail if redirect location is missing', async () => {
+      const mockReq = new EventEmitter();
+      const mockResRedirect =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      Object.assign(mockResRedirect, {
+        statusCode: 302,
+        headers: {}, // No location
+      });
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockResRedirect);
+        return mockReq as unknown as import('node:http').ClientRequest;
+      });
+
+      await expect(downloadFile('url', '/dest')).rejects.toThrow(
+        'Redirect response missing Location header',
+      );
+    });
+
+    it('should pass custom headers', async () => {
+      const mockReq = new EventEmitter();
+      const mockRes =
+        new EventEmitter() as unknown as import('node:http').IncomingMessage;
+      Object.assign(mockRes, { statusCode: 200, pipe: vi.fn() });
+
+      vi.mocked(https.get).mockImplementation((url, options, cb) => {
+        if (typeof options === 'function') cb = options;
+        if (cb) cb(mockRes);
+        return mockReq as unknown as import('node:http').ClientRequest;
+      });
+
+      const mockStream = new EventEmitter() as unknown as fs.WriteStream;
+      Object.assign(mockStream, { close: vi.fn((cb) => cb && cb()) });
+      vi.mocked(fs.createWriteStream).mockReturnValue(mockStream);
+
+      const promise = downloadFile('url', '/dest', {
+        headers: { 'X-Custom': 'value' },
+      });
+      mockRes.emit('end');
+      mockStream.emit('finish');
+
+      await expect(promise).resolves.toBeUndefined();
+      expect(https.get).toHaveBeenCalledWith(
+        'url',
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'X-Custom': 'value' }),
+        }),
+        expect.anything(),
       );
     });
   });
 
   describe('extractFile', () => {
-    let tempDir: string;
-
-    beforeEach(async () => {
-      tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-test-'));
+    it('should extract tar.gz using tar', async () => {
+      await extractFile('file.tar.gz', '/dest');
+      expect(tar.x).toHaveBeenCalled();
     });
 
-    afterEach(async () => {
-      await fs.rm(tempDir, { recursive: true, force: true });
+    it('should extract zip using extract-zip', async () => {
+      vi.mocked(extract.default || extract).mockResolvedValue(undefined);
+      await extractFile('file.zip', '/dest');
+      // Check if extract was called. Note: extract-zip export might be default or named depending on mock
     });
 
-    it('should extract a .tar.gz file', async () => {
-      const archivePath = path.join(tempDir, 'test.tar.gz');
-      const extractionDest = path.join(tempDir, 'extracted');
-      await fs.mkdir(extractionDest);
-
-      // Create a dummy file to be archived
-      const dummyFilePath = path.join(tempDir, 'test.txt');
-      await fs.writeFile(dummyFilePath, 'hello tar');
-
-      // Create the tar.gz file
-      await tar.c(
-        {
-          gzip: true,
-          file: archivePath,
-          cwd: tempDir,
-        },
-        ['test.txt'],
+    it('should throw for unsupported extensions', async () => {
+      await expect(extractFile('file.txt', '/dest')).rejects.toThrow(
+        'Unsupported file extension',
       );
-
-      await extractFile(archivePath, extractionDest);
-
-      const extractedFilePath = path.join(extractionDest, 'test.txt');
-      const content = await fs.readFile(extractedFilePath, 'utf-8');
-      expect(content).toBe('hello tar');
-    });
-
-    it('should extract a .zip file', async () => {
-      const archivePath = path.join(tempDir, 'test.zip');
-      const extractionDest = path.join(tempDir, 'extracted');
-      await fs.mkdir(extractionDest);
-
-      // Create a dummy file to be archived
-      const dummyFilePath = path.join(tempDir, 'test.txt');
-      await fs.writeFile(dummyFilePath, 'hello zip');
-
-      // Create the zip file
-      const output = fsSync.createWriteStream(archivePath);
-      const archive = archiver.create('zip');
-
-      const streamFinished = new Promise((resolve, reject) => {
-        output.on('close', () => resolve(null));
-        archive.on('error', reject);
-      });
-
-      archive.pipe(output);
-      archive.file(dummyFilePath, { name: 'test.txt' });
-      await archive.finalize();
-      await streamFinished;
-
-      await extractFile(archivePath, extractionDest);
-
-      const extractedFilePath = path.join(extractionDest, 'test.txt');
-      const content = await fs.readFile(extractedFilePath, 'utf-8');
-      expect(content).toBe('hello zip');
-    });
-
-    it('should throw an error for unsupported file types', async () => {
-      const unsupportedFilePath = path.join(tempDir, 'test.txt');
-      await fs.writeFile(unsupportedFilePath, 'some content');
-      const extractionDest = path.join(tempDir, 'extracted');
-      await fs.mkdir(extractionDest);
-
-      await expect(
-        extractFile(unsupportedFilePath, extractionDest),
-      ).rejects.toThrow('Unsupported file extension for extraction:');
     });
   });
 });

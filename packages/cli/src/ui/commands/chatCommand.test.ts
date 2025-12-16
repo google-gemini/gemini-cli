@@ -10,7 +10,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { SlashCommand, CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { Content } from '@google/genai';
-import type { GeminiClient } from '@google/gemini-cli-core';
+import { AuthType, type GeminiClient } from '@google/gemini-cli-core';
 
 import * as fsPromises from 'node:fs/promises';
 import { chatCommand, serializeHistoryToMarkdown } from './chatCommand.js';
@@ -52,7 +52,7 @@ describe('chatCommand', () => {
       getHistory: mockGetHistory,
     });
     mockSaveCheckpoint = vi.fn().mockResolvedValue(undefined);
-    mockLoadCheckpoint = vi.fn().mockResolvedValue([]);
+    mockLoadCheckpoint = vi.fn().mockResolvedValue({ history: [] });
     mockDeleteCheckpoint = vi.fn().mockResolvedValue(true);
 
     mockContext = createMockCommandContext({
@@ -66,6 +66,9 @@ describe('chatCommand', () => {
           storage: {
             getProjectTempDir: () => '/project/root/.gemini/tmp/mockhash',
           },
+          getContentGeneratorConfig: () => ({
+            authType: AuthType.LOGIN_WITH_GOOGLE,
+          }),
         },
         logger: {
           saveCheckpoint: mockSaveCheckpoint,
@@ -215,7 +218,10 @@ describe('chatCommand', () => {
       const result = await saveCommand?.action?.(mockContext, tag);
 
       expect(mockCheckpointExists).not.toHaveBeenCalled(); // Should skip existence check
-      expect(mockSaveCheckpoint).toHaveBeenCalledWith(history, tag);
+      expect(mockSaveCheckpoint).toHaveBeenCalledWith(
+        { history, authType: AuthType.LOGIN_WITH_GOOGLE },
+        tag,
+      );
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
@@ -244,7 +250,7 @@ describe('chatCommand', () => {
     });
 
     it('should inform if checkpoint is not found', async () => {
-      mockLoadCheckpoint.mockResolvedValue([]);
+      mockLoadCheckpoint.mockResolvedValue({ history: [] });
 
       const result = await resumeCommand?.action?.(mockContext, badTag);
 
@@ -255,12 +261,53 @@ describe('chatCommand', () => {
       });
     });
 
-    it('should resume a conversation', async () => {
+    it('should resume a conversation with matching authType', async () => {
       const conversation: Content[] = [
         { role: 'user', parts: [{ text: 'hello gemini' }] },
         { role: 'model', parts: [{ text: 'hello world' }] },
       ];
-      mockLoadCheckpoint.mockResolvedValue(conversation);
+      mockLoadCheckpoint.mockResolvedValue({
+        history: conversation,
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      });
+
+      const result = await resumeCommand?.action?.(mockContext, goodTag);
+
+      expect(result).toEqual({
+        type: 'load_history',
+        history: [
+          { type: 'user', text: 'hello gemini' },
+          { type: 'gemini', text: 'hello world' },
+        ] as HistoryItemWithoutId[],
+        clientHistory: conversation,
+      });
+    });
+
+    it('should block resuming a conversation with mismatched authType', async () => {
+      const conversation: Content[] = [
+        { role: 'user', parts: [{ text: 'hello gemini' }] },
+        { role: 'model', parts: [{ text: 'hello world' }] },
+      ];
+      mockLoadCheckpoint.mockResolvedValue({
+        history: conversation,
+        authType: AuthType.USE_GEMINI,
+      });
+
+      const result = await resumeCommand?.action?.(mockContext, goodTag);
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: `Cannot resume chat. It was saved with a different authentication method (${AuthType.USE_GEMINI}) than the current one (${AuthType.LOGIN_WITH_GOOGLE}).`,
+      });
+    });
+
+    it('should resume a legacy conversation without authType', async () => {
+      const conversation: Content[] = [
+        { role: 'user', parts: [{ text: 'hello gemini' }] },
+        { role: 'model', parts: [{ text: 'hello world' }] },
+      ];
+      mockLoadCheckpoint.mockResolvedValue({ history: conversation });
 
       const result = await resumeCommand?.action?.(mockContext, goodTag);
 
@@ -279,7 +326,7 @@ describe('chatCommand', () => {
         const fakeFiles = ['checkpoint-alpha.json', 'checkpoint-beta.json'];
         mockFs.readdir.mockImplementation(
           (async (_: string): Promise<string[]> =>
-            fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
+            fakeFiles) as unknown as typeof fsPromises.readdir,
         );
 
         mockFs.stat.mockImplementation(
@@ -299,7 +346,7 @@ describe('chatCommand', () => {
         const date = new Date();
         mockFs.readdir.mockImplementation(
           (async (_: string): Promise<string[]> =>
-            fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
+            fakeFiles) as unknown as typeof fsPromises.readdir,
         );
         mockFs.stat.mockImplementation((async (
           path: string,
@@ -359,7 +406,7 @@ describe('chatCommand', () => {
         const fakeFiles = ['checkpoint-alpha.json', 'checkpoint-beta.json'];
         mockFs.readdir.mockImplementation(
           (async (_: string): Promise<string[]> =>
-            fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
+            fakeFiles) as unknown as typeof fsPromises.readdir,
         );
 
         mockFs.stat.mockImplementation(
@@ -431,25 +478,25 @@ describe('chatCommand', () => {
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
       const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
       expect(actualPath).toEqual(expectedPath);
-      const expectedContent = `🧑‍💻 ## USER
+      const expectedContent = `## USER 🧑‍💻
 
 context
 
 ---
 
-✨ ## MODEL
+## MODEL ✨
 
 context response
 
 ---
 
-🧑‍💻 ## USER
+## USER 🧑‍💻
 
 Hello
 
 ---
 
-✨ ## MODEL
+## MODEL ✨
 
 Hi there!`;
       expect(actualContent).toEqual(expectedContent);
@@ -523,7 +570,7 @@ Hi there!`;
         const { role, parts } = mockHistory[index];
         const text = parts.map((p) => p.text).join('');
         const roleIcon = role === 'user' ? '🧑‍💻' : '✨';
-        expect(entry).toBe(`${roleIcon} ## ${role.toUpperCase()}\n\n${text}`);
+        expect(entry).toBe(`## ${role.toUpperCase()} ${roleIcon}\n\n${text}`);
       });
     });
   });
@@ -537,9 +584,9 @@ Hi there!`;
       ];
 
       const expectedMarkdown =
-        '🧑‍💻 ## USER\n\nHello\n\n---\n\n' +
-        '✨ ## MODEL\n\nHi there!\n\n---\n\n' +
-        '🧑‍💻 ## USER\n\nHow are you?';
+        '## USER 🧑‍💻\n\nHello\n\n---\n\n' +
+        '## MODEL ✨\n\nHi there!\n\n---\n\n' +
+        '## USER 🧑‍💻\n\nHow are you?';
 
       const result = serializeHistoryToMarkdown(history);
       expect(result).toBe(expectedMarkdown);
@@ -558,19 +605,19 @@ Hi there!`;
         { role: 'user', parts: [{ text: 'How are you?' }] },
       ];
 
-      const expectedMarkdown = `🧑‍💻 ## USER
+      const expectedMarkdown = `## USER 🧑‍💻
 
 Hello
 
 ---
 
-✨ ## MODEL
+## MODEL ✨
 
 
 
 ---
 
-🧑‍💻 ## USER
+## USER 🧑‍💻
 
 How are you?`;
 
@@ -608,13 +655,13 @@ How are you?`;
         },
       ];
 
-      const expectedMarkdown = `🧑‍💻 ## USER
+      const expectedMarkdown = `## USER 🧑‍💻
 
 Please call a function.
 
 ---
 
-✨ ## MODEL
+## MODEL ✨
 
 **Tool Command**:
 \`\`\`json
@@ -628,7 +675,7 @@ Please call a function.
 
 ---
 
-🧑‍💻 ## USER
+## USER 🧑‍💻
 
 **Tool Response**:
 \`\`\`json
@@ -650,13 +697,13 @@ Please call a function.
         { parts: [{ text: 'Hi there!' }] },
       ];
 
-      const expectedMarkdown = `🧑‍💻 ## USER
+      const expectedMarkdown = `## USER 🧑‍💻
 
 Hello
 
 ---
 
-✨ ## MODEL
+## MODEL ✨
 
 Hi there!`;
 

@@ -4,15 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
+import { join } from 'node:path';
 
 describe('Flicker Detector', () => {
-  // TODO: https://github.com/google-gemini/gemini-cli/issues/11170
-  it.skip('should not detect a flicker under the max height budget', async () => {
-    const rig = new TestRig();
-    await rig.setup('flicker-detector-test');
+  let rig: TestRig;
 
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
+  it('should not detect a flicker under the max height budget', async () => {
+    rig.setup('flicker-detector-test', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'flicker-detector.max-height.responses',
+      ),
+    });
     const run = await rig.runInteractive();
     const prompt = 'Tell me a fun fact.';
     await run.type(prompt);

@@ -7,16 +7,18 @@
 import type { Attributes, Meter, Counter, Histogram } from '@opentelemetry/api';
 import { diag, metrics, ValueType } from '@opentelemetry/api';
 import { SERVICE_NAME } from './constants.js';
-import { EVENT_CHAT_COMPRESSION } from './types.js';
 import type { Config } from '../config/config.js';
 import type {
   ModelRoutingEvent,
   ModelSlashCommandEvent,
   AgentFinishEvent,
+  RecoveryAttemptEvent,
 } from './types.js';
 import { AuthType } from '../core/contentGenerator.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
+import { sanitizeHookName } from './sanitize.js';
 
+const EVENT_CHAT_COMPRESSION = 'gemini_cli.chat_compression';
 const TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
 const TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
 const API_REQUEST_COUNT = 'gemini_cli.api.request.count';
@@ -24,6 +26,7 @@ const API_REQUEST_LATENCY = 'gemini_cli.api.request.latency';
 const TOKEN_USAGE = 'gemini_cli.token.usage';
 const SESSION_COUNT = 'gemini_cli.session.count';
 const FILE_OPERATION_COUNT = 'gemini_cli.file.operation.count';
+const LINES_CHANGED = 'gemini_cli.lines.changed';
 const INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
 const CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
 const CONTENT_RETRY_FAILURE_COUNT =
@@ -32,11 +35,16 @@ const MODEL_ROUTING_LATENCY = 'gemini_cli.model_routing.latency';
 const MODEL_ROUTING_FAILURE_COUNT = 'gemini_cli.model_routing.failure.count';
 const MODEL_SLASH_COMMAND_CALL_COUNT =
   'gemini_cli.slash_command.model.call_count';
+const EVENT_HOOK_CALL_COUNT = 'gemini_cli.hook_call.count';
+const EVENT_HOOK_CALL_LATENCY = 'gemini_cli.hook_call.latency';
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
 const AGENT_DURATION_MS = 'gemini_cli.agent.duration';
 const AGENT_TURNS = 'gemini_cli.agent.turns';
+const AGENT_RECOVERY_ATTEMPT_COUNT = 'gemini_cli.agent.recovery_attempt.count';
+const AGENT_RECOVERY_ATTEMPT_DURATION =
+  'gemini_cli.agent.recovery_attempt.duration';
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 const GEN_AI_CLIENT_TOKEN_USAGE = 'gen_ai.client.token.usage';
@@ -56,6 +64,7 @@ const REGRESSION_PERCENTAGE_CHANGE =
   'gemini_cli.performance.regression.percentage_change';
 const BASELINE_COMPARISON = 'gemini_cli.performance.baseline.comparison';
 const FLICKER_FRAME_COUNT = 'gemini_cli.ui.flicker.count';
+const SLOW_RENDER_LATENCY = 'gemini_cli.ui.slow_render.latency';
 const EXIT_FAIL_COUNT = 'gemini_cli.exit.fail.count';
 
 const baseMetricDefinition = {
@@ -72,11 +81,6 @@ const COUNTER_DEFINITIONS = {
       success: boolean;
       decision?: 'accept' | 'reject' | 'modify' | 'auto_accept';
       tool_type?: 'native' | 'mcp';
-      // Optional diff statistics for file-modifying tools
-      model_added_lines?: number;
-      model_removed_lines?: number;
-      user_added_lines?: number;
-      user_removed_lines?: number;
     },
   },
   [API_REQUEST_COUNT]: {
@@ -114,6 +118,15 @@ const COUNTER_DEFINITIONS = {
       mimetype?: string;
       extension?: string;
       programming_language?: string;
+    },
+  },
+  [LINES_CHANGED]: {
+    description: 'Number of lines changed (from file diffs).',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (linesChangedCounter = c),
+    attributes: {} as {
+      function_name?: string;
+      type: 'added' | 'removed';
     },
   },
   [INVALID_CHUNK_COUNT]: {
@@ -169,6 +182,16 @@ const COUNTER_DEFINITIONS = {
       terminate_reason: string;
     },
   },
+  [AGENT_RECOVERY_ATTEMPT_COUNT]: {
+    description: 'Counts agent recovery attempts.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (agentRecoveryAttemptCounter = c),
+    attributes: {} as {
+      agent_name: string;
+      reason: string;
+      success: boolean;
+    },
+  },
   [FLICKER_FRAME_COUNT]: {
     description:
       'Counts UI frames that flicker (render taller than the terminal).',
@@ -181,6 +204,16 @@ const COUNTER_DEFINITIONS = {
     valueType: ValueType.INT,
     assign: (c: Counter) => (exitFailCounter = c),
     attributes: {} as Record<string, never>,
+  },
+  [EVENT_HOOK_CALL_COUNT]: {
+    description: 'Counts hook calls, tagged by hook event name and success.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (hookCallCounter = c),
+    attributes: {} as {
+      hook_event_name: string;
+      hook_name: string;
+      success: boolean;
+    },
   },
 } as const;
 
@@ -222,11 +255,27 @@ const HISTOGRAM_DEFINITIONS = {
       agent_name: string;
     },
   },
+  [SLOW_RENDER_LATENCY]: {
+    description: 'Counts UI frames that take too long to render.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (slowRenderHistogram = h),
+    attributes: {} as Record<string, never>,
+  },
   [AGENT_TURNS]: {
     description: 'Number of turns taken by agents.',
     unit: 'turns',
     valueType: ValueType.INT,
     assign: (h: Histogram) => (agentTurnsHistogram = h),
+    attributes: {} as {
+      agent_name: string;
+    },
+  },
+  [AGENT_RECOVERY_ATTEMPT_DURATION]: {
+    description: 'Duration of agent recovery attempts in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (agentRecoveryAttemptDurationHistogram = h),
     attributes: {} as {
       agent_name: string;
     },
@@ -259,6 +308,17 @@ const HISTOGRAM_DEFINITIONS = {
       'server.address'?: string;
       'server.port'?: number;
       'error.type'?: string;
+    },
+  },
+  [EVENT_HOOK_CALL_LATENCY]: {
+    description: 'Latency of hook calls in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (c: Histogram) => (hookCallLatencyHistogram = c),
+    attributes: {} as {
+      hook_event_name: string;
+      hook_name: string;
+      success: boolean;
     },
   },
 } as const;
@@ -454,6 +514,7 @@ let apiRequestLatencyHistogram: Histogram | undefined;
 let tokenUsageCounter: Counter | undefined;
 let sessionCounter: Counter | undefined;
 let fileOperationCounter: Counter | undefined;
+let linesChangedCounter: Counter | undefined;
 let chatCompressionCounter: Counter | undefined;
 let invalidChunkCounter: Counter | undefined;
 let contentRetryCounter: Counter | undefined;
@@ -464,8 +525,13 @@ let modelSlashCommandCallCounter: Counter | undefined;
 let agentRunCounter: Counter | undefined;
 let agentDurationHistogram: Histogram | undefined;
 let agentTurnsHistogram: Histogram | undefined;
+let agentRecoveryAttemptCounter: Counter | undefined;
+let agentRecoveryAttemptDurationHistogram: Histogram | undefined;
 let flickerFrameCounter: Counter | undefined;
 let exitFailCounter: Counter | undefined;
+let slowRenderHistogram: Histogram | undefined;
+let hookCallCounter: Counter | undefined;
+let hookCallLatencyHistogram: Histogram | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -621,6 +687,21 @@ export function recordFileOperationMetric(
   });
 }
 
+export function recordLinesChanged(
+  config: Config,
+  lines: number,
+  changeType: 'added' | 'removed',
+  attributes?: { function_name?: string },
+): void {
+  if (!linesChangedCounter || !isMetricsInitialized) return;
+  if (!Number.isFinite(lines) || lines <= 0) return;
+  linesChangedCounter.add(lines, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    type: changeType,
+    ...(attributes ?? {}),
+  });
+}
+
 // --- New Metric Recording Functions ---
 
 /**
@@ -637,6 +718,16 @@ export function recordFlickerFrame(config: Config): void {
 export function recordExitFail(config: Config): void {
   if (!exitFailCounter || !isMetricsInitialized) return;
   exitFailCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
+}
+
+/**
+ * Records a metric for when a UI frame is slow in rendering
+ */
+export function recordSlowRender(config: Config, renderLatency: number): void {
+  if (!slowRenderHistogram || !isMetricsInitialized) return;
+  slowRenderHistogram.record(renderLatency, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+  });
 }
 
 /**
@@ -734,6 +825,32 @@ export function recordAgentRunMetrics(
   });
 }
 
+export function recordRecoveryAttemptMetrics(
+  config: Config,
+  event: RecoveryAttemptEvent,
+): void {
+  if (
+    !agentRecoveryAttemptCounter ||
+    !agentRecoveryAttemptDurationHistogram ||
+    !isMetricsInitialized
+  )
+    return;
+
+  const commonAttributes = baseMetricDefinition.getCommonAttributes(config);
+
+  agentRecoveryAttemptCounter.add(1, {
+    ...commonAttributes,
+    agent_name: event.agent_name,
+    reason: event.reason,
+    success: event.success,
+  });
+
+  agentRecoveryAttemptDurationHistogram.record(event.duration_ms, {
+    ...commonAttributes,
+    agent_name: event.agent_name,
+  });
+}
+
 // OpenTelemetry GenAI Semantic Convention Recording Functions
 
 export function recordGenAiClientTokenUsage(
@@ -795,7 +912,7 @@ export function getConventionAttributes(event: {
 function getGenAiProvider(authType?: string): GenAiProviderName {
   switch (authType) {
     case AuthType.USE_VERTEX_AI:
-    case AuthType.CLOUD_SHELL:
+    case AuthType.COMPUTE_ADC:
     case AuthType.LOGIN_WITH_GOOGLE:
       return GenAiProviderName.GCP_VERTEX_AI;
     case AuthType.USE_GEMINI:
@@ -1070,4 +1187,28 @@ export function recordApiResponseMetrics(
       ...attributes.genAiAttributes,
     });
   }
+}
+
+export function recordHookCallMetrics(
+  config: Config,
+  hookEventName: string,
+  hookName: string,
+  durationMs: number,
+  success: boolean,
+): void {
+  if (!hookCallCounter || !hookCallLatencyHistogram || !isMetricsInitialized)
+    return;
+
+  // Always sanitize hook names in metrics (metrics are aggregated and exposed)
+  const sanitizedHookName = sanitizeHookName(hookName);
+
+  const metricAttributes: Attributes = {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    hook_event_name: hookEventName,
+    hook_name: sanitizedHookName,
+    success,
+  };
+
+  hookCallCounter.add(1, metricAttributes);
+  hookCallLatencyHistogram.record(durationMs, metricAttributes);
 }

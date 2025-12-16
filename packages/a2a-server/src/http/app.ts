@@ -6,9 +6,14 @@
 
 import express from 'express';
 
-import type { AgentCard } from '@a2a-js/sdk';
+import type { AgentCard, Message } from '@a2a-js/sdk';
 import type { TaskStore } from '@a2a-js/sdk/server';
-import { DefaultRequestHandler, InMemoryTaskStore } from '@a2a-js/sdk/server';
+import {
+  DefaultRequestHandler,
+  InMemoryTaskStore,
+  DefaultExecutionEventBus,
+  type AgentExecutionEvent,
+} from '@a2a-js/sdk/server';
 import { A2AExpressApp } from '@a2a-js/sdk/server/express'; // Import server components
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
@@ -21,6 +26,15 @@ import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { commandRegistry } from '../commands/command-registry.js';
 import { SimpleExtensionLoader } from '@google/gemini-cli-core';
+import type { Command, CommandArgument } from '../commands/types.js';
+import { GitService } from '@google/gemini-cli-core';
+
+type CommandResponse = {
+  name: string;
+  description: string;
+  arguments: CommandArgument[];
+  subCommands: CommandResponse[];
+};
 
 const coderAgentCard: AgentCard = {
   name: 'Gemini SDLC Agent',
@@ -64,6 +78,76 @@ export function updateCoderAgentCardUrl(port: number) {
   coderAgentCard.url = `http://localhost:${port}/`;
 }
 
+async function handleExecuteCommand(
+  req: express.Request,
+  res: express.Response,
+  context: {
+    config: Awaited<ReturnType<typeof loadConfig>>;
+    git: GitService | undefined;
+    agentExecutor: CoderAgentExecutor;
+  },
+) {
+  logger.info('[CoreAgent] Received /executeCommand request: ', req.body);
+  const { command, args } = req.body;
+  try {
+    if (typeof command !== 'string') {
+      return res.status(400).json({ error: 'Invalid "command" field.' });
+    }
+
+    if (args && !Array.isArray(args)) {
+      return res.status(400).json({ error: '"args" field must be an array.' });
+    }
+
+    const commandToExecute = commandRegistry.get(command);
+
+    if (commandToExecute?.requiresWorkspace) {
+      if (!process.env['CODER_AGENT_WORKSPACE_PATH']) {
+        return res.status(400).json({
+          error: `Command "${command}" requires a workspace, but CODER_AGENT_WORKSPACE_PATH is not set.`,
+        });
+      }
+    }
+
+    if (!commandToExecute) {
+      return res.status(404).json({ error: `Command not found: ${command}` });
+    }
+
+    if (commandToExecute.streaming) {
+      const eventBus = new DefaultExecutionEventBus();
+      res.setHeader('Content-Type', 'text/event-stream');
+      const eventHandler = (event: AgentExecutionEvent) => {
+        const jsonRpcResponse = {
+          jsonrpc: '2.0',
+          id: 'taskId' in event ? event.taskId : (event as Message).messageId,
+          result: event,
+        };
+        res.write(`data: ${JSON.stringify(jsonRpcResponse)}\n`);
+      };
+      eventBus.on('event', eventHandler);
+
+      await commandToExecute.execute({ ...context, eventBus }, args ?? []);
+
+      eventBus.off('event', eventHandler);
+      eventBus.finished();
+      return res.end(); // Explicit return for streaming path
+    } else {
+      const result = await commandToExecute.execute(context, args ?? []);
+      logger.info('[CoreAgent] Sending /executeCommand response: ', result);
+      return res.status(200).json(result);
+    }
+  } catch (e) {
+    logger.error(
+      `Error executing /executeCommand: ${command} with args: ${JSON.stringify(
+        args,
+      )}`,
+      e,
+    );
+    const errorMessage =
+      e instanceof Error ? e.message : 'Unknown error executing command';
+    return res.status(500).json({ error: errorMessage });
+  }
+}
+
 export async function createApp() {
   try {
     // Load the server configuration once on startup.
@@ -76,6 +160,12 @@ export async function createApp() {
       new SimpleExtensionLoader(extensions),
       'a2a-server',
     );
+
+    let git: GitService | undefined;
+    if (config.getCheckpointingEnabled()) {
+      git = new GitService(config.getTargetDir(), config.storage);
+      await git.initialize();
+    }
 
     // loadEnvironment() is called within getConfig now
     const bucketName = process.env['GCS_BUCKET_NAME'];
@@ -95,6 +185,8 @@ export async function createApp() {
     }
 
     const agentExecutor = new CoderAgentExecutor(taskStoreForExecutor);
+
+    const context = { config, git, agentExecutor };
 
     const requestHandler = new DefaultRequestHandler(
       coderAgentCard,
@@ -135,34 +227,48 @@ export async function createApp() {
       }
     });
 
-    expressApp.post('/executeCommand', async (req, res) => {
+    expressApp.post('/executeCommand', (req, res) => {
+      void handleExecuteCommand(req, res, context);
+    });
+
+    expressApp.get('/listCommands', (req, res) => {
       try {
-        const { command, args } = req.body;
+        const transformCommand = (
+          command: Command,
+          visited: string[],
+        ): CommandResponse | undefined => {
+          const commandName = command.name;
+          if (visited.includes(commandName)) {
+            console.warn(
+              `Command ${commandName} already inserted in the response, skipping`,
+            );
+            return undefined;
+          }
 
-        if (typeof command !== 'string') {
-          return res.status(400).json({ error: 'Invalid "command" field.' });
-        }
+          return {
+            name: command.name,
+            description: command.description,
+            arguments: command.arguments ?? [],
+            subCommands: (command.subCommands ?? [])
+              .map((subCommand) =>
+                transformCommand(subCommand, visited.concat(commandName)),
+              )
+              .filter(
+                (subCommand): subCommand is CommandResponse => !!subCommand,
+              ),
+          };
+        };
 
-        if (args && !Array.isArray(args)) {
-          return res
-            .status(400)
-            .json({ error: '"args" field must be an array.' });
-        }
+        const commands = commandRegistry
+          .getAllCommands()
+          .filter((command) => command.topLevel)
+          .map((command) => transformCommand(command, []));
 
-        const commandToExecute = commandRegistry.get(command);
-
-        if (!commandToExecute) {
-          return res
-            .status(404)
-            .json({ error: `Command not found: ${command}` });
-        }
-
-        const result = await commandToExecute.execute(config, args ?? []);
-        return res.status(200).json(result);
+        return res.status(200).json({ commands });
       } catch (e) {
-        logger.error('Error executing /executeCommand:', e);
+        logger.error('Error executing /listCommands:', e);
         const errorMessage =
-          e instanceof Error ? e.message : 'Unknown error executing command';
+          e instanceof Error ? e.message : 'Unknown error listing commands';
         return res.status(500).json({ error: errorMessage });
       }
     });

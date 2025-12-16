@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import { parse, stringify } from 'comment-json';
+import { coreEvents } from '@google/gemini-cli-core';
 
 /**
  * Type representing an object that may contain Symbol keys for comments.
@@ -30,9 +31,10 @@ export function updateSettingsFilePreservingFormat(
   try {
     parsed = parse(originalContent) as Record<string, unknown>;
   } catch (error) {
-    console.error('Error parsing settings file:', error);
-    console.error(
-      'Settings file may be corrupted. Please check the JSON syntax.',
+    coreEvents.emitFeedback(
+      'error',
+      'Error parsing settings file. Please check the JSON syntax.',
+      error,
     );
     return;
   }

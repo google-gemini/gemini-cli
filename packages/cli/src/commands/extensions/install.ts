@@ -18,6 +18,7 @@ import {
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 interface InstallArgs {
   source: string;
@@ -76,10 +77,12 @@ export async function handleInstall(args: InstallArgs) {
       requestSetting: promptForSetting,
       settings: loadSettings(workspaceDir).merged,
     });
-    extensionManager.loadExtensions();
-    const name =
+    await extensionManager.loadExtensions();
+    const extension =
       await extensionManager.installOrUpdateExtension(installMetadata);
-    debugLogger.log(`Extension "${name}" installed successfully and enabled.`);
+    debugLogger.log(
+      `Extension "${extension.name}" installed successfully and enabled.`,
+    );
   } catch (error) {
     debugLogger.error(getErrorMessage(error));
     process.exit(1);
@@ -128,5 +131,6 @@ export const installCommand: CommandModule = {
       allowPreRelease: argv['pre-release'] as boolean | undefined,
       consent: argv['consent'] as boolean | undefined,
     });
+    await exitCli();
   },
 };

@@ -5,9 +5,11 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { act } from 'react';
 import { vi } from 'vitest';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
+import { ExitCodes } from '@google/gemini-cli-core';
 import * as processUtils from '../../utils/processUtils.js';
 
 vi.mock('../../utils/processUtils.js', () => ({
@@ -54,13 +56,15 @@ describe('FolderTrustDialog', () => {
       stdin.write('\u001b[27u'); // Press kitty escape key
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(lastFrame()).toContain(
         'A folder trust level must be selected to continue. Exiting since escape was pressed.',
       );
     });
-    await vi.waitFor(() => {
-      expect(mockedExit).toHaveBeenCalledWith(1);
+    await waitFor(() => {
+      expect(mockedExit).toHaveBeenCalledWith(
+        ExitCodes.FATAL_CANCELLATION_ERROR,
+      );
     });
     expect(onSelect).not.toHaveBeenCalled();
   });
@@ -93,7 +97,7 @@ describe('FolderTrustDialog', () => {
       stdin.write('r');
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockedExit).not.toHaveBeenCalled();
     });
   });

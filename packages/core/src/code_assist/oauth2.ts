@@ -15,11 +15,16 @@ import * as http from 'node:http';
 import url from 'node:url';
 import crypto from 'node:crypto';
 import * as net from 'node:net';
+import { EventEmitter } from 'node:events';
 import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import type { Config } from '../config/config.js';
-import { getErrorMessage, FatalAuthenticationError } from '../utils/errors.js';
+import {
+  getErrorMessage,
+  FatalAuthenticationError,
+  FatalCancellationError,
+} from '../utils/errors.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import { AuthType } from '../core/contentGenerator.js';
 import readline from 'node:readline';
@@ -27,6 +32,36 @@ import { Storage } from '../config/storage.js';
 import { OAuthCredentialStorage } from './oauth-credential-storage.js';
 import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  writeToStdout,
+  createWorkingStdio,
+  writeToStderr,
+} from '../utils/stdio.js';
+import {
+  enableLineWrapping,
+  disableMouseEvents,
+  disableKittyKeyboardProtocol,
+  enterAlternateScreen,
+  exitAlternateScreen,
+} from '../utils/terminal.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
+
+export const authEvents = new EventEmitter();
+
+async function triggerPostAuthCallbacks(tokens: Credentials) {
+  // Construct a JWTInput object to pass to callbacks, as this is the
+  // type expected by the downstream Google Cloud client libraries.
+  const jwtInput: JWTInput = {
+    client_id: OAUTH_CLIENT_ID,
+    client_secret: OAUTH_CLIENT_SECRET,
+    refresh_token: tokens.refresh_token ?? undefined, // Ensure null is not passed
+    type: 'authorized_user',
+    client_email: userAccountManager.getCachedGoogleAccount() ?? undefined,
+  };
+
+  // Execute all registered post-authentication callbacks.
+  authEvents.emit('post_auth', jwtInput);
+}
 
 const userAccountManager = new UserAccountManager();
 
@@ -122,6 +157,8 @@ async function initOauthClient(
     } else {
       await cacheCredentials(tokens);
     }
+
+    await triggerPostAuthCallbacks(tokens);
   });
 
   if (credentials) {
@@ -145,6 +182,8 @@ async function initOauthClient(
           }
         }
         debugLogger.log('Loaded cached credentials.');
+        await triggerPostAuthCallbacks(credentials as Credentials);
+
         return client;
       }
     } catch (error) {
@@ -155,12 +194,15 @@ async function initOauthClient(
     }
   }
 
-  // In Google Cloud Shell, we can use Application Default Credentials (ADC)
-  // provided via its metadata server to authenticate non-interactively using
-  // the identity of the user logged into Cloud Shell.
-  if (authType === AuthType.CLOUD_SHELL) {
+  // In Google Compute Engine based environments (including Cloud Shell), we can
+  // use Application Default Credentials (ADC) provided via its metadata server
+  // to authenticate non-interactively using the identity of the logged-in user.
+  if (authType === AuthType.COMPUTE_ADC) {
     try {
-      debugLogger.log("Attempting to authenticate via Cloud Shell VM's ADC.");
+      debugLogger.log(
+        'Attempting to authenticate via metadata server application default credentials.',
+      );
+
       const computeClient = new Compute({
         // We can leave this empty, since the metadata server will provide
         // the service account email.
@@ -172,7 +214,7 @@ async function initOauthClient(
       return computeClient;
     } catch (e) {
       throw new Error(
-        `Could not authenticate using Cloud Shell credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ${getErrorMessage(
+        `Could not authenticate using metadata server application default credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ${getErrorMessage(
           e,
         )}`,
       );
@@ -182,28 +224,60 @@ async function initOauthClient(
   if (config.isBrowserLaunchSuppressed()) {
     let success = false;
     const maxRetries = 2;
-    for (let i = 0; !success && i < maxRetries; i++) {
-      success = await authWithUserCode(client);
-      if (!success) {
-        debugLogger.error(
-          '\nFailed to authenticate with user code.',
-          i === maxRetries - 1 ? '' : 'Retrying...\n',
-        );
+    // Enter alternate buffer
+    enterAlternateScreen();
+    // Clear screen and move cursor to top-left.
+    writeToStdout('\u001B[2J\u001B[H');
+    disableMouseEvents();
+    disableKittyKeyboardProtocol();
+    enableLineWrapping();
+
+    try {
+      for (let i = 0; !success && i < maxRetries; i++) {
+        success = await authWithUserCode(client);
+        if (!success) {
+          writeToStderr(
+            '\nFailed to authenticate with user code.' +
+              (i === maxRetries - 1 ? '' : ' Retrying...\n'),
+          );
+        }
       }
+    } finally {
+      exitAlternateScreen();
+      // If this was triggered from an active Gemini CLI TUI this event ensures
+      // the TUI will re-initialize the terminal state just like it will when
+      // another editor like VIM may have modified the buffer of settings.
+      coreEvents.emit(CoreEvent.ExternalEditorClosed);
     }
+
     if (!success) {
+      writeToStderr('Failed to authenticate with user code.\n');
       throw new FatalAuthenticationError(
         'Failed to authenticate with user code.',
       );
     }
+
+    // Retrieve and cache Google Account ID after successful user code auth
+    try {
+      await fetchAndCacheUserInfo(client);
+    } catch (error) {
+      debugLogger.warn(
+        'Failed to retrieve Google Account ID during authentication:',
+        getErrorMessage(error),
+      );
+    }
+
+    await triggerPostAuthCallbacks(client.credentials);
   } else {
     const webLogin = await authWithWeb(client);
 
-    debugLogger.log(
-      `\n\nCode Assist login required.\n` +
+    coreEvents.emit(CoreEvent.UserFeedback, {
+      severity: 'info',
+      message:
+        `\n\nCode Assist login required.\n` +
         `Attempting to open authentication page in your browser.\n` +
-        `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
-    );
+        `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n\n`,
+    });
     try {
       // Attempt to open the authentication URL in the default browser.
       // We do not use the `wait` option here because the main script's execution
@@ -215,23 +289,28 @@ async function initOauthClient(
       // in a minimal Docker container), it will emit an unhandled 'error' event,
       // causing the entire Node.js process to crash.
       childProcess.on('error', (error) => {
-        debugLogger.error(
-          `Failed to open browser with error:`,
-          getErrorMessage(error),
-          `\nPlease try running again with NO_BROWSER=true set.`,
-        );
+        coreEvents.emit(CoreEvent.UserFeedback, {
+          severity: 'error',
+          message:
+            `Failed to open browser with error: ${getErrorMessage(error)}\n` +
+            `Please try running again with NO_BROWSER=true set.`,
+        });
       });
     } catch (err) {
-      debugLogger.error(
-        `Failed to open browser with error:`,
-        getErrorMessage(err),
-        `\nPlease try running again with NO_BROWSER=true set.`,
-      );
+      coreEvents.emit(CoreEvent.UserFeedback, {
+        severity: 'error',
+        message:
+          `Failed to open browser with error: ${getErrorMessage(err)}\n` +
+          `Please try running again with NO_BROWSER=true set.`,
+      });
       throw new FatalAuthenticationError(
         `Failed to open browser: ${getErrorMessage(err)}`,
       );
     }
-    debugLogger.log('Waiting for authentication...');
+    coreEvents.emit(CoreEvent.UserFeedback, {
+      severity: 'info',
+      message: 'Waiting for authentication...\n',
+    });
 
     // Add timeout to prevent infinite waiting when browser tab gets stuck
     const authTimeout = 5 * 60 * 1000; // 5 minutes timeout
@@ -247,6 +326,13 @@ async function initOauthClient(
     });
 
     await Promise.race([webLogin.loginCompletePromise, timeoutPromise]);
+
+    coreEvents.emit(CoreEvent.UserFeedback, {
+      severity: 'info',
+      message: 'Authentication succeeded\n',
+    });
+
+    await triggerPostAuthCallbacks(client.credentials);
   }
 
   return client;
@@ -263,55 +349,77 @@ export async function getOauthClient(
 }
 
 async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
-  const redirectUri = 'https://codeassist.google.com/authcode';
-  const codeVerifier = await client.generateCodeVerifierAsync();
-  const state = crypto.randomBytes(32).toString('hex');
-  const authUrl: string = client.generateAuthUrl({
-    redirect_uri: redirectUri,
-    access_type: 'offline',
-    scope: OAUTH_SCOPE,
-    code_challenge_method: CodeChallengeMethod.S256,
-    code_challenge: codeVerifier.codeChallenge,
-    state,
-  });
-  debugLogger.log(
-    'Please visit the following URL to authorize the application:',
-  );
-  debugLogger.log('');
-  debugLogger.log(authUrl);
-  debugLogger.log('');
-
-  const code = await new Promise<string>((resolve) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-    rl.question('Enter the authorization code: ', (code) => {
-      rl.close();
-      resolve(code.trim());
-    });
-  });
-
-  if (!code) {
-    debugLogger.error('Authorization code is required.');
-    return false;
-  }
-
   try {
-    const { tokens } = await client.getToken({
-      code,
-      codeVerifier: codeVerifier.codeVerifier,
+    const redirectUri = 'https://codeassist.google.com/authcode';
+    const codeVerifier = await client.generateCodeVerifierAsync();
+    const state = crypto.randomBytes(32).toString('hex');
+    const authUrl: string = client.generateAuthUrl({
       redirect_uri: redirectUri,
+      access_type: 'offline',
+      scope: OAUTH_SCOPE,
+      code_challenge_method: CodeChallengeMethod.S256,
+      code_challenge: codeVerifier.codeChallenge,
+      state,
     });
-    client.setCredentials(tokens);
-  } catch (error) {
+    writeToStdout(
+      'Please visit the following URL to authorize the application:\n\n' +
+        authUrl +
+        '\n\n',
+    );
+
+    const code = await new Promise<string>((resolve, _) => {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: createWorkingStdio().stdout,
+        terminal: true,
+      });
+
+      rl.question('Enter the authorization code: ', (code) => {
+        rl.close();
+        resolve(code.trim());
+      });
+    });
+
+    if (!code) {
+      writeToStderr('Authorization code is required.\n');
+      debugLogger.error('Authorization code is required.');
+      return false;
+    }
+
+    try {
+      const { tokens } = await client.getToken({
+        code,
+        codeVerifier: codeVerifier.codeVerifier,
+        redirect_uri: redirectUri,
+      });
+      client.setCredentials(tokens);
+    } catch (error) {
+      writeToStderr(
+        'Failed to authenticate with authorization code:' +
+          getErrorMessage(error) +
+          '\n',
+      );
+
+      debugLogger.error(
+        'Failed to authenticate with authorization code:',
+        getErrorMessage(error),
+      );
+      return false;
+    }
+    return true;
+  } catch (err) {
+    if (err instanceof FatalCancellationError) {
+      throw err;
+    }
+    writeToStderr(
+      'Failed to authenticate with user code:' + getErrorMessage(err) + '\n',
+    );
     debugLogger.error(
-      'Failed to authenticate with authorization code:',
-      getErrorMessage(error),
+      'Failed to authenticate with user code:',
+      getErrorMessage(err),
     );
     return false;
   }
-  return true;
 }
 
 async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
@@ -474,7 +582,7 @@ async function fetchCachedCredentials(): Promise<
 > {
   const useEncryptedStorage = getUseEncryptedStorageFlag();
   if (useEncryptedStorage) {
-    return await OAuthCredentialStorage.loadCredentials();
+    return OAuthCredentialStorage.loadCredentials();
   }
 
   const pathsToTry = [
@@ -496,19 +604,6 @@ async function fetchCachedCredentials(): Promise<
   }
 
   return null;
-}
-
-async function cacheCredentials(credentials: Credentials) {
-  const filePath = Storage.getOAuthCredsPath();
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-
-  const credString = JSON.stringify(credentials, null, 2);
-  await fs.writeFile(filePath, credString, { mode: 0o600 });
-  try {
-    await fs.chmod(filePath, 0o600);
-  } catch {
-    /* empty */
-  }
 }
 
 export function clearOauthClientCache() {
@@ -567,4 +662,17 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
 // Helper to ensure test isolation
 export function resetOauthClientForTesting() {
   oauthClientPromises.clear();
+}
+
+async function cacheCredentials(credentials: Credentials) {
+  const filePath = Storage.getOAuthCredsPath();
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+
+  const credString = JSON.stringify(credentials, null, 2);
+  await fs.writeFile(filePath, credString, { mode: 0o600 });
+  try {
+    await fs.chmod(filePath, 0o600);
+  } catch {
+    /* empty */
+  }
 }

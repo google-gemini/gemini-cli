@@ -16,6 +16,7 @@ import {
   BaseToolInvocation,
   Kind,
   ToolConfirmationOutcome,
+  type PolicyUpdateOptions,
 } from './tools.js';
 import type { CallableTool, FunctionCall, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
@@ -77,7 +78,20 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     // Use composite format for policy checks: serverName__toolName
     // This enables server wildcards (e.g., "google-workspace__*")
     // while still allowing specific tool rules
-    super(params, messageBus, `${serverName}__${serverToolName}`, displayName);
+
+    super(
+      params,
+      messageBus,
+      `${serverName}__${serverToolName}`,
+      displayName,
+      serverName,
+    );
+  }
+
+  protected override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return { mcpName: this.serverName };
   }
 
   protected override async getConfirmationDetails(
@@ -108,6 +122,9 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
           DiscoveredMCPToolInvocation.allowlist.add(serverAllowListKey);
         } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysTool) {
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
+        } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
+          DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
+          await this.publishPolicyUpdate(outcome);
         }
       },
     };
@@ -126,6 +143,13 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     }
 
     if (response) {
+      // Check for top-level isError (MCP Spec compliant)
+      const isErrorTop = (response as { isError?: boolean | string }).isError;
+      if (isErrorTop === true || isErrorTop === 'true') {
+        return true;
+      }
+
+      // Legacy check for nested error object (keep for backward compatibility if any tools rely on it)
       const error = (response as { error?: McpError })?.error;
       const isError = error?.isError;
 
@@ -218,6 +242,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     readonly trust?: boolean,
     nameOverride?: string,
     private readonly cliConfig?: Config,
+    override readonly extensionName?: string,
     override readonly extensionId?: string,
     messageBus?: MessageBus,
   ) {
@@ -230,8 +255,13 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       true, // isOutputMarkdown
       false, // canUpdateOutput,
       messageBus,
+      extensionName,
       extensionId,
     );
+  }
+
+  getFullyQualifiedPrefix(): string {
+    return `${this.serverName}__`;
   }
 
   asFullyQualifiedTool(): DiscoveredMCPTool {
@@ -242,8 +272,9 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.description,
       this.parameterSchema,
       this.trust,
-      `${this.serverName}__${this.serverToolName}`,
+      `${this.getFullyQualifiedPrefix()}${this.serverToolName}`,
       this.cliConfig,
+      this.extensionName,
       this.extensionId,
       this.messageBus,
     );

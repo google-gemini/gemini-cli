@@ -1,4 +1,4 @@
-# Automation and Triage Processes
+# Automation and triage processes
 
 This document provides a detailed overview of the automated processes we use to
 manage and triage issues and pull requests. Our goal is to provide prompt
@@ -6,7 +6,7 @@ feedback and ensure that contributions are reviewed and integrated efficiently.
 Understanding this automation will help you as a contributor know what to expect
 and how to best interact with our repository bots.
 
-## Guiding Principle: Issues and Pull Requests
+## Guiding principle: Issues and pull requests
 
 First and foremost, almost every Pull Request (PR) should be linked to a
 corresponding Issue. The issue describes the "what" and the "why" (the bug or
@@ -14,14 +14,17 @@ feature), while the PR is the "how" (the implementation). This separation helps
 us track work, prioritize features, and maintain clear historical context. Our
 automation is built around this principle.
 
+> **Note:** Issues tagged as "🔒Maintainers only" are reserved for project
+> maintainers. We will not accept pull requests related to these issues.
+
 ---
 
-## Detailed Automation Workflows
+## Detailed automation workflows
 
 Here is a breakdown of the specific automation workflows that run in our
 repository.
 
-### 1. When you open an Issue: `Automated Issue Triage`
+### 1. When you open an issue: `Automated Issue Triage`
 
 This is the first bot you will interact with when you create an issue. Its job
 is to perform an initial analysis and apply the correct labels.
@@ -48,7 +51,7 @@ is to perform an initial analysis and apply the correct labels.
   - If the `status/need-information` label is added, please provide the
     requested details in a comment.
 
-### 2. When you open a Pull Request: `Continuous Integration (CI)`
+### 2. When you open a pull request: `Continuous Integration (CI)`
 
 This workflow ensures that all changes meet our quality standards before they
 can be merged.
@@ -70,7 +73,7 @@ can be merged.
   - If a check fails (a red "X" ❌), click the "Details" link next to the failed
     check to view the logs, identify the problem, and push a fix.
 
-### 3. Ongoing Triage for Pull Requests: `PR Auditing and Label Sync`
+### 3. Ongoing triage for pull requests: `PR Auditing and Label Sync`
 
 This workflow runs periodically to ensure all open PRs are correctly linked to
 issues and have consistent labels.
@@ -93,7 +96,7 @@ issues and have consistent labels.
   - This will ensure your PR is correctly categorized and moves through the
     review process smoothly.
 
-### 4. Ongoing Triage for Issues: `Scheduled Issue Triage`
+### 4. Ongoing triage for issues: `Scheduled Issue Triage`
 
 This is a fallback workflow to ensure that no issue gets missed by the triage
 process.
@@ -110,7 +113,7 @@ process.
     ensure every issue is eventually categorized, even if the initial triage
     fails.
 
-### 5. Release Automation
+### 5. Release automation
 
 This workflow handles the process of packaging and publishing new versions of
 the Gemini CLI.
