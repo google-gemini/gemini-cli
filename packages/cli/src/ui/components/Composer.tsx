@@ -174,7 +174,7 @@ export const Composer = () => {
             vimEnabled
               ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
               : uiState.shellModeActive
-                ? ' Type your shell command'
+                ? '  Type your shell command'
                 : '  Type your message or @path/to/file'
           }
           setQueueErrorMessage={uiActions.setQueueErrorMessage}
