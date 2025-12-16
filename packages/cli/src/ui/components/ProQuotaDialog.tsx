@@ -9,7 +9,7 @@ import { Box, Text } from 'ink';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { theme } from '../semantic-colors.js';
 
-import { DEFAULT_GEMINI_MODEL, UserTierId } from '@google/gemini-cli-core';
+import { UserTierId } from '@google/gemini-cli-core';
 
 interface ProQuotaDialogProps {
   failedModel: string;
@@ -92,11 +92,6 @@ export function ProQuotaDialog({
         key: 'retry_once',
       },
       {
-        label: `Switch to ${fallbackModel}`,
-        value: 'retry_always' as const,
-        key: 'retry_always',
-      },
-      {
         label: 'Stop',
         value: 'retry_later' as const,
         key: 'retry_later',
@@ -110,19 +105,31 @@ export function ProQuotaDialog({
     onChoice(choice);
   };
 
+  // Helper to highlight simple slash commands in the message
+  const renderMessage = (msg: string) => {
+    const parts = msg.split(/(\s+)/);
+    return (
+      <Text>
+        {parts.map((part, index) => {
+          if (part.startsWith('/')) {
+            return (
+              <Text key={index} bold color={theme.text.accent}>
+                {part}
+              </Text>
+            );
+          }
+          return <Text key={index}>{part}</Text>;
+        })}
+      </Text>
+    );
+  };
+
   return (
     <Box borderStyle="round" flexDirection="column" padding={1}>
-      <Box marginBottom={1}>
-        <Text>{message}</Text>
-      </Box>
+      <Box marginBottom={1}>{renderMessage(message)}</Box>
       <Box marginTop={1} marginBottom={1}>
         <RadioButtonSelect items={items} onSelect={handleSelect} />
       </Box>
-      <Text color={theme.text.primary}>
-        {fallbackModel === DEFAULT_GEMINI_MODEL && !isModelNotFoundError
-          ? 'Note: We will periodically retry Preview Model to see if congestion has cleared.'
-          : 'Note: You can always use /model to select a different option.'}
-      </Text>
     </Box>
   );
 }

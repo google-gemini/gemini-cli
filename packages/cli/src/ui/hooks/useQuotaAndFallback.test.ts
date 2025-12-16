@@ -261,7 +261,7 @@ describe('useQuotaAndFallback', () => {
           expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
           const message = request!.message;
           expect(message).toContain(
-            'model-A is currently experiencing high demand. We apologize and appreciate your patience.',
+            'We are currently experiencing high demand.',
           );
 
           // Simulate the user choosing to continue with the fallback model
