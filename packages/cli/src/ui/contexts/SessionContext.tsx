@@ -37,6 +37,7 @@ function areModelMetricsEqual(a: ModelMetrics, b: ModelMetrics): boolean {
     return false;
   }
   if (
+    a.tokens.input !== b.tokens.input ||
     a.tokens.prompt !== b.tokens.prompt ||
     a.tokens.candidates !== b.tokens.candidates ||
     a.tokens.total !== b.tokens.total ||
@@ -159,6 +160,7 @@ export interface ComputedSessionStats {
   successRate: number;
   agreementRate: number;
   totalCachedTokens: number;
+  totalInputTokens: number;
   totalPromptTokens: number;
   totalLinesAdded: number;
   totalLinesRemoved: number;
