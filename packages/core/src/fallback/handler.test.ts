@@ -65,7 +65,6 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
     isInFallbackMode: vi.fn(() => false),
     setFallbackMode: vi.fn(),
-    isModelAvailabilityServiceEnabled: vi.fn(() => true),
     isPreviewModelFallbackMode: vi.fn(() => false),
     setPreviewModelFallbackMode: vi.fn(),
     isPreviewModelBypassMode: vi.fn(() => false),
@@ -130,9 +129,6 @@ describe('handleFallback', () => {
       policyConfig = createMockConfig();
 
       // Ensure we test the availability path
-      vi.mocked(policyConfig.isModelAvailabilityServiceEnabled).mockReturnValue(
-        true,
-      );
       vi.mocked(policyConfig.getModelAvailabilityService).mockReturnValue(
         availability,
       );

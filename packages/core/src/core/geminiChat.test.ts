@@ -185,12 +185,13 @@ describe('GeminiChat', () => {
       setPreviewModelFallbackMode: vi.fn(),
       isInteractive: vi.fn().mockReturnValue(false),
       getEnableHooks: vi.fn().mockReturnValue(false),
-      isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(false),
       getActiveModel: vi.fn().mockImplementation(() => currentActiveModel),
       setActiveModel: vi
         .fn()
         .mockImplementation((m: string) => (currentActiveModel = m)),
-      getModelAvailabilityService: vi.fn(),
+      getModelAvailabilityService: vi
+        .fn()
+        .mockReturnValue(createAvailabilityServiceMock()),
     } as unknown as Config;
 
     // Use proper MessageBus mocking for Phase 3 preparation
@@ -2159,9 +2160,6 @@ describe('GeminiChat', () => {
       mockAvailabilityService = createAvailabilityServiceMock();
       vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
         mockAvailabilityService,
-      );
-      vi.mocked(mockConfig.isModelAvailabilityServiceEnabled).mockReturnValue(
-        true,
       );
 
       // Stateful mock for activeModel

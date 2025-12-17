@@ -119,7 +119,6 @@ describe('policyHelpers', () => {
       overrides: Partial<Config> = {},
     ): Config => {
       const defaults = {
-        isModelAvailabilityServiceEnabled: () => true,
         getModelAvailabilityService: () => mockAvailabilityService,
         setActiveModel: vi.fn(),
         modelConfigService: mockModelConfigService,
@@ -129,15 +128,6 @@ describe('policyHelpers', () => {
 
     beforeEach(() => {
       vi.clearAllMocks();
-    });
-
-    it('returns requested model if availability service is disabled', () => {
-      const config = createExtendedMockConfig({
-        isModelAvailabilityServiceEnabled: () => false,
-      });
-      const result = applyModelSelection(config, 'gemini-pro');
-      expect(result.model).toBe('gemini-pro');
-      expect(config.setActiveModel).not.toHaveBeenCalled();
     });
 
     it('returns requested model if it is available', () => {

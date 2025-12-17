@@ -265,11 +265,12 @@ describe('Gemini Client (client.ts)', () => {
       },
       isInteractive: vi.fn().mockReturnValue(false),
       getExperiments: () => {},
-      isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(false),
       getActiveModel: vi.fn().mockReturnValue('test-model'),
       setActiveModel: vi.fn(),
       resetTurn: vi.fn(),
-      getModelAvailabilityService: vi.fn(),
+      getModelAvailabilityService: vi
+        .fn()
+        .mockReturnValue(createAvailabilityServiceMock()),
     } as unknown as Config;
     mockConfig.getHookSystem = vi
       .fn()
@@ -2006,9 +2007,6 @@ ${JSON.stringify(
         vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
           mockAvailabilityService,
         );
-        vi.mocked(mockConfig.isModelAvailabilityServiceEnabled).mockReturnValue(
-          true,
-        );
         vi.mocked(mockConfig.setActiveModel).mockClear();
         mockRouterService.route.mockResolvedValue({
           model: 'model-a',
@@ -2611,14 +2609,14 @@ ${JSON.stringify(
       const abortSignal = new AbortController().signal;
 
       await client.generateContent(
-        { model: DEFAULT_GEMINI_FLASH_MODEL },
+        { model: 'test-model' },
         contents,
         abortSignal,
       );
 
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
         {
-          model: DEFAULT_GEMINI_FLASH_MODEL,
+          model: 'test-model',
           config: {
             abortSignal,
             systemInstruction: getCoreSystemPrompt({} as unknown as Config, ''),
@@ -2632,50 +2630,18 @@ ${JSON.stringify(
     });
 
     it('should use current model from config for content generation', async () => {
-      const initialModel = client['config'].getModel();
+      const initialModel = 'test-model';
       const contents = [{ role: 'user', parts: [{ text: 'test' }] }];
-      const currentModel = initialModel + '-changed';
-
-      vi.spyOn(client['config'], 'getModel').mockReturnValueOnce(currentModel);
 
       await client.generateContent(
-        { model: DEFAULT_GEMINI_FLASH_MODEL },
+        { model: initialModel },
         contents,
         new AbortController().signal,
       );
 
-      expect(mockContentGenerator.generateContent).not.toHaveBeenCalledWith({
-        model: initialModel,
-        config: expect.any(Object),
-        contents,
-      });
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
-        {
-          model: DEFAULT_GEMINI_FLASH_MODEL,
-          config: expect.any(Object),
-          contents,
-        },
-        'test-session-id',
-      );
-    });
-
-    it('should use the Flash model when fallback mode is active', async () => {
-      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
-      const abortSignal = new AbortController().signal;
-      const requestedModel = 'gemini-2.5-pro'; // A non-flash model
-
-      // Mock config to be in fallback mode
-      vi.spyOn(client['config'], 'isInFallbackMode').mockReturnValue(true);
-
-      await client.generateContent(
-        { model: requestedModel },
-        contents,
-        abortSignal,
-      );
-
-      expect(mockGenerateContentFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: DEFAULT_GEMINI_FLASH_MODEL,
+          model: initialModel,
         }),
         'test-session-id',
       );
