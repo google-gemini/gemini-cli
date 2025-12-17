@@ -173,7 +173,7 @@ describe('GeminiChat', () => {
           return {
             model,
             generateContentConfig: {
-              temperature: 0,
+              temperature: modelConfigKey.isRetry ? 1 : 0,
               thinkingConfig,
             },
           };
@@ -185,12 +185,13 @@ describe('GeminiChat', () => {
       setPreviewModelFallbackMode: vi.fn(),
       isInteractive: vi.fn().mockReturnValue(false),
       getEnableHooks: vi.fn().mockReturnValue(false),
-      isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(false),
       getActiveModel: vi.fn().mockImplementation(() => currentActiveModel),
       setActiveModel: vi
         .fn()
         .mockImplementation((m: string) => (currentActiveModel = m)),
-      getModelAvailabilityService: vi.fn(),
+      getModelAvailabilityService: vi
+        .fn()
+        .mockReturnValue(createAvailabilityServiceMock()),
     } as unknown as Config;
 
     // Use proper MessageBus mocking for Phase 3 preparation
@@ -2160,9 +2161,6 @@ describe('GeminiChat', () => {
       vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
         mockAvailabilityService,
       );
-      vi.mocked(mockConfig.isModelAvailabilityServiceEnabled).mockReturnValue(
-        true,
-      );
 
       // Stateful mock for activeModel
       let activeModel = 'model-a';
@@ -2334,13 +2332,18 @@ describe('GeminiChat', () => {
       });
 
       // Different configs per model
-      vi.mocked(mockConfig.modelConfigService.getResolvedConfig)
-        .mockReturnValueOnce(
-          makeResolvedModelConfig('model-a', { temperature: 0.1 }),
-        )
-        .mockReturnValueOnce(
-          makeResolvedModelConfig('model-b', { temperature: 0.9 }),
-        );
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation((key) => {
+        if (key.model === 'model-a') {
+          return makeResolvedModelConfig('model-a', { temperature: 0.1 });
+        }
+        if (key.model === 'model-b') {
+          return makeResolvedModelConfig('model-b', { temperature: 0.9 });
+        }
+        // Default for the initial requested model in this test
+        return makeResolvedModelConfig('model-a', { temperature: 0.1 });
+      });
 
       // First attempt uses model-a, then simulate availability switching to model-b
       mockRetryWithBackoff.mockImplementation(async (apiCall) => {

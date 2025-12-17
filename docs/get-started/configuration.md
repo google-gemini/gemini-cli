@@ -798,11 +798,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`experimental.isModelAvailabilityServiceEnabled`** (boolean):
-  - **Description:** Enable model routing using new availability service.
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
 - **`experimental.jitContext`** (boolean):
   - **Description:** Enable Just-In-Time (JIT) context loading.
   - **Default:** `false`
