@@ -38,6 +38,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
 } from './models.js';
 
 vi.mock('fs', async (importOriginal) => {
@@ -1832,6 +1833,15 @@ describe('Config Quota & Preview Model Access', () => {
       config.setPreviewFeatures(false);
 
       expect(config.getModel()).toBe(nonPreviewModel);
+    });
+
+    it('should switch to preview auto model if enabling preview features while using default auto model', () => {
+      config.setPreviewFeatures(false);
+      config.setModel(DEFAULT_GEMINI_MODEL_AUTO);
+
+      config.setPreviewFeatures(true);
+
+      expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL_AUTO);
     });
 
     it('should NOT reset model if enabling preview features', () => {
