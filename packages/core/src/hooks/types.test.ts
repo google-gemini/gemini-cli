@@ -23,6 +23,7 @@ import type {
 } from '@google/genai';
 import type { LLMRequest, LLMResponse } from './hookTranslator.js';
 import type { HookDecision } from './types.js';
+import { ToolErrorType } from '../tools/tool-error.js';
 
 vi.mock('./hookTranslator.js', () => ({
   defaultHookTranslator: {
@@ -224,6 +225,33 @@ describe('Hook Output Classes', () => {
       const output = new DefaultHookOutput({ decision: 'approve' });
       expect(output.getBlockingError()).toEqual({ blocked: false, reason: '' });
     });
+
+    it('getBlockingOrStoppingResult should return ToolResult for blocking decision', () => {
+      const output = new DefaultHookOutput({
+        decision: 'block',
+        reason: 'test reason',
+      });
+      const result = output.getBlockingOrStoppingResult();
+      expect(result).not.toBeNull();
+      expect(result?.error?.type).toBe(ToolErrorType.EXECUTION_FAILED);
+      expect(result?.llmContent).toContain('Tool execution blocked by hook');
+    });
+
+    it('getBlockingOrStoppingResult should return ToolResult for stop execution', () => {
+      const output = new DefaultHookOutput({
+        continue: false,
+        stopReason: 'stopped',
+      });
+      const result = output.getBlockingOrStoppingResult();
+      expect(result).not.toBeNull();
+      expect(result?.llmContent).toContain('Agent execution stopped by hook');
+    });
+
+    it('getBlockingOrStoppingResult should return null for normal output', () => {
+      const output = new DefaultHookOutput({ decision: 'allow' });
+      const result = output.getBlockingOrStoppingResult();
+      expect(result).toBeNull();
+    });
   });
 
   describe('BeforeToolHookOutput', () => {
@@ -272,6 +300,26 @@ describe('Hook Output Classes', () => {
         hookSpecificOutput: { other: 'value' },
       });
       expect(output2.getEffectiveReason()).toBe('default reason');
+    });
+
+    it('isApprovingDecision should not fall through when permissionDecision is blocking', () => {
+      // Edge case: base decision is approve, but compat field says block
+      const output = new BeforeToolHookOutput({
+        decision: 'approve',
+        hookSpecificOutput: { permissionDecision: 'block' },
+      });
+      // Should respect permissionDecision, not fall through to base decision
+      expect(output.isApprovingDecision()).toBe(false);
+    });
+
+    it('isBlockingDecision should not fall through when permissionDecision is approving', () => {
+      // Edge case: base decision is block, but compat field says approve
+      const output = new BeforeToolHookOutput({
+        decision: 'block',
+        hookSpecificOutput: { permissionDecision: 'approve' },
+      });
+      // Should respect permissionDecision, not fall through to base decision
+      expect(output.isBlockingDecision()).toBe(false);
     });
   });
 

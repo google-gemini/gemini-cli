@@ -892,36 +892,18 @@ export class CoreToolScheduler {
             reqInfo.args,
           );
 
-          // Check if hook blocked the tool
-          const blockingError = beforeHookOutput?.getBlockingError();
-          if (blockingError?.blocked) {
+          // Check if hook blocked the tool or wants to stop execution
+          const blockingResult =
+            beforeHookOutput?.getBlockingOrStoppingResult();
+          if (blockingResult?.error) {
             this.setStatusInternal(
               reqInfo.callId,
               'error',
               signal,
               createErrorResponse(
                 reqInfo,
-                new Error(
-                  `Tool execution blocked by hook: ${blockingError.reason}`,
-                ),
-                ToolErrorType.EXECUTION_FAILED,
-              ),
-            );
-            await this.checkAndNotifyCompletion(signal);
-            return;
-          }
-
-          // Check if hook wants to stop agent execution
-          if (beforeHookOutput?.shouldStopExecution()) {
-            const reason = beforeHookOutput.getEffectiveReason();
-            this.setStatusInternal(
-              reqInfo.callId,
-              'error',
-              signal,
-              createErrorResponse(
-                reqInfo,
-                new Error(`Agent execution stopped by hook: ${reason}`),
-                ToolErrorType.EXECUTION_FAILED,
+                new Error(blockingResult.error.message),
+                blockingResult.error.type,
               ),
             );
             await this.checkAndNotifyCompletion(signal);

@@ -270,30 +270,10 @@ export async function executeToolWithHooks(
       toolInput,
     );
 
-    // Check if hook blocked the tool execution
-    const blockingError = beforeOutput?.getBlockingError();
-    if (blockingError?.blocked) {
-      return {
-        llmContent: `Tool execution blocked: ${blockingError.reason}`,
-        returnDisplay: `Tool execution blocked: ${blockingError.reason}`,
-        error: {
-          type: ToolErrorType.EXECUTION_FAILED,
-          message: blockingError.reason,
-        },
-      };
-    }
-
-    // Check if hook requested to stop entire agent execution
-    if (beforeOutput?.shouldStopExecution()) {
-      const reason = beforeOutput.getEffectiveReason();
-      return {
-        llmContent: `Agent execution stopped by hook: ${reason}`,
-        returnDisplay: `Agent execution stopped by hook: ${reason}`,
-        error: {
-          type: ToolErrorType.EXECUTION_FAILED,
-          message: `Agent execution stopped: ${reason}`,
-        },
-      };
+    // Check if hook blocked the tool execution or requested to stop agent
+    const blockingResult = beforeOutput?.getBlockingOrStoppingResult();
+    if (blockingResult) {
+      return blockingResult;
     }
   }
 
