@@ -91,7 +91,7 @@ export class AgentRegistry {
 
     if (this.config.getDebugMode()) {
       debugLogger.log(
-        `[AgentRegistry] Initialized with ${this.agents.size} agents. `,
+        `[AgentRegistry] Initialized with ${this.agents.size} agents.`,
       );
     }
   }

@@ -10,6 +10,10 @@ import { type Dirent } from 'node:fs';
 import * as path from 'node:path';
 import { z } from 'zod';
 import type { AgentDefinition } from './types.js';
+import {
+  isValidToolName,
+  DELEGATE_TO_AGENT_TOOL_NAME,
+} from '../tools/tool-names.js';
 
 /**
  * DTO for TOML parsing - represents the raw structure of the TOML file.
@@ -58,7 +62,13 @@ const tomlSchema = z.object({
   name: z.string().regex(/^[a-z0-9-_]+$/, 'Name must be a valid slug'),
   description: z.string().min(1),
   display_name: z.string().optional(),
-  tools: z.array(z.string()).optional(),
+  tools: z
+    .array(
+      z.string().refine((val) => isValidToolName(val), {
+        message: 'Invalid tool name',
+      }),
+    )
+    .optional(),
   prompts: z.object({
     system_prompt: z.string().min(1),
     query: z.string().optional(),
@@ -117,10 +127,12 @@ export async function parseAgentToml(
 
   const definition = result.data as TomlAgentDefinition;
 
-  // Filter out delegate_to_agent tool to prevent infinite recursion
-  if (definition.tools) {
-    const filterTools = ['delegate_to_agent'];
-    definition.tools = definition.tools.filter((t) => !filterTools.includes(t));
+  // Prevent sub-agents from delegating to other agents (to prevent recursion/complexity)
+  if (definition.tools?.includes(DELEGATE_TO_AGENT_TOOL_NAME)) {
+    throw new AgentLoadError(
+      filePath,
+      `Validation failed: tools list cannot include '${DELEGATE_TO_AGENT_TOOL_NAME}'. Sub-agents cannot delegate to other agents.`,
+    );
   }
 
   return definition;
@@ -149,7 +161,7 @@ export function tomlToAgentDefinition(
     },
     modelConfig: {
       model: modelName,
-      temp: toml.model?.temperature as number,
+      temp: toml.model?.temperature ?? 1,
       top_p: 0.95,
     },
     runConfig: {
@@ -167,7 +179,7 @@ export function tomlToAgentDefinition(
         query: {
           type: 'string',
           description: 'The task for the agent.',
-          required: true,
+          required: false,
         },
       },
     },

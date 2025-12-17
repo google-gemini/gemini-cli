@@ -89,17 +89,31 @@ describe('toml-loader', () => {
       );
     });
 
-    it('should filter out delegate_to_agent from tools', async () => {
+    it('should throw AgentLoadError if delegate_to_agent is included in tools', async () => {
       const filePath = await writeAgentToml(`
         name = "test-agent"
         description = "A test agent"
-        tools = ["run_command", "delegate_to_agent"]
+        tools = ["run_shell_command", "delegate_to_agent"]
         [prompts]
         system_prompt = "You are a test agent."
       `);
 
-      const result = await parseAgentToml(filePath);
-      expect(result.tools).toEqual(['run_command']);
+      await expect(parseAgentToml(filePath)).rejects.toThrow(
+        /tools list cannot include 'delegate_to_agent'/,
+      );
+    });
+
+    it('should throw AgentLoadError if tools contains invalid names', async () => {
+      const filePath = await writeAgentToml(`
+        name = "test-agent"
+        description = "A test agent"
+        tools = ["not-a-tool"]
+        [prompts]
+        system_prompt = "You are a test agent."
+      `);
+      await expect(parseAgentToml(filePath)).rejects.toThrow(
+        /Validation failed: tools.0: Invalid tool name/,
+      );
     });
   });
 
@@ -131,7 +145,7 @@ describe('toml-loader', () => {
           inputs: {
             query: {
               type: 'string',
-              required: true,
+              required: false,
             },
           },
         },
