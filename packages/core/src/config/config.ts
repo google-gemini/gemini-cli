@@ -52,6 +52,7 @@ import {
   DEFAULT_THINKING_MODE,
   isPreviewModel,
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -975,14 +976,25 @@ export class Config {
   }
 
   setPreviewFeatures(previewFeatures: boolean) {
-    // If it's using a preview model and it's turning off previewFeatures,
-    // switch the model to the default auto mode.
-    if (this.previewFeatures && !previewFeatures) {
-      if (isPreviewModel(this.getModel())) {
-        this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
-      }
-    }
+    const previousValue = this.previewFeatures;
     this.previewFeatures = previewFeatures;
+
+    // No change in state, no action needed
+    if (previousValue === previewFeatures) {
+      return;
+    }
+
+    const currentModel = this.getModel();
+
+    // Case 1: Disabling preview features while on a preview model
+    if (!previewFeatures && isPreviewModel(currentModel)) {
+      this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
+    }
+
+    // Case 2: Enabling preview features while on the default auto model
+    else if (previewFeatures && currentModel === DEFAULT_GEMINI_MODEL_AUTO) {
+      this.setModel(PREVIEW_GEMINI_MODEL_AUTO);
+    }
   }
 
   getHasAccessToPreviewModel(): boolean {
