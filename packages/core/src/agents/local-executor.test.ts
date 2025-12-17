@@ -100,6 +100,10 @@ vi.mock('../core/nonInteractiveToolExecutor.js', () => ({
   executeToolCall: mockExecuteToolCall,
 }));
 
+vi.mock('../utils/version.js', () => ({
+  getVersion: vi.fn().mockResolvedValue('1.2.3'),
+}));
+
 vi.mock('../utils/environmentContext.js');
 
 vi.mock('../telemetry/loggers.js', () => ({

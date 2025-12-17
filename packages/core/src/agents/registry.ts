@@ -10,6 +10,7 @@ import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './toml-loader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
+import { IntrospectionAgent } from './introspection-agent.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
@@ -134,6 +135,11 @@ export class AgentRegistry {
         },
       };
       this.registerAgent(agentDef);
+    }
+
+    // Always register the introspection agent if agents are enabled.
+    if (this.config.isAgentsEnabled() || investigatorSettings?.enabled) {
+      this.registerAgent(IntrospectionAgent);
     }
   }
 
