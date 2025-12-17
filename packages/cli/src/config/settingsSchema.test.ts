@@ -369,6 +369,18 @@ describe('SettingsSchema', () => {
         'Enable model routing using new availability service.',
       );
     });
+
+    it('should have name and description in hook definitions', () => {
+      const hookDef = SETTINGS_SCHEMA_DEFINITIONS['HookDefinitionArray'];
+      expect(hookDef).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hookItemProperties = (hookDef as any).items.properties.hooks.items
+        .properties;
+      expect(hookItemProperties.name).toBeDefined();
+      expect(hookItemProperties.name.type).toBe('string');
+      expect(hookItemProperties.description).toBeDefined();
+      expect(hookItemProperties.description.type).toBe('string');
+    });
   });
 
   it('has JSON schema definitions for every referenced ref', () => {
