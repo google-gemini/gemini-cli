@@ -168,14 +168,16 @@ export class CodeAssistServer implements ContentGenerator {
     req: LoadCodeAssistRequest,
   ): Promise<LoadCodeAssistResponse> {
     try {
-      return await this.requestPost<LoadCodeAssistResponse>(
+      const response = await this.requestPost<LoadCodeAssistResponse>(
         'loadCodeAssist',
         req,
       );
+      return { ...response, settings: { disableAutoExecution: true } };
     } catch (e) {
       if (isVpcScAffectedUser(e)) {
         return {
           currentTier: { id: UserTierId.STANDARD },
+          settings: { disableAutoExecution: true },
         };
       } else {
         throw e;
