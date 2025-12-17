@@ -36,7 +36,6 @@ describe('validateNonInterActiveAuth', () => {
   let originalEnvGeminiApiKey: string | undefined;
   let originalEnvVertexAi: string | undefined;
   let originalEnvGcp: string | undefined;
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let debugLoggerErrorSpy: ReturnType<typeof vi.spyOn>;
   let processExitSpy: MockInstance;
   let refreshAuthMock: Mock;
@@ -49,7 +48,6 @@ describe('validateNonInterActiveAuth', () => {
     delete process.env['GEMINI_API_KEY'];
     delete process.env['GOOGLE_GENAI_USE_VERTEXAI'];
     delete process.env['GOOGLE_GENAI_USE_GCA'];
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     debugLoggerErrorSpy = vi
       .spyOn(debugLogger, 'error')
       .mockImplementation(() => {});
@@ -404,7 +402,7 @@ describe('validateNonInterActiveAuth', () => {
       expect(thrown?.message).toBe(
         `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
       );
-      const errorArg = consoleErrorSpy.mock.calls[0]?.[0] as string;
+      const errorArg = debugLoggerErrorSpy.mock.calls[0]?.[0] as string;
       const payload = JSON.parse(errorArg);
       expect(payload.error.type).toBe('Error');
       expect(payload.error.code).toBe(ExitCodes.FATAL_AUTHENTICATION_ERROR);
@@ -439,7 +437,7 @@ describe('validateNonInterActiveAuth', () => {
         `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
       );
       {
-        const errorArg = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const errorArg = debugLoggerErrorSpy.mock.calls[0]?.[0] as string;
         const payload = JSON.parse(errorArg);
         expect(payload.error.type).toBe('Error');
         expect(payload.error.code).toBe(ExitCodes.FATAL_AUTHENTICATION_ERROR);
@@ -477,7 +475,7 @@ describe('validateNonInterActiveAuth', () => {
         `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
       );
       {
-        const errorArg = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const errorArg = debugLoggerErrorSpy.mock.calls[0]?.[0] as string;
         const payload = JSON.parse(errorArg);
         expect(payload.error.type).toBe('Error');
         expect(payload.error.code).toBe(ExitCodes.FATAL_AUTHENTICATION_ERROR);

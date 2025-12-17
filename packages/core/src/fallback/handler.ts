@@ -13,7 +13,6 @@ import {
 } from '../config/models.js';
 import { logFlashFallback, FlashFallbackEvent } from '../telemetry/index.js';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
-import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { ModelNotFoundError } from '../utils/httpErrors.js';
 import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
@@ -190,7 +189,7 @@ async function handlePolicyDrivenFallback(
       error, // Pass the error so processIntent can handle preview-specific logic
     );
   } catch (handlerError) {
-    debugLogger.error('Fallback handler failed:', handlerError);
+    coreEvents.emitFeedback('error', 'Fallback handler failed:', handlerError);
     return null;
   }
 }
@@ -199,7 +198,8 @@ async function handleUpgrade() {
   try {
     await openBrowserSecurely(UPGRADE_URL_PAGE);
   } catch (error) {
-    debugLogger.warn(
+    coreEvents.emitFeedback(
+      'error',
       'Failed to open browser automatically:',
       getErrorMessage(error),
     );

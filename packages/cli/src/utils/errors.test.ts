@@ -6,7 +6,11 @@
 
 import { vi, type MockInstance } from 'vitest';
 import type { Config } from '@google/gemini-cli-core';
-import { OutputFormat, FatalInputError } from '@google/gemini-cli-core';
+import {
+  OutputFormat,
+  FatalInputError,
+  debugLogger,
+} from '@google/gemini-cli-core';
 import {
   getErrorMessage,
   handleError,
@@ -85,7 +89,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 describe('errors', () => {
   let mockConfig: Config;
   let processExitSpy: MockInstance;
-  let consoleErrorSpy: MockInstance;
+  let debugLoggerErrorSpy: MockInstance;
+  let debugLoggerWarnSpy: MockInstance;
 
   const TEST_SESSION_ID = 'test-session-123';
 
@@ -93,8 +98,13 @@ describe('errors', () => {
     // Reset mocks
     vi.clearAllMocks();
 
-    // Mock console.error
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Mock debugLogger
+    debugLoggerErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+    debugLoggerWarnSpy = vi
+      .spyOn(debugLogger, 'warn')
+      .mockImplementation(() => {});
 
     // Mock process.exit to throw instead of actually exiting
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
@@ -110,7 +120,8 @@ describe('errors', () => {
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
+    debugLoggerErrorSpy.mockRestore();
+    debugLoggerWarnSpy.mockRestore();
     processExitSpy.mockRestore();
   });
 
@@ -148,7 +159,9 @@ describe('errors', () => {
           handleError(testError, mockConfig);
         }).toThrow(testError);
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith('API Error: Test error');
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+          'API Error: Test error',
+        );
       });
 
       it('should handle non-Error objects', () => {
@@ -158,7 +171,9 @@ describe('errors', () => {
           handleError(testError, mockConfig);
         }).toThrow(testError);
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith('API Error: String error');
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+          'API Error: String error',
+        );
       });
     });
 
@@ -176,7 +191,7 @@ describe('errors', () => {
           handleError(testError, mockConfig);
         }).toThrow('process.exit called with code: 1');
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
           JSON.stringify(
             {
               session_id: TEST_SESSION_ID,
@@ -199,7 +214,7 @@ describe('errors', () => {
           handleError(testError, mockConfig, 42);
         }).toThrow('process.exit called with code: 42');
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
           JSON.stringify(
             {
               session_id: TEST_SESSION_ID,
@@ -222,7 +237,7 @@ describe('errors', () => {
           handleError(fatalError, mockConfig);
         }).toThrow('process.exit called with code: 42');
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
           JSON.stringify(
             {
               session_id: TEST_SESSION_ID,
@@ -259,7 +274,7 @@ describe('errors', () => {
           handleError(errorWithStatus, mockConfig);
         }).toThrow('process.exit called with code: 1'); // string codes become 1
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
           JSON.stringify(
             {
               session_id: TEST_SESSION_ID,
@@ -315,7 +330,7 @@ describe('errors', () => {
       it('should log error message to stderr', () => {
         handleToolError(toolName, toolError, mockConfig);
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
           'Error executing tool test-tool: Tool failed',
         );
       });
@@ -329,7 +344,7 @@ describe('errors', () => {
           'Custom display message',
         );
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
           'Error executing tool test-tool: Custom display message',
         );
       });
@@ -351,7 +366,7 @@ describe('errors', () => {
             'invalid_tool_params',
           );
 
-          expect(consoleErrorSpy).toHaveBeenCalledWith(
+          expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
             'Error executing tool test-tool: Tool failed',
           );
           // Should not exit for non-fatal errors
@@ -361,7 +376,7 @@ describe('errors', () => {
         it('should not exit for file not found errors', () => {
           handleToolError(toolName, toolError, mockConfig, 'file_not_found');
 
-          expect(consoleErrorSpy).toHaveBeenCalledWith(
+          expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
             'Error executing tool test-tool: Tool failed',
           );
           expect(processExitSpy).not.toHaveBeenCalled();
@@ -370,7 +385,7 @@ describe('errors', () => {
         it('should not exit for permission denied errors', () => {
           handleToolError(toolName, toolError, mockConfig, 'permission_denied');
 
-          expect(consoleErrorSpy).toHaveBeenCalledWith(
+          expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
             'Error executing tool test-tool: Tool failed',
           );
           expect(processExitSpy).not.toHaveBeenCalled();
@@ -384,7 +399,7 @@ describe('errors', () => {
             'path_not_in_workspace',
           );
 
-          expect(consoleErrorSpy).toHaveBeenCalledWith(
+          expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
             'Error executing tool test-tool: Tool failed',
           );
           expect(processExitSpy).not.toHaveBeenCalled();
@@ -399,7 +414,7 @@ describe('errors', () => {
             'Display message',
           );
 
-          expect(consoleErrorSpy).toHaveBeenCalledWith(
+          expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
             'Error executing tool test-tool: Display message',
           );
           expect(processExitSpy).not.toHaveBeenCalled();
@@ -412,7 +427,7 @@ describe('errors', () => {
             handleToolError(toolName, toolError, mockConfig, 'no_space_left');
           }).toThrow('process.exit called with code: 54');
 
-          expect(consoleErrorSpy).toHaveBeenCalledWith(
+          expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
             JSON.stringify(
               {
                 session_id: TEST_SESSION_ID,
@@ -445,7 +460,7 @@ describe('errors', () => {
 
       it('should log to stderr and not exit for non-fatal errors', () => {
         handleToolError(toolName, toolError, mockConfig, 'invalid_tool_params');
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
           'Error executing tool test-tool: Tool failed',
         );
         expect(processExitSpy).not.toHaveBeenCalled();
@@ -466,7 +481,9 @@ describe('errors', () => {
           handleCancellationError(mockConfig);
         }).toThrow('process.exit called with code: 130');
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith('Operation cancelled.');
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+          'Operation cancelled.',
+        );
       });
     });
 
@@ -482,7 +499,7 @@ describe('errors', () => {
           handleCancellationError(mockConfig);
         }).toThrow('process.exit called with code: 130');
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
           JSON.stringify(
             {
               session_id: TEST_SESSION_ID,
@@ -527,7 +544,7 @@ describe('errors', () => {
           handleMaxTurnsExceededError(mockConfig);
         }).toThrow('process.exit called with code: 53');
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
           'Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
         );
       });
@@ -545,7 +562,7 @@ describe('errors', () => {
           handleMaxTurnsExceededError(mockConfig);
         }).toThrow('process.exit called with code: 53');
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
           JSON.stringify(
             {
               session_id: TEST_SESSION_ID,

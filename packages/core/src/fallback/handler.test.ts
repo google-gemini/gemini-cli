@@ -29,7 +29,6 @@ import type { FallbackModelHandler } from './types.js';
 import { ModelNotFoundError } from '../utils/httpErrors.js';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import { coreEvents } from '../utils/events.js';
-import { debugLogger } from '../utils/debugLogger.js';
 import * as policyHelpers from '../availability/policyHelpers.js';
 import { createDefaultPolicy } from '../availability/policyCatalog.js';
 import {
@@ -88,7 +87,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
 describe('handleFallback', () => {
   let mockConfig: Config;
   let mockHandler: Mock<FallbackModelHandler>;
-  let consoleErrorSpy: MockInstance;
+  let emitFeedbackSpy: MockInstance;
   let fallbackEventSpy: MockInstance;
 
   beforeEach(() => {
@@ -101,15 +100,12 @@ describe('handleFallback', () => {
     // Explicitly set the property to ensure it's present for legacy checks
     mockConfig.fallbackModelHandler = mockHandler;
 
-    // We mocked debugLogger, so we don't need to spy on console.error for handler failures
-    // But tests might check console.error usage in legacy code if any?
-    // The handler uses console.error in legacyHandleFallback.
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
     fallbackEventSpy = vi.spyOn(coreEvents, 'emitFallbackModeChanged');
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
+    emitFeedbackSpy.mockRestore();
     fallbackEventSpy.mockRestore();
   });
 
@@ -207,23 +203,18 @@ describe('handleFallback', () => {
 
   it('should log a warning and continue when upgrade flow fails to open a browser', async () => {
     mockHandler.mockResolvedValue('upgrade');
-    const debugWarnSpy = vi.spyOn(debugLogger, 'warn');
-    const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
-      .mockImplementation(() => {});
     vi.mocked(openBrowserSecurely).mockRejectedValue(new Error('blocked'));
 
     const result = await handleFallback(mockConfig, MOCK_PRO_MODEL, AUTH_OAUTH);
 
     expect(result).toBe(false);
-    expect(debugWarnSpy).toHaveBeenCalledWith(
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
       'Failed to open browser automatically:',
       'blocked',
     );
     expect(mockConfig.setFallbackMode).not.toHaveBeenCalled();
     expect(fallbackEventSpy).not.toHaveBeenCalled();
-    debugWarnSpy.mockRestore();
-    consoleWarnSpy.mockRestore();
   });
 
   describe('when handler returns an unexpected value', () => {
@@ -237,7 +228,8 @@ describe('handleFallback', () => {
       );
 
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(emitFeedbackSpy).toHaveBeenCalledWith(
+        'error',
         'Fallback UI handler failed:',
         new Error(
           'Unexpected fallback intent received from fallbackModelHandler: "null"',
@@ -292,7 +284,8 @@ describe('handleFallback', () => {
     const result = await handleFallback(mockConfig, MOCK_PRO_MODEL, AUTH_OAUTH);
 
     expect(result).toBeNull();
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
       'Fallback UI handler failed:',
       handlerError,
     );
@@ -663,7 +656,7 @@ describe('handleFallback', () => {
 
     it('logs and returns null when handler resolves to null', async () => {
       policyHandler.mockResolvedValue(null);
-      const debugLoggerErrorSpy = vi.spyOn(debugLogger, 'error');
+
       const result = await handleFallback(
         policyConfig,
         MOCK_PRO_MODEL,
@@ -671,13 +664,13 @@ describe('handleFallback', () => {
       );
 
       expect(result).toBeNull();
-      expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+      expect(emitFeedbackSpy).toHaveBeenCalledWith(
+        'error',
         'Fallback handler failed:',
         new Error(
           'Unexpected fallback intent received from fallbackModelHandler: "null"',
         ),
       );
-      debugLoggerErrorSpy.mockRestore();
     });
 
     it('successfully follows expected availability response for Preview Chain', async () => {
