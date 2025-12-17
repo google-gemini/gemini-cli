@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AgentRegistry, getModelConfigAlias } from './registry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
-import type { AgentDefinition } from './types.js';
+import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
@@ -27,6 +27,7 @@ class TestableAgentRegistry extends AgentRegistry {
 
 // Define mock agent structures for testing registration logic
 const MOCK_AGENT_V1: AgentDefinition = {
+  kind: 'local',
   name: 'MockAgent',
   description: 'Mock Description V1',
   inputConfig: { inputs: {} },
@@ -94,7 +95,7 @@ describe('AgentRegistry', () => {
 
       const investigatorDef = previewRegistry.getDefinition(
         'codebase_investigator',
-      );
+      ) as LocalAgentDefinition;
       expect(investigatorDef).toBeDefined();
       expect(investigatorDef?.modelConfig.model).toBe(
         PREVIEW_GEMINI_FLASH_MODEL,
@@ -115,7 +116,7 @@ describe('AgentRegistry', () => {
 
       const investigatorDef = previewRegistry.getDefinition(
         'codebase_investigator',
-      );
+      ) as LocalAgentDefinition;
       expect(investigatorDef).toBeDefined();
       expect(investigatorDef?.modelConfig.model).toBe(
         PREVIEW_GEMINI_FLASH_MODEL,
@@ -136,7 +137,7 @@ describe('AgentRegistry', () => {
 
       const investigatorDef = previewRegistry.getDefinition(
         'codebase_investigator',
-      );
+      ) as LocalAgentDefinition;
       expect(investigatorDef).toBeDefined();
       expect(investigatorDef?.modelConfig.model).toBe(
         DEFAULT_GEMINI_FLASH_LITE_MODEL,
