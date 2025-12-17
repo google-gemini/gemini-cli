@@ -41,7 +41,7 @@ import {
   RecoveryAttemptEvent,
 } from '../telemetry/types.js';
 import type {
-  AgentDefinition,
+  LocalAgentDefinition,
   AgentInputs,
   OutputObject,
   SubagentActivityEvent,
@@ -78,8 +78,8 @@ type AgentTurnResult =
  * This executor runs the agent in a loop, calling tools until it calls the
  * mandatory `complete_task` tool to signal completion.
  */
-export class AgentExecutor<TOutput extends z.ZodTypeAny> {
-  readonly definition: AgentDefinition<TOutput>;
+export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
+  readonly definition: LocalAgentDefinition<TOutput>;
 
   private readonly agentId: string;
   private readonly toolRegistry: ToolRegistry;
@@ -97,13 +97,13 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
    * @param definition The definition object for the agent.
    * @param runtimeContext The global runtime configuration.
    * @param onActivity An optional callback to receive activity events.
-   * @returns A promise that resolves to a new `AgentExecutor` instance.
+   * @returns A promise that resolves to a new `LocalAgentExecutor` instance.
    */
   static async create<TOutput extends z.ZodTypeAny>(
-    definition: AgentDefinition<TOutput>,
+    definition: LocalAgentDefinition<TOutput>,
     runtimeContext: Config,
     onActivity?: ActivityCallback,
-  ): Promise<AgentExecutor<TOutput>> {
+  ): Promise<LocalAgentExecutor<TOutput>> {
     // Create an isolated tool registry for this agent instance.
     const agentToolRegistry = new ToolRegistry(runtimeContext);
     const parentToolRegistry = runtimeContext.getToolRegistry();
@@ -131,13 +131,16 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       agentToolRegistry.sortTools();
       // Validate that all registered tools are safe for non-interactive
       // execution.
-      await AgentExecutor.validateTools(agentToolRegistry, definition.name);
+      await LocalAgentExecutor.validateTools(
+        agentToolRegistry,
+        definition.name,
+      );
     }
 
     // Get the parent prompt ID from context
     const parentPromptId = promptIdContext.getStore();
 
-    return new AgentExecutor(
+    return new LocalAgentExecutor(
       definition,
       runtimeContext,
       agentToolRegistry,
@@ -153,7 +156,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
    * instantiate the class.
    */
   private constructor(
-    definition: AgentDefinition<TOutput>,
+    definition: LocalAgentDefinition<TOutput>,
     runtimeContext: Config,
     toolRegistry: ToolRegistry,
     parentPromptId: string | undefined,
@@ -820,7 +823,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       if (!allowedToolNames.has(functionCall.name as string)) {
         const error = `Unauthorized tool call: '${functionCall.name}' is not available to this agent.`;
 
-        debugLogger.warn(`[AgentExecutor] Blocked call: ${error}`);
+        debugLogger.warn(`[LocalAgentExecutor] Blocked call: ${error}`);
 
         syncResponseParts.push({
           functionResponse: {
