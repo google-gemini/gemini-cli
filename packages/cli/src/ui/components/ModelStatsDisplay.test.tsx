@@ -87,6 +87,7 @@ describe('<ModelStatsDisplay />', () => {
         'gemini-2.5-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
           tokens: {
+            input: 10,
             prompt: 10,
             candidates: 20,
             total: 30,
@@ -128,6 +129,7 @@ describe('<ModelStatsDisplay />', () => {
         'gemini-2.5-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
           tokens: {
+            input: 5,
             prompt: 10,
             candidates: 20,
             total: 30,
@@ -139,6 +141,7 @@ describe('<ModelStatsDisplay />', () => {
         'gemini-2.5-flash': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 50 },
           tokens: {
+            input: 5,
             prompt: 5,
             candidates: 10,
             total: 15,
@@ -180,6 +183,7 @@ describe('<ModelStatsDisplay />', () => {
         'gemini-2.5-pro': {
           api: { totalRequests: 10, totalErrors: 1, totalLatencyMs: 1000 },
           tokens: {
+            input: 50,
             prompt: 100,
             candidates: 200,
             total: 300,
@@ -191,6 +195,7 @@ describe('<ModelStatsDisplay />', () => {
         'gemini-2.5-flash': {
           api: { totalRequests: 20, totalErrors: 2, totalLatencyMs: 500 },
           tokens: {
+            input: 100,
             prompt: 200,
             candidates: 400,
             total: 600,
@@ -235,6 +240,7 @@ describe('<ModelStatsDisplay />', () => {
             totalLatencyMs: 9876,
           },
           tokens: {
+            input: 987654321 - 123456789,
             prompt: 987654321,
             candidates: 123456789,
             total: 999999999,
@@ -272,6 +278,7 @@ describe('<ModelStatsDisplay />', () => {
         'gemini-2.5-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
           tokens: {
+            input: 5,
             prompt: 10,
             candidates: 20,
             total: 30,
