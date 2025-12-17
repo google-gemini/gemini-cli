@@ -1003,11 +1003,6 @@ export const useGeminiStream = (
               return;
             }
 
-            // Clear clipboard images after they've been injected into the query
-            if (clipboardImages && !options?.isContinuation) {
-              clipboardImages.clear();
-            }
-
             if (!options?.isContinuation) {
               if (typeof queryToSend === 'string') {
                 // logging the text prompts only for now
@@ -1053,6 +1048,12 @@ export const useGeminiStream = (
                 addItem(pendingHistoryItemRef.current, userMessageTimestamp);
                 setPendingHistoryItem(null);
               }
+
+              // Clear clipboard images after successful send
+              if (clipboardImages && !options?.isContinuation) {
+                clipboardImages.clear();
+              }
+
               if (loopDetectedRef.current) {
                 loopDetectedRef.current = false;
                 // Show the confirmation dialog to choose whether to disable loop detection
