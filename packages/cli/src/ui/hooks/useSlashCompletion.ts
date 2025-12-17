@@ -116,12 +116,6 @@ function useCommandParser(
       exactMatchAsParent = currentLevel.find(
         (cmd) => matchesCommand(cmd, partial) && cmd.subCommands,
       );
-
-      if (exactMatchAsParent) {
-        leafCommand = exactMatchAsParent;
-        currentLevel = exactMatchAsParent.subCommands;
-        partial = '';
-      }
     }
 
     const depth = commandPathParts.length;
