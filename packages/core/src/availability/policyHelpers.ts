@@ -117,9 +117,6 @@ export function createAvailabilityContextProvider(
   modelGetter: () => string,
 ): () => RetryAvailabilityContext | undefined {
   return () => {
-    if (!config.isModelAvailabilityServiceEnabled()) {
-      return undefined;
-    }
     const service = config.getModelAvailabilityService();
     const currentModel = modelGetter();
 
@@ -138,11 +135,7 @@ export function createAvailabilityContextProvider(
 export function selectModelForAvailability(
   config: Config,
   requestedModel: string,
-): ModelSelectionResult | undefined {
-  if (!config.isModelAvailabilityServiceEnabled()) {
-    return undefined;
-  }
-
+): ModelSelectionResult {
   const chain = resolvePolicyChain(config, requestedModel);
   const selection = config
     .getModelAvailabilityService()

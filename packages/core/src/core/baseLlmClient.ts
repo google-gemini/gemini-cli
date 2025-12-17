@@ -264,22 +264,20 @@ export class BaseLlmClient {
 
     try {
       const apiCall = () => {
-        // If availability is enabled, ensure we use the current active model
+        // Ensure we use the current active model
         // in case a fallback occurred in a previous attempt.
-        if (this.config.isModelAvailabilityServiceEnabled()) {
-          const activeModel = this.config.getActiveModel();
-          if (activeModel !== requestParams.model) {
-            requestParams.model = activeModel;
-            // Re-resolve config if model changed during retry
-            const { generateContentConfig } =
-              this.config.modelConfigService.getResolvedConfig({
-                model: activeModel,
-              });
-            requestParams.config = {
-              ...requestParams.config,
-              ...generateContentConfig,
-            };
-          }
+        const activeModel = this.config.getActiveModel();
+        if (activeModel !== requestParams.model) {
+          requestParams.model = activeModel;
+          // Re-resolve config if model changed during retry
+          const { generateContentConfig } =
+            this.config.modelConfigService.getResolvedConfig({
+              model: activeModel,
+            });
+          requestParams.config = {
+            ...requestParams.config,
+            ...generateContentConfig,
+          };
         }
         return this.contentGenerator.generateContent(requestParams, promptId);
       };
