@@ -55,11 +55,13 @@ export async function loadWasmBinary(
 
 // Text file read threshold - configurable via ENV, -1 to disable
 const DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES = 512 * 1024; // 512 KiB
-const TEXT_FILE_READ_THRESHOLD_BYTES = parseInt(
-  process.env['GEMINI_TEXT_FILE_READ_THRESHOLD_BYTES'] ||
-    String(DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES),
+const parsedThreshold = parseInt(
+  process.env['GEMINI_TEXT_FILE_READ_THRESHOLD_BYTES'] ?? 'not-a-number',
   10,
 );
+const TEXT_FILE_READ_THRESHOLD_BYTES = isNaN(parsedThreshold)
+  ? DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES
+  : parsedThreshold;
 
 // Default values for encoding and separator format
 export const DEFAULT_ENCODING: BufferEncoding = 'utf-8';
