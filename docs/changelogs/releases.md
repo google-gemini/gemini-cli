@@ -486,10 +486,10 @@ https://github.com/google-gemini/gemini-cli/compare/v0.19.4...v0.20.0
   integration after enabling "Preview Features" in their CLI’s `/settings`.
 - **Interactive shell:**
   - **Click-to-Focus:** Go to `/settings` and enable **Use Alternate Buffer**
-    WhenUse Alternate Buffer" setting is enabled users can click within the
+    When "Use Alternate Buffer" setting is enabled users can click within the
     embedded shell output to focus it for input.
   - **Loading phrase:** Clearly indicates when the interactive shell is awaiting
-    user input. ([vid](https://imgur.com/a/kjK8bUK),
+    user input. ([vid](https://imgur.com/a/kjK8bUK)
     [pr](https://github.com/google-gemini/gemini-cli/pull/12535) by
     [@jackwotherspoon](https://github.com/jackwotherspoon))
 
