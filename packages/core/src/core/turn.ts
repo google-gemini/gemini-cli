@@ -32,6 +32,7 @@ import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { createUserContent } from '@google/genai';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { getCitations } from '../utils/generateContentResponseUtilities.js';
+import { LlmRole } from '../telemetry/types.js';
 
 // Define a structure for tools passed to the server
 export interface ServerTool {
@@ -242,6 +243,7 @@ export class Turn {
     modelConfigKey: ModelConfigKey,
     req: PartListUnion,
     signal: AbortSignal,
+    role: LlmRole = LlmRole.MAIN,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
       // Note: This assumes `sendMessageStream` yields events like
@@ -251,6 +253,7 @@ export class Turn {
         req,
         this.prompt_id,
         signal,
+        role,
       );
 
       for await (const streamEvent of responseStream) {

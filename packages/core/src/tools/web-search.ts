@@ -14,6 +14,7 @@ import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { type Config } from '../config/config.js';
 import { getResponseText } from '../utils/partUtils.js';
+import { LlmRole } from '../telemetry/llmRole.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -83,6 +84,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
         { model: 'web-search' },
         [{ role: 'user', parts: [{ text: this.params.query }] }],
         signal,
+        LlmRole.UTILITY_TOOL,
       );
 
       const responseText = getResponseText(response);

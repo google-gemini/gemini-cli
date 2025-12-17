@@ -47,6 +47,7 @@ import type {
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { HookSystem } from '../hooks/hookSystem.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
+import { LlmRole } from '../telemetry/types.js';
 
 vi.mock('../services/chatCompressionService.js');
 
@@ -2545,6 +2546,7 @@ ${JSON.stringify(
         { model: 'test-model' },
         contents,
         abortSignal,
+        LlmRole.MAIN,
       );
 
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
@@ -2570,6 +2572,7 @@ ${JSON.stringify(
         { model: initialModel },
         contents,
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(

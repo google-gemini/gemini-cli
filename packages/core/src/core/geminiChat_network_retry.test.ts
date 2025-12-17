@@ -14,6 +14,7 @@ import { setSimulate429 } from '../utils/testUtils.js';
 import { HookSystem } from '../hooks/hookSystem.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
+import { LlmRole } from '../telemetry/types.js';
 
 // Mock fs module
 vi.mock('node:fs', () => ({
@@ -150,6 +151,7 @@ describe('GeminiChat Network Retries', () => {
       'test message',
       'prompt-id-retry-network',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     const events: StreamEvent[] = [];
@@ -219,6 +221,7 @@ describe('GeminiChat Network Retries', () => {
       'test message',
       'prompt-id-retry-fetch',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     const events: StreamEvent[] = [];
@@ -259,6 +262,7 @@ describe('GeminiChat Network Retries', () => {
       'test message',
       'prompt-id-no-retry',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     await expect(async () => {

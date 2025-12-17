@@ -28,6 +28,7 @@ import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import * as policyHelpers from '../availability/policyHelpers.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
+import { LlmRole } from '../telemetry/types.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -259,6 +260,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-tool-call-empty-end',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       await expect(
         (async () => {
@@ -312,6 +314,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-no-finish-empty-end',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       await expect(
         (async () => {
@@ -359,6 +362,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-valid-then-invalid-end',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       await expect(
         (async () => {
@@ -407,6 +411,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-empty-chunk-consolidation',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // Consume the stream
@@ -466,6 +471,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-multi-chunk',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // Consume the stream to trigger history recording.
@@ -515,6 +521,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-mixed-chunk',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // This loop consumes the stream.
@@ -584,6 +591,7 @@ describe('GeminiChat', () => {
         },
         'prompt-id-stream-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // 4. Assert: The stream processing should throw an InvalidStreamError.
@@ -628,6 +636,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // Should not throw an error
@@ -665,6 +674,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       await expect(
@@ -701,6 +711,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       await expect(
@@ -737,6 +748,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // Should not throw an error
@@ -774,6 +786,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id-malformed',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // Should throw an error
@@ -821,6 +834,7 @@ describe('GeminiChat', () => {
         'test retry',
         'prompt-id-retry-malformed',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       const events: StreamEvent[] = [];
       for await (const event of stream) {
@@ -878,6 +892,7 @@ describe('GeminiChat', () => {
         'hello',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume stream
@@ -903,6 +918,7 @@ describe('GeminiChat', () => {
           },
         },
         'prompt-id-1',
+        LlmRole.MAIN,
       );
     });
 
@@ -926,6 +942,7 @@ describe('GeminiChat', () => {
         'hello',
         'prompt-id-thinking-level',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume stream
@@ -942,6 +959,7 @@ describe('GeminiChat', () => {
           }),
         }),
         'prompt-id-thinking-level',
+        LlmRole.MAIN,
       );
     });
 
@@ -965,6 +983,7 @@ describe('GeminiChat', () => {
         'hello',
         'prompt-id-thinking-budget',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume stream
@@ -975,12 +994,13 @@ describe('GeminiChat', () => {
           model: 'gemini-2.0-flash',
           config: expect.objectContaining({
             thinkingConfig: {
-              thinkingBudget: DEFAULT_THINKING_MODE,
+              thinkingBudget: 8192,
               thinkingLevel: undefined,
             },
           }),
         }),
         'prompt-id-thinking-budget',
+        LlmRole.MAIN,
       );
     });
   });
@@ -1032,6 +1052,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id-no-retry',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       await expect(
@@ -1080,6 +1101,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-yield-retry',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       const events: StreamEvent[] = [];
       for await (const event of stream) {
@@ -1122,6 +1144,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id-retry-success',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       const chunks: StreamEvent[] = [];
       for await (const chunk of stream) {
@@ -1194,6 +1217,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-retry-temperature',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       for await (const _ of stream) {
@@ -1215,6 +1239,7 @@ describe('GeminiChat', () => {
           }),
         }),
         'prompt-id-retry-temperature',
+        LlmRole.MAIN,
       );
 
       // Second call (retry) should have temperature 1
@@ -1228,6 +1253,7 @@ describe('GeminiChat', () => {
           }),
         }),
         'prompt-id-retry-temperature',
+        LlmRole.MAIN,
       );
     });
 
@@ -1253,6 +1279,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id-retry-fail',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       await expect(async () => {
         for await (const _ of stream) {
@@ -1319,6 +1346,7 @@ describe('GeminiChat', () => {
           'test message',
           'prompt-id-400',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
 
         await expect(
@@ -1358,9 +1386,11 @@ describe('GeminiChat', () => {
           'test message',
           'prompt-id-429-retry',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
 
         const events: StreamEvent[] = [];
+
         for await (const event of stream) {
           events.push(event);
         }
@@ -1407,9 +1437,11 @@ describe('GeminiChat', () => {
           'test message',
           'prompt-id-500-retry',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
 
         const events: StreamEvent[] = [];
+
         for await (const event of stream) {
           events.push(event);
         }
@@ -1464,9 +1496,11 @@ describe('GeminiChat', () => {
           'test message',
           'prompt-id-fetch-error-retry',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
 
         const events: StreamEvent[] = [];
+
         for await (const event of stream) {
           events.push(event);
         }
@@ -1528,6 +1562,7 @@ describe('GeminiChat', () => {
       'Second question',
       'prompt-id-retry-existing',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
     for await (const _ of stream) {
       // consume stream
@@ -1600,6 +1635,7 @@ describe('GeminiChat', () => {
       'test empty stream',
       'prompt-id-empty-stream',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
     const chunks: StreamEvent[] = [];
     for await (const chunk of stream) {
@@ -1681,6 +1717,7 @@ describe('GeminiChat', () => {
       'first',
       'prompt-1',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
     const firstStreamIterator = firstStream[Symbol.asyncIterator]();
     await firstStreamIterator.next();
@@ -1691,6 +1728,7 @@ describe('GeminiChat', () => {
       'second',
       'prompt-2',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     // 5. Assert that only one API call has been made so far.
@@ -1796,6 +1834,7 @@ describe('GeminiChat', () => {
         'trigger 429',
         'prompt-id-fb1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // Consume stream to trigger logic
@@ -1862,6 +1901,7 @@ describe('GeminiChat', () => {
       'test message',
       'prompt-id-discard-test',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
     const events: StreamEvent[] = [];
     for await (const event of stream) {
@@ -2078,6 +2118,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-healthy',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume
@@ -2113,6 +2154,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-sticky-once',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume
@@ -2163,6 +2205,7 @@ describe('GeminiChat', () => {
           'test',
           'prompt-fallback-arg',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
         for await (const _ of stream) {
           // consume
@@ -2241,6 +2284,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-config-refresh',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       // Consume to drive both attempts
       for await (const _ of stream) {
@@ -2253,9 +2297,12 @@ describe('GeminiChat', () => {
         1,
         expect.objectContaining({
           model: 'model-a',
-          config: expect.objectContaining({ temperature: 0.1 }),
+          config: expect.objectContaining({
+            temperature: 0.1,
+          }),
         }),
         expect.any(String),
+        LlmRole.MAIN,
       );
       expect(
         mockContentGenerator.generateContentStream,
@@ -2263,9 +2310,12 @@ describe('GeminiChat', () => {
         2,
         expect.objectContaining({
           model: 'model-b',
-          config: expect.objectContaining({ temperature: 0.9 }),
+          config: expect.objectContaining({
+            temperature: 0.9,
+          }),
         }),
         expect.any(String),
+        LlmRole.MAIN,
       );
     });
   });

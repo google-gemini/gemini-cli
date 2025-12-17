@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { formatDuration } from '../utils/formatters.js';
@@ -15,6 +15,7 @@ import {
 } from '../utils/computeStats.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { Table, type Column } from './Table.js';
+import type { LlmRole } from '@google/gemini-cli-core';
 
 interface StatRowData {
   metric: string;
@@ -22,6 +23,7 @@ interface StatRowData {
   isSubtle?: boolean;
   // Dynamic keys for model values
   [key: string]: string | React.ReactNode | boolean | undefined;
+  color?: string;
 }
 
 export const ModelStatsDisplay: React.FC = () => {

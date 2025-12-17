@@ -39,6 +39,8 @@ import {
   toSystemInstruction,
 } from './semantic.js';
 import { sanitizeHookName } from './sanitize.js';
+import { LlmRole } from './llmRole.js';
+export { LlmRole };
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -363,17 +365,20 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
   model: string;
   prompt: GenAIPromptDetails;
   request_text?: string;
+  role?: LlmRole;
 
   constructor(
     model: string,
     prompt_details: GenAIPromptDetails,
     request_text?: string,
+    role?: LlmRole,
   ) {
     this['event.name'] = 'api_request';
     this['event.timestamp'] = new Date().toISOString();
     this.model = model;
     this.prompt = prompt_details;
     this.request_text = request_text;
+    this.role = role;
   }
 
   toLogRecord(config: Config): LogRecord {
@@ -385,6 +390,9 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
       prompt_id: this.prompt.prompt_id,
       request_text: this.request_text,
     };
+    if (this.role) {
+      attributes['role'] = this.role;
+    }
     return { body: `API request to ${this.model}.`, attributes };
   }
 
@@ -578,6 +586,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
   response: GenAIResponseDetails;
   usage: GenAIUsageDetails;
   finish_reasons: OTelFinishReason[];
+  role?: LlmRole;
 
   constructor(
     model: string,
@@ -587,6 +596,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
     auth_type?: string,
     usage_data?: GenerateContentResponseUsageMetadata,
     response_text?: string,
+    role?: LlmRole,
   ) {
     this['event.name'] = 'api_response';
     this['event.timestamp'] = new Date().toISOString();
@@ -607,6 +617,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       total_token_count: usage_data?.totalTokenCount ?? 0,
     };
     this.finish_reasons = toFinishReasons(this.response.candidates);
+    this.role = role;
   }
 
   toLogRecord(config: Config): LogRecord {
@@ -627,6 +638,9 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       status_code: this.status_code,
       finish_reasons: this.finish_reasons,
     };
+    if (this.role) {
+      attributes['role'] = this.role;
+    }
     if (this.response_text) {
       attributes['response_text'] = this.response_text;
     }
