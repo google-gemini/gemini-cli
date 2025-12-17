@@ -954,7 +954,7 @@ export class Task {
 
     if (hasContentForLlm) {
       this.currentPromptId =
-        this.config.getSessionId() + '########' + this.promptCount++;
+        this.config.getSessionId() + '::' + this.promptCount++;
       logger.info('[Task] Sending new parts to LLM.');
       const stateChange: StateChange = {
         kind: CoderAgentEvent.StateChangeEvent,

@@ -138,6 +138,56 @@ export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
  * `as const` is crucial for TypeScript to infer the most specific types possible.
  */
 const SETTINGS_SCHEMA = {
+  agents: {
+    type: 'object',
+    label: 'Agents',
+    category: 'Agents',
+    requiresRestart: false,
+    default: {},
+    description: 'Configuration for agents.',
+    showInDialog: false,
+    additionalProperties: {
+      type: 'object',
+      ref: 'AgentConfig',
+      properties: {
+        enabled: {
+          type: 'boolean',
+          default: true,
+          label: 'Enabled',
+          category: 'Agents',
+          requiresRestart: false,
+        },
+        model: {
+          type: 'string',
+          label: 'Model',
+          category: 'Agents',
+          requiresRestart: false,
+          default: undefined,
+        },
+        maxTimeMinutes: {
+          type: 'number',
+          label: 'Max Time (Minutes)',
+          category: 'Agents',
+          requiresRestart: false,
+          default: undefined,
+        },
+        maxTurns: {
+          type: 'number',
+          label: 'Max Turns',
+          category: 'Agents',
+          requiresRestart: false,
+          default: undefined,
+        },
+        thinkingBudget: {
+          type: 'number',
+          label: 'Thinking Budget',
+          category: 'Agents',
+          requiresRestart: false,
+          default: undefined,
+        },
+      },
+    },
+  },
   // Maintained for compatibility/criticality
   mcpServers: {
     type: 'object',
@@ -1710,6 +1760,33 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         type: 'string',
         description:
           'Service account email to impersonate (name@project.iam.gserviceaccount.com).',
+      },
+    },
+  },
+  AgentConfig: {
+    type: 'object',
+    description: 'Configuration for a specific agent.',
+    additionalProperties: false,
+    properties: {
+      enabled: {
+        type: 'boolean',
+        description: 'Whether the agent is enabled.',
+      },
+      model: {
+        type: 'string',
+        description: 'The model to use for this agent.',
+      },
+      maxTimeMinutes: {
+        type: 'number',
+        description: 'Maximum execution time in minutes.',
+      },
+      maxTurns: {
+        type: 'number',
+        description: 'Maximum number of turns.',
+      },
+      thinkingBudget: {
+        type: 'number',
+        description: 'Budget for thinking tokens.',
       },
     },
   },

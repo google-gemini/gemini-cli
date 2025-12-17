@@ -21,9 +21,6 @@ describe('CodebaseInvestigatorAgent', () => {
       'Codebase Investigator Agent',
     );
     expect(CodebaseInvestigatorAgent.description).toBeDefined();
-    expect(
-      CodebaseInvestigatorAgent.inputConfig.inputs['objective'].required,
-    ).toBe(true);
     expect(CodebaseInvestigatorAgent.outputConfig?.outputName).toBe('report');
     expect(CodebaseInvestigatorAgent.modelConfig?.model).toBe(
       GEMINI_MODEL_ALIAS_PRO,
@@ -34,6 +31,21 @@ describe('CodebaseInvestigatorAgent', () => {
       GLOB_TOOL_NAME,
       GREP_TOOL_NAME,
     ]);
+  });
+
+  it('should use new JSONSchema7 format for inputConfig', () => {
+    expect('inputSchema' in CodebaseInvestigatorAgent.inputConfig).toBe(true);
+    if ('inputSchema' in CodebaseInvestigatorAgent.inputConfig) {
+      expect(CodebaseInvestigatorAgent.inputConfig.inputSchema.type).toBe(
+        'object',
+      );
+      expect(
+        CodebaseInvestigatorAgent.inputConfig.inputSchema.properties,
+      ).toHaveProperty('objective');
+      expect(
+        CodebaseInvestigatorAgent.inputConfig.inputSchema.required,
+      ).toContain('objective');
+    }
   });
 
   it('should process output to a formatted JSON string', () => {

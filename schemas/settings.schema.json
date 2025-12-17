@@ -12,6 +12,16 @@
       "type": "string",
       "default": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json"
     },
+    "agents": {
+      "title": "Agents",
+      "description": "Configuration for agents.",
+      "markdownDescription": "Configuration for agents.\n\n- Category: `Agents`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/AgentConfig"
+      }
+    },
     "mcpServers": {
       "title": "MCP Servers",
       "description": "Configuration for MCP servers.",
@@ -1594,6 +1604,33 @@
         "targetServiceAccount": {
           "type": "string",
           "description": "Service account email to impersonate (name@project.iam.gserviceaccount.com)."
+        }
+      }
+    },
+    "AgentConfig": {
+      "type": "object",
+      "description": "Configuration for a specific agent.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the agent is enabled."
+        },
+        "model": {
+          "type": "string",
+          "description": "The model to use for this agent."
+        },
+        "maxTimeMinutes": {
+          "type": "number",
+          "description": "Maximum execution time in minutes."
+        },
+        "maxTurns": {
+          "type": "number",
+          "description": "Maximum number of turns."
+        },
+        "thinkingBudget": {
+          "type": "number",
+          "description": "Budget for thinking tokens."
         }
       }
     },

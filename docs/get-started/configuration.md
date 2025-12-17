@@ -96,6 +96,12 @@ their corresponding top-level category object in your `settings.json` file.
 
 <!-- SETTINGS-AUTOGEN:START -->
 
+#### `agents`
+
+- **`agents`** (object):
+  - **Description:** Configuration for agents.
+  - **Default:** `{}`
+
 #### `general`
 
 - **`general.previewFeatures`** (boolean):

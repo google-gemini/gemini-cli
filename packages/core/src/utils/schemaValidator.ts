@@ -30,6 +30,27 @@ addFormatsFunc(ajValidator);
  */
 export class SchemaValidator {
   /**
+   * Validates a JSON Schema definition itself (not data against a schema).
+   *
+   * This method ensures that a given schema is a valid JSON Schema before
+   * it's used for data validation. This is useful for catching configuration
+   * errors early at registration time rather than runtime.
+   *
+   * @param schema The JSON Schema to validate
+   * @returns null if the schema is valid, or an error string if invalid
+   */
+  static validateSchema(schema: unknown): string | null {
+    if (!schema) {
+      return null;
+    }
+    const isValid = ajValidator.validateSchema(schema);
+    if (!isValid && ajValidator.errors) {
+      return ajValidator.errorsText(ajValidator.errors);
+    }
+    return null;
+  }
+
+  /**
    * Returns null if the data conforms to the schema described by schema (or if schema
    *  is null). Otherwise, returns a string describing the error.
    */

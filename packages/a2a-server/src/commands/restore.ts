@@ -50,7 +50,30 @@ export class RestoreCommand implements Command {
         : `${argsStr}.json`;
 
       const checkpointDir = config.storage.getProjectTempCheckpointsDir();
-      const filePath = path.join(checkpointDir, selectedFile);
+
+      // Security: Validate the file exists in the checkpoint directory
+      // This prevents path traversal attacks (e.g., ../secret.txt)
+      let availableFiles: string[];
+      try {
+        availableFiles = await fs.readdir(checkpointDir);
+      } catch {
+        availableFiles = [];
+      }
+
+      // Extract just the basename to compare, preventing path traversal
+      const requestedBasename = path.basename(selectedFile);
+      if (!availableFiles.includes(requestedBasename)) {
+        return {
+          name: this.name,
+          data: {
+            type: 'message',
+            messageType: 'error',
+            content: `File not found: ${selectedFile}`,
+          },
+        };
+      }
+
+      const filePath = path.join(checkpointDir, requestedBasename);
 
       let data: string;
       try {
