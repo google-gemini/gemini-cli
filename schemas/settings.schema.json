@@ -387,6 +387,23 @@
       },
       "additionalProperties": false
     },
+    "safety": {
+      "title": "Safety",
+      "description": "Safety settings.",
+      "markdownDescription": "Safety settings.\n\n- Category: `Safety`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "enableConseca": {
+          "title": "Enable Context-Aware Safety",
+          "description": "Enable the context-aware safety checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.",
+          "markdownDescription": "Enable the context-aware safety checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.\n\n- Category: `Safety`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
     "telemetry": {
       "title": "Telemetry",
       "description": "Telemetry configuration.",
