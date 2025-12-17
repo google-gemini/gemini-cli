@@ -213,8 +213,7 @@ on GitHub.
 - fix(patch): cherry-pick ee6556c to release/v0.21.0-preview.1-pr-14691 to patch
   version v0.21.0-preview.1 and create version 0.21.0-preview.2 by
   @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/14908
-- fix(patch): cherry-pick 54de675 to release/v0.21.0-preview.2-pr-14961
-  [CONFLICTS] by @gemini-cli-robot in
+- fix(patch): cherry-pick 54de675 to release/v0.21.0-preview.2-pr-14961 by @gemini-cli-robot in
   https://github.com/google-gemini/gemini-cli/pull/14968
 - fix(patch): cherry-pick 12cbe32 to release/v0.21.0-preview.3-pr-15000 to patch
   version v0.21.0-preview.3 and create version 0.21.0-preview.4 by
