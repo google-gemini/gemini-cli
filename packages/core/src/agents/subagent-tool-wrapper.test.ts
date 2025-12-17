@@ -6,19 +6,19 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
-import { SubagentInvocation } from './invocation.js';
+import { LocalSubagentInvocation } from './local-invocation.js';
 import { convertInputConfigToJsonSchema } from './schema-utils.js';
 import { makeFakeConfig } from '../test-utils/config.js';
-import type { AgentDefinition, AgentInputs } from './types.js';
+import type { LocalAgentDefinition, AgentInputs } from './types.js';
 import type { Config } from '../config/config.js';
 import { Kind } from '../tools/tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 // Mock dependencies to isolate the SubagentToolWrapper class
-vi.mock('./invocation.js');
+vi.mock('./local-invocation.js');
 vi.mock('./schema-utils.js');
 
-const MockedSubagentInvocation = vi.mocked(SubagentInvocation);
+const MockedLocalSubagentInvocation = vi.mocked(LocalSubagentInvocation);
 const mockConvertInputConfigToJsonSchema = vi.mocked(
   convertInputConfigToJsonSchema,
 );
@@ -26,7 +26,8 @@ const mockConvertInputConfigToJsonSchema = vi.mocked(
 // Define reusable test data
 let mockConfig: Config;
 
-const mockDefinition: AgentDefinition = {
+const mockDefinition: LocalAgentDefinition = {
+  kind: 'local',
   name: 'TestAgent',
   displayName: 'Test Agent Display Name',
   description: 'An agent for testing.',
@@ -106,23 +107,23 @@ describe('SubagentToolWrapper', () => {
   });
 
   describe('createInvocation', () => {
-    it('should create a SubagentInvocation with the correct parameters', () => {
+    it('should create a LocalSubagentInvocation with the correct parameters', () => {
       const wrapper = new SubagentToolWrapper(mockDefinition, mockConfig);
       const params: AgentInputs = { goal: 'Test the invocation', priority: 1 };
 
       // The public `build` method calls the protected `createInvocation` after validation
       const invocation = wrapper.build(params);
 
-      expect(invocation).toBeInstanceOf(SubagentInvocation);
-      expect(MockedSubagentInvocation).toHaveBeenCalledExactlyOnceWith(
-        params,
+      expect(invocation).toBeInstanceOf(LocalSubagentInvocation);
+      expect(MockedLocalSubagentInvocation).toHaveBeenCalledExactlyOnceWith(
         mockDefinition,
         mockConfig,
+        params,
         undefined,
       );
     });
 
-    it('should pass the messageBus to the SubagentInvocation constructor', () => {
+    it('should pass the messageBus to the LocalSubagentInvocation constructor', () => {
       const mockMessageBus = {} as MessageBus;
       const wrapper = new SubagentToolWrapper(
         mockDefinition,
@@ -133,10 +134,10 @@ describe('SubagentToolWrapper', () => {
 
       wrapper.build(params);
 
-      expect(MockedSubagentInvocation).toHaveBeenCalledWith(
-        params,
+      expect(MockedLocalSubagentInvocation).toHaveBeenCalledWith(
         mockDefinition,
         mockConfig,
+        params,
         mockMessageBus,
       );
     });
@@ -151,7 +152,7 @@ describe('SubagentToolWrapper', () => {
       expect(() => wrapper.build(invalidParams)).toThrow(
         "params must have required property 'goal'",
       );
-      expect(MockedSubagentInvocation).not.toHaveBeenCalled();
+      expect(MockedLocalSubagentInvocation).not.toHaveBeenCalled();
     });
   });
 });
