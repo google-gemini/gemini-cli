@@ -86,20 +86,20 @@ export class GeminiIgnoreParser implements GeminiIgnoreFilter {
    * Useful for tools like ripgrep that support --ignore-file flag.
    */
   getIgnoreFilePath(): string | null {
-    if (this.patterns.length === 0) {
+    if (!this.hasPatterns()) {
       return null;
     }
-    const ignoreFilePath = path.join(this.projectRoot, '.geminiignore');
-    if (!fs.existsSync(ignoreFilePath)) {
-      return null;
-    }
-    return ignoreFilePath;
+    return path.join(this.projectRoot, '.geminiignore');
   }
 
   /**
    * Returns true if .geminiignore exists and has patterns.
    */
   hasPatterns(): boolean {
-    return this.patterns.length > 0;
+    if (this.patterns.length === 0) {
+      return false;
+    }
+    const ignoreFilePath = path.join(this.projectRoot, '.geminiignore');
+    return fs.existsSync(ignoreFilePath);
   }
 }

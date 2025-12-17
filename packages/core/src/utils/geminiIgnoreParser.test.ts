@@ -70,6 +70,13 @@ describe('GeminiIgnoreParser', () => {
       const parser = new GeminiIgnoreParser(projectRoot);
       expect(parser.hasPatterns()).toBe(true);
     });
+
+    it('should return false for hasPatterns when .geminiignore is deleted', async () => {
+      const parser = new GeminiIgnoreParser(projectRoot);
+      await fs.rm(path.join(projectRoot, '.geminiignore'));
+      expect(parser.hasPatterns()).toBe(false);
+      expect(parser.getIgnoreFilePath()).toBeNull();
+    });
   });
 
   describe('when .geminiignore does not exist', () => {
