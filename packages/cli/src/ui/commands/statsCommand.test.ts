@@ -10,6 +10,7 @@ import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
+import type { Config } from '@google/gemini-cli-core';
 
 describe('statsCommand', () => {
   let mockContext: CommandContext;
@@ -41,6 +42,26 @@ describe('statsCommand', () => {
         type: MessageType.STATS,
         duration: expectedDuration,
       },
+      expect.any(Number),
+    );
+  });
+
+  it('should fetch and display quota if config is available', async () => {
+    if (!statsCommand.action) throw new Error('Command has no action');
+
+    const mockQuota = { buckets: [] };
+    const mockRefreshUserQuota = vi.fn().mockResolvedValue(mockQuota);
+    mockContext.services.config = {
+      refreshUserQuota: mockRefreshUserQuota,
+    } as unknown as Config;
+
+    await statsCommand.action(mockContext, '');
+
+    expect(mockRefreshUserQuota).toHaveBeenCalled();
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quotas: mockQuota,
+      }),
       expect.any(Number),
     );
   });

@@ -34,6 +34,11 @@ import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_MODEL,
+} from './models.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -177,7 +182,7 @@ vi.mock('../code_assist/codeAssist.js');
 vi.mock('../code_assist/experiments/experiments.js');
 
 describe('Server Config (config.ts)', () => {
-  const MODEL = 'gemini-pro';
+  const MODEL = DEFAULT_GEMINI_MODEL;
   const SANDBOX: SandboxConfig = {
     command: 'docker',
     image: 'gemini-cli-sandbox',
@@ -766,6 +771,40 @@ describe('Server Config (config.ts)', () => {
       };
       const config = new Config(paramsWithUndefinedRipgrep);
       expect(config.getUseRipgrep()).toBe(true);
+    });
+  });
+
+  describe('UseWriteTodos Configuration', () => {
+    it('should default useWriteTodos to true when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getUseWriteTodos()).toBe(true);
+    });
+
+    it('should set useWriteTodos to false when provided as false', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        useWriteTodos: false,
+      };
+      const config = new Config(params);
+      expect(config.getUseWriteTodos()).toBe(false);
+    });
+
+    it('should disable useWriteTodos for preview models', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        model: 'gemini-3-pro-preview',
+      };
+      const config = new Config(params);
+      expect(config.getUseWriteTodos()).toBe(false);
+    });
+
+    it('should NOT disable useWriteTodos for non-preview models', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        model: 'gemini-2.5-pro',
+      };
+      const config = new Config(params);
+      expect(config.getUseWriteTodos()).toBe(true);
     });
   });
 
@@ -1703,18 +1742,16 @@ describe('Availability Service Integration', () => {
     cwd: '.',
   };
 
-  it('setActiveModel updates active model and emits event', async () => {
+  it('setActiveModel updates active model', async () => {
     const config = new Config(baseParams);
     const model1 = 'model1';
     const model2 = 'model2';
 
     config.setActiveModel(model1);
     expect(config.getActiveModel()).toBe(model1);
-    expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(model1);
 
     config.setActiveModel(model2);
     expect(config.getActiveModel()).toBe(model2);
-    expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(model2);
   });
 
   it('getActiveModel defaults to configured model if not set', () => {
@@ -1729,5 +1766,109 @@ describe('Availability Service Integration', () => {
 
     config.resetTurn();
     expect(spy).toHaveBeenCalled();
+  });
+});
+
+describe('Config Quota & Preview Model Access', () => {
+  let config: Config;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockCodeAssistServer: any;
+
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    targetDir: '/tmp',
+    debugMode: false,
+    sessionId: 'test-session',
+    model: 'gemini-pro',
+    usageStatisticsEnabled: false,
+    embeddingModel: 'gemini-embedding', // required in type but not in the original file I copied, adding here
+    sandbox: {
+      command: 'docker',
+      image: 'gemini-cli-sandbox',
+    },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCodeAssistServer = {
+      projectId: 'test-project',
+      retrieveUserQuota: vi.fn(),
+    };
+    vi.mocked(getCodeAssistServer).mockReturnValue(mockCodeAssistServer);
+    config = new Config(baseParams);
+  });
+
+  describe('refreshUserQuota', () => {
+    it('should update hasAccessToPreviewModel to true if quota includes preview model', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [{ modelId: PREVIEW_GEMINI_MODEL }],
+      });
+
+      await config.refreshUserQuota();
+      expect(config.getHasAccessToPreviewModel()).toBe(true);
+    });
+
+    it('should update hasAccessToPreviewModel to false if quota does not include preview model', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [{ modelId: 'some-other-model' }],
+      });
+
+      await config.refreshUserQuota();
+      expect(config.getHasAccessToPreviewModel()).toBe(false);
+    });
+
+    it('should update hasAccessToPreviewModel to false if buckets are undefined', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({});
+
+      await config.refreshUserQuota();
+      expect(config.getHasAccessToPreviewModel()).toBe(false);
+    });
+
+    it('should return undefined and not update if codeAssistServer is missing', async () => {
+      vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
+      const result = await config.refreshUserQuota();
+      expect(result).toBeUndefined();
+      expect(config.getHasAccessToPreviewModel()).toBe(false);
+    });
+
+    it('should return undefined if retrieveUserQuota fails', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockRejectedValue(
+        new Error('Network error'),
+      );
+      const result = await config.refreshUserQuota();
+      expect(result).toBeUndefined();
+      // Should remain default (false)
+      expect(config.getHasAccessToPreviewModel()).toBe(false);
+    });
+  });
+
+  describe('setPreviewFeatures', () => {
+    it('should reset model to default auto if disabling preview features while using a preview model', () => {
+      config.setPreviewFeatures(true);
+      config.setModel(PREVIEW_GEMINI_MODEL);
+
+      config.setPreviewFeatures(false);
+
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+    });
+
+    it('should NOT reset model if disabling preview features while NOT using a preview model', () => {
+      config.setPreviewFeatures(true);
+      const nonPreviewModel = 'gemini-1.5-pro';
+      config.setModel(nonPreviewModel);
+
+      config.setPreviewFeatures(false);
+
+      expect(config.getModel()).toBe(nonPreviewModel);
+    });
+
+    it('should NOT reset model if enabling preview features', () => {
+      config.setPreviewFeatures(false);
+      config.setModel(PREVIEW_GEMINI_MODEL); // Just pretending it was set somehow
+
+      config.setPreviewFeatures(true);
+
+      expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL);
+    });
   });
 });

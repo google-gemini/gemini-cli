@@ -4,239 +4,240 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
-import { cleanup } from 'ink-testing-library';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  GEMINI_MODEL_ALIAS_FLASH_LITE,
-  GEMINI_MODEL_ALIAS_FLASH,
-  GEMINI_MODEL_ALIAS_PRO,
-  DEFAULT_GEMINI_MODEL_AUTO,
-} from '@google/gemini-cli-core';
+import { render } from 'ink-testing-library';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ModelDialog } from './ModelDialog.js';
-import { useKeypress } from '../hooks/useKeypress.js';
-import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
-import type { Config } from '@google/gemini-cli-core';
+import { KeypressProvider } from '../contexts/KeypressContext.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
+} from '@google/gemini-cli-core';
+import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
 
-vi.mock('../hooks/useKeypress.js', () => ({
-  useKeypress: vi.fn(),
-}));
-const mockedUseKeypress = vi.mocked(useKeypress);
+// Mock dependencies
+const mockGetDisplayString = vi.fn();
+const mockLogModelSlashCommand = vi.fn();
+const mockModelSlashCommandEvent = vi.fn();
 
-vi.mock('./shared/DescriptiveRadioButtonSelect.js', () => ({
-  DescriptiveRadioButtonSelect: vi.fn(() => null),
-}));
-const mockedSelect = vi.mocked(DescriptiveRadioButtonSelect);
-
-const renderComponent = (
-  props: Partial<React.ComponentProps<typeof ModelDialog>> = {},
-  contextValue: Partial<Config> | undefined = undefined,
-) => {
-  const defaultProps = {
-    onClose: vi.fn(),
-  };
-  const combinedProps = { ...defaultProps, ...props };
-
-  const mockConfig = contextValue
-    ? ({
-        // --- Functions used by ModelDialog ---
-        getModel: vi.fn(() => DEFAULT_GEMINI_MODEL_AUTO),
-        setModel: vi.fn(),
-        getPreviewFeatures: vi.fn(() => false),
-
-        // --- Functions used by ClearcutLogger ---
-        getUsageStatisticsEnabled: vi.fn(() => true),
-        getSessionId: vi.fn(() => 'mock-session-id'),
-        getDebugMode: vi.fn(() => false),
-        getContentGeneratorConfig: vi.fn(() => ({ authType: 'mock' })),
-        getUseSmartEdit: vi.fn(() => false),
-        getProxy: vi.fn(() => undefined),
-        isInteractive: vi.fn(() => false),
-        getExperiments: () => {},
-
-        // --- Spread test-specific overrides ---
-        ...contextValue,
-      } as Config)
-    : undefined;
-
-  const renderResult = render(
-    <ConfigContext.Provider value={mockConfig}>
-      <ModelDialog {...combinedProps} />
-    </ConfigContext.Provider>,
-  );
-
+vi.mock('@google/gemini-cli-core', async () => {
+  const actual = await vi.importActual('@google/gemini-cli-core');
   return {
-    ...renderResult,
-    props: combinedProps,
-    mockConfig,
+    ...actual,
+    getDisplayString: (val: string) => mockGetDisplayString(val),
+    logModelSlashCommand: (config: Config, event: ModelSlashCommandEvent) =>
+      mockLogModelSlashCommand(config, event),
+    ModelSlashCommandEvent: class {
+      constructor(model: string) {
+        mockModelSlashCommandEvent(model);
+      }
+    },
   };
-};
+});
 
 describe('<ModelDialog />', () => {
+  const mockSetModel = vi.fn();
+  const mockGetModel = vi.fn();
+  const mockGetPreviewFeatures = vi.fn();
+  const mockOnClose = vi.fn();
+  const mockGetHasAccessToPreviewModel = vi.fn();
+
+  interface MockConfig extends Partial<Config> {
+    setModel: (model: string) => void;
+    getModel: () => string;
+    getPreviewFeatures: () => boolean;
+    getHasAccessToPreviewModel: () => boolean;
+  }
+
+  const mockConfig: MockConfig = {
+    setModel: mockSetModel,
+    getModel: mockGetModel,
+    getPreviewFeatures: mockGetPreviewFeatures,
+    getHasAccessToPreviewModel: mockGetHasAccessToPreviewModel,
+  };
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    mockGetModel.mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
+    mockGetPreviewFeatures.mockReturnValue(false);
+    mockGetHasAccessToPreviewModel.mockReturnValue(false);
+
+    // Default implementation for getDisplayString
+    mockGetDisplayString.mockImplementation((val: string) => {
+      if (val === 'auto-gemini-2.5') return 'Auto (Gemini 2.5)';
+      if (val === 'auto-gemini-3') return 'Auto (Preview)';
+      return val;
+    });
   });
 
-  afterEach(() => {
-    cleanup();
-  });
+  const renderComponent = (contextValue = mockConfig as Config) =>
+    render(
+      <KeypressProvider>
+        <ConfigContext.Provider value={contextValue}>
+          <ModelDialog onClose={mockOnClose} />
+        </ConfigContext.Provider>
+      </KeypressProvider>,
+    );
 
-  it('renders the title and help text', () => {
-    const { lastFrame, unmount } = renderComponent();
+  const waitForUpdate = () =>
+    new Promise((resolve) => setTimeout(resolve, 150));
+
+  it('renders the initial "main" view correctly', () => {
+    const { lastFrame } = renderComponent();
     expect(lastFrame()).toContain('Select Model');
-    expect(lastFrame()).toContain('(Press Esc to close)');
-    expect(lastFrame()).toContain(
-      'To use a specific Gemini model on startup, use the --model flag.',
-    );
-    unmount();
+    expect(lastFrame()).toContain('Auto');
+    expect(lastFrame()).toContain('Manual');
   });
 
-  it('passes all model options to DescriptiveRadioButtonSelect', () => {
-    const { unmount } = renderComponent();
-    expect(mockedSelect).toHaveBeenCalledTimes(1);
-
-    const props = mockedSelect.mock.calls[0][0];
-    expect(props.items).toHaveLength(4);
-    expect(props.items[0].value).toBe(DEFAULT_GEMINI_MODEL_AUTO);
-    expect(props.items[1].value).toBe(GEMINI_MODEL_ALIAS_PRO);
-    expect(props.items[2].value).toBe(GEMINI_MODEL_ALIAS_FLASH);
-    expect(props.items[3].value).toBe(GEMINI_MODEL_ALIAS_FLASH_LITE);
-    expect(props.showNumbers).toBe(true);
-    unmount();
+  it('renders "main" view with preview options when preview features are enabled', () => {
+    mockGetPreviewFeatures.mockReturnValue(true);
+    mockGetHasAccessToPreviewModel.mockReturnValue(true); // Must have access
+    const { lastFrame } = renderComponent();
+    expect(lastFrame()).toContain('Auto (Preview)');
   });
 
-  it('initializes with the model from ConfigContext', () => {
-    const mockGetModel = vi.fn(() => GEMINI_MODEL_ALIAS_FLASH);
-    const { unmount } = renderComponent({}, { getModel: mockGetModel });
+  it('switches to "manual" view when "Manual" is selected', async () => {
+    const { lastFrame, stdin } = renderComponent();
 
-    expect(mockGetModel).toHaveBeenCalled();
-    expect(mockedSelect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        initialIndex: 2,
-      }),
-      undefined,
-    );
-    unmount();
+    // Select "Manual" (index 1)
+    // Press down arrow to move to "Manual"
+    stdin.write('\u001B[B'); // Arrow Down
+    await waitForUpdate();
+
+    // Press enter to select
+    stdin.write('\r');
+    await waitForUpdate();
+
+    // Should now show manual options
+    expect(lastFrame()).toContain(DEFAULT_GEMINI_MODEL);
+    expect(lastFrame()).toContain(DEFAULT_GEMINI_FLASH_MODEL);
+    expect(lastFrame()).toContain(DEFAULT_GEMINI_FLASH_LITE_MODEL);
   });
 
-  it('initializes with "auto" model if context is not provided', () => {
-    const { unmount } = renderComponent({}, undefined);
+  it('renders "manual" view with preview options when preview features are enabled', async () => {
+    mockGetPreviewFeatures.mockReturnValue(true);
+    mockGetHasAccessToPreviewModel.mockReturnValue(true); // Must have access
+    mockGetModel.mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
+    const { lastFrame, stdin } = renderComponent();
 
-    expect(mockedSelect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        initialIndex: 0,
-      }),
-      undefined,
-    );
-    unmount();
+    // Select "Manual" (index 2 because Preview Auto is first, then Auto (Gemini 2.5))
+    // Press down enough times to ensure we reach the bottom (Manual)
+    stdin.write('\u001B[B'); // Arrow Down
+    await waitForUpdate();
+    stdin.write('\u001B[B'); // Arrow Down
+    await waitForUpdate();
+
+    // Press enter to select Manual
+    stdin.write('\r');
+    await waitForUpdate();
+
+    expect(lastFrame()).toContain(PREVIEW_GEMINI_MODEL);
   });
 
-  it('initializes with "auto" model if getModel returns undefined', () => {
-    const mockGetModel = vi.fn(() => undefined);
-    // @ts-expect-error This test validates component robustness when getModel
-    // returns an unexpected undefined value.
-    const { unmount } = renderComponent({}, { getModel: mockGetModel });
+  it('sets model and closes when a model is selected in "main" view', async () => {
+    const { stdin } = renderComponent();
 
-    expect(mockGetModel).toHaveBeenCalled();
+    // Select "Auto" (index 0)
+    stdin.write('\r');
+    await waitForUpdate();
 
-    // When getModel returns undefined, preferredModel falls back to DEFAULT_GEMINI_MODEL_AUTO
-    // which has index 0, so initialIndex should be 0
-    expect(mockedSelect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        initialIndex: 0,
-      }),
-      undefined,
-    );
-    expect(mockedSelect).toHaveBeenCalledTimes(1);
-    unmount();
+    expect(mockSetModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL_AUTO);
+    expect(mockOnClose).toHaveBeenCalled();
   });
 
-  it('calls config.setModel and onClose when DescriptiveRadioButtonSelect.onSelect is triggered', () => {
-    const { props, mockConfig, unmount } = renderComponent({}, {}); // Pass empty object for contextValue
+  it('sets model and closes when a model is selected in "manual" view', async () => {
+    const { stdin } = renderComponent();
 
-    const childOnSelect = mockedSelect.mock.calls[0][0].onSelect;
-    expect(childOnSelect).toBeDefined();
+    // Navigate to Manual (index 1) and select
+    stdin.write('\u001B[B');
+    await waitForUpdate();
+    stdin.write('\r');
+    await waitForUpdate();
 
-    childOnSelect(GEMINI_MODEL_ALIAS_PRO);
+    // Now in manual view. Default selection is first item (DEFAULT_GEMINI_MODEL)
+    stdin.write('\r');
+    await waitForUpdate();
 
-    // Assert against the default mock provided by renderComponent
-    expect(mockConfig?.setModel).toHaveBeenCalledWith(GEMINI_MODEL_ALIAS_PRO);
-    expect(props.onClose).toHaveBeenCalledTimes(1);
-    unmount();
+    expect(mockSetModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+    expect(mockOnClose).toHaveBeenCalled();
   });
 
-  it('does not pass onHighlight to DescriptiveRadioButtonSelect', () => {
-    const { unmount } = renderComponent();
+  it('closes dialog on escape in "main" view', async () => {
+    const { stdin } = renderComponent();
 
-    const childOnHighlight = mockedSelect.mock.calls[0][0].onHighlight;
-    expect(childOnHighlight).toBeUndefined();
-    unmount();
+    stdin.write('\u001B'); // Escape
+    await waitForUpdate();
+
+    expect(mockOnClose).toHaveBeenCalled();
   });
 
-  it('calls onClose prop when "escape" key is pressed', () => {
-    const { props, unmount } = renderComponent();
+  it('goes back to "main" view on escape in "manual" view', async () => {
+    const { lastFrame, stdin } = renderComponent();
 
-    expect(mockedUseKeypress).toHaveBeenCalled();
+    // Go to manual view
+    stdin.write('\u001B[B');
+    await waitForUpdate();
+    stdin.write('\r');
+    await waitForUpdate();
 
-    const keyPressHandler = mockedUseKeypress.mock.calls[0][0];
-    const options = mockedUseKeypress.mock.calls[0][1];
+    expect(lastFrame()).toContain(DEFAULT_GEMINI_MODEL);
 
-    expect(options).toEqual({ isActive: true });
+    // Press Escape
+    stdin.write('\u001B');
+    await waitForUpdate();
 
-    keyPressHandler({
-      name: 'escape',
-      ctrl: false,
-      meta: false,
-      shift: false,
-      paste: false,
-      insertable: false,
-      sequence: '',
+    expect(mockOnClose).not.toHaveBeenCalled();
+    // Should be back to main view (Manual option visible)
+    expect(lastFrame()).toContain('Manual');
+  });
+
+  describe('Preview Logic', () => {
+    it('should NOT show preview options if user has no access', () => {
+      mockGetHasAccessToPreviewModel.mockReturnValue(false);
+      mockGetPreviewFeatures.mockReturnValue(true); // Even if enabled
+      const { lastFrame } = renderComponent();
+      expect(lastFrame()).not.toContain('Auto (Preview)');
     });
-    expect(props.onClose).toHaveBeenCalledTimes(1);
 
-    keyPressHandler({
-      name: 'a',
-      ctrl: false,
-      meta: false,
-      shift: false,
-      paste: false,
-      insertable: true,
-      sequence: '',
+    it('should NOT show preview options if user has access but preview features are disabled', () => {
+      mockGetHasAccessToPreviewModel.mockReturnValue(true);
+      mockGetPreviewFeatures.mockReturnValue(false);
+      const { lastFrame } = renderComponent();
+      expect(lastFrame()).not.toContain('Auto (Preview)');
     });
-    expect(props.onClose).toHaveBeenCalledTimes(1);
-    unmount();
-  });
 
-  it('updates initialIndex when config context changes', () => {
-    const mockGetModel = vi.fn(() => DEFAULT_GEMINI_MODEL_AUTO);
-    const oldMockConfig = {
-      getModel: mockGetModel,
-      getPreviewFeatures: vi.fn(() => false),
-    } as unknown as Config;
-    const { rerender, unmount } = render(
-      <ConfigContext.Provider value={oldMockConfig}>
-        <ModelDialog onClose={vi.fn()} />
-      </ConfigContext.Provider>,
-    );
+    it('should show preview options if user has access AND preview features are enabled', () => {
+      mockGetHasAccessToPreviewModel.mockReturnValue(true);
+      mockGetPreviewFeatures.mockReturnValue(true);
+      const { lastFrame } = renderComponent();
+      expect(lastFrame()).toContain('Auto (Preview)');
+    });
 
-    expect(mockedSelect.mock.calls[0][0].initialIndex).toBe(0);
+    it('should show "Gemini 3 is now available" header if user has access but preview features disabled', () => {
+      mockGetHasAccessToPreviewModel.mockReturnValue(true);
+      mockGetPreviewFeatures.mockReturnValue(false);
+      const { lastFrame } = renderComponent();
+      expect(lastFrame()).toContain('Gemini 3 is now available.');
+      expect(lastFrame()).toContain('Enable "Preview features" in /settings');
+    });
 
-    mockGetModel.mockReturnValue(GEMINI_MODEL_ALIAS_FLASH_LITE);
-    const newMockConfig = {
-      getModel: mockGetModel,
-      getPreviewFeatures: vi.fn(() => false),
-    } as unknown as Config;
+    it('should show "Gemini 3 is coming soon" header if user has no access', () => {
+      mockGetHasAccessToPreviewModel.mockReturnValue(false);
+      mockGetPreviewFeatures.mockReturnValue(false);
+      const { lastFrame } = renderComponent();
+      expect(lastFrame()).toContain('Gemini 3 is coming soon.');
+    });
 
-    rerender(
-      <ConfigContext.Provider value={newMockConfig}>
-        <ModelDialog onClose={vi.fn()} />
-      </ConfigContext.Provider>,
-    );
-
-    // Should be called at least twice: initial render + re-render after context change
-    expect(mockedSelect).toHaveBeenCalledTimes(2);
-    expect(mockedSelect.mock.calls[1][0].initialIndex).toBe(3);
-    unmount();
+    it('should NOT show header/subheader if preview options are shown', () => {
+      mockGetHasAccessToPreviewModel.mockReturnValue(true);
+      mockGetPreviewFeatures.mockReturnValue(true);
+      const { lastFrame } = renderComponent();
+      expect(lastFrame()).not.toContain('Gemini 3 is now available.');
+      expect(lastFrame()).not.toContain('Gemini 3 is coming soon.');
+    });
   });
 });

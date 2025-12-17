@@ -283,7 +283,6 @@ export class Session {
 
       try {
         const model = getEffectiveModel(
-          this.config.isInFallbackMode(),
           this.config.getModel(),
           this.config.getPreviewFeatures(),
         );
