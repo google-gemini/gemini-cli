@@ -9,12 +9,15 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { reportError } from './errorReporting.js';
+import { debugLogger } from './debugLogger.js';
+import { coreEvents } from './events.js';
 
 // Use a type alias for SpyInstance as it's not directly exported
 type SpyInstance = ReturnType<typeof vi.spyOn>;
 
 describe('reportError', () => {
-  let consoleErrorSpy: SpyInstance;
+  let debugLoggerErrorSpy: SpyInstance;
+  let emitFeedbackSpy: SpyInstance;
   let testDir: string;
   const MOCK_TIMESTAMP = '2025-01-01T00-00-00-000Z';
 
@@ -22,7 +25,12 @@ describe('reportError', () => {
     // Create a temporary directory for logs
     testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-report-test-'));
     vi.resetAllMocks();
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    debugLoggerErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+    emitFeedbackSpy = vi
+      .spyOn(coreEvents, 'emitFeedback')
+      .mockImplementation(() => {});
     vi.spyOn(Date.prototype, 'toISOString').mockReturnValue(MOCK_TIMESTAMP);
   });
 
@@ -54,9 +62,11 @@ describe('reportError', () => {
       context,
     });
 
-    // Verify the console log
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    // Verify the user feedback
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
       `${baseMessage} Full report available at: ${expectedReportPath}`,
+      error,
     );
   });
 
@@ -75,8 +85,10 @@ describe('reportError', () => {
       error: { message: 'Test plain object error' },
     });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
       `${baseMessage} Full report available at: ${expectedReportPath}`,
+      error,
     );
   });
 
@@ -95,8 +107,10 @@ describe('reportError', () => {
       error: { message: 'Just a string error' },
     });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
       `${baseMessage} Full report available at: ${expectedReportPath}`,
+      error,
     );
   });
 
@@ -109,15 +123,24 @@ describe('reportError', () => {
 
     await reportError(error, baseMessage, context, type, nonExistentDir);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Additionally, failed to write detailed error report:`,
       expect.any(Error), // The actual write error
     );
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       'Original error that triggered report generation:',
       error,
     );
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Original context:', context);
+    // User feedback for failure
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
+      `${baseMessage} Failed to write error report.`,
+      error,
+    );
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+      'Original context:',
+      context,
+    );
   });
 
   it('should handle stringification failure of report content (e.g. BigInt in context)', async () => {
@@ -146,15 +169,15 @@ describe('reportError', () => {
 
     await reportError(error, baseMessage, context, type, testDir);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Could not stringify report content (likely due to context):`,
       stringifyError,
     );
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       'Original error that triggered report generation:',
       error,
     );
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       'Original context could not be stringified or included in report.',
     );
 
@@ -165,8 +188,10 @@ describe('reportError', () => {
       error: { message: error.message, stack: error.stack },
     });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
       `${baseMessage} Partial report (excluding context) available at: ${expectedMinimalReportPath}`,
+      error,
     );
   });
 
@@ -186,8 +211,44 @@ describe('reportError', () => {
       error: { message: 'Error without context', stack: 'No context stack' },
     });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
       `${baseMessage} Full report available at: ${expectedReportPath}`,
+      error,
+    );
+  });
+
+  it('should swallow errors from coreEvents.emitFeedback and log a warning', async () => {
+    const error = new Error('Test error');
+    const baseMessage = 'Error occurred.';
+    const type = 'feedback-fail';
+    const feedbackError = new Error('Feedback system failure');
+
+    // Mock emitFeedback to throw
+    emitFeedbackSpy.mockImplementation(() => {
+      throw feedbackError;
+    });
+    // Spy on debugLogger.warn
+    const debugLoggerWarnSpy = vi
+      .spyOn(debugLogger, 'warn')
+      .mockImplementation(() => {});
+
+    await reportError(error, baseMessage, undefined, type, testDir);
+
+    // Should still write the report
+    const expectedReportPath = getExpectedReportPath(type);
+    const reportContent = await fs.readFile(expectedReportPath, 'utf-8');
+    expect(JSON.parse(reportContent)).toEqual({
+      error: { message: 'Test error', stack: error.stack },
+    });
+
+    // Should have tried to emit feedback
+    expect(emitFeedbackSpy).toHaveBeenCalled();
+
+    // Should have logged a warning about the feedback failure
+    expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
+      'Failed to emit user feedback for error report:',
+      feedbackError,
     );
   });
 });

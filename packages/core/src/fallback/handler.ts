@@ -100,7 +100,11 @@ async function legacyHandleFallback(
       error,
     );
   } catch (handlerError) {
-    console.error('Fallback UI handler failed:', handlerError);
+    coreEvents.emitFeedback(
+      'error',
+      'Fallback UI handler failed:',
+      handlerError,
+    );
     return null;
   }
 }

@@ -17,6 +17,8 @@ export async function relaunchOnExitCode(runner: () => Promise<number>) {
       }
     } catch (error) {
       process.stdin.resume();
+      // Keep this console.error, this will happen in the low-level part of the application's lifecycle. See https://github.com/google-gemini/gemini-cli/issues/11912
+      // eslint-disable-next-line no-console
       console.error('Fatal error: Failed to relaunch the CLI process.', error);
       process.exit(1);
     }

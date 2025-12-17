@@ -241,7 +241,7 @@ export async function retryWithBackoff<T>(
                 continue;
               }
             } catch (fallbackError) {
-              console.warn('Model fallback failed:', fallbackError);
+              debugLogger.warn('Model fallback failed:', fallbackError);
             }
           }
           if (!appliedImmediate) {
@@ -253,7 +253,7 @@ export async function retryWithBackoff<T>(
         }
 
         if (classifiedError instanceof RetryableQuotaError) {
-          console.warn(
+          debugLogger.warn(
             `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${classifiedError.retryDelayMs}ms...`,
           );
           await delay(classifiedError.retryDelayMs, signal);
@@ -315,7 +315,7 @@ function logRetryAttempt(
   if (errorStatus === 429) {
     debugLogger.warn(message, error);
   } else if (errorStatus && errorStatus >= 500 && errorStatus < 600) {
-    console.error(message, error);
+    debugLogger.warn(message, error);
   } else if (error instanceof Error) {
     // Fallback for errors that might not have a status but have a message
     if (error.message.includes('429')) {
@@ -324,7 +324,7 @@ function logRetryAttempt(
         error,
       );
     } else if (error.message.match(/5\d{2}/)) {
-      console.error(
+      debugLogger.warn(
         `Attempt ${attempt} failed with 5xx error. Retrying with backoff...`,
         error,
       );

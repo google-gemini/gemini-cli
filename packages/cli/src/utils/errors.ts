@@ -16,6 +16,7 @@ import {
   FatalCancellationError,
   FatalToolExecutionError,
   isFatalToolError,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import { runSyncCleanup } from './cleanup.js';
 
@@ -103,11 +104,11 @@ export function handleError(
       config.getSessionId(),
     );
 
-    console.error(formattedError);
+    debugLogger.error(formattedError);
     runSyncCleanup();
     process.exit(getNumericExitCode(errorCode));
   } else {
-    console.error(errorMessage);
+    debugLogger.error(errorMessage);
     throw error;
   }
 }
@@ -155,16 +156,16 @@ export function handleToolError(
         errorType ?? toolExecutionError.exitCode,
         config.getSessionId(),
       );
-      console.error(formattedError);
+      debugLogger.error(formattedError);
     } else {
-      console.error(errorMessage);
+      debugLogger.error(errorMessage);
     }
     runSyncCleanup();
     process.exit(toolExecutionError.exitCode);
   }
 
   // Non-fatal: log and continue
-  console.error(errorMessage);
+  debugLogger.warn(errorMessage);
 }
 
 /**
@@ -196,11 +197,11 @@ export function handleCancellationError(config: Config): never {
       config.getSessionId(),
     );
 
-    console.error(formattedError);
+    debugLogger.error(formattedError);
     runSyncCleanup();
     process.exit(cancellationError.exitCode);
   } else {
-    console.error(cancellationError.message);
+    debugLogger.error(cancellationError.message);
     runSyncCleanup();
     process.exit(cancellationError.exitCode);
   }
@@ -237,11 +238,11 @@ export function handleMaxTurnsExceededError(config: Config): never {
       config.getSessionId(),
     );
 
-    console.error(formattedError);
+    debugLogger.error(formattedError);
     runSyncCleanup();
     process.exit(maxTurnsError.exitCode);
   } else {
-    console.error(maxTurnsError.message);
+    debugLogger.error(maxTurnsError.message);
     runSyncCleanup();
     process.exit(maxTurnsError.exitCode);
   }

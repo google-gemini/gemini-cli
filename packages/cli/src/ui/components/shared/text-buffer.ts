@@ -1203,7 +1203,8 @@ function textBufferReducerLogic(
             break;
           default: {
             const exhaustiveCheck: never = dir;
-            console.error(
+            coreEvents.emitFeedback(
+              'warning',
               `Unknown visual movement direction: ${exhaustiveCheck}`,
             );
             return state;
@@ -1531,7 +1532,10 @@ function textBufferReducerLogic(
 
     default: {
       const exhaustiveCheck: never = action;
-      console.error(`Unknown action encountered: ${exhaustiveCheck}`);
+      coreEvents.emitFeedback(
+        'warning',
+        `Unknown action encountered: ${exhaustiveCheck}`,
+      );
       return state;
     }
   }
@@ -1912,7 +1916,11 @@ export function useTextBuffer({
         newText = newText.replace(/\r\n?/g, '\n');
         dispatch({ type: 'set_text', payload: newText, pushToUndo: false });
       } catch (err) {
-        console.error('[useTextBuffer] external editor error', err);
+        coreEvents.emitFeedback(
+          'error',
+          '[useTextBuffer] external editor error',
+          err,
+        );
       } finally {
         enableSupportedProtocol();
         coreEvents.emit(CoreEvent.ExternalEditorClosed);

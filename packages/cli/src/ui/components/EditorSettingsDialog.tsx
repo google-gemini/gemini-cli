@@ -22,6 +22,7 @@ import {
   type EditorType,
   isEditorAvailable,
   EDITOR_DISPLAY_NAMES,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 
@@ -68,7 +69,7 @@ export function EditorSettingsDialog({
       )
     : 0;
   if (editorIndex === -1) {
-    console.error(`Editor is not supported: ${currentPreference}`);
+    debugLogger.warn(`Editor is not supported: ${currentPreference}`);
     editorIndex = 0;
   }
 

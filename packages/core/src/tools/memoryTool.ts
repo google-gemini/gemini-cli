@@ -25,6 +25,7 @@ import type {
 import { ToolErrorType } from './tool-error.js';
 import { MEMORY_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const memoryToolSchemaData: FunctionDeclaration = {
   name: MEMORY_TOOL_NAME,
@@ -277,7 +278,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.warn(
+      debugLogger.warn(
         `[MemoryTool] Error executing save_memory for fact "${fact}": ${errorMessage}`,
       );
       return {
@@ -367,7 +368,7 @@ export class MemoryTool
 
       await fsAdapter.writeFile(memoryFilePath, newContent, 'utf-8');
     } catch (error) {
-      console.error(
+      debugLogger.warn(
         `[MemoryTool] Error adding memory entry to ${memoryFilePath}:`,
         error,
       );

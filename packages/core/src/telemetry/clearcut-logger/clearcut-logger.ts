@@ -275,7 +275,7 @@ export class ClearcutLogger {
       this.enqueueHelper(event);
     } catch (error) {
       if (this.config?.getDebugMode()) {
-        console.error('ClearcutLogger: Failed to enqueue log event.', error);
+        debugLogger.warn('ClearcutLogger: Failed to enqueue log event.', error);
       }
     }
   }
@@ -300,7 +300,7 @@ export class ClearcutLogger {
       });
     } catch (error) {
       if (this.config?.getDebugMode()) {
-        console.error('ClearcutLogger: Failed to enqueue log event.', error);
+        debugLogger.warn('ClearcutLogger: Failed to enqueue log event.', error);
       }
     }
   }
@@ -433,7 +433,7 @@ export class ClearcutLogger {
         };
       } else {
         if (this.config?.getDebugMode()) {
-          console.error(
+          debugLogger.warn(
             `Error flushing log events: HTTP ${response.status}: ${response.statusText}`,
           );
         }
@@ -443,7 +443,7 @@ export class ClearcutLogger {
       }
     } catch (e: unknown) {
       if (this.config?.getDebugMode()) {
-        console.error('Error flushing log events:', e as Error);
+        debugLogger.warn('Error flushing log events:', e as Error);
       }
 
       // Re-queue failed events for retry

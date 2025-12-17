@@ -8,6 +8,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { Content } from '@google/genai';
+import { debugLogger } from './debugLogger.js';
+import { coreEvents } from './events.js';
 
 interface ErrorReportData {
   error: { message: string; stack?: string } | { message: string };
@@ -59,13 +61,16 @@ export async function reportError(
     stringifiedReportContent = JSON.stringify(reportContent, null, 2);
   } catch (stringifyError) {
     // This can happen if context contains something like BigInt
-    console.error(
+    debugLogger.error(
       `${baseMessage} Could not stringify report content (likely due to context):`,
       stringifyError,
     );
-    console.error('Original error that triggered report generation:', error);
+    debugLogger.error(
+      'Original error that triggered report generation:',
+      error,
+    );
     if (context) {
-      console.error(
+      debugLogger.error(
         'Original context could not be stringified or included in report.',
       );
     }
@@ -75,42 +80,93 @@ export async function reportError(
       stringifiedReportContent = JSON.stringify(minimalReportContent, null, 2);
       // Still try to write the minimal report
       await fs.writeFile(reportPath, stringifiedReportContent);
-      console.error(
-        `${baseMessage} Partial report (excluding context) available at: ${reportPath}`,
-      );
+      try {
+        coreEvents.emitFeedback(
+          'error',
+          `${baseMessage} Partial report (excluding context) available at: ${reportPath}`,
+          error,
+        );
+      } catch (feedbackError) {
+        debugLogger.warn(
+          'Failed to emit user feedback for partial error report:',
+          feedbackError,
+        );
+      }
     } catch (minimalWriteError) {
-      console.error(
+      debugLogger.error(
         `${baseMessage} Failed to write even a minimal error report:`,
         minimalWriteError,
       );
+      try {
+        coreEvents.emitFeedback(
+          'error',
+          `${baseMessage} Failed to write error report.`,
+          error,
+        );
+      } catch (feedbackError) {
+        debugLogger.warn(
+          'Failed to emit user feedback for failed report write:',
+          feedbackError,
+        );
+      }
     }
     return;
   }
 
   try {
     await fs.writeFile(reportPath, stringifiedReportContent);
-    console.error(`${baseMessage} Full report available at: ${reportPath}`);
+    try {
+      coreEvents.emitFeedback(
+        'error',
+        `${baseMessage} Full report available at: ${reportPath}`,
+        error,
+      );
+    } catch (feedbackError) {
+      debugLogger.warn(
+        'Failed to emit user feedback for error report:',
+        feedbackError,
+      );
+    }
   } catch (writeError) {
-    console.error(
+    debugLogger.error(
       `${baseMessage} Additionally, failed to write detailed error report:`,
       writeError,
     );
     // Log the original error as a fallback if report writing fails
-    console.error('Original error that triggered report generation:', error);
+    debugLogger.error(
+      'Original error that triggered report generation:',
+      error,
+    );
+
+    try {
+      coreEvents.emitFeedback(
+        'error',
+        `${baseMessage} Failed to write error report.`,
+        error,
+      );
+    } catch (feedbackError) {
+      debugLogger.warn(
+        'Failed to emit user feedback for failed report write:',
+        feedbackError,
+      );
+    }
+
     if (context) {
       // Context was stringifiable, but writing the file failed.
       // We already have stringifiedReportContent, but it might be too large for console.
       // So, we try to log the original context object, and if that fails, its stringified version (truncated).
       try {
-        console.error('Original context:', context);
+        debugLogger.error('Original context:', context);
       } catch {
         try {
-          console.error(
+          debugLogger.error(
             'Original context (stringified, truncated):',
             JSON.stringify(context).substring(0, 1000),
           );
         } catch {
-          console.error('Original context could not be logged or stringified.');
+          debugLogger.error(
+            'Original context could not be logged or stringified.',
+          );
         }
       }
     }
