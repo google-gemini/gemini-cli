@@ -1323,15 +1323,6 @@ const SETTINGS_SCHEMA = {
           'Enables extension loading/unloading within the CLI session.',
         showInDialog: false,
       },
-      isModelAvailabilityServiceEnabled: {
-        type: 'boolean',
-        label: 'Enable Model Availability Service',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: false,
-        description: 'Enable model routing using new availability service.',
-        showInDialog: false,
-      },
       jitContext: {
         type: 'boolean',
         label: 'JIT Context Loading',

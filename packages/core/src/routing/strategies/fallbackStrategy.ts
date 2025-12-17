@@ -22,10 +22,6 @@ export class FallbackStrategy implements RoutingStrategy {
     config: Config,
     _baseLlmClient: BaseLlmClient,
   ): Promise<RoutingDecision | null> {
-    if (!config.isModelAvailabilityServiceEnabled()) {
-      return null;
-    }
-
     const requestedModel = config.getModel();
     const resolvedModel = resolveModel(
       requestedModel,
