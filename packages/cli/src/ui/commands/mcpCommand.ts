@@ -10,10 +10,7 @@ import type {
   CommandContext,
 } from './types.js';
 import { CommandKind } from './types.js';
-import type {
-  DiscoveredMCPPrompt,
-  MessageActionReturn,
-} from '@google/gemini-cli-core';
+import type { MessageActionReturn } from '@google/gemini-cli-core';
 import {
   DiscoveredMCPTool,
   getMCPDiscoveryState,
@@ -31,7 +28,7 @@ const authCommand: SlashCommand = {
   name: 'auth',
   description: 'Authenticate with an OAuth-enabled MCP server',
   kind: CommandKind.BUILT_IN,
-  autoExecute: false,
+  autoExecute: true,
   action: async (
     context: CommandContext,
     args: string,
@@ -217,18 +214,20 @@ const listAction = async (
     connectingServers.length > 0;
 
   const allTools = toolRegistry.getAllTools();
-  const mcpTools = allTools.filter(
-    (tool) => tool instanceof DiscoveredMCPTool,
-  ) as DiscoveredMCPTool[];
+  const mcpTools = allTools.filter((tool) => tool instanceof DiscoveredMCPTool);
 
-  const promptRegistry = await config.getPromptRegistry();
+  const promptRegistry = config.getPromptRegistry();
   const mcpPrompts = promptRegistry
     .getAllPrompts()
     .filter(
       (prompt) =>
-        'serverName' in prompt &&
-        serverNames.includes(prompt.serverName as string),
-    ) as DiscoveredMCPPrompt[];
+        'serverName' in prompt && serverNames.includes(prompt.serverName),
+    );
+
+  const resourceRegistry = config.getResourceRegistry();
+  const mcpResources = resourceRegistry
+    .getAllResources()
+    .filter((entry) => serverNames.includes(entry.serverName));
 
   const authStatus: HistoryItemMcpStatus['authStatus'] = {};
   const tokenStorage = new MCPOAuthTokenStorage();
@@ -261,9 +260,16 @@ const listAction = async (
       schema: tool.schema,
     })),
     prompts: mcpPrompts.map((prompt) => ({
-      serverName: prompt.serverName as string,
+      serverName: prompt.serverName,
       name: prompt.name,
       description: prompt.description,
+    })),
+    resources: mcpResources.map((resource) => ({
+      serverName: resource.serverName,
+      name: resource.name,
+      uri: resource.uri,
+      mimeType: resource.mimeType,
+      description: resource.description,
     })),
     authStatus,
     blockedServers: blockedMcpServers,

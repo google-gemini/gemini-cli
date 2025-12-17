@@ -87,6 +87,7 @@ let callbackRegistered = false;
 let authListener: ((newCredentials: JWTInput) => Promise<void>) | undefined =
   undefined;
 const telemetryBuffer: Array<() => void | Promise<void>> = [];
+let activeTelemetryEmail: string | undefined;
 
 export function isTelemetrySdkInitialized(): boolean {
   return telemetryInitialized;
@@ -144,7 +145,20 @@ export async function initializeTelemetry(
   config: Config,
   credentials?: JWTInput,
 ): Promise<void> {
-  if (telemetryInitialized || !config.getTelemetryEnabled()) {
+  if (!config.getTelemetryEnabled()) {
+    return;
+  }
+
+  if (telemetryInitialized) {
+    if (
+      credentials?.client_email &&
+      activeTelemetryEmail &&
+      credentials.client_email !== activeTelemetryEmail
+    ) {
+      const message = `Telemetry credentials have changed (from ${activeTelemetryEmail} to ${credentials.client_email}), but telemetry cannot be re-initialized in this process. Please restart the CLI to use the new account for telemetry.`;
+      debugLogger.error(message);
+      console.error(message);
+    }
     return;
   }
 
@@ -165,10 +179,7 @@ export async function initializeTelemetry(
       callbackRegistered = true;
       authListener = async (newCredentials: JWTInput) => {
         if (config.getTelemetryEnabled() && config.getTelemetryUseCliAuth()) {
-          debugLogger.log(
-            'Telemetry reinit with credentials: ',
-            newCredentials,
-          );
+          debugLogger.log('Telemetry reinit with credentials.');
           await initializeTelemetry(config, newCredentials);
         }
       };
@@ -289,11 +300,12 @@ export async function initializeTelemetry(
   });
 
   try {
-    await sdk.start();
+    sdk.start();
     if (config.getDebugMode()) {
       debugLogger.log('OpenTelemetry SDK started successfully.');
     }
     telemetryInitialized = true;
+    activeTelemetryEmail = credentials?.client_email;
     initializeMetrics(config);
     void flushTelemetryBuffer();
   } catch (error) {
@@ -343,7 +355,7 @@ export async function shutdownTelemetry(
     return;
   }
   try {
-    await ClearcutLogger.getInstance()?.shutdown();
+    ClearcutLogger.getInstance()?.shutdown();
     await sdk.shutdown();
     if (config.getDebugMode() && fromProcessExit) {
       debugLogger.log('OpenTelemetry SDK shut down successfully.');
@@ -366,5 +378,6 @@ export async function shutdownTelemetry(
       authListener = undefined;
     }
     callbackRegistered = false;
+    activeTelemetryEmail = undefined;
   }
 }

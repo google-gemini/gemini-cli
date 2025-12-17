@@ -116,6 +116,20 @@ A test server
 "
 `;
 
+exports[`McpStatus > renders correctly with resources 1`] = `
+"Configured MCP servers:
+
+🟢 server-1 - Ready (1 tool, 1 resource)
+A test server
+  Tools:
+  - tool-1
+    A test tool
+  Resources:
+  - resource-1 (file:///tmp/resource-1.txt)
+    A test resource
+"
+`;
+
 exports[`McpStatus > renders correctly with schema enabled 1`] = `
 "Configured MCP servers:
 

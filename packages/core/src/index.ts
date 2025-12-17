@@ -21,6 +21,7 @@ export * from './confirmation-bus/message-bus.js';
 // Export Commands logic
 export * from './commands/extensions.js';
 export * from './commands/restore.js';
+export * from './commands/init.js';
 export * from './commands/types.js';
 
 // Export Core Logic
@@ -62,6 +63,7 @@ export * from './utils/googleQuotaErrors.js';
 export * from './utils/fileUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
+export * from './utils/shell-permissions.js';
 export * from './utils/terminalSerializer.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
@@ -78,6 +80,8 @@ export * from './utils/debugLogger.js';
 export * from './utils/events.js';
 export * from './utils/extensionLoader.js';
 export * from './utils/package.js';
+export * from './utils/version.js';
+export * from './utils/checkpointUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -103,6 +107,7 @@ export * from './tools/tools.js';
 export * from './tools/tool-error.js';
 export * from './tools/tool-registry.js';
 export * from './tools/tool-names.js';
+export * from './resources/resource-registry.js';
 
 // Export prompt logic
 export * from './prompts/mcp-prompts.js';

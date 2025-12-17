@@ -48,7 +48,7 @@ describe('chatCommand', () => {
 
   beforeEach(() => {
     mockGetHistory = vi.fn().mockReturnValue([]);
-    mockGetChat = vi.fn().mockResolvedValue({
+    mockGetChat = vi.fn().mockReturnValue({
       getHistory: mockGetHistory,
     });
     mockSaveCheckpoint = vi.fn().mockResolvedValue(undefined);
@@ -326,7 +326,7 @@ describe('chatCommand', () => {
         const fakeFiles = ['checkpoint-alpha.json', 'checkpoint-beta.json'];
         mockFs.readdir.mockImplementation(
           (async (_: string): Promise<string[]> =>
-            fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
+            fakeFiles) as unknown as typeof fsPromises.readdir,
         );
 
         mockFs.stat.mockImplementation(
@@ -346,7 +346,7 @@ describe('chatCommand', () => {
         const date = new Date();
         mockFs.readdir.mockImplementation(
           (async (_: string): Promise<string[]> =>
-            fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
+            fakeFiles) as unknown as typeof fsPromises.readdir,
         );
         mockFs.stat.mockImplementation((async (
           path: string,
@@ -406,7 +406,7 @@ describe('chatCommand', () => {
         const fakeFiles = ['checkpoint-alpha.json', 'checkpoint-beta.json'];
         mockFs.readdir.mockImplementation(
           (async (_: string): Promise<string[]> =>
-            fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
+            fakeFiles) as unknown as typeof fsPromises.readdir,
         );
 
         mockFs.stat.mockImplementation(

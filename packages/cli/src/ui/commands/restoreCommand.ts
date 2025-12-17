@@ -9,6 +9,9 @@ import path from 'node:path';
 import { z } from 'zod';
 import {
   type Config,
+  formatCheckpointDisplayList,
+  getToolCallDataSchema,
+  getTruncatedCheckpointNames,
   performRestore,
   type ToolCallData,
 } from '@google/gemini-cli-core';
@@ -19,7 +22,6 @@ import {
   CommandKind,
 } from './types.js';
 import type { HistoryItem } from '../types.js';
-import type { Content } from '@google/genai';
 
 const HistoryItemSchema = z
   .object({
@@ -28,23 +30,7 @@ const HistoryItemSchema = z
   })
   .passthrough();
 
-const ContentSchema = z
-  .object({
-    role: z.string().optional(),
-    parts: z.array(z.record(z.unknown())),
-  })
-  .passthrough();
-
-const ToolCallDataSchema = z.object({
-  history: z.array(HistoryItemSchema).optional(),
-  clientHistory: z.array(ContentSchema).optional(),
-  commitHash: z.string().optional(),
-  toolCall: z.object({
-    name: z.string(),
-    args: z.record(z.unknown()),
-  }),
-  messageId: z.string().optional(),
-});
+const ToolCallDataSchema = getToolCallDataSchema(HistoryItemSchema);
 
 async function restoreAction(
   context: CommandContext,
@@ -78,15 +64,7 @@ async function restoreAction(
           content: 'No restorable tool calls found.',
         };
       }
-      const truncatedFiles = jsonFiles.map((file) => {
-        const components = file.split('.');
-        if (components.length <= 1) {
-          return file;
-        }
-        components.pop();
-        return components.join('.');
-      });
-      const fileList = truncatedFiles.join('\n');
+      const fileList = formatCheckpointDisplayList(jsonFiles);
       return {
         type: 'message',
         messageType: 'info',
@@ -138,9 +116,7 @@ async function restoreAction(
       } else if (action.type === 'load_history' && loadHistory) {
         loadHistory(action.history);
         if (action.clientHistory) {
-          await config
-            ?.getGeminiClient()
-            ?.setHistory(action.clientHistory as Content[]);
+          config?.getGeminiClient()?.setHistory(action.clientHistory);
         }
       }
     }
@@ -171,9 +147,8 @@ async function completion(
   }
   try {
     const files = await fs.readdir(checkpointDir);
-    return files
-      .filter((file) => file.endsWith('.json'))
-      .map((file) => file.replace('.json', ''));
+    const jsonFiles = files.filter((file) => file.endsWith('.json'));
+    return getTruncatedCheckpointNames(jsonFiles);
   } catch (_err) {
     return [];
   }
@@ -189,7 +164,7 @@ export const restoreCommand = (config: Config | null): SlashCommand | null => {
     description:
       'Restore a tool call. This will reset the conversation and file history to the state it was in when the tool call was suggested',
     kind: CommandKind.BUILT_IN,
-    autoExecute: false,
+    autoExecute: true,
     action: restoreAction,
     completion,
   };

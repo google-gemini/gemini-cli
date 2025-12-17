@@ -19,6 +19,7 @@ import * as path from 'node:path';
 import * as tar from 'tar';
 import extract from 'extract-zip';
 import { fetchJson, getGitHubToken } from './github_fetch.js';
+import type { ExtensionConfig } from '../extension.js';
 import type { ExtensionManager } from '../extension-manager.js';
 import { EXTENSIONS_CONFIG_FILENAME } from './variables.js';
 
@@ -172,14 +173,23 @@ export async function checkForExtensionUpdate(
 ): Promise<ExtensionUpdateState> {
   const installMetadata = extension.installMetadata;
   if (installMetadata?.type === 'local') {
-    const latestConfig = extensionManager.loadExtensionConfig(
-      installMetadata.source,
-    );
+    let latestConfig: ExtensionConfig | undefined;
+    try {
+      latestConfig = await extensionManager.loadExtensionConfig(
+        installMetadata.source,
+      );
+    } catch (e) {
+      debugLogger.warn(
+        `Failed to check for update for local extension "${extension.name}". Could not load extension from source path: ${installMetadata.source}. Error: ${getErrorMessage(e)}`,
+      );
+      return ExtensionUpdateState.NOT_UPDATABLE;
+    }
+
     if (!latestConfig) {
-      debugLogger.error(
+      debugLogger.warn(
         `Failed to check for update for local extension "${extension.name}". Could not load extension from source path: ${installMetadata.source}`,
       );
-      return ExtensionUpdateState.ERROR;
+      return ExtensionUpdateState.NOT_UPDATABLE;
     }
     if (latestConfig.version !== extension.version) {
       return ExtensionUpdateState.UPDATE_AVAILABLE;

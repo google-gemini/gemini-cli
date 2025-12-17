@@ -14,7 +14,24 @@ import {
   GEMINI_MODEL_ALIAS_PRO,
   GEMINI_MODEL_ALIAS_FLASH,
   GEMINI_MODEL_ALIAS_FLASH_LITE,
+  supportsMultimodalFunctionResponse,
 } from './models.js';
+
+describe('supportsMultimodalFunctionResponse', () => {
+  it('should return true for gemini-3 model', () => {
+    expect(supportsMultimodalFunctionResponse('gemini-3-pro')).toBe(true);
+  });
+
+  it('should return false for gemini-2 models', () => {
+    expect(supportsMultimodalFunctionResponse('gemini-2.5-pro')).toBe(false);
+    expect(supportsMultimodalFunctionResponse('gemini-2.5-flash')).toBe(false);
+  });
+
+  it('should return false for other models', () => {
+    expect(supportsMultimodalFunctionResponse('some-other-model')).toBe(false);
+    expect(supportsMultimodalFunctionResponse('')).toBe(false);
+  });
+});
 
 describe('getEffectiveModel', () => {
   describe('When NOT in fallback mode', () => {

@@ -21,6 +21,7 @@ vi.mock('@google/gemini-cli-core', async () => {
   return {
     ...actual,
     ChatRecordingService: vi.fn(),
+    generateSummary: vi.fn().mockResolvedValue(undefined),
   };
 });
 

@@ -63,6 +63,7 @@ describe('mcpCommand', () => {
     getPromptRegistry: ReturnType<typeof vi.fn>;
     getGeminiClient: ReturnType<typeof vi.fn>;
     getMcpClientManager: ReturnType<typeof vi.fn>;
+    getResourceRegistry: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -84,7 +85,7 @@ describe('mcpCommand', () => {
       }),
       getMcpServers: vi.fn().mockReturnValue({}),
       getBlockedMcpServers: vi.fn().mockReturnValue([]),
-      getPromptRegistry: vi.fn().mockResolvedValue({
+      getPromptRegistry: vi.fn().mockReturnValue({
         getAllPrompts: vi.fn().mockReturnValue([]),
         getPromptsByServer: vi.fn().mockReturnValue([]),
       }),
@@ -93,6 +94,9 @@ describe('mcpCommand', () => {
         getBlockedMcpServers: vi.fn(),
         getMcpServers: vi.fn(),
       })),
+      getResourceRegistry: vi.fn().mockReturnValue({
+        getAllResources: vi.fn().mockReturnValue([]),
+      }),
     };
 
     mockContext = createMockCommandContext({
@@ -141,6 +145,10 @@ describe('mcpCommand', () => {
       };
 
       mockConfig.getMcpServers = vi.fn().mockReturnValue(mockMcpServers);
+      mockConfig.getMcpClientManager = vi.fn().mockReturnValue({
+        getMcpServers: vi.fn().mockReturnValue(mockMcpServers),
+        getBlockedMcpServers: vi.fn().mockReturnValue([]),
+      });
     });
 
     it('should display configured MCP servers with status indicators and their tools', async () => {
@@ -169,6 +177,30 @@ describe('mcpCommand', () => {
         getAllTools: vi.fn().mockReturnValue(allTools),
       });
 
+      const resourcesByServer: Record<
+        string,
+        Array<{ name: string; uri: string }>
+      > = {
+        server1: [
+          {
+            name: 'Server1 Resource',
+            uri: 'file:///server1/resource1.txt',
+          },
+        ],
+        server2: [],
+        server3: [],
+      };
+      mockConfig.getResourceRegistry = vi.fn().mockReturnValue({
+        getAllResources: vi.fn().mockReturnValue(
+          Object.entries(resourcesByServer).flatMap(([serverName, resources]) =>
+            resources.map((entry) => ({
+              serverName,
+              ...entry,
+            })),
+          ),
+        ),
+      });
+
       await mcpCommand.action!(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -180,6 +212,12 @@ describe('mcpCommand', () => {
             description: tool.description,
             schema: tool.schema,
           })),
+          resources: expect.arrayContaining([
+            expect.objectContaining({
+              serverName: 'server1',
+              uri: 'file:///server1/resource1.txt',
+            }),
+          ]),
         }),
         expect.any(Number),
       );

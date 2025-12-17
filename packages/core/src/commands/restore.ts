@@ -4,20 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content } from '@google/genai';
 import type { GitService } from '../services/gitService.js';
 import type { CommandActionReturn } from './types.js';
-
-export interface ToolCallData<HistoryType = unknown, ArgsType = unknown> {
-  history?: HistoryType;
-  clientHistory?: Content[];
-  commitHash?: string;
-  toolCall: {
-    name: string;
-    args: ArgsType;
-  };
-  messageId?: string;
-}
+import { type ToolCallData } from '../utils/checkpointUtils.js';
 
 export async function* performRestore<
   HistoryType = unknown,

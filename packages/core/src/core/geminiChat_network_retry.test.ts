@@ -93,6 +93,7 @@ describe('GeminiChat Network Retries', () => {
           generateContentConfig: { temperature: 0 },
         })),
       },
+      isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(false),
       isPreviewModelBypassMode: vi.fn().mockReturnValue(false),
       setPreviewModelBypassMode: vi.fn(),
       isPreviewModelFallbackMode: vi.fn().mockReturnValue(false),

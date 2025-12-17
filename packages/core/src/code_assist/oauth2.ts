@@ -56,6 +56,7 @@ async function triggerPostAuthCallbacks(tokens: Credentials) {
     client_secret: OAUTH_CLIENT_SECRET,
     refresh_token: tokens.refresh_token ?? undefined, // Ensure null is not passed
     type: 'authorized_user',
+    client_email: userAccountManager.getCachedGoogleAccount() ?? undefined,
   };
 
   // Execute all registered post-authentication callbacks.
@@ -119,7 +120,7 @@ async function initOauthClient(
     const auth = new GoogleAuth({
       scopes: OAUTH_SCOPE,
     });
-    const byoidClient = await auth.fromJSON({
+    const byoidClient = auth.fromJSON({
       ...credentials,
       refresh_token: credentials.refresh_token ?? undefined,
     });
@@ -255,6 +256,18 @@ async function initOauthClient(
         'Failed to authenticate with user code.',
       );
     }
+
+    // Retrieve and cache Google Account ID after successful user code auth
+    try {
+      await fetchAndCacheUserInfo(client);
+    } catch (error) {
+      debugLogger.warn(
+        'Failed to retrieve Google Account ID during authentication:',
+        getErrorMessage(error),
+      );
+    }
+
+    await triggerPostAuthCallbacks(client.credentials);
   } else {
     const webLogin = await authWithWeb(client);
 
@@ -318,6 +331,8 @@ async function initOauthClient(
       severity: 'info',
       message: 'Authentication succeeded\n',
     });
+
+    await triggerPostAuthCallbacks(client.credentials);
   }
 
   return client;

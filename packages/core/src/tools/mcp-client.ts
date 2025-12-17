@@ -20,9 +20,14 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type {
   GetPromptResult,
   Prompt,
+  ReadResourceResult,
+  Resource,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
+  ListResourcesResultSchema,
   ListRootsRequestSchema,
+  ReadResourceResultSchema,
+  ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -54,6 +59,7 @@ import type { ToolRegistry } from './tool-registry.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
+import type { ResourceRegistry } from '../resources/resource-registry.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -98,14 +104,17 @@ export class McpClient {
   private client: Client | undefined;
   private transport: Transport | undefined;
   private status: MCPServerStatus = MCPServerStatus.DISCONNECTED;
-  private isRefreshing: boolean = false;
-  private pendingRefresh: boolean = false;
+  private isRefreshingTools: boolean = false;
+  private pendingToolRefresh: boolean = false;
+  private isRefreshingResources: boolean = false;
+  private pendingResourceRefresh: boolean = false;
 
   constructor(
     private readonly serverName: string,
     private readonly serverConfig: MCPServerConfig,
     private readonly toolRegistry: ToolRegistry,
     private readonly promptRegistry: PromptRegistry,
+    private readonly resourceRegistry: ResourceRegistry,
     private readonly workspaceContext: WorkspaceContext,
     private readonly cliConfig: Config,
     private readonly debugMode: boolean,
@@ -130,24 +139,8 @@ export class McpClient {
         this.workspaceContext,
       );
 
-      // setup dynamic tool listener
-      const capabilities = this.client.getServerCapabilities();
+      this.registerNotificationHandlers();
 
-      if (capabilities?.tools?.listChanged) {
-        debugLogger.log(
-          `Server '${this.serverName}' supports tool updates. Listening for changes...`,
-        );
-
-        this.client.setNotificationHandler(
-          ToolListChangedNotificationSchema,
-          async () => {
-            debugLogger.log(
-              `🔔 Received tool update notification from '${this.serverName}'`,
-            );
-            await this.refreshTools();
-          },
-        );
-      }
       const originalOnError = this.client.onerror;
       this.client.onerror = (error) => {
         if (this.status !== MCPServerStatus.CONNECTED) {
@@ -176,9 +169,11 @@ export class McpClient {
 
     const prompts = await this.discoverPrompts();
     const tools = await this.discoverTools(cliConfig);
+    const resources = await this.discoverResources();
+    this.updateResourceRegistry(resources);
 
-    if (prompts.length === 0 && tools.length === 0) {
-      throw new Error('No prompts or tools found on the server.');
+    if (prompts.length === 0 && tools.length === 0 && resources.length === 0) {
+      throw new Error('No prompts, tools, or resources found on the server.');
     }
 
     for (const tool of tools) {
@@ -196,6 +191,7 @@ export class McpClient {
     }
     this.toolRegistry.removeMcpToolsByServer(this.serverName);
     this.promptRegistry.removePromptsByServer(this.serverName);
+    this.resourceRegistry.removeResourcesByServer(this.serverName);
     this.updateStatus(MCPServerStatus.DISCONNECTING);
     const client = this.client;
     this.client = undefined;
@@ -250,6 +246,128 @@ export class McpClient {
     return discoverPrompts(this.serverName, this.client!, this.promptRegistry);
   }
 
+  private async discoverResources(): Promise<Resource[]> {
+    this.assertConnected();
+    return discoverResources(this.serverName, this.client!);
+  }
+
+  private updateResourceRegistry(resources: Resource[]): void {
+    this.resourceRegistry.setResourcesForServer(this.serverName, resources);
+  }
+
+  async readResource(uri: string): Promise<ReadResourceResult> {
+    this.assertConnected();
+    return this.client!.request(
+      {
+        method: 'resources/read',
+        params: { uri },
+      },
+      ReadResourceResultSchema,
+    );
+  }
+
+  /**
+   * Registers notification handlers for dynamic updates from the MCP server.
+   * This includes handlers for tool list changes and resource list changes.
+   */
+  private registerNotificationHandlers(): void {
+    if (!this.client) {
+      return;
+    }
+
+    const capabilities = this.client.getServerCapabilities();
+
+    if (capabilities?.tools?.listChanged) {
+      debugLogger.log(
+        `Server '${this.serverName}' supports tool updates. Listening for changes...`,
+      );
+
+      this.client.setNotificationHandler(
+        ToolListChangedNotificationSchema,
+        async () => {
+          debugLogger.log(
+            `🔔 Received tool update notification from '${this.serverName}'`,
+          );
+          await this.refreshTools();
+        },
+      );
+    }
+
+    if (capabilities?.resources?.listChanged) {
+      debugLogger.log(
+        `Server '${this.serverName}' supports resource updates. Listening for changes...`,
+      );
+
+      this.client.setNotificationHandler(
+        ResourceListChangedNotificationSchema,
+        async () => {
+          debugLogger.log(
+            `🔔 Received resource update notification from '${this.serverName}'`,
+          );
+          await this.refreshResources();
+        },
+      );
+    }
+  }
+
+  /**
+   * Refreshes the resources for this server by re-querying the MCP `resources/list` endpoint.
+   *
+   * This method implements a **Coalescing Pattern** to handle rapid bursts of notifications
+   * (e.g., during server startup or bulk updates) without overwhelming the server or
+   * creating race conditions in the ResourceRegistry.
+   */
+  private async refreshResources(): Promise<void> {
+    if (this.isRefreshingResources) {
+      debugLogger.log(
+        `Resource refresh for '${this.serverName}' is already in progress. Pending update.`,
+      );
+      this.pendingResourceRefresh = true;
+      return;
+    }
+
+    this.isRefreshingResources = true;
+
+    try {
+      do {
+        this.pendingResourceRefresh = false;
+
+        if (this.status !== MCPServerStatus.CONNECTED || !this.client) break;
+
+        const timeoutMs = this.serverConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC;
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+
+        let newResources;
+        try {
+          newResources = await this.discoverResources();
+        } catch (err) {
+          debugLogger.error(
+            `Resource discovery failed during refresh: ${getErrorMessage(err)}`,
+          );
+          clearTimeout(timeoutId);
+          break;
+        }
+
+        this.updateResourceRegistry(newResources);
+
+        clearTimeout(timeoutId);
+
+        coreEvents.emitFeedback(
+          'info',
+          `Resources updated for server: ${this.serverName}`,
+        );
+      } while (this.pendingResourceRefresh);
+    } catch (error) {
+      debugLogger.error(
+        `Critical error in resource refresh loop for ${this.serverName}: ${getErrorMessage(error)}`,
+      );
+    } finally {
+      this.isRefreshingResources = false;
+      this.pendingResourceRefresh = false;
+    }
+  }
+
   getServerConfig(): MCPServerConfig {
     return this.serverConfig;
   }
@@ -266,19 +384,19 @@ export class McpClient {
    * creating race conditions in the global ToolRegistry.
    */
   private async refreshTools(): Promise<void> {
-    if (this.isRefreshing) {
+    if (this.isRefreshingTools) {
       debugLogger.log(
         `Tool refresh for '${this.serverName}' is already in progress. Pending update.`,
       );
-      this.pendingRefresh = true;
+      this.pendingToolRefresh = true;
       return;
     }
 
-    this.isRefreshing = true;
+    this.isRefreshingTools = true;
 
     try {
       do {
-        this.pendingRefresh = false;
+        this.pendingToolRefresh = false;
 
         if (this.status !== MCPServerStatus.CONNECTED || !this.client) break;
 
@@ -316,14 +434,14 @@ export class McpClient {
           'info',
           `Tools updated for server: ${this.serverName}`,
         );
-      } while (this.pendingRefresh);
+      } while (this.pendingToolRefresh);
     } catch (error) {
       debugLogger.error(
         `Critical error in refresh loop for ${this.serverName}: ${getErrorMessage(error)}`,
       );
     } finally {
-      this.isRefreshing = false;
-      this.pendingRefresh = false;
+      this.isRefreshingTools = false;
+      this.pendingToolRefresh = false;
     }
   }
 }
@@ -942,6 +1060,52 @@ export async function discoverPrompts(
     }
     return [];
   }
+}
+
+export async function discoverResources(
+  mcpServerName: string,
+  mcpClient: Client,
+): Promise<Resource[]> {
+  if (mcpClient.getServerCapabilities()?.resources == null) {
+    return [];
+  }
+
+  const resources = await listResources(mcpServerName, mcpClient);
+  return resources;
+}
+
+async function listResources(
+  mcpServerName: string,
+  mcpClient: Client,
+): Promise<Resource[]> {
+  const resources: Resource[] = [];
+  let cursor: string | undefined;
+  try {
+    do {
+      const response = await mcpClient.request(
+        {
+          method: 'resources/list',
+          params: cursor ? { cursor } : {},
+        },
+        ListResourcesResultSchema,
+      );
+      resources.push(...(response.resources ?? []));
+      cursor = response.nextCursor ?? undefined;
+    } while (cursor);
+  } catch (error) {
+    if (error instanceof Error && error.message?.includes('Method not found')) {
+      return [];
+    }
+    coreEvents.emitFeedback(
+      'error',
+      `Error discovering resources from ${mcpServerName}: ${getErrorMessage(
+        error,
+      )}`,
+      error,
+    );
+    throw error;
+  }
+  return resources;
 }
 
 /**

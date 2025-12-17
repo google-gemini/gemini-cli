@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ReleaseChannel, getReleaseChannel } from '../../utils/channel.js';
+import { getVersion } from '../../utils/version.js';
 
 // Mock dependencies before importing the module under test
 vi.mock('../../utils/channel.js', async () => {
@@ -15,6 +16,10 @@ vi.mock('../../utils/channel.js', async () => {
     getReleaseChannel: vi.fn(),
   };
 });
+
+vi.mock('../../utils/version.js', async () => ({
+  getVersion: vi.fn(),
+}));
 
 describe('client_metadata', () => {
   const originalPlatform = process.platform;
@@ -29,6 +34,7 @@ describe('client_metadata', () => {
     await import('./client_metadata.js');
     // Provide a default mock implementation for each test
     vi.mocked(getReleaseChannel).mockResolvedValue(ReleaseChannel.STABLE);
+    vi.mocked(getVersion).mockResolvedValue('0.0.0');
   });
 
   afterEach(() => {
@@ -64,22 +70,12 @@ describe('client_metadata', () => {
   });
 
   describe('getClientMetadata', () => {
-    it('should use CLI_VERSION for ideVersion if set', async () => {
-      process.env['CLI_VERSION'] = '1.2.3';
-      Object.defineProperty(process, 'version', { value: 'v18.0.0' });
+    it('should use version from getCliVersion for ideVersion', async () => {
+      vi.mocked(getVersion).mockResolvedValue('1.2.3');
       const { getClientMetadata } = await import('./client_metadata.js');
 
       const metadata = await getClientMetadata();
       expect(metadata.ideVersion).toBe('1.2.3');
-    });
-
-    it('should use process.version for ideVersion as a fallback', async () => {
-      delete process.env['CLI_VERSION'];
-      Object.defineProperty(process, 'version', { value: 'v20.0.0' });
-      const { getClientMetadata } = await import('./client_metadata.js');
-
-      const metadata = await getClientMetadata();
-      expect(metadata.ideVersion).toBe('v20.0.0');
     });
 
     it('should call getReleaseChannel to get the update channel', async () => {
