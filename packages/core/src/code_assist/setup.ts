@@ -9,6 +9,7 @@ import type {
   GeminiUserTier,
   LoadCodeAssistResponse,
   OnboardUserRequest,
+  Settings,
 } from './types.js';
 import { UserTierId } from './types.js';
 import { CodeAssistServer } from './server.js';
@@ -25,6 +26,7 @@ export class ProjectIdRequiredError extends Error {
 export interface UserData {
   projectId: string;
   userTier: UserTierId;
+  settings?: Settings;
 }
 
 /**
@@ -37,7 +39,14 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
     process.env['GOOGLE_CLOUD_PROJECT'] ||
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
-  const caServer = new CodeAssistServer(client, projectId, {}, '', undefined);
+  const caServer = new CodeAssistServer(
+    client,
+    projectId,
+    {},
+    '',
+    undefined,
+    undefined,
+  );
   const coreClientMetadata: ClientMetadata = {
     ideType: 'IDE_UNSPECIFIED',
     platform: 'PLATFORM_UNSPECIFIED',
@@ -58,6 +67,7 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
         return {
           projectId,
           userTier: loadRes.currentTier.id,
+          settings: loadRes.settings,
         };
       }
       throw new ProjectIdRequiredError();
@@ -65,6 +75,7 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
     return {
       projectId: loadRes.cloudaicompanionProject,
       userTier: loadRes.currentTier.id,
+      settings: loadRes.settings,
     };
   }
 
@@ -101,6 +112,7 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
       return {
         projectId,
         userTier: tier.id,
+        settings: loadRes.settings,
       };
     }
     throw new ProjectIdRequiredError();
@@ -109,6 +121,7 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
   return {
     projectId: lroRes.response.cloudaicompanionProject.id,
     userTier: tier.id,
+    settings: loadRes.settings,
   };
 }
 
