@@ -77,7 +77,7 @@ describe('telemetry', () => {
         {},
       );
 
-      expect(result.status).toBe(ActionStatus.ACTION_STATUS_CANCELLED);
+      expect(result?.status).toBe(ActionStatus.ACTION_STATUS_CANCELLED);
     });
 
     it('should set status to ERROR_UNKNOWN if response has error (non-OK SDK response)', () => {
@@ -90,7 +90,7 @@ describe('telemetry', () => {
         {},
       );
 
-      expect(result.status).toBe(ActionStatus.ACTION_STATUS_ERROR_UNKNOWN);
+      expect(result?.status).toBe(ActionStatus.ACTION_STATUS_ERROR_UNKNOWN);
     });
 
     it('should set status to ERROR_UNKNOWN if finishReason is not STOP or MAX_TOKENS', () => {
@@ -108,7 +108,7 @@ describe('telemetry', () => {
         {},
       );
 
-      expect(result.status).toBe(ActionStatus.ACTION_STATUS_ERROR_UNKNOWN);
+      expect(result?.status).toBe(ActionStatus.ACTION_STATUS_ERROR_UNKNOWN);
     });
 
     it('should set status to EMPTY if candidates is empty', () => {
@@ -121,7 +121,7 @@ describe('telemetry', () => {
         {},
       );
 
-      expect(result.status).toBe(ActionStatus.ACTION_STATUS_EMPTY);
+      expect(result?.status).toBe(ActionStatus.ACTION_STATUS_EMPTY);
     });
 
     it('should detect code in response', () => {
@@ -136,7 +136,7 @@ describe('telemetry', () => {
         },
       ]);
       const result = createConversationOffered(response, 'id', undefined, {});
-      expect(result.includedCode).toBe(true);
+      expect(result?.includedCode).toBe(true);
     });
 
     it('should not detect code if no backticks', () => {
@@ -149,7 +149,7 @@ describe('telemetry', () => {
         },
       ]);
       const result = createConversationOffered(response, 'id', undefined, {});
-      expect(result.includedCode).toBe(false);
+      expect(result?.includedCode).toBe(false);
     });
   });
 
