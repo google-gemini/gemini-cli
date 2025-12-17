@@ -201,14 +201,8 @@ const resumeCommand: SlashCommand = {
     };
 
     const uiHistory: HistoryItemWithoutId[] = [];
-    let i = 0;
 
-    for (const item of conversation) {
-      i++;
-      if (i <= INITIAL_HISTORY_LENGTH) {
-        continue;
-      }
-
+    for (const item of conversation.slice(INITIAL_HISTORY_LENGTH)) {
       const text =
         item.parts
           ?.filter((m) => !!m.text)
