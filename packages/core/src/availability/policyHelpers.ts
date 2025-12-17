@@ -160,7 +160,7 @@ export function applyModelSelection(
   options: { consumeAttempt?: boolean } = {},
 ): { model: string; config: GenerateContentConfig; maxAttempts?: number } {
   const resolved = config.modelConfigService.getResolvedConfig(modelConfigKey);
-  const { model } = resolved;
+  const model = resolved.model;
   const selection = selectModelForAvailability(config, model);
 
   if (!selection) {
