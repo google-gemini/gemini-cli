@@ -34,6 +34,15 @@ const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;
  * @returns true if clipboard contains an image
  */
 export async function clipboardHasImage(): Promise<boolean> {
+  if (process.platform === 'linux') {
+    try {
+      const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
+      return stdout.includes('image/');
+    } catch {
+      return false;
+    }
+  }
+
   if (process.platform !== 'darwin') {
     return false;
   }
@@ -57,6 +66,50 @@ export async function clipboardHasImage(): Promise<boolean> {
 export async function saveClipboardImage(
   targetDir?: string,
 ): Promise<string | null> {
+  if (process.platform === 'linux') {
+    try {
+      const baseDir = targetDir || process.cwd();
+      const tempDir = path.join(baseDir, '.gemini-clipboard');
+      await fs.mkdir(tempDir, { recursive: true });
+
+      const timestamp = new Date().getTime();
+
+      const { stdout: types } = await spawnAsync('wl-paste', ['--list-types']);
+      let mimeType = 'image/png';
+      let extension = 'png';
+
+      if (types.includes('image/png')) {
+        mimeType = 'image/png';
+        extension = 'png';
+      } else if (types.includes('image/jpeg')) {
+        mimeType = 'image/jpeg';
+        extension = 'jpg';
+      } else {
+        return null;
+      }
+
+      const tempFilePath = path.join(
+        tempDir,
+        `clipboard-${timestamp}.${extension}`,
+      );
+
+      // Use shell redirection to save the file
+      await spawnAsync('sh', [
+        '-c',
+        `wl-paste --type ${mimeType} > "${tempFilePath}"`,
+      ]);
+
+      const stats = await fs.stat(tempFilePath);
+      if (stats.size > 0) {
+        return tempFilePath;
+      }
+      return null;
+    } catch (error) {
+      debugLogger.warn('Error saving clipboard image:', error);
+      return null;
+    }
+  }
+
   if (process.platform !== 'darwin') {
     return null;
   }
