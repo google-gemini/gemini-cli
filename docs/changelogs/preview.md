@@ -125,14 +125,5 @@ npm install -g @google/gemini-cli@preview
   take priority over ones using the old format by @jacob314 in
   https://github.com/google-gemini/gemini-cli/pull/15116
 
-## New Contributors
-
-- @kuishou68 made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/14671
-- @svarlamov made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/14663
-- @jb-perez made their first contribution in
-  https://github.com/google-gemini/gemini-cli/pull/14473
-
 **Full Changelog**:
 https://github.com/google-gemini/gemini-cli/compare/v0.21.0-preview.6...v0.22.0-preview.0
