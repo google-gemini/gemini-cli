@@ -5,7 +5,9 @@
  */
 
 import * as fs from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
 import * as path from 'node:path';
+import { spawn } from 'node:child_process';
 import {
   debugLogger,
   spawnAsync,
@@ -72,8 +74,6 @@ export async function saveClipboardImage(
       const tempDir = path.join(baseDir, '.gemini-clipboard');
       await fs.mkdir(tempDir, { recursive: true });
 
-      const timestamp = new Date().getTime();
-
       const { stdout: types } = await spawnAsync('wl-paste', ['--list-types']);
       let mimeType = 'image/png';
       let extension = 'png';
@@ -88,16 +88,29 @@ export async function saveClipboardImage(
         return null;
       }
 
+      const timestamp = new Date().getTime();
       const tempFilePath = path.join(
         tempDir,
         `clipboard-${timestamp}.${extension}`,
       );
 
-      // Use shell redirection to save the file
-      await spawnAsync('sh', [
-        '-c',
-        `wl-paste --type ${mimeType} > "${tempFilePath}"`,
-      ]);
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn('wl-paste', ['--type', mimeType]);
+        const fileStream = createWriteStream(tempFilePath);
+
+        child.stdout.pipe(fileStream);
+
+        child.on('close', (code) => {
+          if (code === 0) {
+            resolve();
+          } else {
+            reject(new Error(`wl-paste exited with code ${code}`));
+          }
+        });
+
+        child.on('error', (err) => reject(err));
+        fileStream.on('error', (err) => reject(err));
+      });
 
       const stats = await fs.stat(tempFilePath);
       if (stats.size > 0) {
