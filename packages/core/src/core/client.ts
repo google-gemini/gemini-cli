@@ -31,10 +31,7 @@ import type {
   ResumedSessionData,
 } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
-import {
-  DEFAULT_GEMINI_FLASH_MODEL,
-  getEffectiveModel,
-} from '../config/models.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { ideContextStore } from '../ide/ideContext.js';
@@ -395,12 +392,9 @@ export class GeminiClient {
       return this.currentSequenceModel;
     }
 
-    const configModel = this.config.getModel();
-    return getEffectiveModel(
-      this.config.isInFallbackMode(),
-      configModel,
-      this.config.getPreviewFeatures(),
-    );
+    // Availability logic: The configured model is the source of truth,
+    // including any permanent fallbacks (config.setModel) or manual overrides.
+    return this.config.getActiveModel();
   }
 
   async *sendMessageStream(

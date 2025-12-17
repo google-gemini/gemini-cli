@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { modelCommand } from './modelCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
+import type { Config } from '@google/gemini-cli-core';
 
 describe('modelCommand', () => {
   let mockContext: CommandContext;
@@ -27,6 +28,21 @@ describe('modelCommand', () => {
       type: 'dialog',
       dialog: 'model',
     });
+  });
+
+  it('should call refreshUserQuota if config is available', async () => {
+    if (!modelCommand.action) {
+      throw new Error('The model command must have an action.');
+    }
+
+    const mockRefreshUserQuota = vi.fn();
+    mockContext.services.config = {
+      refreshUserQuota: mockRefreshUserQuota,
+    } as unknown as Config;
+
+    await modelCommand.action(mockContext, '');
+
+    expect(mockRefreshUserQuota).toHaveBeenCalled();
   });
 
   it('should have the correct name and description', () => {

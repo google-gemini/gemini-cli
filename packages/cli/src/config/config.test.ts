@@ -1283,7 +1283,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('auto');
+    expect(config.getModel()).toBe('auto-gemini-2.5');
   });
 
   it('always prefers model from argv', async () => {

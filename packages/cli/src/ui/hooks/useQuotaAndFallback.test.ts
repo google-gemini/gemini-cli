@@ -261,7 +261,7 @@ describe('useQuotaAndFallback', () => {
           expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
           const message = request!.message;
           expect(message).toContain(
-            'model-A is currently experiencing high demand. We apologize and appreciate your patience.',
+            'We are currently experiencing high demand.',
           );
 
           // Simulate the user choosing to continue with the fallback model
@@ -283,7 +283,7 @@ describe('useQuotaAndFallback', () => {
           const lastCall = (mockHistoryManager.addItem as Mock).mock
             .calls[0][0];
           expect(lastCall.type).toBe(MessageType.INFO);
-          expect(lastCall.text).toContain('Switched to fallback model.');
+          expect(lastCall.text).toContain('Switched to fallback model model-B');
         });
       }
 
@@ -316,9 +316,9 @@ describe('useQuotaAndFallback', () => {
 
         const message = request!.message;
         expect(message).toBe(
-          `It seems like you don't have access to Gemini 3.
+          `It seems like you don't have access to gemini-3-pro-preview.
 Learn more at https://goo.gle/enable-preview-features
-To disable Gemini 3, disable "Preview features" in /settings.`,
+To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
         );
 
         // Simulate the user choosing to switch
@@ -415,7 +415,9 @@ To disable Gemini 3, disable "Preview features" in /settings.`,
       expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
       const lastCall = (mockHistoryManager.addItem as Mock).mock.calls[0][0];
       expect(lastCall.type).toBe(MessageType.INFO);
-      expect(lastCall.text).toContain('Switched to fallback model.');
+      expect(lastCall.text).toContain(
+        'Switched to fallback model gemini-flash',
+      );
     });
 
     it('should show a special message when falling back from the preview model', async () => {
@@ -449,7 +451,7 @@ To disable Gemini 3, disable "Preview features" in /settings.`,
       const lastCall = (mockHistoryManager.addItem as Mock).mock.calls[0][0];
       expect(lastCall.type).toBe(MessageType.INFO);
       expect(lastCall.text).toContain(
-        `Switched to fallback model gemini-2.5-pro. We will periodically check if ${PREVIEW_GEMINI_MODEL} is available again.`,
+        `Switched to fallback model gemini-2.5-pro`,
       );
     });
 
@@ -484,7 +486,7 @@ To disable Gemini 3, disable "Preview features" in /settings.`,
       const lastCall = (mockHistoryManager.addItem as Mock).mock.calls[0][0];
       expect(lastCall.type).toBe(MessageType.INFO);
       expect(lastCall.text).toContain(
-        `Switched to fallback model gemini-2.5-flash.`,
+        `Switched to fallback model gemini-2.5-flash`,
       );
     });
   });
