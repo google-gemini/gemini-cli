@@ -974,14 +974,11 @@ export class Config {
   }
 
   setPreviewFeatures(previewFeatures: boolean) {
-    const previousValue = this.previewFeatures;
-    this.previewFeatures = previewFeatures;
-
     // No change in state, no action needed
-    if (previousValue === previewFeatures) {
+    if (this.previewFeatures === previewFeatures) {
       return;
     }
-
+    this.previewFeatures = previewFeatures;
     const currentModel = this.getModel();
 
     // Case 1: Disabling preview features while on a preview model
