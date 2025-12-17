@@ -42,6 +42,8 @@ vi.mock('../../config/extensions/update.js', () => ({
 
 const mockDisableExtension = vi.fn();
 const mockEnableExtension = vi.fn();
+const mockInstallExtension = vi.fn();
+const mockUninstallExtension = vi.fn();
 const mockGetExtensions = vi.fn();
 
 const inactiveExt: GeminiCLIExtension = {
@@ -102,6 +104,8 @@ describe('extensionsCommand', () => {
             Object.assign(actual, {
               enableExtension: mockEnableExtension,
               disableExtension: mockDisableExtension,
+              installOrUpdateExtension: mockInstallExtension,
+              uninstallExtension: mockUninstallExtension,
               getExtensions: mockGetExtensions,
             });
             return actual;
@@ -477,29 +481,166 @@ describe('extensionsCommand', () => {
   });
 
   describe('when enableExtensionReloading is true', () => {
-    it('should include enable and disable subcommands', () => {
+    it('should include enable, disable, install, and uninstall subcommands', () => {
       const command = extensionsCommand(true);
       const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
       expect(subCommandNames).toContain('enable');
       expect(subCommandNames).toContain('disable');
+      expect(subCommandNames).toContain('install');
+      expect(subCommandNames).toContain('uninstall');
     });
   });
 
   describe('when enableExtensionReloading is false', () => {
-    it('should not include enable and disable subcommands', () => {
+    it('should not include enable, disable, install, and uninstall subcommands', () => {
       const command = extensionsCommand(false);
       const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
       expect(subCommandNames).not.toContain('enable');
       expect(subCommandNames).not.toContain('disable');
+      expect(subCommandNames).not.toContain('install');
+      expect(subCommandNames).not.toContain('uninstall');
     });
   });
 
   describe('when enableExtensionReloading is not provided', () => {
-    it('should not include enable and disable subcommands by default', () => {
+    it('should not include enable, disable, install, and uninstall subcommands by default', () => {
       const command = extensionsCommand();
       const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
       expect(subCommandNames).not.toContain('enable');
       expect(subCommandNames).not.toContain('disable');
+      expect(subCommandNames).not.toContain('install');
+      expect(subCommandNames).not.toContain('uninstall');
+    });
+  });
+
+  describe('install', () => {
+    let installAction: SlashCommand['action'];
+
+    beforeEach(() => {
+      installAction = extensionsCommand(true).subCommands?.find(
+        (cmd) => cmd.name === 'install',
+      )?.action;
+
+      expect(installAction).not.toBeNull();
+
+      mockContext.invocation!.name = 'install';
+    });
+
+    it('should show usage if no extension name is provided', async () => {
+      await installAction!(mockContext, '');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.ERROR,
+          text: 'Usage: /extensions install <source>',
+        },
+        expect.any(Number),
+      );
+      expect(mockInstallExtension).not.toHaveBeenCalled();
+    });
+
+    it('should call installExtension and show success message', async () => {
+      const packageName = 'test-extension-package';
+      mockInstallExtension.mockResolvedValue({ name: packageName });
+      await installAction!(mockContext, packageName);
+      expect(mockInstallExtension).toHaveBeenCalledWith({
+        source: packageName,
+        type: 'git',
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: `Installing extension from "${packageName}"...`,
+        },
+        expect.any(Number),
+      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: `Extension "${packageName}" installed successfully.`,
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should show error message on installation failure', async () => {
+      const packageName = 'failed-extension';
+      const errorMessage = 'install failed';
+      mockInstallExtension.mockRejectedValue(new Error(errorMessage));
+
+      await installAction!(mockContext, packageName);
+      expect(mockInstallExtension).toHaveBeenCalledWith({
+        source: packageName,
+        type: 'git',
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.ERROR,
+          text: `Failed to install extension from "${packageName}": ${errorMessage}`,
+        },
+        expect.any(Number),
+      );
+    });
+  });
+
+  describe('uninstall', () => {
+    let uninstallAction: SlashCommand['action'];
+
+    beforeEach(() => {
+      uninstallAction = extensionsCommand(true).subCommands?.find(
+        (cmd) => cmd.name === 'uninstall',
+      )?.action;
+
+      expect(uninstallAction).not.toBeNull();
+
+      mockContext.invocation!.name = 'uninstall';
+    });
+
+    it('should show usage if no extension name is provided', async () => {
+      await uninstallAction!(mockContext, '');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.ERROR,
+          text: 'Usage: /extensions uninstall <extension-name>',
+        },
+        expect.any(Number),
+      );
+      expect(mockUninstallExtension).not.toHaveBeenCalled();
+    });
+
+    it('should call uninstallExtension and show success message', async () => {
+      const extensionName = 'test-extension';
+      await uninstallAction!(mockContext, extensionName);
+      expect(mockUninstallExtension).toHaveBeenCalledWith(extensionName, false);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: `Uninstalling extension "${extensionName}"...`,
+        },
+        expect.any(Number),
+      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: `Extension "${extensionName}" uninstalled successfully.`,
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should show error message on uninstallation failure', async () => {
+      const extensionName = 'failed-extension';
+      const errorMessage = 'uninstall failed';
+      mockUninstallExtension.mockRejectedValue(new Error(errorMessage));
+
+      await uninstallAction!(mockContext, extensionName);
+      expect(mockUninstallExtension).toHaveBeenCalledWith(extensionName, false);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.ERROR,
+          text: `Failed to uninstall extension "${extensionName}": ${errorMessage}`,
+        },
+        expect.any(Number),
+      );
     });
   });
 

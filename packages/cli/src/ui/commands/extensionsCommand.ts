@@ -429,6 +429,123 @@ async function enableAction(context: CommandContext, args: string) {
   }
 }
 
+async function installAction(context: CommandContext, args: string) {
+  const extensionLoader = context.services.config?.getExtensionLoader();
+  if (!(extensionLoader instanceof ExtensionManager)) {
+    debugLogger.error(
+      `Cannot ${context.invocation?.name} extensions in this environment`,
+    );
+    return;
+  }
+
+  const source = args.trim();
+  if (!source) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Usage: /extensions install <source>`,
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  // Quick and dirty sanitization.
+  if (/[^a-zA-Z0-9.:/@\-_]/.test(source)) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Invalid source: ${source}`,
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  context.ui.addItem(
+    {
+      type: MessageType.INFO,
+      text: `Installing extension from "${source}"...`,
+    },
+    Date.now(),
+  );
+
+  try {
+    const extension = await extensionLoader.installOrUpdateExtension({
+      source,
+      type: 'git', // Default to git, manager will figure it out.
+    });
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `Extension "${extension.name}" installed successfully.`,
+      },
+      Date.now(),
+    );
+  } catch (error) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Failed to install extension from "${source}": ${getErrorMessage(
+          error,
+        )}`,
+      },
+      Date.now(),
+    );
+  }
+}
+
+async function uninstallAction(context: CommandContext, args: string) {
+  const extensionLoader = context.services.config?.getExtensionLoader();
+  if (!(extensionLoader instanceof ExtensionManager)) {
+    debugLogger.error(
+      `Cannot ${context.invocation?.name} extensions in this environment`,
+    );
+    return;
+  }
+
+  const name = args.trim();
+  if (!name) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Usage: /extensions uninstall <extension-name>`,
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  context.ui.addItem(
+    {
+      type: MessageType.INFO,
+      text: `Uninstalling extension "${name}"...`,
+    },
+    Date.now(),
+  );
+
+  try {
+    await extensionLoader.uninstallExtension(name, false);
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `Extension "${name}" uninstalled successfully.`,
+      },
+      Date.now(),
+    );
+  } catch (error) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Failed to uninstall extension "${name}": ${getErrorMessage(
+          error,
+        )}`,
+      },
+      Date.now(),
+    );
+  }
+}
+
 /**
  * Exported for testing.
  */
@@ -505,6 +622,23 @@ const enableCommand: SlashCommand = {
   completion: completeExtensionsAndScopes,
 };
 
+const installCommand: SlashCommand = {
+  name: 'install',
+  description: 'Install an extension from a git repo or local path',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: installAction,
+};
+
+const uninstallCommand: SlashCommand = {
+  name: 'uninstall',
+  description: 'Uninstall an extension',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: uninstallAction,
+  completion: completeExtensions,
+};
+
 const exploreExtensionsCommand: SlashCommand = {
   name: 'explore',
   description: 'Open extensions page in your browser',
@@ -526,7 +660,7 @@ export function extensionsCommand(
   enableExtensionReloading?: boolean,
 ): SlashCommand {
   const conditionalCommands = enableExtensionReloading
-    ? [disableCommand, enableCommand]
+    ? [disableCommand, enableCommand, installCommand, uninstallCommand]
     : [];
   return {
     name: 'extensions',
