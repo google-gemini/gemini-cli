@@ -149,7 +149,7 @@ describe('checkpoint utils', () => {
       ] as ToolCallRequestInfo[];
 
       (mockGitService.createFileSnapshot as Mock).mockResolvedValue('hash123');
-      (mockGeminiClient.getHistory as Mock).mockResolvedValue([
+      (mockGeminiClient.getHistory as Mock).mockReturnValue([
         { role: 'user', parts: [] },
       ]);
 

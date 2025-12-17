@@ -300,7 +300,7 @@ export async function initializeTelemetry(
   });
 
   try {
-    await sdk.start();
+    sdk.start();
     if (config.getDebugMode()) {
       debugLogger.log('OpenTelemetry SDK started successfully.');
     }
@@ -355,7 +355,7 @@ export async function shutdownTelemetry(
     return;
   }
   try {
-    await ClearcutLogger.getInstance()?.shutdown();
+    ClearcutLogger.getInstance()?.shutdown();
     await sdk.shutdown();
     if (config.getDebugMode() && fromProcessExit) {
       debugLogger.log('OpenTelemetry SDK shut down successfully.');

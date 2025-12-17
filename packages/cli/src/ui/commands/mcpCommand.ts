@@ -216,7 +216,7 @@ const listAction = async (
   const allTools = toolRegistry.getAllTools();
   const mcpTools = allTools.filter((tool) => tool instanceof DiscoveredMCPTool);
 
-  const promptRegistry = await config.getPromptRegistry();
+  const promptRegistry = config.getPromptRegistry();
   const mcpPrompts = promptRegistry
     .getAllPrompts()
     .filter(
