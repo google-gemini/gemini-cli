@@ -47,8 +47,8 @@ import {
   toGenerateContentRequest,
 } from './converter.js';
 import {
-  createConversationOffered,
   formatProtoJsonDuration,
+  recordConversationOffered,
 } from './telemetry.js';
 import { getClientMetadata } from './experiments/client_metadata.js';
 
@@ -107,15 +107,13 @@ export class CodeAssistServer implements ContentGenerator {
 
         const translatedResponse = fromGenerateContentResponse(response);
 
-        if (response.traceId) {
-          const offered = createConversationOffered(
-            translatedResponse,
-            response.traceId,
-            req.config?.abortSignal,
-            streamingLatency,
-          );
-          await server.recordConversationOffered(offered);
-        }
+        await recordConversationOffered(
+          server,
+          response.traceId,
+          translatedResponse,
+          streamingLatency,
+          req.config?.abortSignal,
+        );
 
         yield translatedResponse;
       }
@@ -145,15 +143,13 @@ export class CodeAssistServer implements ContentGenerator {
 
     const translatedResponse = fromGenerateContentResponse(response);
 
-    if (response.traceId) {
-      const offered = createConversationOffered(
-        translatedResponse,
-        response.traceId,
-        req.config?.abortSignal,
-        streamingLatency,
-      );
-      await this.recordConversationOffered(offered);
-    }
+    await recordConversationOffered(
+      this,
+      response.traceId,
+      translatedResponse,
+      streamingLatency,
+      req.config?.abortSignal,
+    );
 
     return translatedResponse;
   }

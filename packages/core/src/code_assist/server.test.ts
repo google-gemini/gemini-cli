@@ -102,7 +102,10 @@ describe('CodeAssistServer', () => {
             index: 0,
             content: {
               role: 'model',
-              parts: [{ text: 'response' }],
+              parts: [
+                { text: 'response' },
+                { functionCall: { name: 'test', args: {} } },
+              ],
             },
             finishReason: FinishReason.SAFETY,
             safetyRatings: [],
@@ -142,7 +145,10 @@ describe('CodeAssistServer', () => {
             index: 0,
             content: {
               role: 'model',
-              parts: [{ text: 'response' }],
+              parts: [
+                { text: 'response' },
+                { functionCall: { name: 'test', args: {} } },
+              ],
             },
             finishReason: FinishReason.STOP,
             safetyRatings: [],
@@ -204,7 +210,16 @@ describe('CodeAssistServer', () => {
     const mockResponseData = {
       traceId: 'stream-trace-id',
       response: {
-        candidates: [{ content: { parts: [{ text: 'chunk' }] } }],
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: 'chunk' },
+                { functionCall: { name: 'test', args: {} } },
+              ],
+            },
+          },
+        ],
         sdkHttpResponse: {
           responseInternal: {
             ok: true,
