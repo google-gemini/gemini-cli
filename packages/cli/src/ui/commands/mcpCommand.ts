@@ -23,6 +23,7 @@ import {
 } from '@google/gemini-cli-core';
 import { appEvents, AppEvent } from '../../utils/events.js';
 import { MessageType, type HistoryItemMcpStatus } from '../types.js';
+import { SettingScope } from '../../config/settings.js';
 
 const authCommand: SlashCommand = {
   name: 'auth',
@@ -250,6 +251,17 @@ const listAction = async (
     }
   }
 
+  // Get disabled servers from settings
+  const disabledServers = context.services.settings.merged.mcp?.disabled || [];
+
+  // Get session mounted/unmounted servers
+  const sessionMountedServers = Array.from(
+    context.session.sessionMountedMcpServers,
+  );
+  const sessionUnmountedServers = Array.from(
+    context.session.sessionUnmountedMcpServers,
+  );
+
   const mcpStatusItem: HistoryItemMcpStatus = {
     type: MessageType.MCP_STATUS,
     servers: mcpServers,
@@ -273,6 +285,9 @@ const listAction = async (
     })),
     authStatus,
     blockedServers: blockedMcpServers,
+    disabledServers,
+    sessionMountedServers,
+    sessionUnmountedServers,
     discoveryInProgress,
     connectingServers,
     showDescriptions,
@@ -358,6 +373,529 @@ const refreshCommand: SlashCommand = {
   },
 };
 
+/**
+ * Get completion for MCP server names (connected, configured, or previously seen)
+ */
+function completeMcpServerNames(
+  context: CommandContext,
+  partialArg: string,
+): string[] {
+  const { config } = context.services;
+  if (!config) return [];
+
+  const mcpClientManager = config.getMcpClientManager();
+  if (!mcpClientManager) return [];
+
+  const allServerNames = mcpClientManager.getAllMcpServerNames();
+
+  return allServerNames.filter((name) => name.startsWith(partialArg));
+}
+
+/**
+ * Enable an MCP server (persistent - survives restarts)
+ */
+async function enableAction(
+  context: CommandContext,
+  args: string,
+): Promise<void | MessageActionReturn> {
+  const { config } = context.services;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
+
+  const serverName = args.trim();
+  if (!serverName) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Usage: /mcp enable <server-name>',
+    };
+  }
+
+  const mcpClientManager = config.getMcpClientManager();
+  if (!mcpClientManager) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Could not retrieve MCP client manager.',
+    };
+  }
+
+  // Get current disabled servers from settings
+  const settings = context.services.settings;
+  const disabledServers: string[] = settings.merged.mcp?.disabled || [];
+
+  // Check if it's actually disabled
+  if (!disabledServers.includes(serverName)) {
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `MCP server "${serverName}" is not disabled.`,
+    };
+  }
+
+  try {
+    let wasRemoved = false;
+
+    // Check and remove from Workspace scope
+    const workspaceDisabled: string[] =
+      settings.workspace.settings.mcp?.disabled || [];
+    if (workspaceDisabled.includes(serverName)) {
+      const newWorkspaceDisabled = workspaceDisabled.filter(
+        (name) => name !== serverName,
+      );
+      settings.setValue(
+        SettingScope.Workspace,
+        'mcp.disabled',
+        newWorkspaceDisabled,
+      );
+      wasRemoved = true;
+    }
+
+    // Check and remove from User scope
+    const userDisabled: string[] = settings.user.settings.mcp?.disabled || [];
+    if (userDisabled.includes(serverName)) {
+      const newUserDisabled = userDisabled.filter(
+        (name) => name !== serverName,
+      );
+      settings.setValue(SettingScope.User, 'mcp.disabled', newUserDisabled);
+      wasRemoved = true;
+    }
+
+    if (!wasRemoved) {
+      // It must be in System or SystemDefaults, which we probably can't/shouldn't modify here
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `MCP server "${serverName}" is disabled in System settings and cannot be enabled via this command.`,
+      };
+    }
+
+    // Get the server config (check both user config and known configs from extensions)
+    const serverConfig =
+      mcpClientManager.getServerConfig(serverName) ||
+      config.getMcpServers()?.[serverName];
+
+    // Check if server is blocked
+    const blockedServers = mcpClientManager.getBlockedMcpServers();
+    const isBlocked = blockedServers.some((s) => s.name === serverName);
+
+    if (serverConfig) {
+      context.ui.addItem(
+        {
+          type: 'info',
+          text: `Enabling and connecting MCP server "${serverName}"...`,
+        },
+        Date.now(),
+      );
+
+      // Use forceConnect since we just updated settings and need to bypass stale cache
+      await mcpClientManager.maybeDiscoverMcpServer(serverName, serverConfig, {
+        forceConnect: true,
+      });
+
+      // Update the client with the new tools
+      const geminiClient = config.getGeminiClient();
+      if (geminiClient?.isInitialized()) {
+        await geminiClient.setTools();
+      }
+
+      // Reload the slash commands to reflect the changes
+      context.ui.reloadCommands();
+    }
+
+    const blockedWarning = isBlocked
+      ? '\n\n⚠️  Warning: This server appears to be blocked by your configuration (mcp.allowed/mcp.excluded). It may not function until unblocked.'
+      : '';
+
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `MCP server "${serverName}" enabled successfully.${blockedWarning}`,
+    };
+  } catch (error) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Failed to enable MCP server: ${getErrorMessage(error)}`,
+    };
+  }
+}
+
+/**
+ * Disable an MCP server (persistent - survives restarts)
+ */
+async function disableAction(
+  context: CommandContext,
+  args: string,
+): Promise<void | MessageActionReturn> {
+  const { config } = context.services;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
+
+  const serverName = args.trim();
+  if (!serverName) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Usage: /mcp disable <server-name>',
+    };
+  }
+
+  const mcpClientManager = config.getMcpClientManager();
+  if (!mcpClientManager) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Could not retrieve MCP client manager.',
+    };
+  }
+
+  // Get current disabled servers from settings
+  const settings = context.services.settings;
+  const mergedDisabled: string[] = settings.merged.mcp?.disabled || [];
+
+  // Check if already disabled
+  if (mergedDisabled.includes(serverName)) {
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `MCP server "${serverName}" is already disabled.`,
+    };
+  }
+
+  try {
+    // Add to disabled list (use user-scope list to avoid copying workspace settings)
+    const userDisabled: string[] = settings.user.settings.mcp?.disabled || [];
+    const newDisabledServers = [...userDisabled, serverName];
+
+    // Update settings (persists to file)
+    settings.setValue(SettingScope.User, 'mcp.disabled', newDisabledServers);
+
+    // Disconnect the server
+    context.ui.addItem(
+      {
+        type: 'info',
+        text: `Disabling and disconnecting MCP server "${serverName}"...`,
+      },
+      Date.now(),
+    );
+
+    await mcpClientManager.disconnectServer(serverName);
+
+    // Update the client with the new tools
+    const geminiClient = config.getGeminiClient();
+    if (geminiClient?.isInitialized()) {
+      await geminiClient.setTools();
+    }
+
+    // Reload the slash commands to reflect the changes
+    context.ui.reloadCommands();
+
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `MCP server "${serverName}" disabled successfully.`,
+    };
+  } catch (error) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Failed to disable MCP server: ${getErrorMessage(error)}`,
+    };
+  }
+}
+
+/**
+ * Mount an MCP server (session-only - temporarily enables for this session)
+ * This overrides the disabled state if the server is disabled.
+ */
+async function mountAction(
+  context: CommandContext,
+  args: string,
+): Promise<void | MessageActionReturn> {
+  const { config } = context.services;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
+
+  const serverName = args.trim();
+  if (!serverName) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Usage: /mcp mount <server-name>',
+    };
+  }
+
+  const mcpClientManager = config.getMcpClientManager();
+  if (!mcpClientManager) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Could not retrieve MCP client manager.',
+    };
+  }
+
+  // Check if server exists in config (either user-configured or from extensions)
+  const serverConfig =
+    mcpClientManager.getServerConfig(serverName) ||
+    config.getMcpServers()?.[serverName];
+  if (!serverConfig) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `MCP server "${serverName}" is not configured. The server must have been discovered at least once before it can be mounted.`,
+    };
+  }
+
+  // Check if already connected and not in any override state
+  const connectedServers = mcpClientManager.getMcpServers();
+  const isConnected = serverName in connectedServers;
+  const isSessionUnmounted =
+    context.session.sessionUnmountedMcpServers.has(serverName);
+  const settings = context.services.settings;
+  const disabledServers: string[] = settings.merged.mcp?.disabled || [];
+  const isDisabled = disabledServers.includes(serverName);
+
+  // Check if server is blocked
+  const blockedServers = mcpClientManager.getBlockedMcpServers();
+  const isBlocked = blockedServers.some((s) => s.name === serverName);
+
+  if (isConnected && !isSessionUnmounted) {
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `MCP server "${serverName}" is already connected.`,
+    };
+  }
+
+  try {
+    // Add to session mounted set (overrides disabled)
+    if (context.session.setSessionMountedMcpServers) {
+      context.session.setSessionMountedMcpServers(
+        (prev) => new Set([...prev, serverName]),
+      );
+    }
+
+    // Remove from session unmounted set if present
+    if (context.session.setSessionUnmountedMcpServers) {
+      context.session.setSessionUnmountedMcpServers((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(serverName);
+        return newSet;
+      });
+    }
+
+    const statusText = isDisabled
+      ? `Mounting disabled MCP server "${serverName}" for this session...`
+      : `Mounting MCP server "${serverName}" for this session...`;
+
+    context.ui.addItem(
+      {
+        type: 'info',
+        text: statusText,
+      },
+      Date.now(),
+    );
+
+    // Use forceConnect to bypass disabled/session checks since mount is explicit
+    await mcpClientManager.maybeDiscoverMcpServer(serverName, serverConfig, {
+      forceConnect: true,
+    });
+
+    // Update the client with the new tools
+    const geminiClient = config.getGeminiClient();
+    if (geminiClient?.isInitialized()) {
+      await geminiClient.setTools();
+    }
+
+    // Reload the slash commands to reflect the changes
+    context.ui.reloadCommands();
+
+    let resultText = isDisabled
+      ? `MCP server "${serverName}" mounted for this session (will return to disabled on restart).`
+      : `MCP server "${serverName}" mounted for this session.`;
+
+    if (isBlocked) {
+      resultText +=
+        '\n\n⚠️  Warning: This server is blocked by your configuration (mcp.allowed/mcp.excluded), but is being forcefully mounted for this session.';
+    }
+
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: resultText,
+    };
+  } catch (error) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Failed to mount MCP server: ${getErrorMessage(error)}`,
+    };
+  }
+}
+
+/**
+ * Unmount an MCP server (session-only - temporarily disables for this session)
+ * The server will reconnect on restart if it's enabled.
+ */
+async function unmountAction(
+  context: CommandContext,
+  args: string,
+): Promise<void | MessageActionReturn> {
+  const { config } = context.services;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
+
+  const serverName = args.trim();
+  if (!serverName) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Usage: /mcp unmount <server-name>',
+    };
+  }
+
+  const mcpClientManager = config.getMcpClientManager();
+  if (!mcpClientManager) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Could not retrieve MCP client manager.',
+    };
+  }
+
+  // Check if already unmounted in session
+  const isSessionUnmounted =
+    context.session.sessionUnmountedMcpServers.has(serverName);
+  if (isSessionUnmounted) {
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `MCP server "${serverName}" is already unmounted in this session.`,
+    };
+  }
+
+  // Check if server is connected or session-mounted
+  const connectedServers = mcpClientManager.getMcpServers();
+  const isConnected = serverName in connectedServers;
+  const isSessionMounted =
+    context.session.sessionMountedMcpServers.has(serverName);
+
+  if (!isConnected && !isSessionMounted) {
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `MCP server "${serverName}" is not currently connected.`,
+    };
+  }
+
+  try {
+    // Add to session unmounted set
+    if (context.session.setSessionUnmountedMcpServers) {
+      context.session.setSessionUnmountedMcpServers(
+        (prev) => new Set([...prev, serverName]),
+      );
+    }
+
+    // Remove from session mounted set if present
+    if (context.session.setSessionMountedMcpServers) {
+      context.session.setSessionMountedMcpServers((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(serverName);
+        return newSet;
+      });
+    }
+
+    // Disconnect the server
+    context.ui.addItem(
+      {
+        type: 'info',
+        text: `Unmounting MCP server "${serverName}" for this session...`,
+      },
+      Date.now(),
+    );
+
+    await mcpClientManager.disconnectServer(serverName);
+
+    // Update the client with the new tools
+    const geminiClient = config.getGeminiClient();
+    if (geminiClient?.isInitialized()) {
+      await geminiClient.setTools();
+    }
+
+    // Reload the slash commands to reflect the changes
+    context.ui.reloadCommands();
+
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `MCP server "${serverName}" unmounted for this session. It will reconnect on restart.`,
+    };
+  } catch (error) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Failed to unmount MCP server: ${getErrorMessage(error)}`,
+    };
+  }
+}
+
+const enableCommand: SlashCommand = {
+  name: 'enable',
+  description: 'Enable a disabled MCP server (persistent)',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: enableAction,
+  completion: completeMcpServerNames,
+};
+
+const disableCommand: SlashCommand = {
+  name: 'disable',
+  description: 'Disable an MCP server (persistent)',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: disableAction,
+  completion: completeMcpServerNames,
+};
+
+const mountCommand: SlashCommand = {
+  name: 'mount',
+  description: 'Mount an unmounted MCP server (session-only)',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: mountAction,
+  completion: completeMcpServerNames,
+};
+
+const unmountCommand: SlashCommand = {
+  name: 'unmount',
+  description: 'Unmount an MCP server for this session',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: unmountAction,
+  completion: completeMcpServerNames,
+};
+
 export const mcpCommand: SlashCommand = {
   name: 'mcp',
   description: 'Manage configured Model Context Protocol (MCP) servers',
@@ -369,6 +907,10 @@ export const mcpCommand: SlashCommand = {
     schemaCommand,
     authCommand,
     refreshCommand,
+    enableCommand,
+    disableCommand,
+    mountCommand,
+    unmountCommand,
   ],
   action: async (context: CommandContext) => listAction(context),
 };

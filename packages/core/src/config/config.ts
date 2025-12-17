@@ -275,6 +275,21 @@ export interface ConfigParameters {
   enableExtensionReloading?: boolean;
   allowedMcpServers?: string[];
   blockedMcpServers?: string[];
+  /**
+   * Callback to get the list of disabled MCP servers from settings.
+   * Disabled servers are persisted across sessions and won't auto-connect.
+   */
+  getDisabledMcpServers?: () => string[];
+  /**
+   * Callback to get the list of session-mounted MCP servers.
+   * These are temporarily enabled for the current session (overrides disabled).
+   */
+  getSessionMountedMcpServers?: () => string[];
+  /**
+   * Callback to get the list of session-unmounted MCP servers.
+   * These are temporarily disabled for the current session (overrides enabled).
+   */
+  getSessionUnmountedMcpServers?: () => string[];
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   folderTrust?: boolean;
@@ -331,6 +346,9 @@ export class Config {
   private mcpClientManager?: McpClientManager;
   private allowedMcpServers: string[];
   private blockedMcpServers: string[];
+  private getDisabledMcpServersFn?: () => string[];
+  private getSessionMountedMcpServersFn?: () => string[];
+  private getSessionUnmountedMcpServersFn?: () => string[];
   private promptRegistry!: PromptRegistry;
   private resourceRegistry!: ResourceRegistry;
   private agentRegistry!: AgentRegistry;
@@ -472,6 +490,9 @@ export class Config {
     this.mcpServers = params.mcpServers;
     this.allowedMcpServers = params.allowedMcpServers ?? [];
     this.blockedMcpServers = params.blockedMcpServers ?? [];
+    this.getDisabledMcpServersFn = params.getDisabledMcpServers;
+    this.getSessionMountedMcpServersFn = params.getSessionMountedMcpServers;
+    this.getSessionUnmountedMcpServersFn = params.getSessionUnmountedMcpServers;
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
@@ -1013,6 +1034,42 @@ export class Config {
 
   getBlockedMcpServers(): string[] | undefined {
     return this.blockedMcpServers;
+  }
+
+  /**
+   * Returns the list of disabled MCP servers from settings.
+   * Disabled servers are persisted and won't auto-connect until re-enabled.
+   */
+  getDisabledMcpServers(): string[] {
+    return this.getDisabledMcpServersFn?.() ?? [];
+  }
+
+  /**
+   * Returns the list of session-mounted MCP servers.
+   * These are temporarily enabled for the current session (overrides disabled).
+   */
+  getSessionMountedMcpServers(): string[] {
+    return this.getSessionMountedMcpServersFn?.() ?? [];
+  }
+
+  /**
+   * Returns the list of session-unmounted MCP servers.
+   * These are temporarily disabled for the current session (overrides enabled).
+   */
+  getSessionUnmountedMcpServers(): string[] {
+    return this.getSessionUnmountedMcpServersFn?.() ?? [];
+  }
+
+  /**
+   * Sets the callbacks for session-mounted/unmounted MCP servers.
+   * Called by the UI layer after React state is initialized.
+   */
+  setSessionMcpCallbacks(callbacks: {
+    getSessionMounted: () => string[];
+    getSessionUnmounted: () => string[];
+  }): void {
+    this.getSessionMountedMcpServersFn = callbacks.getSessionMounted;
+    this.getSessionUnmountedMcpServersFn = callbacks.getSessionUnmounted;
   }
 
   setMcpServers(mcpServers: Record<string, MCPServerConfig>): void {

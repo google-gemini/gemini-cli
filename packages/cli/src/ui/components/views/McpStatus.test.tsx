@@ -38,6 +38,9 @@ describe('McpStatus', () => {
     prompts: [],
     resources: [],
     blockedServers: [],
+    disabledServers: [],
+    sessionMountedServers: [],
+    sessionUnmountedServers: [],
     serverStatus: () => MCPServerStatus.CONNECTED,
     authStatus: {},
     discoveryInProgress: false,
@@ -180,6 +183,25 @@ describe('McpStatus', () => {
   it('renders correctly with a connecting server', () => {
     const { lastFrame, unmount } = render(
       <McpStatus {...baseProps} connectingServers={['server-1']} />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders correctly with disabled servers', () => {
+    const { lastFrame, unmount } = render(
+      <McpStatus {...baseProps} disabledServers={['disabled-server']} />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders correctly with session unmounted servers', () => {
+    const { lastFrame, unmount } = render(
+      <McpStatus
+        {...baseProps}
+        sessionUnmountedServers={['unmounted-server']}
+      />,
     );
     expect(lastFrame()).toMatchSnapshot();
     unmount();

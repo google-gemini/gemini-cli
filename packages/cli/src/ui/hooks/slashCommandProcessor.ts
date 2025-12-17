@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useEffect, useState } from 'react';
+import { useCallback, useMemo, useEffect, useState, useRef } from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -105,6 +105,12 @@ export const useSlashCommandProcessor = (
   }>(null);
 
   const [sessionShellAllowlist, setSessionShellAllowlist] = useState(
+    new Set<string>(),
+  );
+  const [sessionMountedMcpServers, setSessionMountedMcpServers] = useState(
+    new Set<string>(),
+  );
+  const [sessionUnmountedMcpServers, setSessionUnmountedMcpServers] = useState(
     new Set<string>(),
   );
   const gitService = useMemo(() => {
@@ -224,6 +230,10 @@ export const useSlashCommandProcessor = (
       session: {
         stats: session.stats,
         sessionShellAllowlist,
+        sessionMountedMcpServers,
+        sessionUnmountedMcpServers,
+        setSessionMountedMcpServers,
+        setSessionUnmountedMcpServers,
       },
     }),
     [
@@ -242,12 +252,39 @@ export const useSlashCommandProcessor = (
       setPendingItem,
       toggleVimEnabled,
       sessionShellAllowlist,
+      sessionMountedMcpServers,
+      sessionUnmountedMcpServers,
+      setSessionMountedMcpServers,
+      setSessionUnmountedMcpServers,
       reloadCommands,
       extensionsUpdateState,
       setBannerVisible,
       setCustomDialog,
     ],
   );
+
+  const sessionMountedMcpServersRef = useRef(sessionMountedMcpServers);
+  const sessionUnmountedMcpServersRef = useRef(sessionUnmountedMcpServers);
+
+  useEffect(() => {
+    sessionMountedMcpServersRef.current = sessionMountedMcpServers;
+  }, [sessionMountedMcpServers]);
+
+  useEffect(() => {
+    sessionUnmountedMcpServersRef.current = sessionUnmountedMcpServers;
+  }, [sessionUnmountedMcpServers]);
+
+  // Wire up session MCP callbacks so McpClientManager can check session state
+  useEffect(() => {
+    if (!config) {
+      return;
+    }
+    config.setSessionMcpCallbacks({
+      getSessionMounted: () => Array.from(sessionMountedMcpServersRef.current),
+      getSessionUnmounted: () =>
+        Array.from(sessionUnmountedMcpServersRef.current),
+    });
+  }, [config]);
 
   useEffect(() => {
     if (!config) {

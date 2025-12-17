@@ -243,6 +243,12 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
     'authenticated' | 'expired' | 'unauthenticated' | 'not-configured'
   >;
   blockedServers: Array<{ name: string; extensionName: string }>;
+  /** Servers that are disabled (persistent - saved to settings) */
+  disabledServers: string[];
+  /** Servers that are mounted for this session only (overrides disabled) */
+  sessionMountedServers: string[];
+  /** Servers that are unmounted for this session only */
+  sessionUnmountedServers: string[];
   discoveryInProgress: boolean;
   connectingServers: string[];
   showDescriptions: boolean;
