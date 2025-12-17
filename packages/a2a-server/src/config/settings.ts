@@ -20,7 +20,9 @@ import stripJsonComments from 'strip-json-comments';
 export const USER_SETTINGS_DIR = path.join(homedir(), GEMINI_DIR);
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 
-// Reconcile with https://github.com/google-gemini/gemini-cli/blob/b09bc6656080d4d12e1d06734aae2ec33af5c1ed/packages/cli/src/config/settings.ts#L53
+// TODO: Ensure full compatibility with V2 nested settings structure (settings.schema.json).
+// This involves updating the interface and implementing migration logic to support legacy V1 (flat) settings,
+// similar to how packages/cli/src/config/settings.ts handles it.
 export interface Settings {
   mcpServers?: Record<string, MCPServerConfig>;
   coreTools?: string[];
@@ -29,6 +31,9 @@ export interface Settings {
   showMemoryUsage?: boolean;
   checkpointing?: CheckpointingSettings;
   folderTrust?: boolean;
+  general?: {
+    previewFeatures?: boolean;
+  };
 
   // Git-aware file filtering settings
   fileFiltering?: {
@@ -118,7 +123,7 @@ function resolveEnvVarsInString(value: string): string {
   return value.replace(envVarRegex, (match, varName1, varName2) => {
     const varName = varName1 || varName2;
     if (process && process.env && typeof process.env[varName] === 'string') {
-      return process.env[varName]!;
+      return process.env[varName];
     }
     return match;
   });

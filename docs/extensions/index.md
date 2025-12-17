@@ -1,4 +1,4 @@
-# Gemini CLI Extensions
+# Gemini CLI extensions
 
 _This documentation is up-to-date with the v0.4.0 release._
 
@@ -42,19 +42,23 @@ installed on your machine. See
 for help.
 
 ```
-gemini extensions install https://github.com/gemini-cli-extensions/security
+gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release] [--consent]
 ```
 
-This will install the Gemini CLI Security extension, which offers support for a
-`/security:analyze` command.
+- `<source>`: The github URL or local path of the extension to install.
+- `--ref`: The git ref to install from.
+- `--auto-update`: Enable auto-update for this extension.
+- `--pre-release`: Enable pre-release versions for this extension.
+- `--consent`: Acknowledge the security risks of installing an extension and
+  skip the confirmation prompt.
 
 ### Uninstalling an extension
 
-To uninstall, run `gemini extensions uninstall extension-name`, so, in the case
-of the install example:
+To uninstall one or more extensions, run
+`gemini extensions uninstall <name...>`:
 
 ```
-gemini extensions uninstall gemini-cli-security
+gemini extensions uninstall gemini-cli-security gemini-cli-another-extension
 ```
 
 ### Disabling an extension
@@ -62,37 +66,37 @@ gemini extensions uninstall gemini-cli-security
 Extensions are, by default, enabled across all workspaces. You can disable an
 extension entirely or for specific workspace.
 
-For example, `gemini extensions disable extension-name` will disable the
-extension at the user level, so it will be disabled everywhere.
-`gemini extensions disable extension-name --scope=workspace` will only disable
-the extension in the current workspace.
+```
+gemini extensions disable <name> [--scope <scope>]
+```
+
+- `<name>`: The name of the extension to disable.
+- `--scope`: The scope to disable the extension in (`user` or `workspace`).
 
 ### Enabling an extension
 
-You can enable extensions using `gemini extensions enable extension-name`. You
-can also enable an extension for a specific workspace using
-`gemini extensions enable extension-name --scope=workspace` from within that
-workspace.
+You can enable extensions using `gemini extensions enable <name>`. You can also
+enable an extension for a specific workspace using
+`gemini extensions enable <name> --scope=workspace` from within that workspace.
 
-This is useful if you have an extension disabled at the top-level and only
-enabled in specific places.
+```
+gemini extensions enable <name> [--scope <scope>]
+```
+
+- `<name>`: The name of the extension to enable.
+- `--scope`: The scope to enable the extension in (`user` or `workspace`).
 
 ### Updating an extension
 
 For extensions installed from a local path or a git repository, you can
 explicitly update to the latest version (as reflected in the
-`gemini-extension.json` `version` field) with
-`gemini extensions update extension-name`.
+`gemini-extension.json` `version` field) with `gemini extensions update <name>`.
 
 You can update all extensions with:
 
 ```
 gemini extensions update --all
 ```
-
-## Extension creation
-
-We offer commands to make extension development easier.
 
 ### Create a boilerplate extension
 
@@ -104,8 +108,11 @@ To copy one of these examples into a development directory using the type of
 your choosing, run:
 
 ```
-gemini extensions new path/to/directory custom-commands
+gemini extensions new <path> [template]
 ```
+
+- `<path>`: The path to create the extension in.
+- `[template]`: The boilerplate template to use.
 
 ### Link a local extension
 
@@ -116,8 +123,10 @@ This is useful so you don't have to run `gemini extensions update` every time
 you make changes you'd like to test.
 
 ```
-gemini extensions link path/to/directory
+gemini extensions link <path>
 ```
+
+- `<path>`: The path of the extension to link.
 
 ## How it works
 
@@ -154,11 +163,11 @@ The file has the following structure:
   your extension in the CLI. Note that we expect this name to match the
   extension directory name.
 - `version`: The version of the extension.
-- `mcpServers`: A map of MCP servers to configure. The key is the name of the
+- `mcpServers`: A map of MCP servers to settings. The key is the name of the
   server, and the value is the server configuration. These servers will be
-  loaded on startup just like MCP servers configured in a
+  loaded on startup just like MCP servers settingsd in a
   [`settings.json` file](../get-started/configuration.md). If both an extension
-  and a `settings.json` file configure an MCP server with the same name, the
+  and a `settings.json` file settings an MCP server with the same name, the
   server defined in the `settings.json` file takes precedence.
   - Note that all MCP server configuration options are supported except for
     `trust`.
@@ -179,6 +188,9 @@ precedence.
 
 ### Settings
 
+_Note: This is an experimental feature. We do not yet recommend extension
+authors introduce settings as part of their core flows._
+
 Extensions can define settings that the user will be prompted to provide upon
 installation. This is useful for things like API keys, URLs, or other
 configuration that the extension needs to function.
@@ -190,8 +202,8 @@ Each object in the array should have the following properties:
 - `description`: A description of the setting and what it's used for.
 - `envVar`: The name of the environment variable that the setting will be stored
   as.
-
-**Example**
+- `sensitive`: Optional boolean. If true, obfuscates the input the user provides
+  and stores the secret in keychain storage. **Example**
 
 ```json
 {
@@ -210,6 +222,21 @@ Each object in the array should have the following properties:
 When a user installs this extension, they will be prompted to enter their API
 key. The value will be saved to a `.env` file in the extension's directory
 (e.g., `<home>/.gemini/extensions/my-api-extension/.env`).
+
+You can view a list of an extension's settings by running:
+
+```
+gemini extensions settings list <extension name>
+```
+
+and you can update a given setting using:
+
+```
+gemini extensions settings set <extension name> <setting name> [--scope <scope>]
+```
+
+- `--scope`: The scope to set the setting in (`user` or `workspace`). This is
+  optional and will default to `user`.
 
 ### Custom commands
 

@@ -6,19 +6,19 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import type { SettingScope } from '../../../config/settings.js';
+import type { LoadableSettingScope } from '../../../config/settings.js';
 import { getScopeItems } from '../../../utils/dialogScopeUtils.js';
 import { RadioButtonSelect } from './RadioButtonSelect.js';
 
 interface ScopeSelectorProps {
   /** Callback function when a scope is selected */
-  onSelect: (scope: SettingScope) => void;
+  onSelect: (scope: LoadableSettingScope) => void;
   /** Callback function when a scope is highlighted */
-  onHighlight: (scope: SettingScope) => void;
+  onHighlight: (scope: LoadableSettingScope) => void;
   /** Whether the component is focused */
   isFocused: boolean;
   /** The initial scope to select */
-  initialScope: SettingScope;
+  initialScope: LoadableSettingScope;
 }
 
 export function ScopeSelector({

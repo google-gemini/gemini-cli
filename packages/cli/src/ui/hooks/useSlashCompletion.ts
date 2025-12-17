@@ -33,9 +33,9 @@ interface FzfCommandCacheEntry {
 function logErrorSafely(error: unknown, context: string): void {
   if (error instanceof Error) {
     // Log full error details securely for debugging
-    console.error(`[${context}]`, error);
+    debugLogger.warn(`[${context}]`, error);
   } else {
-    console.error(`[${context}] Non-error thrown:`, error);
+    debugLogger.warn(`[${context}] Non-error thrown:`, error);
   }
 }
 
@@ -159,6 +159,7 @@ interface PerfectMatchResult {
 }
 
 function useCommandSuggestions(
+  query: string | null,
   parserResult: CommandParserResult,
   commandContext: CommandContext,
   getFzfForCommands: (
@@ -207,7 +208,7 @@ function useCommandSuggestions(
               {
                 ...commandContext,
                 invocation: {
-                  raw: `/${rawParts.join(' ')}`,
+                  raw: query || `/${rawParts.join(' ')}`,
                   name: leafCommand.name,
                   args: argString,
                 },
@@ -231,6 +232,7 @@ function useCommandSuggestions(
           }
         }
       };
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       fetchAndSetSuggestions();
       return () => abortController.abort();
     }
@@ -306,7 +308,13 @@ function useCommandSuggestions(
 
     setSuggestions([]);
     return () => abortController.abort();
-  }, [parserResult, commandContext, getFzfForCommands, getPrefixSuggestions]);
+  }, [
+    query,
+    parserResult,
+    commandContext,
+    getFzfForCommands,
+    getPrefixSuggestions,
+  ]);
 
   return { suggestions, isLoading };
 }
@@ -369,6 +377,32 @@ function usePerfectMatch(
   }, [parserResult]);
 }
 
+/**
+ * Gets the SlashCommand object for a given suggestion by navigating the command hierarchy
+ * based on the current parser state.
+ * @param suggestion The suggestion object
+ * @param parserResult The current parser result with hierarchy information
+ * @returns The matching SlashCommand or undefined
+ */
+function getCommandFromSuggestion(
+  suggestion: Suggestion,
+  parserResult: CommandParserResult,
+): SlashCommand | undefined {
+  const { currentLevel } = parserResult;
+
+  if (!currentLevel) {
+    return undefined;
+  }
+
+  // suggestion.value is just the command name at the current level (e.g., "list")
+  // Find it in the current level's commands
+  const command = currentLevel.find((cmd) =>
+    matchesCommand(cmd, suggestion.value),
+  );
+
+  return command;
+}
+
 export interface UseSlashCompletionProps {
   enabled: boolean;
   query: string | null;
@@ -382,6 +416,11 @@ export interface UseSlashCompletionProps {
 export function useSlashCompletion(props: UseSlashCompletionProps): {
   completionStart: number;
   completionEnd: number;
+  getCommandFromSuggestion: (
+    suggestion: Suggestion,
+  ) => SlashCommand | undefined;
+  isArgumentCompletion: boolean;
+  leafCommand: SlashCommand | null;
 } {
   const {
     enabled,
@@ -475,6 +514,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
   // Use extracted hooks for better separation of concerns
   const parserResult = useCommandParser(query, slashCommands);
   const { suggestions: hookSuggestions, isLoading } = useCommandSuggestions(
+    query,
     parserResult,
     commandContext,
     getFzfForCommands,
@@ -503,7 +543,11 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
       return;
     }
 
-    setSuggestions(hookSuggestions);
+    if (isPerfectMatch) {
+      setSuggestions([]);
+    } else {
+      setSuggestions(hookSuggestions);
+    }
     setIsLoadingSuggestions(isLoading);
     setIsPerfectMatch(isPerfectMatch);
     setCompletionStart(calculatedStart);
@@ -524,5 +568,9 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
   return {
     completionStart,
     completionEnd,
+    getCommandFromSuggestion: (suggestion: Suggestion) =>
+      getCommandFromSuggestion(suggestion, parserResult),
+    isArgumentCompletion: parserResult.isArgumentCompletion,
+    leafCommand: parserResult.leafCommand,
   };
 }

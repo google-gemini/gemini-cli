@@ -6,11 +6,15 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type { ToolCall, WaitingToolCall } from './coreToolScheduler.js';
 import {
   CoreToolScheduler,
   convertToFunctionResponse,
   truncateAndSaveToFile,
+} from './coreToolScheduler.js';
+import type {
+  ToolCall,
+  WaitingToolCall,
+  ErroredToolCall,
 } from './coreToolScheduler.js';
 import type {
   ToolCallConfirmationDetails,
@@ -29,16 +33,23 @@ import {
   ToolConfirmationOutcome,
   Kind,
   ApprovalMode,
+  HookSystem,
 } from '../index.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import type { Part, PartListUnion } from '@google/genai';
 import {
   MockModifiableTool,
   MockTool,
   MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
 } from '../test-utils/mock-tool.js';
+import * as modifiableToolModule from '../tools/modifiable-tool.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { isShellInvocationAllowlisted } from '../utils/shell-utils.js';
+import { isShellInvocationAllowlisted } from '../utils/shell-permissions.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL,
+} from '../config/models.js';
 
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
@@ -209,6 +220,58 @@ async function waitForStatus(
   });
 }
 
+function createMockConfig(overrides: Partial<Config> = {}): Config {
+  const defaultToolRegistry = {
+    getTool: () => undefined,
+    getToolByName: () => undefined,
+    getFunctionDeclarations: () => [],
+    tools: new Map(),
+    discovery: {},
+    registerTool: () => {},
+    getToolByDisplayName: () => undefined,
+    getTools: () => [],
+    discoverTools: async () => {},
+    getAllTools: () => [],
+    getToolsByServer: () => [],
+    getExperiments: () => {},
+  } as unknown as ToolRegistry;
+
+  const baseConfig = {
+    getSessionId: () => 'test-session-id',
+    getUsageStatisticsEnabled: () => true,
+    getDebugMode: () => false,
+    isInteractive: () => true,
+    getApprovalMode: () => ApprovalMode.DEFAULT,
+    setApprovalMode: () => {},
+    getAllowedTools: () => [],
+    getContentGeneratorConfig: () => ({
+      model: 'test-model',
+      authType: 'oauth-personal',
+    }),
+    getShellExecutionConfig: () => ({
+      terminalWidth: 90,
+      terminalHeight: 30,
+    }),
+    storage: {
+      getProjectTempDir: () => '/tmp',
+    },
+    getTruncateToolOutputThreshold: () =>
+      DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+    getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+    getToolRegistry: () => defaultToolRegistry,
+    getActiveModel: () => DEFAULT_GEMINI_MODEL,
+    getUseSmartEdit: () => false,
+    getGeminiClient: () => null,
+    getEnableMessageBusIntegration: () => false,
+    getMessageBus: () => null,
+    getEnableHooks: () => false,
+    getPolicyEngine: () => null,
+    getExperiments: () => {},
+  } as unknown as Config;
+
+  return { ...baseConfig, ...overrides } as Config;
+}
+
 describe('CoreToolScheduler', () => {
   it('should cancel a tool call if the signal is aborted before confirmation', async () => {
     const mockTool = new MockTool({
@@ -233,41 +296,16 @@ describe('CoreToolScheduler', () => {
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
 
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.DEFAULT,
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+    const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
+      isInteractive: () => false,
+    });
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -323,41 +361,16 @@ describe('CoreToolScheduler', () => {
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
 
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.DEFAULT,
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+    const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
+      getHookSystem: () => undefined,
+    });
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -449,41 +462,16 @@ describe('CoreToolScheduler', () => {
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
 
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.DEFAULT,
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+    const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
+      getHookSystem: () => undefined,
+    });
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -570,41 +558,16 @@ describe('CoreToolScheduler', () => {
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
 
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.DEFAULT,
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+    const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null,
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
+      isInteractive: () => false,
+    });
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const request = {
@@ -627,27 +590,82 @@ describe('CoreToolScheduler', () => {
     expect(statuses).not.toContain('error');
   });
 
+  it('should error when tool requires confirmation in non-interactive mode', async () => {
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
+    const declarativeTool = mockTool;
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByName: () => declarativeTool,
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+      isInteractive: () => false,
+    });
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: 'mockTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-1',
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls[0].status).toBe('error');
+
+    const erroredCall = completedCalls[0] as ErroredToolCall;
+    const errorResponse = erroredCall.response;
+    const errorParts = errorResponse.responseParts;
+    // @ts-expect-error - accessing internal structure of FunctionResponsePart
+    const errorMessage = errorParts[0].functionResponse.response.error;
+    expect(errorMessage).toContain(
+      'Tool execution for "mockTool" requires user confirmation, which is not supported in non-interactive mode.',
+    );
+  });
+
   describe('getToolSuggestion', () => {
     it('should suggest the top N closest tool names for a typo', () => {
       // Create mocked tool registry
       const mockToolRegistry = {
         getAllToolNames: () => ['list_files', 'read_file', 'write_file'],
       } as unknown as ToolRegistry;
-      const mockConfig = {
+      const mockConfig = createMockConfig({
         getToolRegistry: () => mockToolRegistry,
-        getUseSmartEdit: () => false,
-        getUseModelRouter: () => false,
-        getGeminiClient: () => null, // No client needed for these tests
-        getEnableMessageBusIntegration: () => false,
-        getMessageBus: () => null,
-        getPolicyEngine: () => null,
-      } as unknown as Config;
+        isInteractive: () => false,
+      });
 
       // Create scheduler
       const scheduler = new CoreToolScheduler({
         config: mockConfig,
         getPreferredEditor: () => 'vscode',
-        onEditorClose: vi.fn(),
       });
 
       // Test that the right tool is selected, with only 1 result, for typos
@@ -692,41 +710,21 @@ describe('CoreToolScheduler with payload', () => {
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
 
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.DEFAULT,
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+    const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -774,7 +772,12 @@ describe('convertToFunctionResponse', () => {
 
   it('should handle simple string llmContent', () => {
     const llmContent = 'Simple text output';
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      DEFAULT_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
@@ -788,7 +791,12 @@ describe('convertToFunctionResponse', () => {
 
   it('should handle llmContent as a single Part with text', () => {
     const llmContent: Part = { text: 'Text from Part object' };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      DEFAULT_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
@@ -802,7 +810,12 @@ describe('convertToFunctionResponse', () => {
 
   it('should handle llmContent as a PartListUnion array with a single text Part', () => {
     const llmContent: PartListUnion = [{ text: 'Text from array' }];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      DEFAULT_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
@@ -814,42 +827,120 @@ describe('convertToFunctionResponse', () => {
     ]);
   });
 
-  it('should handle llmContent with inlineData', () => {
-    const llmContent: Part = {
-      inlineData: { mimeType: 'image/png', data: 'base64...' },
-    };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+  it('should handle llmContent as a PartListUnion array with multiple Parts', () => {
+    const llmContent: PartListUnion = [{ text: 'part1' }, { text: 'part2' }];
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      DEFAULT_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: {
-            output: 'Binary content of type image/png was processed.',
-          },
+          response: { output: 'part1\npart2' },
+        },
+      },
+    ]);
+  });
+
+  it('should handle llmContent with fileData for Gemini 3 model (should be siblings)', () => {
+    const llmContent: Part = {
+      fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
+    };
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
+    expect(result).toEqual([
+      {
+        functionResponse: {
+          name: toolName,
+          id: callId,
+          response: { output: 'Binary content provided (1 item(s)).' },
         },
       },
       llmContent,
     ]);
   });
 
-  it('should handle llmContent with fileData', () => {
+  it('should handle llmContent with inlineData for Gemini 3 model (should be nested)', () => {
     const llmContent: Part = {
-      fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
+      inlineData: { mimeType: 'image/png', data: 'base64...' },
     };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: {
-            output: 'Binary content of type application/pdf was processed.',
-          },
+          response: { output: 'Binary content provided (1 item(s)).' },
+          parts: [llmContent],
+        },
+      },
+    ]);
+  });
+
+  it('should handle llmContent with fileData for non-Gemini 3 models', () => {
+    const llmContent: Part = {
+      fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
+    };
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      DEFAULT_GEMINI_MODEL,
+    );
+    expect(result).toEqual([
+      {
+        functionResponse: {
+          name: toolName,
+          id: callId,
+          response: { output: 'Binary content provided (1 item(s)).' },
         },
       },
       llmContent,
     ]);
+  });
+
+  it('should preserve existing functionResponse metadata', () => {
+    const innerId = 'inner-call-id';
+    const innerName = 'inner-tool-name';
+    const responseMetadata = {
+      flags: ['flag1'],
+      isError: false,
+      customData: { key: 'value' },
+    };
+    const input: Part = {
+      functionResponse: {
+        id: innerId,
+        name: innerName,
+        response: responseMetadata,
+      },
+    };
+
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      input,
+      DEFAULT_GEMINI_MODEL,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].functionResponse).toEqual({
+      id: callId,
+      name: toolName,
+      response: responseMetadata,
+    });
   });
 
   it('should handle llmContent as an array of multiple Parts (text and inlineData)', () => {
@@ -858,16 +949,25 @@ describe('convertToFunctionResponse', () => {
       { inlineData: { mimeType: 'image/jpeg', data: 'base64data...' } },
       { text: 'Another text part' },
     ];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { output: 'Tool execution succeeded.' },
+          response: {
+            output: 'Some textual description\nAnother text part',
+          },
+          parts: [
+            { inlineData: { mimeType: 'image/jpeg', data: 'base64data...' } },
+          ],
         },
       },
-      ...llmContent,
     ]);
   });
 
@@ -875,30 +975,38 @@ describe('convertToFunctionResponse', () => {
     const llmContent: PartListUnion = [
       { inlineData: { mimeType: 'image/gif', data: 'gifdata...' } },
     ];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: {
-            output: 'Binary content of type image/gif was processed.',
-          },
+          response: { output: 'Binary content provided (1 item(s)).' },
+          parts: llmContent,
         },
       },
-      ...llmContent,
     ]);
   });
 
   it('should handle llmContent as a generic Part (not text, inlineData, or fileData)', () => {
     const llmContent: Part = { functionCall: { name: 'test', args: {} } };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { output: 'Tool execution succeeded.' },
+          response: {},
         },
       },
     ]);
@@ -906,7 +1014,12 @@ describe('convertToFunctionResponse', () => {
 
   it('should handle empty string llmContent', () => {
     const llmContent = '';
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
@@ -920,13 +1033,18 @@ describe('convertToFunctionResponse', () => {
 
   it('should handle llmContent as an empty array', () => {
     const llmContent: PartListUnion = [];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { output: 'Tool execution succeeded.' },
+          response: {},
         },
       },
     ]);
@@ -934,13 +1052,18 @@ describe('convertToFunctionResponse', () => {
 
   it('should handle llmContent as a Part with undefined inlineData/fileData/text', () => {
     const llmContent: Part = {}; // An empty part object
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { output: 'Tool execution succeeded.' },
+          response: {},
         },
       },
     ]);
@@ -1018,38 +1141,21 @@ describe('CoreToolScheduler edit cancellation', () => {
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
 
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.DEFAULT,
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
+    const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1124,41 +1230,23 @@ describe('CoreToolScheduler YOLO mode', () => {
     const onToolCallsUpdate = vi.fn();
 
     // Configure the scheduler for YOLO mode.
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.YOLO,
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
+    const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
+      getApprovalMode: () => ApprovalMode.YOLO,
+      isInteractive: () => false,
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1234,41 +1322,23 @@ describe('CoreToolScheduler request queueing', () => {
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
 
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+    const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
+      getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
+      isInteractive: () => false,
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1288,6 +1358,7 @@ describe('CoreToolScheduler request queueing', () => {
     };
 
     // Schedule the first call, which will pause execution.
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     scheduler.schedule([request1], abortController.signal);
 
     // Wait for the first call to be in the 'executing' state.
@@ -1361,49 +1432,33 @@ describe('CoreToolScheduler request queueing', () => {
       discoverTools: async () => {},
       getAllTools: () => [],
       getToolsByServer: () => [],
-    };
+    } as unknown as ToolRegistry;
 
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
 
     // Configure the scheduler to auto-approve the specific tool call.
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.DEFAULT, // Not YOLO mode
+    const mockConfig = createMockConfig({
       getAllowedTools: () => ['mockTool'], // Auto-approve this tool
       getToolRegistry: () => toolRegistry,
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
       getShellExecutionConfig: () => ({
         terminalWidth: 80,
         terminalHeight: 24,
       }),
-      getTerminalWidth: vi.fn(() => 80),
-      getTerminalHeight: vi.fn(() => 24),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
+      isInteractive: () => false,
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1491,48 +1546,26 @@ describe('CoreToolScheduler request queueing', () => {
       discoverTools: async () => {},
       getAllTools: () => [],
       getToolsByServer: () => [],
-    };
+    } as unknown as ToolRegistry;
 
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
 
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.DEFAULT,
+    const mockConfig = createMockConfig({
       getAllowedTools: () => ['run_shell_command(git)'],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
       getShellExecutionConfig: () => ({
         terminalWidth: 80,
         terminalHeight: 24,
       }),
-      getTerminalWidth: vi.fn(() => 80),
-      getTerminalHeight: vi.fn(() => 24),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => toolRegistry,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null,
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
+      getHookSystem: () => undefined,
+    });
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1553,7 +1586,7 @@ describe('CoreToolScheduler request queueing', () => {
     expect(statusUpdates).toContain('awaiting_approval');
     expect(executeFn).not.toHaveBeenCalled();
     expect(onAllToolCallsComplete).not.toHaveBeenCalled();
-  });
+  }, 20000);
 
   it('should handle two synchronous calls to schedule', async () => {
     const executeFn = vi.fn().mockResolvedValue({
@@ -1578,41 +1611,22 @@ describe('CoreToolScheduler request queueing', () => {
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
 
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.YOLO,
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+    const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
+      getApprovalMode: () => ApprovalMode.YOLO,
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1655,32 +1669,18 @@ describe('CoreToolScheduler request queueing', () => {
 
   it('should auto-approve remaining tool calls when first tool call is approved with ProceedAlways', async () => {
     let approvalMode = ApprovalMode.DEFAULT;
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
+    const mockConfig = createMockConfig({
       getApprovalMode: () => approvalMode,
-      getAllowedTools: () => [],
       setApprovalMode: (mode: ApprovalMode) => {
         approvalMode = mode;
       },
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const testTool = new TestApprovalTool(mockConfig);
     const toolRegistry = {
@@ -1720,7 +1720,7 @@ describe('CoreToolScheduler request queueing', () => {
         // Capture confirmation handlers for awaiting_approval tools
         toolCalls.forEach((call) => {
           if (call.status === 'awaiting_approval') {
-            const waitingCall = call as WaitingToolCall;
+            const waitingCall = call;
             if (waitingCall.confirmationDetails?.onConfirm) {
               const originalHandler = pendingConfirmations.find(
                 (h) => h === waitingCall.confirmationDetails.onConfirm,
@@ -1735,7 +1735,6 @@ describe('CoreToolScheduler request queueing', () => {
         });
       },
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1848,40 +1847,23 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
 
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
+    const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null,
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-    } as unknown as Config;
+      getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
+      isInteractive: () => false,
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1970,40 +1952,23 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
 
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.YOLO,
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
+    const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null,
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-    } as unknown as Config;
+      getApprovalMode: () => ApprovalMode.YOLO,
+      isInteractive: () => false,
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const requests = [
@@ -2065,6 +2030,89 @@ describe('CoreToolScheduler Sequential Execution', () => {
     expect(call1?.status).toBe('success');
     expect(call2?.status).toBe('cancelled');
     expect(call3?.status).toBe('cancelled');
+  });
+
+  it('should pass confirmation diff data into modifyWithEditor overrides', async () => {
+    const modifyWithEditorSpy = vi
+      .spyOn(modifiableToolModule, 'modifyWithEditor')
+      .mockResolvedValue({
+        updatedParams: { param: 'updated' },
+        updatedDiff: 'updated diff',
+      });
+
+    const mockModifiableTool = new MockModifiableTool('mockModifiableTool');
+    const mockToolRegistry = {
+      getTool: () => mockModifiableTool,
+      getToolByName: () => mockModifiableTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByDisplayName: () => mockModifiableTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+
+    await scheduler.schedule(
+      [
+        {
+          callId: '1',
+          name: 'mockModifiableTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      ],
+      abortController.signal,
+    );
+
+    const toolCall = (scheduler as unknown as { toolCalls: ToolCall[] })
+      .toolCalls[0] as WaitingToolCall;
+    expect(toolCall.status).toBe('awaiting_approval');
+
+    const confirmationSignal = new AbortController().signal;
+    await scheduler.handleConfirmationResponse(
+      toolCall.request.callId,
+      async () => {},
+      ToolConfirmationOutcome.ModifyWithEditor,
+      confirmationSignal,
+    );
+
+    expect(modifyWithEditorSpy).toHaveBeenCalled();
+    const overrides =
+      modifyWithEditorSpy.mock.calls[
+        modifyWithEditorSpy.mock.calls.length - 1
+      ][4];
+    expect(overrides).toEqual({
+      currentContent: 'originalContent',
+      proposedContent: 'newContent',
+    });
+
+    modifyWithEditorSpy.mockRestore();
   });
 });
 

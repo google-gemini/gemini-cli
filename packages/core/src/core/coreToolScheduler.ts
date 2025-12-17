@@ -29,7 +29,7 @@ import {
 } from '../index.js';
 import { READ_FILE_TOOL_NAME, SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import type { Part, PartListUnion } from '@google/genai';
-import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
+import { supportsMultimodalFunctionResponse } from '../config/models.js';
 import type { ModifyContext } from '../tools/modifiable-tool.js';
 import {
   isModifiableDeclarativeTool,
@@ -38,16 +38,19 @@ import {
 import * as Diff from 'diff';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import {
-  isShellInvocationAllowlisted,
-  SHELL_TOOL_NAMES,
-} from '../utils/shell-utils.js';
+import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
 import { doesToolInvocationMatch } from '../utils/tool-utils.js';
+import { isShellInvocationAllowlisted } from '../utils/shell-permissions.js';
 import levenshtein from 'fast-levenshtein';
 import { ShellToolInvocation } from '../tools/shell.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import {
+  fireToolNotificationHook,
+  executeToolWithHooks,
+} from './coreToolHookTriggers.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -169,61 +172,85 @@ export function convertToFunctionResponse(
   toolName: string,
   callId: string,
   llmContent: PartListUnion,
+  model: string,
 ): Part[] {
-  const contentToProcess =
-    Array.isArray(llmContent) && llmContent.length === 1
-      ? llmContent[0]
-      : llmContent;
-
-  if (typeof contentToProcess === 'string') {
-    return [createFunctionResponsePart(callId, toolName, contentToProcess)];
+  if (typeof llmContent === 'string') {
+    return [createFunctionResponsePart(callId, toolName, llmContent)];
   }
 
-  if (Array.isArray(contentToProcess)) {
-    const functionResponse = createFunctionResponsePart(
-      callId,
-      toolName,
-      'Tool execution succeeded.',
-    );
-    return [functionResponse, ...toParts(contentToProcess)];
-  }
+  const parts = toParts(llmContent);
 
-  // After this point, contentToProcess is a single Part object.
-  if (contentToProcess.functionResponse) {
-    if (contentToProcess.functionResponse.response?.['content']) {
-      const stringifiedOutput =
-        getResponseTextFromParts(
-          contentToProcess.functionResponse.response['content'] as Part[],
-        ) || '';
-      return [createFunctionResponsePart(callId, toolName, stringifiedOutput)];
+  // Separate text from binary types
+  const textParts: string[] = [];
+  const inlineDataParts: Part[] = [];
+  const fileDataParts: Part[] = [];
+
+  for (const part of parts) {
+    if (part.text !== undefined) {
+      textParts.push(part.text);
+    } else if (part.inlineData) {
+      inlineDataParts.push(part);
+    } else if (part.fileData) {
+      fileDataParts.push(part);
+    } else if (part.functionResponse) {
+      if (parts.length > 1) {
+        debugLogger.warn(
+          'convertToFunctionResponse received multiple parts with a functionResponse. Only the functionResponse will be used, other parts will be ignored',
+        );
+      }
+      // Handle passthrough case
+      return [
+        {
+          functionResponse: {
+            id: callId,
+            name: toolName,
+            response: part.functionResponse.response,
+          },
+        },
+      ];
     }
-    // It's a functionResponse that we should pass through as is.
-    return [contentToProcess];
+    // Ignore other part types
   }
 
-  if (contentToProcess.inlineData || contentToProcess.fileData) {
-    const mimeType =
-      contentToProcess.inlineData?.mimeType ||
-      contentToProcess.fileData?.mimeType ||
-      'unknown';
-    const functionResponse = createFunctionResponsePart(
-      callId,
-      toolName,
-      `Binary content of type ${mimeType} was processed.`,
-    );
-    return [functionResponse, contentToProcess];
+  // Build the primary response part
+  const part: Part = {
+    functionResponse: {
+      id: callId,
+      name: toolName,
+      response: textParts.length > 0 ? { output: textParts.join('\n') } : {},
+    },
+  };
+
+  const isMultimodalFRSupported = supportsMultimodalFunctionResponse(model);
+  const siblingParts: Part[] = [...fileDataParts];
+
+  if (inlineDataParts.length > 0) {
+    if (isMultimodalFRSupported) {
+      // Nest inlineData if supported by the model
+      (part.functionResponse as unknown as { parts: Part[] }).parts =
+        inlineDataParts;
+    } else {
+      // Otherwise treat as siblings
+      siblingParts.push(...inlineDataParts);
+    }
   }
 
-  if (contentToProcess.text !== undefined) {
-    return [
-      createFunctionResponsePart(callId, toolName, contentToProcess.text),
-    ];
+  // Add descriptive text if the response object is empty but we have binary content
+  if (
+    textParts.length === 0 &&
+    (inlineDataParts.length > 0 || fileDataParts.length > 0)
+  ) {
+    const totalBinaryItems = inlineDataParts.length + fileDataParts.length;
+    part.functionResponse!.response = {
+      output: `Binary content provided (${totalBinaryItems} item(s)).`,
+    };
   }
 
-  // Default case for other kinds of parts.
-  return [
-    createFunctionResponsePart(callId, toolName, 'Tool execution succeeded.'),
-  ];
+  if (siblingParts.length > 0) {
+    return [part, ...siblingParts];
+  }
+
+  return [part];
 }
 
 function toParts(input: PartListUnion): Part[] {
@@ -329,7 +356,6 @@ interface CoreToolSchedulerOptions {
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
   getPreferredEditor: () => EditorType | undefined;
-  onEditorClose: () => void;
 }
 
 export class CoreToolScheduler {
@@ -346,7 +372,6 @@ export class CoreToolScheduler {
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
-  private onEditorClose: () => void;
   private isFinalizingToolCalls = false;
   private isScheduling = false;
   private isCancelling = false;
@@ -365,7 +390,6 @@ export class CoreToolScheduler {
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
-    this.onEditorClose = options.onEditorClose;
 
     // Subscribe to message bus for ASK_USER policy decisions
     // Use a static WeakMap to ensure we only subscribe ONCE per MessageBus instance
@@ -380,6 +404,7 @@ export class CoreToolScheduler {
         const sharedHandler = (request: ToolConfirmationRequest) => {
           // When ASK_USER policy decision is made, respond with requiresUserConfirmation=true
           // to tell tools to use their legacy confirmation flow
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           messageBus.publish({
             type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
             correlationId: request.correlationId,
@@ -506,7 +531,7 @@ export class CoreToolScheduler {
           // Preserve diff for cancelled edit operations
           let resultDisplay: ToolResultDisplay | undefined = undefined;
           if (currentCall.status === 'awaiting_approval') {
-            const waitingCall = currentCall as WaitingToolCall;
+            const waitingCall = currentCall;
             if (waitingCall.confirmationDetails.type === 'edit') {
               resultDisplay = {
                 fileDiff: waitingCall.confirmationDetails.fileDiff,
@@ -870,13 +895,29 @@ export class CoreToolScheduler {
             );
             this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
           } else {
+            if (!this.config.isInteractive()) {
+              throw new Error(
+                `Tool execution for "${
+                  toolCall.tool.displayName || toolCall.tool.name
+                }" requires user confirmation, which is not supported in non-interactive mode.`,
+              );
+            }
+            // Fire Notification hook before showing confirmation to user
+            const messageBus = this.config.getMessageBus();
+            const hooksEnabled = this.config.getEnableHooks();
+            if (hooksEnabled && messageBus) {
+              await fireToolNotificationHook(messageBus, confirmationDetails);
+            }
+
             // Allow IDE to resolve confirmation
             if (
               confirmationDetails.type === 'edit' &&
               confirmationDetails.ideConfirmation
             ) {
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
               confirmationDetails.ideConfirmation.then((resolution) => {
                 if (resolution.status === 'accepted') {
+                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
                   this.handleConfirmationResponse(
                     reqInfo.callId,
                     confirmationDetails.onConfirm,
@@ -884,6 +925,7 @@ export class CoreToolScheduler {
                     signal,
                   );
                 } else {
+                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
                   this.handleConfirmationResponse(
                     reqInfo.callId,
                     confirmationDetails.onConfirm,
@@ -979,6 +1021,15 @@ export class CoreToolScheduler {
           isModifying: true,
         } as ToolCallConfirmationDetails);
 
+        const contentOverrides =
+          waitingToolCall.confirmationDetails.type === 'edit'
+            ? {
+                currentContent:
+                  waitingToolCall.confirmationDetails.originalContent,
+                proposedContent: waitingToolCall.confirmationDetails.newContent,
+              }
+            : undefined;
+
         const { updatedParams, updatedDiff } = await modifyWithEditor<
           typeof waitingToolCall.request.args
         >(
@@ -986,7 +1037,7 @@ export class CoreToolScheduler {
           modifyContext as ModifyContext<typeof waitingToolCall.request.args>,
           editorType,
           signal,
-          this.onEditorClose,
+          contentOverrides,
         );
         this.setArgsInternal(callId, updatedParams);
         this.setStatusInternal(callId, 'awaiting_approval', signal, {
@@ -1097,6 +1148,8 @@ export class CoreToolScheduler {
             : undefined;
 
         const shellExecutionConfig = this.config.getShellExecutionConfig();
+        const hooksEnabled = this.config.getEnableHooks();
+        const messageBus = this.config.getMessageBus();
 
         await runInDevTraceSpan(
           {
@@ -1121,15 +1174,23 @@ export class CoreToolScheduler {
                 );
                 this.notifyToolCallsUpdate();
               };
-              promise = invocation.execute(
+              promise = executeToolWithHooks(
+                invocation,
+                toolName,
                 signal,
+                messageBus,
+                hooksEnabled,
                 liveOutputCallback,
                 shellExecutionConfig,
                 setPidCallback,
               );
             } else {
-              promise = invocation.execute(
+              promise = executeToolWithHooks(
+                invocation,
+                toolName,
                 signal,
+                messageBus,
+                hooksEnabled,
                 liveOutputCallback,
                 shellExecutionConfig,
               );
@@ -1192,6 +1253,7 @@ export class CoreToolScheduler {
                   toolName,
                   callId,
                   content,
+                  this.config.getActiveModel(),
                 );
                 const successResponse: ToolCallResponseInfo = {
                   callId,

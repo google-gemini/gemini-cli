@@ -14,25 +14,28 @@ import {
   getErrorMessage,
 } from '@google/gemini-cli-core';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 interface EnableArgs {
   name: string;
   scope?: string;
 }
 
-export function handleEnable(args: EnableArgs) {
+export async function handleEnable(args: EnableArgs) {
   const workingDir = process.cwd();
   const extensionManager = new ExtensionManager({
     workspaceDir: workingDir,
     requestConsent: requestConsentNonInteractive,
     requestSetting: promptForSetting,
-    loadedSettings: loadSettings(workingDir),
+    settings: loadSettings(workingDir).merged,
   });
+  await extensionManager.loadExtensions();
+
   try {
     if (args.scope?.toLowerCase() === 'workspace') {
-      extensionManager.enableExtension(args.name, SettingScope.Workspace);
+      await extensionManager.enableExtension(args.name, SettingScope.Workspace);
     } else {
-      extensionManager.enableExtension(args.name, SettingScope.User);
+      await extensionManager.enableExtension(args.name, SettingScope.User);
     }
     if (args.scope) {
       debugLogger.log(
@@ -67,7 +70,7 @@ export const enableCommand: CommandModule = {
           argv.scope &&
           !Object.values(SettingScope)
             .map((s) => s.toLowerCase())
-            .includes((argv.scope as string).toLowerCase())
+            .includes(argv.scope.toLowerCase())
         ) {
           throw new Error(
             `Invalid scope: ${argv.scope}. Please use one of ${Object.values(
@@ -79,10 +82,11 @@ export const enableCommand: CommandModule = {
         }
         return true;
       }),
-  handler: (argv) => {
-    handleEnable({
+  handler: async (argv) => {
+    await handleEnable({
       name: argv['name'] as string,
       scope: argv['scope'] as string,
     });
+    await exitCli();
   },
 };

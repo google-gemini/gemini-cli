@@ -8,19 +8,27 @@ import type { Content } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { type ChatCompressionInfo, CompressionStatus } from '../core/turn.js';
-import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import { getCompressionPrompt } from '../core/prompts.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { logChatCompression } from '../telemetry/loggers.js';
 import { makeChatCompressionEvent } from '../telemetry/types.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
+import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
+import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL,
+} from '../config/models.js';
+import { firePreCompressHook } from '../core/sessionHookTriggers.js';
+import { PreCompressTrigger } from '../hooks/types.js';
 
 /**
- * Threshold for compression token count as a fraction of the model's token limit.
- * If the chat history exceeds this threshold, it will be compressed.
+ * Default threshold for compression token count as a fraction of the model's
+ * token limit. If the chat history exceeds this threshold, it will be compressed.
  */
-export const COMPRESSION_TOKEN_THRESHOLD = 0.7;
+export const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.5;
 
 /**
  * The fraction of the latest chat history to keep. A value of 0.3
@@ -76,6 +84,21 @@ export function findCompressSplitPoint(
   return lastSplitPoint;
 }
 
+export function modelStringToModelConfigAlias(model: string): string {
+  switch (model) {
+    case PREVIEW_GEMINI_MODEL:
+      return 'chat-compression-3-pro';
+    case DEFAULT_GEMINI_MODEL:
+      return 'chat-compression-2.5-pro';
+    case DEFAULT_GEMINI_FLASH_MODEL:
+      return 'chat-compression-2.5-flash';
+    case DEFAULT_GEMINI_FLASH_LITE_MODEL:
+      return 'chat-compression-2.5-flash-lite';
+    default:
+      return 'chat-compression-default';
+  }
+}
+
 export class ChatCompressionService {
   async compress(
     chat: GeminiChat,
@@ -102,15 +125,24 @@ export class ChatCompressionService {
       };
     }
 
-    const originalTokenCount = uiTelemetryService.getLastPromptTokenCount();
+    // Fire PreCompress hook before compression (only if hooks are enabled)
+    // This fires for both manual and auto compression attempts
+    const hooksEnabled = config.getEnableHooks();
+    const messageBus = config.getMessageBus();
+    if (hooksEnabled && messageBus) {
+      const trigger = force
+        ? PreCompressTrigger.Manual
+        : PreCompressTrigger.Auto;
+      await firePreCompressHook(messageBus, trigger);
+    }
 
-    const contextPercentageThreshold =
-      config.getChatCompression()?.contextPercentageThreshold;
+    const originalTokenCount = chat.getLastPromptTokenCount();
 
     // Don't compress if not forced and we are under the limit.
     if (!force) {
       const threshold =
-        contextPercentageThreshold ?? COMPRESSION_TOKEN_THRESHOLD;
+        (await config.getCompressionThreshold()) ??
+        DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
       if (originalTokenCount < threshold * tokenLimit(model)) {
         return {
           newHistory: null,
@@ -142,26 +174,24 @@ export class ChatCompressionService {
       };
     }
 
-    const summaryResponse = await config.getContentGenerator().generateContent(
-      {
-        model,
-        contents: [
-          ...historyToCompress,
-          {
-            role: 'user',
-            parts: [
-              {
-                text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
-              },
-            ],
-          },
-        ],
-        config: {
-          systemInstruction: { text: getCompressionPrompt() },
+    const summaryResponse = await config.getBaseLlmClient().generateContent({
+      modelConfigKey: { model: modelStringToModelConfigAlias(model) },
+      contents: [
+        ...historyToCompress,
+        {
+          role: 'user',
+          parts: [
+            {
+              text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+            },
+          ],
         },
-      },
+      ],
+      systemInstruction: { text: getCompressionPrompt() },
       promptId,
-    );
+      // TODO(joshualitt): wire up a sensible abort signal,
+      abortSignal: new AbortController().signal,
+    });
     const summary = getResponseText(summaryResponse) ?? '';
 
     const extraHistory: Content[] = [
@@ -179,12 +209,10 @@ export class ChatCompressionService {
     // Use a shared utility to construct the initial history for an accurate token count.
     const fullNewHistory = await getInitialChatHistory(config, extraHistory);
 
-    // Estimate token count 1 token ≈ 4 characters
-    const newTokenCount = Math.floor(
-      fullNewHistory.reduce(
-        (total, content) => total + JSON.stringify(content).length,
-        0,
-      ) / 4,
+    const newTokenCount = await calculateRequestTokenCount(
+      fullNewHistory.flatMap((c) => c.parts || []),
+      config.getContentGenerator(),
+      model,
     );
 
     logChatCompression(
@@ -206,7 +234,6 @@ export class ChatCompressionService {
         },
       };
     } else {
-      uiTelemetryService.setLastPromptTokenCount(newTokenCount);
       return {
         newHistory: extraHistory,
         info: {

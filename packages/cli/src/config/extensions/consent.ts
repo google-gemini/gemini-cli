@@ -45,7 +45,7 @@ export async function requestConsentInteractive(
   consentDescription: string,
   addExtensionUpdateConfirmationRequest: (value: ConfirmationRequest) => void,
 ): Promise<boolean> {
-  return await promptForConsentInteractive(
+  return promptForConsentInteractive(
     consentDescription + '\n\nDo you want to continue?',
     addExtensionUpdateConfirmationRequest,
   );
@@ -89,7 +89,7 @@ async function promptForConsentInteractive(
   prompt: string,
   addExtensionUpdateConfirmationRequest: (value: ConfirmationRequest) => void,
 ): Promise<boolean> {
-  return await new Promise<boolean>((resolve) => {
+  return new Promise<boolean>((resolve) => {
     addExtensionUpdateConfirmationRequest({
       prompt,
       onConfirm: (resolvedConfirmed) => {
@@ -103,7 +103,10 @@ async function promptForConsentInteractive(
  * Builds a consent string for installing an extension based on it's
  * extensionConfig.
  */
-function extensionConsentString(extensionConfig: ExtensionConfig): string {
+function extensionConsentString(
+  extensionConfig: ExtensionConfig,
+  hasHooks: boolean,
+): string {
   const sanitizedConfig = escapeAnsiCtrlCodes(extensionConfig);
   const output: string[] = [];
   const mcpServerEntries = Object.entries(sanitizedConfig.mcpServers || {});
@@ -130,6 +133,11 @@ function extensionConsentString(extensionConfig: ExtensionConfig): string {
       `This extension will exclude the following core tools: ${sanitizedConfig.excludeTools}`,
     );
   }
+  if (hasHooks) {
+    output.push(
+      '⚠️  This extension contains Hooks which can automatically execute commands.',
+    );
+  }
   return output.join('\n');
 }
 
@@ -145,12 +153,15 @@ function extensionConsentString(extensionConfig: ExtensionConfig): string {
 export async function maybeRequestConsentOrFail(
   extensionConfig: ExtensionConfig,
   requestConsent: (consent: string) => Promise<boolean>,
+  hasHooks: boolean,
   previousExtensionConfig?: ExtensionConfig,
+  previousHasHooks?: boolean,
 ) {
-  const extensionConsent = extensionConsentString(extensionConfig);
+  const extensionConsent = extensionConsentString(extensionConfig, hasHooks);
   if (previousExtensionConfig) {
     const previousExtensionConsent = extensionConsentString(
       previousExtensionConfig,
+      previousHasHooks ?? false,
     );
     if (previousExtensionConsent === extensionConsent) {
       return;

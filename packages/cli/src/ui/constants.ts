@@ -18,6 +18,14 @@ export const SHELL_COMMAND_NAME = 'Shell Command';
 
 export const SHELL_NAME = 'Shell';
 
+// Limit Gemini messages to a very high number of lines to mitigate performance
+// issues in the worst case if we somehow get an enormous response from Gemini.
+// This threshold is arbitrary but should be high enough to never impact normal
+// usage.
+export const MAX_GEMINI_MESSAGE_LINES = 65536;
+
+export const SHELL_FOCUS_HINT_DELAY_MS = 5000;
+
 // Tool status symbols used in ToolMessage component
 export const TOOL_STATUS = {
   SUCCESS: '✓',

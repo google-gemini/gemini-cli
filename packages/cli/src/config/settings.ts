@@ -33,15 +33,26 @@ import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge, type MergeableObject } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import type { ExtensionManager } from './extension-manager.js';
+import {
+  validateSettings,
+  formatValidationError,
+} from './settings-validation.js';
+import { SettingPaths } from './settingPaths.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
   let currentSchema: SettingsSchema | undefined = getSettingsSchema();
+  let parent: SettingDefinition | undefined = undefined;
 
   for (const key of path) {
     if (!currentSchema || !currentSchema[key]) {
+      // Key not found in schema - check if parent has additionalProperties
+      if (parent?.additionalProperties?.mergeStrategy) {
+        return parent.additionalProperties.mergeStrategy;
+      }
       return undefined;
     }
+    parent = current;
     current = currentSchema[key];
     currentSchema = current.properties;
   }
@@ -64,7 +75,7 @@ const MIGRATION_MAP: Record<string, string> = {
   autoAccept: 'tools.autoAccept',
   autoConfigureMaxOldSpaceSize: 'advanced.autoConfigureMemory',
   bugCommand: 'advanced.bugCommand',
-  chatCompression: 'model.chatCompression',
+  chatCompression: 'model.compressionThreshold',
   checkpointing: 'general.checkpointing',
   coreTools: 'tools.core',
   contextFileName: 'context.fileName',
@@ -75,6 +86,7 @@ const MIGRATION_MAP: Record<string, string> = {
   disableUpdateNag: 'general.disableUpdateNag',
   dnsResolutionOrder: 'advanced.dnsResolutionOrder',
   enableMessageBusIntegration: 'tools.enableMessageBusIntegration',
+  enableHooks: 'tools.enableHooks',
   enablePromptCompletion: 'general.enablePromptCompletion',
   enforcedAuthType: 'security.auth.enforcedType',
   excludeTools: 'tools.exclude',
@@ -107,13 +119,14 @@ const MIGRATION_MAP: Record<string, string> = {
   memoryImportFormat: 'context.importFormat',
   memoryDiscoveryMaxDirs: 'context.discoveryMaxDirs',
   model: 'model.name',
-  preferredEditor: 'general.preferredEditor',
+  preferredEditor: SettingPaths.General.PreferredEditor,
   retryFetchErrors: 'general.retryFetchErrors',
   sandbox: 'tools.sandbox',
   selectedAuthType: 'security.auth.selectedType',
   enableInteractiveShell: 'tools.shell.enableInteractiveShell',
   shellPager: 'tools.shell.pager',
   shellShowColor: 'tools.shell.showColor',
+  shellInactivityTimeout: 'tools.shell.inactivityTimeout',
   skipNextSpeakerCheck: 'model.skipNextSpeakerCheck',
   summarizeToolOutput: 'model.summarizeToolOutput',
   telemetry: 'telemetry',
@@ -156,6 +169,38 @@ export enum SettingScope {
   Workspace = 'Workspace',
   System = 'System',
   SystemDefaults = 'SystemDefaults',
+  // Note that this scope is not supported in the settings dialog at this time,
+  // it is only supported for extensions.
+  Session = 'Session',
+}
+
+/**
+ * A type representing the settings scopes that are supported for LoadedSettings.
+ */
+export type LoadableSettingScope =
+  | SettingScope.User
+  | SettingScope.Workspace
+  | SettingScope.System
+  | SettingScope.SystemDefaults;
+
+/**
+ * The actual values of the loadable settings scopes.
+ */
+const _loadableSettingScopes = [
+  SettingScope.User,
+  SettingScope.Workspace,
+  SettingScope.System,
+  SettingScope.SystemDefaults,
+];
+
+/**
+ * A type guard function that checks if `scope` is a loadable settings scope,
+ * and allows promotion to the `LoadableSettingsScope` type based on the result.
+ */
+export function isLoadableSettingScope(
+  scope: SettingScope,
+): scope is LoadableSettingScope {
+  return _loadableSettingScopes.includes(scope);
 }
 
 export interface CheckpointingSettings {
@@ -229,7 +274,7 @@ export function needsMigration(settings: Record<string, unknown>): boolean {
     if (v1Key === v2Path || !(v1Key in settings)) {
       return false;
     }
-    // If a key exists that is both a V1 key and a V2 container (like 'model'),
+    // If a key exists that is a V1 key and a V2 container (like 'model'),
     // we need to check the type. If it's an object, it's a V2 container and not
     // a V1 key that needs migration.
     if (
@@ -257,6 +302,19 @@ function migrateSettingsToV2(
 
   for (const [oldKey, newPath] of Object.entries(MIGRATION_MAP)) {
     if (flatKeys.has(oldKey)) {
+      // If the key exists and is a V2 container (like 'model'), and the value is an object,
+      // it is likely already migrated or partially migrated. We should not move it
+      // to the mapped V2 path (e.g. 'model' -> 'model.name').
+      // Instead, let it fall through to the "Carry over" section to be merged.
+      if (
+        KNOWN_V2_CONTAINERS.has(oldKey) &&
+        typeof flatSettings[oldKey] === 'object' &&
+        flatSettings[oldKey] !== null &&
+        !Array.isArray(flatSettings[oldKey])
+      ) {
+        continue;
+      }
+
       setNestedProperty(v2Settings, newPath, flatSettings[oldKey]);
       flatKeys.delete(oldKey);
     }
@@ -286,8 +344,8 @@ function migrateSettingsToV2(
       v2Settings[remainingKey] = customDeepMerge(
         pathAwareGetStrategy,
         {},
-        newValue as MergeableObject,
         existingValue as MergeableObject,
+        newValue as MergeableObject,
       );
     } else {
       v2Settings[remainingKey] = newValue;
@@ -397,14 +455,14 @@ export class LoadedSettings {
     user: SettingsFile,
     workspace: SettingsFile,
     isTrusted: boolean,
-    migratedInMemorScopes: Set<SettingScope>,
+    migratedInMemoryScopes: Set<SettingScope>,
   ) {
     this.system = system;
     this.systemDefaults = systemDefaults;
     this.user = user;
     this.workspace = workspace;
     this.isTrusted = isTrusted;
-    this.migratedInMemorScopes = migratedInMemorScopes;
+    this.migratedInMemoryScopes = migratedInMemoryScopes;
     this._merged = this.computeMergedSettings();
   }
 
@@ -413,7 +471,7 @@ export class LoadedSettings {
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
   readonly isTrusted: boolean;
-  readonly migratedInMemorScopes: Set<SettingScope>;
+  readonly migratedInMemoryScopes: Set<SettingScope>;
 
   private _merged: Settings;
 
@@ -431,7 +489,7 @@ export class LoadedSettings {
     );
   }
 
-  forScope(scope: SettingScope): SettingsFile {
+  forScope(scope: LoadableSettingScope): SettingsFile {
     switch (scope) {
       case SettingScope.User:
         return this.user;
@@ -446,7 +504,7 @@ export class LoadedSettings {
     }
   }
 
-  setValue(scope: SettingScope, key: string, value: unknown): void {
+  setValue(scope: LoadableSettingScope, key: string, value: unknown): void {
     const settingsFile = this.forScope(scope);
     setNestedProperty(settingsFile.settings, key, value);
     setNestedProperty(settingsFile.originalSettings, key, value);
@@ -562,7 +620,7 @@ export function loadSettings(
   const settingsErrors: SettingsError[] = [];
   const systemSettingsPath = getSystemSettingsPath();
   const systemDefaultsPath = getSystemDefaultsPath();
-  const migratedInMemorScopes = new Set<SettingScope>();
+  const migratedInMemoryScopes = new Set<SettingScope>();
 
   // Resolve paths to their canonical representation to handle symlinks
   const resolvedWorkspaceDir = path.resolve(workspaceDir);
@@ -617,21 +675,36 @@ export function loadSettings(
                   'utf-8',
                 );
               } catch (e) {
-                console.error(
-                  `Error migrating settings file on disk: ${getErrorMessage(
-                    e,
-                  )}`,
+                coreEvents.emitFeedback(
+                  'error',
+                  'Failed to migrate settings file.',
+                  e,
                 );
               }
             } else {
-              migratedInMemorScopes.add(scope);
+              migratedInMemoryScopes.add(scope);
             }
             settingsObject = migratedSettings;
           }
         }
+
+        // Validate settings structure with Zod after migration
+        const validationResult = validateSettings(settingsObject);
+        if (!validationResult.success && validationResult.error) {
+          const errorMessage = formatValidationError(
+            validationResult.error,
+            filePath,
+          );
+          throw new FatalConfigError(errorMessage);
+        }
+
         return { settings: settingsObject as Settings, rawJson: content };
       }
     } catch (error: unknown) {
+      // Preserve FatalConfigError with formatted validation messages
+      if (error instanceof FatalConfigError) {
+        throw error;
+      }
       settingsErrors.push({
         message: getErrorMessage(error),
         path: filePath,
@@ -702,7 +775,7 @@ export function loadSettings(
     isTrusted,
   );
 
-  // loadEnviroment depends on settings so we have to create a temp version of
+  // loadEnvironment depends on settings so we have to create a temp version of
   // the settings to avoid a cycle
   loadEnvironment(tempMergedSettings);
 
@@ -743,7 +816,7 @@ export function loadSettings(
       rawJson: workspaceResult.rawJson,
     },
     isTrusted,
-    migratedInMemorScopes,
+    migratedInMemoryScopes,
   );
 }
 
@@ -751,13 +824,14 @@ export function migrateDeprecatedSettings(
   loadedSettings: LoadedSettings,
   extensionManager: ExtensionManager,
 ): void {
-  const processScope = (scope: SettingScope) => {
+  const processScope = (scope: LoadableSettingScope) => {
     const settings = loadedSettings.forScope(scope).settings;
     if (settings.extensions?.disabled) {
       debugLogger.log(
         `Migrating deprecated extensions.disabled settings from ${scope} settings...`,
       );
       for (const extension of settings.extensions.disabled ?? []) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         extensionManager.disableExtension(extension, scope);
       }
 

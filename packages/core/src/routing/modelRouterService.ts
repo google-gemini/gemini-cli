@@ -5,6 +5,10 @@
  */
 
 import type { Config } from '../config/config.js';
+import {
+  PREVIEW_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL,
+} from '../config/models.js';
 import type {
   RoutingContext,
   RoutingDecision,
@@ -61,6 +65,23 @@ export class ModelRouterService {
         this.config,
         this.config.getBaseLlmClient(),
       );
+
+      // Unified Preview Model Logic:
+      // If the decision is to use 'gemini-2.5-pro' and preview features are enabled,
+      // we attempt to upgrade to 'gemini-3.0-pro' (Preview Model).
+      if (
+        decision.model === DEFAULT_GEMINI_MODEL &&
+        this.config.getPreviewFeatures() &&
+        !decision.metadata.source.includes('override')
+      ) {
+        // We ALWAYS attempt to upgrade to Preview Model here.
+        // If we are in fallback mode, the 'previewModelBypassMode' flag (handled in handler.ts/geminiChat.ts)
+        // will ensure we downgrade to 2.5 Pro for the actual API call if needed.
+        // This allows us to "probe" Preview Model periodically (i.e., every new request tries Preview Model first).
+        decision.model = PREVIEW_GEMINI_MODEL;
+        decision.metadata.source += ' (Preview Model)';
+        decision.metadata.reasoning += ' (Upgraded to Preview Model)';
+      }
 
       const event = new ModelRoutingEvent(
         decision.model,

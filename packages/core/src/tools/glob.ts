@@ -66,7 +66,7 @@ export interface GlobToolParams {
   /**
    * The directory to search in (optional, defaults to current directory)
    */
-  path?: string;
+  dir_path?: string;
 
   /**
    * Whether the search should be case-sensitive (optional, defaults to false)
@@ -100,10 +100,10 @@ class GlobToolInvocation extends BaseToolInvocation<
 
   getDescription(): string {
     let description = `'${this.params.pattern}'`;
-    if (this.params.path) {
+    if (this.params.dir_path) {
       const searchDir = path.resolve(
         this.config.getTargetDir(),
-        this.params.path || '.',
+        this.params.dir_path || '.',
       );
       const relativePath = makeRelative(searchDir, this.config.getTargetDir());
       description += ` within ${shortenPath(relativePath)}`;
@@ -118,13 +118,13 @@ class GlobToolInvocation extends BaseToolInvocation<
 
       // If a specific path is provided, resolve it and check if it's within workspace
       let searchDirectories: readonly string[];
-      if (this.params.path) {
+      if (this.params.dir_path) {
         const searchDirAbsolute = path.resolve(
           this.config.getTargetDir(),
-          this.params.path,
+          this.params.dir_path,
         );
         if (!workspaceContext.isPathWithinWorkspace(searchDirAbsolute)) {
-          const rawError = `Error: Path "${this.params.path}" is not within any workspace directory`;
+          const rawError = `Error: Path "${this.params.dir_path}" is not within any workspace directory`;
           return {
             llmContent: rawError,
             returnDisplay: `Path is not within workspace`,
@@ -276,7 +276,7 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
               "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
             type: 'string',
           },
-          path: {
+          dir_path: {
             description:
               'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
             type: 'string',
@@ -314,7 +314,7 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   ): string | null {
     const searchDirAbsolute = path.resolve(
       this.config.getTargetDir(),
-      params.path || '.',
+      params.dir_path || '.',
     );
 
     const workspaceContext = this.config.getWorkspaceContext();

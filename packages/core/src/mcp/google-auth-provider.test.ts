@@ -20,16 +20,12 @@ describe('GoogleCredentialProvider', () => {
     },
   } as MCPServerConfig;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should throw an error if no scopes are provided', () => {
     const config = {
       url: 'https://test.googleapis.com',
     } as MCPServerConfig;
     expect(() => new GoogleCredentialProvider(config)).toThrow(
-      'Scopes must be provided in the oauth config for Google Credentials provider (or enable allow_unscoped_id_tokens_for_cloud_run to use ID tokens for Cloud Run endpoints)',
+      'Scopes must be provided in the oauth config for Google Credentials provider',
     );
   });
 
@@ -84,24 +80,13 @@ describe('GoogleCredentialProvider', () => {
     );
   });
 
-  it('should not allow run.app host even when unscoped ID token flag is not present', () => {
-    const config = {
-      url: 'https://test.run.app',
-      oauth: {
-        scopes: ['scope1', 'scope2'],
-      },
-    } as MCPServerConfig;
-    expect(() => new GoogleCredentialProvider(config)).toThrow(
-      'To enable the Cloud Run MCP Server at https://test.run.app please set allow_unscoped_id_tokens_cloud_run:true in the MCP Server config.',
-    );
-  });
-
-  describe('with provider instance (Access Tokens)', () => {
+  describe('with provider instance', () => {
     let provider: GoogleCredentialProvider;
     let mockGetAccessToken: Mock;
     let mockClient: {
       getAccessToken: Mock;
       credentials?: { expiry_date: number | null };
+      quotaProjectId?: string;
     };
 
     beforeEach(() => {
@@ -169,73 +154,58 @@ describe('GoogleCredentialProvider', () => {
 
       vi.useRealTimers();
     });
-  });
 
-  describe('ID token flow (allow_unscoped_id_tokens_cloud_run)', () => {
-    let mockFetchIdToken: Mock;
-    let mockIdClient: {
-      idTokenProvider: {
-        fetchIdToken: Mock;
-      };
-    };
+    it('should return quota project ID', async () => {
+      mockClient['quotaProjectId'] = 'test-project-id';
+      const quotaProjectId = await provider.getQuotaProjectId();
+      expect(quotaProjectId).toBe('test-project-id');
+    });
 
-    beforeEach(() => {
-      mockFetchIdToken = vi.fn();
-      mockIdClient = {
-        idTokenProvider: {
-          fetchIdToken: mockFetchIdToken,
+    it('should return request headers with quota project ID', async () => {
+      mockClient['quotaProjectId'] = 'test-project-id';
+      const headers = await provider.getRequestHeaders();
+      expect(headers).toEqual({
+        'X-Goog-User-Project': 'test-project-id',
+      });
+    });
+
+    it('should return empty request headers if quota project ID is missing', async () => {
+      mockClient['quotaProjectId'] = undefined;
+      const headers = await provider.getRequestHeaders();
+      expect(headers).toEqual({});
+    });
+
+    it('should prioritize config headers over quota project ID', async () => {
+      mockClient['quotaProjectId'] = 'quota-project-id';
+      const configWithHeaders = {
+        ...validConfig,
+        headers: {
+          'X-Goog-User-Project': 'config-project-id',
         },
       };
-      (GoogleAuth.prototype.getIdTokenClient as Mock).mockResolvedValue(
-        mockIdClient,
+      const providerWithHeaders = new GoogleCredentialProvider(
+        configWithHeaders,
       );
+      const headers = await providerWithHeaders.getRequestHeaders();
+      expect(headers).toEqual({
+        'X-Goog-User-Project': 'config-project-id',
+      });
     });
-
-    it('should return ID token when flag is enabled and derive audience from hostname', async () => {
-      const config = {
-        url: 'https://test.run.app/path',
-        allow_unscoped_id_tokens_cloud_run: true,
-      } as MCPServerConfig;
-      const payload = { exp: Math.floor(Date.now() / 1000) + 3600 };
-      const validToken = `header.${Buffer.from(JSON.stringify(payload)).toString('base64')}.signature`;
-      mockFetchIdToken.mockResolvedValue(validToken);
-
-      const provider = new GoogleCredentialProvider(config);
-      const tokens = await provider.tokens();
-      expect(tokens?.access_token).toBe(validToken);
-      expect(GoogleAuth.prototype.getIdTokenClient).toHaveBeenCalledWith(
-        'test.run.app',
+    it('should prioritize config headers over quota project ID (case-insensitive)', async () => {
+      mockClient['quotaProjectId'] = 'quota-project-id';
+      const configWithHeaders = {
+        ...validConfig,
+        headers: {
+          'x-goog-user-project': 'config-project-id',
+        },
+      };
+      const providerWithHeaders = new GoogleCredentialProvider(
+        configWithHeaders,
       );
-      expect(mockFetchIdToken).toHaveBeenCalledWith('test.run.app');
-    });
-
-    it('should return undefined and log error when fetching ID token fails', async () => {
-      const config = {
-        url: 'https://test.run.app/path',
-        allow_unscoped_id_tokens_cloud_run: true,
-      } as MCPServerConfig;
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-      mockFetchIdToken.mockRejectedValue(new Error('Fetch failed'));
-
-      const provider = new GoogleCredentialProvider(config);
-      const tokens = await provider.tokens();
-      expect(tokens).toBeUndefined();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to get ID token from Google ADC',
-        expect.any(Error),
-      );
-      consoleErrorSpy.mockRestore();
-    });
-
-    it('should not require scopes when flag allow_unscoped_id_tokens_cloud_run is true', () => {
-      const config = {
-        url: 'https://test.run.app',
-        allow_unscoped_id_tokens_cloud_run: true,
-      } as MCPServerConfig;
-
-      expect(() => new GoogleCredentialProvider(config)).not.toThrow();
+      const headers = await providerWithHeaders.getRequestHeaders();
+      expect(headers).toEqual({
+        'x-goog-user-project': 'config-project-id',
+      });
     });
   });
 });

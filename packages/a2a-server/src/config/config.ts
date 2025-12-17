@@ -20,8 +20,9 @@ import {
   GEMINI_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_MODEL,
-  type GeminiCLIExtension,
-  debugLogger,
+  type ExtensionLoader,
+  startupProfiler,
+  PREVIEW_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -30,16 +31,17 @@ import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
 export async function loadConfig(
   settings: Settings,
-  extensions: GeminiCLIExtension[],
+  extensionLoader: ExtensionLoader,
   taskId: string,
 ): Promise<Config> {
-  const mcpServers = mergeMcpServers(settings, extensions);
   const workspaceDir = process.cwd();
   const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
 
   const configParams: ConfigParameters = {
     sessionId: taskId,
-    model: DEFAULT_GEMINI_MODEL,
+    model: settings.general?.previewFeatures
+      ? PREVIEW_GEMINI_MODEL
+      : DEFAULT_GEMINI_MODEL,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: undefined, // Sandbox might not be relevant for a server-side agent
     targetDir: workspaceDir, // Or a specific directory the agent operates on
@@ -53,7 +55,7 @@ export async function loadConfig(
       process.env['GEMINI_YOLO_MODE'] === 'true'
         ? ApprovalMode.YOLO
         : ApprovalMode.DEFAULT,
-    mcpServers,
+    mcpServers: settings.mcpServers,
     cwd: workspaceDir,
     telemetry: {
       enabled: settings.telemetry?.enabled,
@@ -71,7 +73,12 @@ export async function loadConfig(
     },
     ideMode: false,
     folderTrust: settings.folderTrust === true,
-    extensions,
+    extensionLoader,
+    checkpointing: process.env['CHECKPOINTING']
+      ? process.env['CHECKPOINTING'] === 'true'
+      : settings.checkpointing?.enabled,
+    previewFeatures: settings.general?.previewFeatures,
+    interactive: true,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
@@ -80,7 +87,7 @@ export async function loadConfig(
     [workspaceDir],
     false,
     fileService,
-    extensions,
+    extensionLoader,
     settings.folderTrust === true,
   );
   configParams.userMemory = memoryContent;
@@ -90,6 +97,7 @@ export async function loadConfig(
   });
   // Needed to initialize ToolRegistry, and git checkpointing if enabled
   await config.initialize();
+  startupProfiler.flush(config);
 
   if (process.env['USE_CCPA']) {
     logger.info('[Config] Using CCPA Auth:');
@@ -117,25 +125,6 @@ export async function loadConfig(
   }
 
   return config;
-}
-
-export function mergeMcpServers(
-  settings: Settings,
-  extensions: GeminiCLIExtension[],
-) {
-  const mcpServers = { ...(settings.mcpServers || {}) };
-  for (const extension of extensions) {
-    Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
-      if (mcpServers[key]) {
-        debugLogger.warn(
-          `Skipping extension MCP config for server with key "${key}" as it already exists.`,
-        );
-        return;
-      }
-      mcpServers[key] = server;
-    });
-  }
-  return mcpServers;
 }
 
 export function setTargetDir(agentSettings: AgentSettings | undefined): string {

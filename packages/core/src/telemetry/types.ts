@@ -4,19 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { GenerateContentResponseUsageMetadata } from '@google/genai';
+import type {
+  Candidate,
+  Content,
+  GenerateContentConfig,
+  GenerateContentResponseUsageMetadata,
+} from '@google/genai';
 import type { Config } from '../config/config.js';
-import type { ApprovalMode } from '../config/config.js';
+import type { ApprovalMode } from '../policy/types.js';
+
 import type { CompletedToolCall } from '../core/coreToolScheduler.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import type { FileDiff } from '../tools/tools.js';
 import { AuthType } from '../core/contentGenerator.js';
-import type { LogAttributes } from '@opentelemetry/api-logs';
+import type { LogAttributes, LogRecord } from '@opentelemetry/api-logs';
 import {
   getDecisionFromOutcome,
   ToolCallDecision,
 } from './tool-call-decision.js';
-import type { FileOperation } from './metrics.js';
+import { getConventionAttributes, type FileOperation } from './metrics.js';
 export { ToolCallDecision };
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { OutputFormat } from '../output/types.js';
@@ -25,6 +30,15 @@ import type { AgentTerminateMode } from '../agents/types.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import type { OTelFinishReason } from './semantic.js';
+import {
+  toInputMessages,
+  toOutputMessages,
+  toFinishReasons,
+  toOutputType,
+  toSystemInstruction,
+} from './semantic.js';
+import { sanitizeHookName } from './sanitize.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -55,11 +69,14 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   mcp_tools?: string;
   output_format: OutputFormat;
   extensions_count: number;
+  extensions: string;
   extension_ids: string;
+  auth_type?: string;
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
-    const mcpServers = config.getMcpServers();
+    const mcpServers =
+      config.getMcpClientManager()?.getMcpServers() ?? config.getMcpServers();
 
     let useGemini = false;
     let useVertex = false;
@@ -89,15 +106,15 @@ export class StartSessionEvent implements BaseTelemetryEvent {
     this.output_format = config.getOutputFormat();
     const extensions = config.getExtensions();
     this.extensions_count = extensions.length;
+    this.extensions = extensions.map((e) => e.name).join(',');
     this.extension_ids = extensions.map((e) => e.id).join(',');
+    this.auth_type = generatorConfig?.authType;
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
         .filter((tool) => tool instanceof DiscoveredMCPTool);
       this.mcp_tools_count = mcpTools.length;
-      this.mcp_tools = mcpTools
-        .map((tool) => (tool as DiscoveredMCPTool).name)
-        .join(',');
+      this.mcp_tools = mcpTools.map((tool) => tool.name).join(',');
     }
   }
 
@@ -121,8 +138,10 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       mcp_tools: this.mcp_tools,
       mcp_tools_count: this.mcp_tools_count,
       output_format: this.output_format,
+      extensions: this.extensions,
       extensions_count: this.extensions_count,
       extension_ids: this.extension_ids,
+      auth_type: this.auth_type,
     };
   }
 
@@ -140,6 +159,19 @@ export class EndSessionEvent implements BaseTelemetryEvent {
     this['event.name'] = 'end_session';
     this['event.timestamp'] = new Date().toISOString();
     this.session_id = config?.getSessionId();
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': this['event.name'],
+      'event.timestamp': this['event.timestamp'],
+      session_id: this.session_id,
+    };
+  }
+
+  toLogBody(): string {
+    return 'Session ended.';
   }
 }
 
@@ -205,6 +237,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   tool_type: 'native' | 'mcp';
   content_length?: number;
   mcp_server_name?: string;
+  extension_name?: string;
   extension_id?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
@@ -251,6 +284,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       ) {
         this.tool_type = 'mcp';
         this.mcp_server_name = call.tool.serverName;
+        this.extension_name = call.tool.extensionName;
         this.extension_id = call.tool.extensionId;
       } else {
         this.tool_type = 'native';
@@ -262,7 +296,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
         call.response.resultDisplay !== null &&
         'diffStat' in call.response.resultDisplay
       ) {
-        const diffStat = (call.response.resultDisplay as FileDiff).diffStat;
+        const diffStat = call.response.resultDisplay.diffStat;
         if (diffStat) {
           this.metadata = {
             model_added_lines: diffStat.model_added_lines,
@@ -277,7 +311,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
         }
       }
     } else {
-      this.function_name = function_name!;
+      this.function_name = function_name as string;
       this.function_args = function_args!;
       this.duration_ms = duration_ms!;
       this.success = success!;
@@ -301,6 +335,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       tool_type: this.tool_type,
       content_length: this.content_length,
       mcp_server_name: this.mcp_server_name,
+      extension_name: this.extension_name,
       extension_id: this.extension_id,
       metadata: this.metadata,
     };
@@ -326,30 +361,64 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
   'event.name': 'api_request';
   'event.timestamp': string;
   model: string;
-  prompt_id: string;
+  prompt: GenAIPromptDetails;
   request_text?: string;
 
-  constructor(model: string, prompt_id: string, request_text?: string) {
+  constructor(
+    model: string,
+    prompt_details: GenAIPromptDetails,
+    request_text?: string,
+  ) {
     this['event.name'] = 'api_request';
     this['event.timestamp'] = new Date().toISOString();
     this.model = model;
-    this.prompt_id = prompt_id;
+    this.prompt = prompt_details;
     this.request_text = request_text;
   }
 
-  toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
+  toLogRecord(config: Config): LogRecord {
+    const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': EVENT_API_REQUEST,
       'event.timestamp': this['event.timestamp'],
       model: this.model,
-      prompt_id: this.prompt_id,
+      prompt_id: this.prompt.prompt_id,
       request_text: this.request_text,
     };
+    return { body: `API request to ${this.model}.`, attributes };
   }
 
-  toLogBody(): string {
-    return `API request to ${this.model}.`;
+  toSemanticLogRecord(config: Config): LogRecord {
+    const { 'gen_ai.response.model': _, ...requestConventionAttributes } =
+      getConventionAttributes({
+        model: this.model,
+        auth_type: config.getContentGeneratorConfig()?.authType,
+      });
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_GEN_AI_OPERATION_DETAILS,
+      'event.timestamp': this['event.timestamp'],
+      ...toGenerateContentConfigAttributes(this.prompt.generate_content_config),
+      ...requestConventionAttributes,
+    };
+
+    if (this.prompt.server) {
+      attributes['server.address'] = this.prompt.server.address;
+      attributes['server.port'] = this.prompt.server.port;
+    }
+
+    if (config.getTelemetryLogPromptsEnabled() && this.prompt.contents) {
+      attributes['gen_ai.input.messages'] = JSON.stringify(
+        toInputMessages(this.prompt.contents),
+      );
+    }
+
+    const logRecord: LogRecord = {
+      body: `GenAI operation request details from ${this.model}.`,
+      attributes,
+    };
+
+    return logRecord;
   }
 }
 
@@ -358,18 +427,18 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
   'event.name': 'api_error';
   'event.timestamp': string;
   model: string;
+  prompt: GenAIPromptDetails;
   error: string;
   error_type?: string;
   status_code?: number | string;
   duration_ms: number;
-  prompt_id: string;
   auth_type?: string;
 
   constructor(
     model: string,
     error: string,
     duration_ms: number,
-    prompt_id: string,
+    prompt_details: GenAIPromptDetails,
     auth_type?: string,
     error_type?: string,
     status_code?: number | string,
@@ -381,11 +450,11 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
     this.error_type = error_type;
     this.status_code = status_code;
     this.duration_ms = duration_ms;
-    this.prompt_id = prompt_id;
+    this.prompt = prompt_details;
     this.auth_type = auth_type;
   }
 
-  toOpenTelemetryAttributes(config: Config): LogAttributes {
+  toLogRecord(config: Config): LogRecord {
     const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': EVENT_API_ERROR,
@@ -397,7 +466,7 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
       error: this.error,
       status_code: this.status_code,
       duration_ms: this.duration_ms,
-      prompt_id: this.prompt_id,
+      prompt_id: this.prompt.prompt_id,
       auth_type: this.auth_type,
     };
 
@@ -407,71 +476,156 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
     if (typeof this.status_code === 'number') {
       attributes[SemanticAttributes.HTTP_STATUS_CODE] = this.status_code;
     }
-    return attributes;
+    const logRecord: LogRecord = {
+      body: `API error for ${this.model}. Error: ${this.error}. Duration: ${this.duration_ms}ms.`,
+      attributes,
+    };
+    return logRecord;
   }
 
-  toLogBody(): string {
-    return `API error for ${this.model}. Error: ${this.error}. Duration: ${this.duration_ms}ms.`;
+  toSemanticLogRecord(config: Config): LogRecord {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_GEN_AI_OPERATION_DETAILS,
+      'event.timestamp': this['event.timestamp'],
+      ...toGenerateContentConfigAttributes(this.prompt.generate_content_config),
+      ...getConventionAttributes(this),
+    };
+
+    if (this.prompt.server) {
+      attributes['server.address'] = this.prompt.server.address;
+      attributes['server.port'] = this.prompt.server.port;
+    }
+
+    if (config.getTelemetryLogPromptsEnabled() && this.prompt.contents) {
+      attributes['gen_ai.input.messages'] = JSON.stringify(
+        toInputMessages(this.prompt.contents),
+      );
+    }
+
+    const logRecord: LogRecord = {
+      body: `GenAI operation error details from ${this.model}. Error: ${this.error}. Duration: ${this.duration_ms}ms.`,
+      attributes,
+    };
+
+    return logRecord;
   }
 }
 
-export const EVENT_API_RESPONSE = 'gemini_cli.api_response';
-export class ApiResponseEvent implements BaseTelemetryEvent {
-  'event.name': 'api_response';
-  'event.timestamp': string;
-  model: string;
-  status_code?: number | string;
-  duration_ms: number;
+export interface ServerDetails {
+  address: string;
+  port: number;
+}
+
+export interface GenAIPromptDetails {
+  prompt_id: string;
+  contents: Content[];
+  generate_content_config?: GenerateContentConfig;
+  server?: ServerDetails;
+}
+
+export interface GenAIResponseDetails {
+  response_id?: string;
+  candidates?: Candidate[];
+}
+
+export interface GenAIUsageDetails {
   input_token_count: number;
   output_token_count: number;
   cached_content_token_count: number;
   thoughts_token_count: number;
   tool_token_count: number;
   total_token_count: number;
+}
+
+export const EVENT_API_RESPONSE = 'gemini_cli.api_response';
+export const EVENT_GEN_AI_OPERATION_DETAILS =
+  'gen_ai.client.inference.operation.details';
+
+function toGenerateContentConfigAttributes(
+  config?: GenerateContentConfig,
+): LogAttributes {
+  if (!config) {
+    return {};
+  }
+  return {
+    'gen_ai.request.temperature': config.temperature,
+    'gen_ai.request.top_p': config.topP,
+    'gen_ai.request.top_k': config.topK,
+    'gen_ai.request.choice.count': config.candidateCount,
+    'gen_ai.request.seed': config.seed,
+    'gen_ai.request.frequency_penalty': config.frequencyPenalty,
+    'gen_ai.request.presence_penalty': config.presencePenalty,
+    'gen_ai.request.max_tokens': config.maxOutputTokens,
+    'gen_ai.output.type': toOutputType(config.responseMimeType),
+    'gen_ai.request.stop_sequences': config.stopSequences,
+    'gen_ai.system_instructions': JSON.stringify(
+      toSystemInstruction(config.systemInstruction),
+    ),
+  };
+}
+
+export class ApiResponseEvent implements BaseTelemetryEvent {
+  'event.name': 'api_response';
+  'event.timestamp': string;
+  status_code?: number | string;
+  duration_ms: number;
   response_text?: string;
-  prompt_id: string;
   auth_type?: string;
+
+  model: string;
+  prompt: GenAIPromptDetails;
+  response: GenAIResponseDetails;
+  usage: GenAIUsageDetails;
+  finish_reasons: OTelFinishReason[];
 
   constructor(
     model: string,
     duration_ms: number,
-    prompt_id: string,
+    prompt_details: GenAIPromptDetails,
+    response_details: GenAIResponseDetails,
     auth_type?: string,
     usage_data?: GenerateContentResponseUsageMetadata,
     response_text?: string,
   ) {
     this['event.name'] = 'api_response';
     this['event.timestamp'] = new Date().toISOString();
-    this.model = model;
     this.duration_ms = duration_ms;
     this.status_code = 200;
-    this.input_token_count = usage_data?.promptTokenCount ?? 0;
-    this.output_token_count = usage_data?.candidatesTokenCount ?? 0;
-    this.cached_content_token_count = usage_data?.cachedContentTokenCount ?? 0;
-    this.thoughts_token_count = usage_data?.thoughtsTokenCount ?? 0;
-    this.tool_token_count = usage_data?.toolUsePromptTokenCount ?? 0;
-    this.total_token_count = usage_data?.totalTokenCount ?? 0;
     this.response_text = response_text;
-    this.prompt_id = prompt_id;
     this.auth_type = auth_type;
+
+    this.model = model;
+    this.prompt = prompt_details;
+    this.response = response_details;
+    this.usage = {
+      input_token_count: usage_data?.promptTokenCount ?? 0,
+      output_token_count: usage_data?.candidatesTokenCount ?? 0,
+      cached_content_token_count: usage_data?.cachedContentTokenCount ?? 0,
+      thoughts_token_count: usage_data?.thoughtsTokenCount ?? 0,
+      tool_token_count: usage_data?.toolUsePromptTokenCount ?? 0,
+      total_token_count: usage_data?.totalTokenCount ?? 0,
+    };
+    this.finish_reasons = toFinishReasons(this.response.candidates);
   }
 
-  toOpenTelemetryAttributes(config: Config): LogAttributes {
+  toLogRecord(config: Config): LogRecord {
     const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': EVENT_API_RESPONSE,
       'event.timestamp': this['event.timestamp'],
       model: this.model,
       duration_ms: this.duration_ms,
-      input_token_count: this.input_token_count,
-      output_token_count: this.output_token_count,
-      cached_content_token_count: this.cached_content_token_count,
-      thoughts_token_count: this.thoughts_token_count,
-      tool_token_count: this.tool_token_count,
-      total_token_count: this.total_token_count,
-      prompt_id: this.prompt_id,
+      input_token_count: this.usage.input_token_count,
+      output_token_count: this.usage.output_token_count,
+      cached_content_token_count: this.usage.cached_content_token_count,
+      thoughts_token_count: this.usage.thoughts_token_count,
+      tool_token_count: this.usage.tool_token_count,
+      total_token_count: this.usage.total_token_count,
+      prompt_id: this.prompt.prompt_id,
       auth_type: this.auth_type,
       status_code: this.status_code,
+      finish_reasons: this.finish_reasons,
     };
     if (this.response_text) {
       attributes['response_text'] = this.response_text;
@@ -481,11 +635,49 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
         attributes[SemanticAttributes.HTTP_STATUS_CODE] = this.status_code;
       }
     }
-    return attributes;
+    const logRecord: LogRecord = {
+      body: `API response from ${this.model}. Status: ${this.status_code || 'N/A'}. Duration: ${this.duration_ms}ms.`,
+      attributes,
+    };
+    return logRecord;
   }
 
-  toLogBody(): string {
-    return `API response from ${this.model}. Status: ${this.status_code || 'N/A'}. Duration: ${this.duration_ms}ms.`;
+  toSemanticLogRecord(config: Config): LogRecord {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_GEN_AI_OPERATION_DETAILS,
+      'event.timestamp': this['event.timestamp'],
+      'gen_ai.response.id': this.response.response_id,
+      'gen_ai.response.finish_reasons': this.finish_reasons,
+      'gen_ai.output.messages': JSON.stringify(
+        toOutputMessages(this.response.candidates),
+      ),
+      ...toGenerateContentConfigAttributes(this.prompt.generate_content_config),
+      ...getConventionAttributes(this),
+    };
+
+    if (this.prompt.server) {
+      attributes['server.address'] = this.prompt.server.address;
+      attributes['server.port'] = this.prompt.server.port;
+    }
+
+    if (config.getTelemetryLogPromptsEnabled() && this.prompt.contents) {
+      attributes['gen_ai.input.messages'] = JSON.stringify(
+        toInputMessages(this.prompt.contents),
+      );
+    }
+
+    if (this.usage) {
+      attributes['gen_ai.usage.input_tokens'] = this.usage.input_token_count;
+      attributes['gen_ai.usage.output_tokens'] = this.usage.output_token_count;
+    }
+
+    const logRecord: LogRecord = {
+      body: `GenAI operation details from ${this.model}. Status: ${this.status_code || 'N/A'}. Duration: ${this.duration_ms}ms.`,
+      attributes,
+    };
+
+    return logRecord;
   }
 }
 
@@ -550,26 +742,38 @@ export class LoopDetectedEvent implements BaseTelemetryEvent {
   'event.timestamp': string;
   loop_type: LoopType;
   prompt_id: string;
+  confirmed_by_model?: string;
 
-  constructor(loop_type: LoopType, prompt_id: string) {
+  constructor(
+    loop_type: LoopType,
+    prompt_id: string,
+    confirmed_by_model?: string,
+  ) {
     this['event.name'] = 'loop_detected';
     this['event.timestamp'] = new Date().toISOString();
     this.loop_type = loop_type;
     this.prompt_id = prompt_id;
+    this.confirmed_by_model = confirmed_by_model;
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
+    const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': this['event.name'],
       'event.timestamp': this['event.timestamp'],
       loop_type: this.loop_type,
       prompt_id: this.prompt_id,
     };
+
+    if (this.confirmed_by_model) {
+      attributes['confirmed_by_model'] = this.confirmed_by_model;
+    }
+
+    return attributes;
   }
 
   toLogBody(): string {
-    return `Loop detected. Type: ${this.loop_type}.`;
+    return `Loop detected. Type: ${this.loop_type}.${this.confirmed_by_model ? ` Confirmed by: ${this.confirmed_by_model}` : ''}`;
   }
 }
 
@@ -804,34 +1008,6 @@ export class ConversationFinishedEvent {
   }
 }
 
-export class KittySequenceOverflowEvent {
-  'event.name': 'kitty_sequence_overflow';
-  'event.timestamp': string; // ISO 8601
-  sequence_length: number;
-  truncated_sequence: string;
-  constructor(sequence_length: number, truncated_sequence: string) {
-    this['event.name'] = 'kitty_sequence_overflow';
-    this['event.timestamp'] = new Date().toISOString();
-    this.sequence_length = sequence_length;
-    // Truncate to first 20 chars for logging (avoid logging sensitive data)
-    this.truncated_sequence = truncated_sequence.substring(0, 20);
-  }
-
-  toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
-      ...getCommonAttributes(config),
-      'event.name': this['event.name'],
-      'event.timestamp': this['event.timestamp'],
-      sequence_length: this.sequence_length,
-      truncated_sequence: this.truncated_sequence,
-    };
-  }
-
-  toLogBody(): string {
-    return `Kitty sequence buffer overflow: ${this.sequence_length} bytes`;
-  }
-}
-
 export const EVENT_FILE_OPERATION = 'gemini_cli.file_operation';
 export class FileOperationEvent implements BaseTelemetryEvent {
   'event.name': 'file_operation';
@@ -1055,6 +1231,7 @@ export class ExtensionInstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_install';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   extension_version: string;
   extension_source: string;
@@ -1062,6 +1239,7 @@ export class ExtensionInstallEvent implements BaseTelemetryEvent {
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     extension_version: string,
     extension_source: string,
@@ -1070,6 +1248,7 @@ export class ExtensionInstallEvent implements BaseTelemetryEvent {
     this['event.name'] = 'extension_install';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.extension_version = extension_version;
     this.extension_source = extension_source;
@@ -1149,17 +1328,20 @@ export class ExtensionUninstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_uninstall';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   status: 'success' | 'error';
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     status: 'success' | 'error',
   ) {
     this['event.name'] = 'extension_uninstall';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.status = status;
   }
@@ -1184,6 +1366,7 @@ export class ExtensionUpdateEvent implements BaseTelemetryEvent {
   'event.name': 'extension_update';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   extension_previous_version: string;
   extension_version: string;
@@ -1192,6 +1375,7 @@ export class ExtensionUpdateEvent implements BaseTelemetryEvent {
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     extension_version: string,
     extension_previous_version: string,
@@ -1201,6 +1385,7 @@ export class ExtensionUpdateEvent implements BaseTelemetryEvent {
     this['event.name'] = 'extension_update';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.extension_version = extension_version;
     this.extension_previous_version = extension_previous_version;
@@ -1231,17 +1416,20 @@ export class ExtensionEnableEvent implements BaseTelemetryEvent {
   'event.name': 'extension_enable';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   setting_scope: string;
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     settingScope: string,
   ) {
     this['event.name'] = 'extension_enable';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.setting_scope = settingScope;
   }
@@ -1287,6 +1475,48 @@ export class ModelSlashCommandEvent implements BaseTelemetryEvent {
   }
 }
 
+export const EVENT_LLM_LOOP_CHECK = 'gemini_cli.llm_loop_check';
+export class LlmLoopCheckEvent implements BaseTelemetryEvent {
+  'event.name': 'llm_loop_check';
+  'event.timestamp': string;
+  prompt_id: string;
+  flash_confidence: number;
+  main_model: string;
+  main_model_confidence: number;
+
+  constructor(
+    prompt_id: string,
+    flash_confidence: number,
+    main_model: string,
+    main_model_confidence: number,
+  ) {
+    this['event.name'] = 'llm_loop_check';
+    this['event.timestamp'] = new Date().toISOString();
+    this.prompt_id = prompt_id;
+    this.flash_confidence = flash_confidence;
+    this.main_model = main_model;
+    this.main_model_confidence = main_model_confidence;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_LLM_LOOP_CHECK,
+      'event.timestamp': this['event.timestamp'],
+      prompt_id: this.prompt_id,
+      flash_confidence: this.flash_confidence,
+      main_model: this.main_model,
+      main_model_confidence: this.main_model_confidence,
+    };
+  }
+
+  toLogBody(): string {
+    return this.main_model_confidence === -1
+      ? `LLM loop check. Flash confidence: ${this.flash_confidence.toFixed(2)}. Main model (${this.main_model}) check skipped`
+      : `LLM loop check. Flash confidence: ${this.flash_confidence.toFixed(2)}. Main model (${this.main_model}) confidence: ${this.main_model_confidence.toFixed(2)}`;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -1299,7 +1529,6 @@ export type TelemetryEvent =
   | LoopDetectedEvent
   | LoopDetectionDisabledEvent
   | NextSpeakerCheckEvent
-  | KittySequenceOverflowEvent
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
   | ConversationFinishedEvent
@@ -1316,6 +1545,9 @@ export type TelemetryEvent =
   | ModelSlashCommandEvent
   | AgentStartEvent
   | AgentFinishEvent
+  | RecoveryAttemptEvent
+  | LlmLoopCheckEvent
+  | StartupStatsEvent
   | WebFetchFallbackAttemptEvent;
 
 export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
@@ -1323,17 +1555,20 @@ export class ExtensionDisableEvent implements BaseTelemetryEvent {
   'event.name': 'extension_disable';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   setting_scope: string;
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     settingScope: string,
   ) {
     this['event.name'] = 'extension_disable';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.setting_scope = settingScope;
   }
@@ -1405,15 +1640,65 @@ export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
   }
 }
 
-export const EVENT_AGENT_START = 'gemini_cli.agent.start';
-export class AgentStartEvent implements BaseTelemetryEvent {
-  'event.name': 'agent_start';
+export interface StartupPhaseStats {
+  name: string;
+  duration_ms: number;
+  cpu_usage_user_usec: number;
+  cpu_usage_system_usec: number;
+  start_time_usec: number;
+  end_time_usec: number;
+}
+
+export const EVENT_STARTUP_STATS = 'gemini_cli.startup_stats';
+export class StartupStatsEvent implements BaseTelemetryEvent {
+  'event.name': 'startup_stats';
+  'event.timestamp': string;
+  phases: StartupPhaseStats[];
+  os_platform: string;
+  os_release: string;
+  is_docker: boolean;
+
+  constructor(
+    phases: StartupPhaseStats[],
+    os_platform: string,
+    os_release: string,
+    is_docker: boolean,
+  ) {
+    this['event.name'] = 'startup_stats';
+    this['event.timestamp'] = new Date().toISOString();
+    this.phases = phases;
+    this.os_platform = os_platform;
+    this.os_release = os_release;
+    this.is_docker = is_docker;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_STARTUP_STATS,
+      'event.timestamp': this['event.timestamp'],
+      phases: JSON.stringify(this.phases),
+      os_platform: this.os_platform,
+      os_release: this.os_release,
+      is_docker: this.is_docker,
+    };
+  }
+
+  toLogBody(): string {
+    return `Startup stats: ${this.phases.length} phases recorded.`;
+  }
+}
+
+abstract class BaseAgentEvent implements BaseTelemetryEvent {
+  abstract 'event.name':
+    | 'agent_start'
+    | 'agent_finish'
+    | 'agent_recovery_attempt';
   'event.timestamp': string;
   agent_id: string;
   agent_name: string;
 
   constructor(agent_id: string, agent_name: string) {
-    this['event.name'] = 'agent_start';
     this['event.timestamp'] = new Date().toISOString();
     this.agent_id = agent_id;
     this.agent_name = agent_name;
@@ -1422,10 +1707,27 @@ export class AgentStartEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      'event.name': EVENT_AGENT_START,
       'event.timestamp': this['event.timestamp'],
       agent_id: this.agent_id,
       agent_name: this.agent_name,
+    };
+  }
+
+  abstract toLogBody(): string;
+}
+
+export const EVENT_AGENT_START = 'gemini_cli.agent.start';
+export class AgentStartEvent extends BaseAgentEvent {
+  'event.name' = 'agent_start' as const;
+
+  constructor(agent_id: string, agent_name: string) {
+    super(agent_id, agent_name);
+  }
+
+  override toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...super.toOpenTelemetryAttributes(config),
+      'event.name': EVENT_AGENT_START,
     };
   }
 
@@ -1435,11 +1737,8 @@ export class AgentStartEvent implements BaseTelemetryEvent {
 }
 
 export const EVENT_AGENT_FINISH = 'gemini_cli.agent.finish';
-export class AgentFinishEvent implements BaseTelemetryEvent {
-  'event.name': 'agent_finish';
-  'event.timestamp': string;
-  agent_id: string;
-  agent_name: string;
+export class AgentFinishEvent extends BaseAgentEvent {
+  'event.name' = 'agent_finish' as const;
   duration_ms: number;
   turn_count: number;
   terminate_reason: AgentTerminateMode;
@@ -1451,22 +1750,16 @@ export class AgentFinishEvent implements BaseTelemetryEvent {
     turn_count: number,
     terminate_reason: AgentTerminateMode,
   ) {
-    this['event.name'] = 'agent_finish';
-    this['event.timestamp'] = new Date().toISOString();
-    this.agent_id = agent_id;
-    this.agent_name = agent_name;
+    super(agent_id, agent_name);
     this.duration_ms = duration_ms;
     this.turn_count = turn_count;
     this.terminate_reason = terminate_reason;
   }
 
-  toOpenTelemetryAttributes(config: Config): LogAttributes {
+  override toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
-      ...getCommonAttributes(config),
+      ...super.toOpenTelemetryAttributes(config),
       'event.name': EVENT_AGENT_FINISH,
-      'event.timestamp': this['event.timestamp'],
-      agent_id: this.agent_id,
-      agent_name: this.agent_name,
       duration_ms: this.duration_ms,
       turn_count: this.turn_count,
       terminate_reason: this.terminate_reason,
@@ -1475,6 +1768,45 @@ export class AgentFinishEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Agent ${this.agent_name} finished. Reason: ${this.terminate_reason}. Duration: ${this.duration_ms}ms. Turns: ${this.turn_count}.`;
+  }
+}
+
+export const EVENT_AGENT_RECOVERY_ATTEMPT = 'gemini_cli.agent.recovery_attempt';
+export class RecoveryAttemptEvent extends BaseAgentEvent {
+  'event.name' = 'agent_recovery_attempt' as const;
+  reason: AgentTerminateMode;
+  duration_ms: number;
+  success: boolean;
+  turn_count: number;
+
+  constructor(
+    agent_id: string,
+    agent_name: string,
+    reason: AgentTerminateMode,
+    duration_ms: number,
+    success: boolean,
+    turn_count: number,
+  ) {
+    super(agent_id, agent_name);
+    this.reason = reason;
+    this.duration_ms = duration_ms;
+    this.success = success;
+    this.turn_count = turn_count;
+  }
+
+  override toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...super.toOpenTelemetryAttributes(config),
+      'event.name': EVENT_AGENT_RECOVERY_ATTEMPT,
+      reason: this.reason,
+      duration_ms: this.duration_ms,
+      success: this.success,
+      turn_count: this.turn_count,
+    };
+  }
+
+  toLogBody(): string {
+    return `Agent ${this.agent_name} recovery attempt. Reason: ${this.reason}. Success: ${this.success}. Duration: ${this.duration_ms}ms.`;
   }
 }
 
@@ -1502,5 +1834,88 @@ export class WebFetchFallbackAttemptEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Web fetch fallback attempt. Reason: ${this.reason}`;
+  }
+}
+
+export const EVENT_HOOK_CALL = 'gemini_cli.hook_call';
+export class HookCallEvent implements BaseTelemetryEvent {
+  'event.name': string;
+  'event.timestamp': string;
+  hook_event_name: string;
+  hook_type: 'command';
+  hook_name: string;
+  hook_input: Record<string, unknown>;
+  hook_output?: Record<string, unknown>;
+  exit_code?: number;
+  stdout?: string;
+  stderr?: string;
+  duration_ms: number;
+  success: boolean;
+  error?: string;
+
+  constructor(
+    hookEventName: string,
+    hookType: 'command',
+    hookName: string,
+    hookInput: Record<string, unknown>,
+    durationMs: number,
+    success: boolean,
+    hookOutput?: Record<string, unknown>,
+    exitCode?: number,
+    stdout?: string,
+    stderr?: string,
+    error?: string,
+  ) {
+    this['event.name'] = 'hook_call';
+    this['event.timestamp'] = new Date().toISOString();
+    this.hook_event_name = hookEventName;
+    this.hook_type = hookType;
+    this.hook_name = hookName;
+    this.hook_input = hookInput;
+    this.hook_output = hookOutput;
+    this.exit_code = exitCode;
+    this.stdout = stdout;
+    this.stderr = stderr;
+    this.duration_ms = durationMs;
+    this.success = success;
+    this.error = error;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_HOOK_CALL,
+      'event.timestamp': this['event.timestamp'],
+      hook_event_name: this.hook_event_name,
+      hook_type: this.hook_type,
+      // Sanitize hook_name unless full logging is enabled
+      hook_name: config.getTelemetryLogPromptsEnabled()
+        ? this.hook_name
+        : sanitizeHookName(this.hook_name),
+      duration_ms: this.duration_ms,
+      success: this.success,
+      exit_code: this.exit_code,
+    };
+
+    // Only include potentially sensitive data if telemetry logging of prompts is enabled
+    if (config.getTelemetryLogPromptsEnabled()) {
+      attributes['hook_input'] = safeJsonStringify(this.hook_input, 2);
+      attributes['hook_output'] = safeJsonStringify(this.hook_output, 2);
+      attributes['stdout'] = this.stdout;
+      attributes['stderr'] = this.stderr;
+    }
+
+    if (this.error) {
+      // Always log errors
+      attributes['error'] = this.error;
+    }
+
+    return attributes;
+  }
+
+  toLogBody(): string {
+    const hookId = `${this.hook_event_name}.${this.hook_name}`;
+    const status = `${this.success ? 'succeeded' : 'failed'}`;
+    return `Hook call ${hookId} ${status} in ${this.duration_ms}ms`;
   }
 }

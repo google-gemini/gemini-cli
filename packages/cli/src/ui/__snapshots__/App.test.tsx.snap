@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`App > Snapshots > renders default layout correctly 1`] = `
+"MainContent
+Notifications
+Composer"
+`;
+
+exports[`App > Snapshots > renders screen reader layout correctly 1`] = `
+"Notifications
+Footer
+MainContent
+Composer"
+`;
+
+exports[`App > Snapshots > renders with dialogs visible 1`] = `
+"Notifications
+Footer
+MainContent
+DialogManager"
+`;

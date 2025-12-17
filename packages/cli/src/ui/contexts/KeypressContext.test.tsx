@@ -4,22 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
+import { debugLogger } from '@google/gemini-cli-core';
 import type React from 'react';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import type { Mock } from 'vitest';
-import { vi } from 'vitest';
+import { vi, afterAll, beforeAll } from 'vitest';
 import type { Key } from './KeypressContext.js';
 import {
   KeypressProvider,
   useKeypressContext,
-  DRAG_COMPLETION_TIMEOUT_MS,
-  KITTY_SEQUENCE_TIMEOUT_MS,
-  // CSI_END_O,
-  // SS3_END,
-  SINGLE_QUOTE,
-  DOUBLE_QUOTE,
+  ESC_TIMEOUT,
 } from './KeypressContext.js';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';
@@ -52,21 +48,29 @@ class MockStdin extends EventEmitter {
   }
 }
 
-describe('KeypressContext - Kitty Protocol', () => {
+// Helper function to setup keypress test with standard configuration
+const setupKeypressTest = () => {
+  const keyHandler = vi.fn();
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <KeypressProvider>{children}</KeypressProvider>
+  );
+
+  const { result } = renderHook(() => useKeypressContext(), { wrapper });
+  act(() => result.current.subscribe(keyHandler));
+
+  return { result, keyHandler };
+};
+
+describe('KeypressContext', () => {
   let stdin: MockStdin;
   const mockSetRawMode = vi.fn();
 
-  const wrapper = ({
-    children,
-    kittyProtocolEnabled = true,
-  }: {
-    children: React.ReactNode;
-    kittyProtocolEnabled?: boolean;
-  }) => (
-    <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled ?? false}>
-      {children}
-    </KeypressProvider>
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <KeypressProvider>{children}</KeypressProvider>
   );
+
+  beforeAll(() => vi.useFakeTimers());
+  afterAll(() => vi.useRealTimers());
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -78,25 +82,23 @@ describe('KeypressContext - Kitty Protocol', () => {
   });
 
   describe('Enter key handling', () => {
-    it('should recognize regular enter key (keycode 13) in kitty protocol', async () => {
-      const keyHandler = vi.fn();
+    it.each([
+      {
+        name: 'regular enter key (keycode 13)',
+        sequence: '\x1b[13u',
+      },
+      {
+        name: 'numpad enter key (keycode 57414)',
+        sequence: '\x1b[57414u',
+      },
+    ])('should recognize $name in kitty protocol', async ({ sequence }) => {
+      const { keyHandler } = setupKeypressTest();
 
-      const { result } = renderHook(() => useKeypressContext(), {
-        wrapper: ({ children }) =>
-          wrapper({ children, kittyProtocolEnabled: true }),
-      });
-
-      act(() => result.current.subscribe(keyHandler));
-
-      // Send kitty protocol sequence for regular enter: ESC[13u
-      act(() => {
-        stdin.write(`\x1b[13u`);
-      });
+      act(() => stdin.write(sequence));
 
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'return',
-          kittyProtocol: true,
           ctrl: false,
           meta: false,
           shift: false,
@@ -104,51 +106,14 @@ describe('KeypressContext - Kitty Protocol', () => {
       );
     });
 
-    it('should recognize numpad enter key (keycode 57414) in kitty protocol', async () => {
-      const keyHandler = vi.fn();
+    it('should handle backslash return', async () => {
+      const { keyHandler } = setupKeypressTest();
 
-      const { result } = renderHook(() => useKeypressContext(), {
-        wrapper: ({ children }) =>
-          wrapper({ children, kittyProtocolEnabled: true }),
-      });
-
-      act(() => result.current.subscribe(keyHandler));
-
-      // Send kitty protocol sequence for numpad enter: ESC[57414u
-      act(() => {
-        stdin.write(`\x1b[57414u`);
-      });
+      act(() => stdin.write('\\\r'));
 
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'return',
-          kittyProtocol: true,
-          ctrl: false,
-          meta: false,
-          shift: false,
-        }),
-      );
-    });
-
-    it('should handle numpad enter with modifiers', async () => {
-      const keyHandler = vi.fn();
-
-      const { result } = renderHook(() => useKeypressContext(), {
-        wrapper: ({ children }) =>
-          wrapper({ children, kittyProtocolEnabled: true }),
-      });
-
-      act(() => result.current.subscribe(keyHandler));
-
-      // Send kitty protocol sequence for numpad enter with Shift (modifier 2): ESC[57414;2u
-      act(() => {
-        stdin.write(`\x1b[57414;2u`);
-      });
-
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'return',
-          kittyProtocol: true,
           ctrl: false,
           meta: false,
           shift: true,
@@ -156,92 +121,42 @@ describe('KeypressContext - Kitty Protocol', () => {
       );
     });
 
-    it('should handle numpad enter with Ctrl modifier', async () => {
-      const keyHandler = vi.fn();
+    it.each([
+      {
+        modifier: 'Shift',
+        sequence: '\x1b[57414;2u',
+        expected: { ctrl: false, meta: false, shift: true },
+      },
+      {
+        modifier: 'Ctrl',
+        sequence: '\x1b[57414;5u',
+        expected: { ctrl: true, meta: false, shift: false },
+      },
+      {
+        modifier: 'Alt',
+        sequence: '\x1b[57414;3u',
+        expected: { ctrl: false, meta: true, shift: false },
+      },
+    ])(
+      'should handle numpad enter with $modifier modifier',
+      async ({ sequence, expected }) => {
+        const { keyHandler } = setupKeypressTest();
 
-      const { result } = renderHook(() => useKeypressContext(), {
-        wrapper: ({ children }) =>
-          wrapper({ children, kittyProtocolEnabled: true }),
-      });
+        act(() => stdin.write(sequence));
 
-      act(() => result.current.subscribe(keyHandler));
-
-      // Send kitty protocol sequence for numpad enter with Ctrl (modifier 5): ESC[57414;5u
-      act(() => stdin.write(`\x1b[57414;5u`));
-
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'return',
-          kittyProtocol: true,
-          ctrl: true,
-          meta: false,
-          shift: false,
-        }),
-      );
-    });
-
-    it('should handle numpad enter with Alt modifier', async () => {
-      const keyHandler = vi.fn();
-
-      const { result } = renderHook(() => useKeypressContext(), {
-        wrapper: ({ children }) =>
-          wrapper({ children, kittyProtocolEnabled: true }),
-      });
-
-      act(() => result.current.subscribe(keyHandler));
-
-      // Send kitty protocol sequence for numpad enter with Alt (modifier 3): ESC[57414;3u
-      act(() => {
-        stdin.write(`\x1b[57414;3u`);
-      });
-
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'return',
-          kittyProtocol: true,
-          ctrl: false,
-          meta: true,
-          shift: false,
-        }),
-      );
-    });
-
-    it('should not process kitty sequences when kitty protocol is disabled', async () => {
-      const keyHandler = vi.fn();
-
-      const { result } = renderHook(() => useKeypressContext(), {
-        wrapper: ({ children }) =>
-          wrapper({ children, kittyProtocolEnabled: false }),
-      });
-
-      act(() => result.current.subscribe(keyHandler));
-
-      // Send kitty protocol sequence for numpad enter
-      act(() => {
-        stdin.write(`\x1b[57414u`);
-      });
-
-      // When kitty protocol is disabled, the sequence should be passed through
-      // as individual keypresses, not recognized as a single enter key
-      expect(keyHandler).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'return',
-          kittyProtocol: true,
-        }),
-      );
-    });
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'return',
+            ...expected,
+          }),
+        );
+      },
+    );
   });
 
   describe('Escape key handling', () => {
     it('should recognize escape key (keycode 27) in kitty protocol', async () => {
-      const keyHandler = vi.fn();
-
-      const { result } = renderHook(() => useKeypressContext(), {
-        wrapper: ({ children }) =>
-          wrapper({ children, kittyProtocolEnabled: true }),
-      });
-
-      act(() => result.current.subscribe(keyHandler));
+      const { keyHandler } = setupKeypressTest();
 
       // Send kitty protocol sequence for escape: ESC[27u
       act(() => {
@@ -251,181 +166,148 @@ describe('KeypressContext - Kitty Protocol', () => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'escape',
-          kittyProtocol: true,
         }),
       );
+    });
+
+    it('should handle double Escape', async () => {
+      const keyHandler = vi.fn();
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <KeypressProvider>{children}</KeypressProvider>
+      );
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        stdin.write('\x1b');
+        vi.advanceTimersByTime(10);
+        stdin.write('\x1b');
+        expect(keyHandler).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(ESC_TIMEOUT);
+
+        expect(keyHandler).toHaveBeenNthCalledWith(
+          1,
+          expect.objectContaining({ name: 'escape', meta: true }),
+        );
+        expect(keyHandler).toHaveBeenNthCalledWith(
+          2,
+          expect.objectContaining({ name: 'escape', meta: true }),
+        );
+      });
+    });
+
+    it('should handle lone Escape key (keycode 27) with timeout when kitty protocol is enabled', async () => {
+      // Use real timers for this test to avoid issues with stream/buffer timing
+      const keyHandler = vi.fn();
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <KeypressProvider>{children}</KeypressProvider>
+      );
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      // Send just ESC
+      act(() => {
+        stdin.write('\x1b');
+
+        // Should be buffered initially
+        expect(keyHandler).not.toHaveBeenCalled();
+
+        vi.advanceTimersByTime(ESC_TIMEOUT + 10);
+
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'escape',
+            meta: true,
+          }),
+        );
+      });
     });
   });
 
   describe('Tab and Backspace handling', () => {
-    it('should recognize Tab key in kitty protocol', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
+    it.each([
+      {
+        name: 'Tab key',
+        sequence: '\x1b[9u',
+        expected: { name: 'tab', shift: false },
+      },
+      {
+        name: 'Shift+Tab',
+        sequence: '\x1b[9;2u',
+        expected: { name: 'tab', shift: true },
+      },
+      {
+        name: 'Backspace',
+        sequence: '\x1b[127u',
+        expected: { name: 'backspace', meta: false },
+      },
+      {
+        name: 'Option+Backspace',
+        sequence: '\x1b[127;3u',
+        expected: { name: 'backspace', meta: true },
+      },
+      {
+        name: 'Ctrl+Backspace',
+        sequence: '\x1b[127;5u',
+        expected: { name: 'backspace', ctrl: true },
+      },
+    ])(
+      'should recognize $name in kitty protocol',
+      async ({ sequence, expected }) => {
+        const { keyHandler } = setupKeypressTest();
 
-      act(() => {
-        stdin.write(`\x1b[9u`);
-      });
+        act(() => {
+          stdin.write(sequence);
+        });
 
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'tab',
-          kittyProtocol: true,
-          shift: false,
-        }),
-      );
-    });
-
-    it('should recognize Shift+Tab in kitty protocol', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-
-      // Modifier 2 is Shift
-      act(() => {
-        stdin.write(`\x1b[9;2u`);
-      });
-
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'tab',
-          kittyProtocol: true,
-          shift: true,
-        }),
-      );
-    });
-
-    it('should recognize Backspace key in kitty protocol', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-
-      act(() => {
-        stdin.write(`\x1b[127u`);
-      });
-
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'backspace',
-          kittyProtocol: true,
-          meta: false,
-        }),
-      );
-    });
-
-    it('should recognize Option+Backspace in kitty protocol', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-
-      // Modifier 3 is Alt/Option
-      act(() => {
-        stdin.write(`\x1b[127;3u`);
-      });
-
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'backspace',
-          kittyProtocol: true,
-          meta: true,
-        }),
-      );
-    });
-
-    it('should recognize Ctrl+Backspace in kitty protocol', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-
-      // Modifier 5 is Ctrl
-      act(() => {
-        stdin.write(`\x1b[127;5u`);
-      });
-
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'backspace',
-          kittyProtocol: true,
-          ctrl: true,
-        }),
-      );
-    });
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            ...expected,
+          }),
+        );
+      },
+    );
   });
 
   describe('paste mode', () => {
-    it('should handle multiline paste as a single event', async () => {
+    it.each([
+      {
+        name: 'handle multiline paste as a single event',
+        pastedText: 'This \n is \n a \n multiline \n paste.',
+        writeSequence: (text: string) => {
+          stdin.write(PASTE_START);
+          stdin.write(text);
+          stdin.write(PASTE_END);
+        },
+      },
+      {
+        name: 'handle paste start code split over multiple writes',
+        pastedText: 'pasted content',
+        writeSequence: (text: string) => {
+          stdin.write(PASTE_START.slice(0, 3));
+          stdin.write(PASTE_START.slice(3));
+          stdin.write(text);
+          stdin.write(PASTE_END);
+        },
+      },
+      {
+        name: 'handle paste end code split over multiple writes',
+        pastedText: 'pasted content',
+        writeSequence: (text: string) => {
+          stdin.write(PASTE_START);
+          stdin.write(text);
+          stdin.write(PASTE_END.slice(0, 3));
+          stdin.write(PASTE_END.slice(3));
+        },
+      },
+    ])('should $name', async ({ pastedText, writeSequence }) => {
       const keyHandler = vi.fn();
-      const pastedText = 'This \n is \n a \n multiline \n paste.';
-
-      const { result } = renderHook(() => useKeypressContext(), {
-        wrapper,
-      });
-
-      act(() => result.current.subscribe(keyHandler));
-
-      // Simulate a bracketed paste event
-      act(() => {
-        stdin.write(PASTE_START);
-        stdin.write(pastedText);
-        stdin.write(PASTE_END);
-      });
-
-      await waitFor(() => {
-        // Expect the handler to be called exactly once for the entire paste
-        expect(keyHandler).toHaveBeenCalledTimes(1);
-      });
-
-      // Verify the single event contains the full pasted text
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          paste: true,
-          sequence: pastedText,
-        }),
-      );
-    });
-    it('should paste start code split over multiple writes', async () => {
-      const keyHandler = vi.fn();
-      const pastedText = 'pasted content';
 
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
 
       act(() => result.current.subscribe(keyHandler));
 
-      act(() => {
-        // Split PASTE_START into two parts
-        stdin.write(PASTE_START.slice(0, 3));
-        stdin.write(PASTE_START.slice(3));
-        stdin.write(pastedText);
-        stdin.write(PASTE_END);
-      });
-
-      await waitFor(() => {
-        expect(keyHandler).toHaveBeenCalledTimes(1);
-      });
-
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          paste: true,
-          sequence: pastedText,
-        }),
-      );
-    });
-
-    it('should paste end code split over multiple writes', async () => {
-      const keyHandler = vi.fn();
-      const pastedText = 'pasted content';
-
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-
-      act(() => result.current.subscribe(keyHandler));
-
-      act(() => {
-        stdin.write(PASTE_START);
-        stdin.write(pastedText);
-        // Split PASTE_END into two parts
-        stdin.write(PASTE_END.slice(0, 3));
-        stdin.write(PASTE_END.slice(3));
-      });
+      act(() => writeSequence(pastedText));
 
       await waitFor(() => {
         expect(keyHandler).toHaveBeenCalledTimes(1);
@@ -441,27 +323,23 @@ describe('KeypressContext - Kitty Protocol', () => {
   });
 
   describe('debug keystroke logging', () => {
-    let consoleLogSpy: ReturnType<typeof vi.spyOn>;
-    let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+    let debugLoggerSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      debugLoggerSpy = vi
+        .spyOn(debugLogger, 'log')
+        .mockImplementation(() => {});
     });
 
     afterEach(() => {
-      consoleLogSpy.mockRestore();
-      consoleWarnSpy.mockRestore();
+      debugLoggerSpy.mockRestore();
     });
 
     it('should not log keystrokes when debugKeystrokeLogging is false', async () => {
       const keyHandler = vi.fn();
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider
-          kittyProtocolEnabled={true}
-          debugKeystrokeLogging={false}
-        >
+        <KeypressProvider debugKeystrokeLogging={false}>
           {children}
         </KeypressProvider>
       );
@@ -476,7 +354,7 @@ describe('KeypressContext - Kitty Protocol', () => {
       });
 
       expect(keyHandler).toHaveBeenCalled();
-      expect(consoleLogSpy).not.toHaveBeenCalledWith(
+      expect(debugLoggerSpy).not.toHaveBeenCalledWith(
         expect.stringContaining('[DEBUG] Kitty'),
       );
     });
@@ -485,10 +363,7 @@ describe('KeypressContext - Kitty Protocol', () => {
       const keyHandler = vi.fn();
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider
-          kittyProtocolEnabled={true}
-          debugKeystrokeLogging={true}
-        >
+        <KeypressProvider debugKeystrokeLogging={true}>
           {children}
         </KeypressProvider>
       );
@@ -500,77 +375,8 @@ describe('KeypressContext - Kitty Protocol', () => {
       // Send a complete kitty sequence for escape
       act(() => stdin.write('\x1b[27u'));
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[DEBUG] Kitty buffer accumulating:',
-        expect.stringContaining('"\\u001b[27u"'),
-      );
-      const parsedCall = consoleLogSpy.mock.calls.find(
-        (args) =>
-          typeof args[0] === 'string' &&
-          args[0].includes('[DEBUG] Kitty sequence parsed successfully'),
-      );
-      expect(parsedCall).toBeTruthy();
-      expect(parsedCall?.[1]).toEqual(expect.stringContaining('\\u001b[27u'));
-    });
-
-    it('should log kitty buffer overflow when debugKeystrokeLogging is true', async () => {
-      const keyHandler = vi.fn();
-
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider
-          kittyProtocolEnabled={true}
-          debugKeystrokeLogging={true}
-        >
-          {children}
-        </KeypressProvider>
-      );
-
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-
-      act(() => result.current.subscribe(keyHandler));
-
-      // Send a long sequence starting with a valid kitty prefix to trigger overflow
-      const longSequence = '\x1b[1;' + '1'.repeat(100);
-      act(() => stdin.write(longSequence));
-
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[DEBUG] Kitty buffer overflow, clearing:',
-        expect.any(String),
-      );
-    });
-
-    it('should log kitty buffer clear on Ctrl+C when debugKeystrokeLogging is true', async () => {
-      const keyHandler = vi.fn();
-
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider
-          kittyProtocolEnabled={true}
-          debugKeystrokeLogging={true}
-        >
-          {children}
-        </KeypressProvider>
-      );
-
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-
-      act(() => result.current.subscribe(keyHandler));
-
-      act(() => stdin.write(INCOMPLETE_KITTY_SEQUENCE));
-
-      // Send Ctrl+C
-      act(() => stdin.write('\x03'));
-
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[DEBUG] Kitty buffer cleared on Ctrl+C:',
-        INCOMPLETE_KITTY_SEQUENCE,
-      );
-
-      // Verify Ctrl+C was handled
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'c',
-          ctrl: true,
-        }),
+      expect(debugLoggerSpy).toHaveBeenCalledWith(
+        `[DEBUG] Raw StdIn: ${JSON.stringify('\x1b[27u')}`,
       );
     });
 
@@ -578,10 +384,7 @@ describe('KeypressContext - Kitty Protocol', () => {
       const keyHandler = vi.fn();
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider
-          kittyProtocolEnabled={true}
-          debugKeystrokeLogging={true}
-        >
+        <KeypressProvider debugKeystrokeLogging={true}>
           {children}
         </KeypressProvider>
       );
@@ -594,32 +397,39 @@ describe('KeypressContext - Kitty Protocol', () => {
       act(() => stdin.write(INCOMPLETE_KITTY_SEQUENCE));
 
       // Verify debug logging for accumulation
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[DEBUG] Kitty buffer accumulating:',
-        JSON.stringify(INCOMPLETE_KITTY_SEQUENCE),
-      );
-
-      // Verify warning for char codes
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        'Kitty sequence buffer has content:',
-        JSON.stringify(INCOMPLETE_KITTY_SEQUENCE),
+      expect(debugLoggerSpy).toHaveBeenCalledWith(
+        `[DEBUG] Raw StdIn: ${JSON.stringify(INCOMPLETE_KITTY_SEQUENCE)}`,
       );
     });
   });
 
   describe('Parameterized functional keys', () => {
     it.each([
-      // Parameterized
+      // ModifyOtherKeys
+      { sequence: `\x1b[27;2;13~`, expected: { name: 'return', shift: true } },
+      { sequence: `\x1b[27;5;13~`, expected: { name: 'return', ctrl: true } },
+      { sequence: `\x1b[27;5;9~`, expected: { name: 'tab', ctrl: true } },
+      {
+        sequence: `\x1b[27;6;9~`,
+        expected: { name: 'tab', ctrl: true, shift: true },
+      },
+      // XTerm Function Key
+      { sequence: `\x1b[1;129A`, expected: { name: 'up' } },
       { sequence: `\x1b[1;2H`, expected: { name: 'home', shift: true } },
       { sequence: `\x1b[1;5F`, expected: { name: 'end', ctrl: true } },
       { sequence: `\x1b[1;1P`, expected: { name: 'f1' } },
       { sequence: `\x1b[1;3Q`, expected: { name: 'f2', meta: true } },
+      // Tilde Function Keys
       { sequence: `\x1b[3~`, expected: { name: 'delete' } },
       { sequence: `\x1b[5~`, expected: { name: 'pageup' } },
       { sequence: `\x1b[6~`, expected: { name: 'pagedown' } },
       { sequence: `\x1b[1~`, expected: { name: 'home' } },
       { sequence: `\x1b[4~`, expected: { name: 'end' } },
       { sequence: `\x1b[2~`, expected: { name: 'insert' } },
+      { sequence: `\x1b[11~`, expected: { name: 'f1' } },
+      { sequence: `\x1b[17~`, expected: { name: 'f6' } },
+      { sequence: `\x1b[23~`, expected: { name: 'f11' } },
+      { sequence: `\x1b[24~`, expected: { name: 'f12' } },
       // Reverse tabs
       { sequence: `\x1b[Z`, expected: { name: 'tab', shift: true } },
       { sequence: `\x1b[1;2Z`, expected: { name: 'tab', shift: true } },
@@ -640,6 +450,7 @@ describe('KeypressContext - Kitty Protocol', () => {
         sequence: `\x1b[D`,
         expected: { name: 'left', ctrl: false, meta: false, shift: false },
       },
+
       // Legacy Home/End
       {
         sequence: `\x1b[H`,
@@ -648,6 +459,10 @@ describe('KeypressContext - Kitty Protocol', () => {
       {
         sequence: `\x1b[F`,
         expected: { name: 'end', ctrl: false, meta: false, shift: false },
+      },
+      {
+        sequence: `\x1b[5H`,
+        expected: { name: 'home', ctrl: true, meta: false, shift: false },
       },
     ])(
       'should recognize sequence "$sequence" as $expected.name',
@@ -667,9 +482,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
   describe('Double-tap and batching', () => {
     it('should emit two delete events for double-tap CSI[3~', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
+      const { keyHandler } = setupKeypressTest();
 
       act(() => stdin.write(`\x1b[3~`));
       act(() => stdin.write(`\x1b[3~`));
@@ -685,9 +498,7 @@ describe('KeypressContext - Kitty Protocol', () => {
     });
 
     it('should parse two concatenated tilde-coded sequences in one chunk', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
+      const { keyHandler } = setupKeypressTest();
 
       act(() => stdin.write(`\x1b[3~\x1b[5~`));
 
@@ -698,288 +509,113 @@ describe('KeypressContext - Kitty Protocol', () => {
         expect.objectContaining({ name: 'pageup' }),
       );
     });
-
-    it('should ignore incomplete CSI then parse the next complete sequence', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-
-      // Incomplete ESC sequence then a complete Delete
-      act(() => {
-        // Provide an incomplete ESC sequence chunk with a real ESC character
-        stdin.write('\x1b[1;');
-      });
-      act(() => stdin.write(`\x1b[3~`));
-
-      expect(keyHandler).toHaveBeenCalledTimes(1);
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'delete' }),
-      );
-    });
-  });
-});
-
-describe('Drag and Drop Handling', () => {
-  let stdin: MockStdin;
-  const mockSetRawMode = vi.fn();
-
-  const wrapper = ({
-    children,
-    kittyProtocolEnabled = true,
-  }: {
-    children: React.ReactNode;
-    kittyProtocolEnabled?: boolean;
-  }) => (
-    <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled}>
-      {children}
-    </KeypressProvider>
-  );
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.useFakeTimers();
-    stdin = new MockStdin();
-    (useStdin as Mock).mockReturnValue({
-      stdin,
-      setRawMode: mockSetRawMode,
-    });
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+  describe('Cross-terminal Alt key handling (simulating macOS)', () => {
+    let originalPlatform: NodeJS.Platform;
 
-  describe('drag start by quotes', () => {
-    it('should start collecting when single quote arrives and not broadcast immediately', async () => {
-      const keyHandler = vi.fn();
-
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-
-      act(() => result.current.subscribe(keyHandler));
-
-      act(() => stdin.write(SINGLE_QUOTE));
-
-      expect(keyHandler).not.toHaveBeenCalled();
-    });
-
-    it('should start collecting when double quote arrives and not broadcast immediately', async () => {
-      const keyHandler = vi.fn();
-
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-
-      act(() => result.current.subscribe(keyHandler));
-
-      act(() => stdin.write(DOUBLE_QUOTE));
-
-      expect(keyHandler).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('drag collection and completion', () => {
-    it('should collect single character inputs during drag mode', async () => {
-      const keyHandler = vi.fn();
-
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-
-      act(() => result.current.subscribe(keyHandler));
-
-      // Start by single quote
-      act(() => stdin.write(SINGLE_QUOTE));
-
-      // Send single character
-      act(() => stdin.write('a'));
-
-      // Character should not be immediately broadcast
-      expect(keyHandler).not.toHaveBeenCalled();
-
-      // Fast-forward to completion timeout
-      act(() => {
-        vi.advanceTimersByTime(DRAG_COMPLETION_TIMEOUT_MS + 10);
-      });
-
-      // Should broadcast the collected path as paste (includes starting quote)
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: '',
-          paste: true,
-          sequence: `${SINGLE_QUOTE}a`,
-        }),
-      );
-    });
-
-    it('should collect multiple characters and complete on timeout', async () => {
-      const keyHandler = vi.fn();
-
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-
-      act(() => result.current.subscribe(keyHandler));
-
-      // Start by single quote
-      act(() => stdin.write(SINGLE_QUOTE));
-
-      // Send multiple characters
-      act(() => stdin.write('p'));
-      act(() => stdin.write('a'));
-      act(() => stdin.write('t'));
-      act(() => stdin.write('h'));
-
-      // Characters should not be immediately broadcast
-      expect(keyHandler).not.toHaveBeenCalled();
-
-      // Fast-forward to completion timeout
-      act(() => {
-        vi.advanceTimersByTime(DRAG_COMPLETION_TIMEOUT_MS + 10);
-      });
-
-      // Should broadcast the collected path as paste (includes starting quote)
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: '',
-          paste: true,
-          sequence: `${SINGLE_QUOTE}path`,
-        }),
-      );
-    });
-  });
-});
-
-describe('Kitty Sequence Parsing', () => {
-  let stdin: MockStdin;
-  const mockSetRawMode = vi.fn();
-
-  const wrapper = ({
-    children,
-    kittyProtocolEnabled = true,
-  }: {
-    children: React.ReactNode;
-    kittyProtocolEnabled?: boolean;
-  }) => (
-    <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled}>
-      {children}
-    </KeypressProvider>
-  );
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.useFakeTimers();
-    stdin = new MockStdin();
-    (useStdin as Mock).mockReturnValue({
-      stdin,
-      setRawMode: mockSetRawMode,
-    });
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  // Terminals to test
-  const terminals = ['iTerm2', 'Ghostty', 'MacTerminal', 'VSCodeTerminal'];
-
-  // Key mappings: letter -> [keycode, accented character]
-  const keys: Record<string, [number, string]> = {
-    a: [97, 'å'],
-    o: [111, 'ø'],
-    m: [109, 'µ'],
-  };
-
-  it.each(
-    terminals.flatMap((terminal) =>
-      Object.entries(keys).map(([key, [keycode, accentedChar]]) => {
-        if (terminal === 'Ghostty') {
-          // Ghostty uses kitty protocol sequences
-          return {
-            terminal,
-            key,
-            chunk: `\x1b[${keycode};3u`,
-            expected: {
-              name: key,
-              ctrl: false,
-              meta: true,
-              shift: false,
-              paste: false,
-              kittyProtocol: true,
-            },
-          };
-        } else if (terminal === 'MacTerminal') {
-          // Mac Terminal sends ESC + letter
-          return {
-            terminal,
-            key,
-            kitty: false,
-            chunk: `\x1b${key}`,
-            expected: {
-              sequence: `\x1b${key}`,
-              name: key,
-              ctrl: false,
-              meta: true,
-              shift: false,
-              paste: false,
-            },
-          };
-        } else {
-          // iTerm2 and VSCode send accented characters (å, ø, µ)
-          // Note: µ (mu) is sent with meta:false on iTerm2/VSCode but
-          // gets converted to m with meta:true
-          return {
-            terminal,
-            key,
-            chunk: accentedChar,
-            expected: {
-              name: key,
-              ctrl: false,
-              meta: true, // Always expect meta:true after conversion
-              shift: false,
-              paste: false,
-              sequence: accentedChar,
-            },
-          };
-        }
-      }),
-    ),
-  )(
-    'should handle Alt+$key in $terminal',
-    ({
-      chunk,
-      expected,
-      kitty = true,
-    }: {
-      chunk: string;
-      expected: Partial<Key>;
-      kitty?: boolean;
-    }) => {
-      const keyHandler = vi.fn();
-      const testWrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider kittyProtocolEnabled={kitty}>
-          {children}
-        </KeypressProvider>
-      );
-      const { result } = renderHook(() => useKeypressContext(), {
-        wrapper: testWrapper,
-      });
-      act(() => result.current.subscribe(keyHandler));
-
-      act(() => stdin.write(chunk));
-
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining(expected),
-      );
-    },
-  );
-
-  describe('Backslash key handling', () => {
     beforeEach(() => {
-      vi.useFakeTimers();
+      originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', {
+        value: 'darwin',
+        configurable: true,
+      });
     });
 
     afterEach(() => {
-      vi.useRealTimers();
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        configurable: true,
+      });
     });
 
+    // Terminals to test
+    const terminals = ['iTerm2', 'Ghostty', 'MacTerminal', 'VSCodeTerminal'];
+
+    // Key mappings: letter -> [keycode, accented character]
+    const keys: Record<string, [number, string]> = {
+      b: [98, '\u222B'],
+      f: [102, '\u0192'],
+      m: [109, '\u00B5'],
+    };
+
+    it.each(
+      terminals.flatMap((terminal) =>
+        Object.entries(keys).map(([key, [keycode, accentedChar]]) => {
+          if (terminal === 'Ghostty') {
+            // Ghostty uses kitty protocol sequences
+            return {
+              terminal,
+              key,
+              chunk: `\x1b[${keycode};3u`,
+              expected: {
+                name: key,
+                ctrl: false,
+                meta: true,
+                shift: false,
+                paste: false,
+              },
+            };
+          } else if (terminal === 'MacTerminal') {
+            // Mac Terminal sends ESC + letter
+            return {
+              terminal,
+              key,
+              kitty: false,
+              chunk: `\x1b${key}`,
+              expected: {
+                sequence: `\x1b${key}`,
+                name: key,
+                ctrl: false,
+                meta: true,
+                shift: false,
+                paste: false,
+              },
+            };
+          } else {
+            // iTerm2 and VSCode send accented characters (å, ø, µ)
+            // Note: µ (mu) is sent with meta:false on iTerm2/VSCode but
+            // gets converted to m with meta:true
+            return {
+              terminal,
+              key,
+              chunk: accentedChar,
+              expected: {
+                name: key,
+                ctrl: false,
+                meta: true, // Always expect meta:true after conversion
+                shift: false,
+                paste: false,
+                sequence: accentedChar,
+              },
+            };
+          }
+        }),
+      ),
+    )(
+      'should handle Alt+$key in $terminal',
+      ({ chunk, expected }: { chunk: string; expected: Partial<Key> }) => {
+        const keyHandler = vi.fn();
+        const testWrapper = ({ children }: { children: React.ReactNode }) => (
+          <KeypressProvider>{children}</KeypressProvider>
+        );
+        const { result } = renderHook(() => useKeypressContext(), {
+          wrapper: testWrapper,
+        });
+        act(() => result.current.subscribe(keyHandler));
+
+        act(() => stdin.write(chunk));
+
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining(expected),
+        );
+      },
+    );
+  });
+
+  describe('Backslash key handling', () => {
     it('should treat backslash as a regular keystroke', () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
+      const { keyHandler } = setupKeypressTest();
 
       act(() => stdin.write('\\'));
 
@@ -1009,18 +645,20 @@ describe('Kitty Sequence Parsing', () => {
     expect(keyHandler).not.toHaveBeenCalled();
 
     // Advance time just before timeout
-    act(() => vi.advanceTimersByTime(KITTY_SEQUENCE_TIMEOUT_MS - 5));
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    act(() => vi.advanceTimersByTime(ESC_TIMEOUT - 5));
 
     // Still shouldn't broadcast
     expect(keyHandler).not.toHaveBeenCalled();
 
     // Advance past timeout
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     act(() => vi.advanceTimersByTime(10));
 
     // Should now broadcast the incomplete sequence as regular input
     expect(keyHandler).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: '',
+        name: 'undefined',
         sequence: INCOMPLETE_KITTY_SEQUENCE,
         paste: false,
       }),
@@ -1040,7 +678,6 @@ describe('Kitty Sequence Parsing', () => {
     // Should broadcast immediately as it's not a valid kitty pattern
     expect(keyHandler).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: '',
         sequence: '\x1b[m',
         paste: false,
       }),
@@ -1061,7 +698,6 @@ describe('Kitty Sequence Parsing', () => {
       expect.objectContaining({
         name: 'a',
         ctrl: true,
-        kittyProtocol: true,
       }),
     );
   });
@@ -1082,38 +718,12 @@ describe('Kitty Sequence Parsing', () => {
       expect.objectContaining({
         name: 'a',
         ctrl: true,
-        kittyProtocol: true,
       }),
     );
     expect(keyHandler).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         name: 'b',
-        ctrl: true,
-        kittyProtocol: true,
-      }),
-    );
-  });
-
-  it('should clear kitty buffer and timeout on Ctrl+C', async () => {
-    const keyHandler = vi.fn();
-    const { result } = renderHook(() => useKeypressContext(), { wrapper });
-
-    act(() => result.current.subscribe(keyHandler));
-
-    act(() => stdin.write(INCOMPLETE_KITTY_SEQUENCE));
-
-    // Press Ctrl+C
-    act(() => stdin.write('\x03'));
-
-    // Advance past timeout
-    act(() => vi.advanceTimersByTime(KITTY_SEQUENCE_TIMEOUT_MS + 10));
-
-    // Should only have received Ctrl+C, not the incomplete sequence
-    expect(keyHandler).toHaveBeenCalledTimes(1);
-    expect(keyHandler).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'c',
         ctrl: true,
       }),
     );
@@ -1135,73 +745,41 @@ describe('Kitty Sequence Parsing', () => {
       1,
       expect.objectContaining({
         name: 'return',
-        kittyProtocol: true,
       }),
     );
     expect(keyHandler).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        name: '',
         sequence: '\x1b[!',
       }),
     );
   });
 
-  it('should not buffer sequences when kitty protocol is disabled', async () => {
-    const keyHandler = vi.fn();
-    const { result } = renderHook(() => useKeypressContext(), {
-      wrapper: ({ children }) =>
-        wrapper({ children, kittyProtocolEnabled: false }),
-    });
+  it.each([1, ESC_TIMEOUT - 1])(
+    'should handle sequences arriving character by character with %s ms delay',
+    async (delay) => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
 
-    act(() => result.current.subscribe(keyHandler));
+      act(() => result.current.subscribe(keyHandler));
 
-    // Send what would be a kitty sequence
-    act(() => stdin.write('\x1b[13u'));
+      // Send kitty sequence character by character
+      for (const char of '\x1b[27u') {
+        act(() => stdin.write(char));
+        // Advance time but not enough to timeout
+        vi.advanceTimersByTime(delay);
+      }
 
-    // Should pass through without parsing
-    expect(keyHandler).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sequence: '\x1b[13u',
-      }),
-    );
-    expect(keyHandler).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'return',
-        kittyProtocol: true,
-      }),
-    );
-  });
-
-  it('should handle sequences arriving character by character', async () => {
-    vi.useRealTimers(); // Required for correct buffering timing.
-
-    const keyHandler = vi.fn();
-    const { result } = renderHook(() => useKeypressContext(), { wrapper });
-
-    act(() => {
-      result.current.subscribe(keyHandler);
-    });
-
-    // Send kitty sequence character by character
-    const sequence = '\x1b[27u'; // Escape key
-    for (const char of sequence) {
-      act(() => {
-        stdin.emit('data', Buffer.from(char));
+      // Should parse once complete
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'escape',
+          }),
+        );
       });
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-
-    // Should parse once complete
-    await waitFor(() => {
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'escape',
-          kittyProtocol: true,
-        }),
-      );
-    });
-  });
+    },
+  );
 
   it('should reset timeout when new input arrives', async () => {
     const keyHandler = vi.fn();
@@ -1213,12 +791,14 @@ describe('Kitty Sequence Parsing', () => {
     act(() => stdin.write('\x1b[97;13'));
 
     // Advance time partway
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     act(() => vi.advanceTimersByTime(30));
 
     // Add more to sequence
     act(() => stdin.write('5'));
 
     // Advance time from the first timeout point
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     act(() => vi.advanceTimersByTime(25));
 
     // Should not have timed out yet (timeout restarted)
@@ -1231,105 +811,186 @@ describe('Kitty Sequence Parsing', () => {
     expect(keyHandler).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'a',
-        kittyProtocol: true,
       }),
     );
   });
 
-  it('should flush incomplete kitty sequence on FOCUS_IN event', async () => {
-    const keyHandler = vi.fn();
-    const { result } = renderHook(() => useKeypressContext(), { wrapper });
+  describe('SGR Mouse Handling', () => {
+    it('should ignore SGR mouse sequences', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
 
-    act(() => result.current.subscribe(keyHandler));
+      act(() => result.current.subscribe(keyHandler));
 
-    act(() => stdin.write(INCOMPLETE_KITTY_SEQUENCE));
+      // Send various SGR mouse sequences
+      act(() => {
+        stdin.write('\x1b[<0;10;20M'); // Mouse press
+        stdin.write('\x1b[<0;10;20m'); // Mouse release
+        stdin.write('\x1b[<32;30;40M'); // Mouse drag
+        stdin.write('\x1b[<64;5;5M'); // Scroll up
+      });
 
-    // Incomplete sequence should be buffered, not broadcast
-    expect(keyHandler).not.toHaveBeenCalled();
-
-    // Send FOCUS_IN event
-    act(() => stdin.write('\x1b[I'));
-
-    // The buffered sequence should be flushed
-    expect(keyHandler).toHaveBeenCalledTimes(1);
-    expect(keyHandler).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: '',
-        sequence: INCOMPLETE_KITTY_SEQUENCE,
-        paste: false,
-      }),
-    );
-  });
-
-  it('should flush incomplete kitty sequence on FOCUS_OUT event', async () => {
-    const keyHandler = vi.fn();
-    const { result } = renderHook(() => useKeypressContext(), { wrapper });
-
-    act(() => result.current.subscribe(keyHandler));
-
-    act(() => stdin.write(INCOMPLETE_KITTY_SEQUENCE));
-
-    // Incomplete sequence should be buffered, not broadcast
-    expect(keyHandler).not.toHaveBeenCalled();
-
-    // Send FOCUS_OUT event
-    act(() => stdin.write('\x1b[O'));
-
-    // The buffered sequence should be flushed
-    expect(keyHandler).toHaveBeenCalledTimes(1);
-    expect(keyHandler).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: '',
-        sequence: INCOMPLETE_KITTY_SEQUENCE,
-        paste: false,
-      }),
-    );
-  });
-
-  it('should flush incomplete kitty sequence on paste event', async () => {
-    vi.useFakeTimers();
-    const keyHandler = vi.fn();
-    const { result } = renderHook(() => useKeypressContext(), { wrapper });
-
-    act(() => result.current.subscribe(keyHandler));
-
-    act(() => stdin.write(INCOMPLETE_KITTY_SEQUENCE));
-
-    // Incomplete sequence should be buffered, not broadcast
-    expect(keyHandler).not.toHaveBeenCalled();
-
-    // Send paste start sequence
-    act(() => stdin.write(`\x1b[200~`));
-
-    // The buffered sequence should be flushed
-    expect(keyHandler).toHaveBeenCalledTimes(1);
-    expect(keyHandler).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: '',
-        sequence: INCOMPLETE_KITTY_SEQUENCE,
-        paste: false,
-      }),
-    );
-
-    // Now send some paste content and end paste to make sure paste still works
-    const pastedText = 'hello';
-    const PASTE_MODE_SUFFIX = `\x1b[201~`;
-    act(() => {
-      stdin.write(pastedText);
-      stdin.write(PASTE_MODE_SUFFIX);
+      // Should not broadcast any of these as keystrokes
+      expect(keyHandler).not.toHaveBeenCalled();
     });
 
-    act(() => vi.runAllTimers());
+    it('should handle mixed SGR mouse and key sequences', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
 
-    // The paste event should be broadcast
-    expect(keyHandler).toHaveBeenCalledTimes(2);
-    expect(keyHandler).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        paste: true,
-        sequence: pastedText,
-      }),
-    );
-    vi.useRealTimers();
+      act(() => result.current.subscribe(keyHandler));
+
+      // Send mouse event then a key press
+      act(() => {
+        stdin.write('\x1b[<0;10;20M');
+        stdin.write('a');
+      });
+
+      // Should only broadcast 'a'
+      expect(keyHandler).toHaveBeenCalledTimes(1);
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'a',
+          sequence: 'a',
+        }),
+      );
+    });
+
+    it('should ignore X11 mouse sequences', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      // Send X11 mouse sequence: ESC [ M followed by 3 bytes
+      // Space is 32. 32+0=32 (button 0), 32+33=65 ('A', col 33), 32+34=66 ('B', row 34)
+      const x11Seq = '\x1b[M AB';
+
+      act(() => stdin.write(x11Seq));
+
+      // Should not broadcast as keystrokes
+      expect(keyHandler).not.toHaveBeenCalled();
+    });
+
+    it('should not flush slow SGR mouse sequences as garbage', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      // Send start of SGR sequence
+      act(() => stdin.write('\x1b[<'));
+
+      // Advance time past the normal kitty timeout (50ms)
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      act(() => vi.advanceTimersByTime(ESC_TIMEOUT + 10));
+
+      // Send the rest
+      act(() => stdin.write('0;37;25M'));
+
+      // Should NOT have flushed the prefix as garbage, and should have consumed the whole thing
+      expect(keyHandler).not.toHaveBeenCalled();
+    });
+
+    it('should ignore specific SGR mouse sequence sandwiched between keystrokes', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        stdin.write('H');
+        stdin.write('\x1b[<64;96;8M');
+        stdin.write('I');
+      });
+
+      expect(keyHandler).toHaveBeenCalledTimes(2);
+      expect(keyHandler).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ name: 'h', sequence: 'H', shift: true }),
+      );
+      expect(keyHandler).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ name: 'i', sequence: 'I', shift: true }),
+      );
+    });
+  });
+
+  describe('Ignored Sequences', () => {
+    it.each([
+      { name: 'Focus In', sequence: '\x1b[I' },
+      { name: 'Focus Out', sequence: '\x1b[O' },
+      { name: 'SGR Mouse Release', sequence: '\u001b[<0;44;18m' },
+      { name: 'something mouse', sequence: '\u001b[<0;53;19M' },
+      { name: 'another mouse', sequence: '\u001b[<0;29;19m' },
+    ])('should ignore $name sequence', async ({ sequence }) => {
+      const keyHandler = vi.fn();
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <KeypressProvider>{children}</KeypressProvider>
+      );
+      const { result } = renderHook(() => useKeypressContext(), {
+        wrapper,
+      });
+      act(() => result.current.subscribe(keyHandler));
+
+      for (const char of sequence) {
+        act(() => stdin.write(char));
+
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        act(() => vi.advanceTimersByTime(0));
+      }
+
+      act(() => stdin.write('HI'));
+
+      expect(keyHandler).toHaveBeenCalledTimes(2);
+      expect(keyHandler).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ name: 'h', sequence: 'H', shift: true }),
+      );
+      expect(keyHandler).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ name: 'i', sequence: 'I', shift: true }),
+      );
+    });
+
+    it('should handle F12', async () => {
+      const keyHandler = vi.fn();
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <KeypressProvider>{children}</KeypressProvider>
+      );
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        stdin.write('\u001b[24~');
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'f12', sequence: '\u001b[24~' }),
+      );
+    });
+  });
+
+  describe('Individual Character Input', () => {
+    it.each([
+      'abc', // ASCII character
+      '你好', // Chinese characters
+      'こんにちは', // Japanese characters
+      '안녕하세요', // Korean characters
+      'A你B好C', // Mixed characters
+    ])('should correctly handle string "%s"', async (inputString) => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => stdin.write(inputString));
+
+      expect(keyHandler).toHaveBeenCalledTimes(inputString.length);
+      for (const char of inputString) {
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({ sequence: char }),
+        );
+      }
+    });
   });
 });

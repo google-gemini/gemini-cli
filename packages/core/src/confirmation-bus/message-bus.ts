@@ -4,10 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import type { PolicyEngine } from '../policy/policy-engine.js';
-import { PolicyDecision } from '../policy/types.js';
-import { MessageBusType, type Message } from './types.js';
+import { PolicyDecision, getHookSource } from '../policy/types.js';
+import {
+  MessageBusType,
+  type Message,
+  type HookPolicyDecision,
+} from './types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
 export class MessageBus extends EventEmitter {
@@ -38,7 +43,7 @@ export class MessageBus extends EventEmitter {
     this.emit(message.type, message);
   }
 
-  publish(message: Message): void {
+  async publish(message: Message): Promise<void> {
     if (this.debug) {
       console.debug(`[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`);
     }
@@ -50,7 +55,10 @@ export class MessageBus extends EventEmitter {
       }
 
       if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
-        const decision = this.policyEngine.check(message.toolCall);
+        const { decision } = await this.policyEngine.check(
+          message.toolCall,
+          message.serverName,
+        );
 
         switch (decision) {
           case PolicyDecision.ALLOW:
@@ -80,6 +88,39 @@ export class MessageBus extends EventEmitter {
           default:
             throw new Error(`Unknown policy decision: ${decision}`);
         }
+      } else if (message.type === MessageBusType.HOOK_EXECUTION_REQUEST) {
+        // Handle hook execution requests through policy evaluation
+        const hookRequest = message;
+        const decision = await this.policyEngine.checkHook(hookRequest);
+
+        // Map decision to allow/deny for observability (ASK_USER treated as deny for hooks)
+        const effectiveDecision =
+          decision === PolicyDecision.ALLOW ? 'allow' : 'deny';
+
+        // Emit policy decision for observability
+        this.emitMessage({
+          type: MessageBusType.HOOK_POLICY_DECISION,
+          eventName: hookRequest.eventName,
+          hookSource: getHookSource(hookRequest.input),
+          decision: effectiveDecision,
+          reason:
+            decision !== PolicyDecision.ALLOW
+              ? 'Hook execution denied by policy'
+              : undefined,
+        } as HookPolicyDecision);
+
+        // If allowed, emit the request for hook system to handle
+        if (decision === PolicyDecision.ALLOW) {
+          this.emitMessage(message);
+        } else {
+          // If denied or ASK_USER, emit error response (hooks don't support interactive confirmation)
+          this.emitMessage({
+            type: MessageBusType.HOOK_EXECUTION_RESPONSE,
+            correlationId: hookRequest.correlationId,
+            success: false,
+            error: new Error('Hook execution denied by policy'),
+          });
+        }
       } else {
         // For all other message types, just emit them
         this.emitMessage(message);
@@ -101,5 +142,48 @@ export class MessageBus extends EventEmitter {
     listener: (message: T) => void,
   ): void {
     this.off(type, listener);
+  }
+
+  /**
+   * Request-response pattern: Publish a message and wait for a correlated response
+   * This enables synchronous-style communication over the async MessageBus
+   * The correlation ID is generated internally and added to the request
+   */
+  async request<TRequest extends Message, TResponse extends Message>(
+    request: Omit<TRequest, 'correlationId'>,
+    responseType: TResponse['type'],
+    timeoutMs: number = 60000,
+  ): Promise<TResponse> {
+    const correlationId = randomUUID();
+
+    return new Promise<TResponse>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        cleanup();
+        reject(new Error(`Request timed out waiting for ${responseType}`));
+      }, timeoutMs);
+
+      const cleanup = () => {
+        clearTimeout(timeoutId);
+        this.unsubscribe(responseType, responseHandler);
+      };
+
+      const responseHandler = (response: TResponse) => {
+        // Check if this response matches our request
+        if (
+          'correlationId' in response &&
+          response.correlationId === correlationId
+        ) {
+          cleanup();
+          resolve(response);
+        }
+      };
+
+      // Subscribe to responses
+      this.subscribe<TResponse>(responseType, responseHandler);
+
+      // Publish the request with correlation ID
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      this.publish({ ...request, correlationId } as TRequest);
+    });
   }
 }

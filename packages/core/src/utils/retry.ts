@@ -8,19 +8,18 @@ import type { GenerateContentResponse } from '@google/genai';
 import { ApiError } from '@google/genai';
 import { AuthType } from '../core/contentGenerator.js';
 import {
-  classifyGoogleError,
-  RetryableQuotaError,
   TerminalQuotaError,
+  RetryableQuotaError,
+  classifyGoogleError,
 } from './googleQuotaErrors.js';
 import { delay, createAbortError } from './delay.js';
 import { debugLogger } from './debugLogger.js';
+import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
+import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
+import { classifyFailureKind } from '../availability/errorClassification.js';
+import { applyAvailabilityTransition } from '../availability/policyHelpers.js';
 
-const FETCH_FAILED_MESSAGE =
-  'exception TypeError: fetch failed sending request';
-
-export interface HttpError extends Error {
-  status?: number;
-}
+export type { RetryAvailabilityContext };
 
 export interface RetryOptions {
   maxAttempts: number;
@@ -35,14 +34,49 @@ export interface RetryOptions {
   authType?: string;
   retryFetchErrors?: boolean;
   signal?: AbortSignal;
+  getAvailabilityContext?: () => RetryAvailabilityContext | undefined;
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   maxAttempts: 3,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
-  shouldRetryOnError: defaultShouldRetry,
+  shouldRetryOnError: isRetryableError,
 };
+
+const RETRYABLE_NETWORK_CODES = [
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'EPIPE',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ECONNREFUSED',
+];
+
+function getNetworkErrorCode(error: unknown): string | undefined {
+  const getCode = (obj: unknown): string | undefined => {
+    if (typeof obj !== 'object' || obj === null) {
+      return undefined;
+    }
+    if ('code' in obj && typeof (obj as { code: unknown }).code === 'string') {
+      return (obj as { code: string }).code;
+    }
+    return undefined;
+  };
+
+  const directCode = getCode(error);
+  if (directCode) {
+    return directCode;
+  }
+
+  if (typeof error === 'object' && error !== null && 'cause' in error) {
+    return getCode((error as { cause: unknown }).cause);
+  }
+
+  return undefined;
+}
+
+const FETCH_FAILED_MESSAGE = 'fetch failed';
 
 /**
  * Default predicate function to determine if a retry should be attempted.
@@ -51,16 +85,21 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
  * @param retryFetchErrors Whether to retry on specific fetch errors.
  * @returns True if the error is a transient error, false otherwise.
  */
-function defaultShouldRetry(
+export function isRetryableError(
   error: Error | unknown,
   retryFetchErrors?: boolean,
 ): boolean {
-  if (
-    retryFetchErrors &&
-    error instanceof Error &&
-    error.message.includes(FETCH_FAILED_MESSAGE)
-  ) {
+  // Check for common network error codes
+  const errorCode = getNetworkErrorCode(error);
+  if (errorCode && RETRYABLE_NETWORK_CODES.includes(errorCode)) {
     return true;
+  }
+
+  if (retryFetchErrors && error instanceof Error) {
+    // Check for generic fetch failed message (case-insensitive)
+    if (error.message.toLowerCase().includes(FETCH_FAILED_MESSAGE)) {
+      return true;
+    }
   }
 
   // Priority check for ApiError
@@ -112,8 +151,10 @@ export async function retryWithBackoff<T>(
     shouldRetryOnContent,
     retryFetchErrors,
     signal,
+    getAvailabilityContext,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
+    shouldRetryOnError: isRetryableError,
     ...cleanOptions,
   };
 
@@ -139,6 +180,11 @@ export async function retryWithBackoff<T>(
         continue;
       }
 
+      const successContext = getAvailabilityContext?.();
+      if (successContext) {
+        successContext.service.markHealthy(successContext.policy.model);
+      }
+
       return result;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
@@ -146,8 +192,19 @@ export async function retryWithBackoff<T>(
       }
 
       const classifiedError = classifyGoogleError(error);
+      const failureKind = classifyFailureKind(classifiedError);
+      const appliedImmediate =
+        failureKind === 'terminal' || failureKind === 'not_found';
+      if (appliedImmediate) {
+        applyAvailabilityTransition(getAvailabilityContext, failureKind);
+      }
 
-      if (classifiedError instanceof TerminalQuotaError) {
+      const errorCode = getErrorStatus(error);
+
+      if (
+        classifiedError instanceof TerminalQuotaError ||
+        classifiedError instanceof ModelNotFoundError
+      ) {
         if (onPersistent429 && authType === AuthType.LOGIN_WITH_GOOGLE) {
           try {
             const fallbackModel = await onPersistent429(
@@ -163,10 +220,14 @@ export async function retryWithBackoff<T>(
             debugLogger.warn('Fallback to Flash model failed:', fallbackError);
           }
         }
+        // Terminal/not_found already recorded; nothing else to mark here.
         throw classifiedError; // Throw if no fallback or fallback failed.
       }
 
-      if (classifiedError instanceof RetryableQuotaError) {
+      const is500 =
+        errorCode !== undefined && errorCode >= 500 && errorCode < 600;
+
+      if (classifiedError instanceof RetryableQuotaError || is500) {
         if (attempt >= maxAttempts) {
           if (onPersistent429 && authType === AuthType.LOGIN_WITH_GOOGLE) {
             try {
@@ -183,13 +244,31 @@ export async function retryWithBackoff<T>(
               console.warn('Model fallback failed:', fallbackError);
             }
           }
-          throw classifiedError;
+          if (!appliedImmediate) {
+            applyAvailabilityTransition(getAvailabilityContext, failureKind);
+          }
+          throw classifiedError instanceof RetryableQuotaError
+            ? classifiedError
+            : error;
         }
-        console.warn(
-          `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${classifiedError.retryDelayMs}ms...`,
-        );
-        await delay(classifiedError.retryDelayMs, signal);
-        continue;
+
+        if (classifiedError instanceof RetryableQuotaError) {
+          console.warn(
+            `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${classifiedError.retryDelayMs}ms...`,
+          );
+          await delay(classifiedError.retryDelayMs, signal);
+          continue;
+        } else {
+          const errorStatus = getErrorStatus(error);
+          logRetryAttempt(attempt, error, errorStatus);
+
+          // Exponential backoff with jitter for non-quota errors
+          const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
+          const delayWithJitter = Math.max(0, currentDelay + jitter);
+          await delay(delayWithJitter, signal);
+          currentDelay = Math.min(maxDelayMs, currentDelay * 2);
+          continue;
+        }
       }
 
       // Generic retry logic for other errors
@@ -197,6 +276,9 @@ export async function retryWithBackoff<T>(
         attempt >= maxAttempts ||
         !shouldRetryOnError(error as Error, retryFetchErrors)
       ) {
+        if (!appliedImmediate) {
+          applyAvailabilityTransition(getAvailabilityContext, failureKind);
+        }
         throw error;
       }
 
@@ -212,33 +294,6 @@ export async function retryWithBackoff<T>(
   }
 
   throw new Error('Retry attempts exhausted');
-}
-
-/**
- * Extracts the HTTP status code from an error object.
- * @param error The error object.
- * @returns The HTTP status code, or undefined if not found.
- */
-export function getErrorStatus(error: unknown): number | undefined {
-  if (typeof error === 'object' && error !== null) {
-    if ('status' in error && typeof error.status === 'number') {
-      return error.status;
-    }
-    // Check for error.response.status (common in axios errors)
-    if (
-      'response' in error &&
-      typeof (error as { response?: unknown }).response === 'object' &&
-      (error as { response?: unknown }).response !== null
-    ) {
-      const response = (
-        error as { response: { status?: unknown; headers?: unknown } }
-      ).response;
-      if ('status' in response && typeof response.status === 'number') {
-        return response.status;
-      }
-    }
-  }
-  return undefined;
 }
 
 /**

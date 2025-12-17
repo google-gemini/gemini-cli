@@ -17,6 +17,7 @@ import {
   FatalToolExecutionError,
   isFatalToolError,
 } from '@google/gemini-cli-core';
+import { runSyncCleanup } from './cleanup.js';
 
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -90,6 +91,7 @@ export function handleError(
       stats: streamFormatter.convertToStreamStats(metrics, 0),
     });
 
+    runSyncCleanup();
     process.exit(getNumericExitCode(errorCode));
   } else if (config.getOutputFormat() === OutputFormat.JSON) {
     const formatter = new JsonFormatter();
@@ -98,9 +100,11 @@ export function handleError(
     const formattedError = formatter.formatError(
       error instanceof Error ? error : new Error(getErrorMessage(error)),
       errorCode,
+      config.getSessionId(),
     );
 
     console.error(formattedError);
+    runSyncCleanup();
     process.exit(getNumericExitCode(errorCode));
   } else {
     console.error(errorMessage);
@@ -149,11 +153,13 @@ export function handleToolError(
       const formattedError = formatter.formatError(
         toolExecutionError,
         errorType ?? toolExecutionError.exitCode,
+        config.getSessionId(),
       );
       console.error(formattedError);
     } else {
       console.error(errorMessage);
     }
+    runSyncCleanup();
     process.exit(toolExecutionError.exitCode);
   }
 
@@ -180,18 +186,22 @@ export function handleCancellationError(config: Config): never {
       },
       stats: streamFormatter.convertToStreamStats(metrics, 0),
     });
+    runSyncCleanup();
     process.exit(cancellationError.exitCode);
   } else if (config.getOutputFormat() === OutputFormat.JSON) {
     const formatter = new JsonFormatter();
     const formattedError = formatter.formatError(
       cancellationError,
       cancellationError.exitCode,
+      config.getSessionId(),
     );
 
     console.error(formattedError);
+    runSyncCleanup();
     process.exit(cancellationError.exitCode);
   } else {
     console.error(cancellationError.message);
+    runSyncCleanup();
     process.exit(cancellationError.exitCode);
   }
 }
@@ -217,18 +227,22 @@ export function handleMaxTurnsExceededError(config: Config): never {
       },
       stats: streamFormatter.convertToStreamStats(metrics, 0),
     });
+    runSyncCleanup();
     process.exit(maxTurnsError.exitCode);
   } else if (config.getOutputFormat() === OutputFormat.JSON) {
     const formatter = new JsonFormatter();
     const formattedError = formatter.formatError(
       maxTurnsError,
       maxTurnsError.exitCode,
+      config.getSessionId(),
     );
 
     console.error(formattedError);
+    runSyncCleanup();
     process.exit(maxTurnsError.exitCode);
   } else {
     console.error(maxTurnsError.message);
+    runSyncCleanup();
     process.exit(maxTurnsError.exitCode);
   }
 }

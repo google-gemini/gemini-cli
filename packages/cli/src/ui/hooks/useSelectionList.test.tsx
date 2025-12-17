@@ -6,7 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import {
   useSelectionList,
   type SelectionListItem,
@@ -47,16 +48,21 @@ describe('useSelectionList', () => {
     mockOnHighlight.mockClear();
   });
 
-  const pressKey = (name: string, sequence: string = name) => {
+  const pressKey = (
+    name: string,
+    sequence: string = name,
+    options: { shift?: boolean; ctrl?: boolean } = {},
+  ) => {
     act(() => {
       if (activeKeypressHandler) {
         const key: Key = {
           name,
           sequence,
-          ctrl: false,
+          ctrl: options.ctrl ?? false,
           meta: false,
-          shift: false,
+          shift: options.shift ?? false,
           paste: false,
+          insertable: false,
         };
         activeKeypressHandler(key);
       } else {
@@ -67,7 +73,7 @@ describe('useSelectionList', () => {
     });
   };
 
-  const renderSelectionListHook = (initialProps: {
+  const renderSelectionListHook = async (initialProps: {
     items: Array<SelectionListItem<string>>;
     onSelect: (item: string) => void;
     onHighlight?: (item: string) => void;
@@ -87,23 +93,26 @@ describe('useSelectionList', () => {
           return hookResult;
         },
       },
-      rerender: (newProps: Partial<typeof initialProps>) =>
-        rerender(<TestComponent {...initialProps} {...newProps} />),
-      unmount,
+      rerender: async (newProps: Partial<typeof initialProps>) => {
+        rerender(<TestComponent {...initialProps} {...newProps} />);
+      },
+      unmount: async () => {
+        unmount();
+      },
     };
   };
 
   describe('Initialization', () => {
-    it('should initialize with the default index (0) if enabled', () => {
-      const { result } = renderSelectionListHook({
+    it('should initialize with the default index (0) if enabled', async () => {
+      const { result } = await renderSelectionListHook({
         items,
         onSelect: mockOnSelect,
       });
       expect(result.current.activeIndex).toBe(0);
     });
 
-    it('should initialize with the provided initialIndex if enabled', () => {
-      const { result } = renderSelectionListHook({
+    it('should initialize with the provided initialIndex if enabled', async () => {
+      const { result } = await renderSelectionListHook({
         items,
         initialIndex: 2,
         onSelect: mockOnSelect,
@@ -111,16 +120,16 @@ describe('useSelectionList', () => {
       expect(result.current.activeIndex).toBe(2);
     });
 
-    it('should handle an empty list gracefully', () => {
-      const { result } = renderSelectionListHook({
+    it('should handle an empty list gracefully', async () => {
+      const { result } = await renderSelectionListHook({
         items: [],
         onSelect: mockOnSelect,
       });
       expect(result.current.activeIndex).toBe(0);
     });
 
-    it('should find the next enabled item (downwards) if initialIndex is disabled', () => {
-      const { result } = renderSelectionListHook({
+    it('should find the next enabled item (downwards) if initialIndex is disabled', async () => {
+      const { result } = await renderSelectionListHook({
         items,
         initialIndex: 1,
         onSelect: mockOnSelect,
@@ -128,13 +137,13 @@ describe('useSelectionList', () => {
       expect(result.current.activeIndex).toBe(2);
     });
 
-    it('should wrap around to find the next enabled item if initialIndex is disabled', () => {
+    it('should wrap around to find the next enabled item if initialIndex is disabled', async () => {
       const wrappingItems = [
         { value: 'A', key: 'A' },
         { value: 'B', disabled: true, key: 'B' },
         { value: 'C', disabled: true, key: 'C' },
       ];
-      const { result } = renderSelectionListHook({
+      const { result } = await renderSelectionListHook({
         items: wrappingItems,
         initialIndex: 2,
         onSelect: mockOnSelect,
@@ -142,15 +151,15 @@ describe('useSelectionList', () => {
       expect(result.current.activeIndex).toBe(0);
     });
 
-    it('should default to 0 if initialIndex is out of bounds', () => {
-      const { result } = renderSelectionListHook({
+    it('should default to 0 if initialIndex is out of bounds', async () => {
+      const { result } = await renderSelectionListHook({
         items,
         initialIndex: 10,
         onSelect: mockOnSelect,
       });
       expect(result.current.activeIndex).toBe(0);
 
-      const { result: resultNeg } = renderSelectionListHook({
+      const { result: resultNeg } = await renderSelectionListHook({
         items,
         initialIndex: -1,
         onSelect: mockOnSelect,
@@ -158,12 +167,12 @@ describe('useSelectionList', () => {
       expect(resultNeg.current.activeIndex).toBe(0);
     });
 
-    it('should stick to the initial index if all items are disabled', () => {
+    it('should stick to the initial index if all items are disabled', async () => {
       const allDisabled = [
         { value: 'A', disabled: true, key: 'A' },
         { value: 'B', disabled: true, key: 'B' },
       ];
-      const { result } = renderSelectionListHook({
+      const { result } = await renderSelectionListHook({
         items: allDisabled,
         initialIndex: 1,
         onSelect: mockOnSelect,
@@ -173,8 +182,8 @@ describe('useSelectionList', () => {
   });
 
   describe('Keyboard Navigation (Up/Down/J/K)', () => {
-    it('should move down with "j" and "down" keys, skipping disabled items', () => {
-      const { result } = renderSelectionListHook({
+    it('should move down with "j" and "down" keys, skipping disabled items', async () => {
+      const { result } = await renderSelectionListHook({
         items,
         onSelect: mockOnSelect,
       });
@@ -185,8 +194,8 @@ describe('useSelectionList', () => {
       expect(result.current.activeIndex).toBe(3);
     });
 
-    it('should move up with "k" and "up" keys, skipping disabled items', () => {
-      const { result } = renderSelectionListHook({
+    it('should move up with "k" and "up" keys, skipping disabled items', async () => {
+      const { result } = await renderSelectionListHook({
         items,
         initialIndex: 3,
         onSelect: mockOnSelect,
@@ -198,8 +207,33 @@ describe('useSelectionList', () => {
       expect(result.current.activeIndex).toBe(0);
     });
 
-    it('should wrap navigation correctly', () => {
-      const { result } = renderSelectionListHook({
+    it('should ignore navigation keys when shift is pressed', async () => {
+      const { result } = await renderSelectionListHook({
+        items,
+        initialIndex: 2, // Start at middle item 'C'
+        onSelect: mockOnSelect,
+      });
+      expect(result.current.activeIndex).toBe(2);
+
+      // Shift+Down / Shift+J should not move down
+      pressKey('down', undefined, { shift: true });
+      expect(result.current.activeIndex).toBe(2);
+      pressKey('j', undefined, { shift: true });
+      expect(result.current.activeIndex).toBe(2);
+
+      // Shift+Up / Shift+K should not move up
+      pressKey('up', undefined, { shift: true });
+      expect(result.current.activeIndex).toBe(2);
+      pressKey('k', undefined, { shift: true });
+      expect(result.current.activeIndex).toBe(2);
+
+      // Verify normal navigation still works
+      pressKey('down');
+      expect(result.current.activeIndex).toBe(3);
+    });
+
+    it('should wrap navigation correctly', async () => {
+      const { result } = await renderSelectionListHook({
         items,
         initialIndex: items.length - 1,
         onSelect: mockOnSelect,
@@ -212,8 +246,8 @@ describe('useSelectionList', () => {
       expect(result.current.activeIndex).toBe(3);
     });
 
-    it('should call onHighlight when index changes', () => {
-      renderSelectionListHook({
+    it('should call onHighlight when index changes', async () => {
+      await renderSelectionListHook({
         items,
         onSelect: mockOnSelect,
         onHighlight: mockOnHighlight,
@@ -223,9 +257,9 @@ describe('useSelectionList', () => {
       expect(mockOnHighlight).toHaveBeenCalledWith('C');
     });
 
-    it('should not move or call onHighlight if navigation results in the same index (e.g., single item)', () => {
+    it('should not move or call onHighlight if navigation results in the same index (e.g., single item)', async () => {
       const singleItem = [{ value: 'A', key: 'A' }];
-      const { result } = renderSelectionListHook({
+      const { result } = await renderSelectionListHook({
         items: singleItem,
         onSelect: mockOnSelect,
         onHighlight: mockOnHighlight,
@@ -235,12 +269,12 @@ describe('useSelectionList', () => {
       expect(mockOnHighlight).not.toHaveBeenCalled();
     });
 
-    it('should not move or call onHighlight if all items are disabled', () => {
+    it('should not move or call onHighlight if all items are disabled', async () => {
       const allDisabled = [
         { value: 'A', disabled: true, key: 'A' },
         { value: 'B', disabled: true, key: 'B' },
       ];
-      const { result } = renderSelectionListHook({
+      const { result } = await renderSelectionListHook({
         items: allDisabled,
         onSelect: mockOnSelect,
         onHighlight: mockOnHighlight,
@@ -253,8 +287,8 @@ describe('useSelectionList', () => {
   });
 
   describe('Selection (Enter)', () => {
-    it('should call onSelect when "return" is pressed on enabled item', () => {
-      renderSelectionListHook({
+    it('should call onSelect when "return" is pressed on enabled item', async () => {
+      await renderSelectionListHook({
         items,
         initialIndex: 2,
         onSelect: mockOnSelect,
@@ -264,8 +298,8 @@ describe('useSelectionList', () => {
       expect(mockOnSelect).toHaveBeenCalledWith('C');
     });
 
-    it('should not call onSelect if the active item is disabled', () => {
-      const { result } = renderSelectionListHook({
+    it('should not call onSelect if the active item is disabled', async () => {
+      const { result } = await renderSelectionListHook({
         items,
         onSelect: mockOnSelect,
       });
@@ -278,8 +312,8 @@ describe('useSelectionList', () => {
   });
 
   describe('Keyboard Navigation Robustness (Rapid Input)', () => {
-    it('should handle rapid navigation and selection robustly (avoiding stale state)', () => {
-      const { result } = renderSelectionListHook({
+    it('should handle rapid navigation and selection robustly (avoiding stale state)', async () => {
+      const { result } = await renderSelectionListHook({
         items, // A, B(disabled), C, D. Initial index 0 (A).
         onSelect: mockOnSelect,
         onHighlight: mockOnHighlight,
@@ -298,6 +332,7 @@ describe('useSelectionList', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
         };
         handler(key);
       };
@@ -326,8 +361,8 @@ describe('useSelectionList', () => {
       expect(mockOnSelect).not.toHaveBeenCalledWith('A');
     });
 
-    it('should handle ultra-rapid input (multiple presses in single act) without stale state', () => {
-      const { result } = renderSelectionListHook({
+    it('should handle ultra-rapid input (multiple presses in single act) without stale state', async () => {
+      const { result } = await renderSelectionListHook({
         items, // A, B(disabled), C, D. Initial index 0 (A).
         onSelect: mockOnSelect,
         onHighlight: mockOnHighlight,
@@ -347,6 +382,7 @@ describe('useSelectionList', () => {
             meta: false,
             shift: false,
             paste: false,
+            insertable: false,
           };
           handler(key);
         };
@@ -366,8 +402,8 @@ describe('useSelectionList', () => {
   });
 
   describe('Focus Management (isFocused)', () => {
-    it('should activate the keypress handler when focused (default) and items exist', () => {
-      const { result } = renderSelectionListHook({
+    it('should activate the keypress handler when focused (default) and items exist', async () => {
+      const { result } = await renderSelectionListHook({
         items,
         onSelect: mockOnSelect,
       });
@@ -376,8 +412,8 @@ describe('useSelectionList', () => {
       expect(result.current.activeIndex).toBe(2);
     });
 
-    it('should not activate the keypress handler when isFocused is false', () => {
-      renderSelectionListHook({
+    it('should not activate the keypress handler when isFocused is false', async () => {
+      await renderSelectionListHook({
         items,
         onSelect: mockOnSelect,
         isFocused: false,
@@ -386,8 +422,8 @@ describe('useSelectionList', () => {
       expect(() => pressKey('down')).toThrow(/keypress handler is not active/);
     });
 
-    it('should not activate the keypress handler when items list is empty', () => {
-      renderSelectionListHook({
+    it('should not activate the keypress handler when items list is empty', async () => {
+      await renderSelectionListHook({
         items: [],
         onSelect: mockOnSelect,
         isFocused: true,
@@ -396,8 +432,8 @@ describe('useSelectionList', () => {
       expect(() => pressKey('down')).toThrow(/keypress handler is not active/);
     });
 
-    it('should activate/deactivate when isFocused prop changes', () => {
-      const { result, rerender } = renderSelectionListHook({
+    it('should activate/deactivate when isFocused prop changes', async () => {
+      const { result, rerender } = await renderSelectionListHook({
         items,
         onSelect: mockOnSelect,
         isFocused: false,
@@ -405,12 +441,12 @@ describe('useSelectionList', () => {
 
       expect(activeKeypressHandler).toBeNull();
 
-      rerender({ isFocused: true });
+      await rerender({ isFocused: true });
       expect(activeKeypressHandler).not.toBeNull();
       pressKey('down');
       expect(result.current.activeIndex).toBe(2);
 
-      rerender({ isFocused: false });
+      await rerender({ isFocused: false });
       expect(activeKeypressHandler).toBeNull();
       expect(() => pressKey('down')).toThrow(/keypress handler is not active/);
     });
@@ -433,8 +469,8 @@ describe('useSelectionList', () => {
 
     const pressNumber = (num: string) => pressKey(num, num);
 
-    it('should not respond to numbers if showNumbers is false (default)', () => {
-      const { result } = renderSelectionListHook({
+    it('should not respond to numbers if showNumbers is false (default)', async () => {
+      const { result } = await renderSelectionListHook({
         items: shortList,
         onSelect: mockOnSelect,
       });
@@ -443,8 +479,8 @@ describe('useSelectionList', () => {
       expect(mockOnSelect).not.toHaveBeenCalled();
     });
 
-    it('should select item immediately if the number cannot be extended (unambiguous)', () => {
-      const { result } = renderSelectionListHook({
+    it('should select item immediately if the number cannot be extended (unambiguous)', async () => {
+      const { result } = await renderSelectionListHook({
         items: shortList,
         onSelect: mockOnSelect,
         onHighlight: mockOnHighlight,
@@ -459,8 +495,8 @@ describe('useSelectionList', () => {
       expect(vi.getTimerCount()).toBe(0);
     });
 
-    it('should highlight and wait for timeout if the number can be extended (ambiguous)', () => {
-      const { result } = renderSelectionListHook({
+    it('should highlight and wait for timeout if the number can be extended (ambiguous)', async () => {
+      const { result } = await renderSelectionListHook({
         items: longList,
         initialIndex: 1, // Start at index 1 so pressing "1" (index 0) causes a change
         onSelect: mockOnSelect,
@@ -484,8 +520,8 @@ describe('useSelectionList', () => {
       expect(mockOnSelect).toHaveBeenCalledWith('Item 1');
     });
 
-    it('should handle multi-digit input correctly', () => {
-      const { result } = renderSelectionListHook({
+    it('should handle multi-digit input correctly', async () => {
+      const { result } = await renderSelectionListHook({
         items: longList,
         onSelect: mockOnSelect,
         showNumbers: true,
@@ -502,8 +538,8 @@ describe('useSelectionList', () => {
       expect(mockOnSelect).toHaveBeenCalledWith('Item 12');
     });
 
-    it('should reset buffer if input becomes invalid (out of bounds)', () => {
-      const { result } = renderSelectionListHook({
+    it('should reset buffer if input becomes invalid (out of bounds)', async () => {
+      const { result } = await renderSelectionListHook({
         items: shortList,
         onSelect: mockOnSelect,
         showNumbers: true,
@@ -519,8 +555,8 @@ describe('useSelectionList', () => {
       expect(mockOnSelect).toHaveBeenCalledWith('C');
     });
 
-    it('should allow "0" as subsequent digit, but ignore as first digit', () => {
-      const { result } = renderSelectionListHook({
+    it('should allow "0" as subsequent digit, but ignore as first digit', async () => {
+      const { result } = await renderSelectionListHook({
         items: longList,
         onSelect: mockOnSelect,
         showNumbers: true,
@@ -540,25 +576,27 @@ describe('useSelectionList', () => {
       expect(mockOnSelect).toHaveBeenCalledWith('Item 10');
     });
 
-    it('should clear the initial "0" input after timeout', () => {
-      renderSelectionListHook({
+    it('should clear the initial "0" input after timeout', async () => {
+      await renderSelectionListHook({
         items: longList,
         onSelect: mockOnSelect,
         showNumbers: true,
       });
 
       pressNumber('0');
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       act(() => vi.advanceTimersByTime(1000)); // Timeout the '0' input
 
       pressNumber('1');
       expect(mockOnSelect).not.toHaveBeenCalled(); // Should be waiting for second digit
 
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       act(() => vi.advanceTimersByTime(1000)); // Timeout '1'
       expect(mockOnSelect).toHaveBeenCalledWith('Item 1');
     });
 
-    it('should highlight but not select a disabled item (immediate selection case)', () => {
-      const { result } = renderSelectionListHook({
+    it('should highlight but not select a disabled item (immediate selection case)', async () => {
+      const { result } = await renderSelectionListHook({
         items: shortList, // B (index 1, number 2) is disabled
         onSelect: mockOnSelect,
         onHighlight: mockOnHighlight,
@@ -574,14 +612,14 @@ describe('useSelectionList', () => {
       expect(mockOnSelect).not.toHaveBeenCalled();
     });
 
-    it('should highlight but not select a disabled item (timeout case)', () => {
+    it('should highlight but not select a disabled item (timeout case)', async () => {
       // Create a list where the ambiguous prefix points to a disabled item
       const disabledAmbiguousList = [
         { value: 'Item 1 Disabled', disabled: true, key: 'Item 1 Disabled' },
         ...longList.slice(1),
       ];
 
-      const { result } = renderSelectionListHook({
+      const { result } = await renderSelectionListHook({
         items: disabledAmbiguousList,
         onSelect: mockOnSelect,
         showNumbers: true,
@@ -599,8 +637,8 @@ describe('useSelectionList', () => {
       expect(mockOnSelect).not.toHaveBeenCalled();
     });
 
-    it('should clear the number buffer if a non-numeric key (e.g., navigation) is pressed', () => {
-      const { result } = renderSelectionListHook({
+    it('should clear the number buffer if a non-numeric key (e.g., navigation) is pressed', async () => {
+      const { result } = await renderSelectionListHook({
         items: longList,
         onSelect: mockOnSelect,
         showNumbers: true,
@@ -619,8 +657,8 @@ describe('useSelectionList', () => {
       expect(result.current.activeIndex).toBe(2);
     });
 
-    it('should clear the number buffer if "return" is pressed', () => {
-      renderSelectionListHook({
+    it('should clear the number buffer if "return" is pressed', async () => {
+      await renderSelectionListHook({
         items: longList,
         onSelect: mockOnSelect,
         showNumbers: true,
@@ -642,20 +680,20 @@ describe('useSelectionList', () => {
 
   describe('Reactivity (Dynamic Updates)', () => {
     it('should update activeIndex when initialIndex prop changes', async () => {
-      const { result, rerender } = renderSelectionListHook({
+      const { result, rerender } = await renderSelectionListHook({
         items,
         onSelect: mockOnSelect,
         initialIndex: 0,
       });
 
-      rerender({ initialIndex: 2 });
-      await vi.waitFor(() => {
+      await rerender({ initialIndex: 2 });
+      await waitFor(() => {
         expect(result.current.activeIndex).toBe(2);
       });
     });
 
     it('should respect a new initialIndex even after user interaction', async () => {
-      const { result, rerender } = renderSelectionListHook({
+      const { result, rerender } = await renderSelectionListHook({
         items,
         onSelect: mockOnSelect,
         initialIndex: 0,
@@ -666,30 +704,30 @@ describe('useSelectionList', () => {
       expect(result.current.activeIndex).toBe(2);
 
       // The component re-renders with a new initial index
-      rerender({ initialIndex: 3 });
+      await rerender({ initialIndex: 3 });
 
       // The hook should now respect the new initial index
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.activeIndex).toBe(3);
       });
     });
 
     it('should validate index when initialIndex prop changes to a disabled item', async () => {
-      const { result, rerender } = renderSelectionListHook({
+      const { result, rerender } = await renderSelectionListHook({
         items,
         onSelect: mockOnSelect,
         initialIndex: 0,
       });
 
-      rerender({ initialIndex: 1 });
+      await rerender({ initialIndex: 1 });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.activeIndex).toBe(2);
       });
     });
 
     it('should adjust activeIndex if items change and the initialIndex is now out of bounds', async () => {
-      const { result, rerender } = renderSelectionListHook({
+      const { result, rerender } = await renderSelectionListHook({
         onSelect: mockOnSelect,
         initialIndex: 3,
         items,
@@ -701,10 +739,10 @@ describe('useSelectionList', () => {
         { value: 'X', key: 'X' },
         { value: 'Y', key: 'Y' },
       ];
-      rerender({ items: shorterItems }); // Length 2
+      await rerender({ items: shorterItems }); // Length 2
 
       // The useEffect syncs based on the initialIndex (3) which is now out of bounds. It defaults to 0.
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.activeIndex).toBe(0);
       });
     });
@@ -715,7 +753,7 @@ describe('useSelectionList', () => {
         { value: 'B', key: 'B' },
         { value: 'C', key: 'C' },
       ];
-      const { result, rerender } = renderSelectionListHook({
+      const { result, rerender } = await renderSelectionListHook({
         onSelect: mockOnSelect,
         initialIndex: 1,
         items: initialItems,
@@ -728,22 +766,22 @@ describe('useSelectionList', () => {
         { value: 'B', disabled: true, key: 'B' },
         { value: 'C', key: 'C' },
       ];
-      rerender({ items: newItems });
+      await rerender({ items: newItems });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.activeIndex).toBe(2);
       });
     });
 
     it('should reset to 0 if items change to an empty list', async () => {
-      const { result, rerender } = renderSelectionListHook({
+      const { result, rerender } = await renderSelectionListHook({
         onSelect: mockOnSelect,
         initialIndex: 2,
         items,
       });
 
-      rerender({ items: [] });
-      await vi.waitFor(() => {
+      await rerender({ items: [] });
+      await waitFor(() => {
         expect(result.current.activeIndex).toBe(0);
       });
     });
@@ -756,7 +794,7 @@ describe('useSelectionList', () => {
         { value: 'D', key: 'D' },
       ];
 
-      const { result, rerender } = renderSelectionListHook({
+      const { result, rerender } = await renderSelectionListHook({
         onSelect: mockOnSelect,
         onHighlight: mockOnHighlight,
         initialIndex: 2,
@@ -780,10 +818,10 @@ describe('useSelectionList', () => {
         { value: 'D', key: 'D' },
       ];
 
-      rerender({ items: newItems });
+      await rerender({ items: newItems });
 
       // Active index should remain the same since items are deeply equal
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.activeIndex).toBe(3);
       });
       // onHighlight should NOT be called since the index didn't change
@@ -798,7 +836,7 @@ describe('useSelectionList', () => {
         { value: 'D', key: 'D' },
       ];
 
-      const { result, rerender } = renderSelectionListHook({
+      const { result, rerender } = await renderSelectionListHook({
         onSelect: mockOnSelect,
         onHighlight: mockOnHighlight,
         initialIndex: 3,
@@ -815,10 +853,10 @@ describe('useSelectionList', () => {
         { value: 'Z', key: 'Z' },
       ];
 
-      rerender({ items: newItems });
+      await rerender({ items: newItems });
 
       // Active index should update based on initialIndex and new items
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.activeIndex).toBe(0);
       });
     });
@@ -830,7 +868,7 @@ describe('useSelectionList', () => {
         { value: 'C', key: 'C' },
       ];
 
-      const { result, rerender } = renderSelectionListHook({
+      const { result, rerender } = await renderSelectionListHook({
         onSelect: mockOnSelect,
         initialIndex: 1,
         items: initialItems,
@@ -845,10 +883,10 @@ describe('useSelectionList', () => {
         { value: 'C', key: 'C' },
       ];
 
-      rerender({ items: newItems });
+      await rerender({ items: newItems });
 
       // Should find next valid index since current became disabled
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.activeIndex).toBe(2);
       });
     });
@@ -860,7 +898,7 @@ describe('useSelectionList', () => {
         { value: 'C', key: 'C' },
       ];
 
-      const { result, rerender } = renderSelectionListHook({
+      const { result, rerender } = await renderSelectionListHook({
         onSelect: mockOnSelect,
         items: initialItems,
       });
@@ -875,14 +913,14 @@ describe('useSelectionList', () => {
         { value: 'C', key: 'C' },
       ];
 
-      rerender({ items: newItems });
+      await rerender({ items: newItems });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.activeIndex).toBe(2);
       });
     });
 
-    it('should not re-initialize when items have identical keys but are different objects', () => {
+    it('should not re-initialize when items have identical keys but are different objects', async () => {
       const initialItems = [
         { value: 'A', key: 'A' },
         { value: 'B', key: 'B' },
@@ -890,7 +928,7 @@ describe('useSelectionList', () => {
 
       let renderCount = 0;
 
-      const renderHookWithCount = (initialProps: {
+      const renderHookWithCount = async (initialProps: {
         items: Array<SelectionListItem<string>>;
       }) => {
         function TestComponent(props: typeof initialProps) {
@@ -904,12 +942,13 @@ describe('useSelectionList', () => {
         }
         const { rerender } = render(<TestComponent {...initialProps} />);
         return {
-          rerender: (newProps: Partial<typeof initialProps>) =>
-            rerender(<TestComponent {...initialProps} {...newProps} />),
+          rerender: async (newProps: Partial<typeof initialProps>) => {
+            rerender(<TestComponent {...initialProps} {...newProps} />);
+          },
         };
       };
 
-      const { rerender } = renderHookWithCount({ items: initialItems });
+      const { rerender } = await renderHookWithCount({ items: initialItems });
 
       // Initial render
       expect(renderCount).toBe(1);
@@ -920,7 +959,7 @@ describe('useSelectionList', () => {
         { value: 'B', key: 'B' },
       ];
 
-      rerender({ items: newItems });
+      await rerender({ items: newItems });
       expect(renderCount).toBe(2);
     });
   });
@@ -934,13 +973,13 @@ describe('useSelectionList', () => {
       vi.useRealTimers();
     });
 
-    it('should clear timeout on unmount when timer is active', () => {
+    it('should clear timeout on unmount when timer is active', async () => {
       const longList: Array<SelectionListItem<string>> = Array.from(
         { length: 15 },
         (_, i) => ({ value: `Item ${i + 1}`, key: `Item ${i + 1}` }),
       );
 
-      const { unmount } = renderSelectionListHook({
+      const { unmount } = await renderSelectionListHook({
         items: longList,
         onSelect: mockOnSelect,
         showNumbers: true,
@@ -955,7 +994,7 @@ describe('useSelectionList', () => {
       });
       expect(mockOnSelect).not.toHaveBeenCalled();
 
-      unmount();
+      await unmount();
 
       expect(vi.getTimerCount()).toBe(0);
 

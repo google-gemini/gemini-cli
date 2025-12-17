@@ -15,6 +15,7 @@ import type {
   PartListUnion,
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export const SESSION_FILE_PREFIX = 'session-';
 
@@ -61,7 +62,7 @@ export interface ToolCallRecord {
  */
 export type ConversationRecordExtra =
   | {
-      type: 'user';
+      type: 'user' | 'info' | 'error' | 'warning';
     }
   | {
       type: 'gemini';
@@ -85,6 +86,7 @@ export interface ConversationRecord {
   startTime: string;
   lastUpdated: string;
   messages: MessageRecord[];
+  summary?: string;
 }
 
 /**
@@ -170,7 +172,7 @@ export class ChatRecordingService {
       this.queuedThoughts = [];
       this.queuedTokens = null;
     } catch (error) {
-      console.error('Error initializing chat recording service:', error);
+      debugLogger.error('Error initializing chat recording service:', error);
       throw error;
     }
   }
@@ -222,7 +224,7 @@ export class ChatRecordingService {
         }
       });
     } catch (error) {
-      console.error('Error saving message:', error);
+      debugLogger.error('Error saving message to chat history.', error);
       throw error;
     }
   }
@@ -239,7 +241,7 @@ export class ChatRecordingService {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      console.error('Error saving thought:', error);
+      debugLogger.error('Error saving thought to chat history.', error);
       throw error;
     }
   }
@@ -273,7 +275,10 @@ export class ChatRecordingService {
         }
       });
     } catch (error) {
-      console.error('Error updating message tokens:', error);
+      debugLogger.error(
+        'Error updating message tokens in chat history.',
+        error,
+      );
       throw error;
     }
   }
@@ -367,7 +372,10 @@ export class ChatRecordingService {
         }
       });
     } catch (error) {
-      console.error('Error adding tool call to message:', error);
+      debugLogger.error(
+        'Error adding tool call to message in chat history.',
+        error,
+      );
       throw error;
     }
   }
@@ -381,7 +389,7 @@ export class ChatRecordingService {
       return JSON.parse(this.cachedLastConvData);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        console.error('Error reading conversation file:', error);
+        debugLogger.error('Error reading conversation file.', error);
         throw error;
       }
 
@@ -413,7 +421,7 @@ export class ChatRecordingService {
         fs.writeFileSync(this.conversationFile, newContent);
       }
     } catch (error) {
-      console.error('Error writing conversation file:', error);
+      debugLogger.error('Error writing conversation file.', error);
       throw error;
     }
   }
@@ -431,6 +439,44 @@ export class ChatRecordingService {
   }
 
   /**
+   * Saves a summary for the current session.
+   */
+  saveSummary(summary: string): void {
+    if (!this.conversationFile) return;
+
+    try {
+      this.updateConversation((conversation) => {
+        conversation.summary = summary;
+      });
+    } catch (error) {
+      debugLogger.error('Error saving summary to chat history.', error);
+      // Don't throw - we want graceful degradation
+    }
+  }
+
+  /**
+   * Gets the current conversation data (for summary generation).
+   */
+  getConversation(): ConversationRecord | null {
+    if (!this.conversationFile) return null;
+
+    try {
+      return this.readConversation();
+    } catch (error) {
+      debugLogger.error('Error reading conversation for summary.', error);
+      return null;
+    }
+  }
+
+  /**
+   * Gets the path to the current conversation file.
+   * Returns null if the service hasn't been initialized yet.
+   */
+  getConversationFilePath(): string | null {
+    return this.conversationFile;
+  }
+
+  /**
    * Deletes a session file by session ID.
    */
   deleteSession(sessionId: string): void {
@@ -442,7 +488,7 @@ export class ChatRecordingService {
       const sessionPath = path.join(chatsDir, `${sessionId}.json`);
       fs.unlinkSync(sessionPath);
     } catch (error) {
-      console.error('Error deleting session:', error);
+      debugLogger.error('Error deleting session file.', error);
       throw error;
     }
   }

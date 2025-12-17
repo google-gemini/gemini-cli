@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
 import {
   describe,
   it,
@@ -15,7 +13,8 @@ import {
   type MockedFunction,
   type Mock,
 } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
 import { useAutoAcceptIndicator } from './useAutoAcceptIndicator.js';
 
 import { Config, ApprovalMode } from '@google/gemini-cli-core';
@@ -27,9 +26,7 @@ import { MessageType } from '../types.js';
 vi.mock('./useKeypress.js');
 
 vi.mock('@google/gemini-cli-core', async () => {
-  const actualServerModule = (await vi.importActual(
-    '@google/gemini-cli-core',
-  )) as Record<string, unknown>;
+  const actualServerModule = await vi.importActual('@google/gemini-cli-core');
   return {
     ...actualServerModule,
     Config: vi.fn(),

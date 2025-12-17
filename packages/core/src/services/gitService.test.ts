@@ -32,6 +32,7 @@ const hoistedMockInit = vi.hoisted(() => vi.fn());
 const hoistedMockRaw = vi.hoisted(() => vi.fn());
 const hoistedMockAdd = vi.hoisted(() => vi.fn());
 const hoistedMockCommit = vi.hoisted(() => vi.fn());
+const hoistedMockStatus = vi.hoisted(() => vi.fn());
 vi.mock('simple-git', () => ({
   simpleGit: hoistedMockSimpleGit.mockImplementation(() => ({
     checkIsRepo: hoistedMockCheckIsRepo,
@@ -39,6 +40,7 @@ vi.mock('simple-git', () => ({
     raw: hoistedMockRaw,
     add: hoistedMockAdd,
     commit: hoistedMockCommit,
+    status: hoistedMockStatus,
     env: hoistedMockEnv,
   })),
   CheckRepoActions: { IS_REPO_ROOT: 'is-repo-root' },
@@ -89,6 +91,7 @@ describe('GitService', () => {
       raw: hoistedMockRaw,
       add: hoistedMockAdd,
       commit: hoistedMockCommit,
+      status: hoistedMockStatus,
     }));
     hoistedMockSimpleGit.mockImplementation(() => ({
       checkIsRepo: hoistedMockCheckIsRepo,
@@ -96,6 +99,7 @@ describe('GitService', () => {
       raw: hoistedMockRaw,
       add: hoistedMockAdd,
       commit: hoistedMockCommit,
+      status: hoistedMockStatus,
       env: hoistedMockEnv,
     }));
     hoistedMockCheckIsRepo.mockResolvedValue(false);
@@ -243,6 +247,43 @@ describe('GitService', () => {
       const service = new GitService(projectRoot, storage);
       await service.setupShadowGitRepository();
       expect(hoistedMockCommit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createFileSnapshot', () => {
+    it('should commit with --no-verify flag', async () => {
+      hoistedMockStatus.mockResolvedValue({ isClean: () => false });
+      const service = new GitService(projectRoot, storage);
+      await service.initialize();
+      await service.createFileSnapshot('test commit');
+      expect(hoistedMockCommit).toHaveBeenCalledWith('test commit', {
+        '--no-verify': null,
+      });
+    });
+
+    it('should create a new commit if there are staged changes', async () => {
+      hoistedMockStatus.mockResolvedValue({ isClean: () => false });
+      hoistedMockCommit.mockResolvedValue({ commit: 'new-commit-hash' });
+      const service = new GitService(projectRoot, storage);
+      const commitHash = await service.createFileSnapshot('test message');
+      expect(hoistedMockAdd).toHaveBeenCalledWith('.');
+      expect(hoistedMockStatus).toHaveBeenCalled();
+      expect(hoistedMockCommit).toHaveBeenCalledWith('test message', {
+        '--no-verify': null,
+      });
+      expect(commitHash).toBe('new-commit-hash');
+    });
+
+    it('should return the current HEAD commit hash if there are no staged changes', async () => {
+      hoistedMockStatus.mockResolvedValue({ isClean: () => true });
+      hoistedMockRaw.mockResolvedValue('current-head-hash');
+      const service = new GitService(projectRoot, storage);
+      const commitHash = await service.createFileSnapshot('test message');
+      expect(hoistedMockAdd).toHaveBeenCalledWith('.');
+      expect(hoistedMockStatus).toHaveBeenCalled();
+      expect(hoistedMockCommit).not.toHaveBeenCalled();
+      expect(hoistedMockRaw).toHaveBeenCalledWith('rev-parse', 'HEAD');
+      expect(commitHash).toBe('current-head-hash');
     });
   });
 });

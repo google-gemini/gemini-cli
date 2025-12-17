@@ -2,7 +2,7 @@ name: 'Release: Nightly'
 
 on:
   schedule:
-    - cron: '0 20 * * *'
+    - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -157,4 +157,4 @@ jobs:
           gh issue create \
             --title "Nightly Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')" \
             --body "The nightly-release workflow failed. See the full run for details: ${DETAILS_URL}" \
-            --label 'kind/bug,release-failure,priority/p0'
+            --label 'release-failure,priority/p0'

@@ -14,13 +14,13 @@ import {
 import { MessageType } from '../types.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
-import { getCliVersion } from '../../utils/version.js';
-import { IdeClient, sessionId } from '@google/gemini-cli-core';
+import { IdeClient, sessionId, getVersion } from '@google/gemini-cli-core';
 
 export const bugCommand: SlashCommand = {
   name: 'bug',
   description: 'Submit a bug report',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: async (context: CommandContext, args?: string): Promise<void> => {
     const bugDescription = (args || '').trim();
     const { config } = context.services;
@@ -35,7 +35,7 @@ export const bugCommand: SlashCommand = {
       })`;
     }
     const modelVersion = config?.getModel() || 'Unknown';
-    const cliVersion = await getCliVersion();
+    const cliVersion = await getVersion();
     const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
     const ideClient = await getIdeClientName(context);
 

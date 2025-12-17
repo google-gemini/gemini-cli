@@ -212,7 +212,7 @@ describe('MemoryTool', () => {
 
     it('should have correct name, displayName, description, and schema', () => {
       expect(memoryTool.name).toBe('save_memory');
-      expect(memoryTool.displayName).toBe('Save Memory');
+      expect(memoryTool.displayName).toBe('SaveMemory');
       expect(memoryTool.description).toContain(
         'Saves a specific piece of information',
       );

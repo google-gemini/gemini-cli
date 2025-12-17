@@ -1,5 +1,10 @@
 name: 'Release: Patch (2) Trigger'
 
+run-name: >-
+  Release Patch (2) Trigger |
+  ${{ github.event.pull_request.number && format('PR #{0}', github.event.pull_request.number) || 'Manual' }} |
+  ${{ github.event.pull_request.head.ref || github.event.inputs.ref }}
+
 on:
   pull_request:
     types:

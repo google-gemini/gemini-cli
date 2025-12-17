@@ -15,11 +15,12 @@ import {
 } from '../../utils/messageInspectors.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
 } from '../../config/models.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
+import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 
 vi.mock('../../core/baseLlmClient.js');
 vi.mock('../../utils/promptIdContext.js');
@@ -29,6 +30,7 @@ describe('ClassifierStrategy', () => {
   let mockContext: RoutingContext;
   let mockConfig: Config;
   let mockBaseLlmClient: BaseLlmClient;
+  let mockResolvedConfig: ResolvedModelConfig;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -39,7 +41,17 @@ describe('ClassifierStrategy', () => {
       request: [{ text: 'simple task' }],
       signal: new AbortController().signal,
     };
-    mockConfig = {} as Config;
+
+    mockResolvedConfig = {
+      model: 'classifier',
+      generateContentConfig: {},
+    } as unknown as ResolvedModelConfig;
+    mockConfig = {
+      modelConfigService: {
+        getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
+      },
+      getPreviewFeatures: () => false,
+    } as unknown as Config;
     mockBaseLlmClient = {
       generateJson: vi.fn(),
     } as unknown as BaseLlmClient;
@@ -60,14 +72,7 @@ describe('ClassifierStrategy', () => {
 
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-        config: expect.objectContaining({
-          temperature: 0,
-          maxOutputTokens: 1024,
-          thinkingConfig: {
-            thinkingBudget: 512,
-          },
-        }),
+        modelConfigKey: { model: mockResolvedConfig.model },
         promptId: 'test-prompt-id',
       }),
     );
@@ -128,7 +133,7 @@ describe('ClassifierStrategy', () => {
 
   it('should return null if the classifier API call fails', async () => {
     const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
+      .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
     const testError = new Error('API Failure');
     vi.mocked(mockBaseLlmClient.generateJson).mockRejectedValue(testError);
@@ -146,7 +151,7 @@ describe('ClassifierStrategy', () => {
 
   it('should return null if the classifier returns a malformed JSON object', async () => {
     const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
+      .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
     const malformedApiResponse = {
       reasoning: 'This is a simple task.',
@@ -248,7 +253,7 @@ describe('ClassifierStrategy', () => {
 
   it('should use a fallback promptId if not found in context', async () => {
     const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
+      .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
     vi.mocked(promptIdContext.getStore).mockReturnValue(undefined);
     const mockApiResponse = {

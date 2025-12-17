@@ -11,7 +11,7 @@ import {
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
-import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import { GEMINI_MODEL_ALIAS_PRO } from '../config/models.js';
 import { z } from 'zod';
 
 // Define a type that matches the outputConfig schema for type safety.
@@ -69,7 +69,7 @@ export const CodebaseInvestigatorAgent: AgentDefinition<
   processOutput: (output) => JSON.stringify(output, null, 2),
 
   modelConfig: {
-    model: DEFAULT_GEMINI_MODEL,
+    model: GEMINI_MODEL_ALIAS_PRO,
     temp: 0.1,
     top_p: 0.95,
     thinkingBudget: -1,
@@ -96,7 +96,7 @@ You are a sub-agent in a larger system. Your only responsibility is to provide d
 - **DO:** Find the key modules, classes, and functions that are part of the problem and its solution.
 - **DO:** Understand *why* the code is written the way it is. Question everything.
 - **DO:** Foresee the ripple effects of a change. If \`function A\` is modified, you must check its callers. If a data structure is altered, you must identify where its type definitions need to be updated.
-- **DO:** provide a conclusion and insights to the main agent that invoked you. If the agent is trying to solve a bug, you should provide the root cause of the bug, its impacts, how to fix it etc. If it's a new feature, you should provide insights on where to implement it, what chagnes are necessary etc. 
+- **DO:** provide a conclusion and insights to the main agent that invoked you. If the agent is trying to solve a bug, you should provide the root cause of the bug, its impacts, how to fix it etc. If it's a new feature, you should provide insights on where to implement it, what changes are necessary etc.
 - **DO NOT:** Write the final implementation code yourself.
 - **DO NOT:** Stop at the first relevant file. Your goal is a comprehensive understanding of the entire relevant subsystem.
 You operate in a non-interactive loop and must reason based on the information provided and the output of your tools.

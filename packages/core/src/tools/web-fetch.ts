@@ -19,13 +19,9 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
-import {
-  fetchWithTimeout,
-  isPrivateIp,
-  setGlobalProxy,
-} from '../utils/fetch.js';
+import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
@@ -33,6 +29,7 @@ import {
 } from '../telemetry/index.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { retryWithBackoff } from '../utils/retry.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
@@ -106,6 +103,10 @@ export interface WebFetchToolParams {
   prompt: string;
 }
 
+interface ErrorWithStatus extends Error {
+  status?: number;
+}
+
 class WebFetchToolInvocation extends BaseToolInvocation<
   WebFetchToolParams,
   ToolResult
@@ -133,12 +134,22 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     }
 
     try {
-      const response = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS);
-      if (!response.ok) {
-        throw new Error(
-          `Request failed with status code ${response.status} ${response.statusText}`,
-        );
-      }
+      const response = await retryWithBackoff(
+        async () => {
+          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS);
+          if (!res.ok) {
+            const error = new Error(
+              `Request failed with status code ${res.status} ${res.statusText}`,
+            );
+            (error as ErrorWithStatus).status = res.status;
+            throw error;
+          }
+          return res;
+        },
+        {
+          retryFetchErrors: this.config.getRetryFetchErrors(),
+        },
+      );
 
       const rawContent = await response.text();
       const contentType = response.headers.get('content-type') || '';
@@ -173,10 +184,9 @@ ${textContent}
 ---
 `;
       const result = await geminiClient.generateContent(
+        { model: 'web-fetch-fallback' },
         [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
-        {},
         signal,
-        DEFAULT_GEMINI_FLASH_MODEL,
       );
       const resultText = getResponseText(result) || '';
       return {
@@ -234,6 +244,7 @@ ${textContent}
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
         }
+        await this.publishPolicyUpdate(outcome);
       },
     };
     return confirmationDetails;
@@ -257,10 +268,9 @@ ${textContent}
 
     try {
       const response = await geminiClient.generateContent(
+        { model: 'web-fetch' },
         [{ role: 'user', parts: [{ text: userPrompt }] }],
-        { tools: [{ urlContext: {} }] },
         signal, // Pass signal
-        DEFAULT_GEMINI_FLASH_MODEL,
       );
 
       debugLogger.debug(
@@ -313,7 +323,7 @@ ${textContent}
           this.config,
           new WebFetchFallbackAttemptEvent('primary_failed'),
         );
-        return this.executeFallback(signal);
+        return await this.executeFallback(signal);
       }
 
       const sourceListFormatted: string[] = [];
@@ -415,10 +425,6 @@ export class WebFetchTool extends BaseDeclarativeTool<
       false, // canUpdateOutput
       messageBus,
     );
-    const proxy = config.getProxy();
-    if (proxy) {
-      setGlobalProxy(proxy);
-    }
   }
 
   protected override validateToolParamValues(

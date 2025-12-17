@@ -6,7 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useMessageQueue } from './useMessageQueue.js';
 import { StreamingState } from '../types.js';
 
@@ -150,7 +151,7 @@ describe('useMessageQueue', () => {
     // Transition to Idle
     rerender({ streamingState: StreamingState.Idle });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSubmitQuery).toHaveBeenCalledWith('Message 1\n\nMessage 2');
       expect(result.current.messageQueue).toEqual([]);
     });
@@ -206,7 +207,7 @@ describe('useMessageQueue', () => {
     // Go back to idle - should submit
     rerender({ streamingState: StreamingState.Idle });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSubmitQuery).toHaveBeenCalledWith('First batch');
       expect(result.current.messageQueue).toEqual([]);
     });
@@ -222,7 +223,7 @@ describe('useMessageQueue', () => {
     // Go back to idle - should submit again
     rerender({ streamingState: StreamingState.Idle });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSubmitQuery).toHaveBeenCalledWith('Second batch');
       expect(mockSubmitQuery).toHaveBeenCalledTimes(2);
     });
@@ -252,9 +253,7 @@ describe('useMessageQueue', () => {
       // Pop all messages
       let poppedMessages: string | undefined;
       act(() => {
-        result.current.popAllMessages((messages) => {
-          poppedMessages = messages;
-        });
+        poppedMessages = result.current.popAllMessages();
       });
 
       expect(poppedMessages).toBe('Message 1\n\nMessage 2\n\nMessage 3');
@@ -270,9 +269,7 @@ describe('useMessageQueue', () => {
 
       let poppedMessages: string | undefined = 'not-undefined';
       act(() => {
-        result.current.popAllMessages((messages) => {
-          poppedMessages = messages;
-        });
+        poppedMessages = result.current.popAllMessages();
       });
 
       expect(poppedMessages).toBeUndefined();
@@ -292,9 +289,7 @@ describe('useMessageQueue', () => {
 
       let poppedMessages: string | undefined;
       act(() => {
-        result.current.popAllMessages((messages) => {
-          poppedMessages = messages;
-        });
+        poppedMessages = result.current.popAllMessages();
       });
 
       expect(poppedMessages).toBe('Single message');
@@ -314,7 +309,7 @@ describe('useMessageQueue', () => {
       });
 
       act(() => {
-        result.current.popAllMessages(() => {});
+        result.current.popAllMessages();
       });
 
       // Queue should be empty
@@ -324,9 +319,7 @@ describe('useMessageQueue', () => {
       // Popping again should return undefined
       let secondPop: string | undefined = 'not-undefined';
       act(() => {
-        result.current.popAllMessages((messages) => {
-          secondPop = messages;
-        });
+        secondPop = result.current.popAllMessages();
       });
 
       expect(secondPop).toBeUndefined();
@@ -348,9 +341,7 @@ describe('useMessageQueue', () => {
       // Pop all messages
       let firstPop: string | undefined;
       act(() => {
-        result.current.popAllMessages((messages) => {
-          firstPop = messages;
-        });
+        firstPop = result.current.popAllMessages();
       });
 
       expect(firstPop).toBe('First\n\nSecond');
@@ -364,9 +355,7 @@ describe('useMessageQueue', () => {
       // Pop again
       let secondPop: string | undefined;
       act(() => {
-        result.current.popAllMessages((messages) => {
-          secondPop = messages;
-        });
+        secondPop = result.current.popAllMessages();
       });
 
       expect(secondPop).toBe('Third\n\nFourth');

@@ -6,7 +6,7 @@
 
 import type { CSSProperties } from 'react';
 import type { SemanticColors } from './semantic-tokens.js';
-import { resolveColor } from './color-utils.js';
+import { resolveColor, interpolateColor } from './color-utils.js';
 
 export type ThemeType = 'light' | 'dark' | 'ansi' | 'custom';
 
@@ -25,6 +25,7 @@ export interface ColorsTheme {
   DiffRemoved: string;
   Comment: string;
   Gray: string;
+  DarkGray: string;
   GradientColors?: string[];
 }
 
@@ -37,6 +38,7 @@ export interface CustomTheme {
     secondary?: string;
     link?: string;
     accent?: string;
+    response?: string;
   };
   background?: {
     primary?: string;
@@ -74,6 +76,7 @@ export interface CustomTheme {
   DiffRemoved?: string;
   Comment?: string;
   Gray?: string;
+  DarkGray?: string;
   GradientColors?: string[];
 }
 
@@ -92,6 +95,7 @@ export const lightTheme: ColorsTheme = {
   DiffRemoved: '#FFCCCC',
   Comment: '#008000',
   Gray: '#97a0b0',
+  DarkGray: interpolateColor('#97a0b0', '#FAFAFA', 0.5),
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
@@ -110,13 +114,14 @@ export const darkTheme: ColorsTheme = {
   DiffRemoved: '#430000',
   Comment: '#6C7086',
   Gray: '#6C7086',
+  DarkGray: interpolateColor('#6C7086', '#1E1E2E', 0.5),
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
 export const ansiTheme: ColorsTheme = {
   type: 'ansi',
   Background: 'black',
-  Foreground: 'white',
+  Foreground: '',
   LightBlue: 'blue',
   AccentBlue: 'blue',
   AccentPurple: 'magenta',
@@ -128,6 +133,7 @@ export const ansiTheme: ColorsTheme = {
   DiffRemoved: 'red',
   Comment: 'gray',
   Gray: 'gray',
+  DarkGray: 'gray',
 };
 
 export class Theme {
@@ -161,6 +167,7 @@ export class Theme {
         secondary: this.colors.Gray,
         link: this.colors.AccentBlue,
         accent: this.colors.AccentPurple,
+        response: this.colors.Foreground,
       },
       background: {
         primary: this.colors.Background,
@@ -176,6 +183,7 @@ export class Theme {
       ui: {
         comment: this.colors.Gray,
         symbol: this.colors.AccentCyan,
+        dark: this.colors.DarkGray,
         gradient: this.colors.GradientColors,
       },
       status: {
@@ -267,6 +275,13 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       customTheme.background?.diff?.removed ?? customTheme.DiffRemoved ?? '',
     Comment: customTheme.ui?.comment ?? customTheme.Comment ?? '',
     Gray: customTheme.text?.secondary ?? customTheme.Gray ?? '',
+    DarkGray:
+      customTheme.DarkGray ??
+      interpolateColor(
+        customTheme.text?.secondary ?? customTheme.Gray ?? '',
+        customTheme.background?.primary ?? customTheme.Background ?? '',
+        0.5,
+      ),
     GradientColors: customTheme.ui?.gradient ?? customTheme.GradientColors,
   };
 
@@ -414,6 +429,10 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       secondary: customTheme.text?.secondary ?? colors.Gray,
       link: customTheme.text?.link ?? colors.AccentBlue,
       accent: customTheme.text?.accent ?? colors.AccentPurple,
+      response:
+        customTheme.text?.response ??
+        customTheme.text?.primary ??
+        colors.Foreground,
     },
     background: {
       primary: customTheme.background?.primary ?? colors.Background,
@@ -429,6 +448,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     ui: {
       comment: customTheme.ui?.comment ?? colors.Comment,
       symbol: customTheme.ui?.symbol ?? colors.Gray,
+      dark: colors.DarkGray,
       gradient: customTheme.ui?.gradient ?? colors.GradientColors,
     },
     status: {

@@ -5,6 +5,7 @@
  */
 
 import { debugLogger } from '@google/gemini-cli-core';
+import tinygradient from 'tinygradient';
 
 // Mapping from common CSS color names (lowercase) to hex codes (lowercase)
 // Excludes names directly supported by Ink
@@ -230,4 +231,23 @@ export function resolveColor(colorValue: string): string | undefined {
     `[ColorUtils] Could not resolve color "${colorValue}" to an Ink-compatible format.`,
   );
   return undefined;
+}
+
+export function interpolateColor(
+  color1: string,
+  color2: string,
+  factor: number,
+) {
+  if (factor <= 0 && color1) {
+    return color1;
+  }
+  if (factor >= 1 && color2) {
+    return color2;
+  }
+  if (!color1 || !color2) {
+    return '';
+  }
+  const gradient = tinygradient(color1, color2);
+  const color = gradient.rgbAt(factor);
+  return color.toHexString();
 }

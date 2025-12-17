@@ -18,6 +18,7 @@ import {
   getDirectoryContextString,
 } from './environmentContext.js';
 import type { Config } from '../config/config.js';
+import type { Storage } from '../config/storage.js';
 import { getFolderStructure } from './getFolderStructure.js';
 
 vi.mock('../config/config.js');
@@ -35,6 +36,9 @@ describe('getDirectoryContextString', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getFileService: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+      } as unknown as Storage,
     };
     vi.mocked(getFolderStructure).mockResolvedValue('Mock Folder Structure');
   });
@@ -90,6 +94,9 @@ describe('getEnvironmentContext', () => {
       getFileService: vi.fn(),
 
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+      } as unknown as Storage,
     };
 
     vi.mocked(getFolderStructure).mockResolvedValue('Mock Folder Structure');
