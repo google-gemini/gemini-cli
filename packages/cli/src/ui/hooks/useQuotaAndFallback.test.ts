@@ -136,7 +136,7 @@ describe('useQuotaAndFallback', () => {
           mockGoogleApiError,
           1000 * 60 * 5,
         ); // 5 minutes
-        await act(() => {
+        act(() => {
           promise = handler('gemini-pro', 'gemini-flash', error);
         });
 
@@ -155,7 +155,7 @@ describe('useQuotaAndFallback', () => {
         expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
 
         // Simulate the user choosing to continue with the fallback model
-        await act(() => {
+        act(() => {
           result.current.handleProQuotaChoice('retry_always');
         });
 
@@ -182,7 +182,7 @@ describe('useQuotaAndFallback', () => {
           .calls[0][0] as FallbackModelHandler;
 
         let promise1: Promise<FallbackIntent | null>;
-        await act(() => {
+        act(() => {
           promise1 = handler(
             'gemini-pro',
             'gemini-flash',
@@ -206,7 +206,7 @@ describe('useQuotaAndFallback', () => {
         expect(result2!).toBe('stop');
         expect(result.current.proQuotaRequest).toBe(firstRequest);
 
-        await act(() => {
+        act(() => {
           result.current.handleProQuotaChoice('retry_always');
         });
 
@@ -247,7 +247,7 @@ describe('useQuotaAndFallback', () => {
             .calls[0][0] as FallbackModelHandler;
 
           let promise: Promise<FallbackIntent | null>;
-          await act(() => {
+          act(() => {
             promise = handler('model-A', 'model-B', error);
           });
 
@@ -265,7 +265,7 @@ describe('useQuotaAndFallback', () => {
           );
 
           // Simulate the user choosing to continue with the fallback model
-          await act(() => {
+          act(() => {
             result.current.handleProQuotaChoice('retry_always');
           });
 
@@ -303,7 +303,7 @@ describe('useQuotaAndFallback', () => {
         let promise: Promise<FallbackIntent | null>;
         const error = new ModelNotFoundError('model not found', 404);
 
-        await act(() => {
+        act(() => {
           promise = handler('gemini-3-pro-preview', 'gemini-2.5-pro', error);
         });
 
@@ -322,7 +322,7 @@ To disable Gemini 3, disable "Preview features" in /settings.`,
         );
 
         // Simulate the user choosing to switch
-        await act(() => {
+        act(() => {
           result.current.handleProQuotaChoice('retry_always');
         });
 
@@ -364,7 +364,7 @@ To disable Gemini 3, disable "Preview features" in /settings.`,
       const handler = setFallbackHandlerSpy.mock
         .calls[0][0] as FallbackModelHandler;
       let promise: Promise<FallbackIntent | null>;
-      await act(() => {
+      act(() => {
         promise = handler(
           'gemini-pro',
           'gemini-flash',
@@ -372,7 +372,7 @@ To disable Gemini 3, disable "Preview features" in /settings.`,
         );
       });
 
-      await act(() => {
+      act(() => {
         result.current.handleProQuotaChoice('retry_later');
       });
 
@@ -395,7 +395,7 @@ To disable Gemini 3, disable "Preview features" in /settings.`,
         .calls[0][0] as FallbackModelHandler;
 
       let promise: Promise<FallbackIntent | null>;
-      await act(() => {
+      act(() => {
         promise = handler(
           'gemini-pro',
           'gemini-flash',
@@ -403,7 +403,7 @@ To disable Gemini 3, disable "Preview features" in /settings.`,
         );
       });
 
-      await act(() => {
+      act(() => {
         result.current.handleProQuotaChoice('retry_always');
       });
 
@@ -431,7 +431,7 @@ To disable Gemini 3, disable "Preview features" in /settings.`,
       const handler = setFallbackHandlerSpy.mock
         .calls[0][0] as FallbackModelHandler;
       let promise: Promise<FallbackIntent | null>;
-      await act(() => {
+      act(() => {
         promise = handler(
           PREVIEW_GEMINI_MODEL,
           DEFAULT_GEMINI_MODEL,
@@ -439,7 +439,7 @@ To disable Gemini 3, disable "Preview features" in /settings.`,
         );
       });
 
-      await act(() => {
+      act(() => {
         result.current.handleProQuotaChoice('retry_always');
       });
 
@@ -466,7 +466,7 @@ To disable Gemini 3, disable "Preview features" in /settings.`,
       const handler = setFallbackHandlerSpy.mock
         .calls[0][0] as FallbackModelHandler;
       let promise: Promise<FallbackIntent | null>;
-      await act(() => {
+      act(() => {
         promise = handler(
           PREVIEW_GEMINI_MODEL,
           DEFAULT_GEMINI_FLASH_MODEL,
@@ -474,7 +474,7 @@ To disable Gemini 3, disable "Preview features" in /settings.`,
         );
       });
 
-      await act(() => {
+      act(() => {
         result.current.handleProQuotaChoice('retry_always');
       });
 

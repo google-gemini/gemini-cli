@@ -70,7 +70,7 @@ trigger the hook:
   "hooks": {
     "BeforeTool": [
       {
-        "matcher": "WriteFile|Edit",
+        "matcher": "write_file|replace",
         "hooks": [
           /* hooks for write operations */
         ]
@@ -82,8 +82,8 @@ trigger the hook:
 
 **Matcher patterns:**
 
-- **Exact match:** `"ReadFile"` matches only `ReadFile`
-- **Regex:** `"Write.*|Edit"` matches `WriteFile`, `WriteBinary`, `Edit`
+- **Exact match:** `"read_file"` matches only `read_file`
+- **Regex:** `"write_.*|replace"` matches `write_file`, `replace`
 - **Wildcard:** `"*"` or `""` matches all tools
 
 **Session event matchers:**
@@ -115,6 +115,7 @@ Every hook receives these base fields:
 ```json
 {
   "session_id": "abc123",
+  "transcript_path": "/path/to/transcript.jsonl",
   "cwd": "/path/to/project",
   "hook_event_name": "BeforeTool",
   "timestamp": "2025-12-01T10:30:00Z"
@@ -130,7 +131,7 @@ Every hook receives these base fields:
 
 ```json
 {
-  "tool_name": "WriteFile",
+  "tool_name": "write_file",
   "tool_input": {
     "file_path": "/path/to/file.ts",
     "content": "..."
@@ -159,7 +160,7 @@ Or simple exit codes:
 
 ```json
 {
-  "tool_name": "ReadFile",
+  "tool_name": "read_file",
   "tool_input": { "file_path": "..." },
   "tool_response": "file contents..."
 }
@@ -212,7 +213,7 @@ Or simple exit codes:
     "toolConfig": {
       "functionCallingConfig": {
         "mode": "AUTO",
-        "allowedFunctionNames": ["ReadFile", "WriteFile"]
+        "allowedFunctionNames": ["read_file", "write_file"]
       }
     }
   }
@@ -316,7 +317,7 @@ Or simple exit codes:
     "toolConfig": {
       "functionCallingConfig": {
         "mode": "ANY",
-        "allowedFunctionNames": ["ReadFile", "WriteFile", "Edit"]
+        "allowedFunctionNames": ["read_file", "write_file", "replace"]
       }
     }
   }
@@ -326,7 +327,7 @@ Or simple exit codes:
 Or simple output (comma-separated tool names sets mode to ANY):
 
 ```bash
-echo "ReadFile,WriteFile,Edit"
+echo "read_file,write_file,replace"
 ```
 
 #### SessionStart
@@ -524,7 +525,7 @@ This command:
 
 - Reads `.claude/settings.json`
 - Converts event names (`PreToolUse` → `BeforeTool`, etc.)
-- Translates tool names (`Bash` → `RunShellCommand`, `Edit` → `Edit`)
+- Translates tool names (`Bash` → `run_shell_command`, `replace` → `replace`)
 - Updates matcher patterns
 - Writes to `.gemini/settings.json`
 
@@ -543,12 +544,101 @@ This command:
 
 ### Tool name mapping
 
-| Claude Code | Gemini CLI        |
-| ----------- | ----------------- |
-| `Bash`      | `RunShellCommand` |
-| `Edit`      | `Edit`            |
-| `Read`      | `ReadFile`        |
-| `Write`     | `WriteFile`       |
+| Claude Code | Gemini CLI            |
+| ----------- | --------------------- |
+| `Bash`      | `run_shell_command`   |
+| `Edit`      | `replace`             |
+| `Read`      | `read_file`           |
+| `Write`     | `write_file`          |
+| `Glob`      | `glob`                |
+| `Grep`      | `search_file_content` |
+| `LS`        | `list_directory`      |
+
+## Tool and Event Matchers Reference
+
+### Available tool names for matchers
+
+The following built-in tools can be used in `BeforeTool` and `AfterTool` hook
+matchers:
+
+#### File operations
+
+- `read_file` - Read a single file
+- `read_many_files` - Read multiple files at once
+- `write_file` - Create or overwrite a file
+- `replace` - Edit file content with find/replace
+
+#### File system
+
+- `list_directory` - List directory contents
+- `glob` - Find files matching a pattern
+- `search_file_content` - Search within file contents
+
+#### Execution
+
+- `run_shell_command` - Execute shell commands
+
+#### Web and external
+
+- `google_web_search` - Google Search with grounding
+- `web_fetch` - Fetch web page content
+
+#### Agent features
+
+- `write_todos` - Manage TODO items
+- `save_memory` - Save information to memory
+- `delegate_to_agent` - Delegate tasks to sub-agents
+
+#### Example matchers
+
+```json
+{
+  "matcher": "write_file|replace" // File editing tools
+}
+```
+
+```json
+{
+  "matcher": "read_.*" // All read operations
+}
+```
+
+```json
+{
+  "matcher": "run_shell_command" // Only shell commands
+}
+```
+
+```json
+{
+  "matcher": "*" // All tools
+}
+```
+
+### Event-specific matchers
+
+#### SessionStart event matchers
+
+- `startup` - Fresh session start
+- `resume` - Resuming a previous session
+- `clear` - Session cleared
+
+#### SessionEnd event matchers
+
+- `exit` - Normal exit
+- `clear` - Session cleared
+- `logout` - User logged out
+- `prompt_input_exit` - Exit from prompt input
+- `other` - Other reasons
+
+#### PreCompress event matchers
+
+- `manual` - Manually triggered compression
+- `auto` - Automatically triggered compression
+
+#### Notification event matchers
+
+- `ToolPermission` - Tool permission notifications
 
 ## Learn more
 
