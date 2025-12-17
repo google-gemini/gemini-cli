@@ -14,17 +14,23 @@ import {
 } from '@google/gemini-cli-core';
 
 /**
- * Supported image file extensions based on Gemini API.
+ * Supported image formats based on Gemini API.
+ * Maps file extensions to MIME types.
  * See: https://ai.google.dev/gemini-api/docs/image-understanding
  */
-export const IMAGE_EXTENSIONS = [
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.webp',
-  '.heic',
-  '.heif',
-];
+export const IMAGE_FORMATS: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.heic': 'image/heic',
+  '.heif': 'image/heif',
+};
+
+/**
+ * Supported image file extensions derived from IMAGE_FORMATS.
+ */
+export const IMAGE_EXTENSIONS = Object.keys(IMAGE_FORMATS);
 
 /** Matches strings that start with a path prefix (/, ~, ., Windows drive letter, or UNC path) */
 const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;

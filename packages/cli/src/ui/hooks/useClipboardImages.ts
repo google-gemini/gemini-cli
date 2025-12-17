@@ -9,7 +9,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { PartUnion } from '@google/genai';
 import { debugLogger } from '@google/gemini-cli-core';
-import { IMAGE_EXTENSIONS } from '../utils/clipboardUtils.js';
+import { IMAGE_EXTENSIONS, IMAGE_FORMATS } from '../utils/clipboardUtils.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
 
 /**
@@ -57,6 +57,16 @@ export interface ImageValidationResult {
 }
 
 /**
+ * Result of getImagePartsForText, containing both image data and matched placeholders.
+ */
+export interface ImagePartsResult {
+  /** The image parts to send to the API */
+  parts: PartUnion[];
+  /** The display texts (e.g., "[Image #1]") that were matched and should be stripped */
+  matchedDisplayTexts: string[];
+}
+
+/**
  * Return type for the useClipboardImages hook.
  */
 export interface UseClipboardImagesReturn {
@@ -69,7 +79,7 @@ export interface UseClipboardImagesReturn {
   /** Clear all images (called after message submission) */
   clear: () => void;
   /** Get image parts only for images whose [Image #N] tags are present in the text */
-  getImagePartsForText: (text: string) => Promise<PartUnion[]>;
+  getImagePartsForText: (text: string) => Promise<ImagePartsResult>;
 }
 
 /**
@@ -78,22 +88,9 @@ export interface UseClipboardImagesReturn {
  */
 const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
 
-/**
- * MIME types supported by Gemini API for image inputs.
- * See: https://ai.google.dev/gemini-api/docs/image-understanding
- */
-const MIME_TYPES: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.heic': 'image/heic',
-  '.heif': 'image/heif',
-};
-
 function getMimeType(filePath: string): string | null {
   const ext = path.extname(filePath).toLowerCase();
-  return MIME_TYPES[ext] ?? null;
+  return IMAGE_FORMATS[ext] ?? null;
 }
 
 /**
@@ -248,12 +245,14 @@ export function useClipboardImages(): UseClipboardImagesReturn {
   /**
    * Get image parts only for images whose [Image #N] tags are present in the text.
    * This prevents sending images the user has deleted from their prompt.
+   * Returns both the image parts and the matched display texts for stripping.
    */
   const getImagePartsForText = useCallback(
-    async (text: string): Promise<PartUnion[]> => {
+    async (text: string): Promise<ImagePartsResult> => {
       // Use ref for synchronous access to current state
       const current = registryRef.current;
       const parts: PartUnion[] = [];
+      const matchedDisplayTexts: string[] = [];
 
       for (const image of current.images) {
         // Use String.includes for faster tag checking (no regex compilation)
@@ -265,10 +264,11 @@ export function useClipboardImages(): UseClipboardImagesReturn {
         const part = await readImageAsPart(image.path, image.displayText);
         if (part) {
           parts.push(part);
+          matchedDisplayTexts.push(image.displayText);
         }
       }
 
-      return parts;
+      return { parts, matchedDisplayTexts };
     },
     [], // No dependencies - reads from ref for consistent access
   );

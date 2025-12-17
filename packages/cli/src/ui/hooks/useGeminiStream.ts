@@ -115,7 +115,10 @@ export const useGeminiStream = (
   terminalHeight: number,
   isShellFocused?: boolean,
   clipboardImages?: {
-    getImagePartsForText: (text: string) => Promise<PartUnion[]>;
+    getImagePartsForText: (text: string) => Promise<{
+      parts: PartUnion[];
+      matchedDisplayTexts: string[];
+    }>;
     clear: () => void;
   },
 ) => {
@@ -537,14 +540,20 @@ export const useGeminiStream = (
                   .join(' ')
               : '';
 
-        const imageParts =
+        const { parts: imageParts, matchedDisplayTexts } =
           await clipboardImages.getImagePartsForText(queryText);
         if (imageParts.length > 0) {
           onDebugMessage(`Injecting ${imageParts.length} clipboard image(s)`);
 
-          // Strip [Image #N] references from the text since we're injecting the actual images
-          const stripImageReferences = (text: string): string =>
-            text.replace(/\[Image #\d+\]\s*/g, '').trim();
+          // Strip only the placeholders that correspond to actual registered images
+          // This preserves any user-typed [Image #N] text that doesn't match a registered image
+          const stripImageReferences = (text: string): string => {
+            let result = text;
+            for (const displayText of matchedDisplayTexts) {
+              result = result.replaceAll(displayText, '');
+            }
+            return result.replace(/\s{2,}/g, ' ').trim();
+          };
 
           if (typeof localQueryToSendToGemini === 'string') {
             const cleanedText = stripImageReferences(localQueryToSendToGemini);

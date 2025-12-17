@@ -110,7 +110,7 @@ describe('useClipboardImages', () => {
       });
 
       // Only mention Image #1 and #3 in text (user deleted #2)
-      const parts = await result.current.getImagePartsForText(
+      const { parts } = await result.current.getImagePartsForText(
         'Hello [Image #1] and [Image #3]',
       );
 
@@ -126,7 +126,7 @@ describe('useClipboardImages', () => {
       });
 
       // User deleted all [Image #N] tags from their message
-      const parts = await result.current.getImagePartsForText(
+      const { parts } = await result.current.getImagePartsForText(
         'Hello world, no images here',
       );
 
@@ -153,7 +153,7 @@ describe('useClipboardImages', () => {
         result.current.registerImage('/path/to/small-image.png');
       });
 
-      const parts = await result.current.getImagePartsForText(
+      const { parts } = await result.current.getImagePartsForText(
         '[Image #1] [Image #2]',
       );
 
