@@ -32,7 +32,7 @@ const StatRow: React.FC<StatRowProps> = ({
   isSubtle = false,
   isSection = false,
 }) => (
-  <Box>
+  <Box gap={2}>
     <Box width={METRIC_COL_WIDTH}>
       <Text
         bold={isSection}
@@ -99,7 +99,7 @@ export const ModelStatsDisplay: React.FC = () => {
       <Box height={1} />
 
       {/* Header */}
-      <Box>
+      <Box gap={2}>
         <Box width={METRIC_COL_WIDTH}>
           <Text bold color={theme.text.primary}>
             Metric
