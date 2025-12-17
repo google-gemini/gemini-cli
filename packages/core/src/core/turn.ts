@@ -31,6 +31,7 @@ import { InvalidStreamError } from './geminiChat.js';
 import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { createUserContent } from '@google/genai';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { getCitations } from '../utils/generateContentResponseUtilities.js';
 
 // Define a structure for tools passed to the server
 export interface ServerTool {
@@ -404,15 +405,4 @@ export class Turn {
       .filter((text): text is string => text !== null)
       .join(' ');
   }
-}
-
-function getCitations(resp: GenerateContentResponse): string[] {
-  return (resp.candidates?.[0]?.citationMetadata?.citations ?? [])
-    .filter((citation) => citation.uri !== undefined)
-    .map((citation) => {
-      if (citation.title) {
-        return `(${citation.title}) ${citation.uri}`;
-      }
-      return citation.uri!;
-    });
 }

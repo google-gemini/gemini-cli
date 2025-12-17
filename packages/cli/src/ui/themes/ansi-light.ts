@@ -10,7 +10,7 @@ import { lightSemanticColors } from './semantic-tokens.js';
 const ansiLightColors: ColorsTheme = {
   type: 'light',
   Background: 'white',
-  Foreground: '#444',
+  Foreground: '',
   LightBlue: 'blue',
   AccentBlue: 'blue',
   AccentPurple: 'purple',

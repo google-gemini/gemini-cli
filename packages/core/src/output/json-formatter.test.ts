@@ -71,6 +71,7 @@ describe('JsonFormatter', () => {
             totalLatencyMs: 5672,
           },
           tokens: {
+            input: 13745,
             prompt: 24401,
             candidates: 215,
             total: 24719,
@@ -86,6 +87,7 @@ describe('JsonFormatter', () => {
             totalLatencyMs: 5914,
           },
           tokens: {
+            input: 20803,
             prompt: 20803,
             candidates: 716,
             total: 21657,

@@ -31,10 +31,6 @@ import type {
   ResumedSessionData,
 } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
-import {
-  DEFAULT_GEMINI_FLASH_MODEL,
-  getEffectiveModel,
-} from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { ideContextStore } from '../ide/ideContext.js';
@@ -395,12 +391,9 @@ export class GeminiClient {
       return this.currentSequenceModel;
     }
 
-    const configModel = this.config.getModel();
-    return getEffectiveModel(
-      this.config.isInFallbackMode(),
-      configModel,
-      this.config.getPreviewFeatures(),
-    );
+    // Availability logic: The configured model is the source of truth,
+    // including any permanent fallbacks (config.setModel) or manual overrides.
+    return this.config.getActiveModel();
   }
 
   async *sendMessageStream(
@@ -540,17 +533,16 @@ export class GeminiClient {
     if (this.currentSequenceModel) {
       modelToUse = this.currentSequenceModel;
     } else {
-      const router = await this.config.getModelRouterService();
+      const router = this.config.getModelRouterService();
       const decision = await router.route(routingContext);
       modelToUse = decision.model;
     }
 
     // availability logic
+    const modelConfigKey: ModelConfigKey = { model: modelToUse };
     const { model: finalModel } = applyModelSelection(
       this.config,
-      modelToUse,
-      undefined,
-      undefined,
+      modelConfigKey,
       { consumeAttempt: false },
     );
     modelToUse = finalModel;
@@ -558,7 +550,7 @@ export class GeminiClient {
     this.currentSequenceModel = modelToUse;
     yield { type: GeminiEventType.ModelInfo, value: modelToUse };
 
-    const resultStream = turn.run({ model: modelToUse }, request, linkedSignal);
+    const resultStream = turn.run(modelConfigKey, request, linkedSignal);
     for await (const event of resultStream) {
       if (this.loopDetector.addAndCheck(event)) {
         yield { type: GeminiEventType.LoopDetected };
@@ -675,11 +667,6 @@ export class GeminiClient {
       model: currentAttemptModel,
       generateContentConfig: currentAttemptGenerateContentConfig,
     } = desiredModelConfig;
-    const fallbackModelConfig =
-      this.config.modelConfigService.getResolvedConfig({
-        ...modelConfigKey,
-        model: DEFAULT_GEMINI_FLASH_MODEL,
-      });
 
     try {
       const userMemory = this.config.getUserMemory();
@@ -688,12 +675,7 @@ export class GeminiClient {
         model,
         config: newConfig,
         maxAttempts: availabilityMaxAttempts,
-      } = applyModelSelection(
-        this.config,
-        currentAttemptModel,
-        currentAttemptGenerateContentConfig,
-        modelConfigKey.overrideScope,
-      );
+      } = applyModelSelection(this.config, modelConfigKey);
       currentAttemptModel = model;
       if (newConfig) {
         currentAttemptGenerateContentConfig = newConfig;
@@ -707,28 +689,16 @@ export class GeminiClient {
         );
 
       const apiCall = () => {
-        let modelConfigToUse = desiredModelConfig;
-
-        if (!this.config.isModelAvailabilityServiceEnabled()) {
-          modelConfigToUse = this.config.isInFallbackMode()
-            ? fallbackModelConfig
-            : desiredModelConfig;
-          currentAttemptModel = modelConfigToUse.model;
-          currentAttemptGenerateContentConfig =
-            modelConfigToUse.generateContentConfig;
-        } else {
-          // AvailabilityService
-          const active = this.config.getActiveModel();
-          if (active !== currentAttemptModel) {
-            currentAttemptModel = active;
-            // Re-resolve config if model changed
-            const newConfig = this.config.modelConfigService.getResolvedConfig({
-              ...modelConfigKey,
-              model: currentAttemptModel,
-            });
-            currentAttemptGenerateContentConfig =
-              newConfig.generateContentConfig;
-          }
+        // AvailabilityService
+        const active = this.config.getActiveModel();
+        if (active !== currentAttemptModel) {
+          currentAttemptModel = active;
+          // Re-resolve config if model changed
+          const newConfig = this.config.modelConfigService.getResolvedConfig({
+            ...modelConfigKey,
+            model: currentAttemptModel,
+          });
+          currentAttemptGenerateContentConfig = newConfig.generateContentConfig;
         }
 
         const requestConfig: GenerateContentConfig = {

@@ -85,6 +85,7 @@ describe('<StatsDisplay />', () => {
         'gemini-2.5-pro': {
           api: { totalRequests: 3, totalErrors: 0, totalLatencyMs: 15000 },
           tokens: {
+            input: 500,
             prompt: 1000,
             candidates: 2000,
             total: 43234,
@@ -96,6 +97,7 @@ describe('<StatsDisplay />', () => {
         'gemini-2.5-flash': {
           api: { totalRequests: 5, totalErrors: 1, totalLatencyMs: 4500 },
           tokens: {
+            input: 15000,
             prompt: 25000,
             candidates: 15000,
             total: 150000000,
@@ -123,6 +125,7 @@ describe('<StatsDisplay />', () => {
         'gemini-2.5-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
           tokens: {
+            input: 50,
             prompt: 100,
             candidates: 100,
             total: 250,
@@ -216,6 +219,7 @@ describe('<StatsDisplay />', () => {
           'gemini-2.5-pro': {
             api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
             tokens: {
+              input: 100,
               prompt: 100,
               candidates: 100,
               total: 200,
@@ -398,6 +402,7 @@ describe('<StatsDisplay />', () => {
           'gemini-2.5-pro': {
             api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
             tokens: {
+              input: 50,
               prompt: 100,
               candidates: 100,
               total: 250,

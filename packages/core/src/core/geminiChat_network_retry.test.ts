@@ -13,6 +13,7 @@ import type { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { HookSystem } from '../hooks/hookSystem.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 
 // Mock fs module
 vi.mock('node:fs', () => ({
@@ -78,7 +79,8 @@ describe('GeminiChat Network Retries', () => {
         model: 'test-model',
       }),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
-      isInFallbackMode: vi.fn().mockReturnValue(false),
+      getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
+      setActiveModel: vi.fn(),
       getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
@@ -93,12 +95,10 @@ describe('GeminiChat Network Retries', () => {
           generateContentConfig: { temperature: 0 },
         })),
       },
-      isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(false),
-      isPreviewModelBypassMode: vi.fn().mockReturnValue(false),
-      setPreviewModelBypassMode: vi.fn(),
-      isPreviewModelFallbackMode: vi.fn().mockReturnValue(false),
       getEnableHooks: vi.fn().mockReturnValue(false),
-      setPreviewModelFallbackMode: vi.fn(),
+      getModelAvailabilityService: vi
+        .fn()
+        .mockReturnValue(createAvailabilityServiceMock()),
     } as unknown as Config;
 
     const mockMessageBus = createMockMessageBus();

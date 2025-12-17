@@ -28,11 +28,16 @@ function mergeRecursively(
   path: string[] = [],
 ) {
   for (const key of Object.keys(source)) {
-    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+    // JSON.parse can create objects with __proto__ as an own property.
+    // We must skip it to prevent prototype pollution.
+    if (key === '__proto__') {
+      continue;
+    }
+    const srcValue = source[key];
+    if (srcValue === undefined) {
       continue;
     }
     const newPath = [...path, key];
-    const srcValue = source[key];
     const objValue = target[key];
     const mergeStrategy = getMergeStrategyForPath(newPath);
 

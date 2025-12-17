@@ -12,19 +12,19 @@ import {
 } from './policyHelpers.js';
 import { createDefaultPolicy } from './policyCatalog.js';
 import type { Config } from '../config/config.js';
+import { DEFAULT_GEMINI_MODEL_AUTO } from '../config/models.js';
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
     getPreviewFeatures: () => false,
     getUserTier: () => undefined,
     getModel: () => 'gemini-2.5-pro',
-    isInFallbackMode: () => false,
     ...overrides,
   }) as unknown as Config;
 
 describe('policyHelpers', () => {
   describe('resolvePolicyChain', () => {
-    it('inserts the active model when missing from the catalog', () => {
+    it('returns a single-model chain for a custom model', () => {
       const config = createMockConfig({
         getModel: () => 'custom-model',
       });
@@ -43,7 +43,7 @@ describe('policyHelpers', () => {
 
     it('returns the default chain when active model is "auto"', () => {
       const config = createMockConfig({
-        getModel: () => 'auto',
+        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       });
       const chain = resolvePolicyChain(config);
 
@@ -51,6 +51,25 @@ describe('policyHelpers', () => {
       expect(chain).toHaveLength(2);
       expect(chain[0]?.model).toBe('gemini-2.5-pro');
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
+    });
+
+    it('starts chain from preferredModel when model is "auto"', () => {
+      const config = createMockConfig({
+        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+      });
+      const chain = resolvePolicyChain(config, 'gemini-2.5-flash');
+      expect(chain).toHaveLength(1);
+      expect(chain[0]?.model).toBe('gemini-2.5-flash');
+    });
+
+    it('wraps around the chain when wrapsAround is true', () => {
+      const config = createMockConfig({
+        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+      });
+      const chain = resolvePolicyChain(config, 'gemini-2.5-flash', true);
+      expect(chain).toHaveLength(2);
+      expect(chain[0]?.model).toBe('gemini-2.5-flash');
+      expect(chain[1]?.model).toBe('gemini-2.5-pro');
     });
   });
 
@@ -62,6 +81,17 @@ describe('policyHelpers', () => {
         createDefaultPolicy('c'),
       ];
       const context = buildFallbackPolicyContext(chain, 'b');
+      expect(context.failedPolicy?.model).toBe('b');
+      expect(context.candidates.map((p) => p.model)).toEqual(['c']);
+    });
+
+    it('wraps around when building fallback context if wrapsAround is true', () => {
+      const chain = [
+        createDefaultPolicy('a'),
+        createDefaultPolicy('b'),
+        createDefaultPolicy('c'),
+      ];
+      const context = buildFallbackPolicyContext(chain, 'b', true);
       expect(context.failedPolicy?.model).toBe('b');
       expect(context.candidates.map((p) => p.model)).toEqual(['c', 'a']);
     });
@@ -88,7 +118,6 @@ describe('policyHelpers', () => {
       overrides: Partial<Config> = {},
     ): Config => {
       const defaults = {
-        isModelAvailabilityServiceEnabled: () => true,
         getModelAvailabilityService: () => mockAvailabilityService,
         setActiveModel: vi.fn(),
         modelConfigService: mockModelConfigService,
@@ -100,22 +129,17 @@ describe('policyHelpers', () => {
       vi.clearAllMocks();
     });
 
-    it('returns requested model if availability service is disabled', () => {
-      const config = createExtendedMockConfig({
-        isModelAvailabilityServiceEnabled: () => false,
-      });
-      const result = applyModelSelection(config, 'gemini-pro');
-      expect(result.model).toBe('gemini-pro');
-      expect(config.setActiveModel).not.toHaveBeenCalled();
-    });
-
     it('returns requested model if it is available', () => {
       const config = createExtendedMockConfig();
+      mockModelConfigService.getResolvedConfig.mockReturnValue({
+        model: 'gemini-pro',
+        generateContentConfig: {},
+      });
       mockAvailabilityService.selectFirstAvailable.mockReturnValue({
         selectedModel: 'gemini-pro',
       });
 
-      const result = applyModelSelection(config, 'gemini-pro');
+      const result = applyModelSelection(config, { model: 'gemini-pro' });
       expect(result.model).toBe('gemini-pro');
       expect(result.maxAttempts).toBeUndefined();
       expect(config.setActiveModel).toHaveBeenCalledWith('gemini-pro');
@@ -123,15 +147,20 @@ describe('policyHelpers', () => {
 
     it('switches to backup model and updates config if requested is unavailable', () => {
       const config = createExtendedMockConfig();
+      mockModelConfigService.getResolvedConfig
+        .mockReturnValueOnce({
+          model: 'gemini-pro',
+          generateContentConfig: { temperature: 0.9, topP: 1 },
+        })
+        .mockReturnValueOnce({
+          model: 'gemini-flash',
+          generateContentConfig: { temperature: 0.1, topP: 1 },
+        });
       mockAvailabilityService.selectFirstAvailable.mockReturnValue({
         selectedModel: 'gemini-flash',
       });
-      mockModelConfigService.getResolvedConfig.mockReturnValue({
-        generateContentConfig: { temperature: 0.1 },
-      });
 
-      const currentConfig = { temperature: 0.9, topP: 1 };
-      const result = applyModelSelection(config, 'gemini-pro', currentConfig);
+      const result = applyModelSelection(config, { model: 'gemini-pro' });
 
       expect(result.model).toBe('gemini-flash');
       expect(result.config).toEqual({
@@ -140,6 +169,9 @@ describe('policyHelpers', () => {
       });
 
       expect(mockModelConfigService.getResolvedConfig).toHaveBeenCalledWith({
+        model: 'gemini-pro',
+      });
+      expect(mockModelConfigService.getResolvedConfig).toHaveBeenCalledWith({
         model: 'gemini-flash',
       });
       expect(config.setActiveModel).toHaveBeenCalledWith('gemini-flash');
@@ -147,12 +179,16 @@ describe('policyHelpers', () => {
 
     it('consumes sticky attempt if indicated', () => {
       const config = createExtendedMockConfig();
+      mockModelConfigService.getResolvedConfig.mockReturnValue({
+        model: 'gemini-pro',
+        generateContentConfig: {},
+      });
       mockAvailabilityService.selectFirstAvailable.mockReturnValue({
         selectedModel: 'gemini-pro',
         attempts: 1,
       });
 
-      const result = applyModelSelection(config, 'gemini-pro');
+      const result = applyModelSelection(config, { model: 'gemini-pro' });
       expect(mockAvailabilityService.consumeStickyAttempt).toHaveBeenCalledWith(
         'gemini-pro',
       );
@@ -161,6 +197,10 @@ describe('policyHelpers', () => {
 
     it('does not consume sticky attempt if consumeAttempt is false', () => {
       const config = createExtendedMockConfig();
+      mockModelConfigService.getResolvedConfig.mockReturnValue({
+        model: 'gemini-pro',
+        generateContentConfig: {},
+      });
       mockAvailabilityService.selectFirstAvailable.mockReturnValue({
         selectedModel: 'gemini-pro',
         attempts: 1,
@@ -168,9 +208,7 @@ describe('policyHelpers', () => {
 
       const result = applyModelSelection(
         config,
-        'gemini-pro',
-        undefined,
-        undefined,
+        { model: 'gemini-pro' },
         {
           consumeAttempt: false,
         },

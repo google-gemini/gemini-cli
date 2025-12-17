@@ -199,4 +199,28 @@ describe('customDeepMerge', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((result as any)['hooks']['disabled']).toEqual(['hook-a', 'hook-b']);
   });
+
+  it('should overwrite primitive with object', () => {
+    const target = { a: 1 };
+    const source = { a: { b: 2 } };
+    const getMergeStrategy = () => undefined;
+    const result = customDeepMerge(getMergeStrategy, target, source);
+    expect(result).toEqual({ a: { b: 2 } });
+  });
+
+  it('should overwrite object with primitive', () => {
+    const target = { a: { b: 2 } };
+    const source = { a: 1 };
+    const getMergeStrategy = () => undefined;
+    const result = customDeepMerge(getMergeStrategy, target, source);
+    expect(result).toEqual({ a: 1 });
+  });
+
+  it('should not overwrite with undefined', () => {
+    const target = { a: 1 };
+    const source = { a: undefined };
+    const getMergeStrategy = () => undefined;
+    const result = customDeepMerge(getMergeStrategy, target, source);
+    expect(result).toEqual({ a: 1 });
+  });
 });

@@ -19,7 +19,7 @@ describe('policyCatalog', () => {
   it('returns preview chain when preview enabled', () => {
     const chain = getModelPolicyChain({ previewEnabled: true });
     expect(chain[0]?.model).toBe(PREVIEW_GEMINI_MODEL);
-    expect(chain).toHaveLength(3);
+    expect(chain).toHaveLength(2);
   });
 
   it('returns default chain when preview disabled', () => {
@@ -31,7 +31,7 @@ describe('policyCatalog', () => {
   it('marks preview transients as sticky retries', () => {
     const [previewPolicy] = getModelPolicyChain({ previewEnabled: true });
     expect(previewPolicy.model).toBe(PREVIEW_GEMINI_MODEL);
-    expect(previewPolicy.stateTransitions.transient).toBe('sticky_retry');
+    expect(previewPolicy.stateTransitions.transient).toBe('terminal');
   });
 
   it('applies default actions and state transitions for unspecified kinds', () => {

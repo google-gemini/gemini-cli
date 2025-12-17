@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { selectModelForAvailability } from '../../availability/policyHelpers.js';
 import type { Config } from '../../config/config.js';
-import { getEffectiveModel } from '../../config/models.js';
+import { resolveModel } from '../../config/models.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type {
   RoutingContext,
@@ -21,24 +22,34 @@ export class FallbackStrategy implements RoutingStrategy {
     config: Config,
     _baseLlmClient: BaseLlmClient,
   ): Promise<RoutingDecision | null> {
-    const isInFallbackMode: boolean = config.isInFallbackMode();
+    const requestedModel = config.getModel();
+    const resolvedModel = resolveModel(
+      requestedModel,
+      config.getPreviewFeatures(),
+    );
+    const service = config.getModelAvailabilityService();
+    const snapshot = service.snapshot(resolvedModel);
 
-    if (!isInFallbackMode) {
+    if (snapshot.available) {
       return null;
     }
 
-    const effectiveModel = getEffectiveModel(
-      isInFallbackMode,
-      config.getModel(),
-      config.getPreviewFeatures(),
-    );
-    return {
-      model: effectiveModel,
-      metadata: {
-        source: this.name,
-        latencyMs: 0,
-        reasoning: `In fallback mode. Using: ${effectiveModel}`,
-      },
-    };
+    const selection = selectModelForAvailability(config, requestedModel);
+
+    if (
+      selection?.selectedModel &&
+      selection.selectedModel !== requestedModel
+    ) {
+      return {
+        model: selection.selectedModel,
+        metadata: {
+          source: this.name,
+          latencyMs: 0,
+          reasoning: `Model ${requestedModel} is unavailable (${snapshot.reason}). Using fallback: ${selection.selectedModel}`,
+        },
+      };
+    }
+
+    return null;
   }
 }

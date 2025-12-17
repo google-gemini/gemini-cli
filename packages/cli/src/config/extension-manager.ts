@@ -220,7 +220,7 @@ export class ExtensionManager extends ExtensionLoader {
       }
 
       try {
-        newExtensionConfig = this.loadExtensionConfig(localSourcePath);
+        newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
 
         if (isUpdate && installMetadata.autoUpdate) {
           const oldSettings = new Set(
@@ -364,7 +364,7 @@ export class ExtensionManager extends ExtensionLoader {
       // to get the name and version for logging.
       if (!newExtensionConfig && localSourcePath) {
         try {
-          newExtensionConfig = this.loadExtensionConfig(localSourcePath);
+          newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
         } catch {
           // Ignore error, this is just for logging.
         }
@@ -491,7 +491,7 @@ export class ExtensionManager extends ExtensionLoader {
     }
 
     try {
-      let config = this.loadExtensionConfig(effectiveExtensionPath);
+      let config = await this.loadExtensionConfig(effectiveExtensionPath);
       if (
         this.getExtensions().find((extension) => extension.name === config.name)
       ) {
@@ -571,13 +571,13 @@ export class ExtensionManager extends ExtensionLoader {
     return this.maybeStopExtension(extension);
   }
 
-  loadExtensionConfig(extensionDir: string): ExtensionConfig {
+  async loadExtensionConfig(extensionDir: string): Promise<ExtensionConfig> {
     const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
     if (!fs.existsSync(configFilePath)) {
       throw new Error(`Configuration file not found at ${configFilePath}`);
     }
     try {
-      const configContent = fs.readFileSync(configFilePath, 'utf-8');
+      const configContent = await fs.promises.readFile(configFilePath, 'utf-8');
       const rawConfig = JSON.parse(configContent) as ExtensionConfig;
       if (!rawConfig.name || !rawConfig.version) {
         throw new Error(
