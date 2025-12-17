@@ -1604,6 +1604,20 @@ describe('Config getHooks', () => {
       expect(config.getModel()).toBe('auto');
       expect(spy).toHaveBeenCalled();
     });
+
+    it('should reset active model when setModel is called with the current model after a fallback', () => {
+      const config = new Config(baseParams);
+      const originalModel = config.getModel();
+      const fallbackModel = 'fallback-model';
+
+      config.setActiveModel(fallbackModel);
+      expect(config.getActiveModel()).toBe(fallbackModel);
+
+      config.setModel(originalModel);
+
+      expect(config.getModel()).toBe(originalModel);
+      expect(config.getActiveModel()).toBe(originalModel);
+    });
   });
 });
 

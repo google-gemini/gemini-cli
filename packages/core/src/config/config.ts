@@ -842,7 +842,7 @@ export class Config {
   }
 
   setModel(newModel: string): void {
-    if (this.model !== newModel) {
+    if (this.model !== newModel || this._activeModel !== newModel) {
       this.model = newModel;
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
