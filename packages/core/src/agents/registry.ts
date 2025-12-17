@@ -115,26 +115,31 @@ export class AgentRegistry {
 
     // Register model config.
     // TODO(12916): Migrate sub-agents where possible to static configs.
-    const modelConfig = definition.modelConfig;
+    if (definition.kind === 'local') {
+      const modelConfig = definition.modelConfig;
 
-    const runtimeAlias: ModelConfigAlias = {
-      modelConfig: {
-        model: modelConfig.model,
-        generateContentConfig: {
-          temperature: modelConfig.temp,
-          topP: modelConfig.top_p,
-          thinkingConfig: {
-            includeThoughts: true,
-            thinkingBudget: modelConfig.thinkingBudget ?? -1,
+      const runtimeAlias: ModelConfigAlias = {
+        modelConfig: {
+          model: modelConfig.model,
+          generateContentConfig: {
+            temperature: modelConfig.temp,
+            topP: modelConfig.top_p,
+            thinkingConfig: {
+              includeThoughts: true,
+              thinkingBudget: modelConfig.thinkingBudget ?? -1,
+            },
           },
         },
-      },
-    };
+      };
 
-    this.config.modelConfigService.registerRuntimeModelConfig(
-      getModelConfigAlias(definition),
-      runtimeAlias,
-    );
+      this.config.modelConfigService.registerRuntimeModelConfig(
+        getModelConfigAlias(definition),
+        runtimeAlias,
+      );
+    }
+
+    // Register configured remote A2A agents.
+    // TODO: Implement remote agent registration.
   }
 
   /**
@@ -191,7 +196,7 @@ ${agentDescriptions}`;
     context +=
       'Use `delegate_to_agent` for complex tasks requiring specialized analysis.\n\n';
 
-    for (const [name, def] of this.agents.entries()) {
+    for (const [name, def] of this.agents) {
       context += `- **${name}**: ${def.description}\n`;
     }
     return context;
