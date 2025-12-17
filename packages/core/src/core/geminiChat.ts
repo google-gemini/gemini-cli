@@ -439,17 +439,6 @@ export class GeminiChat {
           this.config.getActiveModel(),
           this.config.getPreviewFeatures(),
         );
-
-        if (modelToUse !== lastModelToUse) {
-          const { generateContentConfig: newConfig } =
-            this.config.modelConfigService.getResolvedConfig({
-              model: modelToUse,
-            });
-          currentGenerateContentConfig = {
-            ...currentGenerateContentConfig,
-            ...newConfig,
-          };
-        }
       }
 
       if (modelToUse !== lastModelToUse) {
