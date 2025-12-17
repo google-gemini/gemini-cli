@@ -109,6 +109,7 @@ export interface ToolCallRequestInfo {
   isClientInitiated: boolean;
   prompt_id: string;
   checkpoint?: string;
+  traceId?: string;
 }
 
 export interface ToolCallResponseInfo {
@@ -291,7 +292,7 @@ export class Turn {
         // Handle function calls (requesting tool execution)
         const functionCalls = resp.functionCalls ?? [];
         for (const fnCall of functionCalls) {
-          const event = this.handlePendingFunctionCall(fnCall);
+          const event = this.handlePendingFunctionCall(fnCall, traceId);
           if (event) {
             yield event;
           }
@@ -370,6 +371,7 @@ export class Turn {
 
   private handlePendingFunctionCall(
     fnCall: FunctionCall,
+    traceId?: string,
   ): ServerGeminiStreamEvent | null {
     const callId =
       fnCall.id ??
@@ -383,6 +385,7 @@ export class Turn {
       args,
       isClientInitiated: false,
       prompt_id: this.prompt_id,
+      traceId,
     };
 
     this.pendingToolCalls.push(toolCallRequest);
