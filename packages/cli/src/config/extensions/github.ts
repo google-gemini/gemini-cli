@@ -175,7 +175,7 @@ export async function checkForExtensionUpdate(
   if (installMetadata?.type === 'local') {
     let latestConfig: ExtensionConfig | undefined;
     try {
-      latestConfig = extensionManager.loadExtensionConfig(
+      latestConfig = await extensionManager.loadExtensionConfig(
         installMetadata.source,
       );
     } catch (e) {

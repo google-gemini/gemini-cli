@@ -85,7 +85,7 @@ export const memoryCommand: SlashCommand = {
         );
 
         try {
-          const config = await context.services.config;
+          const config = context.services.config;
           if (config) {
             const { memoryContent, fileCount } =
               await refreshServerHierarchicalMemory(config);

@@ -120,7 +120,7 @@ async function initOauthClient(
     const auth = new GoogleAuth({
       scopes: OAUTH_SCOPE,
     });
-    const byoidClient = await auth.fromJSON({
+    const byoidClient = auth.fromJSON({
       ...credentials,
       refresh_token: credentials.refresh_token ?? undefined,
     });

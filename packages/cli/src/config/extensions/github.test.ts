@@ -221,9 +221,11 @@ describe('github.ts', () => {
     });
 
     it('should return NOT_UPDATABLE for non-git/non-release extensions', async () => {
-      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue({
-        version: '1.0.0',
-      } as unknown as ExtensionConfig);
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
+        Promise.resolve({
+          version: '1.0.0',
+        } as unknown as ExtensionConfig),
+      );
 
       const linkExt = {
         installMetadata: { type: 'link' },

@@ -140,9 +140,7 @@ describe('useFolderTrust', () => {
     });
 
     await act(async () => {
-      await result.current.handleFolderTrustSelect(
-        FolderTrustChoice.TRUST_FOLDER,
-      );
+      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
     });
 
     await waitFor(() => {
