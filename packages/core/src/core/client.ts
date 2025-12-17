@@ -539,11 +539,10 @@ export class GeminiClient {
     }
 
     // availability logic
+    const modelConfigKey: ModelConfigKey = { model: modelToUse };
     const { model: finalModel } = applyModelSelection(
       this.config,
-      modelToUse,
-      undefined,
-      undefined,
+      modelConfigKey,
       { consumeAttempt: false },
     );
     modelToUse = finalModel;
@@ -551,7 +550,7 @@ export class GeminiClient {
     this.currentSequenceModel = modelToUse;
     yield { type: GeminiEventType.ModelInfo, value: modelToUse };
 
-    const resultStream = turn.run({ model: modelToUse }, request, linkedSignal);
+    const resultStream = turn.run(modelConfigKey, request, linkedSignal);
     for await (const event of resultStream) {
       if (this.loopDetector.addAndCheck(event)) {
         yield { type: GeminiEventType.LoopDetected };
@@ -676,12 +675,7 @@ export class GeminiClient {
         model,
         config: newConfig,
         maxAttempts: availabilityMaxAttempts,
-      } = applyModelSelection(
-        this.config,
-        currentAttemptModel,
-        currentAttemptGenerateContentConfig,
-        modelConfigKey.overrideScope,
-      );
+      } = applyModelSelection(this.config, modelConfigKey);
       currentAttemptModel = model;
       if (newConfig) {
         currentAttemptGenerateContentConfig = newConfig;
