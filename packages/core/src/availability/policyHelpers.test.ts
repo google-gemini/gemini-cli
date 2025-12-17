@@ -19,7 +19,6 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getPreviewFeatures: () => false,
     getUserTier: () => undefined,
     getModel: () => 'gemini-2.5-pro',
-    isInFallbackMode: () => false,
     ...overrides,
   }) as unknown as Config;
 
