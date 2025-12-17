@@ -196,7 +196,7 @@ ${agentDescriptions}`;
     context +=
       'Use `delegate_to_agent` for complex tasks requiring specialized analysis.\n\n';
 
-    for (const [name, def] of Array.from(this.agents.entries())) {
+    for (const [name, def] of this.agents) {
       context += `- **${name}**: ${def.description}\n`;
     }
     return context;
