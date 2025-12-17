@@ -117,7 +117,6 @@ describe('BaseLlmClient', () => {
       setActiveModel: vi.fn(),
       getPreviewFeatures: vi.fn().mockReturnValue(false),
       getUserTier: vi.fn().mockReturnValue(undefined),
-      isInFallbackMode: vi.fn().mockReturnValue(false),
       getModel: vi.fn().mockReturnValue('test-model'),
       getActiveModel: vi.fn().mockReturnValue('test-model'),
     } as unknown as Mocked<Config>;
@@ -776,13 +775,15 @@ describe('BaseLlmClient', () => {
       const getResolvedConfigMock = vi.mocked(
         mockConfig.modelConfigService.getResolvedConfig,
       );
-      getResolvedConfigMock
-        .mockReturnValueOnce(
-          makeResolvedModelConfig(firstModel, { temperature: 0.1 }),
-        )
-        .mockReturnValueOnce(
-          makeResolvedModelConfig(fallbackModel, { temperature: 0.9 }),
-        );
+      getResolvedConfigMock.mockImplementation((key) => {
+        if (key.model === firstModel) {
+          return makeResolvedModelConfig(firstModel, { temperature: 0.1 });
+        }
+        if (key.model === fallbackModel) {
+          return makeResolvedModelConfig(fallbackModel, { temperature: 0.9 });
+        }
+        return makeResolvedModelConfig(key.model);
+      });
 
       // Availability selects the first model initially
       vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
