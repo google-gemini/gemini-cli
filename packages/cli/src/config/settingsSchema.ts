@@ -19,7 +19,7 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
-  GEMINI_MODEL_ALIAS_PRO,
+  GEMINI_MODEL_ALIAS_AUTO,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -1323,15 +1323,6 @@ const SETTINGS_SCHEMA = {
           'Enables extension loading/unloading within the CLI session.',
         showInDialog: false,
       },
-      isModelAvailabilityServiceEnabled: {
-        type: 'boolean',
-        label: 'Enable Model Availability Service',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: false,
-        description: 'Enable model routing using new availability service.',
-        showInDialog: false,
-      },
       jitContext: {
         type: 'boolean',
         label: 'JIT Context Loading',
@@ -1394,7 +1385,7 @@ const SETTINGS_SCHEMA = {
             label: 'Model',
             category: 'Experimental',
             requiresRestart: true,
-            default: GEMINI_MODEL_ALIAS_PRO,
+            default: GEMINI_MODEL_ALIAS_AUTO,
             description:
               'The model to use for the Codebase Investigator agent.',
             showInDialog: false,
