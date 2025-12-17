@@ -236,7 +236,7 @@ describe('ModelConfigService Integration', () => {
     // Re-instantiate service for this isolated test to not pollute other tests
     const service = new ModelConfigService(complexConfig);
 
-    // Register a runtime alias, simulating what AgentExecutor does.
+    // Register a runtime alias, simulating what LocalAgentExecutor does.
     // This alias extends a static base and provides its own settings.
     service.registerRuntimeModelConfig('agent-runtime:my-agent', {
       extends: 'creative-writer', // extends a multi-level alias
