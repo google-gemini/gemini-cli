@@ -265,10 +265,6 @@ export class GeminiChat {
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
-    // Preview Model Bypass mode for the new request.
-    // This ensures that we attempt to use Preview Model for every new user turn
-    // (unless the "Always" fallback mode is active, which is handled separately).
-    this.config.setPreviewModelBypassMode(false);
     let streamDoneResolver: () => void;
     const streamDonePromise = new Promise<void>((resolve) => {
       streamDoneResolver = resolve;
@@ -302,12 +298,7 @@ export class GeminiChat {
       try {
         let lastError: unknown = new Error('Request failed after all retries.');
 
-        let maxAttempts = INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
-        // If we are in Preview Model Fallback Mode, we want to fail fast (1 attempt)
-        // when probing the Preview Model.
-        if (this.config.isPreviewModelFallbackMode() && isPreviewModel(model)) {
-          maxAttempts = 1;
-        }
+        const maxAttempts = INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           let isConnectionPhase = true;
@@ -380,15 +371,6 @@ export class GeminiChat {
             );
           }
           throw lastError;
-        } else {
-          // Preview Model successfully used, disable fallback mode.
-          // We only do this if we didn't bypass Preview Model (i.e. we actually used it).
-          if (
-            isPreviewModel(model) &&
-            !this.config.isPreviewModelBypassMode()
-          ) {
-            this.config.setPreviewModelFallbackMode(false);
-          }
         }
       } finally {
         streamDoneResolver!();
@@ -577,11 +559,7 @@ export class GeminiChat {
       authType: this.config.getContentGeneratorConfig()?.authType,
       retryFetchErrors: this.config.getRetryFetchErrors(),
       signal: generateContentConfig.abortSignal,
-      maxAttempts:
-        availabilityMaxAttempts ??
-        (this.config.isPreviewModelFallbackMode() && isPreviewModel(model)
-          ? 1
-          : undefined),
+      maxAttempts: availabilityMaxAttempts,
       getAvailabilityContext,
     });
 

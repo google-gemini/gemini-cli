@@ -343,10 +343,6 @@ describe('Server Config (config.ts)', () => {
         mockContentConfig,
       );
 
-      // Set fallback mode to true to ensure it gets reset
-      config.setFallbackMode(true);
-      expect(config.isInFallbackMode()).toBe(true);
-
       await config.refreshAuth(authType);
 
       expect(createContentGeneratorConfig).toHaveBeenCalledWith(
@@ -356,8 +352,6 @@ describe('Server Config (config.ts)', () => {
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
       expect(GeminiClient).toHaveBeenCalledWith(config);
-      // Verify that fallback mode is reset
-      expect(config.isInFallbackMode()).toBe(false);
     });
 
     it('should reset model availability status', async () => {
@@ -1568,40 +1562,32 @@ describe('Config getHooks', () => {
   });
 
   describe('setModel', () => {
-    it('should allow setting a pro (any) model and disable fallback mode', () => {
+    it('should allow setting a pro (any) model and reset availability', () => {
       const config = new Config(baseParams);
       const service = config.getModelAvailabilityService();
       const spy = vi.spyOn(service, 'reset');
-
-      config.setFallbackMode(true);
-      expect(config.isInFallbackMode()).toBe(true);
 
       const proModel = 'gemini-2.5-pro';
       config.setModel(proModel);
 
       expect(config.getModel()).toBe(proModel);
-      expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(proModel);
       expect(spy).toHaveBeenCalled();
     });
 
-    it('should allow setting auto model from non-auto model and disable fallback mode', () => {
+    it('should allow setting auto model from non-auto model and reset availability', () => {
       const config = new Config(baseParams);
       const service = config.getModelAvailabilityService();
       const spy = vi.spyOn(service, 'reset');
 
-      config.setFallbackMode(true);
-      expect(config.isInFallbackMode()).toBe(true);
-
       config.setModel('auto');
 
       expect(config.getModel()).toBe('auto');
-      expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
       expect(spy).toHaveBeenCalled();
     });
 
-    it('should allow setting auto model from auto model if it is in the fallback mode', () => {
+    it('should allow setting auto model from auto model and reset availability', () => {
       const config = new Config({
         cwd: '/tmp',
         targetDir: '/path/to/target',
@@ -1613,14 +1599,9 @@ describe('Config getHooks', () => {
       const service = config.getModelAvailabilityService();
       const spy = vi.spyOn(service, 'reset');
 
-      config.setFallbackMode(true);
-      expect(config.isInFallbackMode()).toBe(true);
-
       config.setModel('auto');
 
       expect(config.getModel()).toBe('auto');
-      expect(config.isInFallbackMode()).toBe(false);
-      expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
       expect(spy).toHaveBeenCalled();
     });
   });

@@ -117,7 +117,6 @@ describe('BaseLlmClient', () => {
       setActiveModel: vi.fn(),
       getPreviewFeatures: vi.fn().mockReturnValue(false),
       getUserTier: vi.fn().mockReturnValue(undefined),
-      isInFallbackMode: vi.fn().mockReturnValue(false),
       getModel: vi.fn().mockReturnValue('test-model'),
       getActiveModel: vi.fn().mockReturnValue('test-model'),
     } as unknown as Mocked<Config>;
