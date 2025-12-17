@@ -1,6 +1,6 @@
-# Preview release: Release v0.19.0-preview.0
+# Preview release: Release v0.22.0-preview.0
 
-Released: November 25, 2025
+Released: December 16, 2025
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -11,131 +11,119 @@ To install the preview release:
 npm install -g @google/gemini-cli@preview
 ```
 
-## What's changed
+## What's Changed
 
-- Use lenient MCP output schema validator by @cornmander in
-  https://github.com/google-gemini/gemini-cli/pull/13521
-- Update persistence state to track counts of messages instead of times banner
-  has been displayed by @Adib234 in
-  https://github.com/google-gemini/gemini-cli/pull/13428
-- update docs for http proxy by @scidomino in
-  https://github.com/google-gemini/gemini-cli/pull/13538
-- move stdio by @jacob314 in
-  https://github.com/google-gemini/gemini-cli/pull/13528
-- chore(release): bump version to 0.19.0-nightly.20251120.8e531dc02 by
-  @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/13540
-- Skip pre-commit hooks for shadow repo (#13331) by @vishvananda in
-  https://github.com/google-gemini/gemini-cli/pull/13488
-- fix(ui): Correct mouse click cursor positioning for wide characters by
-  @SandyTao520 in https://github.com/google-gemini/gemini-cli/pull/13537
-- fix(core): correct bash @P prompt transformation detection by @pyrytakala in
-  https://github.com/google-gemini/gemini-cli/pull/13544
-- Optimize and improve test coverage for cli/src/config by @megha1188 in
-  https://github.com/google-gemini/gemini-cli/pull/13485
-- Improve code coverage for cli/src/ui/privacy package by @megha1188 in
-  https://github.com/google-gemini/gemini-cli/pull/13493
-- docs: fix typos in source code and documentation by @fancive in
-  https://github.com/google-gemini/gemini-cli/pull/13577
-- Improved code coverage for cli/src/zed-integration by @megha1188 in
-  https://github.com/google-gemini/gemini-cli/pull/13570
-- feat(ui): build interactive session browser component by @bl-ue in
-  https://github.com/google-gemini/gemini-cli/pull/13351
-- Fix multiple bugs with auth flow including using the implemented but unused
-  restart support. by @jacob314 in
-  https://github.com/google-gemini/gemini-cli/pull/13565
-- feat(core): add modelAvailabilityService for managing and tracking model
-  health by @adamfweidman in
-  https://github.com/google-gemini/gemini-cli/pull/13426
-- docs: fix grammar typo "a MCP" to "an MCP" by @noahacgn in
-  https://github.com/google-gemini/gemini-cli/pull/13595
-- feat: custom loading phrase when interactive shell requires input by
-  @jackwotherspoon in https://github.com/google-gemini/gemini-cli/pull/12535
-- docs: Update uninstall command to reflect multiple extension support by
-  @JayadityaGit in https://github.com/google-gemini/gemini-cli/pull/13582
-- bug(core): Ensure we use thinking budget on fallback to 2.5 by @joshualitt in
-  https://github.com/google-gemini/gemini-cli/pull/13596
-- Remove useModelRouter experimental flag by @Adib234 in
-  https://github.com/google-gemini/gemini-cli/pull/13593
-- feat(docs): Ensure multiline JS objects are rendered properly. by @joshualitt
-  in https://github.com/google-gemini/gemini-cli/pull/13535
-- Fix exp id logging by @owenofbrien in
-  https://github.com/google-gemini/gemini-cli/pull/13430
-- Moved client id logging into createBasicLogEvent by @owenofbrien in
-  https://github.com/google-gemini/gemini-cli/pull/13607
-- Restore bracketed paste mode after external editor exit by @scidomino in
-  https://github.com/google-gemini/gemini-cli/pull/13606
-- feat(core): Add support for custom aliases for model configs. by @joshualitt
-  in https://github.com/google-gemini/gemini-cli/pull/13546
-- feat(core): Add `BaseLlmClient.generateContent`. by @joshualitt in
-  https://github.com/google-gemini/gemini-cli/pull/13591
-- Turn off alternate buffer mode by default. by @jacob314 in
-  https://github.com/google-gemini/gemini-cli/pull/13623
-- fix(cli): Prevent stdout/stderr patching for extension commands by @chrstnb in
-  https://github.com/google-gemini/gemini-cli/pull/13600
-- Improve test coverage for cli/src/ui/components by @megha1188 in
-  https://github.com/google-gemini/gemini-cli/pull/13598
-- Update ink version to 6.4.6 by @jacob314 in
-  https://github.com/google-gemini/gemini-cli/pull/13631
-- chore/release: bump version to 0.19.0-nightly.20251122.42c2e1b21 by
-  @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/13637
-- chore/release: bump version to 0.19.0-nightly.20251123.dadd606c0 by
-  @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/13675
-- chore/release: bump version to 0.19.0-nightly.20251124.e177314a4 by
-  @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/13713
-- fix(core): Fix context window overflow warning for PDF files by @kkitase in
-  https://github.com/google-gemini/gemini-cli/pull/13548
-- feat :rephrasing the extension logging messages to run the explore command
-  when there are no extensions installed by @JayadityaGit in
-  https://github.com/google-gemini/gemini-cli/pull/13740
-- Improve code coverage for cli package by @megha1188 in
-  https://github.com/google-gemini/gemini-cli/pull/13724
-- Add session subtask in /stats command by @Adib234 in
-  https://github.com/google-gemini/gemini-cli/pull/13750
-- feat(core): Migrate chatCompressionService to model configs. by @joshualitt in
-  https://github.com/google-gemini/gemini-cli/pull/12863
-- feat(hooks): Hook Telemetry Infrastructure by @Edilmo in
-  https://github.com/google-gemini/gemini-cli/pull/9082
-- fix: (some minor improvements to configs and getPackageJson return behaviour)
-  by @grMLEqomlkkU5Eeinz4brIrOVCUCkJuN in
-  https://github.com/google-gemini/gemini-cli/pull/12510
-- feat(hooks): Hook Event Handling by @Edilmo in
-  https://github.com/google-gemini/gemini-cli/pull/9097
-- feat(hooks): Hook Agent Lifecycle Integration by @Edilmo in
-  https://github.com/google-gemini/gemini-cli/pull/9105
-- feat(core): Land bool for alternate system prompt. by @joshualitt in
-  https://github.com/google-gemini/gemini-cli/pull/13764
-- bug(core): Add default chat compression config. by @joshualitt in
-  https://github.com/google-gemini/gemini-cli/pull/13766
-- feat(model-availability): introduce ModelPolicy and PolicyCatalog by
-  @adamfweidman in https://github.com/google-gemini/gemini-cli/pull/13751
-- feat(hooks): Hook System Orchestration by @Edilmo in
-  https://github.com/google-gemini/gemini-cli/pull/9102
-- feat(config): add isModelAvailabilityServiceEnabled setting by @adamfweidman
-  in https://github.com/google-gemini/gemini-cli/pull/13777
-- chore/release: bump version to 0.19.0-nightly.20251125.f6d97d448 by
-  @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/13782
-- chore: remove console.error by @adamfweidman in
-  https://github.com/google-gemini/gemini-cli/pull/13779
-- fix: Add $schema property to settings.schema.json by @sacrosanctic in
-  https://github.com/google-gemini/gemini-cli/pull/12763
-- fix(cli): allow non-GitHub SCP-styled URLs for extension installation by @m0ps
-  in https://github.com/google-gemini/gemini-cli/pull/13800
-- fix(resume): allow passing a prompt via stdin while resuming using --resume by
-  @bl-ue in https://github.com/google-gemini/gemini-cli/pull/13520
-- feat(sessions): add /resume slash command to open the session browser by
-  @bl-ue in https://github.com/google-gemini/gemini-cli/pull/13621
-- docs(sessions): add documentation for chat recording and session management by
-  @bl-ue in https://github.com/google-gemini/gemini-cli/pull/13667
-- Fix TypeError: "URL.parse is not a function" for Node.js < v22 by @macarronesc
-  in https://github.com/google-gemini/gemini-cli/pull/13698
-- fallback to flash for TerminalQuota errors by @sehoon38 in
-  https://github.com/google-gemini/gemini-cli/pull/13791
-- Update Code Wiki README badge by @PatoBeltran in
-  https://github.com/google-gemini/gemini-cli/pull/13768
-- Add Databricks auth support and custom header option to gemini cli by
-  @AarushiShah in https://github.com/google-gemini/gemini-cli/pull/11893
-- Update dependency for modelcontextprotocol/sdk to 1.23.0 by @bbiggs in
-  https://github.com/google-gemini/gemini-cli/pull/13827
+- feat(ide): fallback to GEMINI_CLI_IDE_AUTH_TOKEN env var by @skeshive in
+  https://github.com/google-gemini/gemini-cli/pull/14843
+- feat: display quota stats for unused models in /stats by @sehoon38 in
+  https://github.com/google-gemini/gemini-cli/pull/14764
+- feat: ensure codebase investigator uses preview model when main agent does by
+  @abhipatel12 in https://github.com/google-gemini/gemini-cli/pull/14412
+- chore: add closing reason to stale bug workflow by @galz10 in
+  https://github.com/google-gemini/gemini-cli/pull/14861
+- Send the model and CLI version with the user agent by @gundermanc in
+  https://github.com/google-gemini/gemini-cli/pull/14865
+- refactor(sessions): move session summary generation to startup by
+  @jackwotherspoon in https://github.com/google-gemini/gemini-cli/pull/14691
+- Limit search depth in path corrector by @scidomino in
+  https://github.com/google-gemini/gemini-cli/pull/14869
+- Fix: Correct typo in code comment by @kuishou68 in
+  https://github.com/google-gemini/gemini-cli/pull/14671
+- feat(core): Plumbing for late resolution of model configs. by @joshualitt in
+  https://github.com/google-gemini/gemini-cli/pull/14597
+- feat: attempt more error parsing by @adamfweidman in
+  https://github.com/google-gemini/gemini-cli/pull/14899
+- Add missing await. by @gundermanc in
+  https://github.com/google-gemini/gemini-cli/pull/14910
+- feat(core): Add support for transcript_path in hooks for git-ai/Gemini
+  extension by @svarlamov in
+  https://github.com/google-gemini/gemini-cli/pull/14663
+- refactor: implement DelegateToAgentTool with discriminated union by
+  @abhipatel12 in https://github.com/google-gemini/gemini-cli/pull/14769
+- feat: reset availabilityService on /auth by @adamfweidman in
+  https://github.com/google-gemini/gemini-cli/pull/14911
+- chore/release: bump version to 0.21.0-nightly.20251211.8c83e1ea9 by
+  @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/14924
+- Fix: Correctly detect MCP tool errors by @kevin-ramdass in
+  https://github.com/google-gemini/gemini-cli/pull/14937
+- increase labeler timeout by @scidomino in
+  https://github.com/google-gemini/gemini-cli/pull/14922
+- tool(cli): tweak the frontend tool to be aware of more core files from the cli
+  by @jacob314 in https://github.com/google-gemini/gemini-cli/pull/14962
+- feat(cli): polish cached token stats and simplify stats display when quota is
+  present. by @jacob314 in
+  https://github.com/google-gemini/gemini-cli/pull/14961
+- feat(settings-validation): add validation for settings schema by @lifefloating
+  in https://github.com/google-gemini/gemini-cli/pull/12929
+- fix(ide): Update IDE extension to write auth token in env var by @skeshive in
+  https://github.com/google-gemini/gemini-cli/pull/14999
+- Revert "chore(deps): bump express from 5.1.0 to 5.2.0" by @skeshive in
+  https://github.com/google-gemini/gemini-cli/pull/14998
+- feat(a2a): Introduce /init command for a2a server by @cocosheng-g in
+  https://github.com/google-gemini/gemini-cli/pull/13419
+- feat: support multi-file drag and drop of images by @jackwotherspoon in
+  https://github.com/google-gemini/gemini-cli/pull/14832
+- fix(policy): allow codebase_investigator by default in read-only policy by
+  @abhipatel12 in https://github.com/google-gemini/gemini-cli/pull/15000
+- refactor(ide ext): Update port file name + switch to 1-based index for
+  characters + remove truncation text by @skeshive in
+  https://github.com/google-gemini/gemini-cli/pull/10501
+- fix(vscode-ide-companion): correct license generation for workspace
+  dependencies by @skeshive in
+  https://github.com/google-gemini/gemini-cli/pull/15004
+- fix: temp fix for subagent invocation until subagent delegation is merged to
+  stable by @abhipatel12 in
+  https://github.com/google-gemini/gemini-cli/pull/15007
+- test: update ide detection tests to make them more robust when run in an ide
+  by @kevin-ramdass in https://github.com/google-gemini/gemini-cli/pull/15008
+- Remove flex from stats display. See snapshots for diffs. by @jacob314 in
+  https://github.com/google-gemini/gemini-cli/pull/14983
+- Add license field into package.json by @jb-perez in
+  https://github.com/google-gemini/gemini-cli/pull/14473
+- feat: Persistent "Always Allow" policies with granular shell & MCP support by
+  @allenhutchison in https://github.com/google-gemini/gemini-cli/pull/14737
+- chore/release: bump version to 0.21.0-nightly.20251212.54de67536 by
+  @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/14969
+- fix(core): commandPrefix word boundary and compound command safety by
+  @allenhutchison in https://github.com/google-gemini/gemini-cli/pull/15006
+- chore(docs): add 'Maintainers only' label info to CONTRIBUTING.md by @jacob314
+  in https://github.com/google-gemini/gemini-cli/pull/14914
+- Refresh hooks when refreshing extensions. by @scidomino in
+  https://github.com/google-gemini/gemini-cli/pull/14918
+- Add clarity to error messages by @gsehgal in
+  https://github.com/google-gemini/gemini-cli/pull/14879
+- chore : remove a redundant tip by @JayadityaGit in
+  https://github.com/google-gemini/gemini-cli/pull/14947
+- chore/release: bump version to 0.21.0-nightly.20251213.977248e09 by
+  @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/15029
+- Disallow redundant typecasts. by @gundermanc in
+  https://github.com/google-gemini/gemini-cli/pull/15030
+- fix(auth): prioritize GEMINI_API_KEY env var and skip unnecessary key… by
+  @galz10 in https://github.com/google-gemini/gemini-cli/pull/14745
+- fix: use zod for safety check result validation by @allenhutchison in
+  https://github.com/google-gemini/gemini-cli/pull/15026
+- update(telemetry): add hashed_extension_name to field to extension events by
+  @kiranani in https://github.com/google-gemini/gemini-cli/pull/15025
+- fix: similar to policy-engine, throw error in case of requiring tool execution
+  confirmation for non-interactive mode by @MayV in
+  https://github.com/google-gemini/gemini-cli/pull/14702
+- Clean up processes in integration tests by @scidomino in
+  https://github.com/google-gemini/gemini-cli/pull/15102
+- docs: update policy engine getting started and defaults by @NTaylorMullen in
+  https://github.com/google-gemini/gemini-cli/pull/15105
+- Fix tool output fragmentation by encapsulating content in functionResponse by
+  @abhipatel12 in https://github.com/google-gemini/gemini-cli/pull/13082
+- Simplify method signature. by @scidomino in
+  https://github.com/google-gemini/gemini-cli/pull/15114
+- Show raw input token counts in json output. by @jacob314 in
+  https://github.com/google-gemini/gemini-cli/pull/15021
+- fix: Mark A2A requests as interactive by @MayV in
+  https://github.com/google-gemini/gemini-cli/pull/15108
+- use previewFeatures to determine which pro model to use for A2A by @sehoon38
+  in https://github.com/google-gemini/gemini-cli/pull/15131
+- refactor(cli): fix settings merging so that settings using the new json format
+  take priority over ones using the old format by @jacob314 in
+  https://github.com/google-gemini/gemini-cli/pull/15116
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.18.0-preview.4...v0.19.0-preview.0
+https://github.com/google-gemini/gemini-cli/compare/v0.21.0-preview.6...v0.22.0-preview.0
