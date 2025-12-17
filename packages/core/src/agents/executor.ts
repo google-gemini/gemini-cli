@@ -393,11 +393,11 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
       while (true) {
         // Check for termination conditions like max turns.
-        const reason = this.checkTermination(startTime, turnCounter);
-        if (reason) {
-          terminateReason = reason;
-          break;
-        }
+        // const reason = this.checkTermination(startTime, turnCounter);
+        // if (reason) {
+        //   terminateReason = reason;
+        //   break;
+        // }
 
         // Check for timeout or external abort.
         if (combinedSignal.aborted) {
@@ -407,6 +407,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
             : AgentTerminateMode.ABORTED;
           break;
         }
+
+        // Check if this will be the last turn before executing it
+        const isLastTurn = this.checkIsLastTurn(turnCounter);
 
         const turnResult = await this.executeTurn(
           chat,
@@ -423,6 +426,40 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
             finalResult = turnResult.finalResult;
           }
           break; // Exit the loop for *any* stop reason.
+        }
+
+        // If this was the last allowed turn and task is not complete, append warning to the response
+        if (isLastTurn && turnResult.status === 'continue') {
+          // Append warning message to the tool results
+          const warningText = this.getFinalWarningMessage(
+            AgentTerminateMode.MAX_TURNS,
+          );
+          const nextMessageParts = turnResult.nextMessage.parts || [];
+          nextMessageParts.push({ text: warningText });
+          currentMessage = {
+            role: 'user',
+            parts: nextMessageParts,
+          };
+
+          // Execute one more turn with the warning included
+          const finalTurnResult = await this.executeTurn(
+            chat,
+            currentMessage,
+            turnCounter++,
+            combinedSignal,
+            timeoutController.signal,
+          );
+
+          if (
+            finalTurnResult.status === 'stop' &&
+            finalTurnResult.terminateReason === AgentTerminateMode.GOAL
+          ) {
+            terminateReason = AgentTerminateMode.GOAL;
+            finalResult = finalTurnResult.finalResult;
+          } else {
+            terminateReason = AgentTerminateMode.MAX_TURNS;
+          }
+          break;
         }
 
         // If status is 'continue', update message for the next loop
@@ -1059,6 +1096,19 @@ Important Rules:
     }
 
     return null;
+  }
+
+  /**
+   * Checks if the current turn is the last allowed turn before hitting max_turns.
+   *
+   * @param turnCounter - The current turn counter (0-indexed).
+   * @returns True if this is the last turn before max_turns is reached, false otherwise.
+   */
+  private checkIsLastTurn(turnCounter: number): boolean {
+    return (
+      !!this.definition.runConfig.max_turns &&
+      turnCounter >= this.definition.runConfig.max_turns - 1
+    );
   }
 
   /** Emits an activity event to the configured callback. */
