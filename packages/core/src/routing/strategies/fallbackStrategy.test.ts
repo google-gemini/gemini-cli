@@ -23,7 +23,6 @@ vi.mock('../../availability/policyHelpers.js', () => ({
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
-    isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(true),
     getModelAvailabilityService: vi.fn(),
     getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
     getPreviewFeatures: vi.fn().mockReturnValue(false),
@@ -47,15 +46,6 @@ describe('FallbackStrategy', () => {
     mockConfig = createMockConfig({
       getModelAvailabilityService: vi.fn().mockReturnValue(mockService),
     });
-  });
-
-  it('should return null if service is disabled', async () => {
-    vi.mocked(mockConfig.isModelAvailabilityServiceEnabled).mockReturnValue(
-      false,
-    );
-
-    const decision = await strategy.route(mockContext, mockConfig, mockClient);
-    expect(decision).toBeNull();
   });
 
   it('should return null if the requested model is available', async () => {
