@@ -30,7 +30,10 @@ import {
   type ChatCompressionInfo,
 } from './turn.js';
 import { getCoreSystemPrompt } from './prompts.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import {
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+} from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { tokenLimit } from './tokenLimits.js';
@@ -304,12 +307,12 @@ describe('Gemini Client (client.ts)', () => {
     it('should create a new chat session, clearing the old history', async () => {
       // 1. Get the initial chat instance and add some history.
       const initialChat = client.getChat();
-      const initialHistory = await client.getHistory();
+      const initialHistory = client.getHistory();
       await client.addHistory({
         role: 'user',
         parts: [{ text: 'some old message' }],
       });
-      const historyWithOldMessage = await client.getHistory();
+      const historyWithOldMessage = client.getHistory();
       expect(historyWithOldMessage.length).toBeGreaterThan(
         initialHistory.length,
       );
@@ -319,7 +322,7 @@ describe('Gemini Client (client.ts)', () => {
 
       // 3. Get the new chat instance and its history.
       const newChat = client.getChat();
-      const newHistory = await client.getHistory();
+      const newHistory = client.getHistory();
 
       // 4. Assert that the chat instance is new and the history is reset.
       expect(newChat).not.toBe(initialChat);
@@ -2044,7 +2047,9 @@ ${JSON.stringify(
             skipped: [],
           },
         );
-
+        vi.mocked(mockConfig.getModel).mockReturnValue(
+          DEFAULT_GEMINI_MODEL_AUTO,
+        );
         const stream = client.sendMessageStream(
           [{ text: 'Hi' }],
           new AbortController().signal,
@@ -2074,7 +2079,9 @@ ${JSON.stringify(
             skipped: [],
           },
         );
-
+        vi.mocked(mockConfig.getModel).mockReturnValue(
+          DEFAULT_GEMINI_MODEL_AUTO,
+        );
         const stream = client.sendMessageStream(
           [{ text: 'Hi' }],
           new AbortController().signal,
