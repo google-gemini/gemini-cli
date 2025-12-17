@@ -29,16 +29,22 @@ export async function recordConversationOffered(
   streamingLatency: StreamingLatency,
   abortSignal: AbortSignal | undefined,
 ): Promise<void> {
-  if (traceId) {
-    const offered = createConversationOffered(
-      response,
-      traceId,
-      abortSignal,
-      streamingLatency,
-    );
-    if (offered) {
-      await server.recordConversationOffered(offered);
+  try {
+    if (traceId) {
+      const offered = createConversationOffered(
+        response,
+        traceId,
+        abortSignal,
+        streamingLatency,
+      );
+      if (offered) {
+        await server.recordConversationOffered(offered);
+      }
     }
+  } catch (error: unknown) {
+    debugLogger.warn(
+      `Error recording tool call interactions: ${getErrorMessage(error)}`,
+    );
   }
 }
 
@@ -61,7 +67,7 @@ export async function recordToolCallInteractions(
     if (interaction) {
       await server.recordConversationInteraction(interaction);
     }
-  } catch (error) {
+  } catch (error: unknown) {
     debugLogger.warn(
       `Error recording tool call interactions: ${getErrorMessage(error)}`,
     );
@@ -77,7 +83,7 @@ export function createConversationOffered(
   // Only send conversation offered events for responses that contain function
   // calls. Non-function call events don't represent user actionable
   // 'suggestions'.
-  if (response.functionCalls?.length || 0) {
+  if ((response.functionCalls?.length || 0) === 0) {
     return;
   }
 
@@ -107,6 +113,8 @@ function summarizeToolCalls(
   // interaction so that the ConversationOffered and ConversationInteraction
   // events are 1:1 in telemetry.
   for (const toolCall of toolCalls) {
+    traceId ||= toolCall.request.traceId;
+
     // If any tool call is canceled, we treat the entire interaction as canceled.
     if (toolCall.status === 'cancelled') {
       actionStatus = ActionStatus.ACTION_STATUS_CANCELLED;
@@ -129,8 +137,6 @@ function summarizeToolCalls(
         isEdit ||= true;
       }
     }
-
-    traceId ||= toolCall.request.traceId;
   }
 
   // Only file interaction telemetry if 100% of the tool calls were accepted.
