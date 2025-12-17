@@ -10,6 +10,8 @@ import { DeclarativeTool, hasCycleInSchema, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
 class TestToolInvocation implements ToolInvocation<object, ToolResult> {
+  _requiresParentUI: boolean = false;
+
   constructor(
     readonly params: object,
     private readonly executeFn: () => Promise<ToolResult>,

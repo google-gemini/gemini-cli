@@ -8,6 +8,7 @@ import type {
   CompressionStatus,
   GeminiCLIExtension,
   MCPServerConfig,
+  SerializableToolConfirmationDetails,
   ThoughtSummary,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
@@ -404,6 +405,10 @@ export interface ShellConfirmationRequest {
 export interface ConfirmationRequest {
   prompt: ReactNode;
   onConfirm: (confirm: boolean) => void;
+  /** Optional: serialized confirmation details for subagent tools */
+  toolConfirmationDetails?: SerializableToolConfirmationDetails;
+  /** Tool name for context in confirmation UI */
+  toolName?: string;
 }
 
 export interface LoopDetectionConfirmationRequest {

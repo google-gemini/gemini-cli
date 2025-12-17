@@ -63,6 +63,13 @@ export interface ToolInvocation<
     updateOutput?: (output: string | AnsiOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<TResult>;
+
+  /**
+   * If true, the tool requires parent UI for confirmation (e.g., subagent tools).
+   * When set, confirmationDetails are included in MessageBus requests so the
+   * parent can display the standard confirmation dialog.
+   */
+  _requiresParentUI: boolean;
 }
 
 /**
@@ -81,6 +88,13 @@ export abstract class BaseToolInvocation<
   TResult extends ToolResult,
 > implements ToolInvocation<TParams, TResult>
 {
+  /**
+   * If true, the tool requires parent UI for confirmation (e.g., subagent tools).
+   * When set, confirmationDetails are included in MessageBus requests so the
+   * parent can display the standard confirmation dialog.
+   */
+  _requiresParentUI: boolean = false;
+
   constructor(
     readonly params: TParams,
     protected readonly messageBus?: MessageBus,
@@ -99,8 +113,16 @@ export abstract class BaseToolInvocation<
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.messageBus) {
-      const decision = await this.getMessageBusDecision(abortSignal);
+      // First, get confirmation details so we can include them in the MessageBus request.
+      // This allows child tool confirmations to be displayed by the parent UI.
+      const details = await this.getConfirmationDetails(abortSignal);
+
+      // Get decision from MessageBus, including serializable confirmation details
+      // so the parent UI can display the standard confirmation dialog.
+      const decision = await this.getMessageBusDecision(abortSignal, details);
+
       if (decision === 'ALLOW') {
+        // Tool is auto-allowed by policy
         return false;
       }
 
@@ -112,8 +134,19 @@ export abstract class BaseToolInvocation<
         );
       }
 
+      if (decision === 'CONFIRMED') {
+        // User confirmed via MessageBus (e.g., from parent UI for child tools).
+        // Call the onConfirm callback if the details have one.
+        if (details && details.onConfirm) {
+          await details.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+        }
+        return false;
+      }
+
+      // ASK_USER: Return confirmation details for inline UI display
+      // (This is the legacy flow for tools in the main scheduler)
       if (decision === 'ASK_USER') {
-        return this.getConfirmationDetails(abortSignal);
+        return details;
       }
     }
     // When no message bus, use default confirmation flow
@@ -179,7 +212,8 @@ export abstract class BaseToolInvocation<
 
   protected getMessageBusDecision(
     abortSignal: AbortSignal,
-  ): Promise<'ALLOW' | 'DENY' | 'ASK_USER'> {
+    confirmationDetails?: ToolCallConfirmationDetails | false,
+  ): Promise<'ALLOW' | 'DENY' | 'ASK_USER' | 'CONFIRMED'> {
     if (!this.messageBus) {
       // If there's no message bus, we can't make a decision, so we allow.
       // The legacy confirmation flow will still apply if the tool needs it.
@@ -192,76 +226,136 @@ export abstract class BaseToolInvocation<
       args: this.params as Record<string, unknown>,
     };
 
-    return new Promise<'ALLOW' | 'DENY' | 'ASK_USER'>((resolve) => {
-      if (!this.messageBus) {
-        resolve('ALLOW');
-        return;
-      }
-
-      let timeoutId: NodeJS.Timeout | undefined;
-
-      const cleanup = () => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = undefined;
+    return new Promise<'ALLOW' | 'DENY' | 'ASK_USER' | 'CONFIRMED'>(
+      (resolve) => {
+        if (!this.messageBus) {
+          resolve('ALLOW');
+          return;
         }
-        abortSignal.removeEventListener('abort', abortHandler);
-        this.messageBus?.unsubscribe(
+
+        let timeoutId: NodeJS.Timeout | undefined;
+
+        const cleanup = () => {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = undefined;
+          }
+          abortSignal.removeEventListener('abort', abortHandler);
+          this.messageBus?.unsubscribe(
+            MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+            responseHandler,
+          );
+        };
+
+        const abortHandler = () => {
+          cleanup();
+          resolve('DENY');
+        };
+
+        if (abortSignal.aborted) {
+          resolve('DENY');
+          return;
+        }
+
+        const responseHandler = (response: ToolConfirmationResponse) => {
+          if (response.correlationId === correlationId) {
+            cleanup();
+            if (response.requiresUserConfirmation) {
+              // Scheduler said ASK_USER, so use inline confirmation UI
+              resolve('ASK_USER');
+            } else if (response.confirmed) {
+              // User explicitly confirmed via parent UI (e.g., for child tools)
+              resolve('CONFIRMED');
+            } else {
+              resolve('DENY');
+            }
+          }
+        };
+
+        abortSignal.addEventListener('abort', abortHandler);
+
+        timeoutId = setTimeout(() => {
+          cleanup();
+          resolve('ASK_USER'); // Default to ASK_USER on timeout
+        }, 30000);
+
+        this.messageBus.subscribe(
           MessageBusType.TOOL_CONFIRMATION_RESPONSE,
           responseHandler,
         );
-      };
 
-      const abortHandler = () => {
-        cleanup();
-        resolve('DENY');
-      };
+        // Only serialize confirmation details for subagent tools that need parent UI.
+        // Normal inline tools have their own ToolConfirmationMessage and don't need
+        // the parent UI to show a duplicate dialog.
+        const serializableDetails =
+          confirmationDetails && this._requiresParentUI
+            ? this.serializeConfirmationDetails(confirmationDetails)
+            : undefined;
 
-      if (abortSignal.aborted) {
-        resolve('DENY');
-        return;
-      }
+        const request: ToolConfirmationRequest = {
+          type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+          toolCall,
+          correlationId,
+          serverName: this._serverName,
+          confirmationDetails: serializableDetails,
+        };
 
-      const responseHandler = (response: ToolConfirmationResponse) => {
-        if (response.correlationId === correlationId) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          this.messageBus.publish(request);
+        } catch {
           cleanup();
-          if (response.requiresUserConfirmation) {
-            resolve('ASK_USER');
-          } else if (response.confirmed) {
-            resolve('ALLOW');
-          } else {
-            resolve('DENY');
-          }
+          resolve('ALLOW');
         }
-      };
+      },
+    );
+  }
 
-      abortSignal.addEventListener('abort', abortHandler);
-
-      timeoutId = setTimeout(() => {
-        cleanup();
-        resolve('ASK_USER'); // Default to ASK_USER on timeout
-      }, 30000);
-
-      this.messageBus.subscribe(
-        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-        responseHandler,
-      );
-
-      const request: ToolConfirmationRequest = {
-        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
-        toolCall,
-        correlationId,
-        serverName: this._serverName,
-      };
-
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.messageBus.publish(request);
-      } catch (_error) {
-        cleanup();
-        resolve('ALLOW');
-      }
-    });
+  /**
+   * Converts ToolCallConfirmationDetails to a serializable format for the MessageBus.
+   * The onConfirm callback cannot be serialized, so we extract only the data properties.
+   */
+  private serializeConfirmationDetails(
+    details: ToolCallConfirmationDetails,
+  ): ToolConfirmationRequest['confirmationDetails'] {
+    switch (details.type) {
+      case 'edit':
+        return {
+          type: 'edit',
+          title: details.title,
+          fileName: details.fileName,
+          filePath: details.filePath,
+          fileDiff: details.fileDiff,
+          originalContent: details.originalContent,
+          newContent: details.newContent,
+          isModifying: details.isModifying,
+        };
+      case 'exec':
+        return {
+          type: 'exec',
+          title: details.title,
+          command: details.command,
+          rootCommand: details.rootCommand,
+        };
+      case 'mcp':
+        return {
+          type: 'mcp',
+          title: details.title,
+          serverName: details.serverName,
+          toolName: details.toolName,
+          toolDisplayName: details.toolDisplayName,
+        };
+      case 'info':
+        return {
+          type: 'info',
+          title: details.title,
+          prompt: details.prompt,
+          urls: details.urls,
+        };
+      default:
+        // Exhaustiveness check
+        return undefined;
+    }
   }
 
   abstract execute(

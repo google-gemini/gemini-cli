@@ -163,8 +163,25 @@ describe('DelegateToAgentTool', () => {
     });
 
     // Trigger confirmation check
-    const p = invocation.shouldConfirmExecute(new AbortController().signal);
-    void p;
+    const confirmationPromise = invocation.shouldConfirmExecute(
+      new AbortController().signal,
+    );
+
+    // Wait for the async flow to complete and publish the request.
+    // The new confirmation flow fetches confirmation details first (async),
+    // then publishes the request to MessageBus.
+    await new Promise((resolve) => {
+      const check = () => {
+        if (
+          (messageBus.publish as ReturnType<typeof vi.fn>).mock.calls.length > 0
+        ) {
+          resolve(undefined);
+        } else {
+          setImmediate(check);
+        }
+      };
+      setImmediate(check);
+    });
 
     expect(messageBus.publish).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -174,5 +191,8 @@ describe('DelegateToAgentTool', () => {
         }),
       }),
     );
+
+    // Clean up the promise (simulate timeout to avoid hanging)
+    void confirmationPromise.catch(() => {});
   });
 });
