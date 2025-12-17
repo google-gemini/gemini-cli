@@ -192,7 +192,10 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'x', ctrl: true },
     { sequence: '\x18', ctrl: true },
   ],
-  [Command.PASTE_CLIPBOARD]: [{ key: 'v', ctrl: true }],
+  [Command.PASTE_CLIPBOARD]: [
+    { key: 'v', ctrl: true },
+    { key: 'v', command: true },
+  ],
 
   // App level bindings
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
