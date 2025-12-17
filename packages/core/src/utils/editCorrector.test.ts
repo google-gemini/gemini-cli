@@ -237,7 +237,7 @@ describe('editCorrector', () => {
       mockGeminiClientInstance = new GeminiClient(
         mockConfigInstance,
       ) as Mocked<GeminiClient>;
-      mockGeminiClientInstance.getHistory = vi.fn().mockResolvedValue([]);
+      mockGeminiClientInstance.getHistory = vi.fn().mockReturnValue([]);
       mockBaseLlmClientInstance = {
         generateJson: mockGenerateJson,
         config: {
@@ -606,9 +606,7 @@ describe('editCorrector', () => {
             ],
           },
         ];
-        (mockGeminiClientInstance.getHistory as Mock).mockResolvedValue(
-          history,
-        );
+        (mockGeminiClientInstance.getHistory as Mock).mockReturnValue(history);
 
         const result = await ensureCorrectEdit(
           filePath,

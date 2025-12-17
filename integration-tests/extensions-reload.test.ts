@@ -82,7 +82,7 @@ describe('extension reloading', () => {
       writeFileSync(testServerPath, safeJsonStringify(extension, 2));
 
       // Start the CLI.
-      const run = await rig.runInteractive('--debug');
+      const run = await rig.runInteractive({ args: '--debug' });
       await run.expectText('You have 1 extension with an update available');
       // See the outdated extension
       await run.sendText('/extensions list');

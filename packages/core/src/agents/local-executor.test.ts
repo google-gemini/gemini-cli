@@ -274,9 +274,7 @@ describe('LocalAgentExecutor', () => {
     );
     parentToolRegistry.registerTool(MOCK_TOOL_NOT_ALLOWED);
 
-    vi.spyOn(mockConfig, 'getToolRegistry').mockResolvedValue(
-      parentToolRegistry,
-    );
+    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(parentToolRegistry);
 
     mockedGetDirectoryContextString.mockResolvedValue(
       'Mocked Environment Context',

@@ -106,7 +106,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   ): Promise<LocalAgentExecutor<TOutput>> {
     // Create an isolated tool registry for this agent instance.
     const agentToolRegistry = new ToolRegistry(runtimeContext);
-    const parentToolRegistry = await runtimeContext.getToolRegistry();
+    const parentToolRegistry = runtimeContext.getToolRegistry();
 
     if (definition.toolConfig) {
       for (const toolRef of definition.toolConfig.tools) {
