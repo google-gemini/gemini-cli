@@ -304,12 +304,12 @@ describe('Gemini Client (client.ts)', () => {
     it('should create a new chat session, clearing the old history', async () => {
       // 1. Get the initial chat instance and add some history.
       const initialChat = client.getChat();
-      const initialHistory = await client.getHistory();
+      const initialHistory = client.getHistory();
       await client.addHistory({
         role: 'user',
         parts: [{ text: 'some old message' }],
       });
-      const historyWithOldMessage = await client.getHistory();
+      const historyWithOldMessage = client.getHistory();
       expect(historyWithOldMessage.length).toBeGreaterThan(
         initialHistory.length,
       );
@@ -319,7 +319,7 @@ describe('Gemini Client (client.ts)', () => {
 
       // 3. Get the new chat instance and its history.
       const newChat = client.getChat();
-      const newHistory = await client.getHistory();
+      const newHistory = client.getHistory();
 
       // 4. Assert that the chat instance is new and the history is reset.
       expect(newChat).not.toBe(initialChat);
