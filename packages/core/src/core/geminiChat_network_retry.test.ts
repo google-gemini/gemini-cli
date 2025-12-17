@@ -81,7 +81,6 @@ describe('GeminiChat Network Retries', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       setActiveModel: vi.fn(),
-      isInFallbackMode: vi.fn().mockReturnValue(false),
       getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
@@ -96,11 +95,7 @@ describe('GeminiChat Network Retries', () => {
           generateContentConfig: { temperature: 0 },
         })),
       },
-      isPreviewModelBypassMode: vi.fn().mockReturnValue(false),
-      setPreviewModelBypassMode: vi.fn(),
-      isPreviewModelFallbackMode: vi.fn().mockReturnValue(false),
       getEnableHooks: vi.fn().mockReturnValue(false),
-      setPreviewModelFallbackMode: vi.fn(),
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),

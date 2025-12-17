@@ -388,7 +388,6 @@ export class Config {
   private readonly folderTrust: boolean;
   private ideMode: boolean;
 
-  private inFallbackMode = false;
   private _activeModel: string;
   private readonly maxSessionTurns: number;
   private readonly listSessions: boolean;
@@ -447,8 +446,6 @@ export class Config {
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
 
-  private previewModelFallbackMode = false;
-  private previewModelBypassMode = false;
   private readonly enableAgents: boolean;
 
   private readonly experimentalJitContext: boolean;
@@ -774,9 +771,6 @@ export class Config {
       this.setHasAccessToPreviewModel(true);
     }
 
-    // Reset the session flag since we're explicitly changing auth and using default model
-    this.inFallbackMode = false;
-
     // Update model if user no longer has access to the preview model
     if (!this.hasAccessToPreviewModel && isPreviewModel(this.model)) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
@@ -847,13 +841,12 @@ export class Config {
   }
 
   setModel(newModel: string): void {
-    if (this.model !== newModel || this.inFallbackMode) {
+    if (this.model !== newModel || this._activeModel !== newModel) {
       this.model = newModel;
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
     }
-    this.setFallbackMode(false);
     this.modelAvailabilityService.reset();
   }
 
@@ -867,18 +860,6 @@ export class Config {
     }
   }
 
-  resetTurn(): void {
-    this.modelAvailabilityService.resetTurn();
-  }
-
-  isInFallbackMode(): boolean {
-    return this.inFallbackMode;
-  }
-
-  setFallbackMode(active: boolean): void {
-    this.inFallbackMode = active;
-  }
-
   setFallbackModelHandler(handler: FallbackModelHandler): void {
     this.fallbackModelHandler = handler;
   }
@@ -887,20 +868,8 @@ export class Config {
     return this.fallbackModelHandler;
   }
 
-  isPreviewModelFallbackMode(): boolean {
-    return this.previewModelFallbackMode;
-  }
-
-  setPreviewModelFallbackMode(active: boolean): void {
-    this.previewModelFallbackMode = active;
-  }
-
-  isPreviewModelBypassMode(): boolean {
-    return this.previewModelBypassMode;
-  }
-
-  setPreviewModelBypassMode(active: boolean): void {
-    this.previewModelBypassMode = active;
+  resetTurn(): void {
+    this.modelAvailabilityService.resetTurn();
   }
 
   getMaxSessionTurns(): number {
