@@ -91,6 +91,7 @@ const mockConfig = {
   isTrustedFolder: () => true,
   getIdeMode: () => false,
   getEnableInteractiveShell: () => true,
+  getPreviewFeatures: () => false,
 };
 
 const configProxy = new Proxy(mockConfig, {
