@@ -26,12 +26,12 @@ on GitHub.
 - For more information:
   [Gemini 3 Flash is now available in Gemini CLI](https://developers.googleblog.com/gemini-3-flash-is-now-available-in-gemini-cli/).
 - 🎉 Gemini CLI Extensions:
-- Rill: Utilize natural language to analyze Rill data, enabling the exploration
-  of metrics and trends without the need for manual queries. gemini extensions
-  install https://github.​com/rilldata/rill-gemini-extension
-- Browserbase: Interact with web pages, take screenshots, extract information,
-  and perform automated actions with atomic precision. gemini extensions install
-  https://github.​com/browserbase/mcp-server-browserbase
+  - Rill: Utilize natural language to analyze Rill data, enabling the
+    exploration of metrics and trends without the need for manual queries.
+    `gemini extensions install https://github.com/rilldata/rill-gemini-extension`
+  - Browserbase: Interact with web pages, take screenshots, extract information,
+    and perform automated actions with atomic precision.
+    `gemini extensions install https://github.com/browserbase/mcp-server-browserbase`
 - Quota Visibility: The `/stats` command now displays quota information for all
   available models, including those not used in the current session. (@sehoon38)
 - Fuzzy Setting Search: Users can now quickly find settings using fuzzy search
@@ -89,8 +89,7 @@ on GitHub.
 - **Experimental permission improvements:** We are now experimenting with a new
   policy engine in Gemini CLI. This allows users and administrators to create
   fine-grained policy for tool calls. Currently behind a flag. See
-  [https://geminicli.com/docs/core/policy-engine/](../core/policy-engine.md) for
-  more information.
+  [policy engine documentation](../core/policy-engine.md) for more information.
   - Blog:
     [https://allen.hutchison.org/2025/11/26/the-guardrails-of-autonomy/](https://allen.hutchison.org/2025/11/26/the-guardrails-of-autonomy/)
 - **Gemini 3 support for paid:** Gemini 3 support has been rolled out to all API
