@@ -13,6 +13,8 @@ import type {
 } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { ContentGenerator } from './contentGenerator.js';
+import type { AuthType } from './contentGenerator.js';
+import { handleFallback } from '../fallback/handler.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -86,6 +88,7 @@ export class BaseLlmClient {
   constructor(
     private readonly contentGenerator: ContentGenerator,
     private readonly config: Config,
+    private readonly authType?: AuthType,
   ) {}
 
   async generateJson(
@@ -261,22 +264,20 @@ export class BaseLlmClient {
 
     try {
       const apiCall = () => {
-        // If availability is enabled, ensure we use the current active model
+        // Ensure we use the current active model
         // in case a fallback occurred in a previous attempt.
-        if (this.config.isModelAvailabilityServiceEnabled()) {
-          const activeModel = this.config.getActiveModel();
-          if (activeModel !== requestParams.model) {
-            requestParams.model = activeModel;
-            // Re-resolve config if model changed during retry
-            const { generateContentConfig } =
-              this.config.modelConfigService.getResolvedConfig({
-                model: activeModel,
-              });
-            requestParams.config = {
-              ...requestParams.config,
-              ...generateContentConfig,
-            };
-          }
+        const activeModel = this.config.getActiveModel();
+        if (activeModel !== requestParams.model) {
+          requestParams.model = activeModel;
+          // Re-resolve config if model changed during retry
+          const { generateContentConfig } =
+            this.config.modelConfigService.getResolvedConfig({
+              model: activeModel,
+            });
+          requestParams.config = {
+            ...requestParams.config,
+            ...generateContentConfig,
+          };
         }
         return this.contentGenerator.generateContent(requestParams, promptId);
       };
@@ -286,6 +287,12 @@ export class BaseLlmClient {
         maxAttempts:
           availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
         getAvailabilityContext,
+        onPersistent429: this.config.isInteractive()
+          ? (authType, error) =>
+              handleFallback(this.config, requestParams.model, authType, error)
+          : undefined,
+        authType:
+          this.authType ?? this.config.getContentGeneratorConfig()?.authType,
       });
     } catch (error) {
       if (abortSignal?.aborted) {
