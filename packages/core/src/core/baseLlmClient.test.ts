@@ -776,13 +776,15 @@ describe('BaseLlmClient', () => {
       const getResolvedConfigMock = vi.mocked(
         mockConfig.modelConfigService.getResolvedConfig,
       );
-      getResolvedConfigMock
-        .mockReturnValueOnce(
-          makeResolvedModelConfig(firstModel, { temperature: 0.1 }),
-        )
-        .mockReturnValueOnce(
-          makeResolvedModelConfig(fallbackModel, { temperature: 0.9 }),
-        );
+      getResolvedConfigMock.mockImplementation((key) => {
+        if (key.model === firstModel) {
+          return makeResolvedModelConfig(firstModel, { temperature: 0.1 });
+        }
+        if (key.model === fallbackModel) {
+          return makeResolvedModelConfig(fallbackModel, { temperature: 0.9 });
+        }
+        return makeResolvedModelConfig(key.model);
+      });
 
       // Availability selects the first model initially
       vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
