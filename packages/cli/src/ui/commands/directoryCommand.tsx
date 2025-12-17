@@ -79,6 +79,7 @@ export const directoryCommand: SlashCommand = {
       description:
         'Add directories to the workspace. Use comma to separate multiple paths',
       kind: CommandKind.BUILT_IN,
+      autoExecute: false,
       action: async (context: CommandContext, args: string) => {
         const {
           ui: { addItem },

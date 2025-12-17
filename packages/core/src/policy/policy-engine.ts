@@ -19,6 +19,11 @@ import { debugLogger } from '../utils/debugLogger.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
 import type { HookExecutionRequest } from '../confirmation-bus/types.js';
+import {
+  SHELL_TOOL_NAMES,
+  initializeShellParsers,
+  splitCommands,
+} from '../utils/shell-utils.js';
 
 function ruleMatches(
   rule: PolicyRule | SafetyCheckerRule,
@@ -144,8 +149,67 @@ export class PolicyEngine {
         debugLogger.debug(
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
+
+        // Special handling for shell commands: check sub-commands if present
+        if (
+          toolCall.name &&
+          SHELL_TOOL_NAMES.includes(toolCall.name) &&
+          rule.decision === PolicyDecision.ALLOW
+        ) {
+          const command = (toolCall.args as { command?: string })?.command;
+          if (command) {
+            await initializeShellParsers();
+            const subCommands = splitCommands(command);
+
+            // If there are multiple sub-commands, we must verify EACH of them matches an ALLOW rule.
+            // If any sub-command results in DENY -> the whole thing is DENY.
+            // If any sub-command results in ASK_USER -> the whole thing is ASK_USER (unless one is DENY).
+            // Only if ALL sub-commands are ALLOW do we proceed with ALLOW.
+            if (subCommands.length === 0) {
+              // This case occurs if the command is non-empty but parsing fails.
+              // An ALLOW rule for a prefix might have matched, but since the rest of
+              // the command is un-parseable, it's unsafe to proceed.
+              // Fall back to a safe decision.
+              debugLogger.debug(
+                `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to safe decision because implicit ALLOW is unsafe.`,
+              );
+              decision = this.applyNonInteractiveMode(PolicyDecision.ASK_USER);
+            } else if (subCommands.length > 1) {
+              debugLogger.debug(
+                `[PolicyEngine.check] Compound command detected: ${subCommands.length} parts`,
+              );
+              let aggregateDecision = PolicyDecision.ALLOW;
+
+              for (const subCmd of subCommands) {
+                // Recursively check each sub-command
+                const subCall = {
+                  name: toolCall.name,
+                  args: { command: subCmd },
+                };
+                const subResult = await this.check(subCall, serverName);
+
+                if (subResult.decision === PolicyDecision.DENY) {
+                  aggregateDecision = PolicyDecision.DENY;
+                  break; // Fail fast
+                } else if (subResult.decision === PolicyDecision.ASK_USER) {
+                  aggregateDecision = PolicyDecision.ASK_USER;
+                  // efficient: we can only strictly downgrade from ALLOW to ASK_USER,
+                  // but we must continue looking for DENY.
+                }
+              }
+
+              decision = aggregateDecision;
+            } else {
+              // Single command, rule match is valid
+              decision = this.applyNonInteractiveMode(rule.decision);
+            }
+          } else {
+            decision = this.applyNonInteractiveMode(rule.decision);
+          }
+        } else {
+          decision = this.applyNonInteractiveMode(rule.decision);
+        }
         matchedRule = rule;
-        decision = this.applyNonInteractiveMode(rule.decision);
         break;
       }
     }

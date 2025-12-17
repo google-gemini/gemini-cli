@@ -98,7 +98,6 @@ export const INFORMATIVE_TIPS = [
   'Navigate your prompt history with the Up and Down arrows...',
   'You can also use Ctrl+P (up) and Ctrl+N (down) for history...',
   'Search through command history with Ctrl+R...',
-  'Submit your prompt to Gemini with Enter...',
   'Accept an autocomplete suggestion with Tab or Enter...',
   'Move to the start of the line with Ctrl+A or Home...',
   'Move to the end of the line with Ctrl+E or End...',
@@ -161,8 +160,6 @@ export const INFORMATIVE_TIPS = [
   'Set up GitHub Actions with /setup-github...',
   'Configure terminal keybindings for multiline input with /terminal-setup...',
   'Find relevant documentation with /find-docs...',
-  'Review a pull request with /oncall:pr-review...',
-  'Go back to main and clean up the branch with /github:cleanup-back-to-main...',
   'Execute any shell command with !<command>...',
   // Command tips end here
 ];

@@ -178,7 +178,7 @@ export const RenderInline = React.memo(RenderInlineInternal);
 export const getPlainTextLength = (text: string): number => {
   const cleanText = text
     .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
     .replace(/_(.*?)_/g, '$1')
     .replace(/~~(.*?)~~/g, '$1')
     .replace(/`(.*?)`/g, '$1')

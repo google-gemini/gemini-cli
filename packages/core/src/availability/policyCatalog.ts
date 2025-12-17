@@ -51,6 +51,7 @@ const PREVIEW_CHAIN: ModelPolicyChain = [
   definePolicy({
     model: PREVIEW_GEMINI_MODEL,
     stateTransitions: { transient: 'sticky_retry' },
+    actions: { transient: 'silent' },
   }),
   definePolicy({ model: DEFAULT_GEMINI_MODEL }),
   definePolicy({ model: DEFAULT_GEMINI_FLASH_MODEL, isLastResort: true }),
@@ -72,8 +73,11 @@ export function getModelPolicyChain(
 /**
  * Provides a default policy scaffold for models not present in the catalog.
  */
-export function createDefaultPolicy(model: string): ModelPolicy {
-  return definePolicy({ model });
+export function createDefaultPolicy(
+  model: string,
+  options?: { isLastResort?: boolean },
+): ModelPolicy {
+  return definePolicy({ model, isLastResort: options?.isLastResort });
 }
 
 export function validateModelPolicyChain(chain: ModelPolicyChain): void {

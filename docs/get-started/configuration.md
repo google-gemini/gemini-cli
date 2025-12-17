@@ -1,6 +1,6 @@
-# Gemini CLI Configuration
+# Gemini CLI configuration
 
-> **Note on Configuration Format, 9/17/25:** The format of the `settings.json`
+> **Note on configuration format, 9/17/25:** The format of the `settings.json`
 > file has been updated to a new, more organized structure.
 >
 > - The new format will be supported in the stable release starting
@@ -524,6 +524,11 @@ their corresponding top-level category object in your `settings.json` file.
     with (and override) the built-in aliases.
   - **Default:** `{}`
 
+- **`modelConfigs.customOverrides`** (array):
+  - **Description:** Custom model config overrides. These are merged with (and
+    added to) the built-in overrides.
+  - **Default:** `[]`
+
 - **`modelConfigs.overrides`** (array):
   - **Description:** Apply specific configuration overrides based on matches,
     with a primary key of model (or alias). The most specific match will be
@@ -668,7 +673,7 @@ their corresponding top-level category object in your `settings.json` file.
     integration. When enabled, tools automatically respect policy engine
     decisions (ALLOW/DENY/ASK_USER) without requiring individual tool
     implementations.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`tools.enableHooks`** (boolean):
@@ -767,6 +772,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `experimental`
 
+- **`experimental.enableAgents`** (boolean):
+  - **Description:** Enable local and remote subagents.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.extensionManagement`** (boolean):
   - **Description:** Enable extension management features.
   - **Default:** `true`
@@ -779,6 +789,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.isModelAvailabilityServiceEnabled`** (boolean):
   - **Description:** Enable model routing using new availability service.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.jitContext`** (boolean):
+  - **Description:** Enable Just-In-Time (JIT) context loading.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -806,15 +821,70 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.codebaseInvestigatorSettings.model`** (string):
   - **Description:** The model to use for the Codebase Investigator agent.
-  - **Default:** `"gemini-2.5-pro"`
+  - **Default:** `"pro"`
   - **Requires restart:** Yes
 
 #### `hooks`
 
-- **`hooks`** (object):
-  - **Description:** Hook configurations for intercepting and customizing agent
-    behavior.
-  - **Default:** `{}`
+- **`hooks.disabled`** (array):
+  - **Description:** List of hook names (commands) that should be disabled.
+    Hooks in this list will not execute even if configured.
+  - **Default:** `[]`
+
+- **`hooks.BeforeTool`** (array):
+  - **Description:** Hooks that execute before tool execution. Can intercept,
+    validate, or modify tool calls.
+  - **Default:** `[]`
+
+- **`hooks.AfterTool`** (array):
+  - **Description:** Hooks that execute after tool execution. Can process
+    results, log outputs, or trigger follow-up actions.
+  - **Default:** `[]`
+
+- **`hooks.BeforeAgent`** (array):
+  - **Description:** Hooks that execute before agent loop starts. Can set up
+    context or initialize resources.
+  - **Default:** `[]`
+
+- **`hooks.AfterAgent`** (array):
+  - **Description:** Hooks that execute after agent loop completes. Can perform
+    cleanup or summarize results.
+  - **Default:** `[]`
+
+- **`hooks.Notification`** (array):
+  - **Description:** Hooks that execute on notification events (errors,
+    warnings, info). Can log or alert on specific conditions.
+  - **Default:** `[]`
+
+- **`hooks.SessionStart`** (array):
+  - **Description:** Hooks that execute when a session starts. Can initialize
+    session-specific resources or state.
+  - **Default:** `[]`
+
+- **`hooks.SessionEnd`** (array):
+  - **Description:** Hooks that execute when a session ends. Can perform cleanup
+    or persist session data.
+  - **Default:** `[]`
+
+- **`hooks.PreCompress`** (array):
+  - **Description:** Hooks that execute before chat history compression. Can
+    back up or analyze conversation before compression.
+  - **Default:** `[]`
+
+- **`hooks.BeforeModel`** (array):
+  - **Description:** Hooks that execute before LLM requests. Can modify prompts,
+    inject context, or control model parameters.
+  - **Default:** `[]`
+
+- **`hooks.AfterModel`** (array):
+  - **Description:** Hooks that execute after LLM responses. Can process
+    outputs, extract information, or log interactions.
+  - **Default:** `[]`
+
+- **`hooks.BeforeToolSelection`** (array):
+  - **Description:** Hooks that execute before tool selection. Can filter or
+    prioritize available tools dynamically.
+  - **Default:** `[]`
   <!-- SETTINGS-AUTOGEN:END -->
 
 #### `mcpServers`
@@ -950,7 +1020,7 @@ of v0.3.0:
 }
 ```
 
-## Shell History
+## Shell history
 
 The CLI keeps a history of shell commands you run. To avoid conflicts between
 different projects, this history is stored in a project-specific directory
@@ -961,7 +1031,7 @@ within your user's home folder.
     path.
   - The history is stored in a file named `shell_history`.
 
-## Environment Variables & `.env` Files
+## Environment variables and `.env` files
 
 Environment variables are a common way to configure applications, especially for
 sensitive information like API keys or for settings that might change between
@@ -978,7 +1048,7 @@ loading order is:
     the home directory.
 3.  If still not found, it looks for `~/.env` (in the user's home directory).
 
-**Environment Variable Exclusion:** Some environment variables (like `DEBUG` and
+**Environment variable exclusion:** Some environment variables (like `DEBUG` and
 `DEBUG_MODE`) are automatically excluded from being loaded from project `.env`
 files to prevent interference with gemini-cli behavior. Variables from
 `.gemini/.env` files are never excluded. You can customize this behavior using
@@ -1003,7 +1073,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Required for using Code Assist or Vertex AI.
   - If using Vertex AI, ensure you have the necessary permissions in this
     project.
-  - **Cloud Shell Note:** When running in a Cloud Shell environment, this
+  - **Cloud Shell note:** When running in a Cloud Shell environment, this
     variable defaults to a special project allocated for Cloud Shell users. If
     you have `GOOGLE_CLOUD_PROJECT` set in your global environment in Cloud
     Shell, it will be overridden by this default. To use a different project in
@@ -1072,7 +1142,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Specifies the endpoint for the code assist server.
   - This is useful for development and testing.
 
-## Command-Line Arguments
+## Command-line arguments
 
 Arguments passed directly when running the CLI can override other configurations
 for that specific session.
@@ -1167,7 +1237,7 @@ for that specific session.
 - **`--record-responses`**:
   - Path to a file to record model responses for testing.
 
-## Context Files (Hierarchical Instructional Context)
+## Context files (hierarchical instructional context)
 
 While not strictly configuration for the CLI's _behavior_, context files
 (defaulting to `GEMINI.md` but configurable via the `context.fileName` setting)
@@ -1183,7 +1253,7 @@ context.
   that you want the Gemini model to be aware of during your interactions. The
   system is designed to manage this instructional context hierarchically.
 
-### Example Context File Content (e.g., `GEMINI.md`)
+### Example context file content (e.g., `GEMINI.md`)
 
 Here's a conceptual example of what a context file at the root of a TypeScript
 project might contain:
@@ -1224,23 +1294,23 @@ more relevant and precise your context files are, the better the AI can assist
 you. Project-specific context files are highly encouraged to establish
 conventions and context.
 
-- **Hierarchical Loading and Precedence:** The CLI implements a sophisticated
+- **Hierarchical loading and precedence:** The CLI implements a sophisticated
   hierarchical memory system by loading context files (e.g., `GEMINI.md`) from
   several locations. Content from files lower in this list (more specific)
   typically overrides or supplements content from files higher up (more
   general). The exact concatenation order and final context can be inspected
   using the `/memory show` command. The typical loading order is:
-  1.  **Global Context File:**
+  1.  **Global context file:**
       - Location: `~/.gemini/<configured-context-filename>` (e.g.,
         `~/.gemini/GEMINI.md` in your user home directory).
       - Scope: Provides default instructions for all your projects.
-  2.  **Project Root & Ancestors Context Files:**
+  2.  **Project root and ancestors context files:**
       - Location: The CLI searches for the configured context file in the
         current working directory and then in each parent directory up to either
         the project root (identified by a `.git` folder) or your home directory.
       - Scope: Provides context relevant to the entire project or a significant
         portion of it.
-  3.  **Sub-directory Context Files (Contextual/Local):**
+  3.  **Sub-directory context files (contextual/local):**
       - Location: The CLI also scans for the configured context file in
         subdirectories _below_ the current working directory (respecting common
         ignore patterns like `node_modules`, `.git`, etc.). The breadth of this
@@ -1249,15 +1319,15 @@ conventions and context.
         file.
       - Scope: Allows for highly specific instructions relevant to a particular
         component, module, or subsection of your project.
-- **Concatenation & UI Indication:** The contents of all found context files are
-  concatenated (with separators indicating their origin and path) and provided
-  as part of the system prompt to the Gemini model. The CLI footer displays the
-  count of loaded context files, giving you a quick visual cue about the active
-  instructional context.
-- **Importing Content:** You can modularize your context files by importing
+- **Concatenation and UI indication:** The contents of all found context files
+  are concatenated (with separators indicating their origin and path) and
+  provided as part of the system prompt to the Gemini model. The CLI footer
+  displays the count of loaded context files, giving you a quick visual cue
+  about the active instructional context.
+- **Importing content:** You can modularize your context files by importing
   other Markdown files using the `@path/to/file.md` syntax. For more details,
   see the [Memory Import Processor documentation](../core/memport.md).
-- **Commands for Memory Management:**
+- **Commands for memory management:**
   - Use `/memory refresh` to force a re-scan and reload of all context files
     from all configured locations. This updates the AI's instructional context.
   - Use `/memory show` to display the combined instructional context currently
@@ -1304,7 +1374,7 @@ sandbox image:
 BUILD_SANDBOX=1 gemini -s
 ```
 
-## Usage Statistics
+## Usage statistics
 
 To help us improve the Gemini CLI, we collect anonymized usage statistics. This
 data helps us understand how the CLI is used, identify common issues, and
@@ -1312,22 +1382,22 @@ prioritize new features.
 
 **What we collect:**
 
-- **Tool Calls:** We log the names of the tools that are called, whether they
+- **Tool calls:** We log the names of the tools that are called, whether they
   succeed or fail, and how long they take to execute. We do not collect the
   arguments passed to the tools or any data returned by them.
-- **API Requests:** We log the Gemini model used for each request, the duration
+- **API requests:** We log the Gemini model used for each request, the duration
   of the request, and whether it was successful. We do not collect the content
   of the prompts or responses.
-- **Session Information:** We collect information about the configuration of the
+- **Session information:** We collect information about the configuration of the
   CLI, such as the enabled tools and the approval mode.
 
 **What we DON'T collect:**
 
-- **Personally Identifiable Information (PII):** We do not collect any personal
+- **Personally identifiable information (PII):** We do not collect any personal
   information, such as your name, email address, or API keys.
-- **Prompt and Response Content:** We do not log the content of your prompts or
+- **Prompt and response content:** We do not log the content of your prompts or
   the responses from the Gemini model.
-- **File Content:** We do not log the content of any files that are read or
+- **File content:** We do not log the content of any files that are read or
   written by the CLI.
 
 **How to opt out:**

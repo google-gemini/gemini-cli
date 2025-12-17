@@ -14,14 +14,12 @@ import type {
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
-  HookDefinition,
-  HookEventName,
 } from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-  DEFAULT_GEMINI_MODEL,
   DEFAULT_MODEL_CONFIGS,
+  GEMINI_MODEL_ALIAS_PRO,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -80,6 +78,11 @@ export interface SettingCollectionDefinition {
    * For example, a JSON schema generator can use this to point to a shared definition.
    */
   ref?: string;
+  /**
+   * Optional merge strategy for dynamically added properties.
+   * Used when this collection definition is referenced via additionalProperties.
+   */
+  mergeStrategy?: MergeStrategy;
 }
 
 export enum MergeStrategy {
@@ -739,6 +742,16 @@ const SETTINGS_SCHEMA = {
           'Custom named presets for model configs. These are merged with (and override) the built-in aliases.',
         showInDialog: false,
       },
+      customOverrides: {
+        type: 'array',
+        label: 'Custom Model Config Overrides',
+        category: 'Model',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Custom model config overrides. These are merged with (and added to) the built-in overrides.',
+        showInDialog: false,
+      },
       overrides: {
         type: 'array',
         label: 'Model Config Overrides',
@@ -1055,7 +1068,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Message Bus Integration',
         category: 'Tools',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: oneLine`
           Enable policy-based tool confirmation via message bus integration.
           When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.
@@ -1282,6 +1295,15 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
+      enableAgents: {
+        type: 'boolean',
+        label: 'Enable Agents',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable local and remote subagents.',
+        showInDialog: false,
+      },
       extensionManagement: {
         type: 'boolean',
         label: 'Extension Management',
@@ -1308,6 +1330,15 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable model routing using new availability service.',
+        showInDialog: false,
+      },
+      jitContext: {
+        type: 'boolean',
+        label: 'JIT Context Loading',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable Just-In-Time (JIT) context loading.',
         showInDialog: false,
       },
       codebaseInvestigatorSettings: {
@@ -1363,7 +1394,7 @@ const SETTINGS_SCHEMA = {
             label: 'Model',
             category: 'Experimental',
             requiresRestart: true,
-            default: DEFAULT_GEMINI_MODEL,
+            default: GEMINI_MODEL_ALIAS_PRO,
             description:
               'The model to use for the Codebase Investigator agent.',
             showInDialog: false,
@@ -1413,11 +1444,165 @@ const SETTINGS_SCHEMA = {
     label: 'Hooks',
     category: 'Advanced',
     requiresRestart: false,
-    default: {} as { [K in HookEventName]?: HookDefinition[] },
+    default: {},
     description:
       'Hook configurations for intercepting and customizing agent behavior.',
     showInDialog: false,
-    mergeStrategy: MergeStrategy.SHALLOW_MERGE,
+    properties: {
+      disabled: {
+        type: 'array',
+        label: 'Disabled Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [] as string[],
+        description:
+          'List of hook names (commands) that should be disabled. Hooks in this list will not execute even if configured.',
+        showInDialog: false,
+        items: {
+          type: 'string',
+          description: 'Hook command name',
+        },
+        mergeStrategy: MergeStrategy.UNION,
+      },
+      BeforeTool: {
+        type: 'array',
+        label: 'Before Tool Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute before tool execution. Can intercept, validate, or modify tool calls.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      AfterTool: {
+        type: 'array',
+        label: 'After Tool Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute after tool execution. Can process results, log outputs, or trigger follow-up actions.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      BeforeAgent: {
+        type: 'array',
+        label: 'Before Agent Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute before agent loop starts. Can set up context or initialize resources.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      AfterAgent: {
+        type: 'array',
+        label: 'After Agent Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute after agent loop completes. Can perform cleanup or summarize results.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      Notification: {
+        type: 'array',
+        label: 'Notification Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute on notification events (errors, warnings, info). Can log or alert on specific conditions.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      SessionStart: {
+        type: 'array',
+        label: 'Session Start Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute when a session starts. Can initialize session-specific resources or state.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      SessionEnd: {
+        type: 'array',
+        label: 'Session End Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute when a session ends. Can perform cleanup or persist session data.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      PreCompress: {
+        type: 'array',
+        label: 'Pre-Compress Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute before chat history compression. Can back up or analyze conversation before compression.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      BeforeModel: {
+        type: 'array',
+        label: 'Before Model Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute before LLM requests. Can modify prompts, inject context, or control model parameters.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      AfterModel: {
+        type: 'array',
+        label: 'After Model Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute after LLM responses. Can process outputs, extract information, or log interactions.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      BeforeToolSelection: {
+        type: 'array',
+        label: 'Before Tool Selection Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute before tool selection. Can filter or prioritize available tools dynamically.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+    },
+    additionalProperties: {
+      type: 'array',
+      description:
+        'Custom hook event arrays that contain hook definitions for user-defined events',
+      mergeStrategy: MergeStrategy.CONCAT,
+    },
   },
 } as const satisfies SettingsSchema;
 
@@ -1526,11 +1711,6 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         description:
           'Service account email to impersonate (name@project.iam.gserviceaccount.com).',
       },
-      useInstructions: {
-        type: 'boolean',
-        description:
-          'If true, instructions from this server will be included in the system prompt.',
-      },
     },
   },
   TelemetrySettings: {
@@ -1567,6 +1747,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       useCollector: {
         type: 'boolean',
         description: 'Whether to forward telemetry to an OTLP collector.',
+      },
+      useCliAuth: {
+        type: 'boolean',
+        description:
+          'Whether to use CLI authentication for telemetry (only for in-process exporters).',
       },
     },
   },
@@ -1693,6 +1878,46 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
   BooleanOrString: {
     description: 'Accepts either a boolean flag or a string command name.',
     anyOf: [{ type: 'boolean' }, { type: 'string' }],
+  },
+  HookDefinitionArray: {
+    type: 'array',
+    description: 'Array of hook definition objects for a specific event.',
+    items: {
+      type: 'object',
+      description:
+        'Hook definition specifying matcher pattern and hook configurations.',
+      properties: {
+        matcher: {
+          type: 'string',
+          description:
+            'Pattern to match against the event context (tool name, notification type, etc.). Supports exact match, regex (/pattern/), and wildcards (*).',
+        },
+        hooks: {
+          type: 'array',
+          description: 'Hooks to execute when the matcher matches.',
+          items: {
+            type: 'object',
+            description: 'Individual hook configuration.',
+            properties: {
+              type: {
+                type: 'string',
+                description:
+                  'Type of hook (currently only "command" supported).',
+              },
+              command: {
+                type: 'string',
+                description:
+                  'Shell command to execute. Receives JSON input via stdin and returns JSON output via stdout.',
+              },
+              timeout: {
+                type: 'number',
+                description: 'Timeout in milliseconds for hook execution.',
+              },
+            },
+          },
+        },
+      },
+    },
   },
 };
 

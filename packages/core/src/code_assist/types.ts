@@ -177,7 +177,7 @@ export interface HelpLinkUrl {
 
 export interface SetCodeAssistGlobalUserSettingRequest {
   cloudaicompanionProject?: string;
-  freeTierDataCollectionOptin: boolean;
+  freeTierDataCollectionOptin?: boolean;
 }
 
 export interface CodeAssistGlobalUserSettingResponse {
@@ -199,4 +199,81 @@ export interface GoogleRpcResponse {
  */
 interface GoogleRpcErrorInfo {
   reason?: string;
+}
+
+export interface RetrieveUserQuotaRequest {
+  project: string;
+  userAgent?: string;
+}
+
+export interface BucketInfo {
+  remainingAmount?: string;
+  remainingFraction?: number;
+  resetTime?: string;
+  tokenType?: string;
+  modelId?: string;
+}
+
+export interface RetrieveUserQuotaResponse {
+  buckets?: BucketInfo[];
+}
+
+export interface RecordCodeAssistMetricsRequest {
+  project: string;
+  requestId?: string;
+  metadata?: ClientMetadata;
+  metrics?: CodeAssistMetric[];
+}
+
+export interface CodeAssistMetric {
+  timestamp?: string;
+  metricMetadata?: Map<string, string>;
+
+  // The event tied to this metric. Only one of these should be set.
+  conversationOffered?: ConversationOffered;
+  conversationInteraction?: ConversationInteraction;
+}
+
+export enum ConversationInteractionInteraction {
+  UNKNOWN = 0,
+  THUMBSUP = 1,
+  THUMBSDOWN = 2,
+  COPY = 3,
+  INSERT = 4,
+  ACCEPT_CODE_BLOCK = 5,
+  ACCEPT_ALL = 6,
+  ACCEPT_FILE = 7,
+  DIFF = 8,
+  ACCEPT_RANGE = 9,
+}
+
+export enum ActionStatus {
+  ACTION_STATUS_UNSPECIFIED = 0,
+  ACTION_STATUS_NO_ERROR = 1,
+  ACTION_STATUS_ERROR_UNKNOWN = 2,
+  ACTION_STATUS_CANCELLED = 3,
+  ACTION_STATUS_EMPTY = 4,
+}
+
+export interface ConversationOffered {
+  citationCount?: string;
+  includedCode?: boolean;
+  status?: ActionStatus;
+  traceId?: string;
+  streamingLatency?: StreamingLatency;
+  isAgentic?: boolean;
+}
+
+export interface StreamingLatency {
+  firstMessageLatency?: string;
+  totalLatency?: string;
+}
+
+export interface ConversationInteraction {
+  traceId: string;
+  status?: ActionStatus;
+  interaction?: ConversationInteractionInteraction;
+  acceptedLines?: string;
+  language?: string;
+  isAgentic?: boolean;
 }

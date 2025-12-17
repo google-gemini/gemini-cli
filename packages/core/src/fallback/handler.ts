@@ -12,17 +12,14 @@ import {
   PREVIEW_GEMINI_MODEL,
 } from '../config/models.js';
 import { logFlashFallback, FlashFallbackEvent } from '../telemetry/index.js';
-import { coreEvents } from '../utils/events.js';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { ModelNotFoundError } from '../utils/httpErrors.js';
-import {
-  RetryableQuotaError,
-  TerminalQuotaError,
-} from '../utils/googleQuotaErrors.js';
+import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
+import { coreEvents } from '../utils/events.js';
 import type { FallbackIntent, FallbackRecommendation } from './types.js';
-import type { FailureKind } from '../availability/modelPolicy.js';
+import { classifyFailureKind } from '../availability/errorClassification.js';
 import {
   buildFallbackPolicyContext,
   resolvePolicyChain,
@@ -126,6 +123,9 @@ async function handlePolicyDrivenFallback(
     chain,
     failedModel,
   );
+
+  const failureKind = classifyFailureKind(error);
+
   if (!candidates.length) {
     return null;
   }
@@ -135,24 +135,17 @@ async function handlePolicyDrivenFallback(
     candidates.map((policy) => policy.model),
   );
 
-  let lastResortPolicy = candidates.find((policy) => policy.isLastResort);
-  if (!lastResortPolicy) {
-    debugLogger.warn(
-      'No isLastResort policy found in candidates, using last candidate as fallback.',
-    );
-    lastResortPolicy = candidates[candidates.length - 1];
-  }
+  const lastResortPolicy = candidates.find((policy) => policy.isLastResort);
+  const fallbackModel = selection.selectedModel ?? lastResortPolicy?.model;
+  const selectedPolicy = candidates.find(
+    (policy) => policy.model === fallbackModel,
+  );
 
-  const fallbackModel = selection.selectedModel ?? lastResortPolicy.model;
-  const selectedPolicy =
-    candidates.find((policy) => policy.model === fallbackModel) ??
-    lastResortPolicy;
-
-  if (!fallbackModel || fallbackModel === failedModel) {
+  if (!fallbackModel || fallbackModel === failedModel || !selectedPolicy) {
     return null;
   }
 
-  const failureKind = classifyFailureKind(error);
+  // failureKind is already declared and calculated above
   const action = resolvePolicyAction(failureKind, selectedPolicy);
 
   if (action === 'silent') {
@@ -190,6 +183,7 @@ async function handlePolicyDrivenFallback(
       failedModel,
       fallbackModel,
       authType,
+      error, // Pass the error so processIntent can handle preview-specific logic
     );
   } catch (handlerError) {
     debugLogger.error('Fallback handler failed:', handlerError);
@@ -216,25 +210,42 @@ async function processIntent(
   authType?: string,
   error?: unknown,
 ): Promise<boolean> {
+  const isAvailabilityEnabled = config.isModelAvailabilityServiceEnabled();
+
   switch (intent) {
     case 'retry_always':
-      // If the error is non-retryable, e.g. TerminalQuota Error, trigger a regular fallback to flash.
-      // For all other errors, activate previewModel fallback.
-      if (
-        failedModel === PREVIEW_GEMINI_MODEL &&
-        !(error instanceof TerminalQuotaError)
-      ) {
-        activatePreviewModelFallbackMode(config);
+      if (isAvailabilityEnabled) {
+        // TODO(telemetry): Implement generic fallback event logging. Existing
+        // logFlashFallback is specific to a single Model.
+        config.setActiveModel(fallbackModel);
       } else {
-        activateFallbackMode(config, authType);
+        // If the error is non-retryable, e.g. TerminalQuota Error, trigger a regular fallback to flash.
+        // For all other errors, activate previewModel fallback.
+        if (
+          failedModel === PREVIEW_GEMINI_MODEL &&
+          !(error instanceof TerminalQuotaError)
+        ) {
+          activatePreviewModelFallbackMode(config);
+        } else {
+          activateFallbackMode(config, authType);
+        }
       }
       return true;
 
     case 'retry_once':
+      if (isAvailabilityEnabled) {
+        config.setActiveModel(fallbackModel);
+      }
       return true;
 
     case 'stop':
-      activateFallbackMode(config, authType);
+      if (isAvailabilityEnabled) {
+        // TODO(telemetry): Implement generic fallback event logging. Existing
+        // logFlashFallback is specific to a single Model.
+        config.setActiveModel(fallbackModel);
+      } else {
+        activateFallbackMode(config, authType);
+      }
       return false;
 
     case 'retry_later':
@@ -266,17 +277,4 @@ function activatePreviewModelFallbackMode(config: Config) {
     config.setPreviewModelFallbackMode(true);
     // We might want a specific event for Preview Model fallback, but for now we just set the mode.
   }
-}
-
-function classifyFailureKind(error?: unknown): FailureKind {
-  if (error instanceof TerminalQuotaError) {
-    return 'terminal';
-  }
-  if (error instanceof RetryableQuotaError) {
-    return 'transient';
-  }
-  if (error instanceof ModelNotFoundError) {
-    return 'not_found';
-  }
-  return 'unknown';
 }

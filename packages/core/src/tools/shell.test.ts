@@ -36,10 +36,8 @@ vi.mock('node:os', async (importOriginal) => {
 vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
-import {
-  initializeShellParsers,
-  isCommandAllowed,
-} from '../utils/shell-utils.js';
+import { initializeShellParsers } from '../utils/shell-utils.js';
+import { isCommandAllowed } from '../utils/shell-permissions.js';
 import { ShellTool } from './shell.js';
 import { type Config } from '../config/config.js';
 import {
@@ -222,7 +220,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        {},
+        { pager: 'cat' },
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
@@ -247,7 +245,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        {},
+        { pager: 'cat' },
       );
     });
 
@@ -268,7 +266,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        {},
+        { pager: 'cat' },
       );
     });
 
@@ -295,7 +293,7 @@ describe('ShellTool', () => {
           expect.any(Function),
           expect.any(AbortSignal),
           false,
-          {},
+          { pager: 'cat' },
         );
       },
       20000,

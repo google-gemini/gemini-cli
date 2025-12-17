@@ -43,9 +43,9 @@ describe('policyCatalog', () => {
 
   it('clones policy maps so edits do not leak between calls', () => {
     const firstCall = getModelPolicyChain({ previewEnabled: false });
-    firstCall[0]!.actions.terminal = 'silent';
+    firstCall[0].actions.terminal = 'silent';
     const secondCall = getModelPolicyChain({ previewEnabled: false });
-    expect(secondCall[0]!.actions.terminal).toBe('prompt');
+    expect(secondCall[0].actions.terminal).toBe('prompt');
   });
 
   it('passes when there is exactly one last-resort policy', () => {

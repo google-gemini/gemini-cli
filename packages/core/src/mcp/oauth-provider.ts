@@ -302,8 +302,8 @@ export class MCPOAuthProvider {
               <html>
                 <body>
                   <h1>Authentication Failed</h1>
-                  <p>Error: ${(error as string).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
-                  <p>${((url.searchParams.get('error_description') || '') as string).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+                  <p>Error: ${error.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+                  <p>${(url.searchParams.get('error_description') || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
                   <p>You can close this window.</p>
                 </body>
               </html>

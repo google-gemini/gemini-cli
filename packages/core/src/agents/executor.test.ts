@@ -65,13 +65,11 @@ const {
   mockExecuteToolCall,
   mockSetSystemInstruction,
   mockCompress,
-  mockSetTools,
 } = vi.hoisted(() => ({
   mockSendMessageStream: vi.fn(),
   mockExecuteToolCall: vi.fn(),
   mockSetSystemInstruction: vi.fn(),
   mockCompress: vi.fn(),
-  mockSetTools: vi.fn(),
 }));
 
 let mockChatHistory: Content[] = [];
@@ -94,7 +92,6 @@ vi.mock('../core/geminiChat.js', async (importOriginal) => {
       getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
       setHistory: mockSetHistory,
       setSystemInstruction: mockSetSystemInstruction,
-      setTools: mockSetTools,
     })),
   };
 });
@@ -238,7 +235,6 @@ describe('AgentExecutor', () => {
     mockSetHistory.mockClear();
     mockSendMessageStream.mockReset();
     mockSetSystemInstruction.mockReset();
-    mockSetTools.mockReset();
     mockExecuteToolCall.mockReset();
     mockedLogAgentStart.mockReset();
     mockedLogAgentFinish.mockReset();
@@ -258,7 +254,6 @@ describe('AgentExecutor', () => {
         ({
           sendMessageStream: mockSendMessageStream,
           setSystemInstruction: mockSetSystemInstruction,
-          setTools: mockSetTools,
           getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
           getLastPromptTokenCount: vi.fn(() => 100),
           setHistory: mockSetHistory,
@@ -275,9 +270,7 @@ describe('AgentExecutor', () => {
     );
     parentToolRegistry.registerTool(MOCK_TOOL_NOT_ALLOWED);
 
-    vi.spyOn(mockConfig, 'getToolRegistry').mockResolvedValue(
-      parentToolRegistry,
-    );
+    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(parentToolRegistry);
 
     mockedGetDirectoryContextString.mockResolvedValue(
       'Mocked Environment Context',
@@ -322,7 +315,7 @@ describe('AgentExecutor', () => {
         onActivity,
       );
 
-      const agentRegistry = executor['toolRegistry'] as ToolRegistry;
+      const agentRegistry = executor['toolRegistry'];
 
       expect(agentRegistry).not.toBe(parentToolRegistry);
       expect(agentRegistry.getAllToolNames()).toEqual(
@@ -490,8 +483,10 @@ describe('AgentExecutor', () => {
       const { modelConfigKey } = getMockMessageParams(0);
       expect(modelConfigKey.model).toBe(getModelConfigAlias(definition));
 
-      const call = mockSetTools.mock.calls[0];
-      const sentTools = (call[0] as Tool[])[0].functionDeclarations;
+      const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
+      // tools are the 3rd argument (index 2), passed as [{ functionDeclarations: [...] }]
+      const passedToolsArg = chatConstructorArgs[2] as Tool[];
+      const sentTools = passedToolsArg[0].functionDeclarations;
       expect(sentTools).toBeDefined();
 
       expect(sentTools).toEqual(
@@ -615,8 +610,9 @@ describe('AgentExecutor', () => {
       const { modelConfigKey } = getMockMessageParams(0);
       expect(modelConfigKey.model).toBe(getModelConfigAlias(definition));
 
-      const call = mockSetTools.mock.calls[0];
-      const sentTools = (call[0] as Tool[])[0].functionDeclarations;
+      const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
+      const passedToolsArg = chatConstructorArgs[2] as Tool[];
+      const sentTools = passedToolsArg[0].functionDeclarations;
       expect(sentTools).toBeDefined();
 
       const completeToolDef = sentTools!.find(
@@ -756,7 +752,7 @@ describe('AgentExecutor', () => {
       expect(turn2Parts).toBeDefined();
       expect(turn2Parts).toHaveLength(1);
 
-      expect((turn2Parts as Part[])![0]).toEqual(
+      expect((turn2Parts as Part[])[0]).toEqual(
         expect.objectContaining({
           functionResponse: expect.objectContaining({
             name: TASK_COMPLETE_TOOL_NAME,
@@ -946,7 +942,7 @@ describe('AgentExecutor', () => {
       const turn2Params = getMockMessageParams(1);
       const parts = turn2Params.message;
       expect(parts).toBeDefined();
-      expect((parts as Part[])![0]).toEqual(
+      expect((parts as Part[])[0]).toEqual(
         expect.objectContaining({
           functionResponse: expect.objectContaining({
             id: badCallId,

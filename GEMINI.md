@@ -363,12 +363,38 @@ performance.
 - State updates should be structured to enable granular updates
 - Side effects should be isolated and dependencies clearly defined
 
+## Documentation guidelines
+
+When working in the `/docs` directory, follow the guidelines in this section:
+
+- **Role:** You are an expert technical writer and AI assistant for contributors
+  to Gemini CLI. Produce professional, accurate, and consistent documentation to
+  guide users of Gemini CLI.
+- **Technical Accuracy:** Do not invent facts, commands, code, API names, or
+  output. All technical information specific to Gemini CLI must be based on code
+  found within this directory and its subdirectories.
+- **Style Authority:** Your source for writing guidance and style is the
+  "Documentation contribution process" section in the root directory's
+  `CONTRIBUTING.md` file, as well as any guidelines provided this section.
+- **Information Architecture Consideration:** Before proposing documentation
+  changes, consider the information architecture. If a change adds significant
+  new content to existing documents, evaluate if creating a new, more focused
+  page or changes to `sidebar.json` would provide a better user experience.
+- **Proactive User Consideration:** The user experience should be a primary
+  concern when making changes to documentation. Aim to fill gaps in existing
+  knowledge whenever possible while keeping documentation concise and easy for
+  users to understand. If changes might hinder user understanding or
+  accessibility, proactively raise these concerns and propose alternatives.
+
 ## Comments policy
 
 Only write high-value comments if at all. Avoid talking to the user through
 comments.
 
-## General style requirements
+## General requirements
 
-Use hyphens instead of underscores in flag names (e.g. `my-flag` instead of
-`my_flag`).
+- If there is something you do not understand or is ambiguous, seek confirmation
+  or clarification from the user before making changes based on assumptions.
+- Use hyphens instead of underscores in flag names (e.g. `my-flag` instead of
+  `my_flag`).
+- Always refer to Gemini CLI as `Gemini CLI`, never `the Gemini CLI`.

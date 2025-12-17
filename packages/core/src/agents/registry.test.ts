@@ -72,6 +72,25 @@ describe('AgentRegistry', () => {
         `[AgentRegistry] Initialized with ${agentCount} agents.`,
       );
     });
+
+    it('should use preview model for codebase investigator if main model is preview', async () => {
+      const previewConfig = makeFakeConfig({
+        model: 'gemini-3-pro-preview',
+        codebaseInvestigatorSettings: {
+          enabled: true,
+          model: 'pro',
+        },
+      });
+      const previewRegistry = new TestableAgentRegistry(previewConfig);
+
+      await previewRegistry.initialize();
+
+      const investigatorDef = previewRegistry.getDefinition(
+        'codebase_investigator',
+      );
+      expect(investigatorDef).toBeDefined();
+      expect(investigatorDef?.modelConfig.model).toBe('gemini-3-pro-preview');
+    });
   });
 
   describe('registration logic', () => {
@@ -215,6 +234,35 @@ describe('AgentRegistry', () => {
       expect(all).toHaveLength(2);
       expect(all).toEqual(
         expect.arrayContaining([MOCK_AGENT_V1, ANOTHER_AGENT]),
+      );
+    });
+  });
+  describe('getToolDescription', () => {
+    it('should return default message when no agents are registered', () => {
+      expect(registry.getToolDescription()).toContain(
+        'No agents are currently available',
+      );
+    });
+
+    it('should return formatted list of agents when agents are available', () => {
+      registry.testRegisterAgent(MOCK_AGENT_V1);
+      registry.testRegisterAgent({
+        ...MOCK_AGENT_V2,
+        name: 'AnotherAgent',
+        description: 'Another agent description',
+      });
+
+      const description = registry.getToolDescription();
+
+      expect(description).toContain(
+        'Delegates a task to a specialized sub-agent',
+      );
+      expect(description).toContain('Available agents:');
+      expect(description).toContain(
+        `- **${MOCK_AGENT_V1.name}**: ${MOCK_AGENT_V1.description}`,
+      );
+      expect(description).toContain(
+        `- **AnotherAgent**: Another agent description`,
       );
     });
   });
