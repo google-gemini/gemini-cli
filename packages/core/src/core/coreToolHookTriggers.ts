@@ -246,6 +246,7 @@ export async function fireAfterToolHook(
  * @param liveOutputCallback Optional callback for live output updates
  * @param shellExecutionConfig Optional shell execution config
  * @param setPidCallback Optional callback to set the PID for shell invocations
+ * @param beforeHookAlreadyFired Whether BeforeTool hook was already fired (skip duplicate)
  * @returns The tool result
  */
 export async function executeToolWithHooks(
@@ -257,11 +258,12 @@ export async function executeToolWithHooks(
   liveOutputCallback?: (outputChunk: string | AnsiOutput) => void,
   shellExecutionConfig?: ShellExecutionConfig,
   setPidCallback?: (pid: number) => void,
+  beforeHookAlreadyFired = false,
 ): Promise<ToolResult> {
   const toolInput = (invocation.params || {}) as Record<string, unknown>;
 
-  // Fire BeforeTool hook through MessageBus (only if hooks are enabled)
-  if (hooksEnabled && messageBus) {
+  // Fire BeforeTool hook through MessageBus (only if hooks are enabled and not already fired)
+  if (hooksEnabled && messageBus && !beforeHookAlreadyFired) {
     const beforeOutput = await fireBeforeToolHook(
       messageBus,
       toolName,

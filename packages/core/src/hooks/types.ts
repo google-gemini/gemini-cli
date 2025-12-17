@@ -146,6 +146,13 @@ export class DefaultHookOutput implements HookOutput {
   }
 
   /**
+   * Check if this output represents an approving decision
+   */
+  isApprovingDecision(): boolean {
+    return this.decision === 'approve' || this.decision === 'allow';
+  }
+
+  /**
    * Check if this output requests to stop execution
    */
   shouldStopExecution(): boolean {
@@ -249,6 +256,24 @@ export class BeforeToolHookOutput extends DefaultHookOutput {
     }
 
     return super.isBlockingDecision();
+  }
+
+  /**
+   * Check if this output represents an approving decision, considering compatibility fields
+   */
+  override isApprovingDecision(): boolean {
+    // Check compatibility field first
+    if (
+      this.hookSpecificOutput &&
+      'permissionDecision' in this.hookSpecificOutput
+    ) {
+      const compatDecision = this.hookSpecificOutput['permissionDecision'];
+      if (compatDecision === 'approve' || compatDecision === 'allow') {
+        return true;
+      }
+    }
+
+    return super.isApprovingDecision();
   }
 }
 

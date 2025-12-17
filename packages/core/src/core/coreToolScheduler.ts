@@ -48,8 +48,10 @@ import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   fireToolNotificationHook,
+  fireBeforeToolHook,
   executeToolWithHooks,
 } from './coreToolHookTriggers.js';
+import type { DefaultHookOutput } from '../hooks/types.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 export type ValidatingToolCall = {
@@ -878,10 +880,66 @@ export class CoreToolScheduler {
           return;
         }
 
+        // Fire BeforeTool hook BEFORE confirmation to allow hooks to block/approve
+        const messageBus = this.config.getMessageBus();
+        const hooksEnabled = this.config.getEnableHooks();
+        let beforeHookOutput: DefaultHookOutput | undefined;
+
+        if (hooksEnabled && messageBus) {
+          beforeHookOutput = await fireBeforeToolHook(
+            messageBus,
+            reqInfo.name,
+            reqInfo.args,
+          );
+
+          // Check if hook blocked the tool
+          const blockingError = beforeHookOutput?.getBlockingError();
+          if (blockingError?.blocked) {
+            this.setStatusInternal(
+              reqInfo.callId,
+              'error',
+              signal,
+              createErrorResponse(
+                reqInfo,
+                new Error(
+                  `Tool execution blocked by hook: ${blockingError.reason}`,
+                ),
+                ToolErrorType.EXECUTION_FAILED,
+              ),
+            );
+            await this.checkAndNotifyCompletion(signal);
+            return;
+          }
+
+          // Check if hook wants to stop agent execution
+          if (beforeHookOutput?.shouldStopExecution()) {
+            const reason = beforeHookOutput.getEffectiveReason();
+            this.setStatusInternal(
+              reqInfo.callId,
+              'error',
+              signal,
+              createErrorResponse(
+                reqInfo,
+                new Error(`Agent execution stopped by hook: ${reason}`),
+                ToolErrorType.EXECUTION_FAILED,
+              ),
+            );
+            await this.checkAndNotifyCompletion(signal);
+            return;
+          }
+        }
+
         const confirmationDetails =
           await invocation.shouldConfirmExecute(signal);
 
         if (!confirmationDetails) {
+          this.setToolCallOutcome(
+            reqInfo.callId,
+            ToolConfirmationOutcome.ProceedAlways,
+          );
+          this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
+        } else if (beforeHookOutput?.isApprovingDecision()) {
+          // Hook approved - skip confirmation dialog
           this.setToolCallOutcome(
             reqInfo.callId,
             ToolConfirmationOutcome.ProceedAlways,
@@ -903,8 +961,6 @@ export class CoreToolScheduler {
               );
             }
             // Fire Notification hook before showing confirmation to user
-            const messageBus = this.config.getMessageBus();
-            const hooksEnabled = this.config.getEnableHooks();
             if (hooksEnabled && messageBus) {
               await fireToolNotificationHook(messageBus, confirmationDetails);
             }
@@ -1183,6 +1239,7 @@ export class CoreToolScheduler {
                 liveOutputCallback,
                 shellExecutionConfig,
                 setPidCallback,
+                true, // beforeHookAlreadyFired - hook was fired in _processNextInQueue
               );
             } else {
               promise = executeToolWithHooks(
@@ -1193,6 +1250,8 @@ export class CoreToolScheduler {
                 hooksEnabled,
                 liveOutputCallback,
                 shellExecutionConfig,
+                undefined, // setPidCallback
+                true, // beforeHookAlreadyFired - hook was fired in _processNextInQueue
               );
             }
 

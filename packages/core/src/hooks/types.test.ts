@@ -130,6 +130,24 @@ describe('Hook Output Classes', () => {
       expect(output2.isBlockingDecision()).toBe(true);
     });
 
+    it('should return false for isApprovingDecision if decision is not approve or allow', () => {
+      const output1 = new DefaultHookOutput({ decision: 'block' });
+      expect(output1.isApprovingDecision()).toBe(false);
+      const output2 = new DefaultHookOutput({ decision: undefined });
+      expect(output2.isApprovingDecision()).toBe(false);
+      const output3 = new DefaultHookOutput({ decision: 'ask' });
+      expect(output3.isApprovingDecision()).toBe(false);
+      const output4 = new DefaultHookOutput({ decision: 'deny' });
+      expect(output4.isApprovingDecision()).toBe(false);
+    });
+
+    it('should return true for isApprovingDecision if decision is approve or allow', () => {
+      const output1 = new DefaultHookOutput({ decision: 'approve' });
+      expect(output1.isApprovingDecision()).toBe(true);
+      const output2 = new DefaultHookOutput({ decision: 'allow' });
+      expect(output2.isApprovingDecision()).toBe(true);
+    });
+
     it('should return true for shouldStopExecution if continue is false', () => {
       const output = new DefaultHookOutput({ continue: false });
       expect(output.shouldStopExecution()).toBe(true);
@@ -219,6 +237,28 @@ describe('Hook Output Classes', () => {
         hookSpecificOutput: { permissionDecision: 'approve' },
       });
       expect(output2.isBlockingDecision()).toBe(false);
+    });
+
+    it('isApprovingDecision should use permissionDecision from hookSpecificOutput', () => {
+      const output1 = new BeforeToolHookOutput({
+        hookSpecificOutput: { permissionDecision: 'approve' },
+      });
+      expect(output1.isApprovingDecision()).toBe(true);
+
+      const output2 = new BeforeToolHookOutput({
+        hookSpecificOutput: { permissionDecision: 'allow' },
+      });
+      expect(output2.isApprovingDecision()).toBe(true);
+
+      const output3 = new BeforeToolHookOutput({
+        hookSpecificOutput: { permissionDecision: 'block' },
+      });
+      expect(output3.isApprovingDecision()).toBe(false);
+
+      const output4 = new BeforeToolHookOutput({
+        hookSpecificOutput: { permissionDecision: 'deny' },
+      });
+      expect(output4.isApprovingDecision()).toBe(false);
     });
 
     it('getEffectiveReason should use permissionDecisionReason from hookSpecificOutput', () => {
