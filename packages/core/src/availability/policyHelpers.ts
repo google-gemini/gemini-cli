@@ -13,8 +13,17 @@ import type {
   ModelPolicyChain,
   RetryAvailabilityContext,
 } from './modelPolicy.js';
-import { createDefaultPolicy, getModelPolicyChain } from './policyCatalog.js';
-import { DEFAULT_GEMINI_MODEL, getEffectiveModel } from '../config/models.js';
+import {
+  createDefaultPolicy,
+  createSingleModelChain,
+  getModelPolicyChain,
+} from './policyCatalog.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  resolveModel,
+} from '../config/models.js';
 import type { ModelSelectionResult } from './modelAvailabilityService.js';
 
 /**
@@ -24,27 +33,34 @@ import type { ModelSelectionResult } from './modelAvailabilityService.js';
 export function resolvePolicyChain(
   config: Config,
   preferredModel?: string,
+  wrapsAround: boolean = false,
 ): ModelPolicyChain {
-  const chain = getModelPolicyChain({
-    previewEnabled: !!config.getPreviewFeatures(),
-    userTier: config.getUserTier(),
-  });
-  // TODO: This will be replaced when we get rid of Fallback Modes.
-  // Switch to getActiveModel()
-  const activeModel =
-    preferredModel ??
-    getEffectiveModel(
-      config.isInFallbackMode(),
-      config.getModel(),
-      config.getPreviewFeatures(),
-    );
+  // Availability uses the active/requested model directly. Legacy fallback logic
+  // (getEffectiveModel) only applies when availability is disabled.
+  const modelFromConfig =
+    preferredModel ?? config.getActiveModel?.() ?? config.getModel();
 
-  if (activeModel === 'auto') {
-    return [...chain];
+  let chain;
+
+  if (
+    config.getModel() === PREVIEW_GEMINI_MODEL_AUTO ||
+    config.getModel() === DEFAULT_GEMINI_MODEL_AUTO
+  ) {
+    chain = getModelPolicyChain({
+      previewEnabled: config.getModel() === PREVIEW_GEMINI_MODEL_AUTO,
+      userTier: config.getUserTier(),
+    });
+  } else {
+    chain = createSingleModelChain(modelFromConfig);
   }
 
-  if (chain.some((policy) => policy.model === activeModel)) {
-    return [...chain];
+  const activeModel = resolveModel(modelFromConfig);
+
+  const activeIndex = chain.findIndex((policy) => policy.model === activeModel);
+  if (activeIndex !== -1) {
+    return wrapsAround
+      ? [...chain.slice(activeIndex), ...chain.slice(0, activeIndex)]
+      : [...chain.slice(activeIndex)];
   }
 
   // If the user specified a model not in the default chain, we assume they want
@@ -55,10 +71,14 @@ export function resolvePolicyChain(
 /**
  * Produces the failed policy (if it exists in the chain) and the list of
  * fallback candidates that follow it.
+ * @param chain - The ordered list of available model policies.
+ * @param failedModel - The identifier of the model that failed.
+ * @param wrapsAround - If true, treats the chain as a circular buffer.
  */
 export function buildFallbackPolicyContext(
   chain: ModelPolicyChain,
   failedModel: string,
+  wrapsAround: boolean = false,
 ): {
   failedPolicy?: ModelPolicy;
   candidates: ModelPolicy[];
@@ -69,9 +89,12 @@ export function buildFallbackPolicyContext(
   }
   // Return [candidates_after, candidates_before] to prioritize downgrades
   // (continuing the chain) before wrapping around to upgrades.
+  const candidates = wrapsAround
+    ? [...chain.slice(index + 1), ...chain.slice(0, index)]
+    : [...chain.slice(index + 1)];
   return {
     failedPolicy: chain[index],
-    candidates: [...chain.slice(index + 1), ...chain.slice(0, index)],
+    candidates,
   };
 }
 
