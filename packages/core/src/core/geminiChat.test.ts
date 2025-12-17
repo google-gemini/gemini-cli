@@ -167,7 +167,7 @@ describe('GeminiChat', () => {
           return {
             model,
             generateContentConfig: {
-              temperature: 0,
+              temperature: modelConfigKey.isRetry ? 1 : 0,
               thinkingConfig,
             },
           };
@@ -1787,8 +1787,8 @@ describe('GeminiChat', () => {
           })(),
         );
 
-      mockHandleFallback.mockImplementation(async () => 
-         true // Signal retry
+      mockHandleFallback.mockImplementation(
+        async () => true, // Signal retry
       );
 
       const stream = await chat.sendMessageStream(
@@ -2191,13 +2191,18 @@ describe('GeminiChat', () => {
       });
 
       // Different configs per model
-      vi.mocked(mockConfig.modelConfigService.getResolvedConfig)
-        .mockReturnValueOnce(
-          makeResolvedModelConfig('model-a', { temperature: 0.1 }),
-        )
-        .mockReturnValueOnce(
-          makeResolvedModelConfig('model-b', { temperature: 0.9 }),
-        );
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation((key) => {
+        if (key.model === 'model-a') {
+          return makeResolvedModelConfig('model-a', { temperature: 0.1 });
+        }
+        if (key.model === 'model-b') {
+          return makeResolvedModelConfig('model-b', { temperature: 0.9 });
+        }
+        // Default for the initial requested model in this test
+        return makeResolvedModelConfig('model-a', { temperature: 0.1 });
+      });
 
       // First attempt uses model-a, then simulate availability switching to model-b
       mockRetryWithBackoff.mockImplementation(async (apiCall) => {
