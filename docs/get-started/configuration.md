@@ -367,6 +367,12 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3-pro-preview"
         }
       },
+      "gemini-3-flash-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
+        }
+      },
       "gemini-2.5-pro": {
         "extends": "chat-base-2.5",
         "modelConfig": {
@@ -494,6 +500,11 @@ their corresponding top-level category object in your `settings.json` file.
       "chat-compression-3-pro": {
         "modelConfig": {
           "model": "gemini-3-pro-preview"
+        }
+      },
+      "chat-compression-3-flash": {
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
         }
       },
       "chat-compression-2.5-pro": {
@@ -821,7 +832,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.codebaseInvestigatorSettings.model`** (string):
   - **Description:** The model to use for the Codebase Investigator agent.
-  - **Default:** `"pro"`
+  - **Default:** `"auto"`
   - **Requires restart:** Yes
 
 #### `hooks`

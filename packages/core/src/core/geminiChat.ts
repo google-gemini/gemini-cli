@@ -22,11 +22,10 @@ import { createUserContent, FinishReason } from '@google/genai';
 import { retryWithBackoff, isRetryableError } from '../utils/retry.js';
 import type { Config } from '../config/config.js';
 import {
-  DEFAULT_GEMINI_MODEL,
   DEFAULT_THINKING_MODE,
-  PREVIEW_GEMINI_MODEL,
-  getEffectiveModel,
+  resolveModel,
   isGemini2Model,
+  isPreviewModel,
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
@@ -306,10 +305,7 @@ export class GeminiChat {
         let maxAttempts = INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
         // If we are in Preview Model Fallback Mode, we want to fail fast (1 attempt)
         // when probing the Preview Model.
-        if (
-          this.config.isPreviewModelFallbackMode() &&
-          model === PREVIEW_GEMINI_MODEL
-        ) {
+        if (this.config.isPreviewModelFallbackMode() && isPreviewModel(model)) {
           maxAttempts = 1;
         }
 
@@ -388,7 +384,7 @@ export class GeminiChat {
           // Preview Model successfully used, disable fallback mode.
           // We only do this if we didn't bypass Preview Model (i.e. we actually used it).
           if (
-            model === PREVIEW_GEMINI_MODEL &&
+            isPreviewModel(model) &&
             !this.config.isPreviewModelBypassMode()
           ) {
             this.config.setPreviewModelFallbackMode(false);
@@ -435,11 +431,24 @@ export class GeminiChat {
       this.config,
       () => lastModelToUse,
     );
-    const apiCall = async () => {
-      let modelToUse: string;
+    // Track initial active model to detect fallback changes
+    const initialActiveModel = this.config.getActiveModel();
 
-      if (this.config.isModelAvailabilityServiceEnabled()) {
-        modelToUse = this.config.getActiveModel();
+    const apiCall = async () => {
+      // Default to the last used model (which respects arguments/availability selection)
+      let modelToUse = resolveModel(
+        lastModelToUse,
+        this.config.getPreviewFeatures(),
+      );
+
+      // If the active model has changed (e.g. due to a fallback updating the config),
+      // we switch to the new active model.
+      if (this.config.getActiveModel() !== initialActiveModel) {
+        modelToUse = resolveModel(
+          this.config.getActiveModel(),
+          this.config.getPreviewFeatures(),
+        );
+
         if (modelToUse !== lastModelToUse) {
           const { generateContentConfig: newConfig } =
             this.config.modelConfigService.getResolvedConfig({
@@ -452,24 +461,6 @@ export class GeminiChat {
           if (abortSignal) {
             currentGenerateContentConfig.abortSignal = abortSignal;
           }
-        }
-      } else {
-        modelToUse = getEffectiveModel(
-          this.config.isInFallbackMode(),
-          model,
-          this.config.getPreviewFeatures(),
-        );
-
-        // Preview Model Bypass Logic:
-        // If we are in "Preview Model Bypass Mode" (transient failure), we force downgrade to 2.5 Pro
-        // IF the effective model is currently Preview Model.
-        // Note: In availability mode, this should ideally be handled by policy, but preserving
-        // bypass logic for now as it handles specific transient behavior.
-        if (
-          this.config.isPreviewModelBypassMode() &&
-          modelToUse === PREVIEW_GEMINI_MODEL
-        ) {
-          modelToUse = DEFAULT_GEMINI_MODEL;
         }
       }
 
@@ -498,10 +489,9 @@ export class GeminiChat {
         };
         delete config.thinkingConfig?.thinkingLevel;
       }
-      let contentsToUse =
-        modelToUse === PREVIEW_GEMINI_MODEL
-          ? contentsForPreviewModel
-          : requestContents;
+      let contentsToUse = isPreviewModel(modelToUse)
+        ? contentsForPreviewModel
+        : requestContents;
 
       // Fire BeforeModel and BeforeToolSelection hooks if enabled
       const hooksEnabled = this.config.getEnableHooks();
@@ -589,8 +579,7 @@ export class GeminiChat {
       signal: generateContentConfig.abortSignal,
       maxAttempts:
         availabilityMaxAttempts ??
-        (this.config.isPreviewModelFallbackMode() &&
-        model === PREVIEW_GEMINI_MODEL
+        (this.config.isPreviewModelFallbackMode() && isPreviewModel(model)
           ? 1
           : undefined),
       getAvailabilityContext,
