@@ -875,10 +875,10 @@ export function saveSettings(settingsFile: SettingsFile): void {
   }
 }
 
-export async function saveModelChange(
+export function saveModelChange(
   loadedSettings: LoadedSettings,
   model: string,
-): Promise<void> {
+): void {
   try {
     loadedSettings.setValue(SettingScope.User, 'model.name', model);
   } catch (error) {

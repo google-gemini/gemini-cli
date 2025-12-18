@@ -328,7 +328,7 @@ export interface ConfigParameters {
   previewFeatures?: boolean;
   enableAgents?: boolean;
   experimentalJitContext?: boolean;
-  onModelChange?: (model: string) => Promise<void>;
+  onModelChange?: (model: string) => void;
 }
 
 export class Config {
@@ -446,9 +446,7 @@ export class Config {
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
-  private readonly onModelChange:
-    | ((model: string) => Promise<void>)
-    | undefined;
+  private readonly onModelChange: ((model: string) => void) | undefined;
 
   private readonly enableAgents: boolean;
 
@@ -852,7 +850,7 @@ export class Config {
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
       if (this.onModelChange) {
-        void this.onModelChange(newModel);
+        this.onModelChange(newModel);
       }
     }
     this.modelAvailabilityService.reset();

@@ -1620,8 +1620,8 @@ describe('Config getHooks', () => {
       expect(config.getActiveModel()).toBe(originalModel);
     });
 
-    it('should call onModelChange when a new model is set', async () => {
-      const onModelChange = vi.fn().mockResolvedValue(undefined);
+    it('should call onModelChange when a new model is set', () => {
+      const onModelChange = vi.fn();
       const config = new Config({
         ...baseParams,
         onModelChange,
