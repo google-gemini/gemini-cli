@@ -343,7 +343,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         returnDisplayMessage = llmContent;
       } else {
         if (this.params.is_background) {
-          returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden.`;
+          returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
         } else if (result.output.trim()) {
           returnDisplayMessage = result.output;
         } else {

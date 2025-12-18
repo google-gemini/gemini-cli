@@ -160,7 +160,9 @@ export const BackgroundShellDisplay = ({
 
   const renderTabs = () => {
     const tabs = [];
-    const shellList = Array.from(shells.values());
+    const shellList = Array.from(shells.values()).filter(
+      (s) => s.status === 'running',
+    );
 
     // Calculate available width for tabs
     // width - borders(2) - padding(2) - rightText - pidText - spacing
@@ -177,7 +179,16 @@ export const BackgroundShellDisplay = ({
 
     for (let i = 0; i < shellList.length; i++) {
       const shell = shellList[i];
-      const label = ` ${i + 1}: ${shell.command.split(' ')[0]} `;
+      const commandFirstLine = shell.command.split('\n')[0];
+      const maxTabLabelLength = Math.max(
+        1,
+        Math.floor(availableWidth / shellList.length) - 2,
+      ); // -2 for padding
+      const truncatedCommand =
+        commandFirstLine.length > maxTabLabelLength
+          ? `${commandFirstLine.substring(0, maxTabLabelLength - 3)}...`
+          : commandFirstLine;
+      const label = ` ${i + 1}: ${truncatedCommand} `;
       const labelWidth = label.length;
 
       if (currentWidth + labelWidth > availableWidth) {
@@ -186,28 +197,15 @@ export const BackgroundShellDisplay = ({
       }
 
       const isActive = shell.pid === activePid;
-      const isExited = shell.status === 'exited';
+
       tabs.push(
         <Text
           key={shell.pid}
-          color={
-            isActive
-              ? theme.text.primary
-              : isExited
-                ? theme.status.error
-                : theme.text.secondary
-          }
-          backgroundColor={
-            isActive
-              ? isExited
-                ? theme.status.error
-                : theme.border.focused
-              : undefined
-          }
+          color={isActive ? theme.text.primary : theme.text.secondary}
+          backgroundColor={isActive ? theme.border.focused : undefined}
           bold={isActive}
         >
           {label}
-          {isExited ? '(Exited)' : ''}
         </Text>,
       );
       currentWidth += labelWidth;
@@ -226,23 +224,41 @@ export const BackgroundShellDisplay = ({
 
   const renderProcessList = () => {
     const shellList = Array.from(shells.values());
+    const headerText = 'Select Process (Enter to select, Esc to cancel):';
+    const maxCommandLength = Math.max(0, width - 2 - headerText.length - 10); // 2 for padding, 10 for PID/Exit Code
+
     return (
       <Box flexDirection="column" padding={1}>
         <Text bold underline>
-          Select Process (Enter to select, Esc to cancel):
+          {headerText}
         </Text>
         {shellList.map((shell, index) => {
           const isSelected = index === listSelectionIndex;
-          const statusText =
-            shell.status === 'exited' ? ` (Exited: ${shell.exitCode})` : '';
+          const commandText = shell.command.split('\n')[0];
+          const truncatedCommand =
+            commandText.length > maxCommandLength
+              ? `${commandText.substring(0, maxCommandLength - 3)}...`
+              : commandText;
           return (
-            <Text
-              key={shell.pid}
-              color={isSelected ? theme.background.primary : theme.text.primary}
-              backgroundColor={isSelected ? theme.status.success : undefined}
-            >
-              {isSelected ? '> ' : '  '} {index + 1}: {shell.command} (PID:{' '}
-              {shell.pid}){statusText}
+            <Text key={shell.pid}>
+              <Text color={isSelected ? theme.status.success : undefined}>
+                {isSelected ? '> ' : '  '}
+              </Text>
+              {index + 1}: {truncatedCommand} (PID: {shell.pid})
+              {shell.status === 'exited' ? (
+                <Text
+                  color={
+                    isSelected
+                      ? theme.text.primary // When selected, display exit code in primary text color
+                      : shell.exitCode === 0
+                        ? theme.status.success
+                        : theme.status.error
+                  }
+                >
+                  {' '}
+                  (Exit Code: {shell.exitCode})
+                </Text>
+              ) : null}
             </Text>
           );
         })}

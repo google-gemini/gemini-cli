@@ -788,10 +788,13 @@ describe('useShellCommandProcessor', () => {
         result.current.toggleBackgroundShell();
       });
 
-      expect(addItemToHistoryMock).toHaveBeenCalledWith({
-        type: 'info',
-        text: 'There are no running background processes.',
-      });
+      expect(addItemToHistoryMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'info',
+          text: 'No background shells are currently active.',
+        }),
+        expect.any(Number),
+      );
       expect(result.current.isBackgroundShellVisible).toBe(false);
     });
 
@@ -856,7 +859,7 @@ describe('useShellCommandProcessor', () => {
       expect(result.current.activeShellPtyId).toBeNull();
     });
 
-    it('should auto-remove background shell on successful exit', async () => {
+    it('should persist background shell on successful exit and mark as exited', async () => {
       const { result } = renderProcessorHook();
 
       act(() => {
@@ -873,9 +876,12 @@ describe('useShellCommandProcessor', () => {
         exitCallback(0);
       });
 
-      // Should be removed
-      expect(result.current.backgroundShellCount).toBe(0);
-      expect(result.current.backgroundShells.has(888)).toBe(false);
+      // Should NOT be removed, but updated
+      expect(result.current.backgroundShellCount).toBe(0); // Badge count is 0
+      expect(result.current.backgroundShells.has(888)).toBe(true); // Map has it
+      const shell = result.current.backgroundShells.get(888);
+      expect(shell?.status).toBe('exited');
+      expect(shell?.exitCode).toBe(0);
     });
 
     it('should persist background shell on failed exit', async () => {
@@ -895,7 +901,7 @@ describe('useShellCommandProcessor', () => {
       });
 
       // Should NOT be removed, but updated
-      expect(result.current.backgroundShellCount).toBe(1);
+      expect(result.current.backgroundShellCount).toBe(0); // Badge count is 0
       const shell = result.current.backgroundShells.get(999);
       expect(shell?.status).toBe('exited');
       expect(shell?.exitCode).toBe(1);
