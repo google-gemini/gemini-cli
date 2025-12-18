@@ -14,6 +14,7 @@ import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { ImageDisplay, isImageResult } from '../ImageDisplay.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -114,6 +115,13 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           'todos' in truncatedResultDisplay ? (
           // display nothing, as the TodoTray will handle rendering todos
           <></>
+        ) : typeof truncatedResultDisplay === 'object' &&
+          isImageResult(truncatedResultDisplay) ? (
+          <ImageDisplay
+            image={truncatedResultDisplay.image}
+            width={128}
+            height={128}
+          />
         ) : (
           <AnsiOutputText
             data={truncatedResultDisplay as AnsiOutput}
