@@ -246,5 +246,21 @@ export function classifyGoogleError(error: unknown): unknown {
       );
     }
   }
+
+  // If we reached this point and the status is still 429, we return retryable.
+  if (status === 429) {
+    const errorMessage =
+      googleApiError?.message ||
+      (error instanceof Error ? error.message : String(error));
+    return new RetryableQuotaError(
+      errorMessage,
+      googleApiError ?? {
+        code: 429,
+        message: errorMessage,
+        details: [],
+      },
+      DEFAULT_RETRYABLE_DELAY_SECOND,
+    );
+  }
   return error; // Fallback to original error if no specific classification fits.
 }

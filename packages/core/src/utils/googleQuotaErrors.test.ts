@@ -420,4 +420,30 @@ describe('classifyGoogleError', () => {
       expect(result.retryDelayMs).toBe(5000);
     }
   });
+
+  it('should return RetryableQuotaError with 5s fallback for 429 with some detail', () => {
+    const errorWithEmptyDetails = {
+      error: {
+        code: 429,
+        message: 'A generic 429 error with no retry message.',
+        details: [
+          {
+            '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+            reason: 'QUOTA_EXCEEDED',
+            domain: 'googleapis.com',
+            metadata: {
+              quota_limit: '',
+            },
+          },
+        ],
+      },
+    };
+
+    const result = classifyGoogleError(errorWithEmptyDetails);
+
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.retryDelayMs).toBe(5000);
+    }
+  });
 });
