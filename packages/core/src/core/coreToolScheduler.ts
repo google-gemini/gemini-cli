@@ -43,9 +43,7 @@ import { doesToolInvocationMatch } from '../utils/tool-utils.js';
 import { isShellInvocationAllowlisted } from '../utils/shell-permissions.js';
 import levenshtein from 'fast-levenshtein';
 import { ShellToolInvocation } from '../tools/shell.js';
-import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
-import { MessageBusType } from '../confirmation-bus/types.js';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
+
 import {
   fireToolNotificationHook,
   executeToolWithHooks,
@@ -361,15 +359,6 @@ interface CoreToolSchedulerOptions {
 }
 
 export class CoreToolScheduler {
-  // Static WeakMap to track which MessageBus instances already have a handler subscribed
-  // This prevents duplicate subscriptions when multiple CoreToolScheduler instances are created
-  // This prevents duplicate subscriptions when multiple CoreToolScheduler instances are created
-  // (e.g., on every React render, or for each non-interactive tool call)
-  private static subscribedMessageBuses = new WeakMap<
-    MessageBus,
-    (request: ToolConfirmationRequest) => void
-  >();
-
   private toolCalls: ToolCall[] = [];
   private outputUpdateHandler?: OutputUpdateHandler;
   private onAllToolCallsComplete?: AllToolCallsCompleteHandler;
@@ -396,38 +385,6 @@ export class CoreToolScheduler {
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
     this.confirmationStrategy = options.confirmationStrategy;
-
-    // Subscribe to message bus for ASK_USER policy decisions
-    // Use a static WeakMap to ensure we only subscribe ONCE per MessageBus instance
-    // This prevents memory leaks when multiple CoreToolScheduler instances are created
-    // (e.g., on every React render, or for each non-interactive tool call)
-    if (this.config.getEnableMessageBusIntegration()) {
-      const messageBus = this.config.getMessageBus();
-
-      // Check if we've already subscribed a handler to this message bus
-      if (!CoreToolScheduler.subscribedMessageBuses.has(messageBus)) {
-        // Create a shared handler that will be used for this message bus
-        const sharedHandler = (request: ToolConfirmationRequest) => {
-          // When ASK_USER policy decision is made, respond with requiresUserConfirmation=true
-          // to tell tools to use their legacy confirmation flow
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          messageBus.publish({
-            type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-            correlationId: request.correlationId,
-            confirmed: false,
-            requiresUserConfirmation: true,
-          });
-        };
-
-        messageBus.subscribe(
-          MessageBusType.TOOL_CONFIRMATION_REQUEST,
-          sharedHandler,
-        );
-
-        // Store the handler in the WeakMap so we don't subscribe again
-        CoreToolScheduler.subscribedMessageBuses.set(messageBus, sharedHandler);
-      }
-    }
   }
 
   private setStatusInternal(
@@ -1017,6 +974,9 @@ export class CoreToolScheduler {
     signal: AbortSignal,
     payload?: ToolConfirmationPayload,
   ): Promise<void> {
+    console.error(
+      `[CoreToolScheduler] [${Date.now()}] handleConfirmationResponse called for ${callId} with outcome ${outcome}`,
+    );
     const toolCall = this.toolCalls.find(
       (c) => c.request.callId === callId && c.status === 'awaiting_approval',
     );
@@ -1081,6 +1041,7 @@ export class CoreToolScheduler {
       }
       this.setStatusInternal(callId, 'scheduled', signal);
     }
+
     await this.attemptExecutionOfScheduledCalls(signal);
   }
 
@@ -1380,6 +1341,7 @@ export class CoreToolScheduler {
       if (this.onAllToolCallsComplete) {
         this.isFinalizingToolCalls = true;
         // Use the batch array, not the (now empty) active array.
+
         await this.onAllToolCallsComplete(this.completedToolCallsForBatch);
         this.completedToolCallsForBatch = []; // Clear after reporting.
         this.isFinalizingToolCalls = false;
