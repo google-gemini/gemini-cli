@@ -251,3 +251,22 @@ export function interpolateColor(
   const color = gradient.rgbAt(factor);
   return color.toHexString();
 }
+
+export function getThemeTypeFromBackgroundColor(
+  backgroundColor: string | undefined,
+): 'light' | 'dark' | undefined {
+  if (!backgroundColor) {
+    return undefined;
+  }
+
+  // Parse hex color
+  const hex = backgroundColor.replace(/^#/, '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+
+  // Calculate luminance
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+  return luminance > 128 ? 'light' : 'dark';
+}
