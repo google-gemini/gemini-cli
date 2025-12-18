@@ -65,6 +65,20 @@ describe('ResourceRegistry', () => {
     expect(registry.findResourceByUri('nonexistent')).toBeUndefined();
   });
 
+  it('finds resources by serverName:uri identifier for non-hierarchical URIs', () => {
+    registry.setResourcesForServer('a', [
+      createResource({ uri: 'urn:uuid:1234' }),
+    ]);
+    registry.setResourcesForServer('b', [
+      createResource({ uri: 'data:text/plain,hello' }),
+    ]);
+
+    expect(registry.findResourceByUri('a:urn:uuid:1234')?.serverName).toBe('a');
+    expect(
+      registry.findResourceByUri('b:data:text/plain,hello')?.serverName,
+    ).toBe('b');
+  });
+
   it('allows bare URIs when they uniquely match', () => {
     const foo = createResource({ uri: 'file:///tmp/foo.txt' });
     const bar = createResource({ uri: 'file:///tmp/bar.txt' });
