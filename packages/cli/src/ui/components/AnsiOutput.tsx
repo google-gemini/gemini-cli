@@ -8,8 +8,6 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import type { AnsiLine, AnsiOutput, AnsiToken } from '@google/gemini-cli-core';
 
-const DEFAULT_HEIGHT = 24;
-
 interface AnsiOutputProps {
   data: AnsiOutput;
   availableTerminalHeight?: number;
@@ -21,11 +19,11 @@ export const AnsiOutputText: React.FC<AnsiOutputProps> = ({
   availableTerminalHeight,
   width,
 }) => {
-  const lastLines = data.slice(
-    -(availableTerminalHeight && availableTerminalHeight > 0
-      ? availableTerminalHeight
-      : DEFAULT_HEIGHT),
-  );
+  // When availableTerminalHeight is undefined, show all lines
+  const lastLines =
+    availableTerminalHeight !== undefined && availableTerminalHeight > 0
+      ? data.slice(-availableTerminalHeight)
+      : data;
   return (
     <Box flexDirection="column" width={width} flexShrink={0}>
       {lastLines.map((line: AnsiLine, lineIndex: number) => (

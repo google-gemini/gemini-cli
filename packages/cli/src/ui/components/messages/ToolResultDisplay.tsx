@@ -41,15 +41,17 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   terminalWidth,
   renderOutputAsMarkdown = true,
 }) => {
-  const { renderMarkdown } = useUIState();
+  const { renderMarkdown, showFullOutput } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
 
-  const availableHeight = availableTerminalHeight
-    ? Math.max(
-        availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
-        MIN_LINES_SHOWN + 1, // enforce minimum lines shown
-      )
-    : undefined;
+  // When showFullOutput is true, don't limit the height
+  const availableHeight =
+    showFullOutput || !availableTerminalHeight
+      ? undefined
+      : Math.max(
+          availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
+          MIN_LINES_SHOWN + 1, // enforce minimum lines shown
+        );
 
   // Long tool call response in MarkdownDisplay doesn't respect availableTerminalHeight properly,
   // so if we aren't using alternate buffer mode, we're forcing it to not render as markdown when the response is too long, it will fallback
