@@ -36,6 +36,7 @@ import {
   RetryableQuotaError,
   TerminalQuotaError,
 } from '../utils/googleQuotaErrors.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // Mock the telemetry logger and event class
 vi.mock('../telemetry/index.js', () => ({
