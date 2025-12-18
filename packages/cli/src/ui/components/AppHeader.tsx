@@ -26,7 +26,7 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
 
   return (
     <Box flexDirection="column">
-      {!(!settings.merged.ui?.showBanner || config.getScreenReader()) && (
+      {settings.merged.ui?.showBanner && !config.getScreenReader() && (
         <>
           <Header version={version} nightly={nightly} />
           {bannerVisible && bannerText && (
