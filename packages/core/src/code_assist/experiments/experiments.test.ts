@@ -214,4 +214,35 @@ describe('local experiments', () => {
     expect(fs.readFile).toHaveBeenCalled();
     expect(experiments.flags['888']).toBeDefined();
   });
+
+  it('should support snake_case keys in local experiments file', async () => {
+    const { getExperiments } = await import('./experiments.js');
+    const { Storage } = await import('../../config/storage.js');
+    const fs = await import('node:fs/promises');
+
+    const mockLocalResponse = {
+      flags: [
+        {
+          flag_id: 777,
+          bool_value: true,
+        },
+        {
+          flag_id: 888,
+          string_value: 'snake_case_value',
+        },
+      ],
+      experiment_ids: [777, 888],
+    };
+
+    vi.spyOn(Storage, 'getGlobalGeminiDir').mockReturnValue('/mock/gemini/dir');
+    vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(mockLocalResponse));
+
+    const experiments = await getExperiments(undefined);
+
+    expect(experiments.flags['777']).toBeDefined();
+    expect(experiments.flags['777'].boolValue).toBe(true);
+    expect(experiments.flags['888']).toBeDefined();
+    expect(experiments.flags['888'].stringValue).toBe('snake_case_value');
+    expect(experiments.experimentIds).toEqual([777, 888]);
+  });
 });

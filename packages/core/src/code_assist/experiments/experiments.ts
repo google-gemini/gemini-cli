@@ -8,7 +8,12 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { CodeAssistServer } from '../server.js';
 import { getClientMetadata } from './client_metadata.js';
-import type { ListExperimentsResponse, Flag } from './types.js';
+import type {
+  ListExperimentsResponse,
+  Flag,
+  Int32List,
+  StringList,
+} from './types.js';
 import { Storage } from '../../config/storage.js';
 
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -16,6 +21,29 @@ import { debugLogger } from '../../utils/debugLogger.js';
 export interface Experiments {
   flags: Record<string, Flag>;
   experimentIds: number[];
+}
+
+interface RawFlag {
+  flagId?: number;
+  flag_id?: number;
+  boolValue?: boolean;
+  bool_value?: boolean;
+  floatValue?: number;
+  float_value?: number;
+  intValue?: string;
+  int_value?: string;
+  stringValue?: string;
+  string_value?: string;
+  int32ListValue?: Int32List;
+  int32_list_value?: Int32List;
+  stringListValue?: StringList;
+  string_list_value?: StringList;
+}
+
+interface RawListExperimentsResponse {
+  flags?: RawFlag[];
+  experimentIds?: number[];
+  experiment_ids?: number[];
 }
 
 let experimentsPromise: Promise<Experiments> | undefined;
@@ -44,7 +72,8 @@ export async function getExperiments(
         );
         debugLogger.log(`Reading experiments from ${localPath}`);
         const content = await fs.readFile(localPath, 'utf8');
-        const response = JSON.parse(content) as ListExperimentsResponse;
+        const rawResponse = JSON.parse(content) as RawListExperimentsResponse;
+        const response = normalizeLocalResponse(rawResponse);
         debugLogger.log('Successfully loaded local experiments');
         const parsed = parseExperiments(response);
         debugLogger.log('Parsed local experiments:', parsed);
@@ -80,5 +109,24 @@ function parseExperiments(response: ListExperimentsResponse): Experiments {
   return {
     flags,
     experimentIds: response.experimentIds ?? [],
+  };
+}
+
+function normalizeLocalResponse(
+  raw: RawListExperimentsResponse,
+): ListExperimentsResponse {
+  const flags = (raw.flags || []).map((flag) => ({
+    flagId: flag.flagId ?? flag.flag_id,
+    boolValue: flag.boolValue ?? flag.bool_value,
+    floatValue: flag.floatValue ?? flag.float_value,
+    intValue: flag.intValue ?? flag.int_value,
+    stringValue: flag.stringValue ?? flag.string_value,
+    int32ListValue: flag.int32ListValue ?? flag.int32_list_value,
+    stringListValue: flag.stringListValue ?? flag.string_list_value,
+  }));
+
+  return {
+    experimentIds: raw.experimentIds ?? raw.experiment_ids,
+    flags,
   };
 }
