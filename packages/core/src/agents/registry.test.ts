@@ -17,6 +17,13 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
 } from '../config/models.js';
+import * as tomlLoader from './toml-loader.js';
+
+vi.mock('./toml-loader.js', () => ({
+  loadAgentsFromDirectory: vi
+    .fn()
+    .mockResolvedValue({ agents: [], errors: [] }),
+}));
 
 // A test-only subclass to expose the protected `registerAgent` method.
 class TestableAgentRegistry extends AgentRegistry {
@@ -49,6 +56,10 @@ describe('AgentRegistry', () => {
     // Default configuration (debugMode: false)
     mockConfig = makeFakeConfig();
     registry = new TestableAgentRegistry(mockConfig);
+    vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
+      agents: [],
+      errors: [],
+    });
   });
 
   afterEach(() => {
@@ -67,7 +78,10 @@ describe('AgentRegistry', () => {
     // });
 
     it('should log the count of loaded agents in debug mode', async () => {
-      const debugConfig = makeFakeConfig({ debugMode: true });
+      const debugConfig = makeFakeConfig({
+        debugMode: true,
+        enableAgents: true,
+      });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
       const debugLogSpy = vi
         .spyOn(debugLogger, 'log')
@@ -142,6 +156,60 @@ describe('AgentRegistry', () => {
       expect(investigatorDef?.modelConfig.model).toBe(
         DEFAULT_GEMINI_FLASH_LITE_MODEL,
       );
+    });
+
+    it('should load agents from user and project directories with correct precedence', async () => {
+      mockConfig = makeFakeConfig({ enableAgents: true });
+      registry = new TestableAgentRegistry(mockConfig);
+
+      const userAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'common-agent',
+        description: 'User version',
+      };
+      const projectAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'common-agent',
+        description: 'Project version',
+      };
+      const uniqueProjectAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'project-only',
+        description: 'Project only',
+      };
+
+      vi.mocked(tomlLoader.loadAgentsFromDirectory)
+        .mockResolvedValueOnce({ agents: [userAgent], errors: [] }) // User dir
+        .mockResolvedValueOnce({
+          agents: [projectAgent, uniqueProjectAgent],
+          errors: [],
+        }); // Project dir
+
+      await registry.initialize();
+
+      // Project agent should override user agent
+      expect(registry.getDefinition('common-agent')?.description).toBe(
+        'Project version',
+      );
+      expect(registry.getDefinition('project-only')).toBeDefined();
+      expect(
+        vi.mocked(tomlLoader.loadAgentsFromDirectory),
+      ).toHaveBeenCalledTimes(2);
+    });
+
+    it('should NOT load TOML agents when enableAgents is false', async () => {
+      const disabledConfig = makeFakeConfig({
+        enableAgents: false,
+        codebaseInvestigatorSettings: { enabled: false },
+      });
+      const disabledRegistry = new TestableAgentRegistry(disabledConfig);
+
+      await disabledRegistry.initialize();
+
+      expect(disabledRegistry.getAllDefinitions()).toHaveLength(0);
+      expect(
+        vi.mocked(tomlLoader.loadAgentsFromDirectory),
+      ).not.toHaveBeenCalled();
     });
   });
 
