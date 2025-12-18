@@ -16,7 +16,7 @@ import {
   resolvePolicyAction,
   applyAvailabilityTransition,
 } from '../availability/policyHelpers.js';
-import { coreEvents } from '../utils/events.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
@@ -118,7 +118,7 @@ async function handlePolicyDrivenFallback(
 
     return await processIntent(config, intent, fallbackModel);
   } catch (handlerError) {
-    coreEvents.emitFeedback('error', 'Fallback handler failed:', handlerError);
+    debugLogger.error('Fallback handler failed:', handlerError);
     return null;
   }
 }
@@ -127,8 +127,7 @@ async function handleUpgrade() {
   try {
     await openBrowserSecurely(UPGRADE_URL_PAGE);
   } catch (error) {
-    coreEvents.emitFeedback(
-      'error',
+    debugLogger.error(
       'Failed to open browser automatically:',
       getErrorMessage(error),
     );

@@ -29,14 +29,13 @@ import {
 } from '../config/models.js';
 import type { FallbackModelHandler } from './types.js';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
-import { coreEvents } from '../utils/events.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import * as policyHelpers from '../availability/policyHelpers.js';
 import { createDefaultPolicy } from '../availability/policyCatalog.js';
 import {
   RetryableQuotaError,
   TerminalQuotaError,
 } from '../utils/googleQuotaErrors.js';
-import { debugLogger } from '../utils/debugLogger.js';
 
 // Mock the telemetry logger and event class
 vi.mock('../telemetry/index.js', () => ({
@@ -83,8 +82,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
 describe('handleFallback', () => {
   let mockConfig: Config;
   let mockHandler: Mock<FallbackModelHandler>;
-  let emitFeedbackSpy: MockInstance;
-  let fallbackEventSpy: MockInstance;
+  let consoleErrorSpy: MockInstance;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -96,13 +94,14 @@ describe('handleFallback', () => {
     // Explicitly set the property to ensure it's present for legacy checks
     mockConfig.fallbackModelHandler = mockHandler;
 
-    emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
-    fallbackEventSpy = vi.spyOn(coreEvents, 'emitFallbackModeChanged');
+    // We mocked debugLogger, so we don't need to spy on console.error for handler failures
+    // But tests might check console.error usage in legacy code if any?
+    // The handler uses console.error in legacyHandleFallback.
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    emitFeedbackSpy.mockRestore();
-    fallbackEventSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
   });
 
   describe('policy-driven flow', () => {
