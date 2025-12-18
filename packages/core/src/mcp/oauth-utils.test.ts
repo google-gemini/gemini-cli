@@ -260,7 +260,7 @@ describe('OAuthUtils', () => {
 
       await expect(
         OAuthUtils.discoverOAuthConfig('https://example.com/mcp'),
-      ).resolves.toBeNull(); // It catches the error and returns null in the implementation
+      ).rejects.toThrow(/does not match expected/);
     });
   });
 
