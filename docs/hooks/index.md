@@ -7,6 +7,9 @@ the CLI's source code.
 See [writing hooks guide](writing-hooks.md) for a tutorial on creating your
 first hook and a comprehensive example.
 
+See [hooks reference](reference.md) for the technical specification of the I/O
+schemas.
+
 See [best practices](best-practices.md) for guidelines on security, performance,
 and debugging.
 

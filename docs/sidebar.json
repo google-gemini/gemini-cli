@@ -205,6 +205,10 @@
         "slug": "docs/hooks/writing-hooks"
       },
       {
+        "label": "Hooks reference",
+        "slug": "docs/hooks/reference"
+      },
+      {
         "label": "Best practices",
         "slug": "docs/hooks/best-practices"
       }
