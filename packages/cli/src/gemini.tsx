@@ -373,6 +373,30 @@ export async function main() {
     }
   }
 
+  const partialConfig = await loadCliConfig(settings.merged, sessionId, argv);
+
+  if (
+    settings.merged.security?.auth?.selectedType &&
+    !settings.merged.security?.auth?.useExternal
+  ) {
+    // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
+    try {
+      const err = validateAuthMethod(
+        settings.merged.security.auth.selectedType,
+      );
+      if (err) {
+        throw new Error(err);
+      }
+      await partialConfig.refreshAuth(
+        settings.merged.security.auth.selectedType,
+      );
+    } catch (err) {
+      debugLogger.error('Error authenticating:', err);
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+    }
+  }
+
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {
     const memoryArgs = settings.merged.advanced?.autoConfigureMemory
@@ -386,34 +410,6 @@ export async function main() {
     // another way to decouple refreshAuth from requiring a config.
 
     if (sandboxConfig) {
-      const partialConfig = await loadCliConfig(
-        settings.merged,
-        sessionId,
-        argv,
-      );
-
-      if (
-        settings.merged.security?.auth?.selectedType &&
-        !settings.merged.security?.auth?.useExternal
-      ) {
-        // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
-        try {
-          const err = validateAuthMethod(
-            settings.merged.security.auth.selectedType,
-          );
-          if (err) {
-            throw new Error(err);
-          }
-
-          await partialConfig.refreshAuth(
-            settings.merged.security.auth.selectedType,
-          );
-        } catch (err) {
-          debugLogger.error('Error authenticating:', err);
-          await runExitCleanup();
-          process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
-        }
-      }
       let stdinData = '';
       if (!process.stdin.isTTY) {
         stdinData = await readStdin();

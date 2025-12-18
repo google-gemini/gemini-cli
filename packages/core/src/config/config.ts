@@ -94,6 +94,7 @@ import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
+import type { Settings } from '../code_assist/types.js';
 
 import { ApprovalMode } from '../policy/types.js';
 
@@ -327,6 +328,7 @@ export interface ConfigParameters {
   previewFeatures?: boolean;
   enableAgents?: boolean;
   experimentalJitContext?: boolean;
+  remoteAdminSettings?: Settings;
 }
 
 export class Config {
@@ -452,6 +454,7 @@ export class Config {
 
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
+  private remoteAdminSettings?: Settings;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -513,6 +516,7 @@ export class Config {
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.remoteAdminSettings = params.remoteAdminSettings;
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
@@ -742,6 +746,8 @@ export class Config {
 
     const codeAssistServer = getCodeAssistServer(this);
     if (codeAssistServer) {
+      console.log(codeAssistServer.settings);
+      this.setRemoteAdminSettings(codeAssistServer.settings);
       if (codeAssistServer.projectId) {
         await this.refreshUserQuota();
       }
@@ -797,6 +803,14 @@ export class Config {
 
   getUserTier(): UserTierId | undefined {
     return this.contentGenerator?.userTier;
+  }
+
+  getRemoteAdminSettings(): Settings | undefined {
+    return this.remoteAdminSettings;
+  }
+
+  setRemoteAdminSettings(settings: Settings | undefined): void {
+    this.remoteAdminSettings = settings;
   }
 
   /**
