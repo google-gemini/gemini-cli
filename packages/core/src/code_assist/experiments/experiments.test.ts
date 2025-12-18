@@ -12,6 +12,12 @@ import type { ListExperimentsResponse, Flag } from './types.js';
 // Mock dependencies before importing the module under test
 vi.mock('../server.js');
 vi.mock('./client_metadata.js');
+vi.mock('node:fs/promises');
+vi.mock('../../config/storage.js', () => ({
+  Storage: {
+    getGlobalGeminiDir: vi.fn(),
+  },
+}));
 
 describe('experiments', () => {
   let mockServer: CodeAssistServer;
@@ -111,5 +117,101 @@ describe('experiments', () => {
     // Verify the underlying functions were only called once
     expect(getClientMetadata).toHaveBeenCalledTimes(1);
     expect(mockServer.listExperiments).toHaveBeenCalledTimes(1);
+  });
+  it('should return empty experiments if server is undefined', async () => {
+    const { getExperiments } = await import('./experiments.js');
+    const experiments = await getExperiments(undefined);
+
+    expect(experiments.flags).toEqual({});
+    expect(experiments.experimentIds).toEqual([]);
+    expect(getClientMetadata).not.toHaveBeenCalled();
+  });
+});
+
+describe('local experiments', () => {
+  let mockServer: CodeAssistServer;
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env['GEMINI_LOCAL_EXP'] = 'true';
+
+    vi.mocked(getClientMetadata).mockResolvedValue({
+      ideName: 'GEMINI_CLI',
+      ideVersion: '1.0.0',
+      platform: 'LINUX_AMD64',
+      updateChannel: 'stable',
+    });
+
+    mockServer = {
+      listExperiments: vi.fn(),
+    } as unknown as CodeAssistServer;
+  });
+
+  afterEach(() => {
+    delete process.env['GEMINI_LOCAL_EXP'];
+    vi.clearAllMocks();
+  });
+
+  it('should read experiments from file when GEMINI_LOCAL_EXP is true and file exists', async () => {
+    const { getExperiments } = await import('./experiments.js');
+    const { Storage } = await import('../../config/storage.js');
+    const fs = await import('node:fs/promises');
+
+    const mockLocalResponse: ListExperimentsResponse = {
+      flags: [{ flagId: 999, boolValue: true }],
+      experimentIds: [999],
+    };
+
+    vi.spyOn(Storage, 'getGlobalGeminiDir').mockReturnValue('/mock/gemini/dir');
+    vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(mockLocalResponse));
+
+    const experiments = await getExperiments(mockServer);
+
+    expect(fs.readFile).toHaveBeenCalledWith(
+      expect.stringContaining('experiments.json'),
+      'utf8',
+    );
+    expect(mockServer.listExperiments).not.toHaveBeenCalled();
+    expect(experiments.flags['999']).toBeDefined();
+    expect(experiments.experimentIds).toEqual([999]);
+  });
+
+  it('should fallback to server when file reading fails', async () => {
+    const { getExperiments } = await import('./experiments.js');
+    const { Storage } = await import('../../config/storage.js');
+    const fs = await import('node:fs/promises');
+
+    vi.spyOn(Storage, 'getGlobalGeminiDir').mockReturnValue('/mock/gemini/dir');
+    vi.mocked(fs.readFile).mockRejectedValue(new Error('File not found'));
+
+    const mockServerResponse: ListExperimentsResponse = {
+      flags: [{ flagId: 123, boolValue: true }],
+      experimentIds: [123],
+    };
+    vi.mocked(mockServer.listExperiments).mockResolvedValue(mockServerResponse);
+
+    const experiments = await getExperiments(mockServer);
+
+    expect(fs.readFile).toHaveBeenCalled();
+    expect(mockServer.listExperiments).toHaveBeenCalled();
+    expect(experiments.flags['123']).toBeDefined();
+  });
+  it('should read experiments from file even if server is undefined', async () => {
+    const { getExperiments } = await import('./experiments.js');
+    const { Storage } = await import('../../config/storage.js');
+    const fs = await import('node:fs/promises');
+
+    const mockLocalResponse: ListExperimentsResponse = {
+      flags: [{ flagId: 888, boolValue: true }],
+      experimentIds: [888],
+    };
+
+    vi.spyOn(Storage, 'getGlobalGeminiDir').mockReturnValue('/mock/gemini/dir');
+    vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(mockLocalResponse));
+
+    const experiments = await getExperiments(undefined);
+
+    expect(fs.readFile).toHaveBeenCalled();
+    expect(experiments.flags['888']).toBeDefined();
   });
 });
