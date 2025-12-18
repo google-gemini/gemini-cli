@@ -40,6 +40,8 @@ export enum HookEventName {
 export interface CommandHookConfig {
   type: HookType.Command;
   command: string;
+  name?: string;
+  description?: string;
   timeout?: number;
 }
 

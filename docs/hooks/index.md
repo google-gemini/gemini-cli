@@ -414,13 +414,22 @@ precedence rules.
 
 ### Configuration layers
 
-Hook configurations are applied in the following order of precedence (higher
-numbers override lower numbers):
+Hook configurations are applied in the following order of execution (lower
+numbers run first):
 
-1. **System defaults:** Built-in default settings (lowest precedence)
-2. **User settings:** `~/.gemini/settings.json`
-3. **Project settings:** `.gemini/settings.json` in your project directory
-4. **System settings:** `/etc/gemini-cli/settings.json` (highest precedence)
+1.  **Project settings:** `.gemini/settings.json` in your project directory
+    (highest priority)
+2.  **User settings:** `~/.gemini/settings.json`
+3.  **System settings:** `/etc/gemini-cli/settings.json`
+4.  **Extensions:** Internal hooks defined by installed extensions (lowest
+    priority)
+
+#### Deduplication and shadowing
+
+If multiple hooks with the identical **name** and **command** are discovered
+across different configuration layers, Gemini CLI deduplicates them. The hook
+from the higher-priority layer (e.g., Project) will be kept, and others will be
+ignored.
 
 Within each level, hooks run in the order they are declared in the
 configuration.
@@ -450,8 +459,9 @@ configuration.
 
 **Configuration properties:**
 
-- **`name`** (string, required): Unique identifier for the hook used in
-  `/hooks enable/disable` commands
+- **`name`** (string, recommended): Unique identifier for the hook used in
+  `/hooks enable/disable` commands. If omitted, the `command` path is used as
+  the identifier.
 - **`type`** (string, required): Hook type - currently only `"command"` is
   supported
 - **`command`** (string, required): Path to the script or command to execute
@@ -498,6 +508,8 @@ You can temporarily enable or disable individual hooks using commands:
 
 These commands allow you to control hook execution without editing configuration
 files. The hook name should match the `name` field in your hook configuration.
+Changes made via these commands are persisted to your global User settings
+(`~/.gemini/settings.json`).
 
 ### Disabled hooks configuration
 

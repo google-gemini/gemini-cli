@@ -1891,6 +1891,10 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
             type: 'object',
             description: 'Individual hook configuration.',
             properties: {
+              name: {
+                type: 'string',
+                description: 'Unique identifier for the hook.',
+              },
               type: {
                 type: 'string',
                 description:
@@ -1900,6 +1904,10 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
                 type: 'string',
                 description:
                   'Shell command to execute. Receives JSON input via stdin and returns JSON output via stdout.',
+              },
+              description: {
+                type: 'string',
+                description: 'A description of the hook.',
               },
               timeout: {
                 type: 'number',
