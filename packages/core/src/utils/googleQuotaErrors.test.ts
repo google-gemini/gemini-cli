@@ -325,7 +325,7 @@ describe('classifyGoogleError', () => {
     expect(result).toBeInstanceOf(TerminalQuotaError);
   });
 
-  it('should return original error for 429 without specific details', () => {
+  it('should return RetryableQuotaError for any 429', () => {
     const apiError: GoogleApiError = {
       code: 429,
       message: 'Too many requests',
@@ -340,7 +340,10 @@ describe('classifyGoogleError', () => {
     vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
     const originalError = new Error();
     const result = classifyGoogleError(originalError);
-    expect(result).toBe(originalError);
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.retryDelayMs).toBe(5000);
+    }
   });
 
   it('should classify nested JSON string 404 error as ModelNotFoundError', () => {
