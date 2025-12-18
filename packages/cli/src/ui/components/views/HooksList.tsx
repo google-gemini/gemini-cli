@@ -9,7 +9,13 @@ import { Box, Text } from 'ink';
 
 interface HooksListProps {
   hooks: ReadonlyArray<{
-    config: { command?: string; type: string; timeout?: number };
+    config: {
+      command?: string;
+      type: string;
+      name?: string;
+      description?: string;
+      timeout?: number;
+    };
     source: string;
     eventName: string;
     matcher?: string;
@@ -50,7 +56,8 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
             </Text>
             <Box flexDirection="column" paddingLeft={2}>
               {eventHooks.map((hook, index) => {
-                const hookName = hook.config.command || 'unknown';
+                const hookName =
+                  hook.config.name || hook.config.command || 'unknown';
                 const statusColor = hook.enabled ? 'green' : 'gray';
                 const statusText = hook.enabled ? 'enabled' : 'disabled';
 
@@ -63,8 +70,14 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
                       </Text>
                     </Box>
                     <Box paddingLeft={2} flexDirection="column">
+                      {hook.config.description && (
+                        <Text italic>{hook.config.description}</Text>
+                      )}
                       <Text dimColor>
                         Source: {hook.source}
+                        {hook.config.name &&
+                          hook.config.command &&
+                          ` | Command: ${hook.config.command}`}
                         {hook.matcher && ` | Matcher: ${hook.matcher}`}
                         {hook.sequential && ` | Sequential`}
                         {hook.config.timeout &&
