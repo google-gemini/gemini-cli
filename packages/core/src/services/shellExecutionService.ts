@@ -182,6 +182,22 @@ function getSanitizedEnv(): NodeJS.ProcessEnv {
     'TMPDIR',
     'USER',
     'LOGNAME',
+    // GitHub Action-related variables
+    'ADDITIONAL_CONTEXT',
+    'AVAILABLE_LABELS',
+    'BRANCH_NAME',
+    'DESCRIPTION',
+    'EVENT_NAME',
+    'GITHUB_ENV',
+    'IS_PULL_REQUEST',
+    'ISSUES_TO_TRIAGE',
+    'ISSUE_BODY',
+    'ISSUE_NUMBER',
+    'ISSUE_TITLE',
+    'PULL_REQUEST_NUMBER',
+    'REPOSITORY',
+    'TITLE',
+    'TRIGGERING_ACTOR',
   ];
 
   for (const key of essentialVars) {
@@ -190,9 +206,9 @@ function getSanitizedEnv(): NodeJS.ProcessEnv {
     }
   }
 
-  // Always carry over test-specific variables for our own integration tests.
+  // Always carry over variables and secrets with GEMINI_CLI_*.
   for (const key in process.env) {
-    if (key.startsWith('GEMINI_CLI_TEST')) {
+    if (key.startsWith('GEMINI_CLI_')) {
       env[key] = process.env[key];
     }
   }
