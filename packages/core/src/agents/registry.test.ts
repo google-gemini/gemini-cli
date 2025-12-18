@@ -7,9 +7,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AgentRegistry, getModelConfigAlias } from './registry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
-import type { AgentDefinition } from './types.js';
+import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
+import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  GEMINI_MODEL_ALIAS_AUTO,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
+} from '../config/models.js';
+import * as tomlLoader from './toml-loader.js';
+
+vi.mock('./toml-loader.js', () => ({
+  loadAgentsFromDirectory: vi
+    .fn()
+    .mockResolvedValue({ agents: [], errors: [] }),
+}));
 
 // A test-only subclass to expose the protected `registerAgent` method.
 class TestableAgentRegistry extends AgentRegistry {
@@ -20,6 +35,7 @@ class TestableAgentRegistry extends AgentRegistry {
 
 // Define mock agent structures for testing registration logic
 const MOCK_AGENT_V1: AgentDefinition = {
+  kind: 'local',
   name: 'MockAgent',
   description: 'Mock Description V1',
   inputConfig: { inputs: {} },
@@ -41,6 +57,10 @@ describe('AgentRegistry', () => {
     // Default configuration (debugMode: false)
     mockConfig = makeFakeConfig();
     registry = new TestableAgentRegistry(mockConfig);
+    vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
+      agents: [],
+      errors: [],
+    });
   });
 
   afterEach(() => {
@@ -59,7 +79,10 @@ describe('AgentRegistry', () => {
     // });
 
     it('should log the count of loaded agents in debug mode', async () => {
-      const debugConfig = makeFakeConfig({ debugMode: true });
+      const debugConfig = makeFakeConfig({
+        debugMode: true,
+        enableAgents: true,
+      });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
       const debugLogSpy = vi
         .spyOn(debugLogger, 'log')
@@ -73,12 +96,12 @@ describe('AgentRegistry', () => {
       );
     });
 
-    it('should use preview model for codebase investigator if main model is preview', async () => {
+    it('should use preview flash model for codebase investigator if main model is preview pro', async () => {
       const previewConfig = makeFakeConfig({
-        model: 'gemini-3-pro-preview',
+        model: PREVIEW_GEMINI_MODEL,
         codebaseInvestigatorSettings: {
           enabled: true,
-          model: 'pro',
+          model: GEMINI_MODEL_ALIAS_AUTO,
         },
       });
       const previewRegistry = new TestableAgentRegistry(previewConfig);
@@ -87,9 +110,107 @@ describe('AgentRegistry', () => {
 
       const investigatorDef = previewRegistry.getDefinition(
         'codebase_investigator',
-      );
+      ) as LocalAgentDefinition;
       expect(investigatorDef).toBeDefined();
-      expect(investigatorDef?.modelConfig.model).toBe('gemini-3-pro-preview');
+      expect(investigatorDef?.modelConfig.model).toBe(
+        PREVIEW_GEMINI_FLASH_MODEL,
+      );
+    });
+
+    it('should use preview flash model for codebase investigator if main model is preview auto', async () => {
+      const previewConfig = makeFakeConfig({
+        model: PREVIEW_GEMINI_MODEL_AUTO,
+        codebaseInvestigatorSettings: {
+          enabled: true,
+          model: GEMINI_MODEL_ALIAS_AUTO,
+        },
+      });
+      const previewRegistry = new TestableAgentRegistry(previewConfig);
+
+      await previewRegistry.initialize();
+
+      const investigatorDef = previewRegistry.getDefinition(
+        'codebase_investigator',
+      ) as LocalAgentDefinition;
+      expect(investigatorDef).toBeDefined();
+      expect(investigatorDef?.modelConfig.model).toBe(
+        PREVIEW_GEMINI_FLASH_MODEL,
+      );
+    });
+
+    it('should use the model from the investigator settings', async () => {
+      const previewConfig = makeFakeConfig({
+        model: PREVIEW_GEMINI_MODEL,
+        codebaseInvestigatorSettings: {
+          enabled: true,
+          model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        },
+      });
+      const previewRegistry = new TestableAgentRegistry(previewConfig);
+
+      await previewRegistry.initialize();
+
+      const investigatorDef = previewRegistry.getDefinition(
+        'codebase_investigator',
+      ) as LocalAgentDefinition;
+      expect(investigatorDef).toBeDefined();
+      expect(investigatorDef?.modelConfig.model).toBe(
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      );
+    });
+
+    it('should load agents from user and project directories with correct precedence', async () => {
+      mockConfig = makeFakeConfig({ enableAgents: true });
+      registry = new TestableAgentRegistry(mockConfig);
+
+      const userAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'common-agent',
+        description: 'User version',
+      };
+      const projectAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'common-agent',
+        description: 'Project version',
+      };
+      const uniqueProjectAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'project-only',
+        description: 'Project only',
+      };
+
+      vi.mocked(tomlLoader.loadAgentsFromDirectory)
+        .mockResolvedValueOnce({ agents: [userAgent], errors: [] }) // User dir
+        .mockResolvedValueOnce({
+          agents: [projectAgent, uniqueProjectAgent],
+          errors: [],
+        }); // Project dir
+
+      await registry.initialize();
+
+      // Project agent should override user agent
+      expect(registry.getDefinition('common-agent')?.description).toBe(
+        'Project version',
+      );
+      expect(registry.getDefinition('project-only')).toBeDefined();
+      expect(
+        vi.mocked(tomlLoader.loadAgentsFromDirectory),
+      ).toHaveBeenCalledTimes(2);
+    });
+
+    it('should NOT load TOML agents when enableAgents is false', async () => {
+      const disabledConfig = makeFakeConfig({
+        enableAgents: false,
+        codebaseInvestigatorSettings: { enabled: false },
+      });
+      const disabledRegistry = new TestableAgentRegistry(disabledConfig);
+
+      await disabledRegistry.initialize();
+
+      expect(disabledRegistry.getAllDefinitions()).toHaveLength(0);
+      expect(
+        vi.mocked(tomlLoader.loadAgentsFromDirectory),
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -206,6 +327,57 @@ describe('AgentRegistry', () => {
 
       await Promise.all(promises);
       expect(registry.getAllDefinitions()).toHaveLength(100);
+    });
+  });
+
+  describe('inheritance and refresh', () => {
+    it('should resolve "inherit" to the current model from configuration', () => {
+      const config = makeFakeConfig({ model: 'current-model' });
+      const registry = new TestableAgentRegistry(config);
+
+      const agent: AgentDefinition = {
+        ...MOCK_AGENT_V1,
+        modelConfig: { ...MOCK_AGENT_V1.modelConfig, model: 'inherit' },
+      };
+
+      registry.testRegisterAgent(agent);
+
+      const resolved = config.modelConfigService.getResolvedConfig({
+        model: getModelConfigAlias(agent),
+      });
+      expect(resolved.model).toBe('current-model');
+    });
+
+    it('should update inherited models when the main model changes', async () => {
+      const config = makeFakeConfig({ model: 'initial-model' });
+      const registry = new TestableAgentRegistry(config);
+      await registry.initialize();
+
+      const agent: AgentDefinition = {
+        ...MOCK_AGENT_V1,
+        name: 'InheritingAgent',
+        modelConfig: { ...MOCK_AGENT_V1.modelConfig, model: 'inherit' },
+      };
+
+      registry.testRegisterAgent(agent);
+
+      // Verify initial state
+      let resolved = config.modelConfigService.getResolvedConfig({
+        model: getModelConfigAlias(agent),
+      });
+      expect(resolved.model).toBe('initial-model');
+
+      // Change model and emit event
+      vi.spyOn(config, 'getModel').mockReturnValue('new-model');
+      coreEvents.emit(CoreEvent.ModelChanged, {
+        model: 'new-model',
+      });
+
+      // Verify refreshed state
+      resolved = config.modelConfigService.getResolvedConfig({
+        model: getModelConfigAlias(agent),
+      });
+      expect(resolved.model).toBe('new-model');
     });
   });
 
