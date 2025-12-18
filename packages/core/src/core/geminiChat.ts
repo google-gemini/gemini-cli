@@ -65,7 +65,7 @@ export enum StreamEventType {
 
 export type StreamEvent =
   | { type: StreamEventType.CHUNK; value: GenerateContentResponse }
-  | { type: StreamEventType.RETRY };
+  | { type: StreamEventType.RETRY; attempt: number };
 
 /**
  * Options for retrying due to invalid content from the model.
@@ -301,7 +301,7 @@ export class GeminiChat {
           let isConnectionPhase = true;
           try {
             if (attempt > 0) {
-              yield { type: StreamEventType.RETRY };
+              yield { type: StreamEventType.RETRY, attempt };
             }
 
             // If this is a retry, update the key with the new context.

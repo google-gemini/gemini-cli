@@ -117,6 +117,7 @@ export const useGeminiStream = (
   const activeQueryIdRef = useRef<string | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
+  const [retryCount, setRetryCount] = useState<number>(0);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
@@ -804,8 +805,10 @@ export const useGeminiStream = (
         switch (event.type) {
           case ServerGeminiEventType.Thought:
             setThought(event.value);
+            setRetryCount(0);
             break;
           case ServerGeminiEventType.Content:
+            setRetryCount(0);
             geminiMessageBuffer = handleContentEvent(
               event.value,
               geminiMessageBuffer,
@@ -813,6 +816,7 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.ToolCallRequest:
+            setRetryCount(0);
             toolCallRequests.push(event.value);
             break;
           case ServerGeminiEventType.UserCancelled:
@@ -852,6 +856,8 @@ export const useGeminiStream = (
             loopDetectedRef.current = true;
             break;
           case ServerGeminiEventType.Retry:
+            setRetryCount(event.value);
+            break;
           case ServerGeminiEventType.InvalidStream:
             // Will add the missing logic later
             break;
@@ -903,6 +909,7 @@ export const useGeminiStream = (
 
           // Reset quota error flag when starting a new query (not a continuation)
           if (!options?.isContinuation) {
+            setRetryCount(0);
             setModelSwitchedFromQuotaError(false);
             config.setQuotaErrorOccurred(false);
           }
@@ -1311,5 +1318,6 @@ export const useGeminiStream = (
     activePtyId,
     loopDetectionConfirmationRequest,
     lastOutputTime,
+    retryCount,
   };
 };
