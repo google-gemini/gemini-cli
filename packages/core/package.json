@@ -68,6 +68,8 @@
     "undici": "^7.10.0",
     "web-tree-sitter": "^0.25.10",
     "ws": "^8.18.0",
+    "vscode-jsonrpc": "^8.2.1",
+    "vscode-languageserver-types": "^3.17.5",
     "zod": "^3.25.76"
   },
   "optionalDependencies": {

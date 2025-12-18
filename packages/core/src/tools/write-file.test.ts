@@ -11,8 +11,10 @@ import {
   beforeEach,
   afterEach,
   vi,
+  type Mock,
   type Mocked,
 } from 'vitest';
+import { collectDiagnosticsForOutput } from '../lsp/index.js';
 import type { WriteFileToolParams } from './write-file.js';
 import { getCorrectedFileContent, WriteFileTool } from './write-file.js';
 import { ToolErrorType } from './tool-error.js';
@@ -107,6 +109,10 @@ const mockConfig = mockConfigInternal as unknown as Config;
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
+}));
+
+vi.mock('../lsp/index.js', () => ({
+  collectDiagnosticsForOutput: vi.fn(),
 }));
 
 // --- END MOCKS ---
@@ -799,6 +805,68 @@ describe('WriteFileTool', () => {
       expect(() => tool.build(params)).toThrow(
         /File path must be within one of the workspace directories/,
       );
+    });
+  });
+
+  describe('LSP diagnostics integration', () => {
+    const abortSignal = new AbortController().signal;
+
+    beforeEach(() => {
+      (collectDiagnosticsForOutput as Mock).mockReset();
+    });
+
+    it('should include LSP diagnostics in llmContent when present (all severities)', async () => {
+      const filePath = path.join(rootDir, 'lsp_test_file.ts');
+      const content = 'const x: string = 123;'; // Type error
+      const diagnosticsOutput = `<lsp_diagnostics>
+Please fix the following errors:
+ERROR [lsp_test_file.ts:1:7]: Type 'number' is not assignable to type 'string'.
+</lsp_diagnostics>`;
+
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+      (collectDiagnosticsForOutput as Mock).mockResolvedValue(
+        diagnosticsOutput,
+      );
+
+      const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // Write tool should request all severities (1, 2, 3, 4) with abort signal
+      expect(collectDiagnosticsForOutput).toHaveBeenCalledWith(
+        filePath,
+        content,
+        { severityFilter: [1, 2, 3, 4], signal: abortSignal },
+      );
+      expect(result.llmContent).toContain(
+        'Successfully created and wrote to new file',
+      );
+      expect(result.llmContent).toContain('<lsp_diagnostics>');
+      expect(result.llmContent).toContain(
+        "Type 'number' is not assignable to type 'string'",
+      );
+    });
+
+    it('should not include diagnostics section when no errors found', async () => {
+      const filePath = path.join(rootDir, 'clean_file.ts');
+      const content = 'const x: string = "valid";';
+
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+      (collectDiagnosticsForOutput as Mock).mockResolvedValue(null);
+
+      const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(collectDiagnosticsForOutput).toHaveBeenCalledWith(
+        filePath,
+        content,
+        { severityFilter: [1, 2, 3, 4], signal: abortSignal },
+      );
+      expect(result.llmContent).toContain(
+        'Successfully created and wrote to new file',
+      );
+      expect(result.llmContent).not.toContain('<lsp_diagnostics>');
     });
   });
 

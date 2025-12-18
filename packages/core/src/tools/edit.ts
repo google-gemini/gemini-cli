@@ -42,6 +42,7 @@ import { IdeClient } from '../ide/ide-client.js';
 import { safeLiteralReplace } from '../utils/textUtils.js';
 import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { collectDiagnosticsForOutput } from '../lsp/index.js';
 
 export function applyReplacement(
   currentContent: string | null,
@@ -439,6 +440,14 @@ class EditToolInvocation
         ),
       );
 
+      // Collect LSP diagnostics for supported file types (automatic error surfacing)
+      // Edit tool only surfaces ERROR severity to focus on critical issues
+      const diagnosticsOutput = await collectDiagnosticsForOutput(
+        this.resolvedPath,
+        editData.newContent,
+        { severityFilter: [1], signal },
+      );
+
       const llmSuccessMessageParts = [
         editData.isNewFile
           ? `Created new file: ${this.resolvedPath} with provided content.`
@@ -450,8 +459,13 @@ class EditToolInvocation
         );
       }
 
+      // Append diagnostics to LLM content if present
+      const llmContent = diagnosticsOutput
+        ? `${llmSuccessMessageParts.join(' ')}\n\n${diagnosticsOutput}`
+        : llmSuccessMessageParts.join(' ');
+
       return {
-        llmContent: llmSuccessMessageParts.join(' '),
+        llmContent,
         returnDisplay: displayResult,
       };
     } catch (error) {

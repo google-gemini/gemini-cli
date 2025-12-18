@@ -36,6 +36,11 @@ vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
 }));
 
+const mockCollectDiagnosticsForOutput = vi.hoisted(() => vi.fn());
+vi.mock('../lsp/index.js', () => ({
+  collectDiagnosticsForOutput: mockCollectDiagnosticsForOutput,
+}));
+
 interface EditFileParameterSchema {
   properties: {
     file_path: {
@@ -1096,6 +1101,73 @@ describe('EditTool', () => {
 
       expect(params.old_string).toBe(initialContent);
       expect(params.new_string).toBe(modifiedContent);
+    });
+  });
+
+  describe('LSP diagnostics integration', () => {
+    const testFile = 'lsp_edit_test.ts';
+    let filePath: string;
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, testFile);
+      mockCollectDiagnosticsForOutput.mockReset();
+    });
+
+    it('should include LSP diagnostics in llmContent when present (ERROR only)', async () => {
+      const initialContent = 'const x = "old";';
+      const expectedNewContent = 'const x: string = 123;'; // Will have type error
+      const diagnosticsOutput = `<lsp_diagnostics>
+Please fix the following errors:
+ERROR [lsp_edit_test.ts:1:7]: Type 'number' is not assignable to type 'string'.
+</lsp_diagnostics>`;
+
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      mockCollectDiagnosticsForOutput.mockResolvedValue(diagnosticsOutput);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'const x = "old";',
+        new_string: expectedNewContent,
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      // Edit tool should only request ERROR severity (1) with abort signal
+      expect(mockCollectDiagnosticsForOutput).toHaveBeenCalledWith(
+        filePath,
+        expectedNewContent,
+        { severityFilter: [1], signal: expect.any(AbortSignal) },
+      );
+      expect(result.llmContent).toContain('Successfully modified file');
+      expect(result.llmContent).toContain('<lsp_diagnostics>');
+      expect(result.llmContent).toContain(
+        "Type 'number' is not assignable to type 'string'",
+      );
+    });
+
+    it('should not include diagnostics section when no errors found', async () => {
+      const initialContent = 'const x = "old";';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      mockCollectDiagnosticsForOutput.mockResolvedValue(null);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      // Edit tool should only request ERROR severity (1) with abort signal
+      expect(mockCollectDiagnosticsForOutput).toHaveBeenCalledWith(
+        filePath,
+        'const x = "new";',
+        { severityFilter: [1], signal: expect.any(AbortSignal) },
+      );
+      expect(result.llmContent).toContain('Successfully modified file');
+      expect(result.llmContent).not.toContain('<lsp_diagnostics>');
     });
   });
 

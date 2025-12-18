@@ -21,6 +21,7 @@ import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { READ_FILE_TOOL_NAME } from './tool-names.js';
+import { lspManager } from '../lsp/index.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -130,6 +131,13 @@ ${result.llmContent}`;
         programming_language,
       ),
     );
+
+    // Notify LSP servers about the file being read (for text files)
+    if (typeof result.llmContent === 'string') {
+      lspManager.touchFile(this.resolvedPath).catch(() => {
+        // Ignore LSP errors - they shouldn't affect the read operation
+      });
+    }
 
     return {
       llmContent,

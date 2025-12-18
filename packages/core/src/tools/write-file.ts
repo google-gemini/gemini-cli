@@ -44,6 +44,7 @@ import { FileOperation } from '../telemetry/metrics.js';
 import { getSpecificMimeType } from '../utils/fileUtils.js';
 import { getLanguageFromFilePath } from '../utils/language-detection.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { collectDiagnosticsForOutput } from '../lsp/index.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -339,6 +340,14 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         ),
       );
 
+      // Collect LSP diagnostics for supported file types (automatic error surfacing)
+      // Write tool surfaces all severities (ERROR, WARN, INFO, HINT)
+      const diagnosticsOutput = await collectDiagnosticsForOutput(
+        this.resolvedPath,
+        fileContent,
+        { severityFilter: [1, 2, 3, 4], signal: abortSignal },
+      );
+
       const displayResult: FileDiff = {
         fileDiff,
         fileName,
@@ -347,8 +356,13 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         diffStat,
       };
 
+      // Append diagnostics to LLM content if present
+      const llmContent = diagnosticsOutput
+        ? `${llmSuccessMessageParts.join(' ')}\n\n${diagnosticsOutput}`
+        : llmSuccessMessageParts.join(' ');
+
       return {
-        llmContent: llmSuccessMessageParts.join(' '),
+        llmContent,
         returnDisplay: displayResult,
       };
     } catch (error) {
