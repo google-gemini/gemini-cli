@@ -773,7 +773,7 @@ describe('InputPrompt', () => {
       ...mockCommandCompletion,
       showSuggestions: true,
       suggestions: [
-        { label: 'review', value: 'review' },
+        { label: 'review', value: 'review' }, // Match is now at index 0
         { label: 'review-frontend', value: 'review-frontend' },
       ],
       activeSuggestionIndex: 0,
@@ -803,7 +803,7 @@ describe('InputPrompt', () => {
         { label: 'review', value: 'review' },
         { label: 'review-frontend', value: 'review-frontend' },
       ],
-      activeSuggestionIndex: 1, // review-frontend selected
+      activeSuggestionIndex: 1, // review-frontend selected (not the perfect match at 0)
       isPerfectMatch: true, // /review is a perfect match
     });
     props.buffer.text = '/review';

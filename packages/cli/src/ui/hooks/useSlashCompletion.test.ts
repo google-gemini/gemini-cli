@@ -426,10 +426,45 @@ describe('useSlashCompletion', () => {
       await waitFor(() => {
         // All three should match 'review' in our fuzzy mock or as prefix/exact
         expect(result.current.suggestions.length).toBe(3);
+        // 'review' should be first because it is an exact match
+        expect(result.current.suggestions[0].label).toBe('review');
+
         const labels = result.current.suggestions.map((s) => s.label);
         expect(labels).toContain('review');
         expect(labels).toContain('review-frontend');
         expect(labels).toContain('oncall:pr-review');
+        expect(result.current.isPerfectMatch).toBe(true);
+      });
+      unmount();
+    });
+
+    it('should sort exact altName matches to the top', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'help',
+          altNames: ['?'],
+          description: 'Show help',
+          action: vi.fn(),
+        }),
+        createTestCommand({
+          name: 'question-mark',
+          description: 'Alternative name for help',
+          action: vi.fn(),
+        }),
+      ];
+
+      const { result, unmount } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/?',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await waitFor(() => {
+        // 'help' should be first because '?' is an exact altName match
+        expect(result.current.suggestions[0].label).toBe('help');
         expect(result.current.isPerfectMatch).toBe(true);
       });
       unmount();

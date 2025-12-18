@@ -278,7 +278,16 @@ function useCommandSuggestions(
         }
 
         if (!signal.aborted) {
-          const finalSuggestions = potentialSuggestions.map((cmd) => ({
+          // Sort potentialSuggestions so that exact match (by name or altName) comes first
+          const sortedSuggestions = [...potentialSuggestions].sort((a, b) => {
+            const aIsExact = matchesCommand(a, partial);
+            const bIsExact = matchesCommand(b, partial);
+            if (aIsExact && !bIsExact) return -1;
+            if (!aIsExact && bIsExact) return 1;
+            return 0;
+          });
+
+          const finalSuggestions = sortedSuggestions.map((cmd) => ({
             label: cmd.name,
             value: cmd.name,
             description: cmd.description,
