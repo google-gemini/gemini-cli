@@ -411,7 +411,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
   useEffect(() => {
     if (
-      !(settings.merged.ui?.showBanner || config.getScreenReader()) &&
+      !(!settings.merged.ui?.showBanner || config.getScreenReader()) &&
       bannerVisible &&
       bannerText
     ) {
