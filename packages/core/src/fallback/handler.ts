@@ -7,6 +7,7 @@
 import type { Config } from '../config/config.js';
 import { AuthType } from '../core/contentGenerator.js';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { FallbackIntent, FallbackRecommendation } from './types.js';
 import { classifyFailureKind } from '../availability/errorClassification.js';
@@ -16,7 +17,6 @@ import {
   resolvePolicyAction,
   applyAvailabilityTransition,
 } from '../availability/policyHelpers.js';
-import { debugLogger } from '../utils/debugLogger.js';
 
 const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
@@ -127,7 +127,7 @@ async function handleUpgrade() {
   try {
     await openBrowserSecurely(UPGRADE_URL_PAGE);
   } catch (error) {
-    debugLogger.error(
+    debugLogger.warn(
       'Failed to open browser automatically:',
       getErrorMessage(error),
     );
