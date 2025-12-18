@@ -31,7 +31,7 @@ const logger = {
     debugLogger.warn('[WARN] [MemoryDiscovery]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) =>
-    console.error('[ERROR] [MemoryDiscovery]', ...args),
+    debugLogger.error('[ERROR] [MemoryDiscovery]', ...args),
 };
 
 export interface GeminiFileContent {

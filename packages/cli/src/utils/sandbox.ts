@@ -719,7 +719,7 @@ async function imageExists(sandbox: string, image: string): Promise<boolean> {
 }
 
 async function pullImage(sandbox: string, image: string): Promise<boolean> {
-  console.info(`Attempting to pull image ${image} using ${sandbox}...`);
+  debugLogger.log(`Attempting to pull image ${image} using ${sandbox}...`);
   return new Promise((resolve) => {
     const args = ['pull', image];
     const pullProcess = spawn(sandbox, args, { stdio: 'pipe' });
@@ -727,12 +727,12 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
     let stderrData = '';
 
     const onStdoutData = (data: Buffer) => {
-      console.info(data.toString().trim()); // Show pull progress
+      debugLogger.log(data.toString().trim()); // Show pull progress
     };
 
     const onStderrData = (data: Buffer) => {
       stderrData += data.toString();
-      console.error(data.toString().trim()); // Show pull errors/info from the command itself
+      debugLogger.error(data.toString().trim()); // Show pull errors/info from the command itself
     };
 
     const onError = (err: Error) => {
@@ -745,7 +745,7 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
 
     const onClose = (code: number | null) => {
       if (code === 0) {
-        console.info(`Successfully pulled image ${image}.`);
+        debugLogger.log(`Successfully pulled image ${image}.`);
         cleanup();
         resolve(true);
       } else {

@@ -52,7 +52,7 @@ async function readHistoryFile(filePath: string): Promise<string[]> {
     return result;
   } catch (err) {
     if (isNodeError(err) && err.code === 'ENOENT') return [];
-    debugLogger.error('error', 'Error reading history:', err);
+    debugLogger.error('Error reading history:', err);
     return [];
   }
 }
@@ -65,7 +65,7 @@ async function writeHistoryFile(
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, history.join('\n'));
   } catch (error) {
-    debugLogger.error('error', 'Error writing shell history:', error);
+    debugLogger.error('Error writing shell history:', error);
   }
 }
 

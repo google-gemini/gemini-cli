@@ -58,6 +58,7 @@ import { type Content, type Part, type SchemaUnion } from '@google/genai';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 describe('SmartEditTool', () => {
   let tool: SmartEditTool;
@@ -729,7 +730,7 @@ describe('SmartEditTool', () => {
             result.returnDisplay.diffStat?.model_removed_lines,
           );
         } else if (result.error) {
-          console.error(`Edit failed for ${file.path}:`, result.error);
+          debugLogger.warn(`Edit failed for ${file.path}:`, result.error);
         }
       }
 

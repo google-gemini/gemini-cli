@@ -592,7 +592,7 @@ export async function main() {
         // Use the existing session ID to continue recording to the same session
         config.setSessionId(resumedSessionData.conversation.sessionId);
       } catch (error) {
-        console.error(
+        debugLogger.error(
           `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
         await runExitCleanup();

@@ -31,6 +31,7 @@ class DebugLogger {
     // Handle potential errors with the stream
     this.logStream?.on('error', (err) => {
       // Log to console as a fallback, but don't crash the app
+      // eslint-disable-next-line no-console
       console.error('Error writing to debug log stream:', err);
     });
   }
@@ -46,21 +47,25 @@ class DebugLogger {
 
   log(...args: unknown[]): void {
     this.writeToFile('LOG', args);
+    // eslint-disable-next-line no-console
     console.log(...args);
   }
 
   warn(...args: unknown[]): void {
     this.writeToFile('WARN', args);
+    // eslint-disable-next-line no-console
     console.warn(...args);
   }
 
   error(...args: unknown[]): void {
     this.writeToFile('ERROR', args);
+    // eslint-disable-next-line no-console
     console.error(...args);
   }
 
   debug(...args: unknown[]): void {
     this.writeToFile('DEBUG', args);
+    // eslint-disable-next-line no-console
     console.debug(...args);
   }
 }

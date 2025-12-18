@@ -13,6 +13,7 @@ import * as semanticColors from '../semantic-colors.js';
 import * as terminalSetup from '../utils/terminalSetup.js';
 import { Text } from 'ink';
 import type React from 'react';
+import { debugLogger } from '@google/gemini-cli-core';
 
 vi.mock('../hooks/useTerminalSize.js');
 vi.mock('../utils/terminalSetup.js', () => ({
@@ -159,7 +160,7 @@ describe('<Header />', () => {
     render(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).not.toHaveBeenCalled();
     const textCalls = (Text as Mock).mock.calls;
-    console.log(JSON.stringify(textCalls, null, 2));
+    debugLogger.debug(JSON.stringify(textCalls, null, 2));
     expect(textCalls.length).toBe(1);
     expect(textCalls[0][0]).toHaveProperty('color', singleColor);
   });

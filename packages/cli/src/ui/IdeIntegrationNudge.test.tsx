@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render } from 'ink-testing-library';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { render } from '../test-utils/render.js';
 import { act } from 'react';
 import { IdeIntegrationNudge } from './IdeIntegrationNudge.js';
 import { KeypressProvider } from './contexts/KeypressContext.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -21,16 +22,16 @@ describe('IdeIntegrationNudge', () => {
     onComplete: vi.fn(),
   };
 
-  const originalError = console.error;
+  const originalError = debugLogger.warn;
 
   afterEach(() => {
-    console.error = originalError;
+    debugLogger.warn = originalError;
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 
   beforeEach(() => {
-    console.error = (...args) => {
+    debugLogger.warn = (...args) => {
       if (
         typeof args[0] === 'string' &&
         /was not wrapped in act/.test(args[0])
