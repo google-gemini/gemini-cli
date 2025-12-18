@@ -179,6 +179,7 @@ export function usePromptCompletion({
       lastSelectedTextRef.current = '';
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     generatePromptSuggestions();
   }, [
     buffer.text,

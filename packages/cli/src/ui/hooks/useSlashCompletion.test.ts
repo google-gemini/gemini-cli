@@ -530,6 +530,52 @@ describe('useSlashCompletion', () => {
       unmount();
     });
 
+    it('should suggest parent command (and siblings) instead of sub-commands when no trailing space', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'memory',
+          description: 'Manage memory',
+          subCommands: [
+            createTestCommand({ name: 'show', description: 'Show memory' }),
+          ],
+        }),
+        createTestCommand({
+          name: 'memory-leak',
+          description: 'Debug memory leaks',
+        }),
+      ];
+
+      const { result } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/memory',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      // Should verify that we see BOTH 'memory' and 'memory-leak'
+      await waitFor(() => {
+        expect(result.current.suggestions).toHaveLength(2);
+        expect(result.current.suggestions).toEqual(
+          expect.arrayContaining([
+            {
+              label: 'memory',
+              value: 'memory',
+              description: 'Manage memory',
+              commandKind: CommandKind.BUILT_IN,
+            },
+            {
+              label: 'memory-leak',
+              value: 'memory-leak',
+              description: 'Debug memory leaks',
+              commandKind: CommandKind.BUILT_IN,
+            },
+          ]),
+        );
+      });
+    });
+
     it('should suggest all sub-commands when the query ends with the parent command and a space', async () => {
       const slashCommands = [
         createTestCommand({
@@ -892,7 +938,7 @@ describe('useSlashCompletion', () => {
       const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
-          '/memory',
+          '/memory ',
           slashCommands,
           mockCommandContext,
         ),

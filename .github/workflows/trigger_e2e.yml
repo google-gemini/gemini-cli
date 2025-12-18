@@ -11,7 +11,7 @@ on:
         description: 'SHA of the commit to test'
         required: false
         type: 'string'
-  # pull_request:
+  pull_request:
 
 jobs:
   save_repo_name:
@@ -19,10 +19,8 @@ jobs:
     steps:
       - name: 'Save Repo name'
         env:
-          # add "|| github.event.pull_request.head.repo.full_name"
-          REPO_NAME: '${{ github.event.inputs.repo_name || github.event.repository.name }}'
-          # add "|| github.event.pull_request.head.sha"
-          HEAD_SHA: '${{ github.event.inputs.head_sha }}'
+          REPO_NAME: '${{ github.event.inputs.repo_name || github.event.pull_request.head.repo.full_name }}'
+          HEAD_SHA: '${{ github.event.inputs.head_sha || github.event.pull_request.head.sha }}'
         run: |
           mkdir -p ./pr
           echo '${{ env.REPO_NAME }}' > ./pr/repo_name

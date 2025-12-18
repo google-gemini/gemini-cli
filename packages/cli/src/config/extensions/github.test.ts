@@ -43,6 +43,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     debugLogger: {
       error: vi.fn(),
       log: vi.fn(),
+      warn: vi.fn(),
     },
   };
 });
@@ -220,9 +221,11 @@ describe('github.ts', () => {
     });
 
     it('should return NOT_UPDATABLE for non-git/non-release extensions', async () => {
-      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue({
-        version: '1.0.0',
-      } as unknown as ExtensionConfig);
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
+        Promise.resolve({
+          version: '1.0.0',
+        } as unknown as ExtensionConfig),
+      );
 
       const linkExt = {
         installMetadata: { type: 'link' },
@@ -261,6 +264,25 @@ describe('github.ts', () => {
       } as unknown as GeminiCLIExtension;
       expect(await checkForExtensionUpdate(ext, mockExtensionManager)).toBe(
         ExtensionUpdateState.UP_TO_DATE,
+      );
+    });
+
+    it('should return NOT_UPDATABLE if local extension config cannot be loaded', async () => {
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockImplementation(
+        () => {
+          throw new Error('Config not found');
+        },
+      );
+
+      const ext = {
+        name: 'local-ext',
+        version: '1.0.0',
+        path: '/path/to/installed/ext',
+        installMetadata: { type: 'local', source: '/path/to/source/ext' },
+      } as unknown as GeminiCLIExtension;
+
+      expect(await checkForExtensionUpdate(ext, mockExtensionManager)).toBe(
+        ExtensionUpdateState.NOT_UPDATABLE,
       );
     });
   });
