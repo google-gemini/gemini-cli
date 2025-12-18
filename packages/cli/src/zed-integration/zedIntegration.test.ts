@@ -280,7 +280,6 @@ describe('Session', () => {
       getTool: vi.fn().mockReturnValue(mockTool),
     };
     mockConfig = {
-      isInFallbackMode: vi.fn().mockReturnValue(false),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getPreviewFeatures: vi.fn().mockReturnValue({}),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
