@@ -34,16 +34,6 @@ export interface UserFeedbackPayload {
 }
 
 /**
- * Payload for the 'fallback-mode-changed' event.
- */
-export interface FallbackModeChangedPayload {
-  /**
-   * Whether fallback mode is now active.
-   */
-  isInFallbackMode: boolean;
-}
-
-/**
  * Payload for the 'model-changed' event.
  */
 export interface ModelChangedPayload {
@@ -79,7 +69,6 @@ export interface MemoryChangedPayload {
 
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
-  FallbackModeChanged = 'fallback-mode-changed',
   ModelChanged = 'model-changed',
   ConsoleLog = 'console-log',
   Output = 'output',
@@ -89,7 +78,6 @@ export enum CoreEvent {
 
 export interface CoreEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
-  [CoreEvent.FallbackModeChanged]: [FallbackModeChangedPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
@@ -165,15 +153,6 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   ): void {
     const payload: OutputPayload = { isStderr, chunk, encoding };
     this._emitOrQueue(CoreEvent.Output, payload);
-  }
-
-  /**
-   * Notifies subscribers that fallback mode has changed.
-   * This is synchronous and doesn't use backlog (UI should already be initialized).
-   */
-  emitFallbackModeChanged(isInFallbackMode: boolean): void {
-    const payload: FallbackModeChangedPayload = { isInFallbackMode };
-    this.emit(CoreEvent.FallbackModeChanged, payload);
   }
 
   /**

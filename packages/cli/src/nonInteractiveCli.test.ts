@@ -16,7 +16,6 @@ import type {
 import {
   executeToolCall,
   ToolErrorType,
-  shutdownTelemetry,
   GeminiEventType,
   OutputFormat,
   uiTelemetryService,
@@ -61,13 +60,16 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...original,
     executeToolCall: vi.fn(),
-    shutdownTelemetry: vi.fn(),
     isTelemetrySdkInitialized: vi.fn().mockReturnValue(true),
     ChatRecordingService: MockChatRecordingService,
     uiTelemetryService: {
       getMetrics: vi.fn(),
     },
     coreEvents: mockCoreEvents,
+    createWorkingStdio: vi.fn(() => ({
+      stdout: process.stdout,
+      stderr: process.stderr,
+    })),
   };
 });
 
@@ -87,7 +89,6 @@ describe('runNonInteractive', () => {
   let mockSettings: LoadedSettings;
   let mockToolRegistry: ToolRegistry;
   let mockCoreExecuteToolCall: Mock;
-  let mockShutdownTelemetry: Mock;
   let consoleErrorSpy: MockInstance;
   let processStdoutSpy: MockInstance;
   let processStderrSpy: MockInstance;
@@ -119,7 +120,6 @@ describe('runNonInteractive', () => {
 
   beforeEach(async () => {
     mockCoreExecuteToolCall = vi.mocked(executeToolCall);
-    mockShutdownTelemetry = vi.mocked(shutdownTelemetry);
 
     mockCommandServiceCreate.mockResolvedValue({
       getCommands: mockGetCommands,
@@ -198,7 +198,6 @@ describe('runNonInteractive', () => {
     );
     vi.mocked(handleAtCommand).mockImplementation(async ({ query }) => ({
       processedQuery: [{ text: query }],
-      shouldProceed: true,
     }));
   });
 
@@ -243,7 +242,8 @@ describe('runNonInteractive', () => {
       'prompt-id-1',
     );
     expect(getWrittenOutput()).toBe('Hello World\n');
-    expect(mockShutdownTelemetry).toHaveBeenCalled();
+    // Note: Telemetry shutdown is now handled in runExitCleanup() in cleanup.ts
+    // so we no longer expect shutdownTelemetry to be called directly here
   });
 
   it('should handle a single tool call and respond', async () => {
@@ -572,7 +572,6 @@ describe('runNonInteractive', () => {
     // 3. Setup the mock to return the processed parts
     mockHandleAtCommand.mockResolvedValue({
       processedQuery: processedParts,
-      shouldProceed: true,
     });
 
     // Mock a simple stream response from the Gemini client
@@ -636,7 +635,11 @@ describe('runNonInteractive', () => {
     );
     expect(processStdoutSpy).toHaveBeenCalledWith(
       JSON.stringify(
-        { response: 'Hello World', stats: MOCK_SESSION_METRICS },
+        {
+          session_id: 'test-session-id',
+          response: 'Hello World',
+          stats: MOCK_SESSION_METRICS,
+        },
         null,
         2,
       ),
@@ -719,7 +722,15 @@ describe('runNonInteractive', () => {
 
     // This should output JSON with empty response but include stats
     expect(processStdoutSpy).toHaveBeenCalledWith(
-      JSON.stringify({ response: '', stats: MOCK_SESSION_METRICS }, null, 2),
+      JSON.stringify(
+        {
+          session_id: 'test-session-id',
+          response: '',
+          stats: MOCK_SESSION_METRICS,
+        },
+        null,
+        2,
+      ),
     );
   });
 
@@ -754,7 +765,15 @@ describe('runNonInteractive', () => {
 
     // This should output JSON with empty response but include stats
     expect(processStdoutSpy).toHaveBeenCalledWith(
-      JSON.stringify({ response: '', stats: MOCK_SESSION_METRICS }, null, 2),
+      JSON.stringify(
+        {
+          session_id: 'test-session-id',
+          response: '',
+          stats: MOCK_SESSION_METRICS,
+        },
+        null,
+        2,
+      ),
     );
   });
 
@@ -791,6 +810,7 @@ describe('runNonInteractive', () => {
     expect(consoleErrorJsonSpy).toHaveBeenCalledWith(
       JSON.stringify(
         {
+          session_id: 'test-session-id',
           error: {
             type: 'Error',
             message: 'Invalid input provided',
@@ -836,6 +856,7 @@ describe('runNonInteractive', () => {
     expect(consoleErrorJsonSpy).toHaveBeenCalledWith(
       JSON.stringify(
         {
+          session_id: 'test-session-id',
           error: {
             type: 'FatalInputError',
             message: 'Invalid command syntax provided',

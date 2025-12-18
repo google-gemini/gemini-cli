@@ -15,7 +15,15 @@ export { HookAggregator } from './hookAggregator.js';
 export { HookPlanner } from './hookPlanner.js';
 export { HookEventHandler } from './hookEventHandler.js';
 
-// Export interfaces
-export type { HookRegistryEntry, ConfigSource } from './hookRegistry.js';
+// Export interfaces and enums
+export type { HookRegistryEntry } from './hookRegistry.js';
+export { ConfigSource } from './hookRegistry.js';
 export type { AggregatedHookResult } from './hookAggregator.js';
 export type { HookEventContext } from './hookPlanner.js';
+
+// Export hook trigger functions
+export {
+  fireSessionStartHook,
+  fireSessionEndHook,
+  firePreCompressHook,
+} from '../core/sessionHookTriggers.js';

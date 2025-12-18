@@ -22,6 +22,7 @@ import {
   BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
+  type PolicyUpdateOptions,
 } from './tools.js';
 import { ApprovalMode } from '../policy/types.js';
 
@@ -37,10 +38,12 @@ import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
   initializeShellParsers,
-  isCommandAllowed,
-  isShellInvocationAllowlisted,
   stripShellWrapper,
 } from '../utils/shell-utils.js';
+import {
+  isCommandAllowed,
+  isShellInvocationAllowlisted,
+} from '../utils/shell-permissions.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
@@ -81,6 +84,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
       description += ` (${this.params.description.replace(/\n/g, ' ')})`;
     }
     return description;
+  }
+
+  protected override getPolicyUpdateOptions(
+    outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
+      return { commandPrefix: this.params.command };
+    }
+    return undefined;
   }
 
   protected override async getConfirmationDetails(
@@ -124,6 +136,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           commandsToConfirm.forEach((command) => this.allowlist.add(command));
         }
+        await this.publishPolicyUpdate(outcome);
       },
     };
     return confirmationDetails;

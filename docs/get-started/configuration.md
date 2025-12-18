@@ -367,6 +367,12 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3-pro-preview"
         }
       },
+      "gemini-3-flash-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
+        }
+      },
       "gemini-2.5-pro": {
         "extends": "chat-base-2.5",
         "modelConfig": {
@@ -496,6 +502,11 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3-pro-preview"
         }
       },
+      "chat-compression-3-flash": {
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
+        }
+      },
       "chat-compression-2.5-pro": {
         "modelConfig": {
           "model": "gemini-2.5-pro"
@@ -523,6 +534,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Custom named presets for model configs. These are merged
     with (and override) the built-in aliases.
   - **Default:** `{}`
+
+- **`modelConfigs.customOverrides`** (array):
+  - **Description:** Custom model config overrides. These are merged with (and
+    added to) the built-in overrides.
+  - **Default:** `[]`
 
 - **`modelConfigs.overrides`** (array):
   - **Description:** Apply specific configuration overrides based on matches,
@@ -668,7 +684,7 @@ their corresponding top-level category object in your `settings.json` file.
     integration. When enabled, tools automatically respect policy engine
     decisions (ALLOW/DENY/ASK_USER) without requiring individual tool
     implementations.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`tools.enableHooks`** (boolean):
@@ -767,6 +783,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `experimental`
 
+- **`experimental.enableAgents`** (boolean):
+  - **Description:** Enable local and remote subagents.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.extensionManagement`** (boolean):
   - **Description:** Enable extension management features.
   - **Default:** `true`
@@ -774,11 +795,6 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.extensionReloading`** (boolean):
   - **Description:** Enables extension loading/unloading within the CLI session.
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
-- **`experimental.isModelAvailabilityServiceEnabled`** (boolean):
-  - **Description:** Enable model routing using new availability service.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -811,15 +827,70 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.codebaseInvestigatorSettings.model`** (string):
   - **Description:** The model to use for the Codebase Investigator agent.
-  - **Default:** `"gemini-2.5-pro"`
+  - **Default:** `"auto"`
   - **Requires restart:** Yes
 
 #### `hooks`
 
-- **`hooks`** (object):
-  - **Description:** Hook configurations for intercepting and customizing agent
-    behavior.
-  - **Default:** `{}`
+- **`hooks.disabled`** (array):
+  - **Description:** List of hook names (commands) that should be disabled.
+    Hooks in this list will not execute even if configured.
+  - **Default:** `[]`
+
+- **`hooks.BeforeTool`** (array):
+  - **Description:** Hooks that execute before tool execution. Can intercept,
+    validate, or modify tool calls.
+  - **Default:** `[]`
+
+- **`hooks.AfterTool`** (array):
+  - **Description:** Hooks that execute after tool execution. Can process
+    results, log outputs, or trigger follow-up actions.
+  - **Default:** `[]`
+
+- **`hooks.BeforeAgent`** (array):
+  - **Description:** Hooks that execute before agent loop starts. Can set up
+    context or initialize resources.
+  - **Default:** `[]`
+
+- **`hooks.AfterAgent`** (array):
+  - **Description:** Hooks that execute after agent loop completes. Can perform
+    cleanup or summarize results.
+  - **Default:** `[]`
+
+- **`hooks.Notification`** (array):
+  - **Description:** Hooks that execute on notification events (errors,
+    warnings, info). Can log or alert on specific conditions.
+  - **Default:** `[]`
+
+- **`hooks.SessionStart`** (array):
+  - **Description:** Hooks that execute when a session starts. Can initialize
+    session-specific resources or state.
+  - **Default:** `[]`
+
+- **`hooks.SessionEnd`** (array):
+  - **Description:** Hooks that execute when a session ends. Can perform cleanup
+    or persist session data.
+  - **Default:** `[]`
+
+- **`hooks.PreCompress`** (array):
+  - **Description:** Hooks that execute before chat history compression. Can
+    back up or analyze conversation before compression.
+  - **Default:** `[]`
+
+- **`hooks.BeforeModel`** (array):
+  - **Description:** Hooks that execute before LLM requests. Can modify prompts,
+    inject context, or control model parameters.
+  - **Default:** `[]`
+
+- **`hooks.AfterModel`** (array):
+  - **Description:** Hooks that execute after LLM responses. Can process
+    outputs, extract information, or log interactions.
+  - **Default:** `[]`
+
+- **`hooks.BeforeToolSelection`** (array):
+  - **Description:** Hooks that execute before tool selection. Can filter or
+    prioritize available tools dynamically.
+  - **Default:** `[]`
   <!-- SETTINGS-AUTOGEN:END -->
 
 #### `mcpServers`

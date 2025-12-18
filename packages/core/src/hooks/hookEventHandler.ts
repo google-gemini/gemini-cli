@@ -221,6 +221,57 @@ function validateNotificationInput(input: Record<string, unknown>): {
 }
 
 /**
+ * Validates SessionStart input fields
+ */
+function validateSessionStartInput(input: Record<string, unknown>): {
+  source: SessionStartSource;
+} {
+  const source = input['source'];
+  if (typeof source !== 'string') {
+    throw new Error(
+      'Invalid input for SessionStart hook event: source must be a string',
+    );
+  }
+  return {
+    source: source as SessionStartSource,
+  };
+}
+
+/**
+ * Validates SessionEnd input fields
+ */
+function validateSessionEndInput(input: Record<string, unknown>): {
+  reason: SessionEndReason;
+} {
+  const reason = input['reason'];
+  if (typeof reason !== 'string') {
+    throw new Error(
+      'Invalid input for SessionEnd hook event: reason must be a string',
+    );
+  }
+  return {
+    reason: reason as SessionEndReason,
+  };
+}
+
+/**
+ * Validates PreCompress input fields
+ */
+function validatePreCompressInput(input: Record<string, unknown>): {
+  trigger: PreCompressTrigger;
+} {
+  const trigger = input['trigger'];
+  if (typeof trigger !== 'string') {
+    throw new Error(
+      'Invalid input for PreCompress hook event: trigger must be a string',
+    );
+  }
+  return {
+    trigger: trigger as PreCompressTrigger,
+  };
+}
+
+/**
  * Hook event bus that coordinates hook execution across the system
  */
 export class HookEventHandler {
@@ -497,9 +548,16 @@ export class HookEventHandler {
    * Create base hook input with common fields
    */
   private createBaseInput(eventName: HookEventName): HookInput {
+    // Get the transcript path from the ChatRecordingService if available
+    const transcriptPath =
+      this.config
+        .getGeminiClient()
+        ?.getChatRecordingService()
+        ?.getConversationFilePath() ?? '';
+
     return {
       session_id: this.config.getSessionId(),
-      transcript_path: '', // TODO: Implement transcript path when supported
+      transcript_path: transcriptPath,
       cwd: this.config.getWorkingDir(),
       hook_event_name: eventName,
       timestamp: new Date().toISOString(),
@@ -704,12 +762,28 @@ export class HookEventHandler {
           );
           break;
         }
+        case HookEventName.SessionStart: {
+          const { source } = validateSessionStartInput(enrichedInput);
+          result = await this.fireSessionStartEvent(source);
+          break;
+        }
+        case HookEventName.SessionEnd: {
+          const { reason } = validateSessionEndInput(enrichedInput);
+          result = await this.fireSessionEndEvent(reason);
+          break;
+        }
+        case HookEventName.PreCompress: {
+          const { trigger } = validatePreCompressInput(enrichedInput);
+          result = await this.firePreCompressEvent(trigger);
+          break;
+        }
         default:
           throw new Error(`Unsupported hook event: ${request.eventName}`);
       }
 
       // Publish response through MessageBus
       if (this.messageBus) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.messageBus.publish({
           type: MessageBusType.HOOK_EXECUTION_RESPONSE,
           correlationId: request.correlationId,
@@ -720,6 +794,7 @@ export class HookEventHandler {
     } catch (error) {
       // Publish error response
       if (this.messageBus) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.messageBus.publish({
           type: MessageBusType.HOOK_EXECUTION_RESPONSE,
           correlationId: request.correlationId,

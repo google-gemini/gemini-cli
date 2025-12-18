@@ -11,6 +11,7 @@ import { updateEventEmitter } from './updateEventEmitter.js';
 import type { UpdateObject } from '../ui/utils/updateCheck.js';
 import type { LoadedSettings } from '../config/settings.js';
 import EventEmitter from 'node:events';
+import type { ChildProcess } from 'node:child_process';
 import { handleAutoUpdate, setUpdateHandler } from './handleAutoUpdate.js';
 import { MessageType } from '../ui/types.js';
 
@@ -26,22 +27,13 @@ vi.mock('./updateEventEmitter.js', async (importOriginal) =>
   importOriginal<typeof import('./updateEventEmitter.js')>(),
 );
 
-interface MockChildProcess extends EventEmitter {
-  stdin: EventEmitter & {
-    write: Mock;
-    end: Mock;
-  };
-  stderr: EventEmitter;
-}
-
 const mockGetInstallationInfo = vi.mocked(getInstallationInfo);
-// updateEventEmitter is now real, but we will spy on it
 
 describe('handleAutoUpdate', () => {
   let mockSpawn: Mock;
   let mockUpdateInfo: UpdateObject;
   let mockSettings: LoadedSettings;
-  let mockChildProcess: MockChildProcess;
+  let mockChildProcess: ChildProcess;
 
   beforeEach(() => {
     mockSpawn = vi.fn();
@@ -70,8 +62,8 @@ describe('handleAutoUpdate', () => {
         write: vi.fn(),
         end: vi.fn(),
       }),
-      stderr: new EventEmitter(),
-    }) as MockChildProcess;
+      unref: vi.fn(),
+    }) as unknown as ChildProcess;
 
     mockSpawn.mockReturnValue(
       mockChildProcess as unknown as ReturnType<typeof mockSpawn>,
@@ -194,7 +186,6 @@ describe('handleAutoUpdate', () => {
 
       // Simulate failed execution
       setTimeout(() => {
-        mockChildProcess.stderr.emit('data', 'An error occurred');
         mockChildProcess.emit('close', 1);
         resolve();
       }, 0);
@@ -204,7 +195,7 @@ describe('handleAutoUpdate', () => {
 
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-failed', {
       message:
-        'Automatic update failed. Please try updating manually. (command: npm i -g @google/gemini-cli@2.0.0, stderr: An error occurred)',
+        'Automatic update failed. Please try updating manually. (command: npm i -g @google/gemini-cli@2.0.0)',
     });
   });
 
@@ -253,7 +244,8 @@ describe('handleAutoUpdate', () => {
       'npm i -g @google/gemini-cli@nightly',
       {
         shell: true,
-        stdio: 'pipe',
+        stdio: 'ignore',
+        detached: true,
       },
     );
   });

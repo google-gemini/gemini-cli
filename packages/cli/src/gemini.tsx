@@ -31,8 +31,8 @@ import {
   registerCleanup,
   registerSyncCleanup,
   runExitCleanup,
+  registerTelemetryConfig,
 } from './utils/cleanup.js';
-import { getCliVersion } from './utils/version.js';
 import {
   type Config,
   type ResumedSessionData,
@@ -47,7 +47,7 @@ import {
   recordSlowRender,
   coreEvents,
   CoreEvent,
-  createInkStdio,
+  createWorkingStdio,
   patchStdio,
   writeToStdout,
   writeToStderr,
@@ -58,6 +58,11 @@ import {
   shouldEnterAlternateScreen,
   startupProfiler,
   ExitCodes,
+  SessionStartSource,
+  SessionEndReason,
+  fireSessionStartHook,
+  fireSessionEndHook,
+  getVersion,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -191,7 +196,7 @@ export async function startInteractiveUI(
     });
   }
 
-  const version = await getCliVersion();
+  const version = await getVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
   const consolePatcher = new ConsolePatcher({
@@ -203,7 +208,7 @@ export async function startInteractiveUI(
   consolePatcher.patch();
   registerCleanup(consolePatcher.cleanup);
 
-  const { stdout: inkStdout, stderr: inkStderr } = createInkStdio();
+  const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio();
 
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
@@ -459,9 +464,21 @@ export async function main() {
     const config = await loadCliConfig(settings.merged, sessionId, argv);
     loadConfigHandle?.end();
 
+    // Register config for telemetry shutdown
+    // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit
+    registerTelemetryConfig(config);
+
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
     createPolicyUpdater(policyEngine, messageBus);
+
+    // Register SessionEnd hook to fire on graceful exit
+    // This runs before telemetry shutdown in runExitCleanup()
+    if (config.getEnableHooks() && messageBus) {
+      registerCleanup(async () => {
+        await fireSessionEndHook(messageBus, SessionEndReason.Exit);
+      });
+    }
 
     // Cleanup sessions after config initialization
     try {
@@ -481,6 +498,20 @@ export async function main() {
 
     // Handle --list-sessions flag
     if (config.getListSessions()) {
+      // Attempt auth for summary generation (gracefully skips if not configured)
+      const authType = settings.merged.security?.auth?.selectedType;
+      if (authType) {
+        try {
+          await config.refreshAuth(authType);
+        } catch (e) {
+          // Auth failed - continue without summary generation capability
+          debugLogger.debug(
+            'Auth failed for --list-sessions, summaries may not be generated:',
+            e,
+          );
+        }
+      }
+
       await listSessions(config);
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
@@ -585,6 +616,22 @@ export async function main() {
 
     await config.initialize();
     startupProfiler.flush(config);
+
+    // Fire SessionStart hook through MessageBus (only if hooks are enabled)
+    // Must be called AFTER config.initialize() to ensure HookRegistry is loaded
+    const hooksEnabled = config.getEnableHooks();
+    const hookMessageBus = config.getMessageBus();
+    if (hooksEnabled && hookMessageBus) {
+      const sessionStartSource = resumedSessionData
+        ? SessionStartSource.Resume
+        : SessionStartSource.Startup;
+      await fireSessionStartHook(hookMessageBus, sessionStartSource);
+
+      // Register SessionEnd hook for graceful exit
+      registerCleanup(async () => {
+        await fireSessionEndHook(hookMessageBus, SessionEndReason.Exit);
+      });
+    }
 
     // If not a TTY, read from stdin
     // This is for cases where the user pipes input directly into the command

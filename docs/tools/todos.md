@@ -26,7 +26,7 @@ plan.
 
 - **Progress tracking:** The agent updates this list as it works, marking tasks
   as `completed` when done.
-- **Single socus:** Only one task will be marked `in_progress` at a time,
+- **Single focus:** Only one task will be marked `in_progress` at a time,
   indicating exactly what the agent is currently working on.
 - **Dynamic updates:** The plan may evolve as the agent discovers new
   information, leading to new tasks being added or unnecessary ones being

@@ -21,6 +21,7 @@ vi.mock('@google/gemini-cli-core', async () => {
   return {
     ...actual,
     ChatRecordingService: vi.fn(),
+    generateSummary: vi.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -288,6 +289,40 @@ describe('listSessions', () => {
     );
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining(', current)'),
+    );
+  });
+
+  it('should display summary as title when available instead of first user message', async () => {
+    // Arrange
+    const now = new Date('2025-01-20T12:00:00.000Z');
+    const mockSessions: SessionInfo[] = [
+      {
+        id: 'session-with-summary',
+        file: 'session-file',
+        fileName: 'session-file.json',
+        startTime: now.toISOString(),
+        lastUpdated: now.toISOString(),
+        messageCount: 10,
+        displayName: 'Add dark mode to the app', // Summary
+        firstUserMessage:
+          'How do I add dark mode to my React application with CSS variables?',
+        isCurrentSession: false,
+        index: 1,
+        summary: 'Add dark mode to the app',
+      },
+    ];
+
+    mockListSessions.mockResolvedValue(mockSessions);
+
+    // Act
+    await listSessions(mockConfig);
+
+    // Assert: Should show the summary (displayName), not the first user message
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining('1. Add dark mode to the app'),
+    );
+    expect(consoleLogSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('How do I add dark mode to my React application'),
     );
   });
 });

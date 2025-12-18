@@ -24,7 +24,7 @@
         "slug": "docs/get-started"
       },
       {
-        "label": "Gemini 3 Pro on Gemini CLI",
+        "label": "Gemini 3 on Gemini CLI",
         "slug": "docs/get-started/gemini-3"
       },
       {
@@ -194,6 +194,23 @@
     ]
   },
   {
+    "label": "Hooks",
+    "items": [
+      {
+        "label": "Introduction",
+        "slug": "docs/hooks"
+      },
+      {
+        "label": "Writing hooks",
+        "slug": "docs/hooks/writing-hooks"
+      },
+      {
+        "label": "Best practices",
+        "slug": "docs/hooks/best-practices"
+      }
+    ]
+  },
+  {
     "label": "IDE integration",
     "items": [
       {
@@ -218,16 +235,33 @@
         "slug": "docs/releases"
       },
       {
-        "label": "Changelog",
-        "slug": "docs/changelogs"
-      },
-      {
         "label": "Integration tests",
         "slug": "docs/integration-tests"
       },
       {
         "label": "Issue and PR automation",
         "slug": "docs/issue-and-pr-automation"
+      }
+    ]
+  },
+  {
+    "label": "Releases",
+    "items": [
+      {
+        "label": "Release notes",
+        "slug": "docs/changelogs/"
+      },
+      {
+        "label": "Latest release",
+        "slug": "docs/changelogs/latest"
+      },
+      {
+        "label": "Preview release",
+        "slug": "docs/changelogs/preview"
+      },
+      {
+        "label": "Changelog",
+        "slug": "docs/changelogs/releases"
       }
     ]
   },

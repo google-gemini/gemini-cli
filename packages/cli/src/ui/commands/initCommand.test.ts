@@ -9,7 +9,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { initCommand } from './initCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import type { SubmitPromptActionReturn, CommandContext } from './types.js';
+import type { CommandContext } from './types.js';
+import type { SubmitPromptActionReturn } from '@google/gemini-cli-core';
 
 // Mock the 'fs' module
 vi.mock('fs', () => ({

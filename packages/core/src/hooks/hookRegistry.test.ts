@@ -6,11 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
-import {
-  HookRegistry,
-  ConfigSource,
-  HookRegistryNotInitializedError,
-} from './hookRegistry.js';
+import { HookRegistry, ConfigSource } from './hookRegistry.js';
 import type { Storage } from '../config/storage.js';
 import { HookEventName, HookType } from './types.js';
 import type { Config } from '../config/config.js';
@@ -50,6 +46,7 @@ describe('HookRegistry', () => {
       storage: mockStorage,
       getExtensions: vi.fn().mockReturnValue([]),
       getHooks: vi.fn().mockReturnValue({}),
+      getDisabledHooks: vi.fn().mockReturnValue([]),
     } as unknown as Config;
 
     hookRegistry = new HookRegistry(mockConfig);
@@ -256,14 +253,6 @@ describe('HookRegistry', () => {
         HookEventName.Notification,
       );
       expect(notificationHooks).toHaveLength(0);
-    });
-
-    it('should throw error if not initialized', () => {
-      const uninitializedRegistry = new HookRegistry(mockConfig);
-
-      expect(() => {
-        uninitializedRegistry.getHooksForEvent(HookEventName.BeforeTool);
-      }).toThrow(HookRegistryNotInitializedError);
     });
   });
 

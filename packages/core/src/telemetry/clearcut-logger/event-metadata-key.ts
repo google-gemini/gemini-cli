@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 131
+  // Next ID: 133
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -196,6 +196,9 @@ export enum EventMetadataKey {
 
   // Logs the active experiment IDs for the session.
   GEMINI_CLI_EXPERIMENT_IDS = 131,
+
+  // Logs the repository name of the GitHub Action that triggered the session.
+  GEMINI_CLI_GH_REPOSITORY_NAME_HASH = 132,
 
   // ==========================================================================
   // Loop Detected Event Keys

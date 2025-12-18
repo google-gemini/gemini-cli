@@ -124,8 +124,7 @@ This is especially useful for scripting and automation.
 ## Debugging tips
 
 - **CLI debugging:**
-  - Use the `--verbose` flag (if available) with CLI commands for more detailed
-    output.
+  - Use the `--debug` flag for more detailed output.
   - Check the CLI logs, often found in a user-specific configuration or cache
     directory.
 
@@ -154,3 +153,6 @@ guide_, consider searching the Gemini CLI
 [Issue tracker on GitHub](https://github.com/google-gemini/gemini-cli/issues).
 If you can't find an issue similar to yours, consider creating a new GitHub
 Issue with a detailed description. Pull requests are also welcome!
+
+> **Note:** Issues tagged as "🔒Maintainers only" are reserved for project
+> maintainers. We will not accept pull requests related to these issues.

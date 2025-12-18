@@ -49,6 +49,7 @@ describe('fileUtils', () => {
   let testTextFilePath: string;
   let testImageFilePath: string;
   let testPdfFilePath: string;
+  let testAudioFilePath: string;
   let testBinaryFilePath: string;
   let nonexistentFilePath: string;
   let directoryPath: string;
@@ -64,6 +65,7 @@ describe('fileUtils', () => {
     testTextFilePath = path.join(tempRootDir, 'test.txt');
     testImageFilePath = path.join(tempRootDir, 'image.png');
     testPdfFilePath = path.join(tempRootDir, 'document.pdf');
+    testAudioFilePath = path.join(tempRootDir, 'audio.mp3');
     testBinaryFilePath = path.join(tempRootDir, 'app.exe');
     nonexistentFilePath = path.join(tempRootDir, 'nonexistent.txt');
     directoryPath = path.join(tempRootDir, 'subdir');
@@ -671,6 +673,8 @@ describe('fileUtils', () => {
         actualNodeFs.unlinkSync(testImageFilePath);
       if (actualNodeFs.existsSync(testPdfFilePath))
         actualNodeFs.unlinkSync(testPdfFilePath);
+      if (actualNodeFs.existsSync(testAudioFilePath))
+        actualNodeFs.unlinkSync(testAudioFilePath);
       if (actualNodeFs.existsSync(testBinaryFilePath))
         actualNodeFs.unlinkSync(testBinaryFilePath);
     });
@@ -769,6 +773,28 @@ describe('fileUtils', () => {
         (result.llmContent as { inlineData: { data: string } }).inlineData.data,
       ).toBe(fakePdfData.toString('base64'));
       expect(result.returnDisplay).toContain('Read pdf file: document.pdf');
+    });
+
+    it('should process an audio file', async () => {
+      const fakeMp3Data = Buffer.from('fake mp3 data');
+      actualNodeFs.writeFileSync(testAudioFilePath, fakeMp3Data);
+      mockMimeGetType.mockReturnValue('audio/mpeg');
+      const result = await processSingleFileContent(
+        testAudioFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+      );
+      expect(
+        (result.llmContent as { inlineData: unknown }).inlineData,
+      ).toBeDefined();
+      expect(
+        (result.llmContent as { inlineData: { mimeType: string } }).inlineData
+          .mimeType,
+      ).toBe('audio/mpeg');
+      expect(
+        (result.llmContent as { inlineData: { data: string } }).inlineData.data,
+      ).toBe(fakeMp3Data.toString('base64'));
+      expect(result.returnDisplay).toContain('Read audio file: audio.mp3');
     });
 
     it('should read an SVG file as text when under 1MB', async () => {

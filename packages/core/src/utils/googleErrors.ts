@@ -190,32 +190,32 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
   const message = currentError.message;
   const errorDetails = currentError.details;
 
-  if (Array.isArray(errorDetails) && code && message) {
+  if (code && message) {
     const details: GoogleApiErrorDetail[] = [];
-    for (const detail of errorDetails) {
-      if (detail && typeof detail === 'object') {
-        const detailObj = detail as Record<string, unknown>;
-        const typeKey = Object.keys(detailObj).find(
-          (key) => key.trim() === '@type',
-        );
-        if (typeKey) {
-          if (typeKey !== '@type') {
-            detailObj['@type'] = detailObj[typeKey];
-            delete detailObj[typeKey];
+    if (Array.isArray(errorDetails)) {
+      for (const detail of errorDetails) {
+        if (detail && typeof detail === 'object') {
+          const detailObj = detail as Record<string, unknown>;
+          const typeKey = Object.keys(detailObj).find(
+            (key) => key.trim() === '@type',
+          );
+          if (typeKey) {
+            if (typeKey !== '@type') {
+              detailObj['@type'] = detailObj[typeKey];
+              delete detailObj[typeKey];
+            }
+            // We can just cast it; the consumer will have to switch on @type
+            details.push(detailObj as unknown as GoogleApiErrorDetail);
           }
-          // We can just cast it; the consumer will have to switch on @type
-          details.push(detailObj as unknown as GoogleApiErrorDetail);
         }
       }
     }
 
-    if (details.length > 0) {
-      return {
-        code,
-        message,
-        details,
-      };
-    }
+    return {
+      code,
+      message,
+      details,
+    };
   }
 
   return null;
@@ -288,6 +288,18 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
         data = JSON.parse(data);
       } catch (_) {
         // Not a JSON string, can't parse.
+        // Try one more fallback: look for the first '{' and last '}'
+        if (typeof data === 'string') {
+          const firstBrace = data.indexOf('{');
+          const lastBrace = data.lastIndexOf('}');
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            try {
+              data = JSON.parse(data.substring(firstBrace, lastBrace + 1));
+            } catch (__) {
+              // Still failed
+            }
+          }
+        }
       }
     }
 

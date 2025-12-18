@@ -4,11 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { main as generateSchema } from '../generate-settings-schema.ts';
+
+vi.mock('fs', () => ({
+  readFileSync: vi.fn().mockReturnValue(''),
+  writeFileSync: vi.fn(),
+  createWriteStream: vi.fn(() => ({
+    write: vi.fn(),
+    on: vi.fn(),
+  })),
+}));
 
 describe('generate-settings-schema', () => {
   it('keeps schema in sync in check mode', async () => {

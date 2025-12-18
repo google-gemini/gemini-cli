@@ -98,6 +98,7 @@ export const useExtensionUpdates = (
       return !currentState || currentState === ExtensionUpdateState.UNKNOWN;
     });
     if (extensionsToCheck.length === 0) return;
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     checkForAllExtensionUpdates(
       extensionsToCheck,
       extensionManager,
@@ -200,6 +201,7 @@ export const useExtensionUpdates = (
       );
     }
     if (scheduledUpdate) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       Promise.all(updatePromises).then((results) => {
         const nonNullResults = results.filter((result) => result != null);
         scheduledUpdate.onCompleteCallbacks.forEach((callback) => {

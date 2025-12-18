@@ -22,6 +22,10 @@ let mockSendMessageStream: any;
 vi.mock('fs', () => ({
   statSync: vi.fn(),
   mkdirSync: vi.fn(),
+  createWriteStream: vi.fn(() => ({
+    write: vi.fn(),
+    on: vi.fn(),
+  })),
 }));
 
 vi.mock('../core/client.js', () => ({
@@ -233,7 +237,7 @@ describe('editCorrector', () => {
       mockGeminiClientInstance = new GeminiClient(
         mockConfigInstance,
       ) as Mocked<GeminiClient>;
-      mockGeminiClientInstance.getHistory = vi.fn().mockResolvedValue([]);
+      mockGeminiClientInstance.getHistory = vi.fn().mockReturnValue([]);
       mockBaseLlmClientInstance = {
         generateJson: mockGenerateJson,
         config: {
@@ -602,9 +606,7 @@ describe('editCorrector', () => {
             ],
           },
         ];
-        (mockGeminiClientInstance.getHistory as Mock).mockResolvedValue(
-          history,
-        );
+        (mockGeminiClientInstance.getHistory as Mock).mockReturnValue(history);
 
         const result = await ensureCorrectEdit(
           filePath,

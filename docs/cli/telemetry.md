@@ -74,15 +74,16 @@ observability framework — Gemini CLI's observability system provides:
 All telemetry behavior is controlled through your `.gemini/settings.json` file.
 Environment variables can be used to override the settings in the file.
 
-| Setting        | Environment Variable             | Description                                       | Values            | Default                 |
-| -------------- | -------------------------------- | ------------------------------------------------- | ----------------- | ----------------------- |
-| `enabled`      | `GEMINI_TELEMETRY_ENABLED`       | Enable or disable telemetry                       | `true`/`false`    | `false`                 |
-| `target`       | `GEMINI_TELEMETRY_TARGET`        | Where to send telemetry data                      | `"gcp"`/`"local"` | `"local"`               |
-| `otlpEndpoint` | `GEMINI_TELEMETRY_OTLP_ENDPOINT` | OTLP collector endpoint                           | URL string        | `http://localhost:4317` |
-| `otlpProtocol` | `GEMINI_TELEMETRY_OTLP_PROTOCOL` | OTLP transport protocol                           | `"grpc"`/`"http"` | `"grpc"`                |
-| `outfile`      | `GEMINI_TELEMETRY_OUTFILE`       | Save telemetry to file (overrides `otlpEndpoint`) | file path         | -                       |
-| `logPrompts`   | `GEMINI_TELEMETRY_LOG_PROMPTS`   | Include prompts in telemetry logs                 | `true`/`false`    | `true`                  |
-| `useCollector` | `GEMINI_TELEMETRY_USE_COLLECTOR` | Use external OTLP collector (advanced)            | `true`/`false`    | `false`                 |
+| Setting        | Environment Variable             | Description                                         | Values            | Default                 |
+| -------------- | -------------------------------- | --------------------------------------------------- | ----------------- | ----------------------- |
+| `enabled`      | `GEMINI_TELEMETRY_ENABLED`       | Enable or disable telemetry                         | `true`/`false`    | `false`                 |
+| `target`       | `GEMINI_TELEMETRY_TARGET`        | Where to send telemetry data                        | `"gcp"`/`"local"` | `"local"`               |
+| `otlpEndpoint` | `GEMINI_TELEMETRY_OTLP_ENDPOINT` | OTLP collector endpoint                             | URL string        | `http://localhost:4317` |
+| `otlpProtocol` | `GEMINI_TELEMETRY_OTLP_PROTOCOL` | OTLP transport protocol                             | `"grpc"`/`"http"` | `"grpc"`                |
+| `outfile`      | `GEMINI_TELEMETRY_OUTFILE`       | Save telemetry to file (overrides `otlpEndpoint`)   | file path         | -                       |
+| `logPrompts`   | `GEMINI_TELEMETRY_LOG_PROMPTS`   | Include prompts in telemetry logs                   | `true`/`false`    | `true`                  |
+| `useCollector` | `GEMINI_TELEMETRY_USE_COLLECTOR` | Use external OTLP collector (advanced)              | `true`/`false`    | `false`                 |
+| `useCliAuth`   | `GEMINI_TELEMETRY_USE_CLI_AUTH`  | Use CLI credentials for telemetry (GCP target only) | `true`/`false`    | `false`                 |
 
 **Note on boolean environment variables:** For the boolean settings (`enabled`,
 `logPrompts`, `useCollector`), setting the corresponding environment variable to
@@ -129,6 +130,34 @@ Before using either method below, complete these steps:
      logging.googleapis.com \
      --project="$OTLP_GOOGLE_CLOUD_PROJECT"
    ```
+
+### Authenticating with CLI Credentials
+
+By default, the telemetry collector for Google Cloud uses Application Default
+Credentials (ADC). However, you can configure it to use the same OAuth
+credentials that you use to log in to the Gemini CLI. This is useful in
+environments where you don't have ADC set up.
+
+To enable this, set the `useCliAuth` property in your `telemetry` settings to
+`true`:
+
+```json
+{
+  "telemetry": {
+    "enabled": true,
+    "target": "gcp",
+    "useCliAuth": true
+  }
+}
+```
+
+**Important:**
+
+- This setting requires the use of **Direct Export** (in-process exporters).
+- It **cannot** be used with `useCollector: true`. If you enable both, telemetry
+  will be disabled and an error will be logged.
+- The CLI will automatically use your credentials to authenticate with Google
+  Cloud Trace, Metrics, and Logging APIs.
 
 ### Direct export (recommended)
 

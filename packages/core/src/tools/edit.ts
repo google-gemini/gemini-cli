@@ -313,6 +313,7 @@ class EditToolInvocation
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
         }
+        await this.publishPolicyUpdate(outcome);
 
         if (ideConfirmation) {
           const result = await ideConfirmation;

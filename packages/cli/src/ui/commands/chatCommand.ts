@@ -11,11 +11,13 @@ import { theme } from '../semantic-colors.js';
 import type {
   CommandContext,
   SlashCommand,
-  MessageActionReturn,
   SlashCommandActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
-import { decodeTagName } from '@google/gemini-cli-core';
+import {
+  decodeTagName,
+  type MessageActionReturn,
+} from '@google/gemini-cli-core';
 import path from 'node:path';
 import type {
   HistoryItemWithoutId,
@@ -119,7 +121,7 @@ const saveCommand: SlashCommand = {
       }
     }
 
-    const chat = await config?.getGeminiClient()?.getChat();
+    const chat = config?.getGeminiClient()?.getChat();
     if (!chat) {
       return {
         type: 'message',
@@ -155,7 +157,7 @@ const resumeCommand: SlashCommand = {
   description:
     'Resume a conversation from a checkpoint. Usage: /chat resume <tag>',
   kind: CommandKind.BUILT_IN,
-  autoExecute: false,
+  autoExecute: true,
   action: async (context, args) => {
     const tag = args.trim();
     if (!tag) {
@@ -239,7 +241,7 @@ const deleteCommand: SlashCommand = {
   name: 'delete',
   description: 'Delete a conversation checkpoint. Usage: /chat delete <tag>',
   kind: CommandKind.BUILT_IN,
-  autoExecute: false,
+  autoExecute: true,
   action: async (context, args): Promise<MessageActionReturn> => {
     const tag = args.trim();
     if (!tag) {
@@ -303,7 +305,7 @@ export function serializeHistoryToMarkdown(history: Content[]): string {
           })
           .join('') || '';
       const roleIcon = item.role === 'user' ? '🧑‍💻' : '✨';
-      return `${roleIcon} ## ${(item.role || 'model').toUpperCase()}\n\n${text}`;
+      return `## ${(item.role || 'model').toUpperCase()} ${roleIcon}\n\n${text}`;
     })
     .join('\n\n---\n\n');
 }
@@ -330,7 +332,7 @@ const shareCommand: SlashCommand = {
       };
     }
 
-    const chat = await context.services.config?.getGeminiClient()?.getChat();
+    const chat = context.services.config?.getGeminiClient()?.getChat();
     if (!chat) {
       return {
         type: 'message',

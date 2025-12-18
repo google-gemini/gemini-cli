@@ -13,6 +13,7 @@ import {
   afterEach,
   beforeAll,
   afterAll,
+  beforeEach,
 } from 'vitest';
 import type { LogEvent, LogEventEntry } from './clearcut-logger.js';
 import { ClearcutLogger, EventNames, TEST_ONLY } from './clearcut-logger.js';
@@ -99,6 +100,11 @@ vi.mock('../../utils/installationManager.js');
 const mockUserAccount = vi.mocked(UserAccountManager.prototype);
 const mockInstallMgr = vi.mocked(InstallationManager.prototype);
 
+beforeEach(() => {
+  // Ensure Antigravity detection doesn't interfere with other tests
+  vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+});
+
 // TODO(richieforeman): Consider moving this to test setup globally.
 beforeAll(() => {
   server.listen({});
@@ -129,6 +135,20 @@ describe('ClearcutLogger', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  beforeEach(() => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+    vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('CODESPACES', '');
+    vi.stubEnv('VSCODE_IPC_HOOK_CLI', '');
+    vi.stubEnv('EDITOR_IN_CLOUD_SHELL', '');
+    vi.stubEnv('CLOUD_SHELL', '');
+    vi.stubEnv('TERM_PRODUCT', '');
+    vi.stubEnv('MONOSPACE_ENV', '');
+    vi.stubEnv('REPLIT_USER', '');
+    vi.stubEnv('__COG_BASHRC_SOURCED', '');
   });
 
   function setup({
@@ -424,6 +444,84 @@ describe('ClearcutLogger', () => {
           item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
       );
       expect(hasWorkflowName).toBe(false);
+    });
+  });
+
+  describe('GITHUB_REPOSITORY metadata', () => {
+    it('includes hashed repository when GITHUB_REPOSITORY is set', () => {
+      vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const repositoryMetadata = event?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
+      );
+      expect(repositoryMetadata).toBeDefined();
+      expect(repositoryMetadata?.value).toMatch(/^[a-f0-9]{64}$/);
+      expect(repositoryMetadata?.value).not.toBe('google/gemini-cli');
+    });
+
+    it('hashes repository name consistently', () => {
+      vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
+      const { logger } = setup({});
+
+      const event1 = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event2 = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      const hash1 = event1?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
+      )?.value;
+      const hash2 = event2?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
+      )?.value;
+
+      expect(hash1).toBeDefined();
+      expect(hash2).toBeDefined();
+      expect(hash1).toBe(hash2);
+    });
+
+    it('produces different hashes for different repositories', () => {
+      vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
+      const { logger: logger1 } = setup({});
+      const event1 = logger1?.createLogEvent(EventNames.API_ERROR, []);
+      const hash1 = event1?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
+      )?.value;
+
+      vi.stubEnv('GITHUB_REPOSITORY', 'google/other-repo');
+      ClearcutLogger.clearInstance();
+      const { logger: logger2 } = setup({});
+      const event2 = logger2?.createLogEvent(EventNames.API_ERROR, []);
+      const hash2 = event2?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
+      )?.value;
+
+      expect(hash1).toBeDefined();
+      expect(hash2).toBeDefined();
+      expect(hash1).not.toBe(hash2);
+    });
+
+    it('does not include repository when GITHUB_REPOSITORY is not set', () => {
+      vi.stubEnv('GITHUB_REPOSITORY', undefined);
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hasRepository = event?.event_metadata[0].some(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
+      );
+      expect(hasRepository).toBe(false);
     });
   });
 
