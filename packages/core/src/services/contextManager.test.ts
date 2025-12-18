@@ -65,11 +65,6 @@ describe('ContextManager', () => {
         mockEnvResult,
       );
 
-      // Mock concatenateInstructions to return the content as is for this test, or rely on real implementation if mocked with spy.
-      // Since I mocked the whole module above with vi.fn(), I should ensure it behaves correctly or mock return values.
-      // The mock factory above uses actual.concatenateInstructions, so it should work if I don't override it.
-      // But wait, the mock factory was: concatenateInstructions: vi.fn().mockImplementation(actual.concatenateInstructions)
-
       await contextManager.refresh();
 
       expect(memoryDiscovery.loadGlobalMemory).toHaveBeenCalledWith(false);
