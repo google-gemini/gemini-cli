@@ -781,6 +781,20 @@ describe('useShellCommandProcessor', () => {
       expect(result.current.isBackgroundShellVisible).toBe(false);
     });
 
+    it('should show info message when toggling background shells if none are active', async () => {
+      const { result } = renderProcessorHook();
+
+      act(() => {
+        result.current.toggleBackgroundShell();
+      });
+
+      expect(addItemToHistoryMock).toHaveBeenCalledWith({
+        type: 'info',
+        text: 'There are no running background processes.',
+      });
+      expect(result.current.isBackgroundShellVisible).toBe(false);
+    });
+
     it('should dismiss a background shell and remove it from state', async () => {
       const { result } = renderProcessorHook();
 

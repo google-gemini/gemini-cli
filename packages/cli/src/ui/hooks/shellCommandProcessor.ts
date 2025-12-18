@@ -101,8 +101,16 @@ export const useShellCommandProcessor = (
   const toggleBackgroundShell = useCallback(() => {
     if (backgroundShellsRef.current.size > 0) {
       setIsBackgroundShellVisible((prev) => !prev);
+    } else {
+      addItemToHistory(
+        {
+          type: 'info',
+          text: 'No background shells are currently active.',
+        },
+        Date.now(),
+      );
     }
-  }, []);
+  }, [addItemToHistory]);
 
   const backgroundCurrentShell = useCallback(() => {
     const pidToBackground = activeShellPtyId || activeToolPtyId;

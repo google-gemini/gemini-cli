@@ -7,6 +7,7 @@
 import { Box, Text } from 'ink';
 import { useEffect, useState } from 'react';
 import { useUIActions } from '../contexts/UIActionsContext.js';
+import { theme } from '../semantic-colors.js';
 import {
   ShellExecutionService,
   type AnsiOutput,
@@ -189,8 +190,20 @@ export const BackgroundShellDisplay = ({
       tabs.push(
         <Text
           key={shell.pid}
-          color={isActive ? 'white' : isExited ? 'red' : 'gray'}
-          backgroundColor={isActive ? (isExited ? 'red' : 'blue') : undefined}
+          color={
+            isActive
+              ? theme.text.primary
+              : isExited
+                ? theme.status.error
+                : theme.text.secondary
+          }
+          backgroundColor={
+            isActive
+              ? isExited
+                ? theme.status.error
+                : theme.border.focused
+              : undefined
+          }
           bold={isActive}
         >
           {label}
@@ -202,7 +215,7 @@ export const BackgroundShellDisplay = ({
 
     if (overflow) {
       tabs.push(
-        <Text key="overflow" color="yellow" bold>
+        <Text key="overflow" color={theme.status.warning} bold>
           {' ... (Ctrl+O) '}
         </Text>,
       );
@@ -225,8 +238,8 @@ export const BackgroundShellDisplay = ({
           return (
             <Text
               key={shell.pid}
-              color={isSelected ? 'black' : 'white'}
-              backgroundColor={isSelected ? 'green' : undefined}
+              color={isSelected ? theme.background.primary : theme.text.primary}
+              backgroundColor={isSelected ? theme.status.success : undefined}
             >
               {isSelected ? '> ' : '  '} {index + 1}: {shell.command} (PID:{' '}
               {shell.pid}){statusText}
@@ -243,7 +256,7 @@ export const BackgroundShellDisplay = ({
       height="100%"
       width="100%"
       borderStyle="single"
-      borderColor={isFocused ? 'blue' : undefined}
+      borderColor={isFocused ? theme.border.focused : undefined}
     >
       <Box
         flexDirection="row"
@@ -254,7 +267,7 @@ export const BackgroundShellDisplay = ({
         borderRight={false}
         borderTop={false}
         paddingX={1}
-        borderColor={isFocused ? 'blue' : undefined}
+        borderColor={isFocused ? theme.border.focused : undefined}
       >
         <Box flexDirection="row">
           {renderTabs()}
@@ -263,7 +276,7 @@ export const BackgroundShellDisplay = ({
             (PID: {activeShell?.pid}) {isFocused ? '(Focused)' : ''}
           </Text>
         </Box>
-        <Text color="gray">{RIGHT_TEXT} | Ctrl+O List</Text>
+        <Text color={theme.text.accent}>{RIGHT_TEXT} | Ctrl+O List</Text>
       </Box>
       <Box flexGrow={1} overflow="hidden" paddingX={CONTENT_PADDING_X}>
         {isListOpenProp ? (
