@@ -76,7 +76,7 @@ describe('loadSettings', () => {
         fs.rmSync(mockWorkspaceDir, { recursive: true, force: true });
       }
     } catch (e) {
-      debugLogger.error('error', 'Failed to cleanup temp dirs', e);
+      debugLogger.error('Failed to cleanup temp dirs', e);
     }
     vi.restoreAllMocks();
   });

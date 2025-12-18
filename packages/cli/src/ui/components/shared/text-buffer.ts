@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import pathMod from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
-import { coreEvents, CoreEvent } from '@google/gemini-cli-core';
+import { coreEvents, CoreEvent, debugLogger } from '@google/gemini-cli-core';
 import {
   toCodePoints,
   cpLen,
@@ -1203,8 +1203,7 @@ function textBufferReducerLogic(
             break;
           default: {
             const exhaustiveCheck: never = dir;
-            coreEvents.emitFeedback(
-              'warning',
+            debugLogger.error(
               `Unknown visual movement direction: ${exhaustiveCheck}`,
             );
             return state;
@@ -1532,10 +1531,7 @@ function textBufferReducerLogic(
 
     default: {
       const exhaustiveCheck: never = action;
-      coreEvents.emitFeedback(
-        'warning',
-        `Unknown action encountered: ${exhaustiveCheck}`,
-      );
+      debugLogger.error(`Unknown action encountered: ${exhaustiveCheck}`);
       return state;
     }
   }
