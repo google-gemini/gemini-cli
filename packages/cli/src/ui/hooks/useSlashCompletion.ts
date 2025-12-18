@@ -117,6 +117,27 @@ function useCommandParser(
       exactMatchAsParent = currentLevel.find(
         (cmd) => matchesCommand(cmd, partial) && cmd.subCommands,
       );
+
+      if (exactMatchAsParent) {
+        // Only descend if there are NO other matches for the partial at this level.
+        // This ensures that typing "/memory" still shows "/memory-leak" if it exists.
+        const otherMatches = currentLevel.filter(
+          (cmd) =>
+            cmd !== exactMatchAsParent &&
+            (cmd.name.toLowerCase().startsWith(partial.toLowerCase()) ||
+              cmd.altNames?.some((alt) =>
+                alt.toLowerCase().startsWith(partial.toLowerCase()),
+              )),
+        );
+
+        if (otherMatches.length === 0) {
+          leafCommand = exactMatchAsParent;
+          currentLevel = exactMatchAsParent.subCommands as
+            | readonly SlashCommand[]
+            | undefined;
+          partial = '';
+        }
+      }
     }
 
     const depth = commandPathParts.length;

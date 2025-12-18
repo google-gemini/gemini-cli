@@ -470,6 +470,39 @@ describe('useSlashCompletion', () => {
       unmount();
     });
 
+    it('should suggest subcommands when a parent command is fully typed without a trailing space', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'chat',
+          description: 'Manage chat history',
+          subCommands: [
+            createTestCommand({ name: 'list', description: 'List chats' }),
+            createTestCommand({ name: 'save', description: 'Save chat' }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/chat',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await waitFor(() => {
+        // Should show subcommands of 'chat'
+        expect(result.current.suggestions).toHaveLength(2);
+        expect(result.current.suggestions.map((s) => s.label)).toEqual(
+          expect.arrayContaining(['list', 'save']),
+        );
+        // completionStart should be at the end of '/chat' to append subcommands
+        expect(result.current.completionStart).toBe(5);
+      });
+      unmount();
+    });
+
     it('should not provide suggestions for a fully typed command that has no sub-commands or argument completion', async () => {
       const slashCommands = [
         createTestCommand({ name: 'clear', description: 'Clear the screen' }),
