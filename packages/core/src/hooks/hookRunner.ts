@@ -55,8 +55,8 @@ export class HookRunner {
       );
     } catch (error) {
       const duration = Date.now() - startTime;
-      const hookSource = hookConfig.command || 'unknown';
-      const errorMessage = `Hook execution failed for event '${eventName}' (source: ${hookSource}): ${error}`;
+      const hookId = hookConfig.name || hookConfig.command || 'unknown';
+      const errorMessage = `Hook execution failed for event '${eventName}' (hook: ${hookId}): ${error}`;
       debugLogger.warn(`Hook execution error (non-fatal): ${errorMessage}`);
 
       return {
