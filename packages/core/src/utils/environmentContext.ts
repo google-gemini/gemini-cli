@@ -8,6 +8,8 @@ import type { Part, Content } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { getFolderStructure } from './getFolderStructure.js';
 
+export const INITIAL_HISTORY_LENGTH = 1;
+
 /**
  * Generates a string describing the current workspace directories and their structures.
  * @param {Config} config - The runtime configuration and services.

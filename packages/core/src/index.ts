@@ -73,6 +73,7 @@ export * from './utils/generateContentResponseUtilities.js';
 export * from './utils/filesearch/fileSearch.js';
 export * from './utils/errorParsing.js';
 export * from './utils/workspaceContext.js';
+export * from './utils/environmentContext.js';
 export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';
 export * from './utils/promptIdContext.js';
