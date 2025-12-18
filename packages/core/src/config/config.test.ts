@@ -38,6 +38,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
 } from './models.js';
 
 vi.mock('fs', async (importOriginal) => {
@@ -343,10 +344,6 @@ describe('Server Config (config.ts)', () => {
         mockContentConfig,
       );
 
-      // Set fallback mode to true to ensure it gets reset
-      config.setFallbackMode(true);
-      expect(config.isInFallbackMode()).toBe(true);
-
       await config.refreshAuth(authType);
 
       expect(createContentGeneratorConfig).toHaveBeenCalledWith(
@@ -356,8 +353,6 @@ describe('Server Config (config.ts)', () => {
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
       expect(GeminiClient).toHaveBeenCalledWith(config);
-      // Verify that fallback mode is reset
-      expect(config.isInFallbackMode()).toBe(false);
     });
 
     it('should reset model availability status', async () => {
@@ -1568,40 +1563,32 @@ describe('Config getHooks', () => {
   });
 
   describe('setModel', () => {
-    it('should allow setting a pro (any) model and disable fallback mode', () => {
+    it('should allow setting a pro (any) model and reset availability', () => {
       const config = new Config(baseParams);
       const service = config.getModelAvailabilityService();
       const spy = vi.spyOn(service, 'reset');
-
-      config.setFallbackMode(true);
-      expect(config.isInFallbackMode()).toBe(true);
 
       const proModel = 'gemini-2.5-pro';
       config.setModel(proModel);
 
       expect(config.getModel()).toBe(proModel);
-      expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(proModel);
       expect(spy).toHaveBeenCalled();
     });
 
-    it('should allow setting auto model from non-auto model and disable fallback mode', () => {
+    it('should allow setting auto model from non-auto model and reset availability', () => {
       const config = new Config(baseParams);
       const service = config.getModelAvailabilityService();
       const spy = vi.spyOn(service, 'reset');
 
-      config.setFallbackMode(true);
-      expect(config.isInFallbackMode()).toBe(true);
-
       config.setModel('auto');
 
       expect(config.getModel()).toBe('auto');
-      expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
       expect(spy).toHaveBeenCalled();
     });
 
-    it('should allow setting auto model from auto model if it is in the fallback mode', () => {
+    it('should allow setting auto model from auto model and reset availability', () => {
       const config = new Config({
         cwd: '/tmp',
         targetDir: '/path/to/target',
@@ -1613,15 +1600,24 @@ describe('Config getHooks', () => {
       const service = config.getModelAvailabilityService();
       const spy = vi.spyOn(service, 'reset');
 
-      config.setFallbackMode(true);
-      expect(config.isInFallbackMode()).toBe(true);
-
       config.setModel('auto');
 
       expect(config.getModel()).toBe('auto');
-      expect(config.isInFallbackMode()).toBe(false);
-      expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
       expect(spy).toHaveBeenCalled();
+    });
+
+    it('should reset active model when setModel is called with the current model after a fallback', () => {
+      const config = new Config(baseParams);
+      const originalModel = config.getModel();
+      const fallbackModel = 'fallback-model';
+
+      config.setActiveModel(fallbackModel);
+      expect(config.getActiveModel()).toBe(fallbackModel);
+
+      config.setModel(originalModel);
+
+      expect(config.getModel()).toBe(originalModel);
+      expect(config.getActiveModel()).toBe(originalModel);
     });
   });
 });
@@ -1860,6 +1856,15 @@ describe('Config Quota & Preview Model Access', () => {
       config.setPreviewFeatures(false);
 
       expect(config.getModel()).toBe(nonPreviewModel);
+    });
+
+    it('should switch to preview auto model if enabling preview features while using default auto model', () => {
+      config.setPreviewFeatures(false);
+      config.setModel(DEFAULT_GEMINI_MODEL_AUTO);
+
+      config.setPreviewFeatures(true);
+
+      expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL_AUTO);
     });
 
     it('should NOT reset model if enabling preview features', () => {

@@ -52,6 +52,7 @@ import {
   DEFAULT_THINKING_MODE,
   isPreviewModel,
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -387,7 +388,6 @@ export class Config {
   private readonly folderTrust: boolean;
   private ideMode: boolean;
 
-  private inFallbackMode = false;
   private _activeModel: string;
   private readonly maxSessionTurns: number;
   private readonly listSessions: boolean;
@@ -446,8 +446,6 @@ export class Config {
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
 
-  private previewModelFallbackMode = false;
-  private previewModelBypassMode = false;
   private readonly enableAgents: boolean;
 
   private readonly experimentalJitContext: boolean;
@@ -738,8 +736,6 @@ export class Config {
     // Initialize BaseLlmClient now that the ContentGenerator is available
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
-    const previewFeatures = this.getPreviewFeatures();
-
     const codeAssistServer = getCodeAssistServer(this);
     if (codeAssistServer) {
       if (codeAssistServer.projectId) {
@@ -751,7 +747,7 @@ export class Config {
           this.setExperiments(experiments);
 
           // If preview features have not been set and the user authenticated through Google, we enable preview based on remote config only if it's true
-          if (previewFeatures === undefined) {
+          if (this.getPreviewFeatures() === undefined) {
             const remotePreviewFeatures =
               experiments.flags[ExperimentFlags.ENABLE_PREVIEW]?.boolValue;
             if (remotePreviewFeatures === true) {
@@ -774,9 +770,6 @@ export class Config {
     ) {
       this.setHasAccessToPreviewModel(true);
     }
-
-    // Reset the session flag since we're explicitly changing auth and using default model
-    this.inFallbackMode = false;
 
     // Update model if user no longer has access to the preview model
     if (!this.hasAccessToPreviewModel && isPreviewModel(this.model)) {
@@ -848,13 +841,12 @@ export class Config {
   }
 
   setModel(newModel: string): void {
-    if (this.model !== newModel || this.inFallbackMode) {
+    if (this.model !== newModel || this._activeModel !== newModel) {
       this.model = newModel;
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
     }
-    this.setFallbackMode(false);
     this.modelAvailabilityService.reset();
   }
 
@@ -868,18 +860,6 @@ export class Config {
     }
   }
 
-  resetTurn(): void {
-    this.modelAvailabilityService.resetTurn();
-  }
-
-  isInFallbackMode(): boolean {
-    return this.inFallbackMode;
-  }
-
-  setFallbackMode(active: boolean): void {
-    this.inFallbackMode = active;
-  }
-
   setFallbackModelHandler(handler: FallbackModelHandler): void {
     this.fallbackModelHandler = handler;
   }
@@ -888,20 +868,8 @@ export class Config {
     return this.fallbackModelHandler;
   }
 
-  isPreviewModelFallbackMode(): boolean {
-    return this.previewModelFallbackMode;
-  }
-
-  setPreviewModelFallbackMode(active: boolean): void {
-    this.previewModelFallbackMode = active;
-  }
-
-  isPreviewModelBypassMode(): boolean {
-    return this.previewModelBypassMode;
-  }
-
-  setPreviewModelBypassMode(active: boolean): void {
-    this.previewModelBypassMode = active;
+  resetTurn(): void {
+    this.modelAvailabilityService.resetTurn();
   }
 
   getMaxSessionTurns(): number {
@@ -975,14 +943,22 @@ export class Config {
   }
 
   setPreviewFeatures(previewFeatures: boolean) {
-    // If it's using a preview model and it's turning off previewFeatures,
-    // switch the model to the default auto mode.
-    if (this.previewFeatures && !previewFeatures) {
-      if (isPreviewModel(this.getModel())) {
-        this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
-      }
+    // No change in state, no action needed
+    if (this.previewFeatures === previewFeatures) {
+      return;
     }
     this.previewFeatures = previewFeatures;
+    const currentModel = this.getModel();
+
+    // Case 1: Disabling preview features while on a preview model
+    if (!previewFeatures && isPreviewModel(currentModel)) {
+      this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
+    }
+
+    // Case 2: Enabling preview features while on the default auto model
+    else if (previewFeatures && currentModel === DEFAULT_GEMINI_MODEL_AUTO) {
+      this.setModel(PREVIEW_GEMINI_MODEL_AUTO);
+    }
   }
 
   getHasAccessToPreviewModel(): boolean {
