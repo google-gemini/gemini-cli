@@ -842,7 +842,7 @@ describe('useShellCommandProcessor', () => {
       expect(result.current.activeShellPtyId).toBeNull();
     });
 
-    it('should update background shell status on exit', async () => {
+    it('should auto-remove background shell on successful exit', async () => {
       const { result } = renderProcessorHook();
 
       act(() => {
@@ -859,15 +859,36 @@ describe('useShellCommandProcessor', () => {
         exitCallback(0);
       });
 
+      // Should be removed
+      expect(result.current.backgroundShellCount).toBe(0);
+      expect(result.current.backgroundShells.has(888)).toBe(false);
+    });
+
+    it('should persist background shell on failed exit', async () => {
+      const { result } = renderProcessorHook();
+
+      act(() => {
+        result.current.registerBackgroundShell(999, 'fail-exit', '');
+      });
+
+      const exitCallback = mockShellOnExit.mock.calls.find(
+        (call) => call[0] === 999,
+      )?.[1];
+      expect(exitCallback).toBeDefined();
+
+      act(() => {
+        exitCallback(1);
+      });
+
       // Should NOT be removed, but updated
       expect(result.current.backgroundShellCount).toBe(1);
-      const shell = result.current.backgroundShells.get(888);
+      const shell = result.current.backgroundShells.get(999);
       expect(shell?.status).toBe('exited');
-      expect(shell?.exitCode).toBe(0);
+      expect(shell?.exitCode).toBe(1);
 
       // Now dismiss it
       act(() => {
-        result.current.dismissBackgroundShell(888);
+        result.current.dismissBackgroundShell(999);
       });
       expect(result.current.backgroundShellCount).toBe(0);
     });

@@ -145,12 +145,20 @@ export const useShellCommandProcessor = (
       // Subscribe to process exit directly
       ShellExecutionService.onExit(pid, (code) => {
         if (backgroundShellsRef.current.has(pid)) {
-          const shell = backgroundShellsRef.current.get(pid);
-          if (shell) {
-            shell.status = 'exited';
-            shell.exitCode = code;
+          if (code === 0) {
+            backgroundShellsRef.current.delete(pid);
+            setBackgroundShellCount(backgroundShellsRef.current.size);
+            if (backgroundShellsRef.current.size === 0) {
+              setIsBackgroundShellVisible(false);
+            }
+          } else {
+            const shell = backgroundShellsRef.current.get(pid);
+            if (shell) {
+              shell.status = 'exited';
+              shell.exitCode = code;
+            }
+            setTick((t) => t + 1);
           }
-          setTick((t) => t + 1);
         }
       });
 
@@ -376,12 +384,22 @@ export const useShellCommandProcessor = (
 
                 ShellExecutionService.onExit(result.pid, (code) => {
                   if (backgroundShellsRef.current.has(result.pid!)) {
-                    const shell = backgroundShellsRef.current.get(result.pid!);
-                    if (shell) {
-                      shell.status = 'exited';
-                      shell.exitCode = code;
+                    if (code === 0) {
+                      backgroundShellsRef.current.delete(result.pid!);
+                      setBackgroundShellCount(backgroundShellsRef.current.size);
+                      if (backgroundShellsRef.current.size === 0) {
+                        setIsBackgroundShellVisible(false);
+                      }
+                    } else {
+                      const shell = backgroundShellsRef.current.get(
+                        result.pid!,
+                      );
+                      if (shell) {
+                        shell.status = 'exited';
+                        shell.exitCode = code;
+                      }
+                      setTick((t) => t + 1);
                     }
-                    setTick((t) => t + 1);
                   }
                 });
               }
@@ -407,7 +425,7 @@ export const useShellCommandProcessor = (
                 finalOutput = `Command was cancelled.\n${finalOutput}`;
               } else if (result.backgrounded) {
                 finalStatus = ToolCallStatus.Success;
-                finalOutput = `Command moved to background (PID: ${result.pid}). Output hidden.`;
+                finalOutput = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
               } else if (result.signal) {
                 finalStatus = ToolCallStatus.Error;
                 finalOutput = `Command terminated by signal: ${result.signal}.\n${finalOutput}`;
