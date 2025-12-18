@@ -94,6 +94,11 @@ export class ListResourcesTool extends BaseDeclarativeTool<
 > {
   static readonly Name = LIST_RESOURCES_TOOL_NAME;
 
+  // Note: since there is no way for the model to know if an MCP server has any
+  // resources configured, it might try to call this tool too often.
+  // In that case we could build a tool description that contains an overview of
+  // MCP servers with the number of how many resources are available.
+  // More details here: https://github.com/google-gemini/gemini-cli/pull/14854#pullrequestreview-3567996525
   constructor(
     private readonly config: Config,
     messageBus?: MessageBus,
