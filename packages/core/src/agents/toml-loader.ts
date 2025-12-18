@@ -18,7 +18,7 @@ import {
 /**
  * DTO for TOML parsing - represents the raw structure of the TOML file.
  */
-export interface TomlAgentDefinition {
+interface TomlAgentDefinition {
   name: string;
   description: string;
   display_name?: string;

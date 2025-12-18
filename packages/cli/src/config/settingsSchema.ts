@@ -1938,9 +1938,3 @@ type InferSettings<T extends SettingsSchema> = {
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;
-
-export interface FooterSettings {
-  hideCWD?: boolean;
-  hideSandboxStatus?: boolean;
-  hideModelInfo?: boolean;
-}
