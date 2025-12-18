@@ -352,7 +352,9 @@ describe('SettingsSchema', () => {
       expect(setting.default).toBe(false);
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(false);
-      expect(setting.description).toBe('Enable local and remote subagents.');
+      expect(setting.description).toBe(
+        'Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents',
+      );
     });
   });
 
