@@ -46,7 +46,7 @@ export class AgentRegistry {
     this.loadBuiltInAgents();
 
     coreEvents.on(CoreEvent.ModelChanged, () => {
-      this.loadBuiltInAgents();
+      this.refreshAgents();
     });
 
     if (!this.config.isAgentsEnabled()) {
@@ -137,6 +137,13 @@ export class AgentRegistry {
     }
   }
 
+  private refreshAgents(): void {
+    this.loadBuiltInAgents();
+    for (const agent of this.agents.values()) {
+      this.registerAgent(agent);
+    }
+  }
+
   /**
    * Registers an agent definition. If an agent with the same name exists,
    * it will be overwritten, respecting the precedence established by the
@@ -163,10 +170,14 @@ export class AgentRegistry {
     // TODO(12916): Migrate sub-agents where possible to static configs.
     if (definition.kind === 'local') {
       const modelConfig = definition.modelConfig;
+      let model = modelConfig.model;
+      if (model === 'inherit') {
+        model = this.config.getModel();
+      }
 
       const runtimeAlias: ModelConfigAlias = {
         modelConfig: {
-          model: modelConfig.model,
+          model,
           generateContentConfig: {
             temperature: modelConfig.temp,
             topP: modelConfig.top_p,
