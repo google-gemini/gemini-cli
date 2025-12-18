@@ -537,11 +537,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
       return;
     }
 
-    if (isPerfectMatch) {
-      setSuggestions([]);
-    } else {
-      setSuggestions(hookSuggestions);
-    }
+    setSuggestions(hookSuggestions);
     setIsLoadingSuggestions(isLoading);
     setIsPerfectMatch(isPerfectMatch);
     setCompletionStart(calculatedStart);

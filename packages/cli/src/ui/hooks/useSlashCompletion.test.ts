@@ -319,7 +319,7 @@ describe('useSlashCompletion', () => {
       unmount!();
     });
 
-    it('should NOT provide suggestions for a perfectly typed command that is a leaf node', async () => {
+    it('should provide suggestions even for a perfectly typed command that is a leaf node', async () => {
       const slashCommands = [
         createTestCommand({
           name: 'clear',
@@ -344,14 +344,15 @@ describe('useSlashCompletion', () => {
         unmount = hook.unmount;
       });
       await waitFor(() => {
-        expect(result.current.suggestions).toHaveLength(0);
+        expect(result.current.suggestions).toHaveLength(1);
+        expect(result.current.suggestions[0].label).toBe('clear');
         expect(result.current.completionStart).toBe(1);
       });
       unmount!();
     });
 
     it.each([['/?'], ['/usage']])(
-      'should not suggest commands when altNames is fully typed',
+      'should suggest commands even when altNames is fully typed',
       async (query) => {
         const mockSlashCommands = [
           createTestCommand({
@@ -387,12 +388,52 @@ describe('useSlashCompletion', () => {
         });
 
         await waitFor(() => {
-          expect(result.current.suggestions).toHaveLength(0);
+          expect(result.current.suggestions).toHaveLength(1);
           expect(result.current.completionStart).toBe(1);
         });
         unmount!();
       },
     );
+
+    it('should show all matching suggestions even when one is a perfect match', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'review',
+          description: 'Review code',
+          action: vi.fn(),
+        }),
+        createTestCommand({
+          name: 'review-frontend',
+          description: 'Review frontend code',
+          action: vi.fn(),
+        }),
+        createTestCommand({
+          name: 'oncall:pr-review',
+          description: 'Review PR as oncall',
+          action: vi.fn(),
+        }),
+      ];
+
+      const { result, unmount } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/review',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await waitFor(() => {
+        // All three should match 'review' in our fuzzy mock or as prefix/exact
+        expect(result.current.suggestions.length).toBe(3);
+        const labels = result.current.suggestions.map((s) => s.label);
+        expect(labels).toContain('review');
+        expect(labels).toContain('review-frontend');
+        expect(labels).toContain('oncall:pr-review');
+        expect(result.current.isPerfectMatch).toBe(true);
+      });
+      unmount();
+    });
 
     it('should not provide suggestions for a fully typed command that has no sub-commands or argument completion', async () => {
       const slashCommands = [
