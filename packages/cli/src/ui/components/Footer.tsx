@@ -17,6 +17,7 @@ import process from 'node:process';
 import { ThemedGradient } from './ThemedGradient.js';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
+import { ModelUsageDisplay } from './ModelUsageDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
 import { isDevelopment } from '../../utils/installationInfo.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -66,6 +67,7 @@ export const Footer: React.FC = () => {
   const hideModelInfo = settings.merged.ui?.footer?.hideModelInfo || false;
   const hideContextPercentage =
     settings.merged.ui?.footer?.hideContextPercentage ?? true;
+  const showModelUsage = settings.merged.ui?.footer?.showModelUsage || false;
 
   const pathLength = Math.max(20, Math.floor(mainAreaWidth * 0.25));
   const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
@@ -159,6 +161,12 @@ export const Footer: React.FC = () => {
                     model={model}
                     terminalWidth={mainAreaWidth}
                   />
+                </>
+              )}
+              {showModelUsage && (
+                <>
+                  {' '}
+                  <ModelUsageDisplay model={model} />
                 </>
               )}
             </Text>
