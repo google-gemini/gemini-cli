@@ -9,6 +9,16 @@ import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 /**
+ * Error thrown when the discovered resource metadata does not match the expected resource.
+ */
+export class ResourceMismatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ResourceMismatchError';
+  }
+}
+
+/**
  * OAuth authorization server metadata as per RFC 8414.
  */
 export interface OAuthAuthorizationServerMetadata {
@@ -249,7 +259,7 @@ export class OAuthUtils {
         // of the resource metadata parameter in the protected resource metadata document.
         const expectedResource = this.buildResourceParameter(serverUrl);
         if (resourceMetadata.resource !== expectedResource) {
-          throw new Error(
+          throw new ResourceMismatchError(
             `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
           );
         }
@@ -291,12 +301,11 @@ export class OAuthUtils {
 
       return null;
     } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      if (errorMessage.includes('does not match expected')) {
+      if (error instanceof ResourceMismatchError) {
         throw error;
       }
       debugLogger.debug(
-        `Failed to discover OAuth configuration: ${errorMessage}`,
+        `Failed to discover OAuth configuration: ${getErrorMessage(error)}`,
       );
       return null;
     }
@@ -321,6 +330,7 @@ export class OAuthUtils {
    * Discover OAuth configuration from WWW-Authenticate header.
    *
    * @param wwwAuthenticate The WWW-Authenticate header value
+   * @param mcpServerUrl Optional MCP server URL to validate against the resource metadata
    * @returns The discovered OAuth configuration or null if not available
    */
   static async discoverOAuthFromWWWAuthenticate(
@@ -340,7 +350,7 @@ export class OAuthUtils {
       // Validate resource parameter per RFC 9728 Section 7.3
       const expectedResource = this.buildResourceParameter(mcpServerUrl);
       if (resourceMetadata.resource !== expectedResource) {
-        throw new Error(
+        throw new ResourceMismatchError(
           `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
         );
       }
