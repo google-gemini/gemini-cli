@@ -142,13 +142,22 @@ export interface OpenCustomDialogActionReturn {
   component: ReactNode;
 }
 
+/**
+ * The return type for a command action that specifically handles logout logic,
+ * signaling the application to explicitly transition to an unauthenticated state.
+ */
+export interface LogoutActionReturn {
+  type: 'logout';
+}
+
 export type SlashCommandActionReturn =
   | CommandActionReturn<HistoryItemWithoutId[]>
   | QuitActionReturn
   | OpenDialogActionReturn
   | ConfirmShellCommandsActionReturn
   | ConfirmActionReturn
-  | OpenCustomDialogActionReturn;
+  | OpenCustomDialogActionReturn
+  | LogoutActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',

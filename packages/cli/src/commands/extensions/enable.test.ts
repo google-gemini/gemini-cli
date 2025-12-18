@@ -205,7 +205,9 @@ describe('extensions enable command', () => {
         _: [],
         $0: '',
       };
-      await (command.handler as unknown as (args: TestArgv) => void)(argv);
+      await (command.handler as unknown as (args: TestArgv) => Promise<void>)(
+        argv,
+      );
 
       expect(
         mockExtensionManager.prototype.enableExtension,

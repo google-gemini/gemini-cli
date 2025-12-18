@@ -287,7 +287,9 @@ describe('extensions uninstall command', () => {
         [key: string]: unknown;
       }
       const argv: TestArgv = { names: ['my-extension'], _: [], $0: '' };
-      await (command.handler as unknown as (args: TestArgv) => void)(argv);
+      await (command.handler as unknown as (args: TestArgv) => Promise<void>)(
+        argv,
+      );
 
       expect(mockUninstallExtension).toHaveBeenCalledWith(
         'my-extension',

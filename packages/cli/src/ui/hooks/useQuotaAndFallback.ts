@@ -14,6 +14,7 @@ import {
   type UserTierId,
   PREVIEW_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL,
+  VALID_GEMINI_MODELS,
 } from '@google/gemini-cli-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -68,19 +69,28 @@ export function useQuotaAndFallback({
           `Usage limit reached for ${usageLimitReachedModel}.`,
           error.retryDelayMs ? getResetTimeMessage(error.retryDelayMs) : null,
           `/stats for usage details`,
+          `/model to switch models.`,
           `/auth to switch to API key.`,
         ].filter(Boolean);
         message = messageLines.join('\n');
-      } else if (error instanceof ModelNotFoundError) {
+      } else if (
+        error instanceof ModelNotFoundError &&
+        VALID_GEMINI_MODELS.has(failedModel)
+      ) {
         isModelNotFoundError = true;
         const messageLines = [
-          `It seems like you don't have access to Gemini 3.`,
+          `It seems like you don't have access to ${failedModel}.`,
           `Learn more at https://goo.gle/enable-preview-features`,
-          `To disable Gemini 3, disable "Preview features" in /settings.`,
+          `To disable ${failedModel}, disable "Preview features" in /settings.`,
         ];
         message = messageLines.join('\n');
       } else {
-        message = `${failedModel} is currently experiencing high demand. We apologize and appreciate your patience.`;
+        const messageLines = [
+          `We are currently experiencing high demand.`,
+          'We apologize and appreciate your patience.',
+          '/model to switch models.',
+        ];
+        message = messageLines.join('\n');
       }
 
       setModelSwitchedFromQuotaError(true);
@@ -120,30 +130,20 @@ export function useQuotaAndFallback({
       isDialogPending.current = false; // Reset the flag here
 
       if (choice === 'retry_always') {
-        // If we were recovering from a Preview Model failure, show a specific message.
-        if (proQuotaRequest.failedModel === PREVIEW_GEMINI_MODEL) {
-          const showPeriodicalCheckMessage =
-            !proQuotaRequest.isModelNotFoundError &&
-            proQuotaRequest.fallbackModel === DEFAULT_GEMINI_MODEL;
-          historyManager.addItem(
-            {
-              type: MessageType.INFO,
-              text: `Switched to fallback model ${proQuotaRequest.fallbackModel}. ${showPeriodicalCheckMessage ? `We will periodically check if ${PREVIEW_GEMINI_MODEL} is available again.` : ''}`,
-            },
-            Date.now(),
-          );
-        } else {
-          historyManager.addItem(
-            {
-              type: MessageType.INFO,
-              text: 'Switched to fallback model.',
-            },
-            Date.now(),
-          );
-        }
+        // Explicitly set the model to the fallback model to persist the user's choice.
+        // This ensures the Footer updates and future turns use this model.
+        config.setModel(proQuotaRequest.fallbackModel);
+
+        historyManager.addItem(
+          {
+            type: MessageType.INFO,
+            text: `Switched to fallback model ${proQuotaRequest.fallbackModel}`,
+          },
+          Date.now(),
+        );
       }
     },
-    [proQuotaRequest, historyManager],
+    [proQuotaRequest, historyManager, config],
   );
 
   return {
