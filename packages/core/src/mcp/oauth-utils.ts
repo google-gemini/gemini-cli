@@ -291,8 +291,12 @@ export class OAuthUtils {
 
       return null;
     } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      if (errorMessage.includes('does not match expected')) {
+        throw error;
+      }
       debugLogger.debug(
-        `Failed to discover OAuth configuration: ${getErrorMessage(error)}`,
+        `Failed to discover OAuth configuration: ${errorMessage}`,
       );
       return null;
     }
@@ -333,9 +337,7 @@ export class OAuthUtils {
       await this.fetchProtectedResourceMetadata(resourceMetadataUri);
 
     if (resourceMetadata && mcpServerUrl) {
-      // RFC 9728 Section 7.3: The client MUST ensure that the resource identifier URL
-      // it is using as the prefix for the metadata request exactly matches the value
-      // of the resource metadata parameter in the protected resource metadata document.
+      // Validate resource parameter per RFC 9728 Section 7.3
       const expectedResource = this.buildResourceParameter(mcpServerUrl);
       if (resourceMetadata.resource !== expectedResource) {
         throw new Error(

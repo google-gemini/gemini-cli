@@ -761,7 +761,7 @@ export class MCPOAuthProvider {
           }
         }
       } catch (error) {
-        // If it's a security validation error, re-throw it so the user knows why
+        // Re-throw security validation errors
         const msg = getErrorMessage(error);
         if (msg.includes('does not match expected')) {
           throw error;
