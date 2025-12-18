@@ -188,9 +188,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide helpful tips in the UI
   - **Default:** `false`
 
-- **`ui.hideBanner`** (boolean):
-  - **Description:** Hide the application banner
-  - **Default:** `false`
+- **`ui.showBanner`** (boolean):
+  - **Description:** Show the application banner
+  - **Default:** `true`
 
 - **`ui.hideContextSummary`** (boolean):
   - **Description:** Hide the context summary (GEMINI.md, MCP servers) above the
@@ -973,7 +973,7 @@ of v0.3.0:
   },
   "ui": {
     "theme": "GitHub",
-    "hideBanner": true,
+    "showBanner": false,
     "hideTips": false,
     "customWittyPhrases": [
       "You forget a thousand things every day. Make sure this is one of ’em",

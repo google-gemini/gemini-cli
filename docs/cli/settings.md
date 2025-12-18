@@ -43,7 +43,7 @@ they appear in the UI.
 | Hide Window Title              | `ui.hideWindowTitle`                     | Hide the window title bar.                                           | `false` |
 | Show Status in Title           | `ui.showStatusInTitle`                   | Show Gemini CLI status and thoughts in the terminal window title.    | `false` |
 | Hide Tips                      | `ui.hideTips`                            | Hide helpful tips in the UI.                                         | `false` |
-| Hide Banner                    | `ui.hideBanner`                          | Hide the application banner.                                         | `false` |
+| Hide Banner                    | `ui.showBanner`                          | Hide the application banner.                                         | `true`  |
 | Hide Context Summary           | `ui.hideContextSummary`                  | Hide the context summary (GEMINI.md, MCP servers) above the input.   | `false` |
 | Hide CWD                       | `ui.footer.hideCWD`                      | Hide the current working directory path in the footer.               | `false` |
 | Hide Sandbox Status            | `ui.footer.hideSandboxStatus`            | Hide the sandbox status indicator in the footer.                     | `false` |

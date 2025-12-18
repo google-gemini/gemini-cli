@@ -400,14 +400,14 @@ a few things you can try in order of recommendation:
     "hideTips": true
     ```
 
-- **`hideBanner`** (boolean):
+- **`showBanner`** (boolean):
   - **Description:** Enables or disables the startup banner (ASCII art logo) in
     the CLI interface.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Example:**
 
     ```json
-    "hideBanner": true
+    "showBanner": false
     ```
 
 - **`maxSessionTurns`** (number):
@@ -525,7 +525,7 @@ a few things you can try in order of recommendation:
   },
   "usageStatisticsEnabled": true,
   "hideTips": false,
-  "hideBanner": false,
+  "showBanner": true,
   "maxSessionTurns": 10,
   "summarizeToolOutput": {
     "run_shell_command": {
