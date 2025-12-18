@@ -4,8 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Storage } from '../config/storage.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
+import { loadAgentsFromDirectory } from './toml-loader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -16,7 +19,6 @@ import {
   isPreviewModel,
 } from '../config/models.js';
 import type { ModelConfigAlias } from '../services/modelConfigService.js';
-import { coreEvents, CoreEvent } from '../utils/events.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -44,8 +46,48 @@ export class AgentRegistry {
     this.loadBuiltInAgents();
 
     coreEvents.on(CoreEvent.ModelChanged, () => {
-      this.loadBuiltInAgents();
+      this.refreshAgents();
     });
+
+    if (!this.config.isAgentsEnabled()) {
+      return;
+    }
+
+    // Load user-level agents: ~/.gemini/agents/
+    const userAgentsDir = Storage.getUserAgentsDir();
+    const userAgents = await loadAgentsFromDirectory(userAgentsDir);
+    for (const error of userAgents.errors) {
+      debugLogger.warn(
+        `[AgentRegistry] Error loading user agent: ${error.message}`,
+      );
+      coreEvents.emitFeedback('error', `Agent loading error: ${error.message}`);
+    }
+    for (const agent of userAgents.agents) {
+      this.registerAgent(agent);
+    }
+
+    // Load project-level agents: .gemini/agents/ (relative to Project Root)
+    const folderTrustEnabled = this.config.getFolderTrust();
+    const isTrustedFolder = this.config.isTrustedFolder();
+
+    if (!folderTrustEnabled || isTrustedFolder) {
+      const projectAgentsDir = this.config.storage.getProjectAgentsDir();
+      const projectAgents = await loadAgentsFromDirectory(projectAgentsDir);
+      for (const error of projectAgents.errors) {
+        coreEvents.emitFeedback(
+          'error',
+          `Agent loading error: ${error.message}`,
+        );
+      }
+      for (const agent of projectAgents.agents) {
+        this.registerAgent(agent);
+      }
+    } else {
+      coreEvents.emitFeedback(
+        'info',
+        'Skipping project agents due to untrusted folder. To enable, ensure that the project root is trusted.',
+      );
+    }
 
     if (this.config.getDebugMode()) {
       debugLogger.log(
@@ -95,6 +137,13 @@ export class AgentRegistry {
     }
   }
 
+  private refreshAgents(): void {
+    this.loadBuiltInAgents();
+    for (const agent of this.agents.values()) {
+      this.registerAgent(agent);
+    }
+  }
+
   /**
    * Registers an agent definition. If an agent with the same name exists,
    * it will be overwritten, respecting the precedence established by the
@@ -121,10 +170,14 @@ export class AgentRegistry {
     // TODO(12916): Migrate sub-agents where possible to static configs.
     if (definition.kind === 'local') {
       const modelConfig = definition.modelConfig;
+      let model = modelConfig.model;
+      if (model === 'inherit') {
+        model = this.config.getModel();
+      }
 
       const runtimeAlias: ModelConfigAlias = {
         modelConfig: {
-          model: modelConfig.model,
+          model,
           generateContentConfig: {
             temperature: modelConfig.temp,
             topP: modelConfig.top_p,
@@ -181,10 +234,7 @@ export class AgentRegistry {
       .map(([name, def]) => `- **${name}**: ${def.description}`)
       .join('\n');
 
-    return `Delegates a task to a specialized sub-agent.
-
-Available agents:
-${agentDescriptions}`;
+    return `Delegates a task to a specialized sub-agent.\n\nAvailable agents:\n${agentDescriptions}`;
   }
 
   /**
