@@ -11,6 +11,8 @@ import { getClientMetadata } from './client_metadata.js';
 import type { ListExperimentsResponse, Flag } from './types.js';
 import { Storage } from '../../config/storage.js';
 
+import { debugLogger } from '../../utils/debugLogger.js';
+
 export interface Experiments {
   flags: Record<string, Flag>;
   experimentIds: number[];
@@ -32,16 +34,24 @@ export async function getExperiments(
 
   experimentsPromise = (async () => {
     if (process.env['GEMINI_LOCAL_EXP'] === 'true') {
+      debugLogger.log(
+        'GEMINI_LOCAL_EXP is true, attempting to read local experiments',
+      );
       try {
         const localPath = path.join(
           Storage.getGlobalGeminiDir(),
           'experiments.json',
         );
+        debugLogger.log(`Reading experiments from ${localPath}`);
         const content = await fs.readFile(localPath, 'utf8');
         const response = JSON.parse(content) as ListExperimentsResponse;
+        debugLogger.log('Successfully loaded local experiments');
         return parseExperiments(response);
-      } catch (_error) {
-        // Fallback to server if file doesn't exist or is invalid.
+      } catch (error) {
+        debugLogger.warn(
+          'Failed to read local experiments, falling back to server',
+          error,
+        );
       }
     }
 
