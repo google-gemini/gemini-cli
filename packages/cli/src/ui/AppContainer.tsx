@@ -183,6 +183,8 @@ export const AppContainer = (props: AppContainerProps) => {
   );
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
   const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
+  const toggleBackgroundShellRef = useRef<() => void>(() => {});
+  const isBackgroundShellVisibleRef = useRef<boolean>(false);
 
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -663,6 +665,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
+      toggleBackgroundShell: () => {
+        toggleBackgroundShellRef.current();
+        if (!isBackgroundShellVisibleRef.current) {
+          setEmbeddedShellFocused(true);
+        }
+      },
     }),
     [
       setAuthState,
@@ -822,6 +830,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
     terminalHeight,
     embeddedShellFocused,
   );
+
+  useEffect(() => {
+    toggleBackgroundShellRef.current = toggleBackgroundShell;
+  }, [toggleBackgroundShell]);
+
+  useEffect(() => {
+    isBackgroundShellVisibleRef.current = isBackgroundShellVisible;
+  }, [isBackgroundShellVisible]);
 
   // Auto-accept indicator
   const showAutoAcceptIndicator = useAutoAcceptIndicator({

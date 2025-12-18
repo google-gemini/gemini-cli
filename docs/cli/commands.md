@@ -194,6 +194,10 @@ Slash commands provide meta-level control over the CLI itself.
     modify them as desired. Changes to some settings are applied immediately,
     while others require a restart.
 
+- **`/shells`** (or **`/bashes`**)
+  - **Description:** Toggle the background shells view. This allows you to view
+    and manage long-running processes that you've sent to the background.
+
 - **`/stats`**
   - **Description:** Display detailed statistics for the current Gemini CLI
     session, including token usage, cached token savings (when available), and

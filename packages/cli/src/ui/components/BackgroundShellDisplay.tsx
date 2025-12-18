@@ -26,7 +26,7 @@ interface BackgroundShellDisplayProps {
 }
 
 const CONTENT_PADDING_X = 1;
-const RIGHT_TEXT = 'F11 Hide | Ctrl+K Kill';
+const RIGHT_TEXT = 'Ctrl+B Hide | Ctrl+K Kill';
 // 2 for borders, 2 for padding
 const TAB_DISPLAY_HORIZONTAL_PADDING = 4;
 
@@ -84,7 +84,6 @@ export const BackgroundShellDisplay = ({
     } else if (shells.size > 1) {
       setIsBackgroundShellListOpen(true);
     }
-    // We only want this to run on mount (when the component becomes visible)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

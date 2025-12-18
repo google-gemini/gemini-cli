@@ -215,7 +215,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
   [Command.TOGGLE_SHELL_INPUT_FOCUS]: [{ key: 'f', ctrl: true }],
-  [Command.TOGGLE_BACKGROUND_SHELL]: [{ key: 'f11' }],
+  [Command.TOGGLE_BACKGROUND_SHELL]: [{ key: 'b', ctrl: true }],
   [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [{ key: 'o', ctrl: true }],
 
   // Suggestion expansion
