@@ -354,7 +354,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       const offset = buffer.getOffset();
       buffer.replaceRangeByOffset(offset, offset, textToInsert);
     } catch (error) {
-      debugLogger.warn('Error handling clipboard image:', error);
+      debugLogger.error('Error handling clipboard image:', error);
     }
   }, [buffer, config]);
 

@@ -299,9 +299,7 @@ export class ClearcutLogger {
         this.enqueueHelper(event);
       });
     } catch (error) {
-      if (this.config?.getDebugMode()) {
-        debugLogger.warn('ClearcutLogger: Failed to enqueue log event.', error);
-      }
+      debugLogger.warn('ClearcutLogger: Failed to enqueue log event.', error);
     }
   }
 

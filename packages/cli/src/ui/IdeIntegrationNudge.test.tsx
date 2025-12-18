@@ -13,6 +13,21 @@ import { debugLogger } from '@google/gemini-cli-core';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Mock debugLogger
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    debugLogger: {
+      log: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    },
+  };
+});
+
 describe('IdeIntegrationNudge', () => {
   const defaultProps = {
     ide: {
@@ -22,24 +37,20 @@ describe('IdeIntegrationNudge', () => {
     onComplete: vi.fn(),
   };
 
-  const originalError = debugLogger.warn;
-
   afterEach(() => {
-    debugLogger.warn = originalError;
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 
   beforeEach(() => {
-    debugLogger.warn = (...args) => {
+    vi.mocked(debugLogger.warn).mockImplementation((...args) => {
       if (
         typeof args[0] === 'string' &&
         /was not wrapped in act/.test(args[0])
       ) {
         return;
       }
-      originalError.call(console, ...args);
-    };
+    });
     vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '');
     vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '');
   });

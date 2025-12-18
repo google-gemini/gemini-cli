@@ -59,7 +59,6 @@ import { ApprovalMode } from '../policy/types.js';
 import type { Content, Part, SchemaUnion } from '@google/genai';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
-import { debugLogger } from '../utils/debugLogger.js';
 
 describe('EditTool', () => {
   let tool: EditTool;
@@ -1160,7 +1159,7 @@ describe('EditTool', () => {
             result.returnDisplay.diffStat?.model_removed_lines,
           );
         } else if (result.error) {
-          debugLogger.warn(`Edit failed for ${file.path}:`, result.error);
+          throw result.error;
         }
       }
 

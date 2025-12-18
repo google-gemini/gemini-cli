@@ -308,7 +308,7 @@ export async function initializeTelemetry(
     initializeMetrics(config);
     void flushTelemetryBuffer();
   } catch (error) {
-    debugLogger.warn('Error starting OpenTelemetry SDK:', error);
+    debugLogger.error('Error starting OpenTelemetry SDK:', error);
   }
 
   // Note: We don't use process.on('exit') here because that callback is synchronous
@@ -342,7 +342,7 @@ export async function flushTelemetry(config: Config): Promise<void> {
       debugLogger.log('OpenTelemetry SDK flushed successfully.');
     }
   } catch (error) {
-    debugLogger.warn('Error flushing SDK:', error);
+    debugLogger.error('Error flushing SDK:', error);
   }
 }
 
@@ -360,7 +360,7 @@ export async function shutdownTelemetry(
       debugLogger.log('OpenTelemetry SDK shut down successfully.');
     }
   } catch (error) {
-    debugLogger.warn('Error shutting down SDK:', error);
+    debugLogger.error('Error shutting down SDK:', error);
   } finally {
     telemetryInitialized = false;
     sdk = undefined;

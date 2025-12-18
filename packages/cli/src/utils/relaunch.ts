@@ -6,6 +6,7 @@
 
 import { spawn } from 'node:child_process';
 import { RELAUNCH_EXIT_CODE } from './processUtils.js';
+import { writeToStderr } from '@google/gemini-cli-core';
 
 export async function relaunchOnExitCode(runner: () => Promise<number>) {
   while (true) {
@@ -17,9 +18,11 @@ export async function relaunchOnExitCode(runner: () => Promise<number>) {
       }
     } catch (error) {
       process.stdin.resume();
-      // Keep this console.error, this will happen in the low-level part of the application's lifecycle. See https://github.com/google-gemini/gemini-cli/issues/11912
-      // eslint-disable-next-line no-console
-      console.error('Fatal error: Failed to relaunch the CLI process.', error);
+      const errorMessage =
+        error instanceof Error ? (error.stack ?? error.message) : String(error);
+      writeToStderr(
+        `Fatal error: Failed to relaunch the CLI process.\n${errorMessage}\n`,
+      );
       process.exit(1);
     }
   }

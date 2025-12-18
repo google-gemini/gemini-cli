@@ -131,12 +131,6 @@ describe('reportError', () => {
       'Original error that triggered report generation:',
       error,
     );
-    // User feedback for failure
-    expect(emitFeedbackSpy).toHaveBeenCalledWith(
-      'error',
-      `${baseMessage} Failed to write error report.`,
-      error,
-    );
     expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       'Original context:',
       context,
@@ -215,40 +209,6 @@ describe('reportError', () => {
       'error',
       `${baseMessage} Full report available at: ${expectedReportPath}`,
       error,
-    );
-  });
-
-  it('should swallow errors from coreEvents.emitFeedback and log a warning', async () => {
-    const error = new Error('Test error');
-    const baseMessage = 'Error occurred.';
-    const type = 'feedback-fail';
-    const feedbackError = new Error('Feedback system failure');
-
-    // Mock emitFeedback to throw
-    emitFeedbackSpy.mockImplementation(() => {
-      throw feedbackError;
-    });
-    // Spy on debugLogger.warn
-    const debugLoggerWarnSpy = vi
-      .spyOn(debugLogger, 'warn')
-      .mockImplementation(() => {});
-
-    await reportError(error, baseMessage, undefined, type, testDir);
-
-    // Should still write the report
-    const expectedReportPath = getExpectedReportPath(type);
-    const reportContent = await fs.readFile(expectedReportPath, 'utf-8');
-    expect(JSON.parse(reportContent)).toEqual({
-      error: { message: 'Test error', stack: error.stack },
-    });
-
-    // Should have tried to emit feedback
-    expect(emitFeedbackSpy).toHaveBeenCalled();
-
-    // Should have logged a warning about the feedback failure
-    expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
-      'Failed to emit user feedback for error report:',
-      feedbackError,
     );
   });
 });

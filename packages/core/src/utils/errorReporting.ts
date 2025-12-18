@@ -80,53 +80,27 @@ export async function reportError(
       stringifiedReportContent = JSON.stringify(minimalReportContent, null, 2);
       // Still try to write the minimal report
       await fs.writeFile(reportPath, stringifiedReportContent);
-      try {
-        coreEvents.emitFeedback(
-          'error',
-          `${baseMessage} Partial report (excluding context) available at: ${reportPath}`,
-          error,
-        );
-      } catch (feedbackError) {
-        debugLogger.warn(
-          'Failed to emit user feedback for partial error report:',
-          feedbackError,
-        );
-      }
+      coreEvents.emitFeedback(
+        'error',
+        `${baseMessage} Partial report (excluding context) available at: ${reportPath}`,
+        error,
+      );
     } catch (minimalWriteError) {
       debugLogger.error(
         `${baseMessage} Failed to write even a minimal error report:`,
         minimalWriteError,
       );
-      try {
-        coreEvents.emitFeedback(
-          'error',
-          `${baseMessage} Failed to write error report.`,
-          error,
-        );
-      } catch (feedbackError) {
-        debugLogger.warn(
-          'Failed to emit user feedback for failed report write:',
-          feedbackError,
-        );
-      }
     }
     return;
   }
 
   try {
     await fs.writeFile(reportPath, stringifiedReportContent);
-    try {
-      coreEvents.emitFeedback(
-        'error',
-        `${baseMessage} Full report available at: ${reportPath}`,
-        error,
-      );
-    } catch (feedbackError) {
-      debugLogger.warn(
-        'Failed to emit user feedback for error report:',
-        feedbackError,
-      );
-    }
+    coreEvents.emitFeedback(
+      'error',
+      `${baseMessage} Full report available at: ${reportPath}`,
+      error,
+    );
   } catch (writeError) {
     debugLogger.error(
       `${baseMessage} Additionally, failed to write detailed error report:`,
@@ -137,19 +111,6 @@ export async function reportError(
       'Original error that triggered report generation:',
       error,
     );
-
-    try {
-      coreEvents.emitFeedback(
-        'error',
-        `${baseMessage} Failed to write error report.`,
-        error,
-      );
-    } catch (feedbackError) {
-      debugLogger.warn(
-        'Failed to emit user feedback for failed report write:',
-        feedbackError,
-      );
-    }
 
     if (context) {
       // Context was stringifiable, but writing the file failed.
