@@ -5,7 +5,7 @@
  */
 
 /* eslint-disable no-console */
-
+// Disabling rule because this interacts with stdout
 import {
   ChatRecordingService,
   generateSummary,
