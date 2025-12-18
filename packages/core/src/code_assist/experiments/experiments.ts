@@ -46,7 +46,9 @@ export async function getExperiments(
         const content = await fs.readFile(localPath, 'utf8');
         const response = JSON.parse(content) as ListExperimentsResponse;
         debugLogger.log('Successfully loaded local experiments');
-        return parseExperiments(response);
+        const parsed = parseExperiments(response);
+        debugLogger.log('Parsed local experiments:', parsed);
+        return parsed;
       } catch (error) {
         debugLogger.warn(
           'Failed to read local experiments, falling back to server',
@@ -61,7 +63,9 @@ export async function getExperiments(
 
     const metadata = await getClientMetadata();
     const response = await server.listExperiments(metadata);
-    return parseExperiments(response);
+    const parsed = parseExperiments(response);
+    debugLogger.log('Parsed server experiments:', parsed);
+    return parsed;
   })();
   return experimentsPromise;
 }
