@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { formatDuration } from '../utils/formatters.js';
@@ -13,18 +13,23 @@ import {
   calculateCacheHitRate,
   calculateErrorRate,
 } from '../utils/computeStats.js';
-import { useSessionStats } from '../contexts/SessionContext.js';
+import {
+  useSessionStats,
+  type ModelMetrics,
+} from '../contexts/SessionContext.js';
 import { Table, type Column } from './Table.js';
-import type { LlmRole } from '@google/gemini-cli-core';
+import { LlmRole } from '@google/gemini-cli-core';
 
 interface StatRowData {
   metric: string;
   isSection?: boolean;
-  isSubtle?: boolean;
+  indentLevel?: number;
   // Dynamic keys for model values
-  [key: string]: string | React.ReactNode | boolean | undefined;
+  [key: string]: string | React.ReactNode | boolean | undefined | number;
   color?: string;
 }
+
+type RoleMetrics = NonNullable<NonNullable<ModelMetrics['roles']>[LlmRole]>;
 
 export const ModelStatsDisplay: React.FC = () => {
   const { stats } = useSessionStats();
@@ -58,132 +63,187 @@ export const ModelStatsDisplay: React.FC = () => {
     ([, metrics]) => metrics.tokens.cached > 0,
   );
 
-  // Helper to create a row with values for each model
-  const createRow = (
+  const allRoles = Array.from(
+    new Set(
+      activeModels.flatMap(([, metrics]) => Object.keys(metrics.roles || {})),
+    ),
+  ).sort((a, b) => {
+    if (a === LlmRole.MAIN) return -1;
+    if (b === LlmRole.MAIN) return 1;
+    return a.localeCompare(b);
+  }) as LlmRole[];
+
+  const rows: StatRowData[] = [];
+
+  // Helper to add a row for global model metrics
+  const addRow = (
     metric: string,
-    getValue: (
-      metrics: (typeof activeModels)[0][1],
-    ) => string | React.ReactNode,
-    options: { isSection?: boolean; isSubtle?: boolean } = {},
-  ): StatRowData => {
+    getValue: (metrics: ModelMetrics) => string | React.ReactNode,
+    options: {
+      isSection?: boolean;
+      indentLevel?: number;
+    } = {},
+  ) => {
+    const { indentLevel = 0 } = options;
     const row: StatRowData = {
       metric,
       isSection: options.isSection,
-      isSubtle: options.isSubtle,
+      indentLevel,
     };
     activeModels.forEach(([name, metrics]) => {
       row[name] = getValue(metrics);
     });
-    return row;
+    rows.push(row);
   };
 
-  const rows: StatRowData[] = [
-    // API Section
-    { metric: 'API', isSection: true },
-    createRow('Requests', (m) => m.api.totalRequests.toLocaleString()),
-    createRow('Errors', (m) => {
-      const errorRate = calculateErrorRate(m);
-      return (
-        <Text
-          color={
-            m.api.totalErrors > 0 ? theme.status.error : theme.text.primary
-          }
-        >
-          {m.api.totalErrors.toLocaleString()} ({errorRate.toFixed(1)}%)
-        </Text>
-      );
-    }),
-    createRow('Avg Latency', (m) => formatDuration(calculateAverageLatency(m))),
-
-    // Spacer
-    { metric: '' },
-
-    // Tokens Section
-    { metric: 'Tokens', isSection: true },
-    createRow('Total', (m) => (
-      <Text color={theme.text.secondary}>
-        {m.tokens.total.toLocaleString()}
+  // API Section
+  addRow('API', () => '', { isSection: true });
+  addRow('Requests', (m) => m.api.totalRequests.toLocaleString());
+  addRow('Errors', (m) => {
+    const errorRate = calculateErrorRate(m);
+    return (
+      <Text
+        color={m.api.totalErrors > 0 ? theme.status.error : theme.text.primary}
+      >
+        {m.api.totalErrors.toLocaleString()} ({errorRate.toFixed(1)}%)
       </Text>
-    )),
-    createRow(
-      'Input',
-      (m) => (
-        <Text color={theme.text.primary}>
-          {m.tokens.input.toLocaleString()}
-        </Text>
-      ),
-      { isSubtle: true },
+    );
+  });
+  addRow('Avg Latency', (m) => formatDuration(calculateAverageLatency(m)));
+
+  // Spacer
+  rows.push({ metric: ' ' });
+
+  // Tokens Section
+  addRow('Tokens', () => '', { isSection: true });
+  addRow('Total', (m) => (
+    <Text color={theme.text.secondary}>{m.tokens.total.toLocaleString()}</Text>
+  ));
+  addRow(
+    'Input',
+    (m) => (
+      <Text color={theme.text.primary}>{m.tokens.input.toLocaleString()}</Text>
     ),
-  ];
+    { indentLevel: 1 },
+  );
 
   if (hasCached) {
-    rows.push(
-      createRow(
-        'Cache Reads',
-        (m) => {
-          const cacheHitRate = calculateCacheHitRate(m);
-          return (
-            <Text color={theme.text.secondary}>
-              {m.tokens.cached.toLocaleString()} ({cacheHitRate.toFixed(1)}%)
-            </Text>
-          );
-        },
-        { isSubtle: true },
-      ),
+    addRow(
+      'Cache Reads',
+      (m) => {
+        const cacheHitRate = calculateCacheHitRate(m);
+        return (
+          <Text color={theme.text.secondary}>
+            {m.tokens.cached.toLocaleString()} ({cacheHitRate.toFixed(1)}%)
+          </Text>
+        );
+      },
+      { indentLevel: 1 },
     );
   }
 
   if (hasThoughts) {
-    rows.push(
-      createRow(
-        'Thoughts',
-        (m) => (
-          <Text color={theme.text.primary}>
-            {m.tokens.thoughts.toLocaleString()}
-          </Text>
-        ),
-        { isSubtle: true },
+    addRow(
+      'Thoughts',
+      (m) => (
+        <Text color={theme.text.primary}>
+          {m.tokens.thoughts.toLocaleString()}
+        </Text>
       ),
+      { indentLevel: 1 },
     );
   }
 
   if (hasTool) {
-    rows.push(
-      createRow(
-        'Tool',
-        (m) => (
-          <Text color={theme.text.primary}>
-            {m.tokens.tool.toLocaleString()}
-          </Text>
-        ),
-        { isSubtle: true },
+    addRow(
+      'Tool',
+      (m) => (
+        <Text color={theme.text.primary}>{m.tokens.tool.toLocaleString()}</Text>
       ),
+      { indentLevel: 1 },
     );
   }
 
-  rows.push(
-    createRow(
-      'Output',
-      (m) => (
-        <Text color={theme.text.primary}>
-          {m.tokens.candidates.toLocaleString()}
-        </Text>
-      ),
-      { isSubtle: true },
+  addRow(
+    'Output',
+    (m) => (
+      <Text color={theme.text.primary}>
+        {m.tokens.candidates.toLocaleString()}
+      </Text>
     ),
+    { indentLevel: 1 },
   );
+
+  // Roles Section
+  if (allRoles.length > 0) {
+    // Spacer
+    rows.push({ metric: ' ' });
+    rows.push({ metric: 'Roles', isSection: true });
+
+    allRoles.forEach((role) => {
+      // Role Header Row
+      const roleHeaderRow: StatRowData = {
+        metric: role,
+        indentLevel: 1,
+        color: theme.text.accent,
+      };
+      // We don't populate model values for the role header row
+      rows.push(roleHeaderRow);
+
+      const addRoleMetric = (
+        metric: string,
+        getValue: (r: RoleMetrics) => string | React.ReactNode,
+      ) => {
+        const row: StatRowData = {
+          metric,
+          indentLevel: 2,
+        };
+        activeModels.forEach(([name, metrics]) => {
+          const roleMetrics = metrics.roles?.[role];
+          if (roleMetrics) {
+            row[name] = getValue(roleMetrics);
+          } else {
+            row[name] = <Text color={theme.text.secondary}>-</Text>;
+          }
+        });
+        rows.push(row);
+      };
+
+      addRoleMetric('Requests', (r) => r.totalRequests.toLocaleString());
+      addRoleMetric('Input', (r) => (
+        <Text color={theme.text.primary}>
+          {r.tokens.input.toLocaleString()}
+        </Text>
+      ));
+      addRoleMetric('Output', (r) => (
+        <Text color={theme.text.primary}>
+          {r.tokens.candidates.toLocaleString()}
+        </Text>
+      ));
+      addRoleMetric('Cache Reads', (r) => (
+        <Text color={theme.text.secondary}>
+          {r.tokens.cached.toLocaleString()}
+        </Text>
+      ));
+    });
+  }
 
   const columns: Array<Column<StatRowData>> = [
     {
       key: 'metric',
       header: 'Metric',
-      width: 28,
+      width: 36,
       renderCell: (row) => (
         <Text
           bold={row.isSection}
-          color={row.isSection ? theme.text.primary : theme.text.link}
+          color={
+            row.color ?? (row.isSection ? theme.text.primary : theme.text.link)
+          }
+          wrap="truncate-end"
         >
-          {row.isSubtle ? `  ↳ ${row.metric}` : row.metric}
+          {row.indentLevel
+            ? `${'  '.repeat(row.indentLevel)}↳ ${row.metric}`
+            : row.metric}
         </Text>
       ),
     },
@@ -193,7 +253,7 @@ export const ModelStatsDisplay: React.FC = () => {
       flexGrow: 1,
       renderCell: (row: StatRowData) => {
         // Don't render anything for section headers in model columns
-        if (row.isSection) return null;
+        if (row.isSection && !row[name]) return null;
         const val = row[name];
         if (val === undefined || val === null) return null;
         if (typeof val === 'string' || typeof val === 'number') {

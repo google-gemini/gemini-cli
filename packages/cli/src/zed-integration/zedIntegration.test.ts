@@ -24,6 +24,7 @@ import {
   ReadManyFilesTool,
   type GeminiChat,
   type Config,
+  LlmRole,
 } from '@google/gemini-cli-core';
 import { SettingScope, type LoadedSettings } from '../config/settings.js';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
@@ -527,7 +528,8 @@ describe('Session', () => {
         }),
       ]),
       expect.anything(),
-      expect.anything(),
+      expect.any(AbortSignal),
+      LlmRole.MAIN,
     );
   });
 

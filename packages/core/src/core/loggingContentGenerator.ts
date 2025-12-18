@@ -152,6 +152,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     model: string,
     prompt_id: string,
     requestContents: Content[],
+    role: LlmRole,
     generationConfig?: GenerateContentConfig,
     serverDetails?: ServerDetails,
   ): void {
@@ -175,6 +176,7 @@ export class LoggingContentGenerator implements ContentGenerator {
         isStructuredError(error)
           ? (error as StructuredError).status
           : undefined,
+        role,
       ),
     );
   }
@@ -235,6 +237,7 @@ export class LoggingContentGenerator implements ContentGenerator {
             req.model,
             userPromptId,
             contents,
+            role,
             req.config,
             serverDetails,
           );
@@ -285,6 +288,7 @@ export class LoggingContentGenerator implements ContentGenerator {
             req.model,
             userPromptId,
             toContents(req.contents),
+            role,
             req.config,
             serverDetails,
           );
@@ -357,6 +361,7 @@ export class LoggingContentGenerator implements ContentGenerator {
         responses[0]?.modelVersion || req.model,
         userPromptId,
         requestContents,
+        role,
         req.config,
         serverDetails,
       );

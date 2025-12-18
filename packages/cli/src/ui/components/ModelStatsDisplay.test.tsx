@@ -335,6 +335,7 @@ describe('<ModelStatsDisplay />', () => {
               thoughts: 100,
               tool: 50,
             },
+            roles: {},
           },
           'gemini-3-flash-preview': {
             api: { totalRequests: 20, totalErrors: 0, totalLatencyMs: 1000 },
@@ -347,6 +348,7 @@ describe('<ModelStatsDisplay />', () => {
               thoughts: 200,
               tool: 100,
             },
+            roles: {},
           },
         },
         tools: {
@@ -432,5 +434,61 @@ describe('<ModelStatsDisplay />', () => {
     expect(output).toContain('Output');
     expect(output).toContain('Cache Reads');
     expect(output).toMatchSnapshot();
+  });
+
+  it('should handle long metric names with truncation', () => {
+    const longRoleName =
+      'this_is_a_very_long_role_name_that_should_be_truncated' as LlmRole;
+    const { lastFrame } = renderWithMockedStats({
+      models: {
+        'gemini-2.5-pro': {
+          api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
+          tokens: {
+            input: 10,
+            prompt: 10,
+            candidates: 20,
+            total: 30,
+            cached: 0,
+            thoughts: 0,
+            tool: 0,
+          },
+          roles: {
+            [longRoleName]: {
+              totalRequests: 1,
+              totalErrors: 0,
+              totalLatencyMs: 100,
+              tokens: {
+                input: 10,
+                prompt: 10,
+                candidates: 20,
+                total: 30,
+                cached: 0,
+                thoughts: 0,
+                tool: 0,
+              },
+            },
+          },
+        },
+      },
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: {
+          accept: 0,
+          reject: 0,
+          modify: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
+        byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
+    });
+
+    expect(lastFrame()).toMatchSnapshot();
   });
 });

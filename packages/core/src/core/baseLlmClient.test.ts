@@ -172,6 +172,7 @@ describe('BaseLlmClient', () => {
           },
         },
         'test-prompt-id',
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -194,6 +195,7 @@ describe('BaseLlmClient', () => {
           }),
         }),
         expect.any(String),
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -212,6 +214,7 @@ describe('BaseLlmClient', () => {
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.any(Object),
         customPromptId,
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -560,6 +563,7 @@ describe('BaseLlmClient', () => {
           },
         },
         'content-prompt-id',
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -709,6 +713,7 @@ describe('BaseLlmClient', () => {
       expect(mockGenerateContent).toHaveBeenLastCalledWith(
         expect.objectContaining({ model: fallbackModel }),
         expect.any(String),
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -774,6 +779,7 @@ describe('BaseLlmClient', () => {
       expect(mockGenerateContent).toHaveBeenLastCalledWith(
         expect.objectContaining({ model: availableModel }),
         jsonOptions.promptId,
+        LlmRole.UTILITY_TOOL,
       );
     });
 

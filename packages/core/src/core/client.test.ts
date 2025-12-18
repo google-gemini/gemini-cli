@@ -2561,6 +2561,7 @@ ${JSON.stringify(
           contents,
         },
         'test-session-id',
+        LlmRole.MAIN,
       );
     });
 
@@ -2580,6 +2581,7 @@ ${JSON.stringify(
           model: initialModel,
         }),
         'test-session-id',
+        LlmRole.MAIN,
       );
     });
   });

@@ -441,6 +441,7 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
   status_code?: number | string;
   duration_ms: number;
   auth_type?: string;
+  role?: LlmRole;
 
   constructor(
     model: string,
@@ -450,6 +451,7 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
     auth_type?: string,
     error_type?: string,
     status_code?: number | string,
+    role?: LlmRole,
   ) {
     this['event.name'] = 'api_error';
     this['event.timestamp'] = new Date().toISOString();
@@ -460,6 +462,7 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
     this.duration_ms = duration_ms;
     this.prompt = prompt_details;
     this.auth_type = auth_type;
+    this.role = role;
   }
 
   toLogRecord(config: Config): LogRecord {
@@ -477,6 +480,10 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
       prompt_id: this.prompt.prompt_id,
       auth_type: this.auth_type,
     };
+
+    if (this.role) {
+      attributes['role'] = this.role;
+    }
 
     if (this.error_type) {
       attributes['error.type'] = this.error_type;

@@ -94,7 +94,11 @@ describe('LoggingContentGenerator', () => {
 
       await promise;
 
-      expect(wrapped.generateContent).toHaveBeenCalledWith(req, userPromptId);
+      expect(wrapped.generateContent).toHaveBeenCalledWith(
+        req,
+        userPromptId,
+        LlmRole.MAIN,
+      );
       expect(logApiRequest).toHaveBeenCalledWith(
         config,
         expect.any(ApiRequestEvent),
@@ -178,6 +182,7 @@ describe('LoggingContentGenerator', () => {
       expect(wrapped.generateContentStream).toHaveBeenCalledWith(
         req,
         userPromptId,
+        LlmRole.MAIN,
       );
       expect(logApiRequest).toHaveBeenCalledWith(
         config,

@@ -237,6 +237,16 @@ export class UiTelemetryService extends EventEmitter {
     modelMetrics.api.totalRequests++;
     modelMetrics.api.totalErrors++;
     modelMetrics.api.totalLatencyMs += event.duration_ms;
+
+    if (event.role) {
+      if (!modelMetrics.roles[event.role]) {
+        modelMetrics.roles[event.role] = createInitialRoleMetrics();
+      }
+      const roleMetrics = modelMetrics.roles[event.role]!;
+      roleMetrics.totalRequests++;
+      roleMetrics.totalErrors++;
+      roleMetrics.totalLatencyMs += event.duration_ms;
+    }
   }
 
   private processToolCall(event: ToolCallEvent) {
