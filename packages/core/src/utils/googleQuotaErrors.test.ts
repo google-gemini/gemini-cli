@@ -389,4 +389,35 @@ describe('classifyGoogleError', () => {
       });
     }
   });
+
+  it('should return RetryableQuotaError with 5s fallback for generic 429 without specific message', () => {
+    const generic429 = {
+      status: 429,
+      message: 'Resource exhausted. No specific retry info.',
+    };
+
+    const result = classifyGoogleError(generic429);
+
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.retryDelayMs).toBe(5000);
+    }
+  });
+
+  it('should return RetryableQuotaError with 5s fallback for 429 with empty details and no regex match', () => {
+    const errorWithEmptyDetails = {
+      error: {
+        code: 429,
+        message: 'A generic 429 error with no retry message.',
+        details: [],
+      },
+    };
+
+    const result = classifyGoogleError(errorWithEmptyDetails);
+
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.retryDelayMs).toBe(5000);
+    }
+  });
 });

@@ -112,6 +112,18 @@ export function classifyGoogleError(error: unknown): unknown {
           retryDelaySeconds,
         );
       }
+    } else if (status === 429) {
+      // Fallback: If it is a 429 but doesn't have a specific "retry in" message,
+      // assume it is a temporary rate limit and retry after 5 sec (same as DEFAULT_RETRY_OPTIONS).
+      return new RetryableQuotaError(
+        errorMessage,
+        googleApiError ?? {
+          code: 429,
+          message: errorMessage,
+          details: [],
+        },
+        5,
+      );
     }
 
     return error; // Not a 429 error we can handle with structured details or a parsable retry message.
