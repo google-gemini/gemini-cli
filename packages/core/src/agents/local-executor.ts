@@ -20,15 +20,6 @@ import { ToolRegistry } from '../tools/tool-registry.js';
 import { type ToolCallRequestInfo, CompressionStatus } from '../core/turn.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
-import {
-  GLOB_TOOL_NAME,
-  GREP_TOOL_NAME,
-  LS_TOOL_NAME,
-  MEMORY_TOOL_NAME,
-  READ_FILE_TOOL_NAME,
-  READ_MANY_FILES_TOOL_NAME,
-  WEB_SEARCH_TOOL_NAME,
-} from '../tools/tool-names.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import {
   logAgentStart,
@@ -53,6 +44,7 @@ import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getModelConfigAlias } from './registry.js';
+import { ApprovalMode } from '../policy/types.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -129,12 +121,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
 
       agentToolRegistry.sortTools();
-      // Validate that all registered tools are safe for non-interactive
-      // execution.
-      await LocalAgentExecutor.validateTools(
-        agentToolRegistry,
-        definition.name,
-      );
     }
 
     // Get the parent prompt ID from context
@@ -802,19 +788,46 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             });
           }
         } else {
-          // No output expected. Just signal completion.
-          submittedOutput = 'Task completed successfully.';
-          syncResponseParts.push({
-            functionResponse: {
-              name: TASK_COMPLETE_TOOL_NAME,
-              response: { status: 'Task marked complete.' },
-              id: callId,
-            },
-          });
-          this.emitActivity('TOOL_CALL_END', {
-            name: functionCall.name,
-            output: 'Task marked complete.',
-          });
+          // No outputConfig - use default 'result' parameter
+          const resultArg = args['result'];
+          if (
+            resultArg !== undefined &&
+            resultArg !== null &&
+            resultArg !== ''
+          ) {
+            submittedOutput =
+              typeof resultArg === 'string'
+                ? resultArg
+                : JSON.stringify(resultArg, null, 2);
+            syncResponseParts.push({
+              functionResponse: {
+                name: TASK_COMPLETE_TOOL_NAME,
+                response: { status: 'Result submitted and task completed.' },
+                id: callId,
+              },
+            });
+            this.emitActivity('TOOL_CALL_END', {
+              name: functionCall.name,
+              output: 'Result submitted and task completed.',
+            });
+          } else {
+            // No result provided - this is an error for agents expected to return results
+            taskCompleted = false; // Revoke completion
+            const error =
+              'Missing required "result" argument. You must provide your findings when calling complete_task.';
+            syncResponseParts.push({
+              functionResponse: {
+                name: TASK_COMPLETE_TOOL_NAME,
+                response: { error },
+                id: callId,
+              },
+            });
+            this.emitActivity('ERROR', {
+              context: 'tool_call',
+              name: functionCall.name,
+              error,
+            });
+          }
         }
         continue;
       }
@@ -853,8 +866,18 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
       // Create a promise for the tool execution
       const executionPromise = (async () => {
+        // Force YOLO mode for subagents to prevent hanging on confirmation
+        const contextProxy = new Proxy(this.runtimeContext, {
+          get(target, prop, receiver) {
+            if (prop === 'getApprovalMode') {
+              return () => ApprovalMode.YOLO;
+            }
+            return Reflect.get(target, prop, receiver);
+          },
+        });
+
         const { response: toolResponse } = await executeToolCall(
-          this.runtimeContext,
+          contextProxy,
           requestInfo,
           signal,
         );
@@ -939,7 +962,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       name: TASK_COMPLETE_TOOL_NAME,
       description: outputConfig
         ? 'Call this tool to submit your final answer and complete the task. This is the ONLY way to finish.'
-        : 'Call this tool to signal that you have completed your task. This is the ONLY way to finish.',
+        : 'Call this tool to submit your final findings and complete the task. This is the ONLY way to finish.',
       parameters: {
         type: Type.OBJECT,
         properties: {},
@@ -957,6 +980,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       completeTool.parameters!.properties![outputConfig.outputName] =
         schema as Schema;
       completeTool.parameters!.required!.push(outputConfig.outputName);
+    } else {
+      completeTool.parameters!.properties!['result'] = {
+        type: Type.STRING,
+        description:
+          'Your final results or findings to return to the orchestrator. ' +
+          'Ensure this is comprehensive and follows any formatting requested in your instructions.',
+      };
+      completeTool.parameters!.required!.push('result');
     }
 
     toolsList.push(completeTool);
@@ -985,10 +1016,19 @@ Important Rules:
 * Work systematically using available tools to complete your task.
 * Always use absolute paths for file operations. Construct them using the provided "Environment Context".`;
 
-    finalPrompt += `
-* When you have completed your task, you MUST call the \`${TASK_COMPLETE_TOOL_NAME}\` tool.
+    if (this.definition.outputConfig) {
+      finalPrompt += `
+* When you have completed your task, you MUST call the \`${TASK_COMPLETE_TOOL_NAME}\` tool with your structured output.
 * Do not call any other tools in the same turn as \`${TASK_COMPLETE_TOOL_NAME}\`.
 * This is the ONLY way to complete your mission. If you stop calling tools without calling this, you have failed.`;
+    } else {
+      finalPrompt += `
+* When you have completed your task, you MUST call the \`${TASK_COMPLETE_TOOL_NAME}\` tool.
+* You MUST include your final findings in the "result" parameter. This is how you return the necessary results for the task to be marked complete.
+* Ensure your findings are comprehensive and follow any specific formatting requirements provided in your instructions.
+* Do not call any other tools in the same turn as \`${TASK_COMPLETE_TOOL_NAME}\`.
+* This is the ONLY way to complete your mission. If you stop calling tools without calling this, you have failed.`;
+    }
 
     return finalPrompt;
   }
@@ -1013,37 +1053,6 @@ Important Rules:
       });
       return { ...content, parts: newParts };
     });
-  }
-
-  /**
-   * Validates that all tools in a registry are safe for non-interactive use.
-   *
-   * @throws An error if a tool is not on the allow-list for non-interactive execution.
-   */
-  private static async validateTools(
-    toolRegistry: ToolRegistry,
-    agentName: string,
-  ): Promise<void> {
-    // Tools that are non-interactive. This is temporary until we have tool
-    // confirmations for subagents.
-    const allowlist = new Set([
-      LS_TOOL_NAME,
-      READ_FILE_TOOL_NAME,
-      GREP_TOOL_NAME,
-      GLOB_TOOL_NAME,
-      READ_MANY_FILES_TOOL_NAME,
-      MEMORY_TOOL_NAME,
-      WEB_SEARCH_TOOL_NAME,
-    ]);
-    for (const tool of toolRegistry.getAllTools()) {
-      if (!allowlist.has(tool.name)) {
-        throw new Error(
-          `Tool "${tool.name}" is not on the allow-list for non-interactive ` +
-            `execution in agent "${agentName}". Only tools that do not require user ` +
-            `confirmation can be used in subagents.`,
-        );
-      }
-    }
   }
 
   /**

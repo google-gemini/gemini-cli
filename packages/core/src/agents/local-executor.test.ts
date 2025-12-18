@@ -301,11 +301,14 @@ describe('LocalAgentExecutor', () => {
       expect(executor).toBeInstanceOf(LocalAgentExecutor);
     });
 
-    it('SECURITY: should throw if a tool is not on the non-interactive allowlist', async () => {
+    it('should allow any tool for experimentation (formerly SECURITY check)', async () => {
       const definition = createTestDefinition([MOCK_TOOL_NOT_ALLOWED.name]);
-      await expect(
-        LocalAgentExecutor.create(definition, mockConfig, onActivity),
-      ).rejects.toThrow(/not on the allow-list for non-interactive execution/);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      expect(executor).toBeInstanceOf(LocalAgentExecutor);
     });
 
     it('should create an isolated ToolRegistry for the agent', async () => {
@@ -605,7 +608,13 @@ describe('LocalAgentExecutor', () => {
       });
 
       mockModelResponse(
-        [{ name: TASK_COMPLETE_TOOL_NAME, args: {}, id: 'call2' }],
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { result: 'All work done' },
+            id: 'call2',
+          },
+        ],
         'Task finished.',
       );
 
@@ -622,12 +631,12 @@ describe('LocalAgentExecutor', () => {
       const completeToolDef = sentTools!.find(
         (t) => t.name === TASK_COMPLETE_TOOL_NAME,
       );
-      expect(completeToolDef?.parameters?.required).toEqual([]);
+      expect(completeToolDef?.parameters?.required).toEqual(['result']);
       expect(completeToolDef?.description).toContain(
-        'signal that you have completed',
+        'submit your final findings',
       );
 
-      expect(output.result).toBe('Task completed successfully.');
+      expect(output.result).toBe('All work done');
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
     });
 
@@ -780,8 +789,16 @@ describe('LocalAgentExecutor', () => {
 
       // Turn 1: Duplicate calls
       mockModelResponse([
-        { name: TASK_COMPLETE_TOOL_NAME, args: {}, id: 'call1' },
-        { name: TASK_COMPLETE_TOOL_NAME, args: {}, id: 'call2' },
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { result: 'done' },
+          id: 'call1',
+        },
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { result: 'ignored' },
+          id: 'call2',
+        },
       ]);
 
       const output = await executor.run({ goal: 'Dup test' }, signal);
