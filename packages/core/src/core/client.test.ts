@@ -30,7 +30,7 @@ import {
   type ChatCompressionInfo,
 } from './turn.js';
 import { getCoreSystemPrompt } from './prompts.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { DEFAULT_GEMINI_MODEL_AUTO } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { tokenLimit } from './tokenLimits.js';
@@ -231,8 +231,6 @@ describe('Gemini Client (client.ts)', () => {
         .mockReturnValue(mockRouterService as unknown as ModelRouterService),
       getMessageBus: vi.fn().mockReturnValue(undefined),
       getEnableHooks: vi.fn().mockReturnValue(false),
-      isInFallbackMode: vi.fn().mockReturnValue(false),
-      setFallbackMode: vi.fn(),
       getChatCompression: vi.fn().mockReturnValue(undefined),
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
       getUseSmartEdit: vi.fn().mockReturnValue(false),
@@ -262,11 +260,12 @@ describe('Gemini Client (client.ts)', () => {
       },
       isInteractive: vi.fn().mockReturnValue(false),
       getExperiments: () => {},
-      isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(false),
       getActiveModel: vi.fn().mockReturnValue('test-model'),
       setActiveModel: vi.fn(),
       resetTurn: vi.fn(),
-      getModelAvailabilityService: vi.fn(),
+      getModelAvailabilityService: vi
+        .fn()
+        .mockReturnValue(createAvailabilityServiceMock()),
     } as unknown as Config;
     mockConfig.getHookSystem = vi
       .fn()
@@ -304,12 +303,12 @@ describe('Gemini Client (client.ts)', () => {
     it('should create a new chat session, clearing the old history', async () => {
       // 1. Get the initial chat instance and add some history.
       const initialChat = client.getChat();
-      const initialHistory = await client.getHistory();
+      const initialHistory = client.getHistory();
       await client.addHistory({
         role: 'user',
         parts: [{ text: 'some old message' }],
       });
-      const historyWithOldMessage = await client.getHistory();
+      const historyWithOldMessage = client.getHistory();
       expect(historyWithOldMessage.length).toBeGreaterThan(
         initialHistory.length,
       );
@@ -319,7 +318,7 @@ describe('Gemini Client (client.ts)', () => {
 
       // 3. Get the new chat instance and its history.
       const newChat = client.getChat();
-      const newHistory = await client.getHistory();
+      const newHistory = client.getHistory();
 
       // 4. Assert that the chat instance is new and the history is reset.
       expect(newChat).not.toBe(initialChat);
@@ -1531,68 +1530,6 @@ ${JSON.stringify(
           expect.any(AbortSignal),
         );
       });
-
-      it('should use the fallback model and bypass routing when in fallback mode', async () => {
-        vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(true);
-        mockRouterService.route.mockResolvedValue({
-          model: DEFAULT_GEMINI_FLASH_MODEL,
-          reason: 'fallback',
-        });
-
-        const stream = client.sendMessageStream(
-          [{ text: 'Hi' }],
-          new AbortController().signal,
-          'prompt-1',
-        );
-        await fromAsync(stream);
-
-        expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: DEFAULT_GEMINI_FLASH_MODEL },
-          [{ text: 'Hi' }],
-          expect.any(AbortSignal),
-        );
-      });
-
-      it('should stick to the fallback model for the entire sequence even if fallback mode ends', async () => {
-        // Start the sequence in fallback mode
-        vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(true);
-        mockRouterService.route.mockResolvedValue({
-          model: DEFAULT_GEMINI_FLASH_MODEL,
-          reason: 'fallback',
-        });
-        let stream = client.sendMessageStream(
-          [{ text: 'Hi' }],
-          new AbortController().signal,
-          'prompt-fallback-stickiness',
-        );
-        await fromAsync(stream);
-
-        // First call should use fallback model
-        expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: DEFAULT_GEMINI_FLASH_MODEL },
-          [{ text: 'Hi' }],
-          expect.any(AbortSignal),
-        );
-
-        // End fallback mode
-        vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(false);
-
-        // Second call in the same sequence
-        stream = client.sendMessageStream(
-          [{ text: 'Continue' }],
-          new AbortController().signal,
-          'prompt-fallback-stickiness',
-        );
-        await fromAsync(stream);
-
-        // Router should still not be called, and it should stick to the fallback model
-        expect(mockTurnRunFn).toHaveBeenCalledTimes(2); // Ensure it was called again
-        expect(mockTurnRunFn).toHaveBeenLastCalledWith(
-          { model: DEFAULT_GEMINI_FLASH_MODEL }, // Still the fallback model
-          [{ text: 'Continue' }],
-          expect.any(AbortSignal),
-        );
-      });
     });
 
     it('should recursively call sendMessageStream with "Please continue." when InvalidStream event is received', async () => {
@@ -2003,9 +1940,6 @@ ${JSON.stringify(
         vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
           mockAvailabilityService,
         );
-        vi.mocked(mockConfig.isModelAvailabilityServiceEnabled).mockReturnValue(
-          true,
-        );
         vi.mocked(mockConfig.setActiveModel).mockClear();
         mockRouterService.route.mockResolvedValue({
           model: 'model-a',
@@ -2044,7 +1978,9 @@ ${JSON.stringify(
             skipped: [],
           },
         );
-
+        vi.mocked(mockConfig.getModel).mockReturnValue(
+          DEFAULT_GEMINI_MODEL_AUTO,
+        );
         const stream = client.sendMessageStream(
           [{ text: 'Hi' }],
           new AbortController().signal,
@@ -2074,7 +2010,9 @@ ${JSON.stringify(
             skipped: [],
           },
         );
-
+        vi.mocked(mockConfig.getModel).mockReturnValue(
+          DEFAULT_GEMINI_MODEL_AUTO,
+        );
         const stream = client.sendMessageStream(
           [{ text: 'Hi' }],
           new AbortController().signal,
@@ -2604,14 +2542,14 @@ ${JSON.stringify(
       const abortSignal = new AbortController().signal;
 
       await client.generateContent(
-        { model: DEFAULT_GEMINI_FLASH_MODEL },
+        { model: 'test-model' },
         contents,
         abortSignal,
       );
 
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
         {
-          model: DEFAULT_GEMINI_FLASH_MODEL,
+          model: 'test-model',
           config: {
             abortSignal,
             systemInstruction: getCoreSystemPrompt({} as unknown as Config, ''),
@@ -2625,50 +2563,18 @@ ${JSON.stringify(
     });
 
     it('should use current model from config for content generation', async () => {
-      const initialModel = client['config'].getModel();
+      const initialModel = 'test-model';
       const contents = [{ role: 'user', parts: [{ text: 'test' }] }];
-      const currentModel = initialModel + '-changed';
-
-      vi.spyOn(client['config'], 'getModel').mockReturnValueOnce(currentModel);
 
       await client.generateContent(
-        { model: DEFAULT_GEMINI_FLASH_MODEL },
+        { model: initialModel },
         contents,
         new AbortController().signal,
       );
 
-      expect(mockContentGenerator.generateContent).not.toHaveBeenCalledWith({
-        model: initialModel,
-        config: expect.any(Object),
-        contents,
-      });
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
-        {
-          model: DEFAULT_GEMINI_FLASH_MODEL,
-          config: expect.any(Object),
-          contents,
-        },
-        'test-session-id',
-      );
-    });
-
-    it('should use the Flash model when fallback mode is active', async () => {
-      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
-      const abortSignal = new AbortController().signal;
-      const requestedModel = 'gemini-2.5-pro'; // A non-flash model
-
-      // Mock config to be in fallback mode
-      vi.spyOn(client['config'], 'isInFallbackMode').mockReturnValue(true);
-
-      await client.generateContent(
-        { model: requestedModel },
-        contents,
-        abortSignal,
-      );
-
-      expect(mockGenerateContentFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: DEFAULT_GEMINI_FLASH_MODEL,
+          model: initialModel,
         }),
         'test-session-id',
       );

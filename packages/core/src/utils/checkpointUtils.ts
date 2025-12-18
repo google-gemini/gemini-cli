@@ -125,7 +125,7 @@ export async function processRestorableToolCalls<HistoryType>(
         continue;
       }
 
-      const clientHistory = await geminiClient.getHistory();
+      const clientHistory = geminiClient.getHistory();
       const checkpointData: ToolCallData<HistoryType> = {
         history,
         clientHistory,
