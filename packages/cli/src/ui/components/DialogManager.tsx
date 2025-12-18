@@ -31,6 +31,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
+import { ToolConfirmationDialog } from './ToolConfirmationDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -71,6 +72,21 @@ export const DialogManager = ({
       <IdeIntegrationNudge
         ide={uiState.currentIDE!}
         onComplete={uiActions.handleIdePromptComplete}
+      />
+    );
+  }
+  if (
+    uiState.toolConfirmationRequest &&
+    uiState.toolConfirmationRequest.confirmationDetails
+  ) {
+    return (
+      <ToolConfirmationDialog
+        confirmationDetails={
+          uiState.toolConfirmationRequest.confirmationDetails
+        }
+        config={config}
+        onConfirm={uiState.onToolConfirm}
+        terminalWidth={mainAreaWidth}
       />
     );
   }

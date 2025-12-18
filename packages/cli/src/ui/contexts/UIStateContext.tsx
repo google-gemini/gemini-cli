@@ -23,6 +23,7 @@ import type {
   UserTierId,
   IdeInfo,
   FallbackIntent,
+  ToolConfirmationRequest,
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
@@ -136,6 +137,8 @@ export interface UIState {
   };
   bannerVisible: boolean;
   customDialog: React.ReactNode | null;
+  toolConfirmationRequest: ToolConfirmationRequest | null;
+  onToolConfirm: (confirmed: boolean) => void;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

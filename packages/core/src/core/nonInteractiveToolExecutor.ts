@@ -9,6 +9,7 @@ import {
   CoreToolScheduler,
   type CompletedToolCall,
 } from './coreToolScheduler.js';
+import { DelegatedConfirmationStrategy } from './confirmation/DelegatedConfirmationStrategy.js';
 
 /**
  * Executes a single tool call non-interactively by leveraging the CoreToolScheduler.
@@ -18,10 +19,16 @@ export async function executeToolCall(
   toolCallRequest: ToolCallRequestInfo,
   abortSignal: AbortSignal,
 ): Promise<CompletedToolCall> {
+  const messageBus = config.getMessageBus();
+  const confirmationStrategy = messageBus
+    ? new DelegatedConfirmationStrategy(messageBus)
+    : undefined;
+
   return new Promise<CompletedToolCall>((resolve, reject) => {
     const scheduler = new CoreToolScheduler({
       config,
       getPreferredEditor: () => undefined,
+      confirmationStrategy,
       onAllToolCallsComplete: async (completedToolCalls) => {
         if (completedToolCalls.length > 0) {
           resolve(completedToolCalls[0]);

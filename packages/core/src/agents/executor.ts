@@ -53,6 +53,7 @@ import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getModelConfigAlias } from './registry.js';
+import { MessageBusType } from '../confirmation-bus/types.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -131,7 +132,11 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       agentToolRegistry.sortTools();
       // Validate that all registered tools are safe for non-interactive
       // execution.
-      await AgentExecutor.validateTools(agentToolRegistry, definition.name);
+      await AgentExecutor.validateTools(
+        agentToolRegistry,
+        definition.name,
+        !!runtimeContext.getMessageBus(),
+      );
     }
 
     // Get the parent prompt ID from context
@@ -368,10 +373,69 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
     const { max_time_minutes } = this.definition.runConfig;
     const timeoutController = new AbortController();
-    const timeoutId = setTimeout(
-      () => timeoutController.abort(new Error('Agent timed out.')),
-      max_time_minutes * 60 * 1000,
-    );
+    const totalTimeMs = max_time_minutes * 60 * 1000;
+
+    let timeoutId: NodeJS.Timeout | undefined;
+    let totalPausedDuration = 0;
+    let pauseStartTime = 0;
+    let isPaused = false;
+
+    /** Starts or restarts the timeout with the remaining time. */
+    const startTimeout = () => {
+      const elapsedActive = Date.now() - startTime - totalPausedDuration;
+      const remaining = totalTimeMs - elapsedActive;
+      if (remaining <= 0) {
+        timeoutController.abort(new Error('Agent timed out.'));
+        return;
+      }
+      timeoutId = setTimeout(
+        () => timeoutController.abort(new Error('Agent timed out.')),
+        remaining,
+      );
+    };
+
+    /** Pauses the timeout execution. */
+    const pauseTimeout = () => {
+      if (isPaused) return;
+      isPaused = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      pauseStartTime = Date.now();
+    };
+
+    /** Resumes the timeout execution. */
+    const resumeTimeout = () => {
+      if (!isPaused) return;
+      isPaused = false;
+      const pausedDuration = Date.now() - pauseStartTime;
+      totalPausedDuration += pausedDuration;
+      startTimeout();
+    };
+
+    // Start the initial timeout
+    startTimeout();
+
+    // Listen to MessageBus for confirmation events to pause functionality
+    const confirmationRequestHandler = () => {
+      // Pause timeout when a tool asks for confirmation
+      pauseTimeout();
+    };
+
+    const confirmationResponseHandler = () => {
+      // Resume timeout when confirmation is handled
+      resumeTimeout();
+    };
+
+    const messageBus = this.runtimeContext.getMessageBus();
+    if (messageBus) {
+      messageBus.subscribe(
+        MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        confirmationRequestHandler,
+      );
+      messageBus.subscribe(
+        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        confirmationResponseHandler,
+      );
+    }
 
     // Combine the external signal with the internal timeout signal.
     const combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
@@ -535,7 +599,18 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       this.emitActivity('ERROR', { error: String(error) });
       throw error; // Re-throw other errors or external aborts.
     } finally {
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
+      const messageBus = this.runtimeContext.getMessageBus();
+      if (messageBus) {
+        messageBus.unsubscribe(
+          MessageBusType.TOOL_CONFIRMATION_REQUEST,
+          confirmationRequestHandler,
+        );
+        messageBus.unsubscribe(
+          MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          confirmationResponseHandler,
+        );
+      }
       logAgentFinish(
         this.runtimeContext,
         new AgentFinishEvent(
@@ -1020,9 +1095,13 @@ Important Rules:
   private static async validateTools(
     toolRegistry: ToolRegistry,
     agentName: string,
+    allowInteractive = false,
   ): Promise<void> {
     // Tools that are non-interactive. This is temporary until we have tool
     // confirmations for subagents.
+    if (allowInteractive) {
+      return;
+    }
     const allowlist = new Set([
       LS_TOOL_NAME,
       READ_FILE_TOOL_NAME,

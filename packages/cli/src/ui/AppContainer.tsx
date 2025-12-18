@@ -127,6 +127,7 @@ import { enableSupportedProtocol } from './utils/kittyProtocolDetector.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { enableBracketedPaste } from './utils/bracketedPaste.js';
 import { useBanner } from './hooks/useBanner.js';
+import { useToolConfirmationListener } from './hooks/useToolConfirmationListener.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -164,6 +165,8 @@ const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
+  const { request: toolConfirmationRequest, onConfirm: onToolConfirm } =
+    useToolConfirmationListener(config);
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
   });
@@ -1384,6 +1387,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isFolderTrustDialogOpen ||
     !!shellConfirmationRequest ||
     !!confirmationRequest ||
+    !!toolConfirmationRequest ||
     !!customDialog ||
     confirmUpdateExtensionRequests.length > 0 ||
     !!loopDetectionConfirmationRequest ||
@@ -1543,6 +1547,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       warningMessage,
       bannerData,
       bannerVisible,
+      toolConfirmationRequest,
+      onToolConfirm,
     }),
     [
       isThemeDialogOpen,
@@ -1634,6 +1640,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       warningMessage,
       bannerData,
       bannerVisible,
+      toolConfirmationRequest,
+      onToolConfirm,
     ],
   );
 

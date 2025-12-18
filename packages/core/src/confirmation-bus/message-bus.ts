@@ -82,8 +82,19 @@ export class MessageBus extends EventEmitter {
             });
             break;
           case PolicyDecision.ASK_USER:
-            // Pass through to UI for user confirmation
-            this.emitMessage(message);
+            // If the request has no confirmation details, we cannot ask the user yet.
+            // We must tell the tool to provide them.
+            if (!message.confirmationDetails) {
+              this.emitMessage({
+                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+                correlationId: message.correlationId,
+                confirmed: false,
+                requiresUserConfirmation: true,
+              });
+            } else {
+              // Pass through to UI for user confirmation
+              this.emitMessage(message);
+            }
             break;
           default:
             throw new Error(`Unknown policy decision: ${decision}`);

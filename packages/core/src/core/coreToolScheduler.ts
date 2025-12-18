@@ -51,6 +51,7 @@ import {
   executeToolWithHooks,
 } from './coreToolHookTriggers.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { ConfirmationStrategy } from './confirmation/types.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -356,11 +357,14 @@ interface CoreToolSchedulerOptions {
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
   getPreferredEditor: () => EditorType | undefined;
+  confirmationStrategy?: ConfirmationStrategy;
 }
 
 export class CoreToolScheduler {
   // Static WeakMap to track which MessageBus instances already have a handler subscribed
   // This prevents duplicate subscriptions when multiple CoreToolScheduler instances are created
+  // This prevents duplicate subscriptions when multiple CoreToolScheduler instances are created
+  // (e.g., on every React render, or for each non-interactive tool call)
   private static subscribedMessageBuses = new WeakMap<
     MessageBus,
     (request: ToolConfirmationRequest) => void
@@ -372,6 +376,7 @@ export class CoreToolScheduler {
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
+  private confirmationStrategy?: ConfirmationStrategy;
   private isFinalizingToolCalls = false;
   private isScheduling = false;
   private isCancelling = false;
@@ -390,6 +395,7 @@ export class CoreToolScheduler {
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
+    this.confirmationStrategy = options.confirmationStrategy;
 
     // Subscribe to message bus for ASK_USER policy decisions
     // Use a static WeakMap to ensure we only subscribe ONCE per MessageBus instance
@@ -887,77 +893,95 @@ export class CoreToolScheduler {
             ToolConfirmationOutcome.ProceedAlways,
           );
           this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
+        } else if (this.isAutoApproved(toolCall)) {
+          this.setToolCallOutcome(
+            reqInfo.callId,
+            ToolConfirmationOutcome.ProceedAlways,
+          );
+          this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
+        } else if (this.confirmationStrategy) {
+          this.setStatusInternal(
+            reqInfo.callId,
+            'awaiting_approval',
+            signal,
+            confirmationDetails,
+          );
+
+          const outcome = await this.confirmationStrategy.confirm(
+            reqInfo,
+            confirmationDetails,
+            signal,
+          );
+
+          await this.handleConfirmationResponse(
+            reqInfo.callId,
+            confirmationDetails.onConfirm,
+            outcome,
+            signal,
+          );
         } else {
-          if (this.isAutoApproved(toolCall)) {
-            this.setToolCallOutcome(
-              reqInfo.callId,
-              ToolConfirmationOutcome.ProceedAlways,
-            );
-            this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
-          } else {
-            if (!this.config.isInteractive()) {
-              throw new Error(
-                `Tool execution for "${
-                  toolCall.tool.displayName || toolCall.tool.name
-                }" requires user confirmation, which is not supported in non-interactive mode.`,
-              );
-            }
-            // Fire Notification hook before showing confirmation to user
-            const messageBus = this.config.getMessageBus();
-            const hooksEnabled = this.config.getEnableHooks();
-            if (hooksEnabled && messageBus) {
-              await fireToolNotificationHook(messageBus, confirmationDetails);
-            }
-
-            // Allow IDE to resolve confirmation
-            if (
-              confirmationDetails.type === 'edit' &&
-              confirmationDetails.ideConfirmation
-            ) {
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              confirmationDetails.ideConfirmation.then((resolution) => {
-                if (resolution.status === 'accepted') {
-                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                  this.handleConfirmationResponse(
-                    reqInfo.callId,
-                    confirmationDetails.onConfirm,
-                    ToolConfirmationOutcome.ProceedOnce,
-                    signal,
-                  );
-                } else {
-                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                  this.handleConfirmationResponse(
-                    reqInfo.callId,
-                    confirmationDetails.onConfirm,
-                    ToolConfirmationOutcome.Cancel,
-                    signal,
-                  );
-                }
-              });
-            }
-
-            const originalOnConfirm = confirmationDetails.onConfirm;
-            const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
-              ...confirmationDetails,
-              onConfirm: (
-                outcome: ToolConfirmationOutcome,
-                payload?: ToolConfirmationPayload,
-              ) =>
-                this.handleConfirmationResponse(
-                  reqInfo.callId,
-                  originalOnConfirm,
-                  outcome,
-                  signal,
-                  payload,
-                ),
-            };
-            this.setStatusInternal(
-              reqInfo.callId,
-              'awaiting_approval',
-              signal,
-              wrappedConfirmationDetails,
+          if (!this.config.isInteractive()) {
+            throw new Error(
+              `Tool execution for "${
+                toolCall.tool.displayName || toolCall.tool.name
+              }" requires user confirmation, which is not supported in non-interactive mode.`,
             );
           }
+          // Fire Notification hook before showing confirmation to user
+          const messageBus = this.config.getMessageBus();
+          const hooksEnabled = this.config.getEnableHooks();
+          if (hooksEnabled && messageBus) {
+            await fireToolNotificationHook(messageBus, confirmationDetails);
+          }
+
+          // Allow IDE to resolve confirmation
+          if (
+            confirmationDetails.type === 'edit' &&
+            confirmationDetails.ideConfirmation
+          ) {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            confirmationDetails.ideConfirmation.then((resolution) => {
+              if (resolution.status === 'accepted') {
+                // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                this.handleConfirmationResponse(
+                  reqInfo.callId,
+                  confirmationDetails.onConfirm,
+                  ToolConfirmationOutcome.ProceedOnce,
+                  signal,
+                );
+              } else {
+                // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                this.handleConfirmationResponse(
+                  reqInfo.callId,
+                  confirmationDetails.onConfirm,
+                  ToolConfirmationOutcome.Cancel,
+                  signal,
+                );
+              }
+            });
+          }
+
+          const originalOnConfirm = confirmationDetails.onConfirm;
+          const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
+            ...confirmationDetails,
+            onConfirm: (
+              outcome: ToolConfirmationOutcome,
+              payload?: ToolConfirmationPayload,
+            ) =>
+              this.handleConfirmationResponse(
+                reqInfo.callId,
+                originalOnConfirm,
+                outcome,
+                signal,
+                payload,
+              ),
+          };
+          this.setStatusInternal(
+            reqInfo.callId,
+            'awaiting_approval',
+            signal,
+            wrappedConfirmationDetails,
+          );
         }
       } catch (error) {
         if (signal.aborted) {

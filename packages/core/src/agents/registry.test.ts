@@ -48,15 +48,12 @@ describe('AgentRegistry', () => {
   });
 
   describe('initialize', () => {
-    // TODO: Add this test once we actually have a built-in agent configured.
-    // it('should load built-in agents upon initialization', async () => {
-    //   expect(registry.getAllDefinitions()).toHaveLength(0);
+    it('should load built-in agents upon initialization', async () => {
+      await registry.initialize();
 
-    //   await registry.initialize();
-
-    //   // There are currently no built-in agents.
-    //   expect(registry.getAllDefinitions()).toEqual([]);
-    // });
+      const names = registry.getAllAgentNames();
+      expect(names).toContain('shell_test_agent');
+    });
 
     it('should log the count of loaded agents in debug mode', async () => {
       const debugConfig = makeFakeConfig({ debugMode: true });

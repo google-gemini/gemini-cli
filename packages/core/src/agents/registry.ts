@@ -7,6 +7,7 @@
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
+import { ShellTestAgent } from './shell-test-agent.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
@@ -89,6 +90,8 @@ export class AgentRegistry {
       };
       this.registerAgent(agentDef);
     }
+
+    this.registerAgent(ShellTestAgent);
   }
 
   /**
@@ -173,6 +176,7 @@ export class AgentRegistry {
       .join('\n');
 
     return `Delegates a task to a specialized sub-agent.
+  All parameters for the sub-agent should be provided at the top level alongside 'agent_name'.
 
 Available agents:
 ${agentDescriptions}`;

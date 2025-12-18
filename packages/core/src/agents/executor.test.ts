@@ -59,6 +59,8 @@ import { CompressionStatus } from '../core/turn.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { getModelConfigAlias } from './registry.js';
+import { MessageBus } from '../confirmation-bus/message-bus.js';
+import { PolicyEngine } from '../policy/policy-engine.js';
 
 const {
   mockSendMessageStream,
@@ -76,6 +78,14 @@ let mockChatHistory: Content[] = [];
 const mockSetHistory = vi.fn((newHistory: Content[]) => {
   mockChatHistory = newHistory;
 });
+
+let mockPolicyEngineInstance: PolicyEngine;
+
+vi.mock('../policy/policy-engine.js', () => ({
+  PolicyEngine: vi.fn().mockImplementation(() => ({
+    check: vi.fn(() => 'ask_user'),
+  })),
+}));
 
 vi.mock('../services/chatCompressionService.js', () => ({
   ChatCompressionService: vi.fn().mockImplementation(() => ({
@@ -241,6 +251,12 @@ describe('AgentExecutor', () => {
     mockedPromptIdContext.getStore.mockReset();
     mockedPromptIdContext.run.mockImplementation((_id, fn) => fn());
 
+    (PolicyEngine as unknown as Mock).mockImplementation(() => ({
+      check: vi.fn(() => 'ask_user'),
+    }));
+    mockPolicyEngineInstance = new PolicyEngine();
+    (mockPolicyEngineInstance.check as Mock).mockClear();
+
     (ChatCompressionService as Mock).mockImplementation(() => ({
       compress: mockCompress,
     }));
@@ -263,6 +279,9 @@ describe('AgentExecutor', () => {
     vi.useFakeTimers();
 
     mockConfig = makeFakeConfig();
+    vi.spyOn(mockConfig, 'getEnableMessageBusIntegration').mockReturnValue(
+      false,
+    );
     parentToolRegistry = new ToolRegistry(mockConfig);
     parentToolRegistry.registerTool(new LSTool(mockConfig));
     parentToolRegistry.registerTool(
@@ -301,9 +320,43 @@ describe('AgentExecutor', () => {
 
     it('SECURITY: should throw if a tool is not on the non-interactive allowlist', async () => {
       const definition = createTestDefinition([MOCK_TOOL_NOT_ALLOWED.name]);
+      const nonInteractiveMockConfig = makeFakeConfig();
+      vi.spyOn(nonInteractiveMockConfig, 'getToolRegistry').mockResolvedValue(
+        parentToolRegistry,
+      );
+      vi.spyOn(
+        nonInteractiveMockConfig,
+        'getEnableMessageBusIntegration',
+      ).mockReturnValue(false);
+      vi.spyOn(nonInteractiveMockConfig, 'getMessageBus').mockReturnValue(
+        undefined as unknown as MessageBus,
+      );
+
       await expect(
-        AgentExecutor.create(definition, mockConfig, onActivity),
+        AgentExecutor.create(definition, nonInteractiveMockConfig, onActivity),
       ).rejects.toThrow(/not on the allow-list for non-interactive execution/);
+    });
+
+    it('SECURITY: should NOT throw if a tool is not on the allowlist but message bus is enabled for delegated confirmation', async () => {
+      const definition = createTestDefinition([MOCK_TOOL_NOT_ALLOWED.name]);
+      const interactiveMockConfig = makeFakeConfig();
+      vi.spyOn(interactiveMockConfig, 'getToolRegistry').mockResolvedValue(
+        parentToolRegistry,
+      );
+      vi.spyOn(
+        interactiveMockConfig,
+        'getEnableMessageBusIntegration',
+      ).mockReturnValue(true);
+      vi.spyOn(interactiveMockConfig, 'getMessageBus').mockReturnValue(
+        new MessageBus(mockPolicyEngineInstance),
+      ); // Mock a MessageBus
+
+      const executor = await AgentExecutor.create(
+        definition,
+        interactiveMockConfig,
+        onActivity,
+      );
+      expect(executor).toBeInstanceOf(AgentExecutor); // Should create successfully
     });
 
     it('should create an isolated ToolRegistry for the agent', async () => {

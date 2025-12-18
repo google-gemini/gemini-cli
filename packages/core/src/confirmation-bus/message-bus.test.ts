@@ -133,11 +133,53 @@ describe('MessageBus', () => {
         type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
         toolCall: { name: 'test-tool', args: {} },
         correlationId: '123',
+        confirmationDetails: {
+          type: 'info',
+          title: 'Confirm',
+          prompt: 'Do it?',
+        },
       };
 
       await messageBus.publish(request);
 
       expect(requestHandler).toHaveBeenCalledWith(request);
+    });
+
+    it('should request user confirmation logic when policy says ASK_USER but no details provided', async () => {
+      vi.spyOn(policyEngine, 'check').mockResolvedValue({
+        decision: PolicyDecision.ASK_USER,
+      });
+
+      const requestHandler = vi.fn();
+      const responseHandler = vi.fn();
+      messageBus.subscribe(
+        MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        requestHandler,
+      );
+      messageBus.subscribe(
+        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        responseHandler,
+      );
+
+      const request: ToolConfirmationRequest = {
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        toolCall: { name: 'test-tool', args: {} },
+        correlationId: '123',
+        // confirmationDetails is undefined
+      };
+
+      await messageBus.publish(request);
+
+      // Should NOT forward to UI (UI ignores it anyway, causing timeout)
+      expect(requestHandler).not.toHaveBeenCalled();
+
+      // Should immediately ask for confirmation details
+      expect(responseHandler).toHaveBeenCalledWith({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: '123',
+        confirmed: false,
+        requiresUserConfirmation: true,
+      });
     });
 
     it('should emit other message types directly', async () => {
