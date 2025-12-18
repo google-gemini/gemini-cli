@@ -744,6 +744,7 @@ export class MCPOAuthProvider {
             const discoveredConfig =
               await OAuthUtils.discoverOAuthFromWWWAuthenticate(
                 wwwAuthenticate,
+                mcpServerUrl,
               );
             if (discoveredConfig) {
               // Merge discovered config with existing config, preserving clientId and clientSecret
@@ -760,8 +761,14 @@ export class MCPOAuthProvider {
           }
         }
       } catch (error) {
+        // If it's a security validation error, re-throw it so the user knows why
+        const msg = getErrorMessage(error);
+        if (msg.includes('does not match expected')) {
+          throw error;
+        }
+
         debugLogger.debug(
-          `Failed to check endpoint for authentication requirements: ${getErrorMessage(error)}`,
+          `Failed to check endpoint for authentication requirements: ${msg}`,
         );
       }
 
