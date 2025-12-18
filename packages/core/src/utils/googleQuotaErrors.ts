@@ -13,6 +13,8 @@ import type {
 import { parseGoogleApiError } from './googleErrors.js';
 import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 
+const DEFAULT_RETRYABLE_DELAY_SECOND = 5;
+
 /**
  * A non-retryable error indicating a hard quota limit has been reached (e.g., daily limit).
  */
@@ -122,7 +124,7 @@ export function classifyGoogleError(error: unknown): unknown {
           message: errorMessage,
           details: [],
         },
-        5,
+        DEFAULT_RETRYABLE_DELAY_SECOND,
       );
     }
 
