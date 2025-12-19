@@ -10,8 +10,8 @@ import {
   loadJitSubdirectoryMemory,
   concatenateInstructions,
 } from '../utils/memoryDiscovery.js';
-import type { ExtensionLoader } from '../utils/extensionLoader.js';
 import type { Config } from '../config/config.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 
 export class ContextManager {
   private readonly loadedPaths: Set<string> = new Set();
@@ -24,36 +24,40 @@ export class ContextManager {
   }
 
   /**
-   * Loads the global memory (Tier 1) and returns the formatted content.
+   * Refreshes the memory by reloading global and environment memory.
    */
-  async loadGlobalMemory(): Promise<string> {
+  async refresh(): Promise<void> {
+    this.loadedPaths.clear();
+    await this.loadGlobalMemory();
+    await this.loadEnvironmentMemory();
+    this.emitMemoryChanged();
+  }
+
+  private async loadGlobalMemory(): Promise<void> {
     const result = await loadGlobalMemory(this.config.getDebugMode());
     this.markAsLoaded(result.files.map((f) => f.path));
     this.globalMemory = concatenateInstructions(
       result.files.map((f) => ({ filePath: f.path, content: f.content })),
       this.config.getWorkingDir(),
     );
-    return this.globalMemory;
   }
 
-  /**
-   * Loads the environment memory (Tier 2) and returns the formatted content.
-   */
-  async loadEnvironmentMemory(
-    trustedRoots: string[],
-    extensionLoader: ExtensionLoader,
-  ): Promise<string> {
+  private async loadEnvironmentMemory(): Promise<void> {
     const result = await loadEnvironmentMemory(
-      trustedRoots,
-      extensionLoader,
+      [...this.config.getWorkspaceContext().getDirectories()],
+      this.config.getExtensionLoader(),
       this.config.getDebugMode(),
     );
     this.markAsLoaded(result.files.map((f) => f.path));
-    this.environmentMemory = concatenateInstructions(
+    const envMemory = concatenateInstructions(
       result.files.map((f) => ({ filePath: f.path, content: f.content })),
       this.config.getWorkingDir(),
     );
-    return this.environmentMemory;
+    const mcpInstructions =
+      this.config.getMcpClientManager()?.getMcpInstructions() || '';
+    this.environmentMemory = [envMemory, mcpInstructions.trimStart()]
+      .filter(Boolean)
+      .join('\n\n');
   }
 
   /**
@@ -82,6 +86,12 @@ export class ContextManager {
     );
   }
 
+  private emitMemoryChanged(): void {
+    coreEvents.emit(CoreEvent.MemoryChanged, {
+      fileCount: this.loadedPaths.size,
+    });
+  }
+
   getGlobalMemory(): string {
     return this.globalMemory;
   }
@@ -94,15 +104,6 @@ export class ContextManager {
     for (const p of paths) {
       this.loadedPaths.add(p);
     }
-  }
-
-  /**
-   * Resets the loaded paths tracking and memory. Useful for testing or full reloads.
-   */
-  reset(): void {
-    this.loadedPaths.clear();
-    this.globalMemory = '';
-    this.environmentMemory = '';
   }
 
   getLoadedPaths(): ReadonlySet<string> {
