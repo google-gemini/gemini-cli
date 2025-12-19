@@ -73,6 +73,9 @@ This documentation is organized into the following sections:
 - **[Memport](./core/memport.md):** Using the Memory Import Processor.
 - **[Tools API](./core/tools-api.md):** Information on how the core manages and
   exposes tools.
+- **[System Prompt Override](./cli/system-prompt.md):** Replace built-in system
+  instructions using `GEMINI_SYSTEM_MD`.
+
 - **[Policy Engine](./core/policy-engine.md):** Use the Policy Engine for
   fine-grained control over tool execution.
 
