@@ -47,6 +47,7 @@ describe('HookRegistry', () => {
       getExtensions: vi.fn().mockReturnValue([]),
       getHooks: vi.fn().mockReturnValue({}),
       getDisabledHooks: vi.fn().mockReturnValue([]),
+      isTrustedFolder: vi.fn().mockReturnValue(true),
     } as unknown as Config;
 
     hookRegistry = new HookRegistry(mockConfig);
@@ -65,6 +66,35 @@ describe('HookRegistry', () => {
       expect(hookRegistry.getAllHooks()).toHaveLength(0);
       expect(mockDebugLogger.log).toHaveBeenCalledWith(
         'Hook registry initialized with 0 hook entries',
+      );
+    });
+
+    it('should not load hooks if folder is not trusted', async () => {
+      vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(false);
+      const mockHooksConfig = {
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: './hooks/test.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      vi.mocked(mockConfig.getHooks).mockReturnValue(
+        mockHooksConfig as unknown as {
+          [K in HookEventName]?: HookDefinition[];
+        },
+      );
+
+      await hookRegistry.initialize();
+
+      expect(hookRegistry.getAllHooks()).toHaveLength(0);
+      expect(mockDebugLogger.warn).toHaveBeenCalledWith(
+        'Project hooks disabled because the folder is not trusted.',
       );
     });
 

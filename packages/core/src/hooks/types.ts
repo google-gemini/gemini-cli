@@ -16,6 +16,7 @@ import type {
   HookToolConfig,
 } from './hookTranslator.js';
 import { defaultHookTranslator } from './hookTranslator.js';
+import type { ConfigSource } from './hookRegistry.js';
 
 /**
  * Event names for the hook system
@@ -43,6 +44,7 @@ export interface CommandHookConfig {
   name?: string;
   description?: string;
   timeout?: number;
+  source?: ConfigSource;
 }
 
 export type HookConfig = CommandHookConfig;

@@ -110,7 +110,7 @@ export class HookRegistry {
   private processHooksFromConfig(): void {
     // Get hooks from the main config (this comes from the merged settings)
     const configHooks = this.config.getHooks();
-    if (configHooks) {
+    if (configHooks && this.config.isTrustedFolder()) {
       this.processHooksConfiguration(configHooks, ConfigSource.Project);
     }
 
@@ -188,6 +188,9 @@ export class HookRegistry {
           config: hookConfig,
         } as HookRegistryEntry);
         const isDisabled = disabledHooks.includes(hookName);
+
+        // Add source to hook config
+        hookConfig.source = source;
 
         this.entries.push({
           config: hookConfig,
