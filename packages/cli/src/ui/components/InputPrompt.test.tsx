@@ -768,6 +768,63 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should execute perfect match on Enter even if suggestions are showing, if at first suggestion', async () => {
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [
+        { label: 'review', value: 'review' }, // Match is now at index 0
+        { label: 'review-frontend', value: 'review-frontend' },
+      ],
+      activeSuggestionIndex: 0,
+      isPerfectMatch: true,
+    });
+    props.buffer.text = '/review';
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\r');
+    });
+
+    await waitFor(() => {
+      expect(props.onSubmit).toHaveBeenCalledWith('/review');
+    });
+    unmount();
+  });
+
+  it('should autocomplete and NOT execute on Enter if a DIFFERENT suggestion is selected even if perfect match', async () => {
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [
+        { label: 'review', value: 'review' },
+        { label: 'review-frontend', value: 'review-frontend' },
+      ],
+      activeSuggestionIndex: 1, // review-frontend selected (not the perfect match at 0)
+      isPerfectMatch: true, // /review is a perfect match
+    });
+    props.buffer.text = '/review';
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\r');
+    });
+
+    await waitFor(() => {
+      // Should handle autocomplete for index 1
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(1);
+      // Should NOT submit
+      expect(props.onSubmit).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
   it('should submit directly on Enter when a complete leaf command is typed', async () => {
     mockedUseCommandCompletion.mockReturnValue({
       ...mockCommandCompletion,
