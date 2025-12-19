@@ -5,23 +5,23 @@
  */
 
 import type { CodeAssistServer } from '../server.js';
-import type { Events } from './types.js';
+import type { Event } from './types.js';
 
-let eventsPromise: Promise<Events> | undefined;
+let eventPromise: Promise<Event> | undefined;
 
 /**
- * Gets the events from the server.
+ * Gets the next event from the server.
  *
  * The events are cached so that they are only fetched once.
  */
-export async function getEvents(server: CodeAssistServer): Promise<Events> {
-  if (eventsPromise) {
-    return eventsPromise;
+export async function getEvents(server: CodeAssistServer): Promise<Event> {
+  if (eventPromise) {
+    return eventPromise;
   }
 
-  eventsPromise = (async () => {
+  eventPromise = (async () => {
     const response = await server.receiveEvents();
-    return response;
+    return response.event;
   })();
-  return eventsPromise;
+  return eventPromise;
 }

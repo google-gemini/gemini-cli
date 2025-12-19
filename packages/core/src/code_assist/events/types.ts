@@ -5,11 +5,7 @@
  */
 
 export interface ReceiveEventsResponse {
-  events?: Event[];
-}
-
-export interface Events {
-  events?: Event[];
+  event: Event;
 }
 
 export type EventType = 'CAMPAIGN_NOTIFICATION' | 'CLI_BANNER';
@@ -21,13 +17,13 @@ export interface Event {
 }
 
 export interface Campaign {
-  title: string; // will contain whether text is default, warning, or error
-  body: string; // actual banner text
+  title: string; // first line of banner
+  body: string; // rest of banner text
   campaignId: string;
-  actions: Action[];
+  action: Action;
 }
 
 export interface Action {
-  text: string;
-  uri: string;
+  text?: string; // banner's styling WARNING is supported right now
+  uri?: string;
 }

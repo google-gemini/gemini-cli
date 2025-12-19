@@ -7,8 +7,13 @@
 import { useState, useEffect } from 'react';
 import type { Config } from '@google/gemini-cli-core';
 
+interface BannerContent {
+  title: string;
+  body: string;
+}
+
 export interface BannerData {
-  bannerText: string;
+  bannerText: BannerContent;
   isWarning: boolean;
 }
 
@@ -17,7 +22,7 @@ export function useBanner(bannerData: BannerData, config: Config) {
     config.getPreviewFeatures(),
   );
 
-  const { bannerText } = bannerData;
+  const { title, body } = bannerData.bannerText;
 
   useEffect(() => {
     const isEnabled = config.getPreviewFeatures();
@@ -26,11 +31,12 @@ export function useBanner(bannerData: BannerData, config: Config) {
     }
   }, [config, previewEnabled]);
 
-  const bannerTextEscaped = !previewEnabled
-    ? bannerText.replace(/\\n/g, '\n')
-    : '';
+  const titleEscaped = !previewEnabled ? title.replace(/\\n/g, '\n') : '';
+
+  const bodyEscaped = !previewEnabled ? body.replace(/\\n/g, '\n') : '';
 
   return {
-    bannerText: bannerTextEscaped,
+    title: titleEscaped,
+    body: bodyEscaped,
   };
 }

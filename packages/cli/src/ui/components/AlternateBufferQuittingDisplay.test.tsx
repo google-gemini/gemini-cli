@@ -105,7 +105,10 @@ describe('AlternateBufferQuittingDisplay', () => {
     embeddedShellFocused: false,
     renderMarkdown: false,
     banner: {
-      bannerText: '',
+      bannerText: {
+        title: '',
+        body: '',
+      },
       isWarning: false,
     },
   };

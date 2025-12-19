@@ -22,7 +22,10 @@ describe('<AppHeader />', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       banner: {
-        bannerText: 'This is the default banner',
+        bannerText: {
+          title: 'This is the default banner',
+          body: '',
+        },
         isWarning: false,
       },
       bannerVisible: true,
@@ -42,7 +45,10 @@ describe('<AppHeader />', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       banner: {
-        bannerText: '',
+        bannerText: {
+          title: '',
+          body: '',
+        },
         isWarning: false,
       },
     };
@@ -61,7 +67,10 @@ describe('<AppHeader />', () => {
     const mockConfig = makeFakeConfig({ previewFeatures: false });
     const uiState = {
       banner: {
-        bannerText: 'This is the default banner',
+        bannerText: {
+          title: 'This is the default banner',
+          body: '',
+        },
         isWarning: false,
       },
       bannerVisible: true,
@@ -81,7 +90,10 @@ describe('<AppHeader />', () => {
     const mockConfig = makeFakeConfig({ previewFeatures: true });
     const uiState = {
       banner: {
-        bannerText: 'This is the default banner',
+        bannerText: {
+          title: 'This is the default banner',
+          body: '',
+        },
         isWarning: false,
       },
     };
@@ -100,7 +112,10 @@ describe('<AppHeader />', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       banner: {
-        bannerText: 'First line\\nSecond line',
+        bannerText: {
+          title: 'First line\\nSecond line',
+          body: '',
+        },
         isWarning: false,
       },
       bannerVisible: true,

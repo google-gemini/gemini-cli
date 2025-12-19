@@ -31,31 +31,44 @@ describe('events', () => {
   it('should fetch events from the server', async () => {
     const { getEvents } = await import('./events.js');
     const mockApiResponse: ReceiveEventsResponse = {
-      events: [
-        {
-          eventId: '1',
-          eventType: 'CAMPAIGN_NOTIFICATION',
-          campaignNotification: {
-            title: 'title',
-            body: 'body',
-            campaignId: 'id',
-            actions: [],
+      event: {
+        eventId: '1',
+        eventType: 'CAMPAIGN_NOTIFICATION',
+        campaignNotification: {
+          title: 'title',
+          body: 'body',
+          campaignId: 'id',
+          action: {
+            text: '',
+            uri: '',
           },
         },
-      ],
+      },
     };
     vi.mocked(mockServer.receiveEvents).mockResolvedValue(mockApiResponse);
 
     const events = await getEvents(mockServer);
 
     expect(mockServer.receiveEvents).toHaveBeenCalled();
-    expect(events).toEqual(mockApiResponse);
+    expect(events).toEqual(mockApiResponse.event);
   });
 
   it('should cache the events promise to avoid multiple fetches', async () => {
     const { getEvents } = await import('./events.js');
     const mockApiResponse: ReceiveEventsResponse = {
-      events: [],
+      event: {
+        eventId: '',
+        eventType: 'CAMPAIGN_NOTIFICATION',
+        campaignNotification: {
+          title: '',
+          body: '',
+          campaignId: '',
+          action: {
+            text: '',
+            uri: '',
+          },
+        },
+      },
     };
     vi.mocked(mockServer.receiveEvents).mockResolvedValue(mockApiResponse);
 

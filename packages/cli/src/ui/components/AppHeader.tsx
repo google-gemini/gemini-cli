@@ -22,17 +22,18 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
   const config = useConfig();
   const { nightly, mainAreaWidth, banner, bannerVisible } = useUIState();
 
-  const { bannerText } = useBanner(banner, config);
+  const { title, body } = useBanner(banner, config);
 
   return (
     <Box flexDirection="column">
       {!(settings.merged.ui?.hideBanner || config.getScreenReader()) && (
         <>
           <Header version={version} nightly={nightly} />
-          {bannerVisible && bannerText && (
+          {bannerVisible && (title || body) && (
             <Banner
               width={mainAreaWidth}
-              bannerText={bannerText}
+              title={title}
+              body={body}
               isWarning={banner.isWarning}
             />
           )}

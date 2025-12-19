@@ -46,7 +46,10 @@ describe('useBanner', () => {
   let mockConfig: MockConfigShape;
 
   const defaultBannerData = {
-    bannerText: 'Standard Banner',
+    bannerText: {
+      title: 'Standard Banner',
+      body: '',
+    },
     isWarning: false,
   };
 
@@ -67,7 +70,7 @@ describe('useBanner', () => {
       useBanner(defaultBannerData, mockConfig as unknown as Config),
     );
 
-    // Should fall back to warningText (which is empty)
-    expect(result.current.bannerText).toBe('');
+    expect(result.current.title).toBe('');
+    expect(result.current.body).toBe('');
   });
 });

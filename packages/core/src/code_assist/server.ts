@@ -63,6 +63,8 @@ export interface HttpOptions {
 export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
 export const CODE_ASSIST_API_VERSION = 'v1internal';
 
+const METHOD_WITH_PARAMS = 'event:receive?client_type=GEMINI_CLI';
+
 export class CodeAssistServer implements ContentGenerator {
   constructor(
     readonly client: AuthClient,

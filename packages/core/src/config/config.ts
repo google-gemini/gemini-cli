@@ -100,7 +100,6 @@ import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
-import { type Event } from '../code_assist/events/types.js';
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
@@ -200,7 +199,7 @@ import {
 import { McpClientManager } from '../tools/mcp-client-manager.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getEvents } from '../code_assist/events/events.js';
-import type { Events, EventType } from '../code_assist/events/types.js';
+import type { Event } from '../code_assist/events/types.js';
 
 export type { FileFilteringOptions };
 export {
@@ -481,7 +480,7 @@ export class Config {
     | undefined;
   private readonly disabledHooks: string[];
   private experiments: Experiments | undefined;
-  private events: Events | undefined;
+  private event: Event | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private eventsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
@@ -834,8 +833,8 @@ export class Config {
         });
 
       this.eventsPromise = getEvents(codeAssistServer)
-        .then((events) => {
-          this.setEvents(events);
+        .then((event) => {
+          this.setEvent(event);
         })
         .catch((e) => {
           debugLogger.error('Failed fetch events', e);
@@ -843,7 +842,7 @@ export class Config {
     } else {
       this.experiments = undefined;
       this.experimentsPromise = undefined;
-      this.events = undefined;
+      this.event = undefined;
       this.eventsPromise = undefined;
     }
 
@@ -1864,24 +1863,19 @@ export class Config {
   /**
    * Get event based on an event type
    */
-  async getEvent(eventType: EventType): Promise<Event | undefined> {
+  async getEvent(): Promise<Event | undefined> {
     await this.ensureEventsLoaded();
-    if (!this.events?.events) {
+    if (!this.event) {
       return;
     }
-    for (const event of this.events.events) {
-      if (event.eventType === eventType) {
-        return event;
-      }
-    }
-    return;
+    return this.event;
   }
 
   /**
-   * Set events
+   * Set event
    */
-  setEvents(events: Events): void {
-    this.events = events;
+  setEvent(events: Event): void {
+    this.event = events;
   }
 }
 // Export model constants for use in CLI
