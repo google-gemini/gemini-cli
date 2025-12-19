@@ -7,7 +7,7 @@
 import {
   type PolicyRule,
   PolicyDecision,
-  type ApprovalMode,
+  ApprovalMode,
   type SafetyCheckerConfig,
   type SafetyCheckerRule,
   InProcessCheckerType,
@@ -43,7 +43,7 @@ const PolicyRuleSchema = z.object({
       message:
         'priority must be <= 999 to prevent tier overflow. Priorities >= 1000 would jump to the next tier.',
     }),
-  modes: z.array(z.string()).optional(),
+  modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
 });
 
 /**
@@ -56,7 +56,7 @@ const SafetyCheckerRuleSchema = z.object({
   commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
   commandRegex: z.string().optional(),
   priority: z.number().int().default(0),
-  modes: z.array(z.string()).optional(),
+  modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
   checker: z.discriminatedUnion('type', [
     z.object({
       type: z.literal('in-process'),
@@ -216,16 +216,13 @@ function transformPriority(priority: number, tier: number): number {
  * 1. Scans directories for .toml files
  * 2. Parses and validates each file
  * 3. Transforms rules (commandPrefix, arrays, mcpName, priorities)
- * 4. Filters rules by approval mode
- * 5. Collects detailed error information for any failures
+ * 4. Collects detailed error information for any failures
  *
- * @param approvalMode The current approval mode (for filtering rules by mode)
  * @param policyDirs Array of directory paths to scan for policy files
  * @param getPolicyTier Function to determine tier (1-3) for a directory
  * @returns Object containing successfully parsed rules and any errors encountered
  */
 export async function loadPoliciesFromToml(
-  approvalMode: ApprovalMode,
   policyDirs: string[],
   getPolicyTier: (dir: string) => number,
 ): Promise<PolicyLoadResult> {
@@ -324,13 +321,6 @@ export async function loadPoliciesFromToml(
 
         // Transform rules
         const parsedRules: PolicyRule[] = (validationResult.data.rule ?? [])
-          .filter((rule) => {
-            // Filter by mode
-            if (!rule.modes || rule.modes.length === 0) {
-              return true;
-            }
-            return rule.modes.includes(approvalMode);
-          })
           .flatMap((rule) => {
             // Transform commandPrefix/commandRegex to argsPattern
             let effectiveArgsPattern = rule.argsPattern;
@@ -377,6 +367,7 @@ export async function loadPoliciesFromToml(
                   toolName: effectiveToolName,
                   decision: rule.decision,
                   priority: transformPriority(rule.priority, tier),
+                  modes: rule.modes,
                 };
 
                 // Compile regex pattern
@@ -412,12 +403,6 @@ export async function loadPoliciesFromToml(
         const parsedCheckers: SafetyCheckerRule[] = (
           validationResult.data.safety_checker ?? []
         )
-          .filter((checker) => {
-            if (!checker.modes || checker.modes.length === 0) {
-              return true;
-            }
-            return checker.modes.includes(approvalMode);
-          })
           .flatMap((checker) => {
             let effectiveArgsPattern = checker.argsPattern;
             const commandPrefixes: string[] = [];
@@ -459,6 +444,7 @@ export async function loadPoliciesFromToml(
                   toolName: effectiveToolName,
                   priority: checker.priority,
                   checker: checker.checker as SafetyCheckerConfig,
+                  modes: checker.modes,
                 };
 
                 if (argsPattern) {
