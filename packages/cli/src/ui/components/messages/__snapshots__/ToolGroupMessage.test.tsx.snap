@@ -37,9 +37,9 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialo
 │                                                                              │
 │ Do you want to proceed?                                                      │
 │                                                                              │
-│ ● 1. Yes, allow once                                                         │
-│   2. Yes, allow always                                                       │
-│   3. Yes, allow always and save to policy                                    │
+│ ● 1. Allow once                                                              │
+│   2. Allow for this session                                                  │
+│   3. Allow for all future sessions                                           │
 │   4. No, suggest changes (esc)                                               │
 │                                                                              │
 │                                                                              │
@@ -121,9 +121,9 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call awaiting co
 │                                                                              │
 │ Do you want to proceed?                                                      │
 │                                                                              │
-│ ● 1. Yes, allow once                                                         │
-│   2. Yes, allow always                                                       │
-│   3. Yes, allow always and save to policy                                    │
+│ ● 1. Allow once                                                              │
+│   2. Allow for this session                                                  │
+│   3. Allow for all future sessions                                           │
 │   4. No, suggest changes (esc)                                               │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯"

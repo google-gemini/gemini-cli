@@ -104,17 +104,17 @@ describe('ToolConfirmationMessage', () => {
       {
         description: 'for edit confirmations',
         details: editConfirmationDetails,
-        alwaysAllowText: 'Yes, allow always',
+        alwaysAllowText: 'Allow for this session',
       },
       {
         description: 'for exec confirmations',
         details: execConfirmationDetails,
-        alwaysAllowText: 'Yes, allow always',
+        alwaysAllowText: 'Allow for this session',
       },
       {
         description: 'for info confirmations',
         details: infoConfirmationDetails,
-        alwaysAllowText: 'Yes, allow always',
+        alwaysAllowText: 'Allow for this session',
       },
       {
         description: 'for mcp confirmations',
