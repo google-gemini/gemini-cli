@@ -212,6 +212,28 @@ describe('AgentRegistry', () => {
         vi.mocked(tomlLoader.loadAgentsFromDirectory),
       ).not.toHaveBeenCalled();
     });
+
+    it('should register introspection agent if enabled', async () => {
+      const config = makeFakeConfig({
+        introspectionAgentSettings: { enabled: true },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.initialize();
+
+      expect(registry.getDefinition('introspection_agent')).toBeDefined();
+    });
+
+    it('should NOT register introspection agent if disabled', async () => {
+      const config = makeFakeConfig({
+        introspectionAgentSettings: { enabled: false },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.initialize();
+
+      expect(registry.getDefinition('introspection_agent')).toBeUndefined();
+    });
   });
 
   describe('registration logic', () => {

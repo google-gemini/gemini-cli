@@ -1403,6 +1403,26 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      introspectionAgentSettings: {
+        type: 'object',
+        label: 'Introspection Agent Settings',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: {},
+        description: 'Configuration for Introspection Agent.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Introspection Agent',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description: 'Enable the Introspection Agent.',
+            showInDialog: true,
+          },
+        },
+      },
     },
   },
 
