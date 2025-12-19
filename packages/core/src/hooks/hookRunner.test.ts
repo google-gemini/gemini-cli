@@ -114,9 +114,8 @@ describe('HookRunner', () => {
         mockSpawn.mockStdoutOn.mockImplementation(
           (event: string, callback: (data: Buffer) => void) => {
             if (event === 'data') {
-              setTimeout(
-                () => callback(Buffer.from(JSON.stringify(mockOutput))),
-                10,
+              setImmediate(() =>
+                callback(Buffer.from(JSON.stringify(mockOutput))),
               );
             }
           },
@@ -125,7 +124,7 @@ describe('HookRunner', () => {
         mockSpawn.mockProcessOn.mockImplementation(
           (event: string, callback: (code: number) => void) => {
             if (event === 'close') {
-              setTimeout(() => callback(0), 20);
+              setImmediate(() => callback(0));
             }
           },
         );
@@ -150,7 +149,7 @@ describe('HookRunner', () => {
         mockSpawn.mockStderrOn.mockImplementation(
           (event: string, callback: (data: Buffer) => void) => {
             if (event === 'data') {
-              setTimeout(() => callback(Buffer.from(errorMessage)), 10);
+              setImmediate(() => callback(Buffer.from(errorMessage)));
             }
           },
         );
@@ -158,7 +157,7 @@ describe('HookRunner', () => {
         mockSpawn.mockProcessOn.mockImplementation(
           (event: string, callback: (code: number) => void) => {
             if (event === 'close') {
-              setTimeout(() => callback(1), 20);
+              setImmediate(() => callback(1));
             }
           },
         );
@@ -223,9 +222,9 @@ describe('HookRunner', () => {
           killWasCalled = true;
           // Simulate that killing the process triggers the close event
           if (closeCallback) {
-            setTimeout(() => {
+            setImmediate(() => {
               closeCallback!(128); // Exit code 128 indicates process was killed by signal
-            }, 5);
+            });
           }
           return true;
         });
@@ -251,7 +250,7 @@ describe('HookRunner', () => {
         mockSpawn.mockProcessOn.mockImplementation(
           (event: string, callback: (code: number) => void) => {
             if (event === 'close') {
-              setTimeout(() => callback(0), 10);
+              setImmediate(() => callback(0));
             }
           },
         );
@@ -263,7 +262,7 @@ describe('HookRunner', () => {
         );
 
         expect(spawn).toHaveBeenCalledWith(
-          expect.stringMatching(/bash|powershell|cmd/),
+          expect.stringMatching(/bash|powershell/),
           expect.arrayContaining([
             expect.stringMatching(/['"]?\/test\/project['"]?\/hooks\/test\.sh/),
           ]),
@@ -293,7 +292,7 @@ describe('HookRunner', () => {
         mockSpawn.mockProcessOn.mockImplementation(
           (event: string, callback: (code: number) => void) => {
             if (event === 'close') {
-              setTimeout(() => callback(0), 10);
+              setImmediate(() => callback(0));
             }
           },
         );
@@ -306,7 +305,7 @@ describe('HookRunner', () => {
 
         // If secure, spawn will be called with the shell executable and escaped command
         expect(spawn).toHaveBeenCalledWith(
-          expect.stringMatching(/bash|powershell|cmd/),
+          expect.stringMatching(/bash|powershell/),
           expect.arrayContaining([
             expect.stringMatching(/ls (['"]).*echo.*pwned.*\1/),
           ]),
@@ -327,7 +326,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(0), 10);
+            setImmediate(() => callback(0));
           }
         },
       );
@@ -354,7 +353,7 @@ describe('HookRunner', () => {
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
             const exitCode = callCount++ === 0 ? 0 : 1; // First succeeds, second fails
-            setTimeout(() => callback(exitCode), 10);
+            setImmediate(() => callback(exitCode));
           }
         },
       );
@@ -389,7 +388,7 @@ describe('HookRunner', () => {
             ][1] as string[];
             const command = args[args.length - 1];
             executionOrder.push(command);
-            setTimeout(() => callback(0), 10);
+            setImmediate(() => callback(0));
           }
         },
       );
@@ -419,7 +418,7 @@ describe('HookRunner', () => {
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data' && callCount === 1) {
             // Second hook fails
-            setTimeout(() => callback(Buffer.from('Hook 2 failed')), 10);
+            setImmediate(() => callback(Buffer.from('Hook 2 failed')));
           }
         },
       );
@@ -428,7 +427,7 @@ describe('HookRunner', () => {
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
             const exitCode = callCount++ === 1 ? 1 : 0; // Second fails, others succeed
-            setTimeout(() => callback(exitCode), 20);
+            setImmediate(() => callback(exitCode));
           }
         },
       );
@@ -469,9 +468,8 @@ describe('HookRunner', () => {
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
             if (hookCallCount === 0) {
-              setTimeout(
-                () => callback(Buffer.from(JSON.stringify(mockOutput1))),
-                10,
+              setImmediate(() =>
+                callback(Buffer.from(JSON.stringify(mockOutput1))),
               );
             }
           }
@@ -482,7 +480,7 @@ describe('HookRunner', () => {
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
             hookCallCount++;
-            setTimeout(() => callback(0), 20);
+            setImmediate(() => callback(0));
           }
         },
       );
@@ -533,9 +531,8 @@ describe('HookRunner', () => {
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
             if (hookCallCount === 0) {
-              setTimeout(
-                () => callback(Buffer.from(JSON.stringify(mockOutput1))),
-                10,
+              setImmediate(() =>
+                callback(Buffer.from(JSON.stringify(mockOutput1))),
               );
             }
           }
@@ -546,7 +543,7 @@ describe('HookRunner', () => {
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
             hookCallCount++;
-            setTimeout(() => callback(0), 20);
+            setImmediate(() => callback(0));
           }
         },
       );
@@ -577,7 +574,7 @@ describe('HookRunner', () => {
       mockSpawn.mockStderrOn.mockImplementation(
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
-            setTimeout(() => callback(Buffer.from('Hook failed')), 10);
+            setImmediate(() => callback(Buffer.from('Hook failed')));
           }
         },
       );
@@ -585,7 +582,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(1), 20); // All hooks fail
+            setImmediate(() => callback(1)); // All hooks fail
           }
         },
       );
@@ -622,7 +619,7 @@ describe('HookRunner', () => {
       mockSpawn.mockStdoutOn.mockImplementation(
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
-            setTimeout(() => callback(Buffer.from(invalidJson)), 10);
+            setImmediate(() => callback(Buffer.from(invalidJson)));
           }
         },
       );
@@ -630,7 +627,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(0), 20);
+            setImmediate(() => callback(0));
           }
         },
       );
@@ -656,7 +653,7 @@ describe('HookRunner', () => {
       mockSpawn.mockStdoutOn.mockImplementation(
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
-            setTimeout(() => callback(Buffer.from(malformedJson)), 10);
+            setImmediate(() => callback(Buffer.from(malformedJson)));
           }
         },
       );
@@ -664,7 +661,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(0), 20);
+            setImmediate(() => callback(0));
           }
         },
       );
@@ -688,7 +685,7 @@ describe('HookRunner', () => {
       mockSpawn.mockStderrOn.mockImplementation(
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
-            setTimeout(() => callback(Buffer.from(invalidJson)), 10);
+            setImmediate(() => callback(Buffer.from(invalidJson)));
           }
         },
       );
@@ -696,7 +693,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(1), 20);
+            setImmediate(() => callback(1));
           }
         },
       );
@@ -721,7 +718,7 @@ describe('HookRunner', () => {
       mockSpawn.mockStderrOn.mockImplementation(
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
-            setTimeout(() => callback(Buffer.from(invalidJson)), 10);
+            setImmediate(() => callback(Buffer.from(invalidJson)));
           }
         },
       );
@@ -729,7 +726,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(2), 20);
+            setImmediate(() => callback(2));
           }
         },
       );
@@ -752,7 +749,7 @@ describe('HookRunner', () => {
       mockSpawn.mockStdoutOn.mockImplementation(
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
-            setTimeout(() => callback(Buffer.from('')), 10);
+            setImmediate(() => callback(Buffer.from('')));
           }
         },
       );
@@ -760,7 +757,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(0), 20);
+            setImmediate(() => callback(0));
           }
         },
       );
@@ -783,7 +780,7 @@ describe('HookRunner', () => {
       mockSpawn.mockStdoutOn.mockImplementation(
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
-            setTimeout(() => callback(Buffer.from(doubleEncodedJson)), 10);
+            setImmediate(() => callback(Buffer.from(doubleEncodedJson)));
           }
         },
       );
@@ -791,7 +788,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(0), 20);
+            setImmediate(() => callback(0));
           }
         },
       );
