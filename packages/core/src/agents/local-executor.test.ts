@@ -194,9 +194,7 @@ let parentToolRegistry: ToolRegistry;
  * Type-safe helper to create agent definitions for tests.
  */
 
-export const createTestDefinition = <
-  TOutput extends z.ZodTypeAny = z.ZodUnknown,
->(
+const createTestDefinition = <TOutput extends z.ZodTypeAny = z.ZodUnknown>(
   tools: Array<string | MockTool> = [LS_TOOL_NAME],
   runConfigOverrides: Partial<LocalAgentDefinition<TOutput>['runConfig']> = {},
   outputConfigMode: 'default' | 'none' = 'default',
