@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { IntrospectionAgent } from './introspection-agent.js';
 import { GetInternalDocsTool } from '../tools/get-internal-docs.js';
-import { GEMINI_MODEL_ALIAS_PRO } from '../config/models.js';
+import { GEMINI_MODEL_ALIAS_FLASH } from '../config/models.js';
 import type { LocalAgentDefinition } from './types.js';
 
 describe('IntrospectionAgent', () => {
@@ -29,7 +29,7 @@ describe('IntrospectionAgent', () => {
   });
 
   it('should use the correct model and tools', () => {
-    expect(localAgent.modelConfig?.model).toBe(GEMINI_MODEL_ALIAS_PRO);
+    expect(localAgent.modelConfig?.model).toBe(GEMINI_MODEL_ALIAS_FLASH);
 
     const tools = localAgent.toolConfig?.tools || [];
     const hasInternalDocsTool = tools.some(
