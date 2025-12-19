@@ -66,7 +66,7 @@ export async function createContentGeneratorConfig(
   authType: AuthType | undefined,
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey =
-    (await loadApiKey()) || process.env['GEMINI_API_KEY'] || undefined;
+    process.env['GEMINI_API_KEY'] || (await loadApiKey()) || undefined;
   const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
   const googleCloudProject =
     process.env['GOOGLE_CLOUD_PROJECT'] ||
@@ -118,7 +118,6 @@ export async function createContentGenerator(
     }
     const version = await getVersion();
     const model = getEffectiveModel(
-      gcConfig.isInFallbackMode(),
       gcConfig.getModel(),
       gcConfig.getPreviewFeatures(),
     );

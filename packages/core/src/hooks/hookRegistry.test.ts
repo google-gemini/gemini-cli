@@ -6,11 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
-import {
-  HookRegistry,
-  ConfigSource,
-  HookRegistryNotInitializedError,
-} from './hookRegistry.js';
+import { HookRegistry, ConfigSource } from './hookRegistry.js';
 import type { Storage } from '../config/storage.js';
 import { HookEventName, HookType } from './types.js';
 import type { Config } from '../config/config.js';
@@ -194,6 +190,39 @@ describe('HookRegistry', () => {
       expect(hookRegistry.getAllHooks()).toHaveLength(0);
       expect(mockDebugLogger.warn).toHaveBeenCalled(); // At least some warnings should be logged
     });
+
+    it('should respect disabled hooks using friendly name', async () => {
+      const mockHooksConfig = {
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                name: 'disabled-hook',
+                type: 'command',
+                command: './hooks/test.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      // Update mock to return the hooks configuration
+      vi.mocked(mockConfig.getHooks).mockReturnValue(
+        mockHooksConfig as unknown as {
+          [K in HookEventName]?: HookDefinition[];
+        },
+      );
+      vi.mocked(mockConfig.getDisabledHooks).mockReturnValue(['disabled-hook']);
+
+      await hookRegistry.initialize();
+
+      const hooks = hookRegistry.getAllHooks();
+      expect(hooks).toHaveLength(1);
+      expect(hooks[0].enabled).toBe(false);
+      expect(
+        hookRegistry.getHooksForEvent(HookEventName.BeforeTool),
+      ).toHaveLength(0);
+    });
   });
 
   describe('getHooksForEvent', () => {
@@ -258,14 +287,6 @@ describe('HookRegistry', () => {
       );
       expect(notificationHooks).toHaveLength(0);
     });
-
-    it('should throw error if not initialized', () => {
-      const uninitializedRegistry = new HookRegistry(mockConfig);
-
-      expect(() => {
-        uninitializedRegistry.getHooksForEvent(HookEventName.BeforeTool);
-      }).toThrow(HookRegistryNotInitializedError);
-    });
   });
 
   describe('setHookEnabled', () => {
@@ -316,6 +337,77 @@ describe('HookRegistry', () => {
       expect(mockDebugLogger.warn).toHaveBeenCalledWith(
         'No hooks found matching "non-existent-hook"',
       );
+    });
+
+    it('should prefer hook name over command for identification', async () => {
+      const mockHooksConfig = {
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                name: 'friendly-name',
+                type: 'command',
+                command: './hooks/test.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      vi.mocked(mockConfig.getHooks).mockReturnValue(
+        mockHooksConfig as unknown as {
+          [K in HookEventName]?: HookDefinition[];
+        },
+      );
+
+      await hookRegistry.initialize();
+
+      // Should be enabled initially
+      let hooks = hookRegistry.getHooksForEvent(HookEventName.BeforeTool);
+      expect(hooks).toHaveLength(1);
+
+      // Disable using friendly name
+      hookRegistry.setHookEnabled('friendly-name', false);
+      hooks = hookRegistry.getHooksForEvent(HookEventName.BeforeTool);
+      expect(hooks).toHaveLength(0);
+
+      // Identification by command should NOT work when name is present
+      hookRegistry.setHookEnabled('./hooks/test.sh', true);
+      expect(mockDebugLogger.warn).toHaveBeenCalledWith(
+        'No hooks found matching "./hooks/test.sh"',
+      );
+    });
+
+    it('should use command as identifier when name is missing', async () => {
+      const mockHooksConfig = {
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: './hooks/no-name.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      vi.mocked(mockConfig.getHooks).mockReturnValue(
+        mockHooksConfig as unknown as {
+          [K in HookEventName]?: HookDefinition[];
+        },
+      );
+
+      await hookRegistry.initialize();
+
+      // Should be enabled initially
+      let hooks = hookRegistry.getHooksForEvent(HookEventName.BeforeTool);
+      expect(hooks).toHaveLength(1);
+
+      // Disable using command
+      hookRegistry.setHookEnabled('./hooks/no-name.sh', false);
+      hooks = hookRegistry.getHooksForEvent(HookEventName.BeforeTool);
+      expect(hooks).toHaveLength(0);
     });
   });
 

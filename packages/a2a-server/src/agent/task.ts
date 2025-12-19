@@ -73,6 +73,7 @@ export class Task {
   modelInfo?: string;
   currentPromptId: string | undefined;
   promptCount = 0;
+  autoExecute: boolean;
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
@@ -87,6 +88,7 @@ export class Task {
     contextId: string,
     config: Config,
     eventBus?: ExecutionEventBus,
+    autoExecute = false,
   ) {
     this.id = id;
     this.contextId = contextId;
@@ -98,6 +100,7 @@ export class Task {
     this.eventBus = eventBus;
     this.completedToolCalls = [];
     this._resetToolCompletionPromise();
+    this.autoExecute = autoExecute;
     this.config.setFallbackModelHandler(
       // For a2a-server, we want to automatically switch to the fallback model
       // for future requests without retrying the current one. The 'stop'
@@ -111,15 +114,16 @@ export class Task {
     contextId: string,
     config: Config,
     eventBus?: ExecutionEventBus,
+    autoExecute?: boolean,
   ): Promise<Task> {
-    return new Task(id, contextId, config, eventBus);
+    return new Task(id, contextId, config, eventBus, autoExecute);
   }
 
   // Note: `getAllMCPServerStatuses` retrieves the status of all MCP servers for the entire
   // process. This is not scoped to the individual task but reflects the global connection
   // state managed within the @gemini-cli/core module.
   async getMetadata(): Promise<TaskMetadata> {
-    const toolRegistry = await this.config.getToolRegistry();
+    const toolRegistry = this.config.getToolRegistry();
     const mcpServers = this.config.getMcpClientManager()?.getMcpServers() || {};
     const serverStatuses = getAllMCPServerStatuses();
     const servers = Object.keys(mcpServers).map((serverName) => ({
@@ -396,8 +400,15 @@ export class Task {
       }
     });
 
-    if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
-      logger.info('[Task] YOLO mode enabled. Auto-approving all tool calls.');
+    if (
+      this.autoExecute ||
+      this.config.getApprovalMode() === ApprovalMode.YOLO
+    ) {
+      logger.info(
+        '[Task] ' +
+          (this.autoExecute ? '' : 'YOLO mode enabled. ') +
+          'Auto-approving all tool calls.',
+      );
       toolCalls.forEach((tc: ToolCall) => {
         if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -736,8 +747,8 @@ export class Task {
       return false;
     }
 
-    const callId = part.data['callId'] as string;
-    const outcomeString = part.data['outcome'] as string;
+    const callId = part.data['callId'];
+    const outcomeString = part.data['outcome'];
     let confirmationOutcome: ToolConfirmationOutcome | undefined;
 
     if (outcomeString === 'proceed_once') {
