@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { MemoryCommand } from './memory.js';
 import { ExtensionsCommand } from './extensions.js';
 import { InitCommand } from './init.js';
 import { RestoreCommand } from './restore.js';
@@ -16,6 +17,7 @@ class CommandRegistry {
     this.register(new ExtensionsCommand());
     this.register(new RestoreCommand());
     this.register(new InitCommand());
+    this.register(new MemoryCommand());
   }
 
   register(command: Command) {
