@@ -22,3 +22,5 @@ export const LS_TOOL_NAME = 'list_directory';
 export const MEMORY_TOOL_NAME = 'save_memory';
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 export const DELEGATE_TO_AGENT_TOOL_NAME = 'delegate_to_agent';
+export const GIT_STATUS_TOOL_NAME = 'get_git_status';
+export const GIT_DIFF_TOOL_NAME = 'get_git_diff';

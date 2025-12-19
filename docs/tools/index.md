@@ -86,6 +86,8 @@ Gemini CLI's built-in tools can be broadly categorized as follows:
   information across sessions.
 - **[Todo Tool](./todos.md) (`write_todos`):** For managing subtasks of complex
   requests.
+- **[Git Diff](./git-diff.md) (`get_git_diff`):** For viewing unified diffs of
+  staged or unstaged changes.
 
 Additionally, these tools incorporate:
 

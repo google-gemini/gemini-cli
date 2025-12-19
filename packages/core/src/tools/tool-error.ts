@@ -71,6 +71,9 @@ export enum ToolErrorType {
 
   // WebSearch-specific Errors
   WEB_SEARCH_FAILED = 'web_search_failed',
+
+  // Git-specific Errors
+  GIT_NOT_REPO = 'git_not_repo',
 }
 
 /**
