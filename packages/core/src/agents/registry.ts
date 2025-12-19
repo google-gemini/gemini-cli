@@ -99,6 +99,7 @@ export class AgentRegistry {
 
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
+    const introspectionSettings = this.config.getIntrospectionAgentSettings();
 
     // Only register the agent if it's enabled in the settings.
     if (investigatorSettings?.enabled) {
@@ -137,8 +138,8 @@ export class AgentRegistry {
       this.registerAgent(agentDef);
     }
 
-    // Always register the introspection agent if agents are enabled.
-    if (this.config.isAgentsEnabled() || investigatorSettings?.enabled) {
+    // Register the introspection agent if it's explicitly enabled.
+    if (introspectionSettings.enabled) {
       this.registerAgent(IntrospectionAgent);
     }
   }
