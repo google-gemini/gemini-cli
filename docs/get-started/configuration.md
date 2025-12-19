@@ -1129,6 +1129,18 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GEMINI_SANDBOX`**:
   - Alternative to the `sandbox` setting in `settings.json`.
   - Accepts `true`, `false`, `docker`, `podman`, or a custom command string.
+- **`GEMINI_SYSTEM_MD`**:
+  - Replaces the built‑in system prompt with content from a Markdown file.
+  - `true`/`1`: Use project default path `./.gemini/system.md`.
+  - Any other string: Treat as a path (relative/absolute supported, `~`
+    expands).
+  - `false`/`0` or unset: Use the built‑in prompt. See
+    [System Prompt Override](../cli/system-prompt.md).
+- **`GEMINI_WRITE_SYSTEM_MD`**:
+  - Writes the current built‑in system prompt to a file for review.
+  - `true`/`1`: Write to `./.gemini/system.md`. Otherwise treat the value as a
+    path.
+  - Run the CLI once with this set to generate the file.
 - **`SEATBELT_PROFILE`** (macOS specific):
   - Switches the Seatbelt (`sandbox-exec`) profile on macOS.
   - `permissive-open`: (Default) Restricts writes to the project folder (and a
