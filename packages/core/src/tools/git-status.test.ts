@@ -116,5 +116,98 @@ describe('GitStatusTool', () => {
       expect(result.llmContent).toContain('untracked.txt');
       expect(result.llmContent).toContain('Untracked files (1)');
     });
+
+    it('should detect deleted files in unstaged', async () => {
+      // Delete an existing file
+      await fs.unlink(path.join(tempDir, 'initial.txt'));
+
+      const params: GitStatusToolParams = {};
+      const signal = new AbortController().signal;
+
+      const result = await tool.buildAndExecute(params, signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('initial.txt');
+      expect(result.llmContent).toContain('Unstaged files (1)');
+      expect(result.returnDisplay).toContain('1 unstaged');
+    });
+
+    it('should detect conflicted files', async () => {
+      // Create a merge conflict scenario
+      const git = simpleGit(tempDir);
+
+      // Create a file and commit it
+      await fs.writeFile(
+        path.join(tempDir, 'conflict.txt'),
+        'original content',
+      );
+      await git.add('conflict.txt');
+      await git.commit('Add conflict.txt');
+
+      // Create a branch and modify the file
+      await git.checkoutLocalBranch('feature-branch');
+      await fs.writeFile(path.join(tempDir, 'conflict.txt'), 'feature content');
+      await git.add('conflict.txt');
+      await git.commit('Modify in feature branch');
+
+      // Switch back to main and modify the same file differently
+      await git.checkout('main');
+      await fs.writeFile(path.join(tempDir, 'conflict.txt'), 'main content');
+      await git.add('conflict.txt');
+      await git.commit('Modify in main');
+
+      // Attempt merge to create conflict
+      await git.merge(['feature-branch']).catch(() => {
+        // Merge conflict is expected
+      });
+
+      const params: GitStatusToolParams = {};
+      const signal = new AbortController().signal;
+
+      const result = await tool.buildAndExecute(params, signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('conflict.txt');
+      expect(result.llmContent).toContain('Conflicted files');
+      expect(result.returnDisplay).toContain('conflicted');
+    });
+
+    it('should show conflicted files count in returnDisplay', async () => {
+      // Create a merge conflict scenario
+      const git = simpleGit(tempDir);
+
+      // Create a file and commit it
+      await fs.writeFile(
+        path.join(tempDir, 'conflict.txt'),
+        'original content',
+      );
+      await git.add('conflict.txt');
+      await git.commit('Add conflict.txt');
+
+      // Create a branch and modify the file
+      await git.checkoutLocalBranch('feature-branch');
+      await fs.writeFile(path.join(tempDir, 'conflict.txt'), 'feature content');
+      await git.add('conflict.txt');
+      await git.commit('Modify in feature branch');
+
+      // Switch back to main and modify the same file differently
+      await git.checkout('main');
+      await fs.writeFile(path.join(tempDir, 'conflict.txt'), 'main content');
+      await git.add('conflict.txt');
+      await git.commit('Modify in main');
+
+      // Attempt merge to create conflict
+      await git.merge(['feature-branch']).catch(() => {
+        // Merge conflict is expected
+      });
+
+      const params: GitStatusToolParams = {};
+      const signal = new AbortController().signal;
+
+      const result = await tool.buildAndExecute(params, signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.returnDisplay).toMatch(/\d+ conflicted/);
+    });
   });
 });

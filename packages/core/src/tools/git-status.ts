@@ -8,7 +8,7 @@ import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { GIT_STATUS_TOOL_NAME } from './tool-names.js';
-import { getGitStatus } from '../utils/git-utils.js';
+import { getGitStatus } from '../utils/git-status-utils.js';
 import type { Config } from '../config/config.js';
 import { ToolErrorType } from './tool-error.js';
 
@@ -91,6 +91,12 @@ class GitStatusToolInvocation extends BaseToolInvocation<
     } else {
       parts.push('  (none)');
     }
+    parts.push(`\nConflicted files (${status.conflicted.length}):`);
+    if (status.conflicted.length > 0) {
+      parts.push(status.conflicted.map((f) => `  ${f}`).join('\n'));
+    } else {
+      parts.push('  (none)');
+    }
 
     const llmContent = parts.join('\n');
 
@@ -107,10 +113,13 @@ class GitStatusToolInvocation extends BaseToolInvocation<
         counts.push(`${status.staged.length} staged`);
       }
       if (status.unstaged.length > 0) {
-        counts.push(`${status.unstaged.length} modified`);
+        counts.push(`${status.unstaged.length} unstaged`);
       }
       if (status.untracked.length > 0) {
         counts.push(`${status.untracked.length} untracked`);
+      }
+      if (status.conflicted.length > 0) {
+        counts.push(`${status.conflicted.length} conflicted`);
       }
       displayParts.push(counts.join(', '));
     }

@@ -14,6 +14,7 @@ export interface GitStatus {
   staged: string[];
   unstaged: string[];
   untracked: string[];
+  conflicted: string[];
   branch?: string;
   tracking?: string;
   ahead: number;
@@ -43,8 +44,9 @@ export async function getGitStatus(config: Config): Promise<GitStatus | null> {
       isRepo: true,
       isClean: status.isClean(),
       staged: status.staged,
-      unstaged: status.modified,
+      unstaged: [...status.modified, ...status.deleted],
       untracked: status.not_added,
+      conflicted: status.conflicted,
       branch: status.current ?? undefined,
       tracking: status.tracking ?? undefined,
       ahead: status.ahead,
