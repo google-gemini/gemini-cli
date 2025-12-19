@@ -8,18 +8,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { debugLogger } from './debugLogger.js';
 
 describe('DebugLogger', () => {
-  const originalEnv = { ...process.env };
-
-  beforeEach(() => {
-    // Clear debug env vars before each test
-    delete process.env['DEBUG'];
-    delete process.env['DEBUG_MODE'];
-  });
-
   afterEach(() => {
     vi.restoreAllMocks();
-    // Restore original env
-    process.env = { ...originalEnv };
+    vi.unstubAllEnvs();
   });
 
   describe('when debug mode is disabled', () => {
@@ -53,7 +44,7 @@ describe('DebugLogger', () => {
 
   describe('when debug mode is enabled via DEBUG=1', () => {
     beforeEach(() => {
-      process.env['DEBUG'] = '1';
+      vi.stubEnv('DEBUG', '1');
     });
 
     it('should call console.log with the correct arguments', () => {
@@ -114,7 +105,7 @@ describe('DebugLogger', () => {
 
   describe('when debug mode is enabled via DEBUG=true', () => {
     beforeEach(() => {
-      process.env['DEBUG'] = 'true';
+      vi.stubEnv('DEBUG', 'true');
     });
 
     it('should call console.log', () => {
@@ -126,7 +117,7 @@ describe('DebugLogger', () => {
 
   describe('when debug mode is enabled via DEBUG_MODE=1', () => {
     beforeEach(() => {
-      process.env['DEBUG_MODE'] = '1';
+      vi.stubEnv('DEBUG_MODE', '1');
     });
 
     it('should call console.log', () => {
