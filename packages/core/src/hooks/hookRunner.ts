@@ -55,8 +55,8 @@ export class HookRunner {
       );
     } catch (error) {
       const duration = Date.now() - startTime;
-      const hookSource = hookConfig.command || 'unknown';
-      const errorMessage = `Hook execution failed for event '${eventName}' (source: ${hookSource}): ${error}`;
+      const hookId = hookConfig.name || hookConfig.command || 'unknown';
+      const errorMessage = `Hook execution failed for event '${eventName}' (hook: ${hookId}): ${error}`;
       debugLogger.warn(`Hook execution error (non-fatal): ${errorMessage}`);
 
       return {
@@ -235,7 +235,7 @@ export class HookRunner {
         child.stdin.on('error', (err: NodeJS.ErrnoException) => {
           // Ignore EPIPE errors which happen when the child process closes stdin early
           if (err.code !== 'EPIPE') {
-            debugLogger.warn(`Hook stdin error: ${err}`);
+            debugLogger.debug(`Hook stdin error: ${err}`);
           }
         });
 
@@ -247,7 +247,7 @@ export class HookRunner {
         } catch (err) {
           // Ignore EPIPE errors which happen when the child process closes stdin early
           if (err instanceof Error && 'code' in err && err.code !== 'EPIPE') {
-            debugLogger.warn(`Hook stdin write error: ${err}`);
+            debugLogger.debug(`Hook stdin write error: ${err}`);
           }
         }
       }
