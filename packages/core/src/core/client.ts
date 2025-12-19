@@ -179,8 +179,10 @@ export class GeminiClient {
       return;
     }
 
-    const userMemory = this.config.getUserMemory();
-    const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+    const systemMemory = this.config.isJitContextEnabled()
+      ? this.config.getGlobalMemory()
+      : this.config.getUserMemory();
+    const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
     this.getChat().setSystemInstruction(systemInstruction);
   }
 
@@ -198,8 +200,10 @@ export class GeminiClient {
     const history = await getInitialChatHistory(this.config, extraHistory);
 
     try {
-      const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+      const systemMemory = this.config.isJitContextEnabled()
+        ? this.config.getGlobalMemory()
+        : this.config.getUserMemory();
+      const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
       return new GeminiChat(
         this.config,
         systemInstruction,
