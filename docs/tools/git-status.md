@@ -10,12 +10,12 @@ but not staged, and which are untracked, as well as basic branch and remote
 information. This helps the AI understand the state of your working directory
 before proposing commits or other Git operations.
 
-## Arguments
+### Arguments
 
 `get_git_status` takes no arguments. It always operates on the Git repository
 rooted at the current working directory (as configured by the CLI).
 
-## Behavior
+## How to use `get_git_status` with the Gemini CLI
 
 When the current directory is inside a Git repository, the tool returns:
 
@@ -31,10 +31,16 @@ When the current directory is inside a Git repository, the tool returns:
 If the current directory is **not** part of a Git repository, the tool returns a
 clear error indicating that no repository was found.
 
-## Usage
+Usage:
 
-get_git_status() The tool is intended to be called by the Gemini model rather
-than typed directly by the user. You can, for example, ask:
+```
+get_git_status()
+```
+
+## `get_git_status` examples
+
+The tool is intended to be called by the Gemini model rather than typed directly
+by the user. You can, for example, ask:
 
 > “Before making any changes, use the Git status tool to show what’s currently
 > modified in this repo.”
