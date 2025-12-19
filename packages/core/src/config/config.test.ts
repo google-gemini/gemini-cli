@@ -34,6 +34,12 @@ import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
+} from './models.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -177,7 +183,7 @@ vi.mock('../code_assist/codeAssist.js');
 vi.mock('../code_assist/experiments/experiments.js');
 
 describe('Server Config (config.ts)', () => {
-  const MODEL = 'gemini-pro';
+  const MODEL = DEFAULT_GEMINI_MODEL;
   const SANDBOX: SandboxConfig = {
     command: 'docker',
     image: 'gemini-cli-sandbox',
@@ -338,10 +344,6 @@ describe('Server Config (config.ts)', () => {
         mockContentConfig,
       );
 
-      // Set fallback mode to true to ensure it gets reset
-      config.setFallbackMode(true);
-      expect(config.isInFallbackMode()).toBe(true);
-
       await config.refreshAuth(authType);
 
       expect(createContentGeneratorConfig).toHaveBeenCalledWith(
@@ -351,8 +353,6 @@ describe('Server Config (config.ts)', () => {
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
       expect(GeminiClient).toHaveBeenCalledWith(config);
-      // Verify that fallback mode is reset
-      expect(config.isInFallbackMode()).toBe(false);
     });
 
     it('should reset model availability status', async () => {
@@ -769,6 +769,40 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('UseWriteTodos Configuration', () => {
+    it('should default useWriteTodos to true when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getUseWriteTodos()).toBe(true);
+    });
+
+    it('should set useWriteTodos to false when provided as false', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        useWriteTodos: false,
+      };
+      const config = new Config(params);
+      expect(config.getUseWriteTodos()).toBe(false);
+    });
+
+    it('should disable useWriteTodos for preview models', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        model: 'gemini-3-pro-preview',
+      };
+      const config = new Config(params);
+      expect(config.getUseWriteTodos()).toBe(false);
+    });
+
+    it('should NOT disable useWriteTodos for non-preview models', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        model: 'gemini-2.5-pro',
+      };
+      const config = new Config(params);
+      expect(config.getUseWriteTodos()).toBe(true);
+    });
+  });
+
   describe('Shell Tool Inactivity Timeout', () => {
     it('should default to 300000ms (300 seconds) when not provided', () => {
       const config = new Config(baseParams);
@@ -827,15 +861,15 @@ describe('Server Config (config.ts)', () => {
       ).ToolRegistry.prototype.registerTool;
 
       // Check that registerTool was called for ShellTool
-      const wasShellToolRegistered = (registerToolMock as Mock).mock.calls.some(
+      const wasShellToolRegistered = registerToolMock.mock.calls.some(
         (call) => call[0] instanceof vi.mocked(ShellTool),
       );
       expect(wasShellToolRegistered).toBe(true);
 
       // Check that registerTool was NOT called for ReadFileTool
-      const wasReadFileToolRegistered = (
-        registerToolMock as Mock
-      ).mock.calls.some((call) => call[0] instanceof vi.mocked(ReadFileTool));
+      const wasReadFileToolRegistered = registerToolMock.mock.calls.some(
+        (call) => call[0] instanceof vi.mocked(ReadFileTool),
+      );
       expect(wasReadFileToolRegistered).toBe(false);
     });
 
@@ -948,9 +982,9 @@ describe('Server Config (config.ts)', () => {
           }
         ).ToolRegistry.prototype.registerTool;
 
-        const wasShellToolRegistered = (
-          registerToolMock as Mock
-        ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
+        const wasShellToolRegistered = registerToolMock.mock.calls.some(
+          (call) => call[0] instanceof vi.mocked(ShellTool),
+        );
         expect(wasShellToolRegistered).toBe(true);
       });
 
@@ -968,9 +1002,9 @@ describe('Server Config (config.ts)', () => {
           }
         ).ToolRegistry.prototype.registerTool;
 
-        const wasShellToolRegistered = (
-          registerToolMock as Mock
-        ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
+        const wasShellToolRegistered = registerToolMock.mock.calls.some(
+          (call) => call[0] instanceof vi.mocked(ShellTool),
+        );
         expect(wasShellToolRegistered).toBe(true);
       });
     });
@@ -1529,40 +1563,32 @@ describe('Config getHooks', () => {
   });
 
   describe('setModel', () => {
-    it('should allow setting a pro (any) model and disable fallback mode', () => {
+    it('should allow setting a pro (any) model and reset availability', () => {
       const config = new Config(baseParams);
       const service = config.getModelAvailabilityService();
       const spy = vi.spyOn(service, 'reset');
-
-      config.setFallbackMode(true);
-      expect(config.isInFallbackMode()).toBe(true);
 
       const proModel = 'gemini-2.5-pro';
       config.setModel(proModel);
 
       expect(config.getModel()).toBe(proModel);
-      expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(proModel);
       expect(spy).toHaveBeenCalled();
     });
 
-    it('should allow setting auto model from non-auto model and disable fallback mode', () => {
+    it('should allow setting auto model from non-auto model and reset availability', () => {
       const config = new Config(baseParams);
       const service = config.getModelAvailabilityService();
       const spy = vi.spyOn(service, 'reset');
 
-      config.setFallbackMode(true);
-      expect(config.isInFallbackMode()).toBe(true);
-
       config.setModel('auto');
 
       expect(config.getModel()).toBe('auto');
-      expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
       expect(spy).toHaveBeenCalled();
     });
 
-    it('should allow setting auto model from auto model if it is in the fallback mode', () => {
+    it('should allow setting auto model from auto model and reset availability', () => {
       const config = new Config({
         cwd: '/tmp',
         targetDir: '/path/to/target',
@@ -1574,15 +1600,24 @@ describe('Config getHooks', () => {
       const service = config.getModelAvailabilityService();
       const spy = vi.spyOn(service, 'reset');
 
-      config.setFallbackMode(true);
-      expect(config.isInFallbackMode()).toBe(true);
-
       config.setModel('auto');
 
       expect(config.getModel()).toBe('auto');
-      expect(config.isInFallbackMode()).toBe(false);
-      expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
       expect(spy).toHaveBeenCalled();
+    });
+
+    it('should reset active model when setModel is called with the current model after a fallback', () => {
+      const config = new Config(baseParams);
+      const originalModel = config.getModel();
+      const fallbackModel = 'fallback-model';
+
+      config.setActiveModel(fallbackModel);
+      expect(config.getActiveModel()).toBe(fallbackModel);
+
+      config.setModel(originalModel);
+
+      expect(config.getModel()).toBe(originalModel);
+      expect(config.getActiveModel()).toBe(originalModel);
     });
   });
 });
@@ -1703,18 +1738,16 @@ describe('Availability Service Integration', () => {
     cwd: '.',
   };
 
-  it('setActiveModel updates active model and emits event', async () => {
+  it('setActiveModel updates active model', async () => {
     const config = new Config(baseParams);
     const model1 = 'model1';
     const model2 = 'model2';
 
     config.setActiveModel(model1);
     expect(config.getActiveModel()).toBe(model1);
-    expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(model1);
 
     config.setActiveModel(model2);
     expect(config.getActiveModel()).toBe(model2);
-    expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(model2);
   });
 
   it('getActiveModel defaults to configured model if not set', () => {
@@ -1729,5 +1762,118 @@ describe('Availability Service Integration', () => {
 
     config.resetTurn();
     expect(spy).toHaveBeenCalled();
+  });
+});
+
+describe('Config Quota & Preview Model Access', () => {
+  let config: Config;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockCodeAssistServer: any;
+
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    targetDir: '/tmp',
+    debugMode: false,
+    sessionId: 'test-session',
+    model: 'gemini-pro',
+    usageStatisticsEnabled: false,
+    embeddingModel: 'gemini-embedding', // required in type but not in the original file I copied, adding here
+    sandbox: {
+      command: 'docker',
+      image: 'gemini-cli-sandbox',
+    },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCodeAssistServer = {
+      projectId: 'test-project',
+      retrieveUserQuota: vi.fn(),
+    };
+    vi.mocked(getCodeAssistServer).mockReturnValue(mockCodeAssistServer);
+    config = new Config(baseParams);
+  });
+
+  describe('refreshUserQuota', () => {
+    it('should update hasAccessToPreviewModel to true if quota includes preview model', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [{ modelId: PREVIEW_GEMINI_MODEL }],
+      });
+
+      await config.refreshUserQuota();
+      expect(config.getHasAccessToPreviewModel()).toBe(true);
+    });
+
+    it('should update hasAccessToPreviewModel to false if quota does not include preview model', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [{ modelId: 'some-other-model' }],
+      });
+
+      await config.refreshUserQuota();
+      expect(config.getHasAccessToPreviewModel()).toBe(false);
+    });
+
+    it('should update hasAccessToPreviewModel to false if buckets are undefined', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({});
+
+      await config.refreshUserQuota();
+      expect(config.getHasAccessToPreviewModel()).toBe(false);
+    });
+
+    it('should return undefined and not update if codeAssistServer is missing', async () => {
+      vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
+      const result = await config.refreshUserQuota();
+      expect(result).toBeUndefined();
+      expect(config.getHasAccessToPreviewModel()).toBe(false);
+    });
+
+    it('should return undefined if retrieveUserQuota fails', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockRejectedValue(
+        new Error('Network error'),
+      );
+      const result = await config.refreshUserQuota();
+      expect(result).toBeUndefined();
+      // Should remain default (false)
+      expect(config.getHasAccessToPreviewModel()).toBe(false);
+    });
+  });
+
+  describe('setPreviewFeatures', () => {
+    it('should reset model to default auto if disabling preview features while using a preview model', () => {
+      config.setPreviewFeatures(true);
+      config.setModel(PREVIEW_GEMINI_MODEL);
+
+      config.setPreviewFeatures(false);
+
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+    });
+
+    it('should NOT reset model if disabling preview features while NOT using a preview model', () => {
+      config.setPreviewFeatures(true);
+      const nonPreviewModel = 'gemini-1.5-pro';
+      config.setModel(nonPreviewModel);
+
+      config.setPreviewFeatures(false);
+
+      expect(config.getModel()).toBe(nonPreviewModel);
+    });
+
+    it('should switch to preview auto model if enabling preview features while using default auto model', () => {
+      config.setPreviewFeatures(false);
+      config.setModel(DEFAULT_GEMINI_MODEL_AUTO);
+
+      config.setPreviewFeatures(true);
+
+      expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL_AUTO);
+    });
+
+    it('should NOT reset model if enabling preview features', () => {
+      config.setPreviewFeatures(false);
+      config.setModel(PREVIEW_GEMINI_MODEL); // Just pretending it was set somehow
+
+      config.setPreviewFeatures(true);
+
+      expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL);
+    });
   });
 });

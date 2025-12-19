@@ -21,7 +21,6 @@ import {
   migrateDeprecatedSettings,
   SettingScope,
 } from './config/settings.js';
-import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -73,7 +72,6 @@ import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
 import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
-import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
@@ -98,6 +96,7 @@ import { requestConsentNonInteractive } from './config/extensions/consent.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
+import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 
 const SLOW_RENDER_MS = 200;
@@ -360,19 +359,6 @@ export async function main() {
     }
   }
 
-  // Load custom themes from settings
-  themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
-
-  if (settings.merged.ui?.theme) {
-    if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
-      // If the theme is not found during initial load, log a warning and continue.
-      // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
-      debugLogger.warn(
-        `Warning: Theme "${settings.merged.ui?.theme}" not found.`,
-      );
-    }
-  }
-
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {
     const memoryArgs = settings.merged.advanced?.autoConfigureMemory
@@ -550,10 +536,9 @@ export async function main() {
       process.on('SIGINT', () => {
         process.stdin.setRawMode(wasRaw);
       });
-
-      // Detect and enable Kitty keyboard protocol once at startup.
-      await detectAndEnableKittyProtocol();
     }
+
+    await setupTerminalAndTheme(config, settings);
 
     setMaxSizedBoxDebugging(isDebugMode);
     const initAppHandle = startupProfiler.start('initialize_app');

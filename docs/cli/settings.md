@@ -94,7 +94,7 @@ they appear in the UI.
 | Enable Tool Output Truncation    | `tools.enableToolOutputTruncation`   | Enable truncation of large tool outputs.                                                                        | `true`  |
 | Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Truncate tool output if it is larger than this many characters. Set to -1 to disable.                           | `10000` |
 | Tool Output Truncation Lines     | `tools.truncateToolOutputLines`      | The number of lines to keep when truncating tool output.                                                        | `100`   |
-| Enable Message Bus Integration   | `tools.enableMessageBusIntegration`  | Enable policy-based tool confirmation via message bus integration.                                              | `false` |
+| Enable Message Bus Integration   | `tools.enableMessageBusIntegration`  | Enable policy-based tool confirmation via message bus integration.                                              | `true`  |
 
 ### Security
 

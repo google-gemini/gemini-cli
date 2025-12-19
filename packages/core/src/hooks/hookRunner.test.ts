@@ -21,12 +21,24 @@ type MockChildProcessWithoutNullStreams = ChildProcessWithoutNullStreams & {
 
 // Mock child_process with importOriginal for partial mocking
 vi.mock('node:child_process', async (importOriginal) => {
-  const actual = (await importOriginal()) as object;
+  const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as object),
     spawn: vi.fn(),
   };
 });
+
+// Mock debugLogger using vi.hoisted
+const mockDebugLogger = vi.hoisted(() => ({
+  log: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
+vi.mock('../utils/debugLogger.js', () => ({
+  debugLogger: mockDebugLogger,
+}));
 
 // Mock console methods
 const mockConsole = {
@@ -160,6 +172,31 @@ describe('HookRunner', () => {
         expect(result.success).toBe(false);
         expect(result.exitCode).toBe(1);
         expect(result.stderr).toBe(errorMessage);
+      });
+
+      it('should use hook name in error messages if available', async () => {
+        const namedConfig: HookConfig = {
+          name: 'my-friendly-hook',
+          type: HookType.Command,
+          command: './hooks/fail.sh',
+        };
+
+        // Mock error during spawn
+        vi.mocked(spawn).mockImplementationOnce(() => {
+          throw new Error('Spawn error');
+        });
+
+        await hookRunner.executeHook(
+          namedConfig,
+          HookEventName.BeforeTool,
+          mockInput,
+        );
+
+        expect(mockDebugLogger.warn).toHaveBeenCalledWith(
+          expect.stringContaining(
+            '(hook: my-friendly-hook): Error: Spawn error',
+          ),
+        );
       });
 
       it('should handle command hook timeout', async () => {

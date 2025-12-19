@@ -5,20 +5,24 @@
  */
 
 export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
+export const PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
 
 export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
 ]);
 
-export const DEFAULT_GEMINI_MODEL_AUTO = 'auto';
+export const PREVIEW_GEMINI_MODEL_AUTO = 'auto-gemini-3';
+export const DEFAULT_GEMINI_MODEL_AUTO = 'auto-gemini-2.5';
 
 // Model aliases for user convenience.
+export const GEMINI_MODEL_ALIAS_AUTO = 'auto';
 export const GEMINI_MODEL_ALIAS_PRO = 'pro';
 export const GEMINI_MODEL_ALIAS_FLASH = 'flash';
 export const GEMINI_MODEL_ALIAS_FLASH_LITE = 'flash-lite';
@@ -38,17 +42,24 @@ export const DEFAULT_THINKING_MODE = 8192;
  */
 export function resolveModel(
   requestedModel: string,
-  previewFeaturesEnabled: boolean | undefined,
+  previewFeaturesEnabled: boolean = false,
 ): string {
   switch (requestedModel) {
-    case DEFAULT_GEMINI_MODEL_AUTO:
+    case PREVIEW_GEMINI_MODEL_AUTO: {
+      return PREVIEW_GEMINI_MODEL;
+    }
+    case DEFAULT_GEMINI_MODEL_AUTO: {
+      return DEFAULT_GEMINI_MODEL;
+    }
     case GEMINI_MODEL_ALIAS_PRO: {
       return previewFeaturesEnabled
         ? PREVIEW_GEMINI_MODEL
         : DEFAULT_GEMINI_MODEL;
     }
     case GEMINI_MODEL_ALIAS_FLASH: {
-      return DEFAULT_GEMINI_FLASH_MODEL;
+      return previewFeaturesEnabled
+        ? PREVIEW_GEMINI_FLASH_MODEL
+        : DEFAULT_GEMINI_FLASH_MODEL;
     }
     case GEMINI_MODEL_ALIAS_FLASH_LITE: {
       return DEFAULT_GEMINI_FLASH_LITE_MODEL;
@@ -60,47 +71,105 @@ export function resolveModel(
 }
 
 /**
- * Determines the effective model to use, applying fallback logic if necessary.
+ * Resolves the appropriate model based on the classifier's decision.
  *
- * When fallback mode is active, this function enforces the use of the standard
- * fallback model. However, it makes an exception for "lite" models (any model
- * with "lite" in its name), allowing them to be used to preserve cost savings.
- * This ensures that "pro" models are always downgraded, while "lite" model
- * requests are honored.
+ * @param requestedModel The current requested model (e.g. auto-gemini-2.5).
+ * @param modelAlias The alias selected by the classifier ('flash' or 'pro').
+ * @param previewFeaturesEnabled Whether preview features are enabled.
+ * @returns The resolved concrete model name.
+ */
+export function resolveClassifierModel(
+  requestedModel: string,
+  modelAlias: string,
+  previewFeaturesEnabled: boolean = false,
+): string {
+  if (modelAlias === GEMINI_MODEL_ALIAS_FLASH) {
+    if (
+      requestedModel === DEFAULT_GEMINI_MODEL_AUTO ||
+      requestedModel === DEFAULT_GEMINI_MODEL
+    ) {
+      return DEFAULT_GEMINI_FLASH_MODEL;
+    }
+    if (
+      requestedModel === PREVIEW_GEMINI_MODEL_AUTO ||
+      requestedModel === PREVIEW_GEMINI_MODEL
+    ) {
+      return PREVIEW_GEMINI_FLASH_MODEL;
+    }
+    return resolveModel(GEMINI_MODEL_ALIAS_FLASH, previewFeaturesEnabled);
+  }
+  return resolveModel(requestedModel, previewFeaturesEnabled);
+}
+
+/**
+ * Determines the effective model to use.
  *
- * @param isInFallbackMode Whether the application is in fallback mode.
  * @param requestedModel The model that was originally requested.
  * @param previewFeaturesEnabled A boolean indicating if preview features are enabled.
  * @returns The effective model name.
  */
 export function getEffectiveModel(
-  isInFallbackMode: boolean,
   requestedModel: string,
   previewFeaturesEnabled: boolean | undefined,
 ): string {
-  const resolvedModel = resolveModel(requestedModel, previewFeaturesEnabled);
+  return resolveModel(requestedModel, previewFeaturesEnabled);
+}
 
-  // If we are not in fallback mode, simply use the resolved model.
-  if (!isInFallbackMode) {
-    return resolvedModel;
+export function getDisplayString(
+  model: string,
+  previewFeaturesEnabled: boolean = false,
+) {
+  switch (model) {
+    case PREVIEW_GEMINI_MODEL_AUTO:
+      return 'Auto (Gemini 3)';
+    case DEFAULT_GEMINI_MODEL_AUTO:
+      return 'Auto (Gemini 2.5)';
+    case GEMINI_MODEL_ALIAS_PRO:
+      return `Manual (${
+        previewFeaturesEnabled ? PREVIEW_GEMINI_MODEL : DEFAULT_GEMINI_MODEL
+      })`;
+    case GEMINI_MODEL_ALIAS_FLASH:
+      return `Manual (${
+        previewFeaturesEnabled
+          ? PREVIEW_GEMINI_FLASH_MODEL
+          : DEFAULT_GEMINI_FLASH_MODEL
+      })`;
+    default:
+      return `Manual (${model})`;
   }
+}
 
-  // If a "lite" model is requested, honor it. This allows for variations of
-  // lite models without needing to list them all as constants.
-  if (resolvedModel.includes('lite')) {
-    return resolvedModel;
-  }
-
-  // Default fallback for Gemini CLI.
-  return DEFAULT_GEMINI_FLASH_MODEL;
+/**
+ * Checks if the model is a preview model.
+ *
+ * @param model The model name to check.
+ * @returns True if the model is a preview model.
+ */
+export function isPreviewModel(model: string): boolean {
+  return (
+    model === PREVIEW_GEMINI_MODEL ||
+    model === PREVIEW_GEMINI_FLASH_MODEL ||
+    model === PREVIEW_GEMINI_MODEL_AUTO
+  );
 }
 
 /**
  * Checks if the model is a Gemini 2.x model.
  *
  * @param model The model name to check.
- * @returns True if the model is a Gemini 2.x model.
+ * @returns True if the model is a Gemini-2.x model.
  */
 export function isGemini2Model(model: string): boolean {
   return /^gemini-2(\.|$)/.test(model);
+}
+
+/**
+ * Checks if the model supports multimodal function responses (multimodal data nested within function response).
+ * This is supported in Gemini 3.
+ *
+ * @param model The model name to check.
+ * @returns True if the model supports multimodal function responses.
+ */
+export function supportsMultimodalFunctionResponse(model: string): boolean {
+  return model.startsWith('gemini-3-');
 }
