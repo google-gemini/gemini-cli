@@ -263,14 +263,54 @@ describe('HookRunner', () => {
         );
 
         expect(spawn).toHaveBeenCalledWith(
-          '/test/project/hooks/test.sh',
+          expect.stringMatching(/bash|powershell|cmd/),
+          expect.arrayContaining([
+            expect.stringMatching(/['"]?\/test\/project['"]?\/hooks\/test\.sh/),
+          ]),
           expect.objectContaining({
-            shell: true,
+            shell: false,
             env: expect.objectContaining({
               GEMINI_PROJECT_DIR: '/test/project',
               CLAUDE_PROJECT_DIR: '/test/project',
             }),
           }),
+        );
+      });
+
+      it('should not allow command injection via GEMINI_PROJECT_DIR', async () => {
+        const maliciousCwd = '/test/project; echo "pwned" > /tmp/pwned';
+        const mockMaliciousInput: HookInput = {
+          ...mockInput,
+          cwd: maliciousCwd,
+        };
+
+        const config: HookConfig = {
+          type: HookType.Command,
+          command: 'ls $GEMINI_PROJECT_DIR',
+        };
+
+        // Mock the process closing immediately
+        mockSpawn.mockProcessOn.mockImplementation(
+          (event: string, callback: (code: number) => void) => {
+            if (event === 'close') {
+              setTimeout(() => callback(0), 10);
+            }
+          },
+        );
+
+        await hookRunner.executeHook(
+          config,
+          HookEventName.BeforeTool,
+          mockMaliciousInput,
+        );
+
+        // If secure, spawn will be called with the shell executable and escaped command
+        expect(spawn).toHaveBeenCalledWith(
+          expect.stringMatching(/bash|powershell|cmd/),
+          expect.arrayContaining([
+            expect.stringMatching(/ls (['"]).*echo.*pwned.*\1/),
+          ]),
+          expect.objectContaining({ shell: false }),
         );
       });
     });
@@ -344,8 +384,10 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            const command =
-              vi.mocked(spawn).mock.calls[executionOrder.length][0];
+            const args = vi.mocked(spawn).mock.calls[
+              executionOrder.length
+            ][1] as string[];
+            const command = args[args.length - 1];
             executionOrder.push(command);
             setTimeout(() => callback(0), 10);
           }
