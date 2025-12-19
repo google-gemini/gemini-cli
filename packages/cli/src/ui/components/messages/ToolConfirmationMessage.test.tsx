@@ -10,7 +10,10 @@ import type {
   ToolCallConfirmationDetails,
   Config,
 } from '@google/gemini-cli-core';
-import { renderWithProviders } from '../../../test-utils/render.js';
+import {
+  renderWithProviders,
+  createMockSettings,
+} from '../../../test-utils/render.js';
 
 describe('ToolConfirmationMessage', () => {
   const mockConfig = {
@@ -157,6 +160,65 @@ describe('ToolConfirmationMessage', () => {
 
         expect(lastFrame()).toMatchSnapshot();
       });
+    });
+  });
+
+  describe('enablePermanentToolApproval setting', () => {
+    const editConfirmationDetails: ToolCallConfirmationDetails = {
+      type: 'edit',
+      title: 'Confirm Edit',
+      fileName: 'test.txt',
+      filePath: '/test.txt',
+      fileDiff: '...diff...',
+      originalContent: 'a',
+      newContent: 'b',
+      onConfirm: vi.fn(),
+    };
+
+    it('should NOT show "Allow for all future sessions" when setting is false (default)', () => {
+      const mockConfig = {
+        isTrustedFolder: () => true,
+        getIdeMode: () => false,
+      } as unknown as Config;
+
+      const { lastFrame } = renderWithProviders(
+        <ToolConfirmationMessage
+          confirmationDetails={editConfirmationDetails}
+          config={mockConfig}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+        />,
+        {
+          settings: createMockSettings({
+            security: { enablePermanentToolApproval: false },
+          }),
+        },
+      );
+
+      expect(lastFrame()).not.toContain('Allow for all future sessions');
+    });
+
+    it('should show "Allow for all future sessions" when setting is true', () => {
+      const mockConfig = {
+        isTrustedFolder: () => true,
+        getIdeMode: () => false,
+      } as unknown as Config;
+
+      const { lastFrame } = renderWithProviders(
+        <ToolConfirmationMessage
+          confirmationDetails={editConfirmationDetails}
+          config={mockConfig}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+        />,
+        {
+          settings: createMockSettings({
+            security: { enablePermanentToolApproval: true },
+          }),
+        },
+      );
+
+      expect(lastFrame()).toContain('Allow for all future sessions');
     });
   });
 });
