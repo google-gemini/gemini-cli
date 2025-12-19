@@ -90,7 +90,12 @@ import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { DelegateToAgentTool } from '../agents/delegate-to-agent-tool.js';
-import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  DELEGATE_TO_AGENT_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '../tools/tool-names.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -1126,6 +1131,19 @@ export class Config {
         'Cannot enable privileged approval modes in an untrusted folder.',
       );
     }
+
+    // When transitioning specifically from AUTO_EDIT to DEFAULT, clear the session
+    // rules for the tools that trigger this mode. This ensures that "Always allow"
+    // doesn't persist after the user has explicitly toggled off the mode.
+    if (
+      this.approvalMode === ApprovalMode.AUTO_EDIT &&
+      mode === ApprovalMode.DEFAULT
+    ) {
+      this.policyEngine.removeRulesForTool(EDIT_TOOL_NAME);
+      this.policyEngine.removeRulesForTool(WRITE_FILE_TOOL_NAME);
+      this.policyEngine.removeRulesForTool(WEB_FETCH_TOOL_NAME);
+    }
+
     this.approvalMode = mode;
   }
 

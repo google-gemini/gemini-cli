@@ -1176,6 +1176,30 @@ describe('setApprovalMode with folder trust', () => {
     expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
   });
 
+  it('should remove edit tool rules when transitioning from AUTO_EDIT to DEFAULT', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+
+    const removeRulesSpy = vi.spyOn(
+      config.getPolicyEngine(),
+      'removeRulesForTool',
+    );
+
+    // Initial state
+    config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.AUTO_EDIT);
+    removeRulesSpy.mockClear();
+
+    // Transition to DEFAULT
+    config.setApprovalMode(ApprovalMode.DEFAULT);
+
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+    expect(removeRulesSpy).toHaveBeenCalledTimes(3);
+    // We cannot easily check the arguments because tool names are imported constants,
+    // but we can verify it was called 3 times which matches our implementation
+    // for EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME, and WEB_FETCH_TOOL_NAME.
+  });
+
   describe('registerCoreTools', () => {
     beforeEach(() => {
       vi.clearAllMocks();
