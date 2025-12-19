@@ -53,7 +53,7 @@ export async function fireBeforeAgentHook(
       ? createHookOutput('BeforeAgent', response.output)
       : undefined;
   } catch (error) {
-    debugLogger.warn(`BeforeAgent hook failed: ${error}`);
+    debugLogger.debug(`BeforeAgent hook failed: ${error}`);
     return undefined;
   }
 }
@@ -99,7 +99,7 @@ export async function fireAfterAgentHook(
       ? createHookOutput('AfterAgent', response.output)
       : undefined;
   } catch (error) {
-    debugLogger.warn(`AfterAgent hook failed: ${error}`);
+    debugLogger.debug(`AfterAgent hook failed: ${error}`);
     return undefined;
   }
 }
