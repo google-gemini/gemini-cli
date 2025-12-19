@@ -102,20 +102,20 @@ export const ToolConfirmationMessage: React.FC<
       if (!confirmationDetails.isModifying) {
         question = `Apply this change?`;
         options.push({
-          label: 'Yes, allow once',
+          label: 'Allow once',
           value: ToolConfirmationOutcome.ProceedOnce,
-          key: 'Yes, allow once',
+          key: 'Allow once',
         });
         if (isTrustedFolder) {
           options.push({
-            label: 'Yes, allow always',
+            label: 'Allow for this session',
             value: ToolConfirmationOutcome.ProceedAlways,
-            key: 'Yes, allow always',
+            key: 'Allow for this session',
           });
           options.push({
-            label: 'Yes, allow always and save to policy',
+            label: 'Allow for all future sessions',
             value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-            key: 'Yes, allow always and save to policy',
+            key: 'Allow for all future sessions',
           });
         }
         if (!config.getIdeMode() || !isDiffingEnabled) {
@@ -127,9 +127,9 @@ export const ToolConfirmationMessage: React.FC<
         }
 
         options.push({
-          label: 'No, suggest changes (esc)',
+          label: 'Deny (esc)',
           value: ToolConfirmationOutcome.Cancel,
-          key: 'No, suggest changes (esc)',
+          key: 'Deny (esc)',
         });
       }
     } else if (confirmationDetails.type === 'exec') {
@@ -137,81 +137,81 @@ export const ToolConfirmationMessage: React.FC<
 
       question = `Allow execution of: '${executionProps.rootCommand}'?`;
       options.push({
-        label: 'Yes, allow once',
+        label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
-        key: 'Yes, allow once',
+        key: 'Allow once',
       });
       if (isTrustedFolder) {
         options.push({
-          label: `Yes, allow always ...`,
+          label: `Allow for this session`,
           value: ToolConfirmationOutcome.ProceedAlways,
-          key: `Yes, allow always ...`,
+          key: `Allow for this session`,
         });
         options.push({
-          label: `Yes, allow always and save to policy`,
+          label: `Allow for all future sessions`,
           value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-          key: `Yes, allow always and save to policy`,
+          key: `Allow for all future sessions`,
         });
       }
       options.push({
-        label: 'No, suggest changes (esc)',
+        label: 'Deny (esc)',
         value: ToolConfirmationOutcome.Cancel,
-        key: 'No, suggest changes (esc)',
+        key: 'Deny (esc)',
       });
     } else if (confirmationDetails.type === 'info') {
       question = `Do you want to proceed?`;
       options.push({
-        label: 'Yes, allow once',
+        label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
-        key: 'Yes, allow once',
+        key: 'Allow once',
       });
       if (isTrustedFolder) {
         options.push({
-          label: 'Yes, allow always',
+          label: 'Allow for this session',
           value: ToolConfirmationOutcome.ProceedAlways,
-          key: 'Yes, allow always',
+          key: 'Allow for this session',
         });
         options.push({
-          label: 'Yes, allow always and save to policy',
+          label: 'Allow for all future sessions',
           value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-          key: 'Yes, allow always and save to policy',
+          key: 'Allow for all future sessions',
         });
       }
       options.push({
-        label: 'No, suggest changes (esc)',
+        label: 'Deny (esc)',
         value: ToolConfirmationOutcome.Cancel,
-        key: 'No, suggest changes (esc)',
+        key: 'Deny (esc)',
       });
     } else {
       // mcp tool confirmation
       const mcpProps = confirmationDetails;
       question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
       options.push({
-        label: 'Yes, allow once',
+        label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
-        key: 'Yes, allow once',
+        key: 'Allow once',
       });
       if (isTrustedFolder) {
         options.push({
-          label: `Yes, always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
-          value: ToolConfirmationOutcome.ProceedAlwaysTool, // Cast until types are updated
-          key: `Yes, always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
+          label: 'Allow tool for this session',
+          value: ToolConfirmationOutcome.ProceedAlwaysTool,
+          key: 'Allow tool for this session',
         });
         options.push({
-          label: `Yes, always allow all tools from server "${mcpProps.serverName}"`,
+          label: 'Allow all server tools for this session',
           value: ToolConfirmationOutcome.ProceedAlwaysServer,
-          key: `Yes, always allow all tools from server "${mcpProps.serverName}"`,
+          key: 'Allow all server tools for this session',
         });
         options.push({
-          label: `Yes, allow always tool "${mcpProps.toolName}" and save to policy`,
+          label: 'Allow tool for all future sessions',
           value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-          key: `Yes, allow always tool "${mcpProps.toolName}" and save to policy`,
+          key: 'Allow tool for all future sessions',
         });
       }
       options.push({
-        label: 'No, suggest changes (esc)',
+        label: 'Deny (esc)',
         value: ToolConfirmationOutcome.Cancel,
-        key: 'No, suggest changes (esc)',
+        key: 'Deny (esc)',
       });
     }
 
