@@ -120,9 +120,9 @@ export interface PolicyRule {
 
   /**
    * Whether this rule is specific to the current interactive session.
-   * Session-only rules are cleared when switching approval modes.
+   * Temporary rules are cleared when switching approval modes.
    */
-  isSessionOnly?: boolean;
+  temporary?: boolean;
 }
 
 export interface SafetyCheckerRule {

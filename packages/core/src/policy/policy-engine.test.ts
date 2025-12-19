@@ -227,21 +227,21 @@ describe('PolicyEngine', () => {
       engine.addRule({
         toolName: 'tool1',
         decision: PolicyDecision.DENY,
-        isSessionOnly: false,
+        temporary: false,
       });
       engine.addRule({
         toolName: 'tool1',
         decision: PolicyDecision.ALLOW,
-        isSessionOnly: true,
+        temporary: true,
       });
 
       expect(engine.getRules()).toHaveLength(2);
 
-      engine.removeRulesForTool('tool1', { isSessionOnly: true });
+      engine.removeRulesForTool('tool1', { temporary: true });
 
       const remainingRules = engine.getRules();
       expect(remainingRules).toHaveLength(1);
-      expect(remainingRules[0].isSessionOnly).toBe(false);
+      expect(remainingRules[0].temporary).toBe(false);
       expect(remainingRules[0].decision).toBe(PolicyDecision.DENY);
     });
 

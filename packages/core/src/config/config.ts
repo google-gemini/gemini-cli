@@ -1140,13 +1140,13 @@ export class Config {
       mode === ApprovalMode.DEFAULT
     ) {
       this.policyEngine.removeRulesForTool(EDIT_TOOL_NAME, {
-        isSessionOnly: true,
+        temporary: true,
       });
       this.policyEngine.removeRulesForTool(WRITE_FILE_TOOL_NAME, {
-        isSessionOnly: true,
+        temporary: true,
       });
       this.policyEngine.removeRulesForTool(WEB_FETCH_TOOL_NAME, {
-        isSessionOnly: true,
+        temporary: true,
       });
     }
 

@@ -277,7 +277,7 @@ export function createPolicyUpdater(
         // but still lose to admin policies (3.xxx) and settings excludes (200)
         priority: 2.95,
         argsPattern,
-        isSessionOnly: !message.persist,
+        temporary: !message.persist,
       });
 
       if (message.persist) {

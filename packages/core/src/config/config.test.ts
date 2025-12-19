@@ -1200,13 +1200,13 @@ describe('setApprovalMode with folder trust', () => {
 
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     expect(removeRulesSpy).toHaveBeenCalledWith(EDIT_TOOL_NAME, {
-      isSessionOnly: true,
+      temporary: true,
     });
     expect(removeRulesSpy).toHaveBeenCalledWith(WRITE_FILE_TOOL_NAME, {
-      isSessionOnly: true,
+      temporary: true,
     });
     expect(removeRulesSpy).toHaveBeenCalledWith(WEB_FETCH_TOOL_NAME, {
-      isSessionOnly: true,
+      temporary: true,
     });
     expect(removeRulesSpy).toHaveBeenCalledTimes(3);
   });

@@ -377,6 +377,7 @@ export async function loadPoliciesFromToml(
                   toolName: effectiveToolName,
                   decision: rule.decision,
                   priority: transformPriority(rule.priority, tier),
+                  temporary: false,
                 };
 
                 // Compile regex pattern

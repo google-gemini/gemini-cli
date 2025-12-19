@@ -289,14 +289,14 @@ export class PolicyEngine {
    */
   removeRulesForTool(
     toolName: string,
-    options: { isSessionOnly?: boolean } = {},
+    options: { temporary?: boolean } = {},
   ): void {
     this.rules = this.rules.filter((rule) => {
       const toolMatch = rule.toolName === toolName;
       if (!toolMatch) return true;
 
-      if (options.isSessionOnly !== undefined) {
-        return rule.isSessionOnly !== options.isSessionOnly;
+      if (options.temporary !== undefined) {
+        return rule.temporary !== options.temporary;
       }
 
       return false;
