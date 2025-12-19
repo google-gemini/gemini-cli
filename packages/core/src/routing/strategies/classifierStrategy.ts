@@ -12,7 +12,7 @@ import type {
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
-import { resolveClassifierModel } from '../../config/models.js';
+
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import {
@@ -29,16 +29,20 @@ const FLASH_MODEL = 'flash';
 const PRO_MODEL = 'pro';
 
 const CLASSIFIER_SYSTEM_PROMPT = `
-You are a specialized Task Routing AI. Your sole function is to analyze the user's request and classify its complexity. Choose between \`${FLASH_MODEL}\` (SIMPLE) or \`${PRO_MODEL}\` (COMPLEX).
-1.  \`${FLASH_MODEL}\`: A fast, efficient model for simple, well-defined tasks.
-2.  \`${PRO_MODEL}\`: A powerful, advanced model for complex, open-ended, or multi-step tasks.
+You are a specialized Task Routing AI. Your sole function is to analyze the user's request and classify its complexity. Choose between 
+${FLASH_MODEL}
+ (SIMPLE) or 
+${PRO_MODEL}
+ (COMPLEX).
+1.  \n${FLASH_MODEL}\n: A fast, efficient model for simple, well-defined tasks.
+2.  \n${PRO_MODEL}\n: A powerful, advanced model for complex, open-ended, or multi-step tasks.
 <complexity_rubric>
-A task is COMPLEX (Choose \`${PRO_MODEL}\`) if it meets ONE OR MORE of the following criteria:
+A task is COMPLEX (Choose \n${PRO_MODEL}\n) if it meets ONE OR MORE of the following criteria:
 1.  **High Operational Complexity (Est. 4+ Steps/Tool Calls):** Requires dependent actions, significant planning, or multiple coordinated changes.
 2.  **Strategic Planning & Conceptual Design:** Asking "how" or "why." Requires advice, architecture, or high-level strategy.
 3.  **High Ambiguity or Large Scope (Extensive Investigation):** Broadly defined requests requiring extensive investigation.
 4.  **Deep Debugging & Root Cause Analysis:** Diagnosing unknown or complex problems from symptoms.
-A task is SIMPLE (Choose \`${FLASH_MODEL}\`) if it is highly specific, bounded, and has Low Operational Complexity (Est. 1-3 tool calls). Operational simplicity overrides strategic phrasing.
+A task is SIMPLE (Choose \n${FLASH_MODEL}\n) if it is highly specific, bounded, and has Low Operational Complexity (Est. 1-3 tool calls). Operational simplicity overrides strategic phrasing.
 </complexity_rubric>
 **Output Format:**
 Respond *only* in JSON format according to the following schema. Do not include any text outside the JSON structure.
@@ -167,20 +171,26 @@ export class ClassifierStrategy implements RoutingStrategy {
 
       const reasoning = routerResponse.reasoning;
       const latencyMs = Date.now() - startTime;
-      const selectedModel = resolveClassifierModel(
-        config.getModel(),
-        routerResponse.model_choice,
-        config.getPreviewFeatures(),
-      );
 
-      return {
-        model: selectedModel,
-        metadata: {
-          source: 'Classifier',
-          latencyMs,
-          reasoning,
-        },
-      };
+      if (routerResponse.model_choice === FLASH_MODEL) {
+        return {
+          model: config.getSimpleTaskModel(),
+          metadata: {
+            source: 'Classifier',
+            latencyMs,
+            reasoning,
+          },
+        };
+      } else {
+        return {
+          model: config.getComplexTaskModel(),
+          metadata: {
+            source: 'Classifier',
+            reasoning,
+            latencyMs,
+          },
+        };
+      }
     } catch (error) {
       // If the classifier fails for any reason (API error, parsing error, etc.),
       // we log it and return null to allow the composite strategy to proceed.

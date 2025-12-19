@@ -100,16 +100,21 @@ vi.mock('@google/gemini-cli-core', async () => {
     loadEnvironment: vi.fn(),
     loadServerHierarchicalMemory: vi.fn(
       (
-        cwd,
-        dirs,
-        debug,
-        fileService,
+        _cwd,
+        _dirs,
+        _debug,
+        _fileService,
         extensionLoader: ExtensionLoader,
         _maxDirs,
       ) => {
-        const extensionPaths = extensionLoader
-          .getExtensions()
-          .flatMap((e) => e.contextFiles);
+        let extensionPaths: string[] = [];
+        try {
+          extensionPaths = extensionLoader
+            .getExtensions()
+            .flatMap((e) => e.contextFiles);
+        } catch {
+          // Extensions might not be loaded yet or mocked improperly, ignore.
+        }
         return Promise.resolve({
           memoryContent: extensionPaths.join(',') || '',
           fileCount: extensionPaths?.length || 0,

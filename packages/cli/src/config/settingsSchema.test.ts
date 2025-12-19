@@ -415,4 +415,23 @@ describe('SettingsSchema', () => {
       }
     });
   });
+
+  it('should have router settings in schema', () => {
+    const routerSchema = getSettingsSchema().experimental.properties.router;
+    expect(routerSchema).toBeDefined();
+    expect(routerSchema.type).toBe('object');
+    expect(routerSchema.category).toBe('Experimental');
+
+    const simpleTaskModelSchema = routerSchema.properties?.simpleTaskModel;
+    expect(simpleTaskModelSchema).toBeDefined();
+    expect(simpleTaskModelSchema?.type).toBe('string');
+    expect(simpleTaskModelSchema?.category).toBe('Experimental');
+    expect(simpleTaskModelSchema?.default).toBe('gemini-2.5-flash');
+
+    const complexTaskModelSchema = routerSchema.properties?.complexTaskModel;
+    expect(complexTaskModelSchema).toBeDefined();
+    expect(complexTaskModelSchema?.type).toBe('string');
+    expect(complexTaskModelSchema?.category).toBe('Experimental');
+    expect(complexTaskModelSchema?.default).toBe('gemini-2.5-pro');
+  });
 });

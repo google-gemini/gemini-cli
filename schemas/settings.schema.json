@@ -1373,6 +1373,37 @@
             }
           },
           "additionalProperties": false
+        },
+        "router": {
+          "title": "Model Router Configuration",
+          "description": "Settings for configuring the model router.",
+          "markdownDescription": "Settings for configuring the model router.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Model Router",
+              "description": "Enable the model router to automatically select models based on task complexity.",
+              "markdownDescription": "Enable the model router to automatically select models based on task complexity.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "simpleTaskModel": {
+              "title": "Simple Task Model",
+              "description": "The model to use for simple, well-defined tasks when the model router is enabled.",
+              "markdownDescription": "The model to use for simple, well-defined tasks when the model router is enabled.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemini-2.5-flash`",
+              "default": "gemini-2.5-flash",
+              "type": "string"
+            },
+            "complexTaskModel": {
+              "title": "Complex Task Model",
+              "description": "The model to use for complex, multi-step, or ambiguous tasks when the model router is enabled.",
+              "markdownDescription": "The model to use for complex, multi-step, or ambiguous tasks when the model router is enabled.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemini-2.5-pro`",
+              "default": "gemini-2.5-pro",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

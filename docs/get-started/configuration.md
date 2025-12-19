@@ -831,6 +831,24 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"auto"`
   - **Requires restart:** Yes
 
+- **`experimental.router.enabled`** (boolean):
+  - **Description:** Enable the model router to automatically select models
+    based on task complexity.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.router.simpleTaskModel`** (string):
+  - **Description:** The model to use for simple, well-defined tasks when the
+    model router is enabled.
+  - **Default:** `"gemini-2.5-flash"`
+  - **Requires restart:** Yes
+
+- **`experimental.router.complexTaskModel`** (string):
+  - **Description:** The model to use for complex, multi-step, or ambiguous
+    tasks when the model router is enabled.
+  - **Default:** `"gemini-2.5-pro"`
+  - **Requires restart:** Yes
+
 #### `hooks`
 
 - **`hooks.disabled`** (array):
