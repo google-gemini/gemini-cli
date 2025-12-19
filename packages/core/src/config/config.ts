@@ -326,6 +326,12 @@ export interface ConfigParameters {
         [K in HookEventName]?: HookDefinition[];
       } & { disabled?: string[] });
   previewFeatures?: boolean;
+  enableModelAvailabilityService?: boolean;
+  mcpAutoRestart?: {
+    enabled?: boolean;
+    healthCheckIntervalMs?: number;
+    unhealthyTimeoutMs?: number;
+  };
   enableAgents?: boolean;
   experimentalJitContext?: boolean;
 }
@@ -446,6 +452,11 @@ export class Config {
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
 
+  private readonly mcpAutoRestart: {
+    enabled: boolean;
+    healthCheckIntervalMs: number;
+    unhealthyTimeoutMs: number;
+  };
   private readonly enableAgents: boolean;
 
   private readonly experimentalJitContext: boolean;
@@ -509,6 +520,13 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.model = params.model;
+    this.mcpAutoRestart = {
+      enabled: params.mcpAutoRestart?.enabled ?? true,
+      healthCheckIntervalMs:
+        params.mcpAutoRestart?.healthCheckIntervalMs ?? 15000,
+      unhealthyTimeoutMs: params.mcpAutoRestart?.unhealthyTimeoutMs ?? 30000,
+    };
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
@@ -1308,6 +1326,10 @@ export class Config {
 
   isAgentsEnabled(): boolean {
     return this.enableAgents;
+  }
+
+  getMcpAutoRestartConfig() {
+    return this.mcpAutoRestart;
   }
 
   getNoBrowser(): boolean {
