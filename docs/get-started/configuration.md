@@ -731,6 +731,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`security.enablePermanentToolApproval`** (boolean):
+  - **Description:** Enable the "Allow for all future sessions" option in tool
+    confirmation dialogs.
+  - **Default:** `false`
+
 - **`security.blockGitExtensions`** (boolean):
   - **Description:** Blocks installing and loading extensions from Git.
   - **Default:** `false`
