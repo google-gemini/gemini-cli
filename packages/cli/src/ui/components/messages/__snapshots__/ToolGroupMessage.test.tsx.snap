@@ -40,7 +40,7 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialo
 │ ● 1. Allow once                                                              │
 │   2. Allow for this session                                                  │
 │   3. Allow for all future sessions                                           │
-│   4. Deny (esc)                                                              │
+│   4. No, suggest changes (esc)                                               │
 │                                                                              │
 │                                                                              │
 │ ?  second-confirm A tool for testing                                         │
@@ -124,7 +124,7 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call awaiting co
 │ ● 1. Allow once                                                              │
 │   2. Allow for this session                                                  │
 │   3. Allow for all future sessions                                           │
-│   4. Deny (esc)                                                              │
+│   4. No, suggest changes (esc)                                               │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
 `;

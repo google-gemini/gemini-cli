@@ -127,9 +127,9 @@ export const ToolConfirmationMessage: React.FC<
         }
 
         options.push({
-          label: 'Deny (esc)',
+          label: 'No, suggest changes (esc)',
           value: ToolConfirmationOutcome.Cancel,
-          key: 'Deny (esc)',
+          key: 'No, suggest changes (esc)',
         });
       }
     } else if (confirmationDetails.type === 'exec') {
@@ -154,9 +154,9 @@ export const ToolConfirmationMessage: React.FC<
         });
       }
       options.push({
-        label: 'Deny (esc)',
+        label: 'No, suggest changes (esc)',
         value: ToolConfirmationOutcome.Cancel,
-        key: 'Deny (esc)',
+        key: 'No, suggest changes (esc)',
       });
     } else if (confirmationDetails.type === 'info') {
       question = `Do you want to proceed?`;
@@ -178,9 +178,9 @@ export const ToolConfirmationMessage: React.FC<
         });
       }
       options.push({
-        label: 'Deny (esc)',
+        label: 'No, suggest changes (esc)',
         value: ToolConfirmationOutcome.Cancel,
-        key: 'Deny (esc)',
+        key: 'No, suggest changes (esc)',
       });
     } else {
       // mcp tool confirmation
@@ -209,9 +209,9 @@ export const ToolConfirmationMessage: React.FC<
         });
       }
       options.push({
-        label: 'Deny (esc)',
+        label: 'No, suggest changes (esc)',
         value: ToolConfirmationOutcome.Cancel,
-        key: 'Deny (esc)',
+        key: 'No, suggest changes (esc)',
       });
     }
 

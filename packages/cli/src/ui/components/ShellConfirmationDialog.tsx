@@ -61,9 +61,9 @@ export const ShellConfirmationDialog: React.FC<
       key: 'Allow for this session',
     },
     {
-      label: 'Deny (esc)',
+      label: 'No (esc)',
       value: ToolConfirmationOutcome.Cancel,
-      key: 'Deny (esc)',
+      key: 'No (esc)',
     },
   ];
 

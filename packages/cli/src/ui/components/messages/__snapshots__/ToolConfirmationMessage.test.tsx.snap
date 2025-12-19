@@ -11,7 +11,7 @@ Do you want to proceed?
 ● 1. Allow once
   2. Allow for this session
   3. Allow for all future sessions
-  4. Deny (esc)
+  4. No, suggest changes (esc)
 "
 `;
 
@@ -23,7 +23,7 @@ Do you want to proceed?
 ● 1. Allow once
   2. Allow for this session
   3. Allow for all future sessions
-  4. Deny (esc)
+  4. No, suggest changes (esc)
 "
 `;
 
@@ -38,7 +38,7 @@ Apply this change?
 
 ● 1. Allow once
   2. Modify with external editor
-  3. Deny (esc)
+  3. No, suggest changes (esc)
 "
 `;
 
@@ -55,7 +55,7 @@ Apply this change?
   2. Allow for this session
   3. Allow for all future sessions
   4. Modify with external editor
-  5. Deny (esc)
+  5. No, suggest changes (esc)
 "
 `;
 
@@ -65,7 +65,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' 
 Allow execution of: 'echo'?
 
 ● 1. Allow once
-  2. Deny (esc)
+  2. No, suggest changes (esc)
 "
 `;
 
@@ -77,7 +77,7 @@ Allow execution of: 'echo'?
 ● 1. Allow once
   2. Allow for this session
   3. Allow for all future sessions
-  4. Deny (esc)
+  4. No, suggest changes (esc)
 "
 `;
 
@@ -87,7 +87,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for info confirmations' 
 Do you want to proceed?
 
 ● 1. Allow once
-  2. Deny (esc)
+  2. No, suggest changes (esc)
 "
 `;
 
@@ -99,7 +99,7 @@ Do you want to proceed?
 ● 1. Allow once
   2. Allow for this session
   3. Allow for all future sessions
-  4. Deny (esc)
+  4. No, suggest changes (esc)
 "
 `;
 
@@ -110,7 +110,7 @@ Tool: test-tool
 Allow execution of MCP tool "test-tool" from server "test-server"?
 
 ● 1. Allow once
-  2. Deny (esc)
+  2. No, suggest changes (esc)
 "
 `;
 
@@ -124,6 +124,6 @@ Allow execution of MCP tool "test-tool" from server "test-server"?
   2. Allow tool for this session
   3. Allow all server tools for this session
   4. Allow tool for all future sessions
-  5. Deny (esc)
+  5. No, suggest changes (esc)
 "
 `;

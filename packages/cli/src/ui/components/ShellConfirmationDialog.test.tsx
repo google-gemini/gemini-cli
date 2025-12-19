@@ -43,13 +43,13 @@ describe('ShellConfirmationDialog', () => {
     expect(select).toContain('Allow for this session');
   });
 
-  it('calls onConfirm with Cancel when "Deny (esc)" is selected', () => {
+  it('calls onConfirm with Cancel when "No (esc)" is selected', () => {
     const { lastFrame } = renderWithProviders(
       <ShellConfirmationDialog request={request} />,
       { width: 100 },
     );
     const select = lastFrame()!.toString();
     // Simulate selecting the third option
-    expect(select).toContain('Deny (esc)');
+    expect(select).toContain('No (esc)');
   });
 });
