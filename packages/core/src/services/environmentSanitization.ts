@@ -42,76 +42,75 @@ export function sanitizeEnvironment(
   return results;
 }
 
-const ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES: ReadonlySet<string> = new Set([
-  // Cross-platform
-  'PATH',
-  // Windows specific
-  'Path',
-  'SYSTEMROOT',
-  'SystemRoot',
-  'COMSPEC',
-  'ComSpec',
-  'PATHEXT',
-  'WINDIR',
-  'TEMP',
-  'TMP',
-  'USERPROFILE',
-  'SYSTEMDRIVE',
-  'SystemDrive',
-  // Unix/Linux/macOS specific
-  'HOME',
-  'LANG',
-  'SHELL',
-  'TMPDIR',
-  'USER',
-  'LOGNAME',
-  // GitHub Action-related variables
-  'ADDITIONAL_CONTEXT',
-  'AVAILABLE_LABELS',
-  'BRANCH_NAME',
-  'DESCRIPTION',
-  'EVENT_NAME',
-  'GITHUB_ENV',
-  'IS_PULL_REQUEST',
-  'ISSUES_TO_TRIAGE',
-  'ISSUE_BODY',
-  'ISSUE_NUMBER',
-  'ISSUE_TITLE',
-  'PULL_REQUEST_NUMBER',
-  'REPOSITORY',
-  'TITLE',
-  'TRIGGERING_ACTOR',
-]);
+export const ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES: ReadonlySet<string> =
+  new Set([
+    // Cross-platform
+    'PATH',
+    // Windows specific
+    'SYSTEMROOT',
+    'COMSPEC',
+    'PATHEXT',
+    'WINDIR',
+    'TEMP',
+    'TMP',
+    'USERPROFILE',
+    'SYSTEMDRIVE',
+    // Unix/Linux/macOS specific
+    'HOME',
+    'LANG',
+    'SHELL',
+    'TMPDIR',
+    'USER',
+    'LOGNAME',
+    // GitHub Action-related variables
+    'ADDITIONAL_CONTEXT',
+    'AVAILABLE_LABELS',
+    'BRANCH_NAME',
+    'DESCRIPTION',
+    'EVENT_NAME',
+    'GITHUB_ENV',
+    'IS_PULL_REQUEST',
+    'ISSUES_TO_TRIAGE',
+    'ISSUE_BODY',
+    'ISSUE_NUMBER',
+    'ISSUE_TITLE',
+    'PULL_REQUEST_NUMBER',
+    'REPOSITORY',
+    'TITLE',
+    'TRIGGERING_ACTOR',
+  ]);
 
-const NEVER_ALLOWED_ENVIRONMENT_VARIABLES: ReadonlySet<string> = new Set([
-  'CLIENT_ID',
-  'DB_URI',
-  'CONNECTION_STRING',
-  'AWS_DEFAULT_REGION',
-  'AZURE_CLIENT_ID',
-  'AZURE_TENANT_ID',
-  'SLACK_WEBHOOK_URL',
-  'TWILIO_ACCOUNT_SID',
-  'DATABASE_URL',
-  'GOOGLE_CLOUD_PROJECT',
-  'GOOGLE_CLOUD_ACCOUNT',
-  'FIREBASE_PROJECT_ID',
-]);
+export const NEVER_ALLOWED_ENVIRONMENT_VARIABLES: ReadonlySet<string> = new Set(
+  [
+    'CLIENT_ID',
+    'DB_URI',
+    'CONNECTION_STRING',
+    'AWS_DEFAULT_REGION',
+    'AZURE_CLIENT_ID',
+    'AZURE_TENANT_ID',
+    'SLACK_WEBHOOK_URL',
+    'TWILIO_ACCOUNT_SID',
+    'DATABASE_URL',
+    'GOOGLE_CLOUD_PROJECT',
+    'GOOGLE_CLOUD_ACCOUNT',
+    'FIREBASE_PROJECT_ID',
+  ],
+);
 
-const NEVER_ALLOWED_NAME_PATTERNS = [
-  /TOKEN/,
-  /SECRET/,
-  /PASSWORD/,
-  /PASSWD/,
-  /KEY/,
-  /AUTH/,
-  /CREDENTAL/,
-  /CREDS/,
-  /PRVATE/,
-  /CERT/,
+export const NEVER_ALLOWED_NAME_PATTERNS = [
+  /TOKEN/i,
+  /SECRET/i,
+  /PASSWORD/i,
+  /PASSWD/i,
+  /KEY/i,
+  /AUTH/i,
+  /CREDENTIAL/i,
+  /CREDS/i,
+  /PRIVATE/i,
+  /CERT/i,
 ] as const;
 
-const NEVER_ALLOWED_VALUE_PATTERNS = [
+export const NEVER_ALLOWED_VALUE_PATTERNS = [
   /-----BEGIN (RSA|OPENSSH|EC|PGP) PRIVATE KEY-----/i,
   /-----BEGIN CERTIFICATE-----/i,
   // Credentials in URL
@@ -119,11 +118,11 @@ const NEVER_ALLOWED_VALUE_PATTERNS = [
   // GitHub tokens (classic, fine-grained, OAuth, etc.)
   /(ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9_]{36,}/i,
   // Google API keys
-  /AIzaSy[a-zA-Z0-9_\\-]{33}/,
+  /AIzaSy[a-zA-Z0-9_\\-]{33}/i,
   // Amazon AWS Access Key ID
-  /AKIA[A-Z0-9]{16}/,
+  /AKIA[A-Z0-9]{16}/i,
   // Generic OAuth/JWT tokens
-  /eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*/,
+  /eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*/i,
   // Stripe API keys
   /(s|r)k_(live|test)_[0-9a-zA-Z]{24}/i,
   // Slack tokens (bot, user, etc.)
