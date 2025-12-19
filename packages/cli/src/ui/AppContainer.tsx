@@ -447,7 +447,8 @@ export const AppContainer = (props: AppContainerProps) => {
     if (
       !(settings.merged.ui?.hideBanner || config.getScreenReader()) &&
       bannerVisible &&
-      banner.bannerText
+      banner.bannerText &&
+      (banner.bannerText.title || banner.bannerText.body)
     ) {
       // The header should show a banner but the Header is rendered in static
       // so we must trigger a static refresh for it to be visible.
