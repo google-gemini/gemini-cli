@@ -83,6 +83,10 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "@google/gemini-cli": "^0.1.1"
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@google/gemini-cli": "^0.1.1",
+    "@types/fluent-ffmpeg": "^2.1.28",
+    "canvas": "^3.2.0",
+    "fluent-ffmpeg": "^2.1.3"
   }
 }

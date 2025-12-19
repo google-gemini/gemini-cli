@@ -1,0 +1,22 @@
+{
+  "name": "acupuncture-video-generator",
+  "version": "1.0.0",
+  "description": "Medical advertisement video generator for Acupuncture Clinic - Paralysis treatment awareness",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "generate": "node index.js",
+    "add-audio": "node add-audio.js",
+    "create-formats": "node create-formats.js",
+    "clean": "rm -rf output"
+  },
+  "keywords": [
+    "video",
+    "medical",
+    "advertisement",
+    "acupuncture",
+    "ffmpeg"
+  ],
+  "author": "Acupuncture Clinic",
+  "license": "MIT"
+}
