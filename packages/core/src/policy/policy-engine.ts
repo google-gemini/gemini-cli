@@ -284,9 +284,23 @@ export class PolicyEngine {
 
   /**
    * Remove rules for a specific tool.
+   * @param toolName The name of the tool.
+   * @param options Optional filters for removal.
    */
-  removeRulesForTool(toolName: string): void {
-    this.rules = this.rules.filter((rule) => rule.toolName !== toolName);
+  removeRulesForTool(
+    toolName: string,
+    options: { isSessionOnly?: boolean } = {},
+  ): void {
+    this.rules = this.rules.filter((rule) => {
+      const toolMatch = rule.toolName === toolName;
+      if (!toolMatch) return true;
+
+      if (options.isSessionOnly !== undefined) {
+        return rule.isSessionOnly !== options.isSessionOnly;
+      }
+
+      return false;
+    });
   }
 
   /**

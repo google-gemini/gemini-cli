@@ -223,6 +223,28 @@ describe('PolicyEngine', () => {
       expect(remainingRules.some((r) => r.toolName === 'tool2')).toBe(true);
     });
 
+    it('should remove ONLY session-only rules when filter is applied', () => {
+      engine.addRule({
+        toolName: 'tool1',
+        decision: PolicyDecision.DENY,
+        isSessionOnly: false,
+      });
+      engine.addRule({
+        toolName: 'tool1',
+        decision: PolicyDecision.ALLOW,
+        isSessionOnly: true,
+      });
+
+      expect(engine.getRules()).toHaveLength(2);
+
+      engine.removeRulesForTool('tool1', { isSessionOnly: true });
+
+      const remainingRules = engine.getRules();
+      expect(remainingRules).toHaveLength(1);
+      expect(remainingRules[0].isSessionOnly).toBe(false);
+      expect(remainingRules[0].decision).toBe(PolicyDecision.DENY);
+    });
+
     it('should handle removing non-existent tool', () => {
       engine.addRule({ toolName: 'existing', decision: PolicyDecision.ALLOW });
 

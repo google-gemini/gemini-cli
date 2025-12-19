@@ -117,6 +117,12 @@ export interface PolicyRule {
    * Default is 0.
    */
   priority?: number;
+
+  /**
+   * Whether this rule is specific to the current interactive session.
+   * Session-only rules are cleared when switching approval modes.
+   */
+  isSessionOnly?: boolean;
 }
 
 export interface SafetyCheckerRule {

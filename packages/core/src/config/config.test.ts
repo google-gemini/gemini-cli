@@ -1199,9 +1199,15 @@ describe('setApprovalMode with folder trust', () => {
     config.setApprovalMode(ApprovalMode.DEFAULT);
 
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
-    expect(removeRulesSpy).toHaveBeenCalledWith(EDIT_TOOL_NAME);
-    expect(removeRulesSpy).toHaveBeenCalledWith(WRITE_FILE_TOOL_NAME);
-    expect(removeRulesSpy).toHaveBeenCalledWith(WEB_FETCH_TOOL_NAME);
+    expect(removeRulesSpy).toHaveBeenCalledWith(EDIT_TOOL_NAME, {
+      isSessionOnly: true,
+    });
+    expect(removeRulesSpy).toHaveBeenCalledWith(WRITE_FILE_TOOL_NAME, {
+      isSessionOnly: true,
+    });
+    expect(removeRulesSpy).toHaveBeenCalledWith(WEB_FETCH_TOOL_NAME, {
+      isSessionOnly: true,
+    });
     expect(removeRulesSpy).toHaveBeenCalledTimes(3);
   });
 

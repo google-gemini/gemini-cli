@@ -1139,9 +1139,15 @@ export class Config {
       this.approvalMode === ApprovalMode.AUTO_EDIT &&
       mode === ApprovalMode.DEFAULT
     ) {
-      this.policyEngine.removeRulesForTool(EDIT_TOOL_NAME);
-      this.policyEngine.removeRulesForTool(WRITE_FILE_TOOL_NAME);
-      this.policyEngine.removeRulesForTool(WEB_FETCH_TOOL_NAME);
+      this.policyEngine.removeRulesForTool(EDIT_TOOL_NAME, {
+        isSessionOnly: true,
+      });
+      this.policyEngine.removeRulesForTool(WRITE_FILE_TOOL_NAME, {
+        isSessionOnly: true,
+      });
+      this.policyEngine.removeRulesForTool(WEB_FETCH_TOOL_NAME, {
+        isSessionOnly: true,
+      });
     }
 
     this.approvalMode = mode;
