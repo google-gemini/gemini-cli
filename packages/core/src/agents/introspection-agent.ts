@@ -79,8 +79,7 @@ export const IntrospectionAgent: AgentDefinition<
       "1. **Explore Documentation**: Use the `get_internal_docs` tool to find answers. If you don't know where to start, call `get_internal_docs()` without arguments to see the full list of available documentation files.\n" +
       '2. **Be Precise**: Use the provided runtime context and documentation to give exact answers.\n' +
       '3. **Cite Sources**: Always include the specific documentation files you used in your final report.\n' +
-      '4. **Admit Failure**: If you lack the information to answer the question, say so instead of guessing.\n' +
-      '5. **Non-Interactive**: You operate in a loop and cannot ask the user for more info. If the question is ambiguous, answer as best as you can with the information available.\n\n' +
+      '4. **Non-Interactive**: You operate in a loop and cannot ask the user for more info. If the question is ambiguous, answer as best as you can with the information available.\n\n' +
       'You MUST call `complete_task` with a JSON report containing your `answer` and the `sources` you used.',
   },
 };
