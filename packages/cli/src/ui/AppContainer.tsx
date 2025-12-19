@@ -1456,8 +1456,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
         ) {
           setBanner({
             bannerText: {
-              title: 'Gemini 3 is now available.',
-              body: 'To use Gemini 3, enable "Preview features" in /settings\nLearn more at https://goo.gle/enable-preview-features',
+              title: 'Gemini 3 Flash and Pro are now available.',
+              body: 'Enable "Preview features" in /settings. \nLearn more at https://goo.gle/enable-preview-features',
             },
             isWarning: false,
           });
