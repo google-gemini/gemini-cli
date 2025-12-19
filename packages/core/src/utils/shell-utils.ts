@@ -14,6 +14,7 @@ import {
 import type { Node } from 'web-tree-sitter';
 import { Language, Parser } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
+import { sanitizeEnvironment } from '../services/environmentSanitization.js';
 
 export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
@@ -338,7 +339,7 @@ function parsePowerShellCommandDetails(
       ],
       {
         env: {
-          ...process.env,
+          ...sanitizeEnvironment(process.env),
           [POWERSHELL_COMMAND_ENV]: command,
         },
         encoding: 'utf-8',

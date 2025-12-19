@@ -60,6 +60,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
+import { sanitizeEnvironment } from '../services/environmentSanitization.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -1782,7 +1783,7 @@ export async function createTransport(
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
       env: {
-        ...process.env,
+        ...sanitizeEnvironment(process.env),
         ...(mcpServerConfig.env || {}),
       } as Record<string, string>,
       cwd: mcpServerConfig.cwd,

@@ -19,7 +19,7 @@ import {
   serializeTerminalToObject,
   type AnsiOutput,
 } from '../utils/terminalSerializer.js';
-import { sanitizeEnvironment } from './environmentSantization.js';
+import { sanitizeEnvironment } from './environmentSanitization.js';
 const { Terminal } = pkg;
 
 const SIGKILL_TIMEOUT_MS = 200;
@@ -250,7 +250,7 @@ export class ShellExecutionService {
         shell: false,
         detached: !isWindows,
         env: {
-          ...sanitizeEnvironment(),
+          ...sanitizeEnvironment(process.env),
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: 'cat',
@@ -464,7 +464,7 @@ export class ShellExecutionService {
         cols,
         rows,
         env: {
-          ...sanitizeEnvironment(),
+          ...sanitizeEnvironment(process.env),
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: shellExecutionConfig.pager ?? 'cat',
