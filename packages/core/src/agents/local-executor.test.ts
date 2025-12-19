@@ -14,7 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import { debugLogger } from '../utils/debugLogger.js';
-import { AgentExecutor, type ActivityCallback } from './executor.js';
+import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
@@ -48,8 +48,8 @@ import {
   RecoveryAttemptEvent,
 } from '../telemetry/types.js';
 import type {
-  AgentDefinition,
   AgentInputs,
+  LocalAgentDefinition,
   SubagentActivityEvent,
   OutputConfig,
 } from './types.js';
@@ -193,12 +193,13 @@ let parentToolRegistry: ToolRegistry;
 /**
  * Type-safe helper to create agent definitions for tests.
  */
-const createTestDefinition = <TOutput extends z.ZodTypeAny>(
+
+const createTestDefinition = <TOutput extends z.ZodTypeAny = z.ZodUnknown>(
   tools: Array<string | MockTool> = [LS_TOOL_NAME],
-  runConfigOverrides: Partial<AgentDefinition<TOutput>['runConfig']> = {},
+  runConfigOverrides: Partial<LocalAgentDefinition<TOutput>['runConfig']> = {},
   outputConfigMode: 'default' | 'none' = 'default',
   schema: TOutput = z.string() as unknown as TOutput,
-): AgentDefinition<TOutput> => {
+): LocalAgentDefinition<TOutput> => {
   let outputConfig: OutputConfig<TOutput> | undefined;
 
   if (outputConfigMode === 'default') {
@@ -210,6 +211,7 @@ const createTestDefinition = <TOutput extends z.ZodTypeAny>(
   }
 
   return {
+    kind: 'local',
     name: 'TestAgent',
     description: 'An agent for testing.',
     inputConfig: {
@@ -223,7 +225,7 @@ const createTestDefinition = <TOutput extends z.ZodTypeAny>(
   };
 };
 
-describe('AgentExecutor', () => {
+describe('LocalAgentExecutor', () => {
   let activities: SubagentActivityEvent[];
   let onActivity: ActivityCallback;
   let abortController: AbortController;
@@ -289,19 +291,22 @@ describe('AgentExecutor', () => {
   describe('create (Initialization and Validation)', () => {
     it('should create successfully with allowed tools', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME]);
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
       );
-      expect(executor).toBeInstanceOf(AgentExecutor);
+      expect(executor).toBeInstanceOf(LocalAgentExecutor);
     });
 
-    it('SECURITY: should throw if a tool is not on the non-interactive allowlist', async () => {
+    it('should allow any tool for experimentation (formerly SECURITY check)', async () => {
       const definition = createTestDefinition([MOCK_TOOL_NOT_ALLOWED.name]);
-      await expect(
-        AgentExecutor.create(definition, mockConfig, onActivity),
-      ).rejects.toThrow(/not on the allow-list for non-interactive execution/);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      expect(executor).toBeInstanceOf(LocalAgentExecutor);
     });
 
     it('should create an isolated ToolRegistry for the agent', async () => {
@@ -309,7 +314,7 @@ describe('AgentExecutor', () => {
         LS_TOOL_NAME,
         READ_FILE_TOOL_NAME,
       ]);
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -330,7 +335,7 @@ describe('AgentExecutor', () => {
       mockedPromptIdContext.getStore.mockReturnValue(parentId);
 
       const definition = createTestDefinition();
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -361,7 +366,7 @@ describe('AgentExecutor', () => {
         },
       ]);
 
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -390,7 +395,7 @@ describe('AgentExecutor', () => {
       definition.inputConfig.inputs = {
         goal: { type: 'string', required: true, description: 'goal' },
       };
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -413,7 +418,7 @@ describe('AgentExecutor', () => {
 
     it('should execute successfully when model calls complete_task with output (Happy Path with Output)', async () => {
       const definition = createTestDefinition();
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -562,7 +567,7 @@ describe('AgentExecutor', () => {
 
     it('should execute successfully when model calls complete_task without output (Happy Path No Output)', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {}, 'none');
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -601,7 +606,13 @@ describe('AgentExecutor', () => {
       });
 
       mockModelResponse(
-        [{ name: TASK_COMPLETE_TOOL_NAME, args: {}, id: 'call2' }],
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { result: 'All work done' },
+            id: 'call2',
+          },
+        ],
         'Task finished.',
       );
 
@@ -618,18 +629,18 @@ describe('AgentExecutor', () => {
       const completeToolDef = sentTools!.find(
         (t) => t.name === TASK_COMPLETE_TOOL_NAME,
       );
-      expect(completeToolDef?.parameters?.required).toEqual([]);
+      expect(completeToolDef?.parameters?.required).toEqual(['result']);
       expect(completeToolDef?.description).toContain(
-        'signal that you have completed',
+        'submit your final findings',
       );
 
-      expect(output.result).toBe('Task completed successfully.');
+      expect(output.result).toBe('All work done');
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
     });
 
     it('should error immediately if the model stops tools without calling complete_task (Protocol Violation)', async () => {
       const definition = createTestDefinition();
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -705,7 +716,7 @@ describe('AgentExecutor', () => {
 
     it('should report an error if complete_task is called with missing required arguments', async () => {
       const definition = createTestDefinition();
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -768,7 +779,7 @@ describe('AgentExecutor', () => {
 
     it('should handle multiple calls to complete_task in the same turn (accept first, block rest)', async () => {
       const definition = createTestDefinition([], {}, 'none');
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -776,8 +787,16 @@ describe('AgentExecutor', () => {
 
       // Turn 1: Duplicate calls
       mockModelResponse([
-        { name: TASK_COMPLETE_TOOL_NAME, args: {}, id: 'call1' },
-        { name: TASK_COMPLETE_TOOL_NAME, args: {}, id: 'call2' },
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { result: 'done' },
+          id: 'call1',
+        },
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { result: 'ignored' },
+          id: 'call2',
+        },
       ]);
 
       const output = await executor.run({ goal: 'Dup test' }, signal);
@@ -803,7 +822,7 @@ describe('AgentExecutor', () => {
 
     it('should execute parallel tool calls and then complete', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME]);
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -898,7 +917,7 @@ describe('AgentExecutor', () => {
 
     it('SECURITY: should block unauthorized tools and provide explicit failure to model', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME]);
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -934,7 +953,7 @@ describe('AgentExecutor', () => {
 
       // 2. Verify console warning
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining(`[AgentExecutor] Blocked call:`),
+        expect.stringContaining(`[LocalAgentExecutor] Blocked call:`),
       );
       consoleWarnSpy.mockRestore();
 
@@ -975,7 +994,7 @@ describe('AgentExecutor', () => {
         'default',
         z.string().min(10), // The schema is for the output value itself
       );
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -1044,7 +1063,7 @@ describe('AgentExecutor', () => {
       });
 
       // We expect the error to be thrown during the run, not creation
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -1075,7 +1094,7 @@ describe('AgentExecutor', () => {
 
     it('should handle a failed tool call and feed the error to the model', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME]);
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -1196,7 +1215,7 @@ describe('AgentExecutor', () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
         max_turns: MAX,
       });
-      const executor = await AgentExecutor.create(definition, mockConfig);
+      const executor = await LocalAgentExecutor.create(definition, mockConfig);
 
       mockWorkResponse('t1');
       mockWorkResponse('t2');
@@ -1213,7 +1232,7 @@ describe('AgentExecutor', () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
         max_time_minutes: 0.5, // 30 seconds
       });
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -1270,7 +1289,7 @@ describe('AgentExecutor', () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
         max_time_minutes: 1,
       });
-      const executor = await AgentExecutor.create(definition, mockConfig);
+      const executor = await LocalAgentExecutor.create(definition, mockConfig);
 
       mockModelResponse([
         { name: LS_TOOL_NAME, args: { path: '.' }, id: 't1' },
@@ -1306,7 +1325,7 @@ describe('AgentExecutor', () => {
 
     it('should terminate when AbortSignal is triggered', async () => {
       const definition = createTestDefinition();
-      const executor = await AgentExecutor.create(definition, mockConfig);
+      const executor = await LocalAgentExecutor.create(definition, mockConfig);
 
       mockSendMessageStream.mockImplementationOnce(async () =>
         (async function* () {
@@ -1358,7 +1377,7 @@ describe('AgentExecutor', () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
         max_turns: MAX,
       });
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -1406,7 +1425,7 @@ describe('AgentExecutor', () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
         max_turns: MAX,
       });
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -1440,7 +1459,7 @@ describe('AgentExecutor', () => {
 
     it('should recover successfully from a protocol violation (no complete_task)', async () => {
       const definition = createTestDefinition();
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -1482,7 +1501,7 @@ describe('AgentExecutor', () => {
 
     it('should fail recovery from a protocol violation if it violates again', async () => {
       const definition = createTestDefinition();
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -1525,7 +1544,7 @@ describe('AgentExecutor', () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
         max_time_minutes: 0.5, // 30 seconds
       });
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -1580,7 +1599,7 @@ describe('AgentExecutor', () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
         max_time_minutes: 0.5, // 30 seconds
       });
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -1672,7 +1691,7 @@ describe('AgentExecutor', () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
         max_turns: MAX,
       });
-      const executor = await AgentExecutor.create(definition, mockConfig);
+      const executor = await LocalAgentExecutor.create(definition, mockConfig);
 
       // Turn 1 (hits max_turns)
       mockWorkResponse('t1');
@@ -1697,7 +1716,7 @@ describe('AgentExecutor', () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
         max_turns: MAX,
       });
-      const executor = await AgentExecutor.create(definition, mockConfig);
+      const executor = await LocalAgentExecutor.create(definition, mockConfig);
 
       // Turn 1 (hits max_turns)
       mockWorkResponse('t1');
@@ -1752,7 +1771,7 @@ describe('AgentExecutor', () => {
 
     it('should attempt to compress chat history on each turn', async () => {
       const definition = createTestDefinition();
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -1786,7 +1805,7 @@ describe('AgentExecutor', () => {
 
     it('should update chat history when compression is successful', async () => {
       const definition = createTestDefinition();
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -1821,7 +1840,7 @@ describe('AgentExecutor', () => {
 
     it('should pass hasFailedCompressionAttempt=true to compression after a failure', async () => {
       const definition = createTestDefinition();
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,
@@ -1866,7 +1885,7 @@ describe('AgentExecutor', () => {
 
     it('should reset hasFailedCompressionAttempt flag after a successful compression', async () => {
       const definition = createTestDefinition();
-      const executor = await AgentExecutor.create(
+      const executor = await LocalAgentExecutor.create(
         definition,
         mockConfig,
         onActivity,

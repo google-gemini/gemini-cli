@@ -17,6 +17,7 @@ import { CommandKind } from './types.js';
 import {
   decodeTagName,
   type MessageActionReturn,
+  INITIAL_HISTORY_LENGTH,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
 import type {
@@ -131,7 +132,7 @@ const saveCommand: SlashCommand = {
     }
 
     const history = chat.getHistory();
-    if (history.length > 2) {
+    if (history.length > INITIAL_HISTORY_LENGTH) {
       const authType = config?.getContentGeneratorConfig()?.authType;
       await logger.saveCheckpoint({ history, authType }, tag);
       return {
@@ -200,11 +201,8 @@ const resumeCommand: SlashCommand = {
     };
 
     const uiHistory: HistoryItemWithoutId[] = [];
-    let hasSystemPrompt = false;
-    let i = 0;
 
-    for (const item of conversation) {
-      i += 1;
+    for (const item of conversation.slice(INITIAL_HISTORY_LENGTH)) {
       const text =
         item.parts
           ?.filter((m) => !!m.text)
@@ -213,15 +211,11 @@ const resumeCommand: SlashCommand = {
       if (!text) {
         continue;
       }
-      if (i === 1 && text.match(/context for our chat/)) {
-        hasSystemPrompt = true;
-      }
-      if (i > 2 || !hasSystemPrompt) {
-        uiHistory.push({
-          type: (item.role && rolemap[item.role]) || MessageType.GEMINI,
-          text,
-        } as HistoryItemWithoutId);
-      }
+
+      uiHistory.push({
+        type: (item.role && rolemap[item.role]) || MessageType.GEMINI,
+        text,
+      } as HistoryItemWithoutId);
     }
     return {
       type: 'load_history',
@@ -343,10 +337,10 @@ const shareCommand: SlashCommand = {
 
     const history = chat.getHistory();
 
-    // An empty conversation has two hidden messages that setup the context for
+    // An empty conversation has a hidden message that sets up the context for
     // the chat. Thus, to check whether a conversation has been started, we
     // can't check for length 0.
-    if (history.length <= 2) {
+    if (history.length <= INITIAL_HISTORY_LENGTH) {
       return {
         type: 'message',
         messageType: 'info',
