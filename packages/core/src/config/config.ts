@@ -134,6 +134,10 @@ export interface CodebaseInvestigatorSettings {
   model?: string;
 }
 
+export interface IntrospectionAgentSettings {
+  enabled?: boolean;
+}
+
 /**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
@@ -307,6 +311,7 @@ export interface ConfigParameters {
   enableMessageBusIntegration?: boolean;
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
+  introspectionAgentSettings?: IntrospectionAgentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -429,6 +434,7 @@ export class Config {
   private readonly outputSettings: OutputSettings;
   private readonly enableMessageBusIntegration: boolean;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
+  private readonly introspectionAgentSettings: IntrospectionAgentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -577,6 +583,9 @@ export class Config {
         params.codebaseInvestigatorSettings?.thinkingBudget ??
         DEFAULT_THINKING_MODE,
       model: params.codebaseInvestigatorSettings?.model,
+    };
+    this.introspectionAgentSettings = {
+      enabled: params.introspectionAgentSettings?.enabled ?? false,
     };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
@@ -1548,6 +1557,10 @@ export class Config {
 
   getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
     return this.codebaseInvestigatorSettings;
+  }
+
+  getIntrospectionAgentSettings(): IntrospectionAgentSettings {
+    return this.introspectionAgentSettings;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {

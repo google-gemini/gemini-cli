@@ -836,6 +836,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"auto"`
   - **Requires restart:** Yes
 
+- **`experimental.introspectionAgentSettings.enabled`** (boolean):
+  - **Description:** Enable the Introspection Agent.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 #### `hooks`
 
 - **`hooks.disabled`** (array):
