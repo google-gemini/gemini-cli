@@ -8,6 +8,16 @@ import * as fs from 'node:fs';
 import * as util from 'node:util';
 
 /**
+ * Checks if debug mode is enabled via environment variables.
+ * This matches the logic in packages/cli/src/config/config.ts:isDebugMode()
+ */
+function isDebugModeEnabled(): boolean {
+  return [process.env['DEBUG'], process.env['DEBUG_MODE']].some(
+    (v) => v === 'true' || v === '1',
+  );
+}
+
+/**
  * A simple, centralized logger for developer-facing debug messages.
  *
  * WHY USE THIS?
@@ -16,8 +26,9 @@ import * as util from 'node:util';
  * - We can lint against direct `console.*` usage to enforce this pattern.
  *
  * HOW IT WORKS:
- * This is a thin wrapper around the native `console` object. The `ConsolePatcher`
- * will intercept these calls and route them to the debug drawer UI.
+ * Debug messages (log, warn, debug) are only output to console when debug mode
+ * is enabled via DEBUG=1 or DEBUG_MODE=1 environment variables. Error messages
+ * are always output. All messages are written to the debug log file if configured.
  */
 class DebugLogger {
   private logStream: fs.WriteStream | undefined;
@@ -46,22 +57,29 @@ class DebugLogger {
 
   log(...args: unknown[]): void {
     this.writeToFile('LOG', args);
-    console.log(...args);
+    if (isDebugModeEnabled()) {
+      console.log(...args);
+    }
   }
 
   warn(...args: unknown[]): void {
     this.writeToFile('WARN', args);
-    console.warn(...args);
+    if (isDebugModeEnabled()) {
+      console.warn(...args);
+    }
   }
 
   error(...args: unknown[]): void {
     this.writeToFile('ERROR', args);
+    // Errors are always output to console
     console.error(...args);
   }
 
   debug(...args: unknown[]): void {
     this.writeToFile('DEBUG', args);
-    console.debug(...args);
+    if (isDebugModeEnabled()) {
+      console.debug(...args);
+    }
   }
 }
 
