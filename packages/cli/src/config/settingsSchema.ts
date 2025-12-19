@@ -1301,7 +1301,8 @@ const SETTINGS_SCHEMA = {
         category: 'Experimental',
         requiresRestart: true,
         default: false,
-        description: 'Enable local and remote subagents.',
+        description:
+          'Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents',
         showInDialog: false,
       },
       extensionManagement: {
@@ -1890,6 +1891,10 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
             type: 'object',
             description: 'Individual hook configuration.',
             properties: {
+              name: {
+                type: 'string',
+                description: 'Unique identifier for the hook.',
+              },
               type: {
                 type: 'string',
                 description:
@@ -1899,6 +1904,10 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
                 type: 'string',
                 description:
                   'Shell command to execute. Receives JSON input via stdin and returns JSON output via stdout.',
+              },
+              description: {
+                type: 'string',
+                description: 'A description of the hook.',
               },
               timeout: {
                 type: 'number',
@@ -1929,9 +1938,3 @@ type InferSettings<T extends SettingsSchema> = {
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;
-
-export interface FooterSettings {
-  hideCWD?: boolean;
-  hideSandboxStatus?: boolean;
-  hideModelInfo?: boolean;
-}
