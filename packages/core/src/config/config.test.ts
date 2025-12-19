@@ -40,6 +40,11 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
 } from './models.js';
+import {
+  EDIT_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '../tools/tool-names.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -1194,10 +1199,10 @@ describe('setApprovalMode with folder trust', () => {
     config.setApprovalMode(ApprovalMode.DEFAULT);
 
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+    expect(removeRulesSpy).toHaveBeenCalledWith(EDIT_TOOL_NAME);
+    expect(removeRulesSpy).toHaveBeenCalledWith(WRITE_FILE_TOOL_NAME);
+    expect(removeRulesSpy).toHaveBeenCalledWith(WEB_FETCH_TOOL_NAME);
     expect(removeRulesSpy).toHaveBeenCalledTimes(3);
-    // We cannot easily check the arguments because tool names are imported constants,
-    // but we can verify it was called 3 times which matches our implementation
-    // for EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME, and WEB_FETCH_TOOL_NAME.
   });
 
   describe('registerCoreTools', () => {
