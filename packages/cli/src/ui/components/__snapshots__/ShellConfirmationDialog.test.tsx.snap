@@ -13,8 +13,8 @@ exports[`ShellConfirmationDialog > renders correctly 1`] = `
  │                                                                                                  │
  │ Do you want to proceed?                                                                          │
  │                                                                                                  │
- │ ● 1. Yes, allow once                                                                             │
- │   2. Yes, allow always for this session                                                          │
+ │ ● 1. Allow once                                                                                  │
+ │   2. Allow for this session                                                                      │
  │   3. No (esc)                                                                                    │
  │                                                                                                  │
  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
