@@ -117,6 +117,27 @@ function useCommandParser(
       exactMatchAsParent = currentLevel.find(
         (cmd) => matchesCommand(cmd, partial) && cmd.subCommands,
       );
+
+      if (exactMatchAsParent) {
+        // Only descend if there are NO other matches for the partial at this level.
+        // This ensures that typing "/memory" still shows "/memory-leak" if it exists.
+        const otherMatches = currentLevel.filter(
+          (cmd) =>
+            cmd !== exactMatchAsParent &&
+            (cmd.name.toLowerCase().startsWith(partial.toLowerCase()) ||
+              cmd.altNames?.some((alt) =>
+                alt.toLowerCase().startsWith(partial.toLowerCase()),
+              )),
+        );
+
+        if (otherMatches.length === 0) {
+          leafCommand = exactMatchAsParent;
+          currentLevel = exactMatchAsParent.subCommands as
+            | readonly SlashCommand[]
+            | undefined;
+          partial = '';
+        }
+      }
     }
 
     const depth = commandPathParts.length;
@@ -278,7 +299,16 @@ function useCommandSuggestions(
         }
 
         if (!signal.aborted) {
-          const finalSuggestions = potentialSuggestions.map((cmd) => ({
+          // Sort potentialSuggestions so that exact match (by name or altName) comes first
+          const sortedSuggestions = [...potentialSuggestions].sort((a, b) => {
+            const aIsExact = matchesCommand(a, partial);
+            const bIsExact = matchesCommand(b, partial);
+            if (aIsExact && !bIsExact) return -1;
+            if (!aIsExact && bIsExact) return 1;
+            return 0;
+          });
+
+          const finalSuggestions = sortedSuggestions.map((cmd) => ({
             label: cmd.name,
             value: cmd.name,
             description: cmd.description,
@@ -537,11 +567,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
       return;
     }
 
-    if (isPerfectMatch) {
-      setSuggestions([]);
-    } else {
-      setSuggestions(hookSuggestions);
-    }
+    setSuggestions(hookSuggestions);
     setIsLoadingSuggestions(isLoading);
     setIsPerfectMatch(isPerfectMatch);
     setCompletionStart(calculatedStart);
