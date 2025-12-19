@@ -112,6 +112,10 @@ export class HookRegistry {
     const configHooks = this.config.getHooks();
     if (configHooks && this.config.isTrustedFolder()) {
       this.processHooksConfiguration(configHooks, ConfigSource.Project);
+    } else {
+      debugLogger.warn(
+        'Project hooks disabled because the folder is not trusted.',
+      );
     }
 
     // Get hooks from extensions
