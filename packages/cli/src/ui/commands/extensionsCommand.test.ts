@@ -26,8 +26,20 @@ import {
   type MockedFunction,
 } from 'vitest';
 import { type ExtensionUpdateAction } from '../state/extensions.js';
-import { ExtensionManager } from '../../config/extension-manager.js';
+import {
+  ExtensionManager,
+  inferInstallMetadata,
+} from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
+
+vi.mock('../../config/extension-manager.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../config/extension-manager.js')>();
+  return {
+    ...actual,
+    inferInstallMetadata: vi.fn(),
+  };
+});
 
 import open from 'open';
 
@@ -540,8 +552,13 @@ describe('extensionsCommand', () => {
 
     it('should call installExtension and show success message', async () => {
       const packageName = 'test-extension-package';
+      vi.mocked(inferInstallMetadata).mockResolvedValue({
+        source: packageName,
+        type: 'git',
+      });
       mockInstallExtension.mockResolvedValue({ name: packageName });
       await installAction!(mockContext, packageName);
+      expect(inferInstallMetadata).toHaveBeenCalledWith(packageName);
       expect(mockInstallExtension).toHaveBeenCalledWith({
         source: packageName,
         type: 'git',
@@ -565,9 +582,14 @@ describe('extensionsCommand', () => {
     it('should show error message on installation failure', async () => {
       const packageName = 'failed-extension';
       const errorMessage = 'install failed';
+      vi.mocked(inferInstallMetadata).mockResolvedValue({
+        source: packageName,
+        type: 'git',
+      });
       mockInstallExtension.mockRejectedValue(new Error(errorMessage));
 
       await installAction!(mockContext, packageName);
+      expect(inferInstallMetadata).toHaveBeenCalledWith(packageName);
       expect(mockInstallExtension).toHaveBeenCalledWith({
         source: packageName,
         type: 'git',
@@ -579,6 +601,19 @@ describe('extensionsCommand', () => {
         },
         expect.any(Number),
       );
+    });
+
+    it('should show error message for invalid source', async () => {
+      const invalidSource = 'a;b';
+      await installAction!(mockContext, invalidSource);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.ERROR,
+          text: `Invalid source: ${invalidSource}`,
+        },
+        expect.any(Number),
+      );
+      expect(mockInstallExtension).not.toHaveBeenCalled();
     });
   });
 

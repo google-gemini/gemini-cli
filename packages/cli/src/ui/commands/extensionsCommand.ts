@@ -20,7 +20,10 @@ import {
 } from './types.js';
 import open from 'open';
 import process from 'node:process';
-import { ExtensionManager } from '../../config/extension-manager.js';
+import {
+  ExtensionManager,
+  inferInstallMetadata,
+} from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
 import { theme } from '../semantic-colors.js';
 
@@ -450,8 +453,21 @@ async function installAction(context: CommandContext, args: string) {
     return;
   }
 
-  // Quick and dirty sanitization.
-  if (/[^a-zA-Z0-9.:/@\-_]/.test(source)) {
+  // Validate that the source is either a valid URL or a valid file path.
+  let isValid = false;
+  try {
+    // Check if it's a valid URL.
+    new URL(source);
+    isValid = true;
+  } catch {
+    // If not a URL, check for characters that are disallowed in file paths
+    // and could be used for command injection.
+    if (!/[;&|`'"]/.test(source)) {
+      isValid = true;
+    }
+  }
+
+  if (!isValid) {
     context.ui.addItem(
       {
         type: MessageType.ERROR,
@@ -471,10 +487,9 @@ async function installAction(context: CommandContext, args: string) {
   );
 
   try {
-    const extension = await extensionLoader.installOrUpdateExtension({
-      source,
-      type: 'git', // Default to git, manager will figure it out.
-    });
+    const installMetadata = await inferInstallMetadata(source);
+    const extension =
+      await extensionLoader.installOrUpdateExtension(installMetadata);
     context.ui.addItem(
       {
         type: MessageType.INFO,
