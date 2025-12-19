@@ -9,13 +9,15 @@ import * as path from 'node:path';
 import { homedir, platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
+import type {
+  GeminiCodeAssistSetting} from '@google/gemini-cli-core';
 import {
   debugLogger,
   FatalConfigError,
   GEMINI_DIR,
   getErrorMessage,
   Storage,
-  coreEvents,
+  coreEvents
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -429,6 +431,7 @@ function mergeSettings(
   user: Settings,
   workspace: Settings,
   isTrusted: boolean,
+  remoteAdminSettings: Settings,
 ): Settings {
   const safeWorkspace = isTrusted ? workspace : ({} as Settings);
 
@@ -438,13 +441,20 @@ function mergeSettings(
   // 2. User Settings
   // 3. Workspace Settings
   // 4. System Settings (as overrides)
-  return customDeepMerge(
+  const baseSettings = customDeepMerge(
     getMergeStrategyForPath,
     {}, // Start with an empty object
     systemDefaults,
     user,
     safeWorkspace,
     system,
+  ) as Settings;
+
+  // 5. Remote Admin Settings (as overrides)
+  return customDeepMerge(
+    () => MergeStrategy.REPLACE,
+    baseSettings,
+    remoteAdminSettings,
   ) as Settings;
 }
 
@@ -462,6 +472,7 @@ export class LoadedSettings {
     this.user = user;
     this.workspace = workspace;
     this.isTrusted = isTrusted;
+    this.remoteAdminSettings = {};
     this.migratedInMemoryScopes = migratedInMemoryScopes;
     this._merged = this.computeMergedSettings();
   }
@@ -471,6 +482,7 @@ export class LoadedSettings {
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
   readonly isTrusted: boolean;
+  remoteAdminSettings: Settings;
   readonly migratedInMemoryScopes: Set<SettingScope>;
 
   private _merged: Settings;
@@ -486,7 +498,24 @@ export class LoadedSettings {
       this.user.settings,
       this.workspace.settings,
       this.isTrusted,
+      this.remoteAdminSettings,
     );
+  }
+
+  applyRemoteAdminSettings(
+    geminiCodeAssistSettings: GeminiCodeAssistSetting,
+  ): void {
+    const convertedSettings: Settings = {};
+    if (geminiCodeAssistSettings.disableAutoExecution !== undefined) {
+      // If auto-execution is disabled by remote settings, then YOLO mode should also be disabled.
+      if (geminiCodeAssistSettings.disableAutoExecution === true) {
+        convertedSettings.security = {
+          disableYoloMode: true,
+        };
+      }
+    }
+    this.remoteAdminSettings = convertedSettings;
+    this._merged = this.computeMergedSettings();
   }
 
   forScope(scope: LoadableSettingScope): SettingsFile {
@@ -773,6 +802,7 @@ export function loadSettings(
     userSettings,
     workspaceSettings,
     isTrusted,
+    {},
   );
 
   // loadEnvironment depends on settings so we have to create a temp version of

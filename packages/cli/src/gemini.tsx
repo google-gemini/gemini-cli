@@ -20,6 +20,7 @@ import {
   loadSettings,
   migrateDeprecatedSettings,
   SettingScope,
+  applyRemoteAdminSettings,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
@@ -390,6 +391,9 @@ export async function main() {
       await partialConfig.refreshAuth(
         settings.merged.security.auth.selectedType,
       );
+      if (partialConfig.getRemoteAdminSettings()) {
+        applyRemoteAdminSettings(partialConfig.getRemoteAdminSettings());
+      }
     } catch (err) {
       debugLogger.error('Error authenticating:', err);
       await runExitCleanup();

@@ -94,7 +94,7 @@ import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
-import type { Settings } from '../code_assist/types.js';
+import type { GeminiCodeAssistSetting } from '../code_assist/types.js';
 
 import { ApprovalMode } from '../policy/types.js';
 
@@ -328,7 +328,7 @@ export interface ConfigParameters {
   previewFeatures?: boolean;
   enableAgents?: boolean;
   experimentalJitContext?: boolean;
-  remoteAdminSettings?: Settings;
+  remoteAdminSettings?: GeminiCodeAssistSetting;
 }
 
 export class Config {
@@ -454,7 +454,7 @@ export class Config {
 
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
-  private remoteAdminSettings?: Settings;
+  private remoteAdminSettings?: GeminiCodeAssistSetting;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -805,11 +805,11 @@ export class Config {
     return this.contentGenerator?.userTier;
   }
 
-  getRemoteAdminSettings(): Settings | undefined {
+  getRemoteAdminSettings(): GeminiCodeAssistSetting | undefined {
     return this.remoteAdminSettings;
   }
 
-  setRemoteAdminSettings(settings: Settings | undefined): void {
+  setRemoteAdminSettings(settings: GeminiCodeAssistSetting | undefined): void {
     this.remoteAdminSettings = settings;
   }
 

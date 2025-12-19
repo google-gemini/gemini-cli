@@ -51,7 +51,7 @@ export interface LoadCodeAssistResponse {
   allowedTiers?: GeminiUserTier[] | null;
   ineligibleTiers?: IneligibleTier[] | null;
   cloudaicompanionProject?: string | null;
-  settings?: Settings;
+  settings?: GeminiCodeAssistSetting;
 }
 
 /**
@@ -280,8 +280,8 @@ export interface ConversationInteraction {
 }
 
 /**
- * Settings reflects the structure for code assist related settings.
+ * GeminiCodeAssistSetting reflects the structure for code assist related settings.
  */
-export interface Settings {
+export interface GeminiCodeAssistSetting {
   disableAutoExecution?: boolean;
 }
