@@ -162,7 +162,8 @@ export function isPreviewModel(model: string): boolean {
   return (
     model === PREVIEW_GEMINI_MODEL ||
     model === PREVIEW_GEMINI_FLASH_MODEL ||
-    model === PREVIEW_GEMINI_MODEL_AUTO
+    model === PREVIEW_GEMINI_MODEL_AUTO ||
+    model === PREVIEW_GEMINI_MODEL_PRO_ONLY
   );
 }
 
