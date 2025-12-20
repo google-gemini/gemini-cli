@@ -149,12 +149,358 @@ describe('Settings Loading and Merging', () => {
   });
 
   describe('loadSettings', () => {
-    it('should load empty settings if no files exist', () => {
+    it('should load schema defaults if no files exist', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.system.settings).toEqual({});
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual({});
+      expect(settings.merged).toEqual({
+        advanced: {
+          autoConfigureMemory: false,
+          excludedEnvVars: ['DEBUG', 'DEBUG_MODE'],
+        },
+        context: {
+          discoveryMaxDirs: 200,
+          fileFiltering: {
+            disableFuzzySearch: false,
+            enableRecursiveFileSearch: true,
+            respectGeminiIgnore: true,
+            respectGitIgnore: true,
+          },
+          includeDirectories: [],
+          loadMemoryFromIncludeDirectories: false,
+        },
+        experimental: {
+          codebaseInvestigatorSettings: {
+            enabled: true,
+            maxNumTurns: 10,
+            maxTimeMinutes: 3,
+            model: 'auto',
+            thinkingBudget: 8192,
+          },
+          enableAgents: false,
+          extensionManagement: true,
+          extensionReloading: false,
+          jitContext: false,
+        },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        general: {
+          checkpointing: {
+            enabled: false,
+          },
+          debugKeystrokeLogging: false,
+          disableAutoUpdate: false,
+          disableUpdateNag: false,
+          enablePromptCompletion: false,
+          previewFeatures: false,
+          retryFetchErrors: false,
+          sessionRetention: {
+            enabled: false,
+            minRetention: '1d',
+          },
+          vimMode: false,
+        },
+        hooks: {
+          AfterAgent: [],
+          AfterModel: [],
+          AfterTool: [],
+          BeforeAgent: [],
+          BeforeModel: [],
+          BeforeTool: [],
+          BeforeToolSelection: [],
+          Notification: [],
+          PreCompress: [],
+          SessionEnd: [],
+          SessionStart: [],
+          disabled: [],
+        },
+        ide: {
+          enabled: false,
+          hasSeenNudge: false,
+        },
+        mcp: {},
+        mcpServers: {},
+        model: {
+          compressionThreshold: 0.5,
+          maxSessionTurns: -1,
+          skipNextSpeakerCheck: true,
+        },
+        modelConfigs: {
+          aliases: {
+            base: {
+              modelConfig: {
+                generateContentConfig: {
+                  temperature: 0,
+                  topP: 1,
+                },
+              },
+            },
+            'chat-base': {
+              extends: 'base',
+              modelConfig: {
+                generateContentConfig: {
+                  temperature: 1,
+                  thinkingConfig: {
+                    includeThoughts: true,
+                  },
+                  topK: 64,
+                  topP: 0.95,
+                },
+              },
+            },
+            'chat-base-2.5': {
+              extends: 'chat-base',
+              modelConfig: {
+                generateContentConfig: {
+                  thinkingConfig: {
+                    thinkingBudget: 8192,
+                  },
+                },
+              },
+            },
+            'chat-base-3': {
+              extends: 'chat-base',
+              modelConfig: {
+                generateContentConfig: {
+                  thinkingConfig: {
+                    thinkingLevel: 'HIGH',
+                  },
+                },
+              },
+            },
+            'chat-compression-2.5-flash': {
+              modelConfig: {
+                model: 'gemini-2.5-flash',
+              },
+            },
+            'chat-compression-2.5-flash-lite': {
+              modelConfig: {
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            'chat-compression-2.5-pro': {
+              modelConfig: {
+                model: 'gemini-2.5-pro',
+              },
+            },
+            'chat-compression-3-flash': {
+              modelConfig: {
+                model: 'gemini-3-flash-preview',
+              },
+            },
+            'chat-compression-3-pro': {
+              modelConfig: {
+                model: 'gemini-3-pro-preview',
+              },
+            },
+            'chat-compression-default': {
+              modelConfig: {
+                model: 'gemini-2.5-pro',
+              },
+            },
+            classifier: {
+              extends: 'base',
+              modelConfig: {
+                generateContentConfig: {
+                  maxOutputTokens: 1024,
+                  thinkingConfig: {
+                    thinkingBudget: 512,
+                  },
+                },
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            'edit-corrector': {
+              extends: 'base',
+              modelConfig: {
+                generateContentConfig: {
+                  thinkingConfig: {
+                    thinkingBudget: 0,
+                  },
+                },
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            'gemini-2.5-flash': {
+              extends: 'chat-base-2.5',
+              modelConfig: {
+                model: 'gemini-2.5-flash',
+              },
+            },
+            'gemini-2.5-flash-base': {
+              extends: 'base',
+              modelConfig: {
+                model: 'gemini-2.5-flash',
+              },
+            },
+            'gemini-2.5-flash-lite': {
+              extends: 'chat-base-2.5',
+              modelConfig: {
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            'gemini-2.5-pro': {
+              extends: 'chat-base-2.5',
+              modelConfig: {
+                model: 'gemini-2.5-pro',
+              },
+            },
+            'gemini-3-flash-preview': {
+              extends: 'chat-base-3',
+              modelConfig: {
+                model: 'gemini-3-flash-preview',
+              },
+            },
+            'gemini-3-pro-preview': {
+              extends: 'chat-base-3',
+              modelConfig: {
+                model: 'gemini-3-pro-preview',
+              },
+            },
+            'llm-edit-fixer': {
+              extends: 'gemini-2.5-flash-base',
+              modelConfig: {},
+            },
+            'loop-detection': {
+              extends: 'gemini-2.5-flash-base',
+              modelConfig: {},
+            },
+            'loop-detection-double-check': {
+              extends: 'base',
+              modelConfig: {
+                model: 'gemini-2.5-pro',
+              },
+            },
+            'next-speaker-checker': {
+              extends: 'gemini-2.5-flash-base',
+              modelConfig: {},
+            },
+            'prompt-completion': {
+              extends: 'base',
+              modelConfig: {
+                generateContentConfig: {
+                  maxOutputTokens: 16000,
+                  temperature: 0.3,
+                  thinkingConfig: {
+                    thinkingBudget: 0,
+                  },
+                },
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            'summarizer-default': {
+              extends: 'base',
+              modelConfig: {
+                generateContentConfig: {
+                  maxOutputTokens: 2000,
+                },
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            'summarizer-shell': {
+              extends: 'base',
+              modelConfig: {
+                generateContentConfig: {
+                  maxOutputTokens: 2000,
+                },
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            'web-fetch': {
+              extends: 'gemini-2.5-flash-base',
+              modelConfig: {
+                generateContentConfig: {
+                  tools: [
+                    {
+                      urlContext: {},
+                    },
+                  ],
+                },
+              },
+            },
+            'web-fetch-fallback': {
+              extends: 'gemini-2.5-flash-base',
+              modelConfig: {},
+            },
+            'web-search': {
+              extends: 'gemini-2.5-flash-base',
+              modelConfig: {
+                generateContentConfig: {
+                  tools: [
+                    {
+                      googleSearch: {},
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          customAliases: {},
+          customOverrides: [],
+          overrides: [],
+        },
+        output: {
+          format: 'text',
+        },
+        privacy: {
+          usageStatisticsEnabled: true,
+        },
+        security: {
+          auth: {},
+          blockGitExtensions: false,
+          disableYoloMode: false,
+          folderTrust: {
+            enabled: false,
+          },
+        },
+        tools: {
+          autoAccept: false,
+          enableHooks: false,
+          enableMessageBusIntegration: true,
+          enableToolOutputTruncation: true,
+          shell: {
+            enableInteractiveShell: true,
+            inactivityTimeout: 300,
+            pager: 'cat',
+            showColor: false,
+          },
+          truncateToolOutputLines: 1000,
+          truncateToolOutputThreshold: 4000000,
+          useRipgrep: true,
+        },
+        ui: {
+          accessibility: {
+            disableLoadingPhrases: false,
+            screenReader: false,
+          },
+          customThemes: {},
+          customWittyPhrases: [],
+          footer: {
+            hideCWD: false,
+            hideContextPercentage: true,
+            hideModelInfo: false,
+            hideSandboxStatus: false,
+          },
+          hideBanner: false,
+          hideContextSummary: false,
+          hideFooter: false,
+          hideTips: false,
+          hideWindowTitle: false,
+          incrementalRendering: true,
+          showCitations: false,
+          showLineNumbers: true,
+          showMemoryUsage: false,
+          showModelInfoInChat: false,
+          showStatusInTitle: false,
+          useAlternateBuffer: false,
+          useFullWidth: true,
+        },
+        useSmartEdit: true,
+        useWriteTodos: true,
+      });
     });
 
     it.each([
@@ -201,7 +547,7 @@ describe('Settings Loading and Merging', () => {
         expect(
           settings[scope as 'system' | 'user' | 'workspace'].settings,
         ).toEqual(content);
-        expect(settings.merged).toEqual(content);
+        expect(settings.merged).toMatchObject(content);
       },
     );
 
@@ -265,7 +611,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.system.settings).toEqual(systemSettingsContent);
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
-      expect(settings.merged).toEqual({
+      expect(settings.merged).toMatchObject({
         ui: {
           theme: 'system-theme',
         },
@@ -318,7 +664,7 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      expect(settings.merged).toEqual({
+      expect(settings.merged).toMatchObject({
         ui: {
           theme: 'legacy-dark',
         },
@@ -443,10 +789,10 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.advanced?.excludedEnvVars).toEqual(
         expect.arrayContaining(['USER_VAR', 'WORKSPACE_VAR']),
       );
-      expect(settings.merged.advanced?.excludedEnvVars).toHaveLength(2);
+      expect(settings.merged.advanced?.excludedEnvVars).toHaveLength(4);
     });
 
-    it('should merge all settings files with the correct precedence', () => {
+    it('should merge all settings files(including schema defaults) with the correct precedence', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const systemDefaultsContent = {
         ui: {
@@ -509,7 +855,18 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
+        advanced: {
+          autoConfigureMemory: false,
+          excludedEnvVars: ['DEBUG', 'DEBUG_MODE'],
+        },
         context: {
+          discoveryMaxDirs: 200,
+          fileFiltering: {
+            disableFuzzySearch: false,
+            enableRecursiveFileSearch: true,
+            respectGeminiIgnore: true,
+            respectGitIgnore: true,
+          },
           fileName: 'WORKSPACE_CONTEXT.md',
           includeDirectories: [
             '/system/defaults/dir',
@@ -518,14 +875,341 @@ describe('Settings Loading and Merging', () => {
             '/workspace/dir',
             '/system/dir',
           ],
+          loadMemoryFromIncludeDirectories: false,
+        },
+        experimental: {
+          codebaseInvestigatorSettings: {
+            enabled: true,
+            maxNumTurns: 10,
+            maxTimeMinutes: 3,
+            model: 'auto',
+            thinkingBudget: 8192,
+          },
+          enableAgents: false,
+          extensionManagement: true,
+          extensionReloading: false,
+          jitContext: false,
+        },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        general: {
+          checkpointing: {
+            enabled: false,
+          },
+          debugKeystrokeLogging: false,
+          disableAutoUpdate: false,
+          disableUpdateNag: false,
+          enablePromptCompletion: false,
+          previewFeatures: false,
+          retryFetchErrors: false,
+          sessionRetention: {
+            enabled: false,
+            minRetention: '1d',
+          },
+          vimMode: false,
+        },
+        hooks: {
+          AfterAgent: [],
+          AfterModel: [],
+          AfterTool: [],
+          BeforeAgent: [],
+          BeforeModel: [],
+          BeforeTool: [],
+          BeforeToolSelection: [],
+          Notification: [],
+          PreCompress: [],
+          SessionEnd: [],
+          SessionStart: [],
+          disabled: [],
+        },
+        ide: {
+          enabled: false,
+          hasSeenNudge: false,
+        },
+        mcp: {},
+        mcpServers: {},
+        model: {
+          compressionThreshold: 0.5,
+          maxSessionTurns: -1,
+          skipNextSpeakerCheck: true,
+        },
+        modelConfigs: {
+          aliases: {
+            base: {
+              modelConfig: {
+                generateContentConfig: {
+                  temperature: 0,
+                  topP: 1,
+                },
+              },
+            },
+            'chat-base': {
+              extends: 'base',
+              modelConfig: {
+                generateContentConfig: {
+                  temperature: 1,
+                  thinkingConfig: {
+                    includeThoughts: true,
+                  },
+                  topK: 64,
+                  topP: 0.95,
+                },
+              },
+            },
+            'chat-base-2.5': {
+              extends: 'chat-base',
+              modelConfig: {
+                generateContentConfig: {
+                  thinkingConfig: {
+                    thinkingBudget: 8192,
+                  },
+                },
+              },
+            },
+            'chat-base-3': {
+              extends: 'chat-base',
+              modelConfig: {
+                generateContentConfig: {
+                  thinkingConfig: {
+                    thinkingLevel: 'HIGH',
+                  },
+                },
+              },
+            },
+            'chat-compression-2.5-flash': {
+              modelConfig: {
+                model: 'gemini-2.5-flash',
+              },
+            },
+            'chat-compression-2.5-flash-lite': {
+              modelConfig: {
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            'chat-compression-2.5-pro': {
+              modelConfig: {
+                model: 'gemini-2.5-pro',
+              },
+            },
+            'chat-compression-3-flash': {
+              modelConfig: {
+                model: 'gemini-3-flash-preview',
+              },
+            },
+            'chat-compression-3-pro': {
+              modelConfig: {
+                model: 'gemini-3-pro-preview',
+              },
+            },
+            'chat-compression-default': {
+              modelConfig: {
+                model: 'gemini-2.5-pro',
+              },
+            },
+            classifier: {
+              extends: 'base',
+              modelConfig: {
+                generateContentConfig: {
+                  maxOutputTokens: 1024,
+                  thinkingConfig: {
+                    thinkingBudget: 512,
+                  },
+                },
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            'edit-corrector': {
+              extends: 'base',
+              modelConfig: {
+                generateContentConfig: {
+                  thinkingConfig: {
+                    thinkingBudget: 0,
+                  },
+                },
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            'gemini-2.5-flash': {
+              extends: 'chat-base-2.5',
+              modelConfig: {
+                model: 'gemini-2.5-flash',
+              },
+            },
+            'gemini-2.5-flash-base': {
+              extends: 'base',
+              modelConfig: {
+                model: 'gemini-2.5-flash',
+              },
+            },
+            'gemini-2.5-flash-lite': {
+              extends: 'chat-base-2.5',
+              modelConfig: {
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            'gemini-2.5-pro': {
+              extends: 'chat-base-2.5',
+              modelConfig: {
+                model: 'gemini-2.5-pro',
+              },
+            },
+            'gemini-3-flash-preview': {
+              extends: 'chat-base-3',
+              modelConfig: {
+                model: 'gemini-3-flash-preview',
+              },
+            },
+            'gemini-3-pro-preview': {
+              extends: 'chat-base-3',
+              modelConfig: {
+                model: 'gemini-3-pro-preview',
+              },
+            },
+            'llm-edit-fixer': {
+              extends: 'gemini-2.5-flash-base',
+              modelConfig: {},
+            },
+            'loop-detection': {
+              extends: 'gemini-2.5-flash-base',
+              modelConfig: {},
+            },
+            'loop-detection-double-check': {
+              extends: 'base',
+              modelConfig: {
+                model: 'gemini-2.5-pro',
+              },
+            },
+            'next-speaker-checker': {
+              extends: 'gemini-2.5-flash-base',
+              modelConfig: {},
+            },
+            'prompt-completion': {
+              extends: 'base',
+              modelConfig: {
+                generateContentConfig: {
+                  maxOutputTokens: 16000,
+                  temperature: 0.3,
+                  thinkingConfig: {
+                    thinkingBudget: 0,
+                  },
+                },
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            'summarizer-default': {
+              extends: 'base',
+              modelConfig: {
+                generateContentConfig: {
+                  maxOutputTokens: 2000,
+                },
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            'summarizer-shell': {
+              extends: 'base',
+              modelConfig: {
+                generateContentConfig: {
+                  maxOutputTokens: 2000,
+                },
+                model: 'gemini-2.5-flash-lite',
+              },
+            },
+            'web-fetch': {
+              extends: 'gemini-2.5-flash-base',
+              modelConfig: {
+                generateContentConfig: {
+                  tools: [
+                    {
+                      urlContext: {},
+                    },
+                  ],
+                },
+              },
+            },
+            'web-fetch-fallback': {
+              extends: 'gemini-2.5-flash-base',
+              modelConfig: {},
+            },
+            'web-search': {
+              extends: 'gemini-2.5-flash-base',
+              modelConfig: {
+                generateContentConfig: {
+                  tools: [
+                    {
+                      googleSearch: {},
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          customAliases: {},
+          customOverrides: [],
+          overrides: [],
+        },
+        output: {
+          format: 'text',
+        },
+        privacy: {
+          usageStatisticsEnabled: true,
+        },
+        security: {
+          auth: {},
+          blockGitExtensions: false,
+          disableYoloMode: false,
+          folderTrust: {
+            enabled: false,
+          },
         },
         telemetry: false,
         tools: {
+          autoAccept: false,
+          enableHooks: false,
+          enableMessageBusIntegration: true,
+          enableToolOutputTruncation: true,
           sandbox: false,
+          shell: {
+            enableInteractiveShell: true,
+            inactivityTimeout: 300,
+            pager: 'cat',
+            showColor: false,
+          },
+          truncateToolOutputLines: 1000,
+          truncateToolOutputThreshold: 4000000,
+          useRipgrep: true,
         },
         ui: {
+          accessibility: {
+            disableLoadingPhrases: false,
+            screenReader: false,
+          },
+          customThemes: {},
+          customWittyPhrases: [],
+          footer: {
+            hideCWD: false,
+            hideContextPercentage: true,
+            hideModelInfo: false,
+            hideSandboxStatus: false,
+          },
+          hideBanner: false,
+          hideContextSummary: false,
+          hideFooter: false,
+          hideTips: false,
+          hideWindowTitle: false,
+          incrementalRendering: true,
+          showCitations: false,
+          showLineNumbers: true,
+          showMemoryUsage: false,
+          showModelInfoInChat: false,
+          showStatusInTitle: false,
           theme: 'system-theme',
+          useAlternateBuffer: false,
+          useFullWidth: true,
         },
+        useSmartEdit: true,
+        useWriteTodos: true,
       });
     });
 
@@ -660,7 +1344,7 @@ describe('Settings Loading and Merging', () => {
         },
         expected: {
           key: 'advanced.excludedEnvVars',
-          value: ['DEBUG', 'NODE_ENV', 'CUSTOM_VAR'],
+          value: ['DEBUG', 'DEBUG_MODE', 'NODE_ENV', 'CUSTOM_VAR'],
         },
       },
       {
@@ -671,7 +1355,7 @@ describe('Settings Loading and Merging', () => {
         },
         expected: {
           key: 'advanced.excludedEnvVars',
-          value: ['WORKSPACE_DEBUG', 'WORKSPACE_VAR'],
+          value: ['DEBUG', 'DEBUG_MODE', 'WORKSPACE_DEBUG', 'WORKSPACE_VAR'],
         },
       },
     ])(
@@ -734,6 +1418,7 @@ describe('Settings Loading and Merging', () => {
       ]);
       expect(settings.merged.advanced?.excludedEnvVars).toEqual([
         'DEBUG',
+        'DEBUG_MODE',
         'NODE_ENV',
         'USER_VAR',
         'WORKSPACE_DEBUG',
@@ -814,8 +1499,8 @@ describe('Settings Loading and Merging', () => {
       (fs.readFileSync as Mock).mockReturnValue('{}');
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.merged.telemetry).toBeUndefined();
-      expect(settings.merged.ui).toBeUndefined();
-      expect(settings.merged.mcpServers).toBeUndefined();
+      expect(settings.merged.ui).toBeDefined();
+      expect(settings.merged.mcpServers).toEqual({});
     });
 
     it('should merge MCP servers correctly, with workspace taking precedence', () => {
@@ -941,7 +1626,7 @@ describe('Settings Loading and Merging', () => {
       (mockFsExistsSync as Mock).mockReturnValue(false); // No settings files exist
       (fs.readFileSync as Mock).mockReturnValue('{}');
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.mcpServers).toBeUndefined();
+      expect(settings.merged.mcpServers).toEqual({});
     });
 
     it('should merge MCP servers from system, user, and workspace with system taking precedence', () => {
@@ -1075,10 +1760,10 @@ describe('Settings Loading and Merging', () => {
           expected: 0.8,
         },
         {
-          description: 'should be undefined if not in any settings file',
+          description: 'should be default if not in any settings file',
           userContent: {},
           workspaceContent: {},
-          expected: undefined,
+          expected: 0.5,
         },
       ])('$description', ({ userContent, workspaceContent, expected }) => {
         (mockFsExistsSync as Mock).mockReturnValue(true);
@@ -1590,7 +2275,7 @@ describe('Settings Loading and Merging', () => {
         );
         expect(settings.system.path).toBe(MOCK_ENV_SYSTEM_SETTINGS_PATH);
         expect(settings.system.settings).toEqual(systemSettingsContent);
-        expect(settings.merged).toEqual({
+        expect(settings.merged).toMatchObject({
           ...systemSettingsContent,
         });
       });
@@ -1692,8 +2377,9 @@ describe('Settings Loading and Merging', () => {
         'DEBUG',
       ]);
       expect(settings.merged.advanced?.excludedEnvVars).toEqual([
-        'NODE_ENV',
         'DEBUG',
+        'DEBUG_MODE',
+        'NODE_ENV',
       ]);
     });
 
@@ -1732,6 +2418,7 @@ describe('Settings Loading and Merging', () => {
       ]);
       expect(settings.merged.advanced?.excludedEnvVars).toEqual([
         'DEBUG',
+        'DEBUG_MODE',
         'NODE_ENV',
         'USER_VAR',
         'WORKSPACE_DEBUG',

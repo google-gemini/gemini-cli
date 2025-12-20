@@ -622,7 +622,7 @@ export async function loadCliConfig(
       screenReader,
     },
     telemetry: telemetrySettings,
-    usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
+    usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled,
     fileFiltering,
     checkpointing: settings.general?.checkpointing?.enabled,
     proxy:
@@ -634,7 +634,7 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.advanced?.bugCommand,
     model: resolvedModel,
-    maxSessionTurns: settings.model?.maxSessionTurns ?? -1,
+    maxSessionTurns: settings.model?.maxSessionTurns,
     experimentalZedIntegration: argv.experimentalAcp || false,
     listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,
@@ -652,11 +652,10 @@ export async function loadCliConfig(
     interactive,
     trustedFolder,
     useRipgrep: settings.tools?.useRipgrep,
-    enableInteractiveShell:
-      settings.tools?.shell?.enableInteractiveShell ?? true,
+    enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
-    enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
+    enablePromptCompletion: settings.general?.enablePromptCompletion,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     truncateToolOutputLines: settings.tools?.truncateToolOutputLines,
     enableToolOutputTruncation: settings.tools?.enableToolOutputTruncation,
@@ -671,11 +670,11 @@ export async function loadCliConfig(
       settings.experimental?.codebaseInvestigatorSettings,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
-    retryFetchErrors: settings.general?.retryFetchErrors ?? false,
+    retryFetchErrors: settings.general?.retryFetchErrors,
     ptyInfo: ptyInfo?.name,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
-    enableHooks: settings.tools?.enableHooks ?? false,
+    enableHooks: settings.tools?.enableHooks,
     hooks: settings.hooks || {},
   });
 }
