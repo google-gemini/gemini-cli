@@ -430,9 +430,14 @@ export class SessionSelector {
       try {
         selectedSession = await this.findSession(resumeArg);
       } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('No previous sessions found')) {
+          throw error;
+        }
+
         // Re-throw with more detailed message for resume command
         throw new Error(
-          `Invalid session identifier "${resumeArg}". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.  Error: ${error}`,
+          `Invalid session identifier "${resumeArg}". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
         );
       }
     }
