@@ -888,6 +888,98 @@ describe('loggers', () => {
         }),
       });
     });
+
+    it('should log tool names from function declarations in semantic log', () => {
+      const mockConfig = {
+        getSessionId: () => 'test-session-id',
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => true,
+        isInteractive: () => false,
+        getUsageStatisticsEnabled: () => true,
+        getContentGeneratorConfig: () => ({
+          authType: AuthType.USE_GEMINI,
+        }),
+      } as Config;
+
+      const promptDetails = {
+        prompt_id: 'prompt-id-tools-1',
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: 'Hello' }],
+          },
+        ],
+        generate_content_config: {
+          temperature: 0.7,
+          tools: [
+            {
+              functionDeclarations: [
+                { name: 'read_file', description: 'Read a file' },
+                { name: 'write_file', description: 'Write a file' },
+                { name: 'list_resources', description: 'List MCP resources' },
+              ],
+            },
+          ],
+        },
+      };
+
+      const event = new ApiRequestEvent(
+        'test-model',
+        promptDetails,
+        'Request with tools',
+      );
+
+      logApiRequest(mockConfig, event);
+
+      // Verify the second (semantic) log record includes tool names
+      expect(mockLogger.emit).toHaveBeenNthCalledWith(2, {
+        body: 'GenAI operation request details from test-model.',
+        attributes: expect.objectContaining({
+          'event.name': 'gen_ai.client.inference.operation.details',
+          'gen_ai.request.model': 'test-model',
+          'gen_ai.request.tool_names': [
+            'read_file',
+            'write_file',
+            'list_resources',
+          ],
+        }),
+      });
+    });
+
+    it('should not include tool_names when no tools are configured', () => {
+      const mockConfig = {
+        getSessionId: () => 'test-session-id',
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => true,
+        isInteractive: () => false,
+        getUsageStatisticsEnabled: () => true,
+        getContentGeneratorConfig: () => ({
+          authType: AuthType.USE_GEMINI,
+        }),
+      } as Config;
+
+      const promptDetails = {
+        prompt_id: 'prompt-id-no-tools',
+        contents: [],
+        generate_content_config: {
+          temperature: 0.7,
+        },
+      };
+
+      const event = new ApiRequestEvent(
+        'test-model',
+        promptDetails,
+        'Request without tools',
+      );
+
+      logApiRequest(mockConfig, event);
+
+      // Verify the second (semantic) log record does NOT include tool_names
+      const secondCall = mockLogger.emit.mock.calls[1][0];
+      expect(
+        secondCall.attributes['gen_ai.request.tool_names'],
+      ).toBeUndefined();
+    });
   });
 
   describe('logFlashFallback', () => {
