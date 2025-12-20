@@ -177,7 +177,7 @@ export class McpClient {
     }
 
     for (const tool of tools) {
-      this.toolRegistry.registerTool(tool);
+      this.toolRegistry.registerTool(tool.asFullyQualifiedTool());
     }
     this.toolRegistry.sortTools();
   }
@@ -420,7 +420,7 @@ export class McpClient {
         this.toolRegistry.removeMcpToolsByServer(this.serverName);
 
         for (const tool of newTools) {
-          this.toolRegistry.registerTool(tool);
+          this.toolRegistry.registerTool(tool.asFullyQualifiedTool());
         }
         this.toolRegistry.sortTools();
 
@@ -1778,13 +1778,14 @@ export async function createTransport(
   }
 
   if (mcpServerConfig.command) {
+    const env = {
+      ...process.env,
+      ...(mcpServerConfig.env || {}),
+    } as Record<string, string>;
     const transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
-      env: {
-        ...process.env,
-        ...(mcpServerConfig.env || {}),
-      } as Record<string, string>,
+      env,
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
     });

@@ -468,7 +468,8 @@ export class ToolRegistry {
    */
   getFunctionDeclarations(): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
-    this.getActiveTools().forEach((tool) => {
+    const activeTools = this.getActiveTools();
+    activeTools.forEach((tool) => {
       declarations.push(tool.schema);
     });
     return declarations;

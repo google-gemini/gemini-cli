@@ -99,6 +99,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   ): Promise<LocalAgentExecutor<TOutput>> {
     // Create an isolated tool registry for this agent instance.
     const agentToolRegistry = new ToolRegistry(runtimeContext);
+
+    // Set the message bus from the context so hooks can be fired
+    const messageBus = runtimeContext.getMessageBus();
+    if (messageBus) {
+      agentToolRegistry.setMessageBus(messageBus);
+    }
+
     const parentToolRegistry = runtimeContext.getToolRegistry();
 
     if (definition.toolConfig) {

@@ -1202,6 +1202,8 @@ export class Config {
     const geminiClient = this.getGeminiClient();
     if (geminiClient?.isInitialized()) {
       await geminiClient.updateSystemInstruction();
+      // Refresh tools as well, as they might have been discovered after initialization (e.g. MCP)
+      geminiClient.refreshTools();
     }
   }
 

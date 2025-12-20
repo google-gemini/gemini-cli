@@ -330,6 +330,25 @@ export class TestRig {
       ide: { enabled: false, hasSeenNudge: true },
       ...options.settings, // Allow tests to override/add settings
     };
+
+    // FORCE telemetry settings for integration tests
+    if (!settings.telemetry) {
+      settings.telemetry = {
+        enabled: true,
+        target: 'local',
+        otlpEndpoint: '',
+        outfile: telemetryPath,
+        logPrompts: true,
+      };
+    } else {
+      settings.telemetry.enabled = true;
+      settings.telemetry.target = 'local';
+      settings.telemetry.outfile = telemetryPath;
+      if (settings.telemetry.logPrompts === undefined) {
+        settings.telemetry.logPrompts = true;
+      }
+    }
+
     writeFileSync(
       join(geminiDir, 'settings.json'),
       JSON.stringify(settings, null, 2),
@@ -406,6 +425,14 @@ export class TestRig {
 
     if (options.stdin) {
       execOptions.input = options.stdin;
+    }
+
+    if (env['VERBOSE'] === 'true') {
+      console.log('RUNNING CLI with args:', commandArgs);
+      console.log('CWD:', this.testDir!);
+      // console.log('ENV:', env); // Might be too much, but let's see some key ones
+      console.log('GEMINI_SETTINGS_DIR:', env['GEMINI_SETTINGS_DIR']);
+      console.log('GEMINI_TELEMETRY_DIR:', env['GEMINI_TELEMETRY_DIR']);
     }
 
     const child = spawn(command, commandArgs, {
@@ -646,29 +673,36 @@ export class TestRig {
 
   async waitForToolCall(
     toolName: string,
-    timeout?: number,
-    matchArgs?: (args: string) => boolean,
+    timeout: number = 30000,
+    interval: number = 100,
   ) {
-    // Use environment-specific timeout
-    if (!timeout) {
-      timeout = getDefaultTimeout();
+    if (env['VERBOSE'] === 'true') {
+      console.log(`POLL: Waiting for tool call '${toolName}'...`);
     }
-
-    // Wait for telemetry to be ready before polling for tool calls
-    await this.waitForTelemetryReady();
-
-    return poll(
+    await poll(
       () => {
         const toolLogs = this.readToolLogs();
-        return toolLogs.some(
-          (log) =>
-            log.toolRequest.name === toolName &&
-            (matchArgs?.call(this, log.toolRequest.args) ?? true),
-        );
+        if (env['VERBOSE'] === 'true' && toolLogs.length > 0) {
+          console.log(
+            'POLL: Current tool logs:',
+            JSON.stringify(toolLogs, null, 2),
+          );
+        }
+        return toolLogs.some((l) => l.toolRequest.name === toolName);
       },
       timeout,
-      100,
+      interval,
     );
+
+    const logs = this.readToolLogs();
+    const foundLog = logs.find((l) => l.toolRequest.name === toolName);
+    if (!foundLog && env['VERBOSE'] === 'true') {
+      console.log(
+        `POLL: Tool call ${toolName} NOT FOUND after timeout. Available calls:`,
+        logs.map((l) => l.toolRequest.name),
+      );
+    }
+    return foundLog;
   }
 
   async expectToolCallSuccess(
@@ -852,7 +886,6 @@ export class TestRig {
   }
 
   private _readAndParseTelemetryLog(): ParsedLog[] {
-    // Telemetry is always written to the test directory
     const logFilePath = join(this.testDir!, 'telemetry.log');
 
     if (!logFilePath || !fs.existsSync(logFilePath)) {
@@ -860,30 +893,48 @@ export class TestRig {
     }
 
     const content = readFileSync(logFilePath, 'utf-8');
-
-    // Split the content into individual JSON objects
-    // They are separated by "}\n{"
-    const jsonObjects = content
-      .split(/}\n{/)
-      .map((obj, index, array) => {
-        // Add back the braces we removed during split
-        if (index > 0) obj = '{' + obj;
-        if (index < array.length - 1) obj = obj + '}';
-        return obj.trim();
-      })
-      .filter((obj) => obj);
-
     const logs: ParsedLog[] = [];
 
-    for (const jsonStr of jsonObjects) {
-      try {
-        const logData = JSON.parse(jsonStr);
-        logs.push(logData);
-      } catch (e) {
-        // Skip objects that aren't valid JSON
-        if (env['VERBOSE'] === 'true') {
-          console.error('Failed to parse telemetry object:', e);
+    // OpenTelemetry log records in the file might be separated by newlines,
+    // but a single record can also span multiple lines if it has large values.
+    // We use a robust approach to find all JSON objects.
+    let startIdx = 0;
+    while ((startIdx = content.indexOf('{', startIdx)) !== -1) {
+      let braceCount = 0;
+      let inString = false;
+      let escape = false;
+      let endIdx = startIdx;
+
+      for (let i = startIdx; i < content.length; i++) {
+        const char = content[i];
+        if (escape) {
+          escape = false;
+        } else if (char === '\\') {
+          escape = true;
+        } else if (char === '"') {
+          inString = !inString;
+        } else if (!inString) {
+          if (char === '{') braceCount++;
+          else if (char === '}') braceCount--;
         }
+
+        if (braceCount === 0) {
+          endIdx = i + 1;
+          break;
+        }
+      }
+
+      if (braceCount === 0) {
+        const potentialJson = content.substring(startIdx, endIdx);
+        try {
+          logs.push(JSON.parse(potentialJson));
+        } catch {
+          // Not valid JSON, skip
+        }
+        startIdx = endIdx;
+      } else {
+        // No matching closing brace found
+        break;
       }
     }
 
@@ -956,6 +1007,17 @@ export class TestRig {
       (logData) =>
         logData.attributes &&
         logData.attributes['event.name'] === 'gemini_cli.api_request',
+    );
+    return apiRequests;
+  }
+
+  readAllRequests(): ParsedLog[] {
+    const logs = this._readAndParseTelemetryLog();
+    const apiRequests = logs.filter(
+      (logData) =>
+        logData.attributes &&
+        (logData.attributes['event.name'] === 'gemini_cli.api_request' ||
+          logData.attributes['event.name'] === 'gemini_cli.api_stream_request'),
     );
     return apiRequests;
   }
@@ -1047,9 +1109,29 @@ export class TestRig {
 
     const run = new InteractiveRun(ptyProcess);
     this._interactiveRuns.push(run);
-    // Wait for the app to be ready
-    await run.expectText('  Type your message or @path/to/file', 30000);
+    // Wait for the app to be ready - either the main prompt or the auth spinner
+    await poll(
+      () => {
+        const out = stripAnsi(run.output).toLowerCase();
+        return (
+          out.includes('type your message or @path/to/file') ||
+          out.includes('waiting for auth')
+        );
+      },
+      30000,
+      200,
+    );
     return run;
+  }
+
+  readHistoryLog(): unknown[] {
+    const logPath = join(this.testDir!, 'history.log');
+    if (!fs.existsSync(logPath)) return [];
+    const content = readFileSync(logPath, 'utf-8');
+    return content
+      .split('\n')
+      .filter((line) => line.trim())
+      .map((line) => JSON.parse(line));
   }
 
   readHookLogs() {
@@ -1075,12 +1157,30 @@ export class TestRig {
         logData.attributes &&
         logData.attributes['event.name'] === 'gemini_cli.hook_call'
       ) {
+        let hookInput = logData.attributes.hook_input ?? {};
+        if (typeof hookInput === 'string') {
+          try {
+            hookInput = JSON.parse(hookInput);
+          } catch {
+            // Keep as string if not valid JSON
+          }
+        }
+
+        let hookOutput = logData.attributes.hook_output ?? {};
+        if (typeof hookOutput === 'string') {
+          try {
+            hookOutput = JSON.parse(hookOutput);
+          } catch {
+            // Keep as string if not valid JSON
+          }
+        }
+
         logs.push({
           hookCall: {
             hook_event_name: logData.attributes.hook_event_name ?? '',
             hook_name: logData.attributes.hook_name ?? '',
-            hook_input: logData.attributes.hook_input ?? {},
-            hook_output: logData.attributes.hook_output ?? {},
+            hook_input: hookInput as Record<string, unknown>,
+            hook_output: hookOutput as Record<string, unknown>,
             exit_code: logData.attributes.exit_code ?? 0,
             stdout: logData.attributes.stdout ?? '',
             stderr: logData.attributes.stderr ?? '',

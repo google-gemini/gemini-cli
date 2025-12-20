@@ -19,6 +19,7 @@ import type { ServerGeminiStreamEvent, ChatCompressionInfo } from './turn.js';
 import { CompressionStatus } from './turn.js';
 import { Turn, GeminiEventType } from './turn.js';
 import type { Config } from '../config/config.js';
+import { resolveModel } from '../config/models.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
@@ -94,7 +95,27 @@ export class GeminiClient {
 
   async initialize() {
     this.chat = await this.startChat();
+    await this.setTools();
     this.updateTelemetryTokenCount();
+  }
+
+  refreshTools() {
+    void this.setTools();
+  }
+
+  async setTools(): Promise<void> {
+    if (this.chat) {
+      this.chat.setTools(this.getTools());
+    }
+  }
+
+  private getTools(): Tool[] {
+    const toolRegistry = this.config.getToolRegistry();
+    const toolDeclarations = toolRegistry.getFunctionDeclarations();
+    if (toolDeclarations.length === 0) {
+      return [];
+    }
+    return [{ functionDeclarations: toolDeclarations }];
   }
 
   private getContentGeneratorOrFail(): ContentGenerator {
@@ -130,13 +151,6 @@ export class GeminiClient {
   setHistory(history: Content[]) {
     this.getChat().setHistory(history);
     this.forceFullIdeContext = true;
-  }
-
-  async setTools(): Promise<void> {
-    const toolRegistry = this.config.getToolRegistry();
-    const toolDeclarations = toolRegistry.getFunctionDeclarations();
-    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
-    this.getChat().setTools(tools);
   }
 
   async resetChat(): Promise<void> {
@@ -193,10 +207,7 @@ export class GeminiClient {
     this.forceFullIdeContext = true;
     this.hasFailedCompressionAttempt = false;
 
-    const toolRegistry = this.config.getToolRegistry();
-    const toolDeclarations = toolRegistry.getFunctionDeclarations();
-    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
-
+    const tools = this.getTools();
     const history = await getInitialChatHistory(this.config, extraHistory);
 
     try {
@@ -388,16 +399,6 @@ export class GeminiClient {
         newIdeContext: currentIdeContext,
       };
     }
-  }
-
-  private _getEffectiveModelForCurrentTurn(): string {
-    if (this.currentSequenceModel) {
-      return this.currentSequenceModel;
-    }
-
-    // Availability logic: The configured model is the source of truth,
-    // including any permanent fallbacks (config.setModel) or manual overrides.
-    return this.config.getActiveModel();
   }
 
   async *sendMessageStream(
@@ -604,30 +605,29 @@ export class GeminiClient {
         return turn;
       }
 
-      const nextSpeakerCheck = await checkNextSpeaker(
+      const speakerDecision = await checkNextSpeaker(
         this.getChat(),
         this.config.getBaseLlmClient(),
         signal,
         prompt_id,
       );
+
       logNextSpeakerCheck(
         this.config,
         new NextSpeakerCheckEvent(
-          prompt_id,
-          turn.finishReason?.toString() || '',
-          nextSpeakerCheck?.next_speaker || '',
+          this.lastPromptId,
+          modelToUse,
+          speakerDecision?.next_speaker || 'user',
         ),
       );
-      if (nextSpeakerCheck?.next_speaker === 'model') {
-        const nextRequest = [{ text: 'Please continue.' }];
-        // This recursive call's events will be yielded out, and the final
-        // turn object from the recursive call will be returned.
-        return yield* this.sendMessageStream(
+
+      if (speakerDecision?.next_speaker === 'model') {
+        const nextRequest = [{ text: 'System: Please continue.' }];
+        yield* this.sendMessageStream(
           nextRequest,
           signal,
           prompt_id,
           boundedTurns - 1,
-          // isInvalidStreamRetry is false here, as this is a next speaker check
         );
       }
     }
@@ -673,8 +673,8 @@ export class GeminiClient {
     } = desiredModelConfig;
 
     try {
-      const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+      const systemMemory = this.config.getUserMemory();
+      const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
       const {
         model,
         config: newConfig,
@@ -788,5 +788,10 @@ export class GeminiClient {
     }
 
     return info;
+  }
+
+  private _getEffectiveModelForCurrentTurn(): string {
+    const currentModel = this.config.getModel();
+    return resolveModel(currentModel, this.config.getPreviewFeatures());
   }
 }

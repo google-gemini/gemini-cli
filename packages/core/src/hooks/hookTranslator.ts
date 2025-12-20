@@ -185,19 +185,32 @@ export class HookTranslatorGenAIv1 extends HookTranslator {
             ? content.parts
             : [content.parts];
 
-          // Extract only text parts - intentionally filtering out non-text content
-          const textContent = parts
-            .filter(hasTextProperty)
-            .map((part) => part.text)
-            .join('');
+          const contentParts = parts.map((part) => {
+            if (hasTextProperty(part)) {
+              return { type: 'text', text: part.text };
+            }
+            if (part.inlineData) {
+              return { type: 'image', inlineData: part.inlineData };
+            }
+            if (part.fileData) {
+              return { type: 'file', fileData: part.fileData };
+            }
+            if (part.functionCall) {
+              return { type: 'function_call', functionCall: part.functionCall };
+            }
+            if (part.functionResponse) {
+              return {
+                type: 'function_response',
+                functionResponse: part.functionResponse,
+              };
+            }
+            return { type: 'unknown', part };
+          });
 
-          // Only add message if there's text content
-          if (textContent) {
-            messages.push({
-              role,
-              content: textContent,
-            });
-          }
+          messages.push({
+            role,
+            content: contentParts as LLMRequest['messages'][0]['content'],
+          });
         }
       }
     }
@@ -225,17 +238,32 @@ export class HookTranslatorGenAIv1 extends HookTranslator {
     baseRequest?: GenerateContentParameters,
   ): GenerateContentParameters {
     // Convert hook messages back to SDK Content format
-    const contents = hookRequest.messages.map((message) => ({
-      role: message.role === 'model' ? 'model' : message.role,
-      parts: [
-        {
-          text:
-            typeof message.content === 'string'
-              ? message.content
-              : String(message.content),
-        },
-      ],
-    }));
+    const contents = hookRequest.messages.map((message) => {
+      let parts: Array<Record<string, unknown>> = [];
+      if (typeof message.content === 'string') {
+        parts = [{ text: message.content }];
+      } else if (Array.isArray(message.content)) {
+        parts = message.content.map((p: Record<string, unknown>) => {
+          if (p.type === 'text') return { text: p.text as string };
+          if (p.type === 'image')
+            return { inlineData: p.inlineData as Record<string, unknown> };
+          if (p.type === 'file')
+            return { fileData: p.fileData as Record<string, unknown> };
+          if (p.type === 'function_call')
+            return { functionCall: p.functionCall as Record<string, unknown> };
+          if (p.type === 'function_response')
+            return {
+              functionResponse: p.functionResponse as Record<string, unknown>,
+            };
+          return (p.part as Record<string, unknown>) || p;
+        });
+      }
+
+      return {
+        role: message.role === 'model' ? 'model' : message.role,
+        parts,
+      };
+    });
 
     // Build the result with proper typing
     const result: GenerateContentParameters = {

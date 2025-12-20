@@ -668,6 +668,10 @@ export class GeminiChat {
     this.tools = tools;
   }
 
+  getTools(): Tool[] {
+    return this.tools;
+  }
+
   async maybeIncludeSchemaDepthContext(error: StructuredError): Promise<void> {
     // Check for potentially problematic cyclic tools with cyclic schemas
     // and include a recommendation to remove potentially problematic tools.
