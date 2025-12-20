@@ -41,7 +41,10 @@ import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { StreamingState } from '../types.js';
-import { isSlashCommand } from '../utils/commandUtils.js';
+import {
+  isAutoExecutableCommand,
+  isSlashCommand,
+} from '../utils/commandUtils.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -658,8 +661,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 ? 0 // Default to the first if none is active
                 : completion.activeSuggestionIndex;
             if (targetIndex < completion.suggestions.length) {
-              completion.handleAutocomplete(targetIndex);
-              setExpandedSuggestionIndex(-1); // Reset expansion after selection
+              const targetSuggestion = completion.suggestions[targetIndex];
+              const command =
+                completion.getCommandFromSuggestion(targetSuggestion);
+              if (isAutoExecutableCommand(command)) {
+                // Execute the command immediately
+                buffer.setText(targetSuggestion.value);
+                handleSubmit(buffer.text);
+              } else {
+                completion.handleAutocomplete(targetIndex);
+                setExpandedSuggestionIndex(-1); // Reset expansion after selection
+              }
             }
           }
           return;
