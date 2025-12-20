@@ -12,7 +12,7 @@ exports[`ApiAuthDialog > renders correctly 1`] = `
 │ │ Paste your API key here                                                                      │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│ (Press Enter to submit, Esc to cancel)                                                           │
+│ (Press Enter to submit, Esc to cancel, Ctrl+C to clear stored key)                               │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;

@@ -1,7 +1,8 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.21.0-nightly.20251211.8c83e1ea9",
+  "version": "0.21.0-nightly.20251219.70696e364",
   "description": "Gemini CLI Core",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
@@ -44,9 +45,7 @@
     "ajv-formats": "^3.0.0",
     "chardet": "^2.1.0",
     "diff": "^7.0.0",
-    "dotenv": "^17.1.0",
     "fast-levenshtein": "^2.0.6",
-    "fast-uri": "^3.0.6",
     "fdir": "^6.4.6",
     "fzf": "^0.5.2",
     "glob": "^12.0.0",
@@ -66,7 +65,6 @@
     "tree-sitter-bash": "^0.25.0",
     "undici": "^7.10.0",
     "web-tree-sitter": "^0.25.10",
-    "ws": "^8.18.0",
     "zod": "^3.25.76"
   },
   "optionalDependencies": {
@@ -81,11 +79,9 @@
   "devDependencies": {
     "@google/gemini-cli-test-utils": "file:../test-utils",
     "@types/diff": "^7.0.2",
-    "@types/dotenv": "^6.1.1",
     "@types/fast-levenshtein": "^0.0.4",
     "@types/minimatch": "^5.1.2",
     "@types/picomatch": "^4.0.1",
-    "@types/ws": "^8.5.10",
     "msw": "^2.3.4",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"

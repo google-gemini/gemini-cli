@@ -147,12 +147,12 @@ describe('SmartEditTool', () => {
         const problematicSnippet =
           snippetMatch && snippetMatch[1] ? snippetMatch[1] : '';
 
-        if (((schema as any).properties as any)?.corrected_target_snippet) {
+        if ((schema as any).properties?.corrected_target_snippet) {
           return Promise.resolve({
             corrected_target_snippet: problematicSnippet,
           });
         }
-        if (((schema as any).properties as any)?.corrected_new_string) {
+        if ((schema as any).properties?.corrected_new_string) {
           const originalNewStringMatch = promptText.match(
             /original_new_string \(what was intended to replace original_old_string\):\n```\n([\s\S]*?)\n```/,
           );

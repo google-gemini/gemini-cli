@@ -41,7 +41,9 @@ This project follows
 
 The process for contributing code is as follows:
 
-1.  **Find an issue** that you want to work on.
+1.  **Find an issue** that you want to work on. If an issue is tagged as
+    "🔒Maintainers only", this means it is reserved for project maintainers. We
+    will not accept pull requests related to these issues.
 2.  **Fork the repository** and create a new branch.
 3.  **Make your changes** in the `packages/` directory.
 4.  **Ensure all checks pass** by running `npm run preflight`.
