@@ -89,14 +89,14 @@ export class ClipboardTestHelpers {
     try {
       if (platform === 'win32') {
         // Windows - requires .NET framework
-        // Escape single quotes for PowerShell to prevent injection
-        const escapedPath = absolutePath.replace(/'/g, "''");
-        const script = `
-          Add-Type -AssemblyName System.Windows.Forms;
-          $image = [System.Drawing.Image]::FromFile('${escapedPath}');
-          [System.Windows.Forms.Clipboard]::SetImage($image);
-        `;
-        await execAsync(`powershell -Command "${script}"`);
+        // Use execFile with arguments to prevent command injection.
+        await execFileAsync('powershell', [
+          '-NoProfile',
+          '-Command',
+          "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::SetImage([System.Drawing.Image]::FromFile($args[0]))",
+          absolutePath,
+        ]);
+
       } else if (platform === 'darwin') {
         // macOS - use osascript with path as argument to prevent injection
         await execFileAsync('osascript', [
