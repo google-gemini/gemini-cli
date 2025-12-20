@@ -96,7 +96,7 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
               </Text>
             </Box>
             <Box flexDirection="column" paddingLeft={2}>
-              {eventHooks.map((hook, index) => {
+              {eventHooks.map((hook) => {
                 const hookName =
                   hook.config.name || hook.config.command || 'unknown';
                 const statusColor = hook.enabled
@@ -109,7 +109,7 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
 
                 return (
                   <Box
-                    key={`${eventName}-${index}`}
+                    key={`${hook.source}:${hook.config.name ?? ''}:${hook.config.command ?? ''}`}
                     flexDirection="column"
                     marginBottom={1}
                   >
