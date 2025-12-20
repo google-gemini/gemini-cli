@@ -1200,6 +1200,13 @@
           "default": false,
           "type": "boolean"
         },
+        "enablePermanentToolApproval": {
+          "title": "Allow Permanent Tool Approval",
+          "description": "Enable the \"Allow for all future sessions\" option in tool confirmation dialogs.",
+          "markdownDescription": "Enable the \"Allow for all future sessions\" option in tool confirmation dialogs.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "blockGitExtensions": {
           "title": "Blocks extensions from Git",
           "description": "Blocks installing and loading extensions from Git.",
@@ -1370,6 +1377,23 @@
               "markdownDescription": "The model to use for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `auto`",
               "default": "auto",
               "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "introspectionAgentSettings": {
+          "title": "Introspection Agent Settings",
+          "description": "Configuration for Introspection Agent.",
+          "markdownDescription": "Configuration for Introspection Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Introspection Agent",
+              "description": "Enable the Introspection Agent.",
+              "markdownDescription": "Enable the Introspection Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
             }
           },
           "additionalProperties": false
