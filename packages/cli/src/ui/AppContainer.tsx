@@ -1436,16 +1436,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
     let isMounted = true;
 
     const fetchBannerTexts = async () => {
-      const [bannerTextUI] = await Promise.all([config.getEvent()]);
+      const bannerTextUI = await config.getEvent();
 
       if (isMounted) {
-        const bannerText =
-          bannerTextUI !== undefined
-            ? {
-                title: bannerTextUI.campaignNotification.title,
-                body: bannerTextUI.campaignNotification.body,
-              }
-            : { title: '', body: '' };
+        const bannerText = {
+          title: bannerTextUI?.campaignNotification?.title ?? '',
+          body: bannerTextUI?.campaignNotification?.body ?? '',
+        };
         const isWarning =
           bannerTextUI?.campaignNotification?.action?.text === 'WARNING';
         setBanner({ bannerText, isWarning });
