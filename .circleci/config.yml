@@ -1,5 +1,5 @@
 # Note: This issue was created to track cross-platform clipboard image handling.
-# 
+#
 # Created: '2025-12-21'
 # Related: 'https://github.com/google-gemini/gemini-cli/issues/5316'
 
@@ -73,7 +73,7 @@ jobs:
           command: |
             mkdir -p ~/.config/@google/gemini-cli
             echo "{\"apiKey\": \"${GEMINI_API_KEY}\", \"autoApprove\": true}" > ~/.config/@google/gemini-cli/config.json
-            
+
             # Targeted E2E tests
             npm run test:integration:sandbox:none -- \
               --pool=forks \

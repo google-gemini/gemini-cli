@@ -114,6 +114,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   focus = true,
   inputWidth,
   suggestionsWidth,
+  suggestionsPosition: _suggestionsPosition,
+  onSuggestionsVisibilityChange,
   shellModeActive,
   setShellModeActive,
   approvalMode,
@@ -168,7 +170,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   useEffect(() => {
     onSuggestionsVisibilityChange(completion.showSuggestions);
-  }, [completion.showSuggestions]);
+  }, [completion.showSuggestions, onSuggestionsVisibilityChange]);
 
   const reverseSearchCompletion = useReverseSearchCompletion(
     buffer,
