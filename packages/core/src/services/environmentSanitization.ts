@@ -44,10 +44,21 @@ export function sanitizeEnvironment(
     (config.blockedEnvironmentVariables || []).map((k) => k.toUpperCase()),
   );
 
+  // Enable strict sanitization in GitHub actions.
+  const isStrictSanitization = !!processEnv['GITHUB_SHA'];
+
   for (const key in processEnv) {
     const value = processEnv[key];
 
-    if (!shouldRedactEnvironmentVariable(key, value, allowedSet, blockedSet)) {
+    if (
+      !shouldRedactEnvironmentVariable(
+        key,
+        value,
+        allowedSet,
+        blockedSet,
+        isStrictSanitization,
+      )
+    ) {
       results[key] = value;
     }
   }
@@ -147,6 +158,7 @@ function shouldRedactEnvironmentVariable(
   value: string | undefined,
   allowedSet?: Set<string>,
   blockedSet?: Set<string>,
+  isStrictSanitization = false,
 ): boolean {
   key = key.toUpperCase();
   value = value?.toUpperCase();
@@ -169,6 +181,11 @@ function shouldRedactEnvironmentVariable(
 
   // These are always redacted.
   if (NEVER_ALLOWED_ENVIRONMENT_VARIABLES.has(key)) {
+    return true;
+  }
+
+  // If in strict mode (e.g. GitHub Action), and not explicitly allowed, redact it.
+  if (isStrictSanitization) {
     return true;
   }
 
