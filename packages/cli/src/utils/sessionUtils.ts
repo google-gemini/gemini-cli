@@ -24,6 +24,28 @@ import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
 export const RESUME_LATEST = 'latest';
 
 /**
+ * Error thrown when no sessions exist for the current project.
+ */
+export class NoSessionsFoundError extends Error {
+  constructor(message = 'No previous sessions found for this project.') {
+    super(message);
+    this.name = 'NoSessionsFoundError';
+  }
+}
+
+/**
+ * Error thrown when a session identifier is invalid.
+ */
+export class InvalidSessionIdentifierError extends Error {
+  constructor(identifier: string) {
+    super(
+      `Invalid session identifier "${identifier}". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
+    );
+    this.name = 'InvalidSessionIdentifierError';
+  }
+}
+
+/**
  * Represents a text match found during search with surrounding context.
  */
 export interface TextMatch {
@@ -370,7 +392,7 @@ export class SessionSelector {
     const sessions = await this.listSessions();
 
     if (sessions.length === 0) {
-      throw new Error('No previous sessions found for this project.');
+      throw new NoSessionsFoundError();
     }
 
     // Sort by startTime (oldest first, so newest sessions get highest numbers)
@@ -398,9 +420,7 @@ export class SessionSelector {
       return sortedSessions[index - 1];
     }
 
-    throw new Error(
-      `Invalid session identifier "${identifier}". Use --list-sessions to see available sessions.`,
-    );
+    throw new InvalidSessionIdentifierError(identifier);
   }
 
   /**
@@ -430,14 +450,17 @@ export class SessionSelector {
       try {
         selectedSession = await this.findSession(resumeArg);
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (message.includes('No previous sessions found')) {
+        // NoSessionsFoundError and InvalidSessionIdentifierError already have
+        // detailed messages - just rethrow them
+        if (
+          error instanceof NoSessionsFoundError ||
+          error instanceof InvalidSessionIdentifierError
+        ) {
           throw error;
         }
-
-        // Re-throw with more detailed message for resume command
+        // Wrap unexpected errors with context
         throw new Error(
-          `Invalid session identifier "${resumeArg}". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
+          `Failed to find session "${resumeArg}": ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
