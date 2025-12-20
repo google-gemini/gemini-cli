@@ -39,7 +39,7 @@ export class NoSessionsFoundError extends Error {
 export class InvalidSessionIdentifierError extends Error {
   constructor(identifier: string) {
     super(
-      `Invalid session identifier "${identifier}". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
+      `Invalid session identifier "${identifier}".\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
     );
     this.name = 'InvalidSessionIdentifierError';
   }
