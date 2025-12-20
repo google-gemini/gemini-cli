@@ -670,8 +670,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 completion.getCommandFromSuggestion(targetSuggestion);
               if (isAutoExecutableCommand(command)) {
                 // Execute the command immediately
-                buffer.setText(targetSuggestion.value);
-                handleSubmit(buffer.text);
+                const completedText =
+                  completion.getCompletedText(targetSuggestion);
+                if (completedText) {
+                  handleSubmit(completedText.trim());
+                }
               } else {
                 completion.handleAutocomplete(targetIndex);
                 setExpandedSuggestionIndex(-1); // Reset expansion after selection
