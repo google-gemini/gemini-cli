@@ -65,6 +65,13 @@ vi.mock('../tools/tool-registry', () => {
   return { ToolRegistry: ToolRegistryMock };
 });
 
+vi.mock('../tools/mcp-client-manager.js', () => ({
+  McpClientManager: vi.fn().mockImplementation(() => ({
+    startConfiguredMcpServers: vi.fn(),
+    getMcpInstructions: vi.fn().mockReturnValue('MCP Instructions'),
+  })),
+}));
+
 vi.mock('../utils/memoryDiscovery.js', () => ({
   loadServerHierarchicalMemory: vi.fn(),
 }));
@@ -168,12 +175,15 @@ vi.mock('../utils/fetch.js', () => ({
   setGlobalProxy: mockSetGlobalProxy,
 }));
 
+vi.mock('../services/contextManager.js');
+
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import { uiTelemetryService } from '../telemetry/index.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
+import { ContextManager } from '../services/contextManager.js';
 
 vi.mock('../core/baseLlmClient.js');
 vi.mock('../core/tokenLimits.js', () => ({
@@ -1777,7 +1787,7 @@ describe('Config Quota & Preview Model Access', () => {
     sessionId: 'test-session',
     model: 'gemini-pro',
     usageStatisticsEnabled: false,
-    embeddingModel: 'gemini-embedding', // required in type but not in the original file I copied, adding here
+    embeddingModel: 'gemini-embedding',
     sandbox: {
       command: 'docker',
       image: 'gemini-cli-sandbox',
@@ -1875,5 +1885,73 @@ describe('Config Quota & Preview Model Access', () => {
 
       expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL);
     });
+  });
+});
+
+describe('Config JIT Initialization', () => {
+  let config: Config;
+  let mockContextManager: {
+    refresh: Mock;
+    getGlobalMemory: Mock;
+    getEnvironmentMemory: Mock;
+    getLoadedPaths: Mock;
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockContextManager = {
+      refresh: vi.fn(),
+      getGlobalMemory: vi.fn().mockReturnValue('Global Memory'),
+      getEnvironmentMemory: vi
+        .fn()
+        .mockReturnValue('Environment Memory\n\nMCP Instructions'),
+      getLoadedPaths: vi.fn().mockReturnValue(new Set(['/path/to/GEMINI.md'])),
+    };
+    (ContextManager as unknown as Mock).mockImplementation(
+      () => mockContextManager,
+    );
+  });
+
+  it('should initialize ContextManager, load memory, and delegate to it when experimentalJitContext is enabled', async () => {
+    const params: ConfigParameters = {
+      sessionId: 'test-session',
+      targetDir: '/tmp/test',
+      debugMode: false,
+      model: 'test-model',
+      experimentalJitContext: true,
+      userMemory: 'Initial Memory',
+      cwd: '/tmp/test',
+    };
+
+    config = new Config(params);
+    await config.initialize();
+
+    expect(ContextManager).toHaveBeenCalledWith(config);
+    expect(mockContextManager.refresh).toHaveBeenCalled();
+    expect(config.getUserMemory()).toBe(
+      'Global Memory\n\nEnvironment Memory\n\nMCP Instructions',
+    );
+
+    // Verify state update (delegated to ContextManager)
+    expect(config.getGeminiMdFileCount()).toBe(1);
+    expect(config.getGeminiMdFilePaths()).toEqual(['/path/to/GEMINI.md']);
+  });
+
+  it('should NOT initialize ContextManager when experimentalJitContext is disabled', async () => {
+    const params: ConfigParameters = {
+      sessionId: 'test-session',
+      targetDir: '/tmp/test',
+      debugMode: false,
+      model: 'test-model',
+      experimentalJitContext: false,
+      userMemory: 'Initial Memory',
+      cwd: '/tmp/test',
+    };
+
+    config = new Config(params);
+    await config.initialize();
+
+    expect(ContextManager).not.toHaveBeenCalled();
+    expect(config.getUserMemory()).toBe('Initial Memory');
   });
 });

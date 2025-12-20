@@ -435,9 +435,15 @@ export async function loadCliConfig(
   });
   await extensionManager.loadExtensions();
 
-  // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
-  const { memoryContent, fileCount, filePaths } =
-    await loadServerHierarchicalMemory(
+  const experimentalJitContext = settings.experimental?.jitContext ?? false;
+
+  let memoryContent = '';
+  let fileCount = 0;
+  let filePaths: string[] = [];
+
+  if (!experimentalJitContext) {
+    // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
+    const result = await loadServerHierarchicalMemory(
       cwd,
       [],
       debugMode,
@@ -448,6 +454,10 @@ export async function loadCliConfig(
       memoryFileFiltering,
       settings.context?.discoveryMaxDirs,
     );
+    memoryContent = result.memoryContent;
+    fileCount = result.fileCount;
+    filePaths = result.filePaths;
+  }
 
   const question = argv.promptInteractive || argv.prompt || '';
 
@@ -669,6 +679,8 @@ export async function loadCliConfig(
     enableMessageBusIntegration,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
+    introspectionAgentSettings:
+      settings.experimental?.introspectionAgentSettings,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,

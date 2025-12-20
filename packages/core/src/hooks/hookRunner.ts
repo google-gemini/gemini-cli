@@ -17,6 +17,11 @@ import type {
 } from './types.js';
 import type { LLMRequest } from './hookTranslator.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  escapeShellArg,
+  getShellConfiguration,
+  type ShellType,
+} from '../utils/shell-utils.js';
 
 /**
  * Default timeout for hook execution (60 seconds)
@@ -201,7 +206,13 @@ export class HookRunner {
       let stdout = '';
       let stderr = '';
       let timedOut = false;
-      const command = this.expandCommand(hookConfig.command, input);
+
+      const shellConfig = getShellConfiguration();
+      const command = this.expandCommand(
+        hookConfig.command,
+        input,
+        shellConfig.shell,
+      );
 
       // Set up environment variables
       const env = {
@@ -210,12 +221,16 @@ export class HookRunner {
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
       };
 
-      const child = spawn(command, {
-        env,
-        cwd: input.cwd,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        shell: true,
-      });
+      const child = spawn(
+        shellConfig.executable,
+        [...shellConfig.argsPrefix, command],
+        {
+          env,
+          cwd: input.cwd,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          shell: false,
+        },
+      );
 
       // Set up timeout
       const timeoutHandle = setTimeout(() => {
@@ -338,10 +353,16 @@ export class HookRunner {
   /**
    * Expand command with environment variables and input context
    */
-  private expandCommand(command: string, input: HookInput): string {
+  private expandCommand(
+    command: string,
+    input: HookInput,
+    shellType: ShellType,
+  ): string {
+    debugLogger.debug(`Expanding hook command: ${command} (cwd: ${input.cwd})`);
+    const escapedCwd = escapeShellArg(input.cwd, shellType);
     return command
-      .replace(/\$GEMINI_PROJECT_DIR/g, input.cwd)
-      .replace(/\$CLAUDE_PROJECT_DIR/g, input.cwd); // For compatibility
+      .replace(/\$GEMINI_PROJECT_DIR/g, () => escapedCwd)
+      .replace(/\$CLAUDE_PROJECT_DIR/g, () => escapedCwd); // For compatibility
   }
 
   /**
