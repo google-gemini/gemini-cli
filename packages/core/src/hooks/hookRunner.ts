@@ -18,6 +18,7 @@ import type {
 import type { LLMRequest } from './hookTranslator.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { sanitizeEnvironment } from '../services/environmentSanitization.js';
+import type { Config } from '../config/config.js';
 
 /**
  * Default timeout for hook execution (60 seconds)
@@ -35,7 +36,7 @@ const EXIT_CODE_NON_BLOCKING_ERROR = 1;
  * Hook runner that executes command hooks
  */
 export class HookRunner {
-  constructor() {}
+  constructor(private readonly config: Config) {}
 
   /**
    * Execute a single hook
@@ -206,7 +207,7 @@ export class HookRunner {
 
       // Set up environment variables
       const env = {
-        ...sanitizeEnvironment(process.env),
+        ...sanitizeEnvironment(process.env, this.config.sanitizationConfig),
         GEMINI_PROJECT_DIR: input.cwd,
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
       };

@@ -26,15 +26,28 @@
 // feature that lets extensions declare the env vars they need and enables
 // the user to accept/reject them.
 
+export type EnvironmentSanitizationConfig = {
+  allowedEnvironmentVariables: string[];
+  blockedEnvironmentVariables: string[];
+};
+
 export function sanitizeEnvironment(
   processEnv: NodeJS.ProcessEnv,
+  config: EnvironmentSanitizationConfig,
 ): NodeJS.ProcessEnv {
   const results: NodeJS.ProcessEnv = {};
+
+  const allowedSet = new Set(
+    (config.allowedEnvironmentVariables || []).map((k) => k.toUpperCase()),
+  );
+  const blockedSet = new Set(
+    (config.blockedEnvironmentVariables || []).map((k) => k.toUpperCase()),
+  );
 
   for (const key in processEnv) {
     const value = processEnv[key];
 
-    if (!shouldRedactEnvironmentVariable(key, value)) {
+    if (!shouldRedactEnvironmentVariable(key, value, allowedSet, blockedSet)) {
       results[key] = value;
     }
   }
@@ -132,9 +145,19 @@ export const NEVER_ALLOWED_VALUE_PATTERNS = [
 function shouldRedactEnvironmentVariable(
   key: string,
   value: string | undefined,
+  allowedSet?: Set<string>,
+  blockedSet?: Set<string>,
 ): boolean {
   key = key.toUpperCase();
   value = value?.toUpperCase();
+
+  // User overrides take precedence.
+  if (allowedSet?.has(key)) {
+    return false;
+  }
+  if (blockedSet?.has(key)) {
+    return true;
+  }
 
   // These are never redacted.
   if (

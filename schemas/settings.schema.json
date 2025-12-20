@@ -1224,6 +1224,26 @@
           },
           "additionalProperties": false
         },
+        "allowedEnvironmentVariables": {
+          "title": "Allowed Environment Variables",
+          "description": "Environment variables to always allow (bypass redaction).",
+          "markdownDescription": "Environment variables to always allow (bypass redaction).\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blockedEnvironmentVariables": {
+          "title": "Blocked Environment Variables",
+          "description": "Environment variables to always redact.",
+          "markdownDescription": "Environment variables to always redact.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "auth": {
           "title": "Authentication",
           "description": "Authentication settings.",

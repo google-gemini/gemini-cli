@@ -13,6 +13,11 @@ import {
   sanitizeEnvironment,
 } from './environmentSanitization.js';
 
+const EMPTY_OPTIONS = {
+  allowedEnvironmentVariables: [],
+  blockedEnvironmentVariables: [],
+};
+
 describe('sanitizeEnvironment', () => {
   it('should allow safe, common environment variables', () => {
     const env = {
@@ -22,7 +27,7 @@ describe('sanitizeEnvironment', () => {
       SystemRoot: 'C:\\Windows',
       LANG: 'en_US.UTF-8',
     };
-    const sanitized = sanitizeEnvironment(env);
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
     expect(sanitized).toEqual(env);
   });
 
@@ -31,7 +36,7 @@ describe('sanitizeEnvironment', () => {
       GEMINI_CLI_FOO: 'bar',
       GEMINI_CLI_BAZ: 'qux',
     };
-    const sanitized = sanitizeEnvironment(env);
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
     expect(sanitized).toEqual(env);
   });
 
@@ -42,7 +47,7 @@ describe('sanitizeEnvironment', () => {
       DATABASE_URL: 'sensitive-url',
       SAFE_VAR: 'is-safe',
     };
-    const sanitized = sanitizeEnvironment(env);
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
     expect(sanitized).toEqual({
       SAFE_VAR: 'is-safe',
     });
@@ -64,7 +69,7 @@ describe('sanitizeEnvironment', () => {
       // Safe variable
       USEFUL_INFO: 'is-ok',
     };
-    const sanitized = sanitizeEnvironment(env);
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
     expect(sanitized).toEqual({
       USEFUL_INFO: 'is-ok',
     });
@@ -79,7 +84,7 @@ describe('sanitizeEnvironment', () => {
       CERTIFICATE: '-----BEGIN CERTIFICATE-----...',
       SAFE_VAR: 'is-safe',
     };
-    const sanitized = sanitizeEnvironment(env);
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
     expect(sanitized).toEqual({
       SAFE_VAR: 'is-safe',
     });
@@ -118,7 +123,7 @@ describe('sanitizeEnvironment', () => {
       // Safe variable
       SAFE_VAR: 'is-safe',
     };
-    const sanitized = sanitizeEnvironment(env);
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
     expect(sanitized).toEqual({
       SAFE_VAR: 'is-safe',
     });
@@ -140,7 +145,7 @@ describe('sanitizeEnvironment', () => {
       AUTHENTICATION_FLOW: 'oauth',
       PRIVATE_JET_OWNER: 'false',
     };
-    const sanitized = sanitizeEnvironment(env);
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
     expect(sanitized).toEqual({
       SAFE_URL: 'https://example.com/foo/bar',
       NOT_A_JWT: 'this.is.not.a.jwt',
@@ -153,7 +158,7 @@ describe('sanitizeEnvironment', () => {
       UNDEFINED_VAR: undefined,
       ANOTHER_SAFE_VAR: 'value',
     };
-    const sanitized = sanitizeEnvironment(env);
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
     expect(sanitized).toEqual({
       EMPTY_VAR: '',
       ANOTHER_SAFE_VAR: 'value',
@@ -165,13 +170,13 @@ describe('sanitizeEnvironment', () => {
       NODE_ENV: 'development',
       APP_VERSION: '1.0.0',
     };
-    const sanitized = sanitizeEnvironment(env);
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
     expect(sanitized).toEqual(env);
   });
 
   it('should handle an empty environment', () => {
     const env = {};
-    const sanitized = sanitizeEnvironment(env);
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
     expect(sanitized).toEqual({});
   });
 
@@ -191,7 +196,7 @@ describe('sanitizeEnvironment', () => {
       // Allowed by name but redacted by value
       RANDOM_VAR: '-----BEGIN CERTIFICATE-----...',
     };
-    const sanitized = sanitizeEnvironment(env);
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
     expect(sanitized).toEqual({
       PATH: '/usr/bin',
       HOME: '/home/user',
@@ -216,5 +221,66 @@ describe('sanitizeEnvironment', () => {
     for (const pattern of NEVER_ALLOWED_VALUE_PATTERNS) {
       expect(pattern.flags).toContain('i');
     }
+  });
+
+  it('should allow variables specified in allowedEnvironmentVariables', () => {
+    const env = {
+      MY_TOKEN: 'secret-token',
+      OTHER_SECRET: 'another-secret',
+    };
+    const allowed = ['MY_TOKEN'];
+    const sanitized = sanitizeEnvironment(env, {
+      allowedEnvironmentVariables: allowed,
+      blockedEnvironmentVariables: [],
+    });
+    expect(sanitized).toEqual({
+      MY_TOKEN: 'secret-token',
+    });
+  });
+
+  it('should block variables specified in blockedEnvironmentVariables', () => {
+    const env = {
+      SAFE_VAR: 'safe-value',
+      BLOCKED_VAR: 'blocked-value',
+    };
+    const blocked = ['BLOCKED_VAR'];
+    const sanitized = sanitizeEnvironment(env, {
+      allowedEnvironmentVariables: [],
+      blockedEnvironmentVariables: blocked,
+    });
+    expect(sanitized).toEqual({
+      SAFE_VAR: 'safe-value',
+    });
+  });
+
+  it('should prioritize allowed over blocked if a variable is in both (though user configuration should avoid this)', () => {
+    const env = {
+      CONFLICT_VAR: 'value',
+    };
+    const allowed = ['CONFLICT_VAR'];
+    const blocked = ['CONFLICT_VAR'];
+    const sanitized = sanitizeEnvironment(env, {
+      allowedEnvironmentVariables: allowed,
+      blockedEnvironmentVariables: blocked,
+    });
+    expect(sanitized).toEqual({
+      CONFLICT_VAR: 'value',
+    });
+  });
+
+  it('should be case insensitive for allowed and blocked lists', () => {
+    const env = {
+      MY_TOKEN: 'secret-token',
+      BLOCKED_VAR: 'blocked-value',
+    };
+    const allowed = ['my_token'];
+    const blocked = ['blocked_var'];
+    const sanitized = sanitizeEnvironment(env, {
+      allowedEnvironmentVariables: allowed,
+      blockedEnvironmentVariables: blocked,
+    });
+    expect(sanitized).toEqual({
+      MY_TOKEN: 'secret-token',
+    });
   });
 });

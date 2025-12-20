@@ -12,6 +12,7 @@ import {
   SHELL_TOOL_NAMES,
   type ParsedCommandDetail,
 } from './shell-utils.js';
+import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 
 /**
  * Checks a shell command against security policies and allowlists.
@@ -47,7 +48,7 @@ export function checkCommandPermissions(
   blockReason?: string;
   isHardDenial?: boolean;
 } {
-  const parseResult = parseCommandDetails(command);
+  const parseResult = parseCommandDetails(command, config.sanitizationConfig);
   if (!parseResult || parseResult.hasError) {
     return {
       allAllowed: false,
@@ -210,6 +211,7 @@ export function isCommandAllowed(
 export function isShellInvocationAllowlisted(
   invocation: AnyToolInvocation,
   allowedPatterns: string[],
+  sanitizationConfig: EnvironmentSanitizationConfig,
 ): boolean {
   if (!allowedPatterns.length) {
     return false;
@@ -246,7 +248,7 @@ export function isShellInvocationAllowlisted(
 
   const command = commandValue.trim();
 
-  const parseResult = parseCommandDetails(command);
+  const parseResult = parseCommandDetails(command, sanitizationConfig);
   if (!parseResult || parseResult.hasError) {
     return false;
   }

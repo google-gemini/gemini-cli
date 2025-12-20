@@ -1449,7 +1449,11 @@ export class CoreToolScheduler {
     const toolName = typeof tool === 'string' ? tool : tool.name;
 
     if (SHELL_TOOL_NAMES.includes(toolName)) {
-      return isShellInvocationAllowlisted(invocation, allowedTools);
+      return isShellInvocationAllowlisted(
+        invocation,
+        allowedTools,
+        this.config.sanitizationConfig,
+      );
     }
 
     return doesToolInvocationMatch(tool, invocation, allowedTools);

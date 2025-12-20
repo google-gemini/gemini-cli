@@ -11,6 +11,7 @@ import { HookEventName, HookType } from './types.js';
 import type { HookConfig } from './types.js';
 import type { HookInput } from './types.js';
 import type { Readable, Writable } from 'node:stream';
+import type { Config } from '../config/config.js';
 
 // Mock type for the child_process spawn
 type MockChildProcessWithoutNullStreams = ChildProcessWithoutNullStreams & {
@@ -65,7 +66,14 @@ describe('HookRunner', () => {
   beforeEach(() => {
     vi.resetAllMocks();
 
-    hookRunner = new HookRunner();
+    const mockConfig = {
+      sanitizationConfig: {
+        allowedEnvironmentVariables: [],
+        blockedEnvironmentVariables: [],
+      },
+    } as unknown as Config;
+
+    hookRunner = new HookRunner(mockConfig);
 
     // Mock spawn with accessible mock functions
     const mockStdoutOn = vi.fn();

@@ -99,7 +99,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
-    const rootCommands = [...new Set(getCommandRoots(command))];
+    const rootCommands = [
+      ...new Set(getCommandRoots(command, this.config.sanitizationConfig)),
+    ];
 
     // In non-interactive mode, we need to prevent the tool from hanging while
     // waiting for user input. If a tool is not fully allowed (e.g. via
@@ -254,7 +256,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
           },
           combinedController.signal,
           this.config.getEnableInteractiveShell(),
-          { ...shellExecutionConfig, pager: 'cat' },
+          {
+            ...shellExecutionConfig,
+            pager: 'cat',
+            sanitizationConfig:
+              shellExecutionConfig?.sanitizationConfig ??
+              this.config.sanitizationConfig,
+          },
         );
 
       if (pid && setPidCallback) {
@@ -397,7 +405,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
     }
 
     const invocation = { params: { command } } as unknown as AnyToolInvocation;
-    return isShellInvocationAllowlisted(invocation, allowedTools);
+    return isShellInvocationAllowlisted(
+      invocation,
+      allowedTools,
+      this.config.sanitizationConfig,
+    );
   }
 }
 
@@ -494,7 +506,10 @@ export class ShellTool extends BaseDeclarativeTool<
       }
       return commandCheck.reason;
     }
-    if (getCommandRoots(params.command).length === 0) {
+    if (
+      getCommandRoots(params.command, this.config.sanitizationConfig).length ===
+      0
+    ) {
       return 'Could not identify command root to obtain permission from user.';
     }
     if (params.dir_path) {

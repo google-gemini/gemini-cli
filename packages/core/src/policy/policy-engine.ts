@@ -159,7 +159,10 @@ export class PolicyEngine {
           const command = (toolCall.args as { command?: string })?.command;
           if (command) {
             await initializeShellParsers();
-            const subCommands = splitCommands(command);
+            const subCommands = splitCommands(command, {
+              allowedEnvironmentVariables: [],
+              blockedEnvironmentVariables: [],
+            });
 
             // If there are multiple sub-commands, we must verify EACH of them matches an ALLOW rule.
             // If any sub-command results in DENY -> the whole thing is DENY.

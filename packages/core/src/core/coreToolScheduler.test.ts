@@ -251,6 +251,10 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getShellExecutionConfig: () => ({
       terminalWidth: 90,
       terminalHeight: 30,
+      sanitizationConfig: {
+        allowedEnvironmentVariables: [],
+        blockedEnvironmentVariables: [],
+      },
     }),
     storage: {
       getProjectTempDir: () => '/tmp',
@@ -1444,6 +1448,10 @@ describe('CoreToolScheduler request queueing', () => {
       getShellExecutionConfig: () => ({
         terminalWidth: 80,
         terminalHeight: 24,
+        sanitizationConfig: {
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+        },
       }),
       isInteractive: () => false,
     });
@@ -1513,6 +1521,7 @@ describe('CoreToolScheduler request queueing', () => {
           params: { command: 'git status && rm -rf /tmp/should-not-run' },
         } as unknown as AnyToolInvocation,
         ['run_shell_command(git)'],
+        { allowedEnvironmentVariables: [], blockedEnvironmentVariables: [] },
       ),
     ).toBe(false);
 
@@ -1556,6 +1565,10 @@ describe('CoreToolScheduler request queueing', () => {
       getShellExecutionConfig: () => ({
         terminalWidth: 80,
         terminalHeight: 24,
+        sanitizationConfig: {
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+        },
       }),
       getToolRegistry: () => toolRegistry,
       getHookSystem: () => undefined,
