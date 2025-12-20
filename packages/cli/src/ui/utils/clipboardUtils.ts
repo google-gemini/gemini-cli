@@ -891,6 +891,42 @@ export async function cleanupOldClipboardImages(
 }
 
 /**
+ * Gets clipboard text content
+ */
+export async function getClipboardText(): Promise<string | null> {
+  try {
+    if (process.platform === 'darwin') {
+      const { stdout } = await execAsync('pbpaste', {
+        maxBuffer: 50 * 1024 * 1024,
+      });
+      return stdout;
+    } else if (process.platform === 'win32') {
+      const { stdout } = await execAsync(
+        'powershell -Command "Get-Clipboard"',
+        { maxBuffer: 50 * 1024 * 1024 },
+      );
+      return stdout.trim();
+    } else if (process.platform === 'linux') {
+      try {
+        const { stdout } = await execAsync('xclip -selection clipboard -o', {
+          maxBuffer: 50 * 1024 * 1024,
+        });
+        return stdout;
+      } catch {
+        const { stdout } = await execAsync('xsel --clipboard --output', {
+          maxBuffer: 50 * 1024 * 1024,
+        });
+        return stdout;
+      }
+    }
+    return null;
+  } catch (error) {
+    debugLogger.error('Failed to get clipboard text:', error);
+    return null;
+  }
+}
+
+/**
  * Matches strings that start with a path prefix (/, ~, ., Windows drive letter, or UNC path)
  */
 const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;

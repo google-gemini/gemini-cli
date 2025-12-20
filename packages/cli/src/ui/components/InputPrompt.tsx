@@ -34,6 +34,7 @@ import {
   clipboardHasImage,
   saveClipboardImageDetailed,
   cleanupOldClipboardImages,
+  getClipboardText,
 } from '../utils/clipboardUtils.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
@@ -326,7 +327,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     try {
       const hasImage = await clipboardHasImage();
       if (!hasImage) {
-        console.log('No image found in clipboard');
+        console.log('No image found in clipboard, trying text paste');
+        // Fallback to text paste
+        try {
+          const text = await getClipboardText();
+          if (text) {
+            buffer.insert(text);
+            return true;
+          }
+        } catch (error) {
+          console.error('Failed to paste text from clipboard', error);
+        }
         return false;
       }
 
