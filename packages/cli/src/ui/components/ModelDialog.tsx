@@ -11,10 +11,12 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_MODEL_PRO_ONLY,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_MODEL_PRO_ONLY,
   ModelSlashCommandEvent,
   logModelSlashCommand,
   getDisplayString,
@@ -76,6 +78,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         key: DEFAULT_GEMINI_MODEL_AUTO,
       },
       {
+        value: DEFAULT_GEMINI_MODEL_PRO_ONLY,
+        title: getDisplayString(DEFAULT_GEMINI_MODEL_PRO_ONLY),
+        description:
+          'Always use gemini-2.5-pro (no automatic switching to flash)',
+        key: DEFAULT_GEMINI_MODEL_PRO_ONLY,
+      },
+      {
         value: 'Manual',
         title: manualModelSelected
           ? `Manual (${manualModelSelected})`
@@ -86,13 +95,22 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     ];
 
     if (shouldShowPreviewModels) {
-      list.unshift({
-        value: PREVIEW_GEMINI_MODEL_AUTO,
-        title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
-        description:
-          'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
-        key: PREVIEW_GEMINI_MODEL_AUTO,
-      });
+      list.unshift(
+        {
+          value: PREVIEW_GEMINI_MODEL_AUTO,
+          title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
+          description:
+            'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
+          key: PREVIEW_GEMINI_MODEL_AUTO,
+        },
+        {
+          value: PREVIEW_GEMINI_MODEL_PRO_ONLY,
+          title: getDisplayString(PREVIEW_GEMINI_MODEL_PRO_ONLY),
+          description:
+            'Always use gemini-3-pro (no automatic switching to flash)',
+          key: PREVIEW_GEMINI_MODEL_PRO_ONLY,
+        },
+      );
     }
     return list;
   }, [shouldShowPreviewModels, manualModelSelected]);

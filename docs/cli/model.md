@@ -19,14 +19,18 @@ Use the following command in Gemini CLI:
 
 Running this command will open a dialog with your options:
 
-| Option            | Description                                                    | Models                                                                 |
-| ----------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Auto (Gemini 3)   | Let the system choose the best Gemini 3 model for your task.   | gemini-3-pro-preview (if enabled), gemini-3-flash-preview (if enabled) |
-| Auto (Gemini 2.5) | Let the system choose the best Gemini 2.5 model for your task. | gemini-2.5-pro, gemini-2.5-flash                                       |
-| Manual            | Select a specific model.                                       | Any available model.                                                   |
+| Option            | Description                                                                    | Models                                                                 |
+| ----------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| Auto (Gemini 3)   | Let the system choose the best Gemini 3 model for your task.                   | gemini-3-pro-preview (if enabled), gemini-3-flash-preview (if enabled) |
+| Pro (Gemini 3)    | Always use gemini-3-pro-preview (no automatic switching to flash, if enabled). | gemini-3-pro-preview (if enabled)                                      |
+| Auto (Gemini 2.5) | Let the system choose the best Gemini 2.5 model for your task.                 | gemini-2.5-pro, gemini-2.5-flash                                       |
+| Pro (Gemini 2.5)  | Always use gemini-2.5-pro (no automatic switching to flash).                   | gemini-2.5-pro                                                         |
+| Manual            | Select a specific model.                                                       | Any available model.                                                   |
 
 We recommend selecting one of the above **Auto** options. However, you can
-select **Manual** to select a specific model from those available.
+select **Pro** options for critical tasks where you want to ensure consistent
+use of the Pro model throughout long sessions, or select **Manual** to choose a
+specific model from those available.
 
 ### Gemini 3 and preview features
 
@@ -52,10 +56,17 @@ Gemini CLI.
   application could include a mix of complex tasks (building architecture and
   scaffolding the project) and simple tasks (generating CSS).
 
-- **Switch to Pro if you aren't getting the results you want.** If you think you
-  need your model to be a little "smarter," you can manually select Pro. Pro
-  will provide you with the highest levels of reasoning and creativity. Example:
-  A complex or multi-stage debugging task.
+- **Use Pro-only mode for critical or long sessions.** If you're working on
+  extended sessions (20+ prompts) or mission-critical tasks where consistency is
+  paramount, the Pro options ensure the system always uses the Pro model without
+  ever switching to Flash. This prevents potential issues from Flash models
+  being selected at inopportune times. Example: A complex refactoring task
+  spanning multiple files over a long conversation.
+
+- **Switch to Manual/Pro if you aren't getting the results you want.** If you
+  think you need your model to be a little "smarter," you can manually select
+  Pro. Pro will provide you with the highest levels of reasoning and creativity.
+  Example: A complex or multi-stage debugging task.
 
 - **Switch to Flash or Flash-Lite if you need faster results.** If you need a
   simple response quickly, Flash or Flash-Lite is the best option. Example:

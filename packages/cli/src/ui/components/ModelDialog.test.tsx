@@ -12,10 +12,12 @@ import { KeypressProvider } from '../contexts/KeypressContext.js';
 import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_MODEL_PRO_ONLY,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_MODEL_PRO_ONLY,
 } from '@google/gemini-cli-core';
 import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
 
@@ -70,6 +72,8 @@ describe('<ModelDialog />', () => {
     mockGetDisplayString.mockImplementation((val: string) => {
       if (val === 'auto-gemini-2.5') return 'Auto (Gemini 2.5)';
       if (val === 'auto-gemini-3') return 'Auto (Preview)';
+      if (val === 'pro-only-gemini-2.5') return 'Pro (Gemini 2.5)';
+      if (val === 'pro-only-gemini-3') return 'Pro (Gemini 3)';
       return val;
     });
   });
@@ -103,8 +107,11 @@ describe('<ModelDialog />', () => {
   it('switches to "manual" view when "Manual" is selected', async () => {
     const { lastFrame, stdin } = renderComponent();
 
-    // Select "Manual" (index 1)
-    // Press down arrow to move to "Manual"
+    // Select "Manual" (index 2: Auto, Pro, Manual)
+    // Press down arrow to move to Pro
+    stdin.write('\u001B[B'); // Arrow Down
+    await waitForUpdate();
+    // Press down arrow to move to Manual
     stdin.write('\u001B[B'); // Arrow Down
     await waitForUpdate();
 
@@ -124,8 +131,12 @@ describe('<ModelDialog />', () => {
     mockGetModel.mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
     const { lastFrame, stdin } = renderComponent();
 
-    // Select "Manual" (index 2 because Preview Auto is first, then Auto (Gemini 2.5))
-    // Press down enough times to ensure we reach the bottom (Manual)
+    // Select "Manual" (index 4: Auto Gemini 3, Pro Gemini 3, Auto Gemini 2.5, Pro Gemini 2.5, Manual)
+    // Press down enough times to ensure we reach Manual
+    stdin.write('\u001B[B'); // Arrow Down
+    await waitForUpdate();
+    stdin.write('\u001B[B'); // Arrow Down
+    await waitForUpdate();
     stdin.write('\u001B[B'); // Arrow Down
     await waitForUpdate();
     stdin.write('\u001B[B'); // Arrow Down
@@ -152,7 +163,9 @@ describe('<ModelDialog />', () => {
   it('sets model and closes when a model is selected in "manual" view', async () => {
     const { stdin } = renderComponent();
 
-    // Navigate to Manual (index 1) and select
+    // Navigate to Manual (index 2: Auto, Pro, Manual) and select
+    stdin.write('\u001B[B');
+    await waitForUpdate();
     stdin.write('\u001B[B');
     await waitForUpdate();
     stdin.write('\r');
@@ -178,7 +191,9 @@ describe('<ModelDialog />', () => {
   it('goes back to "main" view on escape in "manual" view', async () => {
     const { lastFrame, stdin } = renderComponent();
 
-    // Go to manual view
+    // Go to manual view (index 2)
+    stdin.write('\u001B[B');
+    await waitForUpdate();
     stdin.write('\u001B[B');
     await waitForUpdate();
     stdin.write('\r');
@@ -238,6 +253,49 @@ describe('<ModelDialog />', () => {
       const { lastFrame } = renderComponent();
       expect(lastFrame()).not.toContain('Gemini 3 is now available.');
       expect(lastFrame()).not.toContain('Gemini 3 is coming soon.');
+    });
+  });
+
+  describe('Pro-only mode', () => {
+    it('shows Pro (Gemini 2.5) option in main menu', () => {
+      const { lastFrame } = renderComponent();
+      expect(lastFrame()).toContain('Pro (Gemini 2.5)');
+    });
+
+    it('shows Pro (Gemini 3) option when preview features are enabled', () => {
+      mockGetHasAccessToPreviewModel.mockReturnValue(true);
+      mockGetPreviewFeatures.mockReturnValue(true);
+      const { lastFrame } = renderComponent();
+      expect(lastFrame()).toContain('Pro (Gemini 3)');
+    });
+
+    it('sets pro-only-gemini-2.5 when Pro (Gemini 2.5) is selected', async () => {
+      const { stdin } = renderComponent();
+
+      stdin.write('\u001B[B');
+      await waitForUpdate();
+
+      stdin.write('\r');
+      await waitForUpdate();
+
+      expect(mockSetModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL_PRO_ONLY);
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+
+    it('sets pro-only-gemini-3 when Pro (Gemini 3) is selected', async () => {
+      mockGetHasAccessToPreviewModel.mockReturnValue(true);
+      mockGetPreviewFeatures.mockReturnValue(true);
+      mockGetModel.mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
+      const { stdin } = renderComponent();
+
+      stdin.write('\u001B[B');
+      await waitForUpdate();
+
+      stdin.write('\r');
+      await waitForUpdate();
+
+      expect(mockSetModel).toHaveBeenCalledWith(PREVIEW_GEMINI_MODEL_PRO_ONLY);
+      expect(mockOnClose).toHaveBeenCalled();
     });
   });
 });

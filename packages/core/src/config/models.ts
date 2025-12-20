@@ -21,6 +21,9 @@ export const VALID_GEMINI_MODELS = new Set([
 export const PREVIEW_GEMINI_MODEL_AUTO = 'auto-gemini-3';
 export const DEFAULT_GEMINI_MODEL_AUTO = 'auto-gemini-2.5';
 
+export const PREVIEW_GEMINI_MODEL_PRO_ONLY = 'pro-only-gemini-3';
+export const DEFAULT_GEMINI_MODEL_PRO_ONLY = 'pro-only-gemini-2.5';
+
 // Model aliases for user convenience.
 export const GEMINI_MODEL_ALIAS_AUTO = 'auto';
 export const GEMINI_MODEL_ALIAS_PRO = 'pro';
@@ -49,6 +52,12 @@ export function resolveModel(
       return PREVIEW_GEMINI_MODEL;
     }
     case DEFAULT_GEMINI_MODEL_AUTO: {
+      return DEFAULT_GEMINI_MODEL;
+    }
+    case PREVIEW_GEMINI_MODEL_PRO_ONLY: {
+      return PREVIEW_GEMINI_MODEL;
+    }
+    case DEFAULT_GEMINI_MODEL_PRO_ONLY: {
       return DEFAULT_GEMINI_MODEL;
     }
     case GEMINI_MODEL_ALIAS_PRO: {
@@ -124,6 +133,10 @@ export function getDisplayString(
       return 'Auto (Gemini 3)';
     case DEFAULT_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 2.5)';
+    case PREVIEW_GEMINI_MODEL_PRO_ONLY:
+      return 'Pro (Gemini 3)';
+    case DEFAULT_GEMINI_MODEL_PRO_ONLY:
+      return 'Pro (Gemini 2.5)';
     case GEMINI_MODEL_ALIAS_PRO:
       return `Manual (${
         previewFeaturesEnabled ? PREVIEW_GEMINI_MODEL : DEFAULT_GEMINI_MODEL
