@@ -741,6 +741,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`security.allowedEnvironmentVariables`** (array):
+  - **Description:** Environment variables to always allow (bypass redaction).
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
+- **`security.blockedEnvironmentVariables`** (array):
+  - **Description:** Environment variables to always redact.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 - **`security.auth.selectedType`** (string):
   - **Description:** The currently selected authentication type.
   - **Default:** `undefined`

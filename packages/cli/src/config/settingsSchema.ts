@@ -1193,6 +1193,27 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      allowedEnvironmentVariables: {
+        type: 'array',
+        label: 'Allowed Environment Variables',
+        category: 'Security',
+        requiresRestart: true,
+        default: [] as string[],
+        description:
+          'Environment variables to always allow (bypass redaction).',
+        showInDialog: false,
+        items: { type: 'string' },
+      },
+      blockedEnvironmentVariables: {
+        type: 'array',
+        label: 'Blocked Environment Variables',
+        category: 'Security',
+        requiresRestart: true,
+        default: [] as string[],
+        description: 'Environment variables to always redact.',
+        showInDialog: false,
+        items: { type: 'string' },
+      },
       auth: {
         type: 'object',
         label: 'Authentication',
