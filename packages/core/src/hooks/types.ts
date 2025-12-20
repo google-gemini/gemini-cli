@@ -16,7 +16,16 @@ import type {
   HookToolConfig,
 } from './hookTranslator.js';
 import { defaultHookTranslator } from './hookTranslator.js';
-import type { ConfigSource } from './hookRegistry.js';
+
+/**
+ * Configuration source levels in precedence order (highest to lowest)
+ */
+export enum ConfigSource {
+  Project = 'project',
+  User = 'user',
+  System = 'system',
+  Extensions = 'extensions',
+}
 
 /**
  * Event names for the hook system

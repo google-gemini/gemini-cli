@@ -6,8 +6,7 @@
 
 import { spawn } from 'node:child_process';
 import type { HookConfig } from './types.js';
-import { HookEventName } from './types.js';
-import { ConfigSource } from './hookRegistry.js';
+import { HookEventName, ConfigSource } from './types.js';
 import type { Config } from '../config/config.js';
 import type {
   HookInput,
@@ -36,9 +35,9 @@ const EXIT_CODE_NON_BLOCKING_ERROR = 1;
  * Hook runner that executes command hooks
  */
 export class HookRunner {
-  private readonly config?: Config;
+  private readonly config: Config;
 
-  constructor(config?: Config) {
+  constructor(config: Config) {
     this.config = config;
   }
 
@@ -55,7 +54,6 @@ export class HookRunner {
     // Secondary security check: Ensure project hooks are not executed in untrusted folders
     if (
       hookConfig.source === ConfigSource.Project &&
-      this.config &&
       !this.config.isTrustedFolder()
     ) {
       const errorMessage =

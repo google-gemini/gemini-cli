@@ -6,9 +6,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
-import { HookRegistry, ConfigSource } from './hookRegistry.js';
+import { HookRegistry } from './hookRegistry.js';
 import type { Storage } from '../config/storage.js';
-import { HookEventName, HookType } from './types.js';
+import { ConfigSource, HookEventName, HookType } from './types.js';
 import type { Config } from '../config/config.js';
 import type { HookDefinition } from './types.js';
 

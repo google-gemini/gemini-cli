@@ -6,18 +6,8 @@
 
 import type { Config } from '../config/config.js';
 import type { HookDefinition, HookConfig } from './types.js';
-import { HookEventName } from './types.js';
+import { HookEventName, ConfigSource } from './types.js';
 import { debugLogger } from '../utils/debugLogger.js';
-
-/**
- * Configuration source levels in precedence order (highest to lowest)
- */
-export enum ConfigSource {
-  Project = 'project',
-  User = 'user',
-  System = 'system',
-  Extensions = 'extensions',
-}
 
 /**
  * Hook registry entry with source information
@@ -110,12 +100,14 @@ export class HookRegistry {
   private processHooksFromConfig(): void {
     // Get hooks from the main config (this comes from the merged settings)
     const configHooks = this.config.getHooks();
-    if (configHooks && this.config.isTrustedFolder()) {
-      this.processHooksConfiguration(configHooks, ConfigSource.Project);
-    } else {
-      debugLogger.warn(
-        'Project hooks disabled because the folder is not trusted.',
-      );
+    if (configHooks) {
+      if (this.config.isTrustedFolder()) {
+        this.processHooksConfiguration(configHooks, ConfigSource.Project);
+      } else {
+        debugLogger.warn(
+          'Project hooks disabled because the folder is not trusted.',
+        );
+      }
     }
 
     // Get hooks from extensions

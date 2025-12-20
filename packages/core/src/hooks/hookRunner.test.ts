@@ -12,7 +12,7 @@ import type { HookConfig } from './types.js';
 import type { HookInput } from './types.js';
 import type { Readable, Writable } from 'node:stream';
 import type { Config } from '../config/config.js';
-import { ConfigSource } from './hookRegistry.js';
+import { ConfigSource } from './types.js';
 
 // Mock type for the child_process spawn
 type MockChildProcessWithoutNullStreams = ChildProcessWithoutNullStreams & {
