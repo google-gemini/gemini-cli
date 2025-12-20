@@ -26,7 +26,18 @@ export class ClipboardTestHelpers {
     try {
       if (platform === 'win32') {
         // Windows
-        await execAsync(`echo ${JSON.stringify(text)} | clip`);
+        const proc = exec('clip');
+        proc.stdin?.write(text);
+        proc.stdin?.end();
+        await new Promise((resolve, reject) => {
+          proc.on('close', (code) => {
+            if (code === 0) resolve(undefined);
+            else reject(new Error(`clip exited with code ${code}`));
+          });
+          proc.on('error', reject);
+          // Add timeout to prevent hanging
+          setTimeout(() => reject(new Error('clip timed out')), 5000);
+        });
       } else if (platform === 'darwin') {
         // macOS
         const proc = exec('pbcopy');
