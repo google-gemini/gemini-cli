@@ -7,6 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
+import { theme } from '../../semantic-colors.js';
 
 interface HooksListProps {
   hooks: ReadonlyArray<{
@@ -28,10 +29,15 @@ interface HooksListProps {
 export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
   if (hooks.length === 0) {
     return (
-      <Box flexDirection="column" marginTop={1} marginBottom={1}>
-        <Box marginTop={1}>
-          <Text>No hooks configured.</Text>
-        </Box>
+      <Box
+        borderStyle="round"
+        borderColor={theme.border.default}
+        flexDirection="column"
+        padding={1}
+        marginY={1}
+        width="100%"
+      >
+        <Text color={theme.text.primary}>No hooks configured.</Text>
       </Box>
     );
   }
@@ -49,7 +55,15 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
   );
 
   return (
-    <Box flexDirection="column" marginTop={1} marginBottom={1}>
+    <Box
+      borderStyle="round"
+      borderColor={theme.border.default}
+      flexDirection="column"
+      padding={1}
+      marginY={1}
+      width="100%"
+    >
+      <Box marginBottom={1}>
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.status.warning} bold underline>
           ⚠️ Security Warning:
@@ -68,14 +82,19 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
       </Box>
 
       <Box marginTop={1}>
-        <Text bold>Configured Hooks:</Text>
+          <Text bold color={theme.text.accent}>
+          Configured Hooks
+        </Text>
       </Box>
-      <Box flexDirection="column" paddingLeft={2} marginTop={1}>
+      </Box>
+      <Box flexDirection="column" marginTop={1}>
         {Object.entries(hooksByEvent).map(([eventName, eventHooks]) => (
           <Box key={eventName} flexDirection="column" marginBottom={1}>
-            <Text color={theme.text.accent} bold>
-              {eventName}:
-            </Text>
+            <Box marginBottom={1}>
+              <Text bold color={theme.text.link}>
+                {eventName}
+              </Text>
+            </Box>
             <Box flexDirection="column" paddingLeft={2}>
               {eventHooks.map((hook, index) => {
                 const hookName =
@@ -83,21 +102,30 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
                 const statusColor = hook.enabled
                   ? theme.status.success
                   : theme.text.secondary;
+                const statusColor = hook.enabled
+                  ? theme.status.success
+                  : theme.text.secondary;
                 const statusText = hook.enabled ? 'enabled' : 'disabled';
 
                 return (
-                  <Box key={`${eventName}-${index}`} flexDirection="column">
-                    <Box>
-                      <Text>
-                        <Text color={theme.text.accent}>{hookName}</Text>
-                        <Text color={statusColor}>{` [${statusText}]`}</Text>
+                  <Box
+                    key={`${eventName}-${index}`}
+                    flexDirection="column"
+                    marginBottom={1}
+                  >
+                    <Box flexDirection="row" marginBottom={0.5}>
+                      <Text color={theme.text.accent} bold>
+                        {hookName}
                       </Text>
+                      <Text color={statusColor}>{` [${statusText}]`}</Text>
                     </Box>
                     <Box paddingLeft={2} flexDirection="column">
                       {hook.config.description && (
-                        <Text italic>{hook.config.description}</Text>
+                        <Text color={theme.text.primary} italic>
+                          {hook.config.description}
+                        </Text>
                       )}
-                      <Text dimColor>
+                      <Text color={theme.text.secondary}>
                         Source: {hook.source}
                         {hook.config.name &&
                           hook.config.command &&
