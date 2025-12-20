@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 // No longer using uuid
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Takes a screenshot and saves it to the specified directory
@@ -30,22 +30,22 @@ export async function takeScreenshot(
     const displayName = `screenshot-${timestamp.split('T')[0]}`;
 
     if (process.platform === 'darwin') {
-      // macOS - escape double quotes for shell
-      // Escape backslashes first, then double quotes
-      const safePath = filePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      await execAsync(`screencapture -x "${safePath}"`);
+      // macOS
+      await execFileAsync('screencapture', ['-x', filePath]);
     } else if (process.platform === 'win32') {
-      // Windows - escape single quotes for PowerShell
-      const safePath = filePath.replace(/'/g, "''");
-      await execAsync(
-        `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{PRTSC}'); $image = [System.Windows.Forms.Clipboard]::GetImage(); if ($image) { $image.Save('${safePath}', [System.Drawing.Imaging.ImageFormat]::Png) }"`,
-      );
+      // Windows
+      await execFileAsync('powershell', [
+        '-NoProfile',
+        '-Command',
+        "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{PRTSC}'); $image = [System.Windows.Forms.Clipboard]::GetImage(); if ($image) { $image.Save($args[0], [System.Drawing.Imaging.ImageFormat]::Png) }",
+        filePath,
+      ]);
     } else if (process.platform === 'linux') {
       // Linux - requires scrot or gnome-screenshot
       try {
-        await execAsync(`gnome-screenshot -f "${filePath}"`);
+        await execFileAsync('gnome-screenshot', ['-f', filePath]);
       } catch {
-        await execAsync(`scrot -s "${filePath}"`);
+        await execFileAsync('scrot', ['-s', filePath]);
       }
     } else {
       console.error('Screenshot not supported on this platform');
@@ -79,23 +79,28 @@ export async function copyImageToClipboard(filePath: string): Promise<boolean> {
     if (process.platform === 'darwin') {
       // Escape double quotes and backslashes for AppleScript
       const safePath = filePath.replace(/[\\"]/g, '\\$&');
-      await execAsync(
-        `osascript -e 'set the clipboard to (read (POSIX file "${safePath}") as {«class PNGf», picture} as alias)'`,
-      );
+      await execFileAsync('osascript', [
+        '-e',
+        `set the clipboard to (read (POSIX file "${safePath}") as {«class PNGf», picture} as alias)`,
+      ]);
       return true;
     } else if (process.platform === 'win32') {
-      // Escape single quotes for PowerShell
-      const safePath = filePath.replace(/'/g, "''");
-      await execAsync(
-        `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::SetImage([System.Drawing.Image]::FromFile('${safePath}'))"`,
-      );
+      await execFileAsync('powershell', [
+        '-NoProfile',
+        '-Command',
+        'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::SetImage([System.Drawing.Image]::FromFile($args[0]))',
+        filePath,
+      ]);
       return true;
     } else if (process.platform === 'linux') {
-      // Escape double quotes and backslashes for shell
-      const safePath = filePath.replace(/(["$`\\])/g, '\\$1');
-      await execAsync(
-        `xclip -selection clipboard -t image/png -i "${safePath}"`,
-      );
+      await execFileAsync('xclip', [
+        '-selection',
+        'clipboard',
+        '-t',
+        'image/png',
+        '-i',
+        filePath,
+      ]);
       return true;
     }
     console.warn('Clipboard copy not supported on this platform');

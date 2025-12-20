@@ -93,10 +93,9 @@ export class ClipboardTestHelpers {
         await execFileAsync('powershell', [
           '-NoProfile',
           '-Command',
-          "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::SetImage([System.Drawing.Image]::FromFile($args[0]))",
+          'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::SetImage([System.Drawing.Image]::FromFile($args[0]))',
           absolutePath,
         ]);
-
       } else if (platform === 'darwin') {
         // macOS - use osascript with path as argument to prevent injection
         await execFileAsync('osascript', [

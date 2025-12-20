@@ -518,7 +518,7 @@ export async function saveClipboardImageDetailed(
           return result
         `;
 
-        const { stdout } = await execAsync(`osascript -e '${script}'`);
+        const { stdout } = await execFileAsync('osascript', ['-e', script]);
         const result = stdout.trim();
 
         if (result === 'success') {
@@ -548,16 +548,15 @@ export async function saveClipboardImageDetailed(
         tempDir,
         `clipboard-${timestamp}-${randomString}.png`,
       );
-      // In PowerShell, a single quote within a single-quoted string is escaped by doubling it.
-      const escapedPath = tempFilePath.replace(/'/g, "''");
       // First try with the standard approach
       const powershellCommand = `
+        param([string]$outputPath)
         try {
           Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop;
           if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
             $img = [System.Windows.Forms.Clipboard]::GetImage();
             if ($img) {
-              $img.Save('${escapedPath}', [System.Drawing.Imaging.ImageFormat]::Png);
+              $img.Save($outputPath, [System.Drawing.Imaging.ImageFormat]::Png);
               "success";
               exit 0;
             }
@@ -599,10 +598,18 @@ export async function saveClipboardImageDetailed(
 
       try {
         // First try with the standard approach
-        result = await execAsync(
-          `powershell -ExecutionPolicy Bypass -NoProfile -Command "& {${powershellCommand}}"`,
+        result = await execFileAsync(
+          'powershell.exe',
+          [
+            '-ExecutionPolicy',
+            'Bypass',
+            '-NoProfile',
+            '-Command',
+            powershellCommand,
+            '-outputPath',
+            tempFilePath,
+          ],
           {
-            shell: 'powershell.exe',
             maxBuffer: 10 * 1024 * 1024,
           },
         );
