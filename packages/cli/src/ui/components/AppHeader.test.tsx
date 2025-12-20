@@ -13,9 +13,21 @@ vi.mock('../utils/terminalSetup.js', () => ({
   getTerminalProgram: () => null,
 }));
 
+vi.mock('../../utils/persistentState.js', () => ({
+  persistentState: {
+    get: vi.fn().mockReturnValue({}),
+    set: vi.fn(),
+  },
+}));
+
+import { persistentState } from '../../utils/persistentState.js';
+
 describe('<AppHeader />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (
+      persistentState.get as unknown as ReturnType<typeof vi.fn>
+    ).mockReturnValue({});
   });
 
   it('should render the banner with default text', () => {
@@ -127,6 +139,34 @@ describe('<AppHeader />', () => {
     );
 
     expect(lastFrame()).not.toContain('First line\\nSecond line');
+    unmount();
+  });
+
+  it('should not render the banner if shown count exceeds limit', () => {
+    (
+      persistentState.get as unknown as ReturnType<typeof vi.fn>
+    ).mockReturnValue({
+      e1a84b6fb88e50f1a51826f94630ca087a6a6504b409948344fcb67f8569a72c: 20,
+    });
+    const mockConfig = makeFakeConfig();
+    const uiState = {
+      banner: {
+        bannerText: {
+          title: 'Standard Banner',
+          body: '',
+        },
+        isWarning: false,
+      },
+      bannerVisible: true,
+    };
+
+    const { lastFrame, unmount } = renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      { config: mockConfig, uiState },
+    );
+
+    expect(lastFrame()).not.toContain('Standard Banner');
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 });
