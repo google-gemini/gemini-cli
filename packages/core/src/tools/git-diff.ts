@@ -10,16 +10,13 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { GIT_DIFF_TOOL_NAME } from './tool-names.js';
 import {
   getGitDiff,
-  getGitFileLists,
+  formatGitDiffOutput,
   type GitDiffOptions,
+  type FileDiffInfo,
 } from '../utils/git-diff-utils.js';
 import type { Config } from '../config/config.js';
 import { ToolErrorType } from './tool-error.js';
-import type {
-  AnsiOutput,
-  AnsiToken,
-  AnsiLine,
-} from '../utils/terminalSerializer.js';
+import { simpleGit, type SimpleGit } from 'simple-git';
 
 export interface GitDiffToolParams {
   /**
@@ -33,16 +30,6 @@ export interface GitDiffToolParams {
    * Optional array of file paths to limit the diff to specific files.
    */
   paths?: string[];
-}
-
-interface FileDiffInfo {
-  status: 'A' | 'M' | 'D' | 'R';
-  filePath: string;
-  added: number;
-  removed: number;
-  isStaged: boolean;
-  hasBothStagedAndUnstaged: boolean;
-  unstagedStatus?: 'A' | 'M' | 'D' | 'R';
 }
 
 class GitDiffToolInvocation extends BaseToolInvocation<
@@ -165,18 +152,39 @@ class GitDiffToolInvocation extends BaseToolInvocation<
     return files;
   }
 
+  /**
+   * Converts a git status code to our status type.
+   */
+  private getStatusFromCode(code: string): 'A' | 'M' | 'D' | 'R' {
+    if (code === 'A' || code.startsWith('A')) return 'A';
+    if (code === 'D' || code.startsWith('D')) return 'D';
+    if (code === 'R' || code.startsWith('R')) return 'R';
+    return 'M'; // Modified or any other change
+  }
+
   async execute(
     _signal: AbortSignal,
     _updateOutput?: (output: string) => void,
   ): Promise<ToolResult> {
-    const options: GitDiffOptions = {
-      staged: this.params.staged,
-      paths: this.params.paths,
-    };
-
-    const result = await getGitDiff(this.config, options);
-
-    if (result === null) {
+    const targetDir = this.config.getTargetDir();
+    const git: SimpleGit = simpleGit(targetDir);
+    let status;
+    try {
+      const isRepo = await git.checkIsRepo();
+      if (!isRepo) {
+        return {
+          llmContent:
+            'Not in a Git repository. The current directory is not a Git repository.',
+          returnDisplay:
+            'Not in a Git repository. The current directory is not a Git repository.',
+          error: {
+            message: 'Not in a Git repository',
+            type: ToolErrorType.GIT_NOT_REPO,
+          },
+        };
+      }
+      status = await git.status();
+    } catch {
       return {
         llmContent:
           'Not in a Git repository. The current directory is not a Git repository.',
@@ -189,7 +197,70 @@ class GitDiffToolInvocation extends BaseToolInvocation<
       };
     }
 
-    if (!result.hasChanges) {
+    // Build file lists from status.files
+    const stagedFiles = new Set<string>();
+    const unstagedFiles = new Set<string>();
+    const fileStatusMap = new Map<
+      string,
+      { staged?: 'A' | 'M' | 'D' | 'R'; unstaged?: 'A' | 'M' | 'D' | 'R' }
+    >();
+
+    for (const file of status.files) {
+      const filePath = file.path;
+      const hasStaged = file.index.trim() && file.index !== '?';
+      const hasUnstaged = file.working_dir.trim() && file.working_dir !== '?';
+
+      if (hasStaged) {
+        stagedFiles.add(filePath);
+        fileStatusMap.set(filePath, {
+          ...fileStatusMap.get(filePath),
+          staged: this.getStatusFromCode(file.index),
+        });
+      }
+
+      if (hasUnstaged) {
+        unstagedFiles.add(filePath);
+        fileStatusMap.set(filePath, {
+          ...fileStatusMap.get(filePath),
+          unstaged: this.getStatusFromCode(file.working_dir),
+        });
+      }
+    }
+
+    // Filter files based on staged parameter
+    let relevantFiles: string[] = [];
+    if (this.params.staged === true) {
+      relevantFiles = Array.from(stagedFiles);
+    } else if (this.params.staged === false) {
+      relevantFiles = Array.from(unstagedFiles);
+    } else {
+      // All changes: union of staged and unstaged
+      relevantFiles = Array.from(new Set([...stagedFiles, ...unstagedFiles]));
+    }
+
+    if (relevantFiles.length === 0) {
+      const noDiffMessage =
+        this.params.staged === true
+          ? 'No staged changes to show.'
+          : this.params.staged === false
+            ? 'No unstaged changes to show.'
+            : 'No changes to show.';
+
+      return {
+        llmContent: noDiffMessage,
+        returnDisplay: noDiffMessage,
+      };
+    }
+
+    // Make a single git diff call
+    const options: GitDiffOptions = {
+      staged: this.params.staged,
+      paths: this.params.paths,
+    };
+
+    const result = await getGitDiff(this.config, options);
+
+    if (result === null || !result.hasChanges) {
       const noDiffMessage =
         this.params.staged === true
           ? 'No staged changes to show.'
@@ -213,26 +284,7 @@ class GitDiffToolInvocation extends BaseToolInvocation<
     const header = `${diffType} changes diff:\n\n`;
     const llmContent = header + result.diff;
 
-    const fileLists = await getGitFileLists(this.config);
-    let stagedFiles = new Set<string>();
-    let unstagedFiles = new Set<string>();
     const defaultStaged = this.params.staged ?? false;
-
-    if (fileLists) {
-      stagedFiles = new Set(fileLists.staged);
-      unstagedFiles = new Set(fileLists.unstaged);
-    }
-
-    let stagedDiff: string | null = null;
-    let unstagedDiff: string | null = null;
-
-    if (this.params.staged === undefined) {
-      const stagedResult = await getGitDiff(this.config, { staged: true });
-      const unstagedResult = await getGitDiff(this.config, { staged: false });
-      stagedDiff = stagedResult?.diff ?? null;
-      unstagedDiff = unstagedResult?.diff ?? null;
-    }
-
     const fileDiffs = this.parseDiff(
       result.diff,
       stagedFiles,
@@ -240,35 +292,28 @@ class GitDiffToolInvocation extends BaseToolInvocation<
       defaultStaged,
     );
 
-    if (this.params.staged === undefined && stagedDiff && unstagedDiff) {
-      const unstagedFileDiffs = this.parseDiff(
-        unstagedDiff,
-        unstagedFiles,
-        new Set(),
-        false,
-      );
-      const unstagedStatusMap = new Map<string, 'A' | 'M' | 'D' | 'R'>();
-      const unstagedFilePaths = new Set<string>();
-      for (const file of unstagedFileDiffs) {
-        unstagedStatusMap.set(file.filePath, file.status);
-        unstagedFilePaths.add(file.filePath);
-      }
+    // Enhance file diffs with status information from status.files
+    for (const fileDiff of fileDiffs) {
+      const statusInfo = fileStatusMap.get(fileDiff.filePath);
+      if (statusInfo) {
+        // Update status from ground truth if available
+        if (fileDiff.isStaged && statusInfo.staged) {
+          fileDiff.status = statusInfo.staged;
+        } else if (!fileDiff.isStaged && statusInfo.unstaged) {
+          fileDiff.status = statusInfo.unstaged;
+        }
 
-      for (const file of fileDiffs) {
-        if (file.hasBothStagedAndUnstaged) {
-          if (!unstagedFilePaths.has(file.filePath)) {
-            file.hasBothStagedAndUnstaged = false;
-          } else {
-            const unstagedStatus = unstagedStatusMap.get(file.filePath);
-            if (unstagedStatus && unstagedStatus !== file.status) {
-              file.unstagedStatus = unstagedStatus;
-            } else if (unstagedStatus) {
-              file.unstagedStatus = undefined;
-            }
-          }
+        // Set unstaged status if file has both staged and unstaged changes
+        if (
+          fileDiff.hasBothStagedAndUnstaged &&
+          statusInfo.unstaged &&
+          statusInfo.unstaged !== fileDiff.status
+        ) {
+          fileDiff.unstagedStatus = statusInfo.unstaged;
         }
       }
     }
+
     let changeType: string;
     if (this.params.staged === true) {
       changeType = 'staged';
@@ -286,185 +331,15 @@ class GitDiffToolInvocation extends BaseToolInvocation<
       }
     }
 
-    let totalFilesFromStatus = fileDiffs.length;
-    if (fileLists) {
-      if (this.params.staged === true) {
-        totalFilesFromStatus = fileLists.staged.length;
-      } else if (this.params.staged === false) {
-        totalFilesFromStatus = fileLists.unstaged.length;
-      } else {
-        if (stagedDiff && unstagedDiff) {
-          const stagedFileDiffs = this.parseDiff(
-            stagedDiff,
-            stagedFiles,
-            new Set(),
-            true,
-          );
-          const unstagedFileDiffs = this.parseDiff(
-            unstagedDiff,
-            new Set(),
-            unstagedFiles,
-            false,
-          );
-          const allDiffFiles = new Set<string>();
-          for (const file of stagedFileDiffs) {
-            allDiffFiles.add(file.filePath);
-          }
-          for (const file of unstagedFileDiffs) {
-            allDiffFiles.add(file.filePath);
-          }
-          totalFilesFromStatus = allDiffFiles.size;
-        } else {
-          const allStatusFiles = new Set([
-            ...fileLists.staged,
-            ...fileLists.unstaged,
-          ]);
-          totalFilesFromStatus = allStatusFiles.size;
-        }
-      }
-    }
+    // Calculate total files from status
+    const totalFilesFromStatus = relevantFiles.length;
 
-    const ansiLines: AnsiLine[] = [];
-    ansiLines.push([
-      {
-        text: `git-diff: ${fileDiffs.length} file${fileDiffs.length !== 1 ? 's' : ''} ${changeType}\n`,
-        bold: false,
-        italic: false,
-        underline: false,
-        dim: false,
-        inverse: false,
-        fg: '',
-        bg: '',
-      },
-    ]);
-
-    const createToken = (
-      text: string,
-      color: string,
-      bold = false,
-    ): AnsiToken => ({
-      text,
-      bold,
-      italic: false,
-      underline: false,
-      dim: false,
-      inverse: false,
-      fg: color,
-      bg: '',
-    });
-
-    const createPlainToken = (text: string): AnsiToken => createToken(text, '');
-
-    for (const file of fileDiffs) {
-      const line: AnsiToken[] = [];
-
-      const statusLabels: string[] = [];
-      const statusColors: string[] = [];
-
-      switch (file.status) {
-        case 'A':
-          statusLabels.push('[A]');
-          statusColors.push('green');
-          break;
-        case 'D':
-          statusLabels.push('[D]');
-          statusColors.push('red');
-          break;
-        case 'R':
-          statusLabels.push('[R]');
-          statusColors.push('yellow');
-          break;
-        case 'M':
-        default:
-          statusLabels.push('[M]');
-          statusColors.push('cyan');
-          break;
-      }
-
-      if (file.hasBothStagedAndUnstaged && file.unstagedStatus) {
-        const unstagedStatus = file.unstagedStatus;
-        if (unstagedStatus !== file.status) {
-          switch (unstagedStatus) {
-            case 'A':
-              statusLabels.push('[A]');
-              statusColors.push('green');
-              break;
-            case 'D':
-              statusLabels.push('[D]');
-              statusColors.push('red');
-              break;
-            case 'R':
-              statusLabels.push('[R]');
-              statusColors.push('yellow');
-              break;
-            case 'M':
-            default:
-              statusLabels.push('[M]');
-              statusColors.push('cyan');
-              break;
-          }
-        }
-      }
-
-      for (let i = 0; i < statusLabels.length; i++) {
-        line.push(createToken(statusLabels[i], statusColors[i]));
-      }
-      line.push(createPlainToken('\t'));
-
-      let filePathColor: string;
-      let useStrikethrough = false;
-
-      if (file.status === 'D') {
-        filePathColor = 'red';
-        useStrikethrough = true;
-      } else if (file.hasBothStagedAndUnstaged) {
-        filePathColor = 'yellow';
-      } else if (file.isStaged) {
-        filePathColor = 'green';
-      } else {
-        filePathColor = '';
-      }
-
-      const filePathText = useStrikethrough
-        ? file.filePath
-            .split('')
-            .map((char) => char + '\u0336')
-            .join('')
-        : file.filePath;
-
-      line.push(createToken(filePathText, filePathColor));
-
-      if (file.added > 0 || file.removed > 0) {
-        line.push(createPlainToken(' ['));
-
-        if (file.added > 0) {
-          line.push(createToken(`+${file.added}`, 'green'));
-          if (file.removed > 0) {
-            line.push(createPlainToken(' '));
-          }
-        }
-
-        if (file.removed > 0) {
-          line.push(createToken(`-${file.removed}`, 'red'));
-        }
-
-        line.push(createPlainToken(']'));
-      }
-
-      ansiLines.push(line);
-    }
-
-    // Add "+x more files" if there are files in git status that don't appear in diff
-    if (totalFilesFromStatus > fileDiffs.length) {
-      const moreCount = totalFilesFromStatus - fileDiffs.length;
-      ansiLines.push([
-        createPlainToken(
-          `\n+${moreCount} more file${moreCount !== 1 ? 's' : ''}`,
-        ),
-      ]);
-    }
-
-    const returnDisplay: AnsiOutput = ansiLines;
+    // Format the output using the utility function
+    const returnDisplay = formatGitDiffOutput(
+      fileDiffs,
+      changeType,
+      totalFilesFromStatus,
+    );
 
     return {
       llmContent,
