@@ -1164,6 +1164,16 @@ const SETTINGS_SCHEMA = {
         description: 'Disable YOLO mode, even if enabled by a flag.',
         showInDialog: true,
       },
+      enablePermanentToolApproval: {
+        type: 'boolean',
+        label: 'Allow Permanent Tool Approval',
+        category: 'Security',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable the "Allow for all future sessions" option in tool confirmation dialogs.',
+        showInDialog: true,
+      },
       blockGitExtensions: {
         type: 'boolean',
         label: 'Blocks extensions from Git',
@@ -1390,6 +1400,26 @@ const SETTINGS_SCHEMA = {
             description:
               'The model to use for the Codebase Investigator agent.',
             showInDialog: false,
+          },
+        },
+      },
+      introspectionAgentSettings: {
+        type: 'object',
+        label: 'Introspection Agent Settings',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: {},
+        description: 'Configuration for Introspection Agent.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Introspection Agent',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description: 'Enable the Introspection Agent.',
+            showInDialog: true,
           },
         },
       },
