@@ -166,6 +166,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     shellModeActive,
   );
 
+  useEffect(() => {
+    onSuggestionsVisibilityChange(completion.showSuggestions);
+  }, [completion.showSuggestions]);
+
   const reverseSearchCompletion = useReverseSearchCompletion(
     buffer,
     shellHistoryData,
