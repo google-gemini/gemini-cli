@@ -78,8 +78,8 @@ interface ContentRetryOptions {
 }
 
 const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
-  maxAttempts: 3, // Increased from 2 (20% increase) - 1 initial call + 2 retries
-  initialDelayMs: 600, // Increased from 500 (20% increase)
+  maxAttempts: 4, // Increased from 3 (20% increase) - 1 initial call + 3 retries
+  initialDelayMs: 720, // Increased from 600 (20% increase)
 };
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';

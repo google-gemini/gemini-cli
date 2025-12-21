@@ -6,15 +6,15 @@
 
 import type { GenerateContentResponse } from '@google/genai';
 import { ApiError } from '@google/genai';
-import {
-  TerminalQuotaError,
-  RetryableQuotaError,
-  classifyGoogleError,
-} from './googleQuotaErrors.js';
-import { delay, createAbortError } from './delay.js';
-import { debugLogger } from './debugLogger.js';
-import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
+import { debugLogger } from './debugLogger.js';
+import { createAbortError, delay } from './delay.js';
+import {
+  classifyGoogleError,
+  RetryableQuotaError,
+  TerminalQuotaError,
+} from './googleQuotaErrors.js';
+import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 
 export type { RetryAvailabilityContext };
 
@@ -35,9 +35,9 @@ export interface RetryOptions {
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
-  maxAttempts: 4, // Increased from 3 (20% increase)
-  initialDelayMs: 6000, // Increased from 5000 (20% increase)
-  maxDelayMs: 36000, // Increased from 30000 (20% increase) - 36 seconds
+  maxAttempts: 5, // Increased from 4 (20% increase)
+  initialDelayMs: 7200, // Increased from 6000 (20% increase)
+  maxDelayMs: 43200, // Increased from 36000 (20% increase) - 43.2 seconds
   shouldRetryOnError: isRetryableError,
 };
 
