@@ -79,7 +79,7 @@ priority = 100
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should transform commandRegex to argsPattern', async () => {
+    it('should handle commandRegex separately via commandPattern', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
 toolName = "run_shell_command"
@@ -89,15 +89,12 @@ priority = 100
 `);
 
       expect(result.rules).toHaveLength(1);
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git status"}'),
-      ).toBe(true);
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git log --all"}'),
-      ).toBe(true);
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git branch"}'),
-      ).toBe(false);
+      expect(result.rules[0].argsPattern).toBeUndefined();
+      expect(result.rules[0].commandPattern).toBeInstanceOf(RegExp);
+
+      expect(result.rules[0].commandPattern?.test('git status')).toBe(true);
+      expect(result.rules[0].commandPattern?.test('git log --all')).toBe(true);
+      expect(result.rules[0].commandPattern?.test('git branch')).toBe(false);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -417,6 +414,37 @@ priority = 100
       const error = result.errors[0];
       expect(error.errorType).toBe('rule_validation');
       expect(error.details).toContain('mutually exclusive');
+    });
+
+    it('should return a rule_validation error if commandRegex and argsPattern are combined', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "git .*"
+argsPattern = "test"
+decision = "allow"
+priority = 100
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('rule_validation');
+      expect(error.details).toContain('mutually exclusive');
+    });
+
+    it('should support commandRegex in safety checkers', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "run_shell_command"
+commandRegex = "git .*"
+priority = 100
+checker = { type = "in-process", name = "allowed-path" }
+`);
+
+      expect(result.checkers).toHaveLength(1);
+      expect(result.checkers[0].argsPattern).toBeUndefined();
+      expect(result.checkers[0].commandPattern).toBeInstanceOf(RegExp);
+      expect(result.checkers[0].commandPattern?.test('git status')).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
 
     it('should return a regex_compilation error for invalid argsPattern', async () => {

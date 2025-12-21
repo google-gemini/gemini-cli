@@ -108,6 +108,11 @@ export interface PolicyRule {
   argsPattern?: RegExp;
 
   /**
+   * Pattern to match specifically against the 'command' argument of run_shell_command.
+   */
+  commandPattern?: RegExp;
+
+  /**
    * The decision to make when this rule matches.
    */
   decision: PolicyDecision;
@@ -131,6 +136,11 @@ export interface SafetyCheckerRule {
    * Can be used for more fine-grained control.
    */
   argsPattern?: RegExp;
+
+  /**
+   * Pattern to match specifically against the 'command' argument of run_shell_command.
+   */
+  commandPattern?: RegExp;
 
   /**
    * Priority of this checker. Higher numbers run first.

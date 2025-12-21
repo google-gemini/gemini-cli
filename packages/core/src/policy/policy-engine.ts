@@ -47,6 +47,16 @@ function ruleMatches(
     }
   }
 
+  // Check command pattern if specified
+  if (rule.commandPattern) {
+    if (!toolCall.args || typeof toolCall.args['command'] !== 'string') {
+      return false;
+    }
+    if (!rule.commandPattern.test(toolCall.args['command'])) {
+      return false;
+    }
+  }
+
   // Check args pattern if specified
   if (rule.argsPattern) {
     // If rule has an args pattern but tool has no args, no match

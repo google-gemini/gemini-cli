@@ -109,6 +109,60 @@ describe('PolicyEngine', () => {
       );
     });
 
+    it('should match by command pattern for run_shell_command', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          commandPattern: /^git (status|log)/,
+          decision: PolicyDecision.ALLOW,
+        },
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.DENY,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Should match the command pattern
+      expect(
+        (
+          await engine.check(
+            { name: 'run_shell_command', args: { command: 'git status' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'run_shell_command',
+              args: { command: 'git log --oneline' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Should NOT match the command pattern
+      expect(
+        (
+          await engine.check(
+            { name: 'run_shell_command', args: { command: 'git commit' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.DENY);
+
+      // Should NOT match if command arg is missing or not a string
+      expect(
+        (await engine.check({ name: 'run_shell_command', args: {} }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.DENY);
+    });
+
     it('should apply rules by priority', async () => {
       const rules: PolicyRule[] = [
         { toolName: 'shell', decision: PolicyDecision.DENY, priority: 1 },

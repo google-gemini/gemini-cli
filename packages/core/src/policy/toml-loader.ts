@@ -333,7 +333,7 @@ export async function loadPoliciesFromToml(
           })
           .flatMap((rule) => {
             // Transform commandPrefix/commandRegex to argsPattern
-            let effectiveArgsPattern = rule.argsPattern;
+            const effectiveArgsPattern = rule.argsPattern;
             const commandPrefixes: string[] = [];
 
             if (rule.commandPrefix) {
@@ -341,8 +341,6 @@ export async function loadPoliciesFromToml(
                 ? rule.commandPrefix
                 : [rule.commandPrefix];
               commandPrefixes.push(...prefixes);
-            } else if (rule.commandRegex) {
-              effectiveArgsPattern = `"command":"${rule.commandRegex}`;
             }
 
             // Expand command prefixes to multiple patterns
@@ -400,6 +398,27 @@ export async function loadPoliciesFromToml(
                   }
                 }
 
+                // Compile command regex pattern
+                if (rule.commandRegex) {
+                  try {
+                    policyRule.commandPattern = new RegExp(rule.commandRegex);
+                  } catch (e) {
+                    const error = e as Error;
+                    errors.push({
+                      filePath,
+                      fileName: file,
+                      tier: tierName,
+                      errorType: 'regex_compilation',
+                      message: 'Invalid command regex pattern',
+                      details: `Pattern: ${rule.commandRegex}\nError: ${error.message}`,
+                      suggestion:
+                        'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
+                    });
+                    // Skip this rule if regex compilation fails
+                    return null;
+                  }
+                }
+
                 return policyRule;
               });
             });
@@ -419,7 +438,7 @@ export async function loadPoliciesFromToml(
             return checker.modes.includes(approvalMode);
           })
           .flatMap((checker) => {
-            let effectiveArgsPattern = checker.argsPattern;
+            const effectiveArgsPattern = checker.argsPattern;
             const commandPrefixes: string[] = [];
 
             if (checker.commandPrefix) {
@@ -427,8 +446,6 @@ export async function loadPoliciesFromToml(
                 ? checker.commandPrefix
                 : [checker.commandPrefix];
               commandPrefixes.push(...prefixes);
-            } else if (checker.commandRegex) {
-              effectiveArgsPattern = `"command":"${checker.commandRegex}`;
             }
 
             const argsPatterns: Array<string | undefined> =
@@ -473,6 +490,26 @@ export async function loadPoliciesFromToml(
                       errorType: 'regex_compilation',
                       message: 'Invalid regex pattern in safety checker',
                       details: `Pattern: ${argsPattern}\nError: ${error.message}`,
+                    });
+                    return null;
+                  }
+                }
+
+                if (checker.commandRegex) {
+                  try {
+                    safetyCheckerRule.commandPattern = new RegExp(
+                      checker.commandRegex,
+                    );
+                  } catch (e) {
+                    const error = e as Error;
+                    errors.push({
+                      filePath,
+                      fileName: file,
+                      tier: tierName,
+                      errorType: 'regex_compilation',
+                      message:
+                        'Invalid command regex pattern in safety checker',
+                      details: `Pattern: ${checker.commandRegex}\nError: ${error.message}`,
                     });
                     return null;
                   }

@@ -49,6 +49,9 @@ const listPoliciesCommand: SlashCommand = {
       if (rule.argsPattern) {
         content += ` (args match: \`${rule.argsPattern.source}\`)`;
       }
+      if (rule.commandPattern) {
+        content += ` (command match: \`${rule.commandPattern.source}\`)`;
+      }
       if (rule.priority !== undefined) {
         content += ` [Priority: ${rule.priority}]`;
       }
