@@ -17,6 +17,7 @@ import {
   resolvePolicyAction,
   applyAvailabilityTransition,
 } from '../availability/policyHelpers.js';
+import { FallbackEvent, logFallback } from '../telemetry/index.js';
 
 const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
@@ -85,7 +86,7 @@ async function handlePolicyDrivenFallback(
 
     if (action === 'silent') {
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
-      return processIntent(config, 'retry_always', fallbackModel);
+      return processIntent(config, 'retry_always', fallbackModel, failedModel);
     }
 
     // This will be used in the future when FallbackRecommendation is passed through UI
@@ -116,7 +117,7 @@ async function handlePolicyDrivenFallback(
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
     }
 
-    return await processIntent(config, intent, fallbackModel);
+    return await processIntent(config, intent, fallbackModel, failedModel);
   } catch (handlerError) {
     debugLogger.error('Fallback handler failed:', handlerError);
     return null;
@@ -138,11 +139,14 @@ async function processIntent(
   config: Config,
   intent: FallbackIntent | null,
   fallbackModel: string,
+  failedModel: string,
 ): Promise<boolean> {
   switch (intent) {
     case 'retry_always':
-      // TODO(telemetry): Implement generic fallback event logging. Existing
-      // logFlashFallback is specific to a single Model.
+      logFallback(
+        config,
+        new FallbackEvent(failedModel, fallbackModel, 'retry_always'),
+      );
       config.setActiveModel(fallbackModel);
       return true;
 
