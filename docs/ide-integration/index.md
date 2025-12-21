@@ -128,8 +128,8 @@ editor.
 You can also **modify the suggested changes** directly in the diff view before
 accepting them.
 
-If you select ‘Yes, allow always’ in the CLI, changes will no longer show up in
-the IDE as they will be auto-accepted.
+If you select ‘Allow for this session’ in the CLI, changes will no longer show
+up in the IDE as they will be auto-accepted.
 
 ## Using with sandboxing
 

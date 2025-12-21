@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { isKittyProtocolEnabled } from '../utils/kittyProtocolDetector.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 export interface KittyProtocolStatus {
   enabled: boolean;
@@ -18,7 +18,7 @@ export interface KittyProtocolStatus {
  */
 export function useKittyKeyboardProtocol(): KittyProtocolStatus {
   const [status] = useState<KittyProtocolStatus>({
-    enabled: isKittyProtocolEnabled(),
+    enabled: terminalCapabilityManager.isKittyProtocolEnabled(),
     checking: false,
   });
 

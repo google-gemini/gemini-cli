@@ -49,7 +49,7 @@ const setCommand: CommandModule<object, SetArgs> = {
     if (!extension || !extensionManager) {
       return;
     }
-    const extensionConfig = extensionManager.loadExtensionConfig(
+    const extensionConfig = await extensionManager.loadExtensionConfig(
       extension.path,
     );
     if (!extensionConfig) {
@@ -89,7 +89,7 @@ const listCommand: CommandModule<object, ListArgs> = {
     if (!extension || !extensionManager) {
       return;
     }
-    const extensionConfig = extensionManager.loadExtensionConfig(
+    const extensionConfig = await extensionManager.loadExtensionConfig(
       extension.path,
     );
     if (

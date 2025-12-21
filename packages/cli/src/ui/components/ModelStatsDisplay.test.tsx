@@ -22,7 +22,7 @@ vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
 
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 
-const renderWithMockedStats = (metrics: SessionMetrics) => {
+const renderWithMockedStats = (metrics: SessionMetrics, width?: number) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
       sessionId: 'test-session',
@@ -36,7 +36,7 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
     startNewPrompt: vi.fn(),
   });
 
-  return render(<ModelStatsDisplay />);
+  return render(<ModelStatsDisplay />, width);
 };
 
 describe('<ModelStatsDisplay />', () => {
@@ -310,6 +310,62 @@ describe('<ModelStatsDisplay />', () => {
     const output = lastFrame();
     expect(output).toContain('gemini-2.5-pro');
     expect(output).not.toContain('gemini-2.5-flash');
+    expect(output).toMatchSnapshot();
+  });
+
+  it('should handle models with long names (gemini-3-*-preview) without layout breaking', () => {
+    const { lastFrame } = renderWithMockedStats(
+      {
+        models: {
+          'gemini-3-pro-preview': {
+            api: { totalRequests: 10, totalErrors: 0, totalLatencyMs: 2000 },
+            tokens: {
+              input: 1000,
+              prompt: 2000,
+              candidates: 4000,
+              total: 6000,
+              cached: 500,
+              thoughts: 100,
+              tool: 50,
+            },
+          },
+          'gemini-3-flash-preview': {
+            api: { totalRequests: 20, totalErrors: 0, totalLatencyMs: 1000 },
+            tokens: {
+              input: 2000,
+              prompt: 4000,
+              candidates: 8000,
+              total: 12000,
+              cached: 1000,
+              thoughts: 200,
+              tool: 100,
+            },
+          },
+        },
+        tools: {
+          totalCalls: 0,
+          totalSuccess: 0,
+          totalFail: 0,
+          totalDurationMs: 0,
+          totalDecisions: {
+            accept: 0,
+            reject: 0,
+            modify: 0,
+            [ToolCallDecision.AUTO_ACCEPT]: 0,
+          },
+          byName: {},
+        },
+        files: {
+          totalLinesAdded: 0,
+          totalLinesRemoved: 0,
+        },
+      },
+      80,
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('gemini-3-pro-');
+    expect(output).toContain('gemini-3-flash-');
     expect(output).toMatchSnapshot();
   });
 });

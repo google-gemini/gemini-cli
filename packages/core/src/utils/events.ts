@@ -5,7 +5,6 @@
  */
 
 import { EventEmitter } from 'node:events';
-import type { LoadServerHierarchicalMemoryResponse } from './memoryDiscovery.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -32,16 +31,6 @@ export interface UserFeedbackPayload {
    * or verbose output, while keeping the 'message' field clean for end users.
    */
   error?: unknown;
-}
-
-/**
- * Payload for the 'fallback-mode-changed' event.
- */
-export interface FallbackModeChangedPayload {
-  /**
-   * Whether fallback mode is now active.
-   */
-  isInFallbackMode: boolean;
 }
 
 /**
@@ -74,11 +63,12 @@ export interface OutputPayload {
 /**
  * Payload for the 'memory-changed' event.
  */
-export type MemoryChangedPayload = LoadServerHierarchicalMemoryResponse;
+export interface MemoryChangedPayload {
+  fileCount: number;
+}
 
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
-  FallbackModeChanged = 'fallback-mode-changed',
   ModelChanged = 'model-changed',
   ConsoleLog = 'console-log',
   Output = 'output',
@@ -88,7 +78,6 @@ export enum CoreEvent {
 
 export interface CoreEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
-  [CoreEvent.FallbackModeChanged]: [FallbackModeChangedPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
@@ -164,15 +153,6 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   ): void {
     const payload: OutputPayload = { isStderr, chunk, encoding };
     this._emitOrQueue(CoreEvent.Output, payload);
-  }
-
-  /**
-   * Notifies subscribers that fallback mode has changed.
-   * This is synchronous and doesn't use backlog (UI should already be initialized).
-   */
-  emitFallbackModeChanged(isInFallbackMode: boolean): void {
-    const payload: FallbackModeChangedPayload = { isInFallbackMode };
-    this.emit(CoreEvent.FallbackModeChanged, payload);
   }
 
   /**

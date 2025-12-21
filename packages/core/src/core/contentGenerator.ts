@@ -122,7 +122,6 @@ export async function createContentGenerator(
     }
     const version = await getVersion();
     const model = getEffectiveModel(
-      gcConfig.isInFallbackMode(),
       gcConfig.getModel(),
       gcConfig.getPreviewFeatures(),
     );

@@ -111,12 +111,12 @@ describe('BaseLlmClient', () => {
           .fn()
           .mockImplementation(({ model }) => makeResolvedModelConfig(model)),
       } as unknown as ModelConfigService,
-      isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(false),
-      getModelAvailabilityService: vi.fn(),
+      getModelAvailabilityService: vi
+        .fn()
+        .mockReturnValue(createAvailabilityServiceMock()),
       setActiveModel: vi.fn(),
       getPreviewFeatures: vi.fn().mockReturnValue(false),
       getUserTier: vi.fn().mockReturnValue(undefined),
-      isInFallbackMode: vi.fn().mockReturnValue(false),
       getModel: vi.fn().mockReturnValue('test-model'),
       getActiveModel: vi.fn().mockReturnValue('test-model'),
     } as unknown as Mocked<Config>;
@@ -614,10 +614,6 @@ describe('BaseLlmClient', () => {
     let jsonOptions: GenerateJsonOptions;
 
     beforeEach(() => {
-      mockConfig.isModelAvailabilityServiceEnabled = vi
-        .fn()
-        .mockReturnValue(true);
-
       mockAvailabilityService = createAvailabilityServiceMock({
         selectedModel: 'test-model',
         skipped: [],
@@ -645,23 +641,6 @@ describe('BaseLlmClient', () => {
         ...defaultOptions,
         promptId: 'json-prompt-id',
       };
-    });
-
-    it('should preserve legacy behavior when availability is disabled', async () => {
-      mockConfig.isModelAvailabilityServiceEnabled = vi
-        .fn()
-        .mockReturnValue(false);
-      mockGenerateContent.mockResolvedValue(
-        createMockResponse('Some text response'),
-      );
-
-      await client.generateContent(contentOptions);
-
-      expect(
-        mockAvailabilityService.selectFirstAvailable,
-      ).not.toHaveBeenCalled();
-      expect(mockConfig.setActiveModel).not.toHaveBeenCalled();
-      expect(mockAvailabilityService.markHealthy).not.toHaveBeenCalled();
     });
 
     it('should mark model as healthy on success', async () => {
@@ -796,13 +775,15 @@ describe('BaseLlmClient', () => {
       const getResolvedConfigMock = vi.mocked(
         mockConfig.modelConfigService.getResolvedConfig,
       );
-      getResolvedConfigMock
-        .mockReturnValueOnce(
-          makeResolvedModelConfig(firstModel, { temperature: 0.1 }),
-        )
-        .mockReturnValueOnce(
-          makeResolvedModelConfig(fallbackModel, { temperature: 0.9 }),
-        );
+      getResolvedConfigMock.mockImplementation((key) => {
+        if (key.model === firstModel) {
+          return makeResolvedModelConfig(firstModel, { temperature: 0.1 });
+        }
+        if (key.model === fallbackModel) {
+          return makeResolvedModelConfig(fallbackModel, { temperature: 0.9 });
+        }
+        return makeResolvedModelConfig(key.model);
+      });
 
       // Availability selects the first model initially
       vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({

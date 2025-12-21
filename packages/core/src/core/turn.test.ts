@@ -36,13 +36,6 @@ vi.mock('../utils/errorReporting', () => ({
   reportError: vi.fn(),
 }));
 
-// Use the actual implementation from partUtils now that it's provided.
-vi.mock('../utils/generateContentResponseUtilities', () => ({
-  getResponseText: (resp: GenerateContentResponse) =>
-    resp.candidates?.[0]?.content?.parts?.map((part) => part.text).join('') ||
-    undefined,
-}));
-
 describe('Turn', () => {
   let turn: Turn;
   // Define a type for the mocked Chat instance for clarity

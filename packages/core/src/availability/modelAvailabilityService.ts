@@ -6,7 +6,7 @@
 
 export type ModelId = string;
 
-export type TerminalUnavailabilityReason = 'quota' | 'capacity';
+type TerminalUnavailabilityReason = 'quota' | 'capacity';
 export type TurnUnavailabilityReason = 'retry_once_per_turn';
 
 export type UnavailabilityReason =

@@ -28,7 +28,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { isKittyProtocolEnabled } from './kittyProtocolDetector.js';
+import { terminalCapabilityManager } from './terminalCapabilityManager.js';
 
 import { debugLogger } from '@google/gemini-cli-core';
 
@@ -323,7 +323,7 @@ async function configureWindsurf(): Promise<TerminalSetupResult> {
  */
 export async function terminalSetup(): Promise<TerminalSetupResult> {
   // Check if terminal already has optimal keyboard support
-  if (isKittyProtocolEnabled()) {
+  if (terminalCapabilityManager.isKittyProtocolEnabled()) {
     return {
       success: true,
       message:

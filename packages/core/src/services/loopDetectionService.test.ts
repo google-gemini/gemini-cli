@@ -18,6 +18,7 @@ import { GeminiEventType } from '../core/turn.js';
 import * as loggers from '../telemetry/loggers.js';
 import { LoopType } from '../telemetry/types.js';
 import { LoopDetectionService } from './loopDetectionService.js';
+import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
   logLoopDetected: vi.fn(),
@@ -37,6 +38,9 @@ describe('LoopDetectionService', () => {
     mockConfig = {
       getTelemetryEnabled: () => true,
       isInteractive: () => false,
+      getModelAvailabilityService: vi
+        .fn()
+        .mockReturnValue(createAvailabilityServiceMock()),
     } as unknown as Config;
     service = new LoopDetectionService(mockConfig);
     vi.clearAllMocks();
@@ -732,13 +736,15 @@ describe('LoopDetectionService LLM Checks', () => {
       generateJson: vi.fn(),
     } as unknown as BaseLlmClient;
 
+    const mockAvailability = createAvailabilityServiceMock();
+    vi.mocked(mockAvailability.snapshot).mockReturnValue({ available: true });
+
     mockConfig = {
       getGeminiClient: () => mockGeminiClient,
       getBaseLlmClient: () => mockBaseLlmClient,
       getDebugMode: () => false,
       getTelemetryEnabled: () => true,
       getModel: vi.fn().mockReturnValue('cognitive-loop-v1'),
-      isInFallbackMode: vi.fn().mockReturnValue(false),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((key) => {
           if (key.model === 'loop-detection') {
@@ -751,6 +757,7 @@ describe('LoopDetectionService LLM Checks', () => {
         }),
       },
       isInteractive: () => false,
+      getModelAvailabilityService: vi.fn().mockReturnValue(mockAvailability),
     } as unknown as Config;
 
     service = new LoopDetectionService(mockConfig);
@@ -901,9 +908,6 @@ describe('LoopDetectionService LLM Checks', () => {
   });
 
   it('should detect a loop when confidence is exactly equal to the threshold (0.9)', async () => {
-    // Mock isInFallbackMode to false so it double checks
-    vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(false);
-
     mockBaseLlmClient.generateJson = vi
       .fn()
       .mockResolvedValueOnce({
@@ -944,9 +948,6 @@ describe('LoopDetectionService LLM Checks', () => {
   });
 
   it('should not detect a loop when Flash is confident (0.9) but Main model is not (0.89)', async () => {
-    // Mock isInFallbackMode to false so it double checks
-    vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(false);
-
     mockBaseLlmClient.generateJson = vi
       .fn()
       .mockResolvedValueOnce({
@@ -988,9 +989,13 @@ describe('LoopDetectionService LLM Checks', () => {
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(3);
   });
 
-  it('should only call Flash model if in fallback mode', async () => {
-    // Mock isInFallbackMode to true
-    vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(true);
+  it('should only call Flash model if main model is unavailable', async () => {
+    // Mock availability to return unavailable for the main model
+    const availability = mockConfig.getModelAvailabilityService();
+    vi.mocked(availability.snapshot).mockReturnValue({
+      available: false,
+      reason: 'quota',
+    });
 
     mockBaseLlmClient.generateJson = vi.fn().mockResolvedValueOnce({
       unproductive_state_confidence: 0.9,

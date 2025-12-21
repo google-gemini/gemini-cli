@@ -7,9 +7,23 @@
 import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
 import { CodeAssistServer } from './server.js';
 import { OAuth2Client } from 'google-auth-library';
-import { UserTierId } from './types.js';
+import { UserTierId, ActionStatus } from './types.js';
+import { FinishReason } from '@google/genai';
 
 vi.mock('google-auth-library');
+
+function createTestServer(headers: Record<string, string> = {}) {
+  const mockRequest = vi.fn();
+  const client = { request: mockRequest } as unknown as OAuth2Client;
+  const server = new CodeAssistServer(
+    client,
+    'test-project',
+    { headers },
+    'test-session',
+    UserTierId.FREE,
+  );
+  return { server, mockRequest, client };
+}
 
 describe('CodeAssistServer', () => {
   beforeEach(() => {
@@ -29,15 +43,9 @@ describe('CodeAssistServer', () => {
   });
 
   it('should call the generateContent endpoint', async () => {
-    const mockRequest = vi.fn();
-    const client = { request: mockRequest } as unknown as OAuth2Client;
-    const server = new CodeAssistServer(
-      client,
-      'test-project',
-      { headers: { 'x-custom-header': 'test-value' } },
-      'test-session',
-      UserTierId.FREE,
-    );
+    const { server, mockRequest } = createTestServer({
+      'x-custom-header': 'test-value',
+    });
     const mockResponseData = {
       response: {
         candidates: [
@@ -47,7 +55,7 @@ describe('CodeAssistServer', () => {
               role: 'model',
               parts: [{ text: 'response' }],
             },
-            finishReason: 'STOP',
+            finishReason: FinishReason.STOP,
             safetyRatings: [],
           },
         ],
@@ -84,6 +92,205 @@ describe('CodeAssistServer', () => {
     );
   });
 
+  it('should detect error in generateContent response', async () => {
+    const { server, mockRequest } = createTestServer();
+    const mockResponseData = {
+      traceId: 'test-trace-id',
+      response: {
+        candidates: [
+          {
+            index: 0,
+            content: {
+              role: 'model',
+              parts: [
+                { text: 'response' },
+                { functionCall: { name: 'test', args: {} } },
+              ],
+            },
+            finishReason: FinishReason.SAFETY,
+            safetyRatings: [],
+          },
+        ],
+      },
+    };
+    mockRequest.mockResolvedValue({ data: mockResponseData });
+
+    const recordConversationOfferedSpy = vi.spyOn(
+      server,
+      'recordConversationOffered',
+    );
+
+    await server.generateContent(
+      {
+        model: 'test-model',
+        contents: [{ role: 'user', parts: [{ text: 'request' }] }],
+      },
+      'user-prompt-id',
+    );
+
+    expect(recordConversationOfferedSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: ActionStatus.ACTION_STATUS_ERROR_UNKNOWN,
+      }),
+    );
+  });
+
+  it('should record conversation offered on successful generateContent', async () => {
+    const { server, mockRequest } = createTestServer();
+    const mockResponseData = {
+      traceId: 'test-trace-id',
+      response: {
+        candidates: [
+          {
+            index: 0,
+            content: {
+              role: 'model',
+              parts: [
+                { text: 'response' },
+                { functionCall: { name: 'test', args: {} } },
+              ],
+            },
+            finishReason: FinishReason.STOP,
+            safetyRatings: [],
+          },
+        ],
+        sdkHttpResponse: {
+          responseInternal: {
+            ok: true,
+          },
+        },
+      },
+    };
+    mockRequest.mockResolvedValue({ data: mockResponseData });
+    vi.spyOn(server, 'recordCodeAssistMetrics').mockResolvedValue(undefined);
+
+    await server.generateContent(
+      {
+        model: 'test-model',
+        contents: [{ role: 'user', parts: [{ text: 'request' }] }],
+      },
+      'user-prompt-id',
+    );
+
+    expect(server.recordCodeAssistMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metrics: expect.arrayContaining([
+          expect.objectContaining({
+            conversationOffered: expect.objectContaining({
+              traceId: 'test-trace-id',
+              status: ActionStatus.ACTION_STATUS_NO_ERROR,
+              streamingLatency: expect.objectContaining({
+                totalLatency: expect.stringMatching(/\d+s/),
+                firstMessageLatency: expect.stringMatching(/\d+s/),
+              }),
+            }),
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('should record conversation offered on generateContentStream', async () => {
+    const { server, mockRequest } = createTestServer();
+
+    const { Readable } = await import('node:stream');
+    const mockStream = new Readable({ read() {} });
+    mockRequest.mockResolvedValue({ data: mockStream });
+
+    vi.spyOn(server, 'recordCodeAssistMetrics').mockResolvedValue(undefined);
+
+    const stream = await server.generateContentStream(
+      {
+        model: 'test-model',
+        contents: [{ role: 'user', parts: [{ text: 'request' }] }],
+      },
+      'user-prompt-id',
+    );
+
+    const mockResponseData = {
+      traceId: 'stream-trace-id',
+      response: {
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: 'chunk' },
+                { functionCall: { name: 'test', args: {} } },
+              ],
+            },
+          },
+        ],
+        sdkHttpResponse: {
+          responseInternal: {
+            ok: true,
+          },
+        },
+      },
+    };
+
+    setTimeout(() => {
+      mockStream.push('data: ' + JSON.stringify(mockResponseData) + '\n\n');
+      mockStream.push(null);
+    }, 0);
+
+    for await (const _ of stream) {
+      // Consume stream
+    }
+
+    expect(server.recordCodeAssistMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metrics: expect.arrayContaining([
+          expect.objectContaining({
+            conversationOffered: expect.objectContaining({
+              traceId: 'stream-trace-id',
+            }),
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('should record conversation interaction', async () => {
+    const { server } = createTestServer();
+    vi.spyOn(server, 'recordCodeAssistMetrics').mockResolvedValue(undefined);
+
+    const interaction = {
+      traceId: 'test-trace-id',
+    };
+
+    await server.recordConversationInteraction(interaction);
+
+    expect(server.recordCodeAssistMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project: 'test-project',
+        metrics: expect.arrayContaining([
+          expect.objectContaining({
+            conversationInteraction: interaction,
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('should call recordCodeAssistMetrics endpoint', async () => {
+    const { server, mockRequest } = createTestServer();
+    mockRequest.mockResolvedValue({ data: {} });
+
+    const req = {
+      project: 'test-project',
+      metrics: [],
+    };
+    await server.recordCodeAssistMetrics(req);
+
+    expect(mockRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: expect.stringContaining(':recordCodeAssistMetrics'),
+        method: 'POST',
+        body: expect.any(String),
+      }),
+    );
+  });
+
   describe('getMethodUrl', () => {
     const originalEnv = process.env;
 
@@ -114,15 +321,7 @@ describe('CodeAssistServer', () => {
   });
 
   it('should call the generateContentStream endpoint and parse SSE', async () => {
-    const mockRequest = vi.fn();
-    const client = { request: mockRequest } as unknown as OAuth2Client;
-    const server = new CodeAssistServer(
-      client,
-      'test-project',
-      {},
-      'test-session',
-      UserTierId.FREE,
-    );
+    const { server, mockRequest } = createTestServer();
 
     // Create a mock readable stream
     const { Readable } = await import('node:stream');
@@ -179,9 +378,7 @@ describe('CodeAssistServer', () => {
   });
 
   it('should ignore malformed SSE data', async () => {
-    const mockRequest = vi.fn();
-    const client = { request: mockRequest } as unknown as OAuth2Client;
-    const server = new CodeAssistServer(client);
+    const { server, mockRequest } = createTestServer();
 
     const { Readable } = await import('node:stream');
     const mockStream = new Readable({
@@ -205,14 +402,8 @@ describe('CodeAssistServer', () => {
   });
 
   it('should call the onboardUser endpoint', async () => {
-    const client = new OAuth2Client();
-    const server = new CodeAssistServer(
-      client,
-      'test-project',
-      {},
-      'test-session',
-      UserTierId.FREE,
-    );
+    const { server } = createTestServer();
+
     const mockResponse = {
       name: 'operations/123',
       done: true,
@@ -233,14 +424,7 @@ describe('CodeAssistServer', () => {
   });
 
   it('should call the loadCodeAssist endpoint', async () => {
-    const client = new OAuth2Client();
-    const server = new CodeAssistServer(
-      client,
-      'test-project',
-      {},
-      'test-session',
-      UserTierId.FREE,
-    );
+    const { server } = createTestServer();
     const mockResponse = {
       currentTier: {
         id: UserTierId.FREE,
@@ -265,14 +449,7 @@ describe('CodeAssistServer', () => {
   });
 
   it('should return 0 for countTokens', async () => {
-    const client = new OAuth2Client();
-    const server = new CodeAssistServer(
-      client,
-      'test-project',
-      {},
-      'test-session',
-      UserTierId.FREE,
-    );
+    const { server } = createTestServer();
     const mockResponse = {
       totalTokens: 100,
     };
@@ -286,14 +463,7 @@ describe('CodeAssistServer', () => {
   });
 
   it('should throw an error for embedContent', async () => {
-    const client = new OAuth2Client();
-    const server = new CodeAssistServer(
-      client,
-      'test-project',
-      {},
-      'test-session',
-      UserTierId.FREE,
-    );
+    const { server } = createTestServer();
     await expect(
       server.embedContent({
         model: 'test-model',
@@ -303,14 +473,7 @@ describe('CodeAssistServer', () => {
   });
 
   it('should handle VPC-SC errors when calling loadCodeAssist', async () => {
-    const client = new OAuth2Client();
-    const server = new CodeAssistServer(
-      client,
-      'test-project',
-      {},
-      'test-session',
-      UserTierId.FREE,
-    );
+    const { server } = createTestServer();
     const mockVpcScError = {
       response: {
         data: {
@@ -340,8 +503,7 @@ describe('CodeAssistServer', () => {
   });
 
   it('should re-throw non-VPC-SC errors from loadCodeAssist', async () => {
-    const client = new OAuth2Client();
-    const server = new CodeAssistServer(client);
+    const { server } = createTestServer();
     const genericError = new Error('Something else went wrong');
     vi.spyOn(server, 'requestPost').mockRejectedValue(genericError);
 
@@ -356,14 +518,7 @@ describe('CodeAssistServer', () => {
   });
 
   it('should call the listExperiments endpoint with metadata', async () => {
-    const client = new OAuth2Client();
-    const server = new CodeAssistServer(
-      client,
-      'test-project',
-      {},
-      'test-session',
-      UserTierId.FREE,
-    );
+    const { server } = createTestServer();
     const mockResponse = {
       experiments: [],
     };
@@ -382,14 +537,7 @@ describe('CodeAssistServer', () => {
   });
 
   it('should call the retrieveUserQuota endpoint', async () => {
-    const client = new OAuth2Client();
-    const server = new CodeAssistServer(
-      client,
-      'test-project',
-      {},
-      'test-session',
-      UserTierId.FREE,
-    );
+    const { server } = createTestServer();
     const mockResponse = {
       buckets: [
         {

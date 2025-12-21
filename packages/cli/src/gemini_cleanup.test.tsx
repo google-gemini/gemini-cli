@@ -210,6 +210,7 @@ describe('gemini.tsx main function cleanup', () => {
       getFileFilteringRespectGitIgnore: vi.fn(() => true),
       getOutputFormat: vi.fn(() => 'text'),
       getUsageStatisticsEnabled: vi.fn(() => false),
+      setTerminalBackground: vi.fn(),
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     try {

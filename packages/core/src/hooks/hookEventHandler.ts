@@ -42,6 +42,7 @@ import {
   type HookExecutionRequest,
 } from '../confirmation-bus/types.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 
 /**
  * Validates that a value is a non-null object
@@ -573,13 +574,23 @@ export class HookEventHandler {
     results: HookExecutionResult[],
     aggregated: AggregatedHookResult,
   ): void {
-    const successCount = results.filter((r) => r.success).length;
-    const errorCount = results.length - successCount;
+    const failedHooks = results.filter((r) => !r.success);
+    const successCount = results.length - failedHooks.length;
+    const errorCount = failedHooks.length;
 
     if (errorCount > 0) {
+      const failedNames = failedHooks
+        .map((r) => this.getHookNameFromResult(r))
+        .join(', ');
+
       debugLogger.warn(
-        `Hook execution for ${eventName}: ${successCount} succeeded, ${errorCount} failed, ` +
+        `Hook execution for ${eventName}: ${successCount} succeeded, ${errorCount} failed (${failedNames}), ` +
           `total duration: ${aggregated.totalDuration}ms`,
+      );
+
+      coreEvents.emitFeedback(
+        'warning',
+        `Hook(s) [${failedNames}] failed for event ${eventName}. Press F12 to see the debug drawer for more details.\n`,
       );
     } else {
       debugLogger.debug(
@@ -613,7 +624,7 @@ export class HookEventHandler {
 
     // Log individual errors
     for (const error of aggregated.errors) {
-      debugLogger.error(`Hook execution error: ${error.message}`);
+      debugLogger.warn(`Hook execution error: ${error.message}`);
     }
   }
 

@@ -31,7 +31,6 @@ const mockConfig = {
   getModel: vi.fn().mockReturnValue('gemini-pro'),
   getProxy: vi.fn().mockReturnValue(undefined),
   getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
-  isInFallbackMode: vi.fn().mockReturnValue(false),
   getPreviewFeatures: vi.fn().mockReturnValue(false),
 } as unknown as Config;
 
@@ -120,7 +119,6 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => true,
-      isInFallbackMode: vi.fn().mockReturnValue(false),
       getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
@@ -189,7 +187,6 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      isInFallbackMode: vi.fn().mockReturnValue(false),
       getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
@@ -237,7 +234,6 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      isInFallbackMode: vi.fn().mockReturnValue(false),
       getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
@@ -272,7 +268,6 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      isInFallbackMode: vi.fn().mockReturnValue(false),
       getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
@@ -315,7 +310,6 @@ describe('createContentGenerator', () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getUsageStatisticsEnabled: () => false,
-      isInFallbackMode: vi.fn().mockReturnValue(false),
       getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
     const mockGenerator = {

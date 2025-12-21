@@ -14,7 +14,7 @@ import { interpolateColor } from './color-utils.js';
 const shadesOfPurpleColors: ColorsTheme = {
   type: 'dark',
   // Required colors for ColorsTheme interface
-  Background: '#2d2b57', // Main background
+  Background: '#1e1e3f', // Main background in the VSCode terminal.
   Foreground: '#e3dfff', // Default text color (hljs, hljs-subst)
   LightBlue: '#847ace', // Light blue/purple accent
   AccentBlue: '#a599e9', // Borders, secondary blue

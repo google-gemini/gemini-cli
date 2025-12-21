@@ -210,6 +210,60 @@ describe('OAuthUtils', () => {
     });
   });
 
+  describe('discoverOAuthConfig', () => {
+    const mockResourceMetadata: OAuthProtectedResourceMetadata = {
+      resource: 'https://example.com/mcp',
+      authorization_servers: ['https://auth.example.com'],
+      bearer_methods_supported: ['header'],
+    };
+
+    const mockAuthServerMetadata: OAuthAuthorizationServerMetadata = {
+      issuer: 'https://auth.example.com',
+      authorization_endpoint: 'https://auth.example.com/authorize',
+      token_endpoint: 'https://auth.example.com/token',
+      scopes_supported: ['read', 'write'],
+    };
+
+    it('should succeed when resource metadata matches server URL', async () => {
+      mockFetch
+        // fetchProtectedResourceMetadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResourceMetadata),
+        })
+        // discoverAuthorizationServerMetadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      const config = await OAuthUtils.discoverOAuthConfig(
+        'https://example.com/mcp',
+      );
+
+      expect(config).toEqual({
+        authorizationUrl: 'https://auth.example.com/authorize',
+        tokenUrl: 'https://auth.example.com/token',
+        scopes: ['read', 'write'],
+      });
+    });
+
+    it('should throw error when resource metadata does not match server URL', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            ...mockResourceMetadata,
+            resource: 'https://malicious.com/mcp',
+          }),
+      });
+
+      await expect(
+        OAuthUtils.discoverOAuthConfig('https://example.com/mcp'),
+      ).rejects.toThrow(/does not match expected/);
+    });
+  });
+
   describe('metadataToOAuthConfig', () => {
     it('should convert metadata to OAuth config', () => {
       const metadata: OAuthAuthorizationServerMetadata = {

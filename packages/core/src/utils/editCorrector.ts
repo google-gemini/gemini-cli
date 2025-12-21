@@ -90,7 +90,7 @@ async function findLastEditTimestamp(
   filePath: string,
   client: GeminiClient,
 ): Promise<number> {
-  const history = (await client.getHistory()) ?? [];
+  const history = client.getHistory() ?? [];
 
   // Tools that may reference the file path in their FunctionResponse `output`.
   const toolsInResp = new Set([

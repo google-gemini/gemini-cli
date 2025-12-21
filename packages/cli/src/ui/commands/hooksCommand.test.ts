@@ -309,6 +309,24 @@ describe('hooksCommand', () => {
         content: 'Failed to enable hook: Failed to save settings',
       });
     });
+
+    it('should complete hook names using friendly names', () => {
+      const enableCmd = hooksCommand.subCommands!.find(
+        (cmd) => cmd.name === 'enable',
+      )!;
+
+      const hookEntry = createMockHook(
+        './hooks/test.sh',
+        HookEventName.BeforeTool,
+        true,
+      );
+      hookEntry.config.name = 'friendly-name';
+
+      mockHookSystem.getAllHooks.mockReturnValue([hookEntry]);
+
+      const completions = enableCmd.completion!(mockContext, 'frie');
+      expect(completions).toContain('friendly-name');
+    });
   });
 
   describe('disable subcommand', () => {

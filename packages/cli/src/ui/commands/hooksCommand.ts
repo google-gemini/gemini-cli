@@ -213,7 +213,7 @@ function completeHookNames(
  * Get a display name for a hook
  */
 function getHookDisplayName(hook: HookRegistryEntry): string {
-  return hook.config.command || 'unknown-hook';
+  return hook.config.name || hook.config.command || 'unknown-hook';
 }
 
 const panelCommand: SlashCommand = {

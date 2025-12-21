@@ -9,13 +9,13 @@ import { DelegateToAgentTool } from './delegate-to-agent-tool.js';
 import { AgentRegistry } from './registry.js';
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
-import { SubagentInvocation } from './invocation.js';
+import { LocalSubagentInvocation } from './local-invocation.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
-vi.mock('./invocation.js', () => ({
-  SubagentInvocation: vi.fn().mockImplementation(() => ({
+vi.mock('./local-invocation.js', () => ({
+  LocalSubagentInvocation: vi.fn().mockImplementation(() => ({
     execute: vi
       .fn()
       .mockResolvedValue({ content: [{ type: 'text', text: 'Success' }] }),
@@ -29,6 +29,7 @@ describe('DelegateToAgentTool', () => {
   let messageBus: MessageBus;
 
   const mockAgentDef: AgentDefinition = {
+    kind: 'local',
     name: 'test_agent',
     description: 'A test agent',
     promptConfig: {},
@@ -46,6 +47,7 @@ describe('DelegateToAgentTool', () => {
   beforeEach(() => {
     config = {
       getDebugMode: () => false,
+      getActiveModel: () => 'test-model',
       modelConfigService: {
         registerRuntimeModelConfig: vi.fn(),
       },
@@ -93,10 +95,10 @@ describe('DelegateToAgentTool', () => {
 
     const result = await invocation.execute(new AbortController().signal);
     expect(result).toEqual({ content: [{ type: 'text', text: 'Success' }] });
-    expect(SubagentInvocation).toHaveBeenCalledWith(
-      { arg1: 'valid' },
+    expect(LocalSubagentInvocation).toHaveBeenCalledWith(
       mockAgentDef,
       config,
+      { arg1: 'valid' },
       messageBus,
     );
   });

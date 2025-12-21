@@ -219,7 +219,7 @@ all tools with `*`, specify only the tools you need:
 
 ```json
 {
-  "matcher": "WriteFile|Edit",
+  "matcher": "write_file|replace",
   "hooks": [
     {
       "name": "validate-writes",
@@ -298,7 +298,7 @@ cat > test-input.json << 'EOF'
   "session_id": "test-123",
   "cwd": "/tmp/test",
   "hook_event_name": "BeforeTool",
-  "tool_name": "WriteFile",
+  "tool_name": "write_file",
   "tool_input": {
     "file_path": "test.txt",
     "content": "Test content"
@@ -437,7 +437,7 @@ Add descriptions to help others understand your hooks:
   "hooks": {
     "BeforeTool": [
       {
-        "matcher": "WriteFile|Edit",
+        "matcher": "write_file|replace",
         "hooks": [
           {
             "name": "secret-scanner",
@@ -484,7 +484,7 @@ Verify the hook appears in the list and is enabled.
 
 ```bash
 # Test regex pattern
-echo "WriteFile" | grep -E "Write.*|Edit"
+echo "write_file|replace" | grep -E "write_.*|replace"
 ```
 
 **Check disabled list:**
@@ -559,7 +559,7 @@ async function getCachedData(key) {
   "hooks": {
     "BeforeTool": [
       {
-        "matcher": "WriteFile",
+        "matcher": "write_file",
         "hooks": [
           {
             "name": "quick-check",
@@ -569,7 +569,7 @@ async function getCachedData(key) {
         ]
       },
       {
-        "matcher": "WriteFile",
+        "matcher": "write_file",
         "hooks": [
           {
             "name": "deep-check",

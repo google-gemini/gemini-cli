@@ -35,7 +35,6 @@ import {
   type IdeContext,
   type UserTierId,
   type UserFeedbackPayload,
-  DEFAULT_GEMINI_FLASH_MODEL,
   IdeClient,
   ideContextStore,
   getErrorMessage,
@@ -50,7 +49,6 @@ import {
   coreEvents,
   CoreEvent,
   refreshServerHierarchicalMemory,
-  type ModelChangedPayload,
   type MemoryChangedPayload,
   writeToStdout,
   disableMouseEvents,
@@ -123,7 +121,7 @@ import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
-import { enableSupportedProtocol } from './utils/kittyProtocolDetector.js';
+import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { enableBracketedPaste } from './utils/bracketedPaste.js';
 import { useBanner } from './hooks/useBanner.js';
@@ -256,12 +254,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   // Helper to determine the effective model, considering the fallback state.
-  const getEffectiveModel = useCallback(() => {
-    if (config.isInFallbackMode()) {
-      return DEFAULT_GEMINI_FLASH_MODEL;
-    }
-    return config.getModel();
-  }, [config]);
+  const getEffectiveModel = useCallback(() => config.getModel(), [config]);
 
   const [currentModel, setCurrentModel] = useState(getEffectiveModel());
 
@@ -340,22 +333,15 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Subscribe to fallback mode and model changes from core
   useEffect(() => {
-    const handleFallbackModeChanged = () => {
-      const effectiveModel = getEffectiveModel();
-      setCurrentModel(effectiveModel);
+    const handleModelChanged = () => {
+      setCurrentModel(config.getModel());
     };
 
-    const handleModelChanged = (payload: ModelChangedPayload) => {
-      setCurrentModel(payload.model);
-    };
-
-    coreEvents.on(CoreEvent.FallbackModeChanged, handleFallbackModeChanged);
     coreEvents.on(CoreEvent.ModelChanged, handleModelChanged);
     return () => {
-      coreEvents.off(CoreEvent.FallbackModeChanged, handleFallbackModeChanged);
       coreEvents.off(CoreEvent.ModelChanged, handleModelChanged);
     };
-  }, [getEffectiveModel]);
+  }, [getEffectiveModel, config]);
 
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();
@@ -412,7 +398,7 @@ export const AppContainer = (props: AppContainerProps) => {
       app.rerender();
     }
     enableBracketedPaste();
-    enableSupportedProtocol();
+    terminalCapabilityManager.enableKittyProtocol();
     refreshStatic();
   }, [refreshStatic, isAlternateBuffer, app, config]);
 
@@ -1438,7 +1424,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           authType === AuthType.USE_VERTEX_AI
         ) {
           setDefaultBannerText(
-            'Gemini 3 is now available.\nTo use Gemini 3, enable "Preview features" in /settings\nLearn more at https://goo.gle/enable-preview-features',
+            'Gemini 3 Flash and Pro are now available. \nEnable "Preview features" in /settings. \nLearn more at https://goo.gle/enable-preview-features',
           );
         }
       }
@@ -1543,6 +1529,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       warningMessage,
       bannerData,
       bannerVisible,
+      terminalBackgroundColor: config.getTerminalBackground(),
     }),
     [
       isThemeDialogOpen,
@@ -1634,6 +1621,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       warningMessage,
       bannerData,
       bannerVisible,
+      config,
     ],
   );
 

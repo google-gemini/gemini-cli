@@ -27,6 +27,7 @@ import {
   coreEvents,
   CoreEvent,
   createWorkingStdio,
+  recordToolCallInteractions,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -407,6 +408,8 @@ export async function runNonInteractive({
             geminiClient
               .getChat()
               .recordCompletedToolCalls(currentModel, completedToolCalls);
+
+            await recordToolCallInteractions(config, completedToolCalls);
           } catch (error) {
             debugLogger.error(
               `Error recording completed tool call information: ${error}`,

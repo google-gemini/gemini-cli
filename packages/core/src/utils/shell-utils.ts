@@ -12,8 +12,9 @@ import {
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
 import type { Node } from 'web-tree-sitter';
-import { Language, Parser } from 'web-tree-sitter';
+import { Language, Parser, Query } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
+import { debugLogger } from './debugLogger.js';
 
 export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
@@ -305,12 +306,38 @@ function parseBashCommandDetails(command: string): CommandParseResult | null {
   }
 
   const details = collectCommandDetails(tree.rootNode, command);
+
+  const hasError =
+    tree.rootNode.hasError ||
+    details.length === 0 ||
+    hasPromptCommandTransform(tree.rootNode);
+
+  if (hasError) {
+    let query = null;
+    try {
+      query = new Query(bashLanguage, '(ERROR) @error (MISSING) @missing');
+      const captures = query.captures(tree.rootNode);
+      const syntaxErrors = captures.map((capture) => {
+        const { node, name } = capture;
+        const type = name === 'missing' ? 'Missing' : 'Error';
+        return `${type} node: "${node.text}" at ${node.startPosition.row}:${node.startPosition.column}`;
+      });
+
+      debugLogger.log(
+        'Bash command parsing error detected for command:',
+        command,
+        'Syntax Errors:',
+        syntaxErrors,
+      );
+    } catch (_e) {
+      // Ignore query errors
+    } finally {
+      query?.delete();
+    }
+  }
   return {
     details,
-    hasError:
-      tree.rootNode.hasError ||
-      details.length === 0 ||
-      hasPromptCommandTransform(tree.rootNode),
+    hasError,
   };
 }
 

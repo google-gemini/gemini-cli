@@ -27,8 +27,17 @@ const mockDebugLogger = vi.hoisted(() => ({
   debug: vi.fn(),
 }));
 
+// Mock coreEvents
+const mockCoreEvents = vi.hoisted(() => ({
+  emitFeedback: vi.fn(),
+}));
+
 vi.mock('../utils/debugLogger.js', () => ({
   debugLogger: mockDebugLogger,
+}));
+
+vi.mock('../utils/events.js', () => ({
+  coreEvents: mockCoreEvents,
 }));
 
 describe('HookEventHandler', () => {
@@ -166,6 +175,53 @@ describe('HookEventHandler', () => {
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0].message).toBe('Planning failed');
       expect(mockDebugLogger.error).toHaveBeenCalled();
+    });
+
+    it('should emit feedback when some hooks fail', async () => {
+      const mockPlan = [
+        {
+          type: HookType.Command,
+          command: './fail.sh',
+        } as HookConfig,
+      ];
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: false,
+          duration: 50,
+          hookConfig: mockPlan[0],
+          eventName: HookEventName.BeforeTool,
+          error: new Error('Failed to execute'),
+        },
+      ];
+      const mockAggregated = {
+        success: false,
+        allOutputs: [],
+        errors: [new Error('Failed to execute')],
+        totalDuration: 50,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.BeforeTool,
+        hookConfigs: mockPlan,
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      await hookEventHandler.fireBeforeToolEvent('EditTool', {});
+
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('./fail.sh'),
+      );
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('F12'),
+      );
     });
   });
 

@@ -589,7 +589,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // If the command is a perfect match, pressing enter should execute it.
-      if (completion.isPerfectMatch && keyMatchers[Command.RETURN](key)) {
+      // We prioritize execution unless the user is explicitly selecting a different suggestion.
+      if (
+        completion.isPerfectMatch &&
+        keyMatchers[Command.RETURN](key) &&
+        (!completion.showSuggestions || completion.activeSuggestionIndex <= 0)
+      ) {
         handleSubmit(buffer.text);
         return;
       }

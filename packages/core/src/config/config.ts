@@ -48,7 +48,11 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_THINKING_MODE,
+  isPreviewModel,
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -80,6 +84,7 @@ import { PolicyEngine } from '../policy/policy-engine.js';
 import type { PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
+import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
@@ -127,6 +132,10 @@ export interface CodebaseInvestigatorSettings {
   maxTimeMinutes?: number;
   thinkingBudget?: number;
   model?: string;
+}
+
+export interface IntrospectionAgentSettings {
+  enabled?: boolean;
 }
 
 /**
@@ -302,6 +311,7 @@ export interface ConfigParameters {
   enableMessageBusIntegration?: boolean;
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
+  introspectionAgentSettings?: IntrospectionAgentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -322,7 +332,6 @@ export interface ConfigParameters {
       } & { disabled?: string[] });
   previewFeatures?: boolean;
   enableAgents?: boolean;
-  enableModelAvailabilityService?: boolean;
   experimentalJitContext?: boolean;
 }
 
@@ -379,11 +388,11 @@ export class Config {
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
   private previewFeatures: boolean | undefined;
+  private hasAccessToPreviewModel: boolean = false;
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
 
-  private inFallbackMode = false;
   private _activeModel: string;
   private readonly maxSessionTurns: number;
   private readonly listSessions: boolean;
@@ -425,6 +434,7 @@ export class Config {
   private readonly outputSettings: OutputSettings;
   private readonly enableMessageBusIntegration: boolean;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
+  private readonly introspectionAgentSettings: IntrospectionAgentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -442,13 +452,11 @@ export class Config {
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
 
-  private previewModelFallbackMode = false;
-  private previewModelBypassMode = false;
-  private readonly enableModelAvailabilityService: boolean;
   private readonly enableAgents: boolean;
 
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
+  private terminalBackground: string | undefined = undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -508,8 +516,6 @@ export class Config {
     this.bugCommand = params.bugCommand;
     this.model = params.model;
     this._activeModel = params.model;
-    this.enableModelAvailabilityService =
-      params.enableModelAvailabilityService ?? false;
     this.enableAgents = params.enableAgents ?? false;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.modelAvailabilityService = new ModelAvailabilityService();
@@ -551,7 +557,10 @@ export class Config {
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
-    this.useWriteTodos = params.useWriteTodos ?? true;
+    // // TODO(joshualitt): Re-evaluate the todo tool for 3 family.
+    this.useWriteTodos = isPreviewModel(this.model)
+      ? false
+      : (params.useWriteTodos ?? true);
     this.enableHooks = params.enableHooks ?? false;
     this.disabledHooks =
       (params.hooks && 'disabled' in params.hooks
@@ -574,6 +583,9 @@ export class Config {
         params.codebaseInvestigatorSettings?.thinkingBudget ??
         DEFAULT_THINKING_MODE,
       model: params.codebaseInvestigatorSettings?.model,
+    };
+    this.introspectionAgentSettings = {
+      enabled: params.introspectionAgentSettings?.enabled ?? false,
     };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
@@ -693,6 +705,7 @@ export class Config {
 
     if (this.experimentalJitContext) {
       this.contextManager = new ContextManager(this);
+      await this.contextManager.refresh();
     }
 
     await this.geminiClient.initialize();
@@ -716,6 +729,9 @@ export class Config {
       this.geminiClient.stripThoughtsFromHistory();
     }
 
+    // Reset availability status when switching auth (e.g. from limited key to OAuth)
+    this.modelAvailabilityService.reset();
+
     const newContentGeneratorConfig = await createContentGeneratorConfig(
       this,
       authMethod,
@@ -731,16 +747,18 @@ export class Config {
     // Initialize BaseLlmClient now that the ContentGenerator is available
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
-    const previewFeatures = this.getPreviewFeatures();
-
     const codeAssistServer = getCodeAssistServer(this);
     if (codeAssistServer) {
+      if (codeAssistServer.projectId) {
+        await this.refreshUserQuota();
+      }
+
       this.experimentsPromise = getExperiments(codeAssistServer)
         .then((experiments) => {
           this.setExperiments(experiments);
 
           // If preview features have not been set and the user authenticated through Google, we enable preview based on remote config only if it's true
-          if (previewFeatures === undefined) {
+          if (this.getPreviewFeatures() === undefined) {
             const remotePreviewFeatures =
               experiments.flags[ExperimentFlags.ENABLE_PREVIEW]?.boolValue;
             if (remotePreviewFeatures === true) {
@@ -756,8 +774,18 @@ export class Config {
       this.experimentsPromise = undefined;
     }
 
-    // Reset the session flag since we're explicitly changing auth and using default model
-    this.inFallbackMode = false;
+    const authType = this.contentGeneratorConfig.authType;
+    if (
+      authType === AuthType.USE_GEMINI ||
+      authType === AuthType.USE_VERTEX_AI
+    ) {
+      this.setHasAccessToPreviewModel(true);
+    }
+
+    // Update model if user no longer has access to the preview model
+    if (!this.hasAccessToPreviewModel && isPreviewModel(this.model)) {
+      this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
+    }
   }
 
   async getExperimentsAsync(): Promise<Experiments | undefined> {
@@ -803,6 +831,14 @@ export class Config {
     this.sessionId = sessionId;
   }
 
+  setTerminalBackground(terminalBackground: string | undefined): void {
+    this.terminalBackground = terminalBackground;
+  }
+
+  getTerminalBackground(): string | undefined {
+    return this.terminalBackground;
+  }
+
   shouldLoadMemoryFromIncludeDirectories(): boolean {
     return this.loadMemoryFromIncludeDirectories;
   }
@@ -824,13 +860,12 @@ export class Config {
   }
 
   setModel(newModel: string): void {
-    if (this.model !== newModel || this.inFallbackMode) {
+    if (this.model !== newModel || this._activeModel !== newModel) {
       this.model = newModel;
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
     }
-    this.setFallbackMode(false);
     this.modelAvailabilityService.reset();
   }
 
@@ -841,20 +876,7 @@ export class Config {
   setActiveModel(model: string): void {
     if (this._activeModel !== model) {
       this._activeModel = model;
-      coreEvents.emitModelChanged(model);
     }
-  }
-
-  resetTurn(): void {
-    this.modelAvailabilityService.resetTurn();
-  }
-
-  isInFallbackMode(): boolean {
-    return this.inFallbackMode;
-  }
-
-  setFallbackMode(active: boolean): void {
-    this.inFallbackMode = active;
   }
 
   setFallbackModelHandler(handler: FallbackModelHandler): void {
@@ -865,20 +887,8 @@ export class Config {
     return this.fallbackModelHandler;
   }
 
-  isPreviewModelFallbackMode(): boolean {
-    return this.previewModelFallbackMode;
-  }
-
-  setPreviewModelFallbackMode(active: boolean): void {
-    this.previewModelFallbackMode = active;
-  }
-
-  isPreviewModelBypassMode(): boolean {
-    return this.previewModelBypassMode;
-  }
-
-  setPreviewModelBypassMode(active: boolean): void {
-    this.previewModelBypassMode = active;
+  resetTurn(): void {
+    this.modelAvailabilityService.resetTurn();
   }
 
   getMaxSessionTurns(): number {
@@ -952,7 +962,49 @@ export class Config {
   }
 
   setPreviewFeatures(previewFeatures: boolean) {
+    // No change in state, no action needed
+    if (this.previewFeatures === previewFeatures) {
+      return;
+    }
     this.previewFeatures = previewFeatures;
+    const currentModel = this.getModel();
+
+    // Case 1: Disabling preview features while on a preview model
+    if (!previewFeatures && isPreviewModel(currentModel)) {
+      this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
+    }
+
+    // Case 2: Enabling preview features while on the default auto model
+    else if (previewFeatures && currentModel === DEFAULT_GEMINI_MODEL_AUTO) {
+      this.setModel(PREVIEW_GEMINI_MODEL_AUTO);
+    }
+  }
+
+  getHasAccessToPreviewModel(): boolean {
+    return this.hasAccessToPreviewModel;
+  }
+
+  setHasAccessToPreviewModel(hasAccess: boolean): void {
+    this.hasAccessToPreviewModel = hasAccess;
+  }
+
+  async refreshUserQuota(): Promise<RetrieveUserQuotaResponse | undefined> {
+    const codeAssistServer = getCodeAssistServer(this);
+    if (!codeAssistServer || !codeAssistServer.projectId) {
+      return undefined;
+    }
+    try {
+      const quota = await codeAssistServer.retrieveUserQuota({
+        project: codeAssistServer.projectId,
+      });
+      const hasAccess =
+        quota.buckets?.some((b) => b.modelId === PREVIEW_GEMINI_MODEL) ?? false;
+      this.setHasAccessToPreviewModel(hasAccess);
+      return quota;
+    } catch (e) {
+      debugLogger.debug('Failed to retrieve user quota', e);
+      return undefined;
+    }
   }
 
   getCoreTools(): string[] | undefined {
@@ -1020,6 +1072,14 @@ export class Config {
   }
 
   getUserMemory(): string {
+    if (this.experimentalJitContext && this.contextManager) {
+      return [
+        this.contextManager.getGlobalMemory(),
+        this.contextManager.getEnvironmentMemory(),
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+    }
     return this.userMemory;
   }
 
@@ -1044,6 +1104,9 @@ export class Config {
   }
 
   getGeminiMdFileCount(): number {
+    if (this.experimentalJitContext && this.contextManager) {
+      return this.contextManager.getLoadedPaths().size;
+    }
     return this.geminiMdFileCount;
   }
 
@@ -1052,6 +1115,9 @@ export class Config {
   }
 
   getGeminiMdFilePaths(): string[] {
+    if (this.experimentalJitContext && this.contextManager) {
+      return Array.from(this.contextManager.getLoadedPaths());
+    }
     return this.geminiMdFilePaths;
   }
 
@@ -1247,10 +1313,6 @@ export class Config {
 
   getEnableExtensionReloading(): boolean {
     return this.enableExtensionReloading;
-  }
-
-  isModelAvailabilityServiceEnabled(): boolean {
-    return this.enableModelAvailabilityService;
   }
 
   isAgentsEnabled(): boolean {
@@ -1495,6 +1557,10 @@ export class Config {
 
   getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
     return this.codebaseInvestigatorSettings;
+  }
+
+  getIntrospectionAgentSettings(): IntrospectionAgentSettings {
+    return this.introspectionAgentSettings;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {

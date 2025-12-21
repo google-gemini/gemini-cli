@@ -472,7 +472,9 @@ export class LoopDetectionService {
       return false;
     }
 
-    if (this.config.isInFallbackMode()) {
+    const availability = this.config.getModelAvailabilityService();
+
+    if (!availability.snapshot(doubleCheckModelName).available) {
       const flashModelName = this.config.modelConfigService.getResolvedConfig({
         model: 'loop-detection',
       }).model;

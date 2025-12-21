@@ -367,6 +367,12 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3-pro-preview"
         }
       },
+      "gemini-3-flash-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
+        }
+      },
       "gemini-2.5-pro": {
         "extends": "chat-base-2.5",
         "modelConfig": {
@@ -494,6 +500,11 @@ their corresponding top-level category object in your `settings.json` file.
       "chat-compression-3-pro": {
         "modelConfig": {
           "model": "gemini-3-pro-preview"
+        }
+      },
+      "chat-compression-3-flash": {
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
         }
       },
       "chat-compression-2.5-pro": {
@@ -720,6 +731,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`security.enablePermanentToolApproval`** (boolean):
+  - **Description:** Enable the "Allow for all future sessions" option in tool
+    confirmation dialogs.
+  - **Default:** `false`
+
 - **`security.blockGitExtensions`** (boolean):
   - **Description:** Blocks installing and loading extensions from Git.
   - **Default:** `false`
@@ -773,7 +789,8 @@ their corresponding top-level category object in your `settings.json` file.
 #### `experimental`
 
 - **`experimental.enableAgents`** (boolean):
-  - **Description:** Enable local and remote subagents.
+  - **Description:** Enable local and remote subagents. Warning: Experimental
+    feature, uses YOLO mode for subagents
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -784,11 +801,6 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.extensionReloading`** (boolean):
   - **Description:** Enables extension loading/unloading within the CLI session.
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
-- **`experimental.isModelAvailabilityServiceEnabled`** (boolean):
-  - **Description:** Enable model routing using new availability service.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -821,7 +833,12 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.codebaseInvestigatorSettings.model`** (string):
   - **Description:** The model to use for the Codebase Investigator agent.
-  - **Default:** `"pro"`
+  - **Default:** `"auto"`
+  - **Requires restart:** Yes
+
+- **`experimental.introspectionAgentSettings.enabled`** (boolean):
+  - **Description:** Enable the Introspection Agent.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 #### `hooks`
@@ -1117,6 +1134,18 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GEMINI_SANDBOX`**:
   - Alternative to the `sandbox` setting in `settings.json`.
   - Accepts `true`, `false`, `docker`, `podman`, or a custom command string.
+- **`GEMINI_SYSTEM_MD`**:
+  - Replaces the built‑in system prompt with content from a Markdown file.
+  - `true`/`1`: Use project default path `./.gemini/system.md`.
+  - Any other string: Treat as a path (relative/absolute supported, `~`
+    expands).
+  - `false`/`0` or unset: Use the built‑in prompt. See
+    [System Prompt Override](../cli/system-prompt.md).
+- **`GEMINI_WRITE_SYSTEM_MD`**:
+  - Writes the current built‑in system prompt to a file for review.
+  - `true`/`1`: Write to `./.gemini/system.md`. Otherwise treat the value as a
+    path.
+  - Run the CLI once with this set to generate the file.
 - **`SEATBELT_PROFILE`** (macOS specific):
   - Switches the Seatbelt (`sandbox-exec`) profile on macOS.
   - `permissive-open`: (Default) Restricts writes to the project folder (and a

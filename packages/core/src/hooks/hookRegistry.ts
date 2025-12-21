@@ -96,10 +96,12 @@ export class HookRegistry {
   }
 
   /**
-   * Get hook name for display purposes
+   * Get hook name for identification and display purposes
    */
-  private getHookName(entry: HookRegistryEntry): string {
-    return entry.config.command || 'unknown-command';
+  private getHookName(
+    entry: HookRegistryEntry | { config: HookConfig },
+  ): string {
+    return entry.config.name || entry.config.command || 'unknown-command';
   }
 
   /**
