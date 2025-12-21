@@ -6,15 +6,15 @@
 
 import type { GenerateContentResponse } from '@google/genai';
 import { ApiError } from '@google/genai';
-import {
-  TerminalQuotaError,
-  RetryableQuotaError,
-  classifyGoogleError,
-} from './googleQuotaErrors.js';
-import { delay, createAbortError } from './delay.js';
-import { debugLogger } from './debugLogger.js';
-import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
+import { debugLogger } from './debugLogger.js';
+import { createAbortError, delay } from './delay.js';
+import {
+  classifyGoogleError,
+  RetryableQuotaError,
+  TerminalQuotaError,
+} from './googleQuotaErrors.js';
+import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 
 export type { RetryAvailabilityContext };
 
@@ -208,7 +208,16 @@ export async function retryWithBackoff<T>(
               continue;
             }
           } catch (fallbackError) {
-            debugLogger.warn('Fallback to Flash model failed:', fallbackError);
+            const errorMessage =
+              classifiedError instanceof TerminalQuotaError
+                ? classifiedError.message
+                : classifiedError instanceof ModelNotFoundError
+                  ? classifiedError.message
+                  : 'Unknown error';
+            debugLogger.warn(
+              `Model fallback failed after ${errorMessage}. Failed to switch to fallback model:`,
+              fallbackError,
+            );
           }
         }
         // Terminal/not_found already recorded; nothing else to mark here.
@@ -232,7 +241,14 @@ export async function retryWithBackoff<T>(
                 continue;
               }
             } catch (fallbackError) {
-              console.warn('Model fallback failed:', fallbackError);
+              const errorMessage =
+                classifiedError instanceof RetryableQuotaError
+                  ? classifiedError.message
+                  : `HTTP ${errorCode} error`;
+              console.warn(
+                `Model fallback failed after ${errorMessage} (attempt ${attempt}/${maxAttempts}). Failed to switch to fallback model:`,
+                fallbackError,
+              );
             }
           }
           throw classifiedError instanceof RetryableQuotaError
@@ -278,7 +294,9 @@ export async function retryWithBackoff<T>(
     }
   }
 
-  throw new Error('Retry attempts exhausted');
+  throw new Error(
+    `Retry attempts exhausted after ${maxAttempts} attempts. Last error was not retryable or all retries failed.`,
+  );
 }
 
 /**
@@ -292,31 +310,33 @@ function logRetryAttempt(
   error: unknown,
   errorStatus?: number,
 ): void {
-  let message = `Attempt ${attempt} failed. Retrying with backoff...`;
+  const errorDetails =
+    error instanceof Error ? `: ${error.message}` : '';
+  let message = `API request attempt ${attempt} failed${errorDetails}. Retrying with exponential backoff...`;
   if (errorStatus) {
-    message = `Attempt ${attempt} failed with status ${errorStatus}. Retrying with backoff...`;
+    message = `API request attempt ${attempt} failed with HTTP status ${errorStatus}${errorDetails}. Retrying with exponential backoff...`;
   }
 
   if (errorStatus === 429) {
     debugLogger.warn(message, error);
   } else if (errorStatus && errorStatus >= 500 && errorStatus < 600) {
     console.error(message, error);
-  } else if (error instanceof Error) {
-    // Fallback for errors that might not have a status but have a message
-    if (error.message.includes('429')) {
-      debugLogger.warn(
-        `Attempt ${attempt} failed with 429 error (no Retry-After header). Retrying with backoff...`,
-        error,
-      );
-    } else if (error.message.match(/5\d{2}/)) {
-      console.error(
-        `Attempt ${attempt} failed with 5xx error. Retrying with backoff...`,
-        error,
-      );
+    } else if (error instanceof Error) {
+      // Fallback for errors that might not have a status but have a message
+      if (error.message.includes('429')) {
+        debugLogger.warn(
+          `API request attempt ${attempt} failed with 429 rate limit error (no Retry-After header). Retrying with exponential backoff...`,
+          error,
+        );
+      } else if (error.message.match(/5\d{2}/)) {
+        console.error(
+          `API request attempt ${attempt} failed with 5xx server error. Retrying with exponential backoff...`,
+          error,
+        );
+      } else {
+        debugLogger.warn(message, error); // Default to warn for other errors
+      }
     } else {
-      debugLogger.warn(message, error); // Default to warn for other errors
+      debugLogger.warn(message, error); // Default to warn if error type is unknown
     }
-  } else {
-    debugLogger.warn(message, error); // Default to warn if error type is unknown
-  }
 }

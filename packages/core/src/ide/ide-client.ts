@@ -711,11 +711,16 @@ export class IdeClient {
         }
       },
     );
-    this.client.onerror = (_error) => {
-      const errorMessage = _error instanceof Error ? _error.message : `_error`;
+    this.client.onerror = (error) => {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+            ? error
+            : 'Unknown error occurred';
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable\n${errorMessage}`,
+        `IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable\nError details: ${errorMessage}`,
         true,
       );
     };
@@ -796,12 +801,15 @@ export class IdeClient {
       await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
       return true;
-    } catch (_error) {
+    } catch (connectionError) {
       if (transport) {
         try {
           await transport.close();
         } catch (closeError) {
-          logger.debug('Failed to close transport:', closeError);
+          logger.debug(
+            `Failed to close HTTP SSE transport after connection failure:`,
+            closeError,
+          );
         }
       }
       return false;
@@ -830,12 +838,15 @@ export class IdeClient {
       await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
       return true;
-    } catch (_error) {
+    } catch (connectionError) {
       if (transport) {
         try {
           await transport.close();
         } catch (closeError) {
-          logger.debug('Failed to close transport:', closeError);
+          logger.debug(
+            `Failed to close stdio transport after connection failure:`,
+            closeError,
+          );
         }
       }
       return false;
