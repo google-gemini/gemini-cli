@@ -16,6 +16,8 @@ import type {
   HookToolConfig,
 } from './hookTranslator.js';
 import { defaultHookTranslator } from './hookTranslator.js';
+import type { ToolResult } from '../tools/tools.js';
+import { ToolErrorType } from '../tools/tool-error.js';
 
 /**
  * Event names for the hook system
@@ -148,6 +150,13 @@ export class DefaultHookOutput implements HookOutput {
   }
 
   /**
+   * Check if this output represents an approving decision
+   */
+  isApprovingDecision(): boolean {
+    return this.decision === 'approve' || this.decision === 'allow';
+  }
+
+  /**
    * Check if this output requests to stop execution
    */
   shouldStopExecution(): boolean {
@@ -211,6 +220,40 @@ export class DefaultHookOutput implements HookOutput {
     }
     return { blocked: false, reason: '' };
   }
+
+  /**
+   * If the hook output indicates execution should be blocked or stopped,
+   * returns a ToolResult object representing the error. Otherwise, returns null.
+   */
+  getBlockingOrStoppingResult(): ToolResult | null {
+    const blockingError = this.getBlockingError();
+    if (blockingError.blocked) {
+      const message = `Tool execution blocked by hook: ${blockingError.reason}`;
+      return {
+        llmContent: message,
+        returnDisplay: message,
+        error: {
+          type: ToolErrorType.EXECUTION_FAILED,
+          message,
+        },
+      };
+    }
+
+    if (this.shouldStopExecution()) {
+      const reason = this.getEffectiveReason();
+      const message = `Agent execution stopped by hook: ${reason}`;
+      return {
+        llmContent: message,
+        returnDisplay: message,
+        error: {
+          type: ToolErrorType.EXECUTION_FAILED,
+          message,
+        },
+      };
+    }
+
+    return null;
+  }
 }
 
 /**
@@ -239,18 +282,32 @@ export class BeforeToolHookOutput extends DefaultHookOutput {
    * Check if this output represents a blocking decision, considering compatibility fields
    */
   override isBlockingDecision(): boolean {
-    // Check compatibility field first
+    // If compatibility field exists, use it exclusively (don't fall through)
     if (
       this.hookSpecificOutput &&
       'permissionDecision' in this.hookSpecificOutput
     ) {
       const compatDecision = this.hookSpecificOutput['permissionDecision'];
-      if (compatDecision === 'block' || compatDecision === 'deny') {
-        return true;
-      }
+      return compatDecision === 'block' || compatDecision === 'deny';
     }
 
     return super.isBlockingDecision();
+  }
+
+  /**
+   * Check if this output represents an approving decision, considering compatibility fields
+   */
+  override isApprovingDecision(): boolean {
+    // If compatibility field exists, use it exclusively (don't fall through)
+    if (
+      this.hookSpecificOutput &&
+      'permissionDecision' in this.hookSpecificOutput
+    ) {
+      const compatDecision = this.hookSpecificOutput['permissionDecision'];
+      return compatDecision === 'approve' || compatDecision === 'allow';
+    }
+
+    return super.isApprovingDecision();
   }
 }
 
