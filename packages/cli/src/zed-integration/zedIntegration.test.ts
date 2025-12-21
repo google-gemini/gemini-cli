@@ -15,7 +15,7 @@ import {
   type Mocked,
 } from 'vitest';
 import { GeminiAgent, Session } from './zedIntegration.js';
-import * as acp from './acp.js';
+import * as acp from '@agentclientprotocol/sdk';
 import {
   AuthType,
   ToolConfirmationOutcome,
@@ -85,7 +85,7 @@ describe('GeminiAgent', () => {
   let mockConfig: Mocked<Awaited<ReturnType<typeof loadCliConfig>>>;
   let mockSettings: Mocked<LoadedSettings>;
   let mockArgv: CliArgs;
-  let mockClient: Mocked<acp.Client>;
+  let mockConnection: Mocked<acp.AgentSideConnection>;
   let agent: GeminiAgent;
 
   beforeEach(() => {
@@ -106,13 +106,13 @@ describe('GeminiAgent', () => {
       setValue: vi.fn(),
     } as unknown as Mocked<LoadedSettings>;
     mockArgv = {} as unknown as CliArgs;
-    mockClient = {
+    mockConnection = {
       sessionUpdate: vi.fn(),
-    } as unknown as Mocked<acp.Client>;
+    } as unknown as Mocked<acp.AgentSideConnection>;
 
     (loadCliConfig as unknown as Mock).mockResolvedValue(mockConfig);
 
-    agent = new GeminiAgent(mockConfig, mockSettings, mockArgv, mockClient);
+    agent = new GeminiAgent(mockConfig, mockSettings, mockArgv, mockConnection);
   });
 
   it('should initialize correctly', async () => {
@@ -123,7 +123,7 @@ describe('GeminiAgent', () => {
 
     expect(response.protocolVersion).toBe(acp.PROTOCOL_VERSION);
     expect(response.authMethods).toHaveLength(3);
-    expect(response.agentCapabilities.loadSession).toBe(false);
+    expect(response.agentCapabilities?.loadSession).toBe(false);
   });
 
   it('should authenticate correctly', async () => {
@@ -202,7 +202,7 @@ describe('GeminiAgent', () => {
   });
 
   it('should initialize file system service if client supports it', async () => {
-    agent = new GeminiAgent(mockConfig, mockSettings, mockArgv, mockClient);
+    agent = new GeminiAgent(mockConfig, mockSettings, mockArgv, mockConnection);
     await agent.initialize({
       clientCapabilities: { fs: { readTextFile: true, writeTextFile: true } },
       protocolVersion: 1,
@@ -257,7 +257,7 @@ describe('GeminiAgent', () => {
 describe('Session', () => {
   let mockChat: Mocked<GeminiChat>;
   let mockConfig: Mocked<Config>;
-  let mockClient: Mocked<acp.Client>;
+  let mockConnection: Mocked<acp.AgentSideConnection>;
   let session: Session;
   let mockToolRegistry: { getTool: Mock };
   let mockTool: { kind: string; build: Mock };
@@ -280,7 +280,6 @@ describe('Session', () => {
       getTool: vi.fn().mockReturnValue(mockTool),
     };
     mockConfig = {
-      isInFallbackMode: vi.fn().mockReturnValue(false),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getPreviewFeatures: vi.fn().mockReturnValue({}),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
@@ -292,13 +291,13 @@ describe('Session', () => {
       getEnableRecursiveFileSearch: vi.fn().mockReturnValue(false),
       getDebugMode: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
-    mockClient = {
+    mockConnection = {
       sessionUpdate: vi.fn(),
       requestPermission: vi.fn(),
       sendNotification: vi.fn(),
-    } as unknown as Mocked<acp.Client>;
+    } as unknown as Mocked<acp.AgentSideConnection>;
 
-    session = new Session('session-1', mockChat, mockConfig, mockClient);
+    session = new Session('session-1', mockChat, mockConfig, mockConnection);
   });
 
   afterEach(() => {
@@ -322,7 +321,7 @@ describe('Session', () => {
     });
 
     expect(mockChat.sendMessageStream).toHaveBeenCalled();
-    expect(mockClient.sessionUpdate).toHaveBeenCalledWith({
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
       sessionId: 'session-1',
       update: {
         sessionUpdate: 'agent_message_chunk',
@@ -361,7 +360,7 @@ describe('Session', () => {
 
     expect(mockToolRegistry.getTool).toHaveBeenCalledWith('test_tool');
     expect(mockTool.build).toHaveBeenCalledWith({ foo: 'bar' });
-    expect(mockClient.sessionUpdate).toHaveBeenCalledWith(
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         update: expect.objectContaining({
           sessionUpdate: 'tool_call',
@@ -369,7 +368,7 @@ describe('Session', () => {
         }),
       }),
     );
-    expect(mockClient.sessionUpdate).toHaveBeenCalledWith(
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         update: expect.objectContaining({
           sessionUpdate: 'tool_call_update',
@@ -392,7 +391,7 @@ describe('Session', () => {
       execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
     });
 
-    mockClient.requestPermission.mockResolvedValue({
+    mockConnection.requestPermission.mockResolvedValue({
       outcome: {
         outcome: 'selected',
         optionId: ToolConfirmationOutcome.ProceedOnce,
@@ -423,7 +422,7 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: 'Call tool' }],
     });
 
-    expect(mockClient.requestPermission).toHaveBeenCalled();
+    expect(mockConnection.requestPermission).toHaveBeenCalled();
     expect(confirmationDetails.onConfirm).toHaveBeenCalledWith(
       ToolConfirmationOutcome.ProceedOnce,
     );
@@ -441,7 +440,7 @@ describe('Session', () => {
       execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
     });
 
-    mockClient.requestPermission.mockResolvedValue({
+    mockConnection.requestPermission.mockResolvedValue({
       outcome: { outcome: 'cancelled' },
     });
 
@@ -635,7 +634,7 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: 'Call tool' }],
     });
 
-    expect(mockClient.sessionUpdate).toHaveBeenCalledWith(
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         update: expect.objectContaining({
           sessionUpdate: 'tool_call_update',

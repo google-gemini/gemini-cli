@@ -42,8 +42,10 @@ vi.mock('node:os', () => ({
   platform: mocks.platform,
 }));
 
-vi.mock('./kittyProtocolDetector.js', () => ({
-  isKittyProtocolEnabled: vi.fn().mockReturnValue(false),
+vi.mock('./terminalCapabilityManager.js', () => ({
+  terminalCapabilityManager: {
+    isKittyProtocolEnabled: vi.fn().mockReturnValue(false),
+  },
 }));
 
 describe('terminalSetup', () => {

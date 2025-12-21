@@ -4,87 +4,108 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FallbackStrategy } from './fallbackStrategy.js';
 import type { RoutingContext } from '../routingStrategy.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { Config } from '../../config/config.js';
+import type { ModelAvailabilityService } from '../../availability/modelAvailabilityService.js';
 import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
 } from '../../config/models.js';
+import { selectModelForAvailability } from '../../availability/policyHelpers.js';
+
+vi.mock('../../availability/policyHelpers.js', () => ({
+  selectModelForAvailability: vi.fn(),
+}));
+
+const createMockConfig = (overrides: Partial<Config> = {}): Config =>
+  ({
+    getModelAvailabilityService: vi.fn(),
+    getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
+    getPreviewFeatures: vi.fn().mockReturnValue(false),
+    ...overrides,
+  }) as unknown as Config;
 
 describe('FallbackStrategy', () => {
   const strategy = new FallbackStrategy();
   const mockContext = {} as RoutingContext;
   const mockClient = {} as BaseLlmClient;
+  let mockService: ModelAvailabilityService;
+  let mockConfig: Config;
 
-  it('should return null when not in fallback mode', async () => {
-    const mockConfig = {
-      isInFallbackMode: () => false,
-      getModel: () => DEFAULT_GEMINI_MODEL,
-      getPreviewFeatures: () => false,
-    } as Config;
+  beforeEach(() => {
+    vi.resetAllMocks();
+
+    mockService = {
+      snapshot: vi.fn(),
+    } as unknown as ModelAvailabilityService;
+
+    mockConfig = createMockConfig({
+      getModelAvailabilityService: vi.fn().mockReturnValue(mockService),
+    });
+  });
+
+  it('should return null if the requested model is available', async () => {
+    // Mock snapshot to return available
+    vi.mocked(mockService.snapshot).mockReturnValue({ available: true });
+
+    const decision = await strategy.route(mockContext, mockConfig, mockClient);
+    expect(decision).toBeNull();
+    // Should check availability of the resolved model (DEFAULT_GEMINI_MODEL)
+    expect(mockService.snapshot).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+  });
+
+  it('should return null if fallback selection is same as requested model', async () => {
+    // Mock snapshot to return unavailable
+    vi.mocked(mockService.snapshot).mockReturnValue({
+      available: false,
+      reason: 'quota',
+    });
+    // Mock selectModelForAvailability to return the SAME model (no fallback found)
+    vi.mocked(selectModelForAvailability).mockReturnValue({
+      selectedModel: DEFAULT_GEMINI_MODEL,
+      skipped: [],
+    });
 
     const decision = await strategy.route(mockContext, mockConfig, mockClient);
     expect(decision).toBeNull();
   });
 
-  describe('when in fallback mode', () => {
-    it('should downgrade a pro model to the flash model', async () => {
-      const mockConfig = {
-        isInFallbackMode: () => true,
-        getModel: () => DEFAULT_GEMINI_MODEL,
-        getPreviewFeatures: () => false,
-      } as Config;
-
-      const decision = await strategy.route(
-        mockContext,
-        mockConfig,
-        mockClient,
-      );
-
-      expect(decision).not.toBeNull();
-      expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
-      expect(decision?.metadata.source).toBe('fallback');
-      expect(decision?.metadata.reasoning).toContain('In fallback mode');
+  it('should return fallback decision if model is unavailable and fallback found', async () => {
+    // Mock snapshot to return unavailable
+    vi.mocked(mockService.snapshot).mockReturnValue({
+      available: false,
+      reason: 'quota',
     });
 
-    it('should honor a lite model request', async () => {
-      const mockConfig = {
-        isInFallbackMode: () => true,
-        getModel: () => DEFAULT_GEMINI_FLASH_LITE_MODEL,
-        getPreviewFeatures: () => false,
-      } as Config;
-
-      const decision = await strategy.route(
-        mockContext,
-        mockConfig,
-        mockClient,
-      );
-
-      expect(decision).not.toBeNull();
-      expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
-      expect(decision?.metadata.source).toBe('fallback');
+    // Mock selectModelForAvailability to find a fallback (Flash)
+    vi.mocked(selectModelForAvailability).mockReturnValue({
+      selectedModel: DEFAULT_GEMINI_FLASH_MODEL,
+      skipped: [{ model: DEFAULT_GEMINI_MODEL, reason: 'quota' }],
     });
 
-    it('should use the flash model if flash is requested', async () => {
-      const mockConfig = {
-        isInFallbackMode: () => true,
-        getModel: () => DEFAULT_GEMINI_FLASH_MODEL,
-        getPreviewFeatures: () => false,
-      } as Config;
+    const decision = await strategy.route(mockContext, mockConfig, mockClient);
 
-      const decision = await strategy.route(
-        mockContext,
-        mockConfig,
-        mockClient,
-      );
+    expect(decision).not.toBeNull();
+    expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    expect(decision?.metadata.source).toBe('fallback');
+    expect(decision?.metadata.reasoning).toContain(
+      `Model ${DEFAULT_GEMINI_MODEL} is unavailable`,
+    );
+  });
 
-      expect(decision).not.toBeNull();
-      expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
-      expect(decision?.metadata.source).toBe('fallback');
-    });
+  it('should correctly handle "auto" alias by resolving it before checking availability', async () => {
+    // Mock snapshot to return available for the RESOLVED model
+    vi.mocked(mockService.snapshot).mockReturnValue({ available: true });
+    vi.mocked(mockConfig.getModel).mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
+
+    const decision = await strategy.route(mockContext, mockConfig, mockClient);
+
+    expect(decision).toBeNull();
+    // Important: check that it queried snapshot with the RESOLVED model, not 'auto'
+    expect(mockService.snapshot).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
   });
 });
