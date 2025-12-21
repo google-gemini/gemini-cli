@@ -49,6 +49,18 @@
       "topK": 64
     }
   },
+  "gemini-3-flash-preview": {
+    "model": "gemini-3-flash-preview",
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      },
+      "topK": 64
+    }
+  },
   "gemini-2.5-pro": {
     "model": "gemini-2.5-pro",
     "generateContentConfig": {
@@ -201,6 +213,10 @@
   },
   "chat-compression-3-pro": {
     "model": "gemini-3-pro-preview",
+    "generateContentConfig": {}
+  },
+  "chat-compression-3-flash": {
+    "model": "gemini-3-flash-preview",
     "generateContentConfig": {}
   },
   "chat-compression-2.5-pro": {

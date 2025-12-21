@@ -4,12 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
 describe('save_memory', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
   it('should be able to save to memory', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to save to memory', {
       settings: { tools: { core: ['save_memory'] } },
     });
@@ -17,7 +24,7 @@ describe('save_memory', () => {
     const prompt = `remember that my favorite color is  blue.
 
   what is my favorite color? tell me that and surround it with $ symbol`;
-    const result = await rig.run(prompt);
+    const result = await rig.run({ args: prompt });
 
     const foundToolCall = await rig.waitForToolCall('save_memory');
 

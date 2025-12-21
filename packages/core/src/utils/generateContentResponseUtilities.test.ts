@@ -13,11 +13,13 @@ import {
   getFunctionCallsFromPartsAsJson,
   getStructuredResponse,
   getStructuredResponseFromParts,
+  getCitations,
 } from './generateContentResponseUtilities.js';
 import type {
   GenerateContentResponse,
   Part,
   SafetyRating,
+  CitationMetadata,
 } from '@google/genai';
 import { FinishReason } from '@google/genai';
 
@@ -33,6 +35,7 @@ const mockResponse = (
   parts: Part[],
   finishReason: FinishReason = FinishReason.STOP,
   safetyRatings: SafetyRating[] = [],
+  citationMetadata?: CitationMetadata,
 ): GenerateContentResponse => ({
   candidates: [
     {
@@ -43,6 +46,7 @@ const mockResponse = (
       index: 0,
       finishReason,
       safetyRatings,
+      citationMetadata,
     },
   ],
   promptFeedback: {
@@ -68,6 +72,82 @@ const minimalMockResponse = (
 });
 
 describe('generateContentResponseUtilities', () => {
+  describe('getCitations', () => {
+    it('should return empty array for no candidates', () => {
+      expect(getCitations(minimalMockResponse(undefined))).toEqual([]);
+    });
+
+    it('should return empty array if no citationMetadata', () => {
+      const response = mockResponse([mockTextPart('Hello')]);
+      expect(getCitations(response)).toEqual([]);
+    });
+
+    it('should return citations with title and uri', () => {
+      const citationMetadata: CitationMetadata = {
+        citations: [
+          {
+            startIndex: 0,
+            endIndex: 10,
+            uri: 'https://example.com',
+            title: 'Example Title',
+          },
+        ],
+      };
+      const response = mockResponse(
+        [mockTextPart('Hello')],
+        undefined,
+        undefined,
+        citationMetadata,
+      );
+      expect(getCitations(response)).toEqual([
+        '(Example Title) https://example.com',
+      ]);
+    });
+
+    it('should return citations with uri only if no title', () => {
+      const citationMetadata: CitationMetadata = {
+        citations: [
+          {
+            startIndex: 0,
+            endIndex: 10,
+            uri: 'https://example.com',
+          },
+        ],
+      };
+      const response = mockResponse(
+        [mockTextPart('Hello')],
+        undefined,
+        undefined,
+        citationMetadata,
+      );
+      expect(getCitations(response)).toEqual(['https://example.com']);
+    });
+
+    it('should filter out citations without uri', () => {
+      const citationMetadata: CitationMetadata = {
+        citations: [
+          {
+            startIndex: 0,
+            endIndex: 10,
+            title: 'No URI',
+          },
+          {
+            startIndex: 10,
+            endIndex: 20,
+            uri: 'https://valid.com',
+          },
+        ],
+      };
+      const response = mockResponse(
+        [mockTextPart('Hello')],
+        undefined,
+        undefined,
+        citationMetadata,
+      );
+      expect(getCitations(response)).toEqual(['https://valid.com']);
+    });
+  });
+
   describe('getResponseTextFromParts', () => {
     it('should return undefined for no parts', () => {
       expect(getResponseTextFromParts([])).toBeUndefined();
