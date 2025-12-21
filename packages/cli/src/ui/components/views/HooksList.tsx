@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
+import { theme } from '../../semantic-colors.js';
 
 interface HooksListProps {
   hooks: ReadonlyArray<{
@@ -27,8 +28,15 @@ interface HooksListProps {
 export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
   if (hooks.length === 0) {
     return (
-      <Box marginTop={1} marginBottom={1}>
-        <Text>No hooks configured.</Text>
+      <Box
+        borderStyle="round"
+        borderColor={theme.border.default}
+        flexDirection="column"
+        padding={1}
+        marginY={1}
+        width="100%"
+      >
+        <Text color={theme.text.primary}>No hooks configured.</Text>
       </Box>
     );
   }
@@ -46,34 +54,55 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
   );
 
   return (
-    <Box flexDirection="column" marginTop={1} marginBottom={1}>
-      <Text bold>Configured Hooks:</Text>
-      <Box flexDirection="column" paddingLeft={2} marginTop={1}>
+    <Box
+      borderStyle="round"
+      borderColor={theme.border.default}
+      flexDirection="column"
+      padding={1}
+      marginY={1}
+      width="100%"
+    >
+      <Box marginBottom={1}>
+        <Text bold color={theme.text.accent}>
+          Configured Hooks
+        </Text>
+      </Box>
+      <Box flexDirection="column" marginTop={1}>
         {Object.entries(hooksByEvent).map(([eventName, eventHooks]) => (
           <Box key={eventName} flexDirection="column" marginBottom={1}>
-            <Text color="cyan" bold>
-              {eventName}:
-            </Text>
+            <Box marginBottom={1}>
+              <Text bold color={theme.text.link}>
+                {eventName}
+              </Text>
+            </Box>
             <Box flexDirection="column" paddingLeft={2}>
-              {eventHooks.map((hook, index) => {
+              {eventHooks.map((hook) => {
                 const hookName =
                   hook.config.name || hook.config.command || 'unknown';
-                const statusColor = hook.enabled ? 'green' : 'gray';
+                const statusColor = hook.enabled
+                  ? theme.status.success
+                  : theme.text.secondary;
                 const statusText = hook.enabled ? 'enabled' : 'disabled';
 
                 return (
-                  <Box key={`${eventName}-${index}`} flexDirection="column">
-                    <Box>
-                      <Text>
-                        <Text color="yellow">{hookName}</Text>
-                        <Text color={statusColor}>{` [${statusText}]`}</Text>
+                  <Box
+                    key={`${hook.source}:${hook.config.name ?? ''}:${hook.config.command ?? ''}`}
+                    flexDirection="column"
+                    marginBottom={1}
+                  >
+                    <Box flexDirection="row" marginBottom={0.5}>
+                      <Text color={theme.text.accent} bold>
+                        {hookName}
                       </Text>
+                      <Text color={statusColor}>{` [${statusText}]`}</Text>
                     </Box>
                     <Box paddingLeft={2} flexDirection="column">
                       {hook.config.description && (
-                        <Text italic>{hook.config.description}</Text>
+                        <Text color={theme.text.primary} italic>
+                          {hook.config.description}
+                        </Text>
                       )}
-                      <Text dimColor>
+                      <Text color={theme.text.secondary}>
                         Source: {hook.source}
                         {hook.config.name &&
                           hook.config.command &&
@@ -92,7 +121,7 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
         ))}
       </Box>
       <Box marginTop={1}>
-        <Text dimColor>
+        <Text color={theme.text.secondary}>
           Tip: Use `/hooks enable {'<hook-name>'}` or `/hooks disable{' '}
           {'<hook-name>'}` to toggle hooks
         </Text>
