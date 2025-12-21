@@ -58,6 +58,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'policies');
   }
 
+  static getUserAgentsDir(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'agents');
+  }
+
   static getSystemSettingsPath(): string {
     if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
       return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
@@ -121,6 +125,10 @@ export class Storage {
 
   getProjectCommandsDir(): string {
     return path.join(this.getGeminiDir(), 'commands');
+  }
+
+  getProjectAgentsDir(): string {
+    return path.join(this.getGeminiDir(), 'agents');
   }
 
   getProjectTempCheckpointsDir(): string {

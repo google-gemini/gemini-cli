@@ -115,6 +115,10 @@
       {
         "label": "Uninstall",
         "slug": "docs/cli/uninstall"
+      },
+      {
+        "label": "System prompt override",
+        "slug": "docs/cli/system-prompt"
       }
     ]
   },
@@ -203,6 +207,10 @@
       {
         "label": "Writing hooks",
         "slug": "docs/hooks/writing-hooks"
+      },
+      {
+        "label": "Hooks reference",
+        "slug": "docs/hooks/reference"
       },
       {
         "label": "Best practices",
