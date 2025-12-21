@@ -478,5 +478,94 @@ priority = 100
       expect(error.errorType).toBe('file_read');
       expect(error.message).toContain('Failed to read policy directory');
     });
+
+    it('should return a rule_validation error if safety checker combines commandRegex and argsPattern', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "run_shell_command"
+commandRegex = "git .*"
+argsPattern = "test"
+priority = 100
+checker = { type = "in-process", name = "allowed-path" }
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('rule_validation');
+      expect(error.message).toContain(
+        'Invalid shell command syntax in safety checker',
+      );
+      expect(error.details).toContain('mutually exclusive');
+    });
+
+    it('should return a rule_validation error if safety checker combines commandPrefix and commandRegex', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "run_shell_command"
+commandPrefix = "git"
+commandRegex = "git .*"
+priority = 100
+checker = { type = "in-process", name = "allowed-path" }
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('rule_validation');
+      expect(error.message).toContain(
+        'Invalid shell command syntax in safety checker',
+      );
+      expect(error.details).toContain('mutually exclusive');
+    });
+
+    it('should return a rule_validation error if safety checker uses commandPrefix with non-shell tool', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "read_file"
+commandPrefix = "git"
+priority = 100
+checker = { type = "in-process", name = "allowed-path" }
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('rule_validation');
+      expect(error.message).toContain(
+        'Invalid shell command syntax in safety checker',
+      );
+      expect(error.details).toContain('run_shell_command');
+    });
+
+    it('should include suggestion in regex_compilation error for safety checker commandRegex', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "run_shell_command"
+commandRegex = "git (status"
+priority = 100
+checker = { type = "in-process", name = "allowed-path" }
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('regex_compilation');
+      expect(error.message).toContain(
+        'Invalid command regex pattern in safety checker',
+      );
+      expect(error.suggestion).toBeDefined();
+      expect(error.suggestion).toContain('Check regex syntax');
+    });
+
+    it('should include suggestion in regex_compilation error for safety checker argsPattern', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "run_shell_command"
+argsPattern = "(open"
+priority = 100
+checker = { type = "in-process", name = "allowed-path" }
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('regex_compilation');
+      expect(error.message).toContain(
+        'Invalid regex pattern in safety checker',
+      );
+      expect(error.suggestion).toBeDefined();
+      expect(error.suggestion).toContain('Check regex syntax');
+    });
   });
 });

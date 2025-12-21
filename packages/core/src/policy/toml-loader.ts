@@ -87,6 +87,11 @@ const PolicyFileSchema = z.object({
 type PolicyRuleToml = z.infer<typeof PolicyRuleSchema>;
 
 /**
+ * Type for a raw safety checker rule from TOML.
+ */
+type SafetyCheckerRuleToml = z.infer<typeof SafetyCheckerRuleSchema>;
+
+/**
  * Types of errors that can occur while loading policy files.
  */
 export type PolicyFileErrorType =
@@ -158,8 +163,9 @@ function formatSchemaError(error: ZodError, ruleIndex: number): string {
  * Returns an error message if invalid, or null if valid.
  */
 function validateShellCommandSyntax(
-  rule: PolicyRuleToml,
-  ruleIndex: number,
+  rule: PolicyRuleToml | SafetyCheckerRuleToml,
+  index: number,
+  itemType: 'Rule' | 'Safety Checker' = 'Rule',
 ): string | null {
   const hasCommandPrefix = rule.commandPrefix !== undefined;
   const hasCommandRegex = rule.commandRegex !== undefined;
@@ -169,7 +175,7 @@ function validateShellCommandSyntax(
     // Must have exactly toolName = "run_shell_command"
     if (rule.toolName !== 'run_shell_command' || Array.isArray(rule.toolName)) {
       return (
-        `Rule #${ruleIndex + 1}: commandPrefix and commandRegex can only be used with toolName = "run_shell_command"\n` +
+        `${itemType} #${index + 1}: commandPrefix and commandRegex can only be used with toolName = "run_shell_command"\n` +
         `  Found: toolName = ${JSON.stringify(rule.toolName)}\n` +
         `  Fix: Set toolName = "run_shell_command" (not an array)`
       );
@@ -178,7 +184,7 @@ function validateShellCommandSyntax(
     // Can't combine with argsPattern
     if (hasArgsPattern) {
       return (
-        `Rule #${ruleIndex + 1}: cannot use both commandPrefix/commandRegex and argsPattern\n` +
+        `${itemType} #${index + 1}: cannot use both commandPrefix/commandRegex and argsPattern\n` +
         `  These fields are mutually exclusive\n` +
         `  Fix: Use either commandPrefix/commandRegex OR argsPattern, not both`
       );
@@ -187,7 +193,7 @@ function validateShellCommandSyntax(
     // Can't use both commandPrefix and commandRegex
     if (hasCommandPrefix && hasCommandRegex) {
       return (
-        `Rule #${ruleIndex + 1}: cannot use both commandPrefix and commandRegex\n` +
+        `${itemType} #${index + 1}: cannot use both commandPrefix and commandRegex\n` +
         `  These fields are mutually exclusive\n` +
         `  Fix: Use either commandPrefix OR commandRegex, not both`
       );
@@ -319,6 +325,28 @@ export async function loadPoliciesFromToml(
               details: validationError,
             });
             // Continue to next rule, don't skip the entire file
+          }
+        }
+
+        // Validate shell command convenience syntax for checkers
+        const tomlCheckers = validationResult.data.safety_checker ?? [];
+        for (let i = 0; i < tomlCheckers.length; i++) {
+          const checker = tomlCheckers[i];
+          const validationError = validateShellCommandSyntax(
+            checker,
+            i,
+            'Safety Checker',
+          );
+          if (validationError) {
+            errors.push({
+              filePath,
+              fileName: file,
+              tier: tierName,
+              ruleIndex: i,
+              errorType: 'rule_validation',
+              message: 'Invalid shell command syntax in safety checker',
+              details: validationError,
+            });
           }
         }
 
@@ -490,6 +518,8 @@ export async function loadPoliciesFromToml(
                       errorType: 'regex_compilation',
                       message: 'Invalid regex pattern in safety checker',
                       details: `Pattern: ${argsPattern}\nError: ${error.message}`,
+                      suggestion:
+                        'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
                     });
                     return null;
                   }
@@ -510,6 +540,8 @@ export async function loadPoliciesFromToml(
                       message:
                         'Invalid command regex pattern in safety checker',
                       details: `Pattern: ${checker.commandRegex}\nError: ${error.message}`,
+                      suggestion:
+                        'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
                     });
                     return null;
                   }
