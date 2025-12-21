@@ -30,6 +30,7 @@ import { MalformedJsonResponseEvent } from '../telemetry/types.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { ModelConfigService } from '../services/modelConfigService.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
+import { LlmRole } from '../telemetry/types.js';
 
 vi.mock('../utils/errorReporting.js');
 vi.mock('../telemetry/loggers.js');
@@ -129,6 +130,7 @@ describe('BaseLlmClient', () => {
       schema: { type: 'object', properties: { color: { type: 'string' } } },
       abortSignal: abortController.signal,
       promptId: 'test-prompt-id',
+      role: LlmRole.UTILITY_TOOL,
     };
   });
 
@@ -170,6 +172,7 @@ describe('BaseLlmClient', () => {
           },
         },
         'test-prompt-id',
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -192,6 +195,7 @@ describe('BaseLlmClient', () => {
           }),
         }),
         expect.any(String),
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -210,6 +214,7 @@ describe('BaseLlmClient', () => {
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.any(Object),
         customPromptId,
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -529,6 +534,7 @@ describe('BaseLlmClient', () => {
         contents: [{ role: 'user', parts: [{ text: 'Give me content.' }] }],
         abortSignal: abortController.signal,
         promptId: 'content-prompt-id',
+        role: LlmRole.UTILITY_TOOL,
       };
 
       const result = await client.generateContent(options);
@@ -557,6 +563,7 @@ describe('BaseLlmClient', () => {
           },
         },
         'content-prompt-id',
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -569,6 +576,7 @@ describe('BaseLlmClient', () => {
         contents: [{ role: 'user', parts: [{ text: 'Give me content.' }] }],
         abortSignal: abortController.signal,
         promptId: 'content-prompt-id',
+        role: LlmRole.UTILITY_TOOL,
       };
 
       await client.generateContent(options);
@@ -591,6 +599,7 @@ describe('BaseLlmClient', () => {
         contents: [{ role: 'user', parts: [{ text: 'Give me content.' }] }],
         abortSignal: abortController.signal,
         promptId: 'content-prompt-id',
+        role: LlmRole.UTILITY_TOOL,
       };
 
       await expect(client.generateContent(options)).rejects.toThrow(
@@ -635,6 +644,7 @@ describe('BaseLlmClient', () => {
         contents: [{ role: 'user', parts: [{ text: 'Give me a color.' }] }],
         abortSignal: abortController.signal,
         promptId: 'content-prompt-id',
+        role: LlmRole.UTILITY_TOOL,
       };
 
       jsonOptions = {
@@ -656,6 +666,7 @@ describe('BaseLlmClient', () => {
       await client.generateContent({
         ...contentOptions,
         modelConfigKey: { model: successfulModel },
+        role: LlmRole.UTILITY_TOOL,
       });
 
       expect(mockAvailabilityService.markHealthy).toHaveBeenCalledWith(
@@ -681,6 +692,7 @@ describe('BaseLlmClient', () => {
         ...contentOptions,
         modelConfigKey: { model: firstModel },
         maxAttempts: 2,
+        role: LlmRole.UTILITY_TOOL,
       });
 
       await vi.runAllTimersAsync();
@@ -690,6 +702,7 @@ describe('BaseLlmClient', () => {
         ...contentOptions,
         modelConfigKey: { model: firstModel },
         maxAttempts: 2,
+        role: LlmRole.UTILITY_TOOL,
       });
 
       expect(mockConfig.setActiveModel).toHaveBeenCalledWith(firstModel);
@@ -700,6 +713,7 @@ describe('BaseLlmClient', () => {
       expect(mockGenerateContent).toHaveBeenLastCalledWith(
         expect.objectContaining({ model: fallbackModel }),
         expect.any(String),
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -725,6 +739,7 @@ describe('BaseLlmClient', () => {
       await client.generateContent({
         ...contentOptions,
         modelConfigKey: { model: stickyModel },
+        role: LlmRole.UTILITY_TOOL,
       });
 
       expect(mockAvailabilityService.consumeStickyAttempt).toHaveBeenCalledWith(
@@ -764,6 +779,7 @@ describe('BaseLlmClient', () => {
       expect(mockGenerateContent).toHaveBeenLastCalledWith(
         expect.objectContaining({ model: availableModel }),
         jsonOptions.promptId,
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -815,6 +831,7 @@ describe('BaseLlmClient', () => {
         ...contentOptions,
         modelConfigKey: { model: firstModel },
         maxAttempts: 2,
+        role: LlmRole.UTILITY_TOOL,
       });
 
       expect(mockGenerateContent).toHaveBeenCalledTimes(2);

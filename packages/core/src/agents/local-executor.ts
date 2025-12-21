@@ -46,6 +46,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { getModelConfigAlias } from './registry.js';
 import { getVersion } from '../utils/version.js';
 import { ApprovalMode } from '../policy/types.js';
+import { LlmRole } from '../telemetry/types.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -585,6 +586,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     signal: AbortSignal,
     promptId: string,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+    const role =
+      this.definition.name === 'codebase_investigator'
+        ? LlmRole.SUBAGENT_CODEBASE_INVESTIGATOR
+        : LlmRole.SUBAGENT;
+
     const responseStream = await chat.sendMessageStream(
       {
         model: getModelConfigAlias(this.definition),
@@ -593,6 +599,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       message.parts || [],
       promptId,
       signal,
+      role,
     );
 
     const functionCalls: FunctionCall[] = [];

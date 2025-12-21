@@ -51,6 +51,7 @@ import {
   recordConversationOffered,
 } from './telemetry.js';
 import { getClientMetadata } from './experiments/client_metadata.js';
+import type { LlmRole } from '../telemetry/types.js';
 
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
@@ -73,6 +74,8 @@ export class CodeAssistServer implements ContentGenerator {
   async generateContentStream(
     req: GenerateContentParameters,
     userPromptId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const responses =
       await this.requestStreamingPost<CaGenerateContentResponse>(
@@ -123,6 +126,8 @@ export class CodeAssistServer implements ContentGenerator {
   async generateContent(
     req: GenerateContentParameters,
     userPromptId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    role: LlmRole,
   ): Promise<GenerateContentResponse> {
     const start = Date.now();
     const response = await this.requestPost<CaGenerateContentResponse>(

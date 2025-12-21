@@ -30,7 +30,7 @@ import type {
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import type { Config } from '../config/config.js';
-import { ApiRequestEvent } from '../telemetry/types.js';
+import { ApiRequestEvent, LlmRole } from '../telemetry/types.js';
 
 describe('LoggingContentGenerator', () => {
   let wrapped: ContentGenerator;
@@ -87,13 +87,18 @@ describe('LoggingContentGenerator', () => {
       const promise = loggingContentGenerator.generateContent(
         req,
         userPromptId,
+        LlmRole.MAIN,
       );
 
       vi.advanceTimersByTime(1000);
 
       await promise;
 
-      expect(wrapped.generateContent).toHaveBeenCalledWith(req, userPromptId);
+      expect(wrapped.generateContent).toHaveBeenCalledWith(
+        req,
+        userPromptId,
+        LlmRole.MAIN,
+      );
       expect(logApiRequest).toHaveBeenCalledWith(
         config,
         expect.any(ApiRequestEvent),
@@ -116,6 +121,7 @@ describe('LoggingContentGenerator', () => {
       const promise = loggingContentGenerator.generateContent(
         req,
         userPromptId,
+        LlmRole.MAIN,
       );
 
       vi.advanceTimersByTime(1000);
@@ -154,12 +160,17 @@ describe('LoggingContentGenerator', () => {
       vi.mocked(wrapped.generateContentStream).mockResolvedValue(
         createAsyncGenerator(),
       );
+
       const startTime = new Date('2025-01-01T00:00:00.000Z');
+
       vi.setSystemTime(startTime);
 
       const stream = await loggingContentGenerator.generateContentStream(
         req,
+
         userPromptId,
+
+        LlmRole.MAIN,
       );
 
       vi.advanceTimersByTime(1000);
@@ -171,6 +182,7 @@ describe('LoggingContentGenerator', () => {
       expect(wrapped.generateContentStream).toHaveBeenCalledWith(
         req,
         userPromptId,
+        LlmRole.MAIN,
       );
       expect(logApiRequest).toHaveBeenCalledWith(
         config,
@@ -201,6 +213,7 @@ describe('LoggingContentGenerator', () => {
       const stream = await loggingContentGenerator.generateContentStream(
         req,
         userPromptId,
+        LlmRole.MAIN,
       );
 
       vi.advanceTimersByTime(1000);
