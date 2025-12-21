@@ -48,7 +48,7 @@ describe('chatCommand', () => {
 
   beforeEach(() => {
     mockGetHistory = vi.fn().mockReturnValue([]);
-    mockGetChat = vi.fn().mockResolvedValue({
+    mockGetChat = vi.fn().mockReturnValue({
       getHistory: mockGetHistory,
     });
     mockSaveCheckpoint = vi.fn().mockResolvedValue(undefined);
@@ -163,7 +163,6 @@ describe('chatCommand', () => {
 
       mockGetHistory.mockReturnValue([
         { role: 'user', parts: [{ text: 'context for our chat' }] },
-        { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
       ]);
       result = await saveCommand?.action?.(mockContext, tag);
       expect(result).toEqual({
@@ -208,9 +207,7 @@ describe('chatCommand', () => {
     it('should save the conversation if overwrite is confirmed', async () => {
       const history: Content[] = [
         { role: 'user', parts: [{ text: 'context for our chat' }] },
-        { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
         { role: 'user', parts: [{ text: 'hello' }] },
-        { role: 'model', parts: [{ text: 'Hi there!' }] },
       ];
       mockGetHistory.mockReturnValue(history);
       mockContext.overwriteConfirmed = true;
@@ -263,6 +260,7 @@ describe('chatCommand', () => {
 
     it('should resume a conversation with matching authType', async () => {
       const conversation: Content[] = [
+        { role: 'user', parts: [{ text: 'system setup' }] },
         { role: 'user', parts: [{ text: 'hello gemini' }] },
         { role: 'model', parts: [{ text: 'hello world' }] },
       ];
@@ -285,6 +283,7 @@ describe('chatCommand', () => {
 
     it('should block resuming a conversation with mismatched authType', async () => {
       const conversation: Content[] = [
+        { role: 'user', parts: [{ text: 'system setup' }] },
         { role: 'user', parts: [{ text: 'hello gemini' }] },
         { role: 'model', parts: [{ text: 'hello world' }] },
       ];
@@ -304,6 +303,7 @@ describe('chatCommand', () => {
 
     it('should resume a legacy conversation without authType', async () => {
       const conversation: Content[] = [
+        { role: 'user', parts: [{ text: 'system setup' }] },
         { role: 'user', parts: [{ text: 'hello gemini' }] },
         { role: 'model', parts: [{ text: 'hello world' }] },
       ];
@@ -521,7 +521,6 @@ Hi there!`;
     it('should inform if there is no conversation to share', async () => {
       mockGetHistory.mockReturnValue([
         { role: 'user', parts: [{ text: 'context' }] },
-        { role: 'model', parts: [{ text: 'context response' }] },
       ]);
       const result = await shareCommand?.action?.(mockContext, 'my-chat.json');
       expect(mockFs.writeFile).not.toHaveBeenCalled();
