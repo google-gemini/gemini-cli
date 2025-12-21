@@ -5,13 +5,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
-import { SubagentInvocation } from './invocation.js';
-import { AgentExecutor } from './executor.js';
-import type {
-  AgentDefinition,
-  SubagentActivityEvent,
-  AgentInputs,
-} from './types.js';
+import type { LocalAgentDefinition } from './types.js';
+import { LocalSubagentInvocation } from './local-invocation.js';
+import { LocalAgentExecutor } from './local-executor.js';
+import type { SubagentActivityEvent, AgentInputs } from './types.js';
 import { AgentTerminateMode } from './types.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolErrorType } from '../tools/tool-error.js';
@@ -19,13 +16,14 @@ import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { type z } from 'zod';
 
-vi.mock('./executor.js');
+vi.mock('./local-executor.js');
 
-const MockAgentExecutor = vi.mocked(AgentExecutor);
+const MockLocalAgentExecutor = vi.mocked(LocalAgentExecutor);
 
 let mockConfig: Config;
 
-const testDefinition: AgentDefinition<z.ZodUnknown> = {
+const testDefinition: LocalAgentDefinition<z.ZodUnknown> = {
+  kind: 'local',
   name: 'MockAgent',
   description: 'A mock agent.',
   inputConfig: {
@@ -39,8 +37,8 @@ const testDefinition: AgentDefinition<z.ZodUnknown> = {
   promptConfig: { systemPrompt: 'test' },
 };
 
-describe('SubagentInvocation', () => {
-  let mockExecutorInstance: Mocked<AgentExecutor<z.ZodUnknown>>;
+describe('LocalSubagentInvocation', () => {
+  let mockExecutorInstance: Mocked<LocalAgentExecutor<z.ZodUnknown>>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -49,20 +47,20 @@ describe('SubagentInvocation', () => {
     mockExecutorInstance = {
       run: vi.fn(),
       definition: testDefinition,
-    } as unknown as Mocked<AgentExecutor<z.ZodUnknown>>;
+    } as unknown as Mocked<LocalAgentExecutor<z.ZodUnknown>>;
 
-    MockAgentExecutor.create.mockResolvedValue(
-      mockExecutorInstance as unknown as AgentExecutor<z.ZodTypeAny>,
+    MockLocalAgentExecutor.create.mockResolvedValue(
+      mockExecutorInstance as unknown as LocalAgentExecutor<z.ZodTypeAny>,
     );
   });
 
   it('should pass the messageBus to the parent constructor', () => {
     const mockMessageBus = {} as MessageBus;
     const params = { task: 'Analyze data' };
-    const invocation = new SubagentInvocation<z.ZodUnknown>(
-      params,
+    const invocation = new LocalSubagentInvocation(
       testDefinition,
       mockConfig,
+      params,
       mockMessageBus,
     );
 
@@ -74,10 +72,10 @@ describe('SubagentInvocation', () => {
   describe('getDescription', () => {
     it('should format the description with inputs', () => {
       const params = { task: 'Analyze data', priority: 5 };
-      const invocation = new SubagentInvocation<z.ZodUnknown>(
-        params,
+      const invocation = new LocalSubagentInvocation(
         testDefinition,
         mockConfig,
+        params,
       );
       const description = invocation.getDescription();
       expect(description).toBe(
@@ -88,10 +86,10 @@ describe('SubagentInvocation', () => {
     it('should truncate long input values', () => {
       const longTask = 'A'.repeat(100);
       const params = { task: longTask };
-      const invocation = new SubagentInvocation<z.ZodUnknown>(
-        params,
+      const invocation = new LocalSubagentInvocation(
         testDefinition,
         mockConfig,
+        params,
       );
       const description = invocation.getDescription();
       // Default INPUT_PREVIEW_MAX_LENGTH is 50
@@ -102,7 +100,7 @@ describe('SubagentInvocation', () => {
 
     it('should truncate the overall description if it exceeds the limit', () => {
       // Create a definition and inputs that result in a very long description
-      const longNameDef = {
+      const longNameDef: LocalAgentDefinition = {
         ...testDefinition,
         name: 'VeryLongAgentNameThatTakesUpSpace',
       };
@@ -110,10 +108,10 @@ describe('SubagentInvocation', () => {
       for (let i = 0; i < 20; i++) {
         params[`input${i}`] = `value${i}`;
       }
-      const invocation = new SubagentInvocation<z.ZodUnknown>(
-        params,
+      const invocation = new LocalSubagentInvocation(
         longNameDef,
         mockConfig,
+        params,
       );
       const description = invocation.getDescription();
       // Default DESCRIPTION_MAX_LENGTH is 200
@@ -130,15 +128,15 @@ describe('SubagentInvocation', () => {
     let signal: AbortSignal;
     let updateOutput: ReturnType<typeof vi.fn>;
     const params = { task: 'Execute task' };
-    let invocation: SubagentInvocation<z.ZodUnknown>;
+    let invocation: LocalSubagentInvocation;
 
     beforeEach(() => {
       signal = new AbortController().signal;
       updateOutput = vi.fn();
-      invocation = new SubagentInvocation<z.ZodUnknown>(
-        params,
+      invocation = new LocalSubagentInvocation(
         testDefinition,
         mockConfig,
+        params,
       );
     });
 
@@ -151,7 +149,7 @@ describe('SubagentInvocation', () => {
 
       const result = await invocation.execute(signal, updateOutput);
 
-      expect(MockAgentExecutor.create).toHaveBeenCalledWith(
+      expect(MockLocalAgentExecutor.create).toHaveBeenCalledWith(
         testDefinition,
         mockConfig,
         expect.any(Function),
@@ -173,7 +171,7 @@ describe('SubagentInvocation', () => {
 
     it('should stream THOUGHT_CHUNK activities from the executor', async () => {
       mockExecutorInstance.run.mockImplementation(async () => {
-        const onActivity = MockAgentExecutor.create.mock.calls[0][2];
+        const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
 
         if (onActivity) {
           onActivity({
@@ -202,7 +200,7 @@ describe('SubagentInvocation', () => {
 
     it('should NOT stream other activities (e.g., TOOL_CALL_START, ERROR)', async () => {
       mockExecutorInstance.run.mockImplementation(async () => {
-        const onActivity = MockAgentExecutor.create.mock.calls[0][2];
+        const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
 
         if (onActivity) {
           onActivity({
@@ -230,7 +228,7 @@ describe('SubagentInvocation', () => {
 
     it('should run successfully without an updateOutput callback', async () => {
       mockExecutorInstance.run.mockImplementation(async () => {
-        const onActivity = MockAgentExecutor.create.mock.calls[0][2];
+        const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
         if (onActivity) {
           // Ensure calling activity doesn't crash when updateOutput is undefined
           onActivity({
@@ -269,7 +267,7 @@ describe('SubagentInvocation', () => {
 
     it('should handle executor creation failure', async () => {
       const creationError = new Error('Failed to initialize tools.');
-      MockAgentExecutor.create.mockRejectedValue(creationError);
+      MockLocalAgentExecutor.create.mockRejectedValue(creationError);
 
       const result = await invocation.execute(signal, updateOutput);
 

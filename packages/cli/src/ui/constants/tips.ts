@@ -160,8 +160,6 @@ export const INFORMATIVE_TIPS = [
   'Set up GitHub Actions with /setup-github...',
   'Configure terminal keybindings for multiline input with /terminal-setup...',
   'Find relevant documentation with /find-docs...',
-  'Review a pull request with /oncall:pr-review...',
-  'Go back to main and clean up the branch with /github:cleanup-back-to-main...',
   'Execute any shell command with !<command>...',
   // Command tips end here
 ];

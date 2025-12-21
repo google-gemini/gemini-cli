@@ -123,7 +123,7 @@ export class Task {
   // process. This is not scoped to the individual task but reflects the global connection
   // state managed within the @gemini-cli/core module.
   async getMetadata(): Promise<TaskMetadata> {
-    const toolRegistry = await this.config.getToolRegistry();
+    const toolRegistry = this.config.getToolRegistry();
     const mcpServers = this.config.getMcpClientManager()?.getMcpServers() || {};
     const serverStatuses = getAllMCPServerStatuses();
     const servers = Object.keys(mcpServers).map((serverName) => ({
