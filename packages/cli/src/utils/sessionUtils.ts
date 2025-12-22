@@ -24,24 +24,43 @@ import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
 export const RESUME_LATEST = 'latest';
 
 /**
- * Error thrown when no sessions exist for the current project.
+ * Error codes for session-related errors.
  */
-export class NoSessionsFoundError extends Error {
-  constructor(message = 'No previous sessions found for this project.') {
-    super(message);
-    this.name = 'NoSessionsFoundError';
-  }
-}
+export type SessionErrorCode =
+  | 'NO_SESSIONS_FOUND'
+  | 'INVALID_SESSION_IDENTIFIER';
 
 /**
- * Error thrown when a session identifier is invalid.
+ * Error thrown for session-related failures.
+ * Uses a code field to differentiate between error types.
  */
-export class InvalidSessionIdentifierError extends Error {
-  constructor(identifier: string) {
-    super(
+export class SessionError extends Error {
+  constructor(
+    readonly code: SessionErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'SessionError';
+  }
+
+  /**
+   * Creates an error for when no sessions exist for the current project.
+   */
+  static noSessionsFound(): SessionError {
+    return new SessionError(
+      'NO_SESSIONS_FOUND',
+      'No previous sessions found for this project.',
+    );
+  }
+
+  /**
+   * Creates an error for when a session identifier is invalid.
+   */
+  static invalidSessionIdentifier(identifier: string): SessionError {
+    return new SessionError(
+      'INVALID_SESSION_IDENTIFIER',
       `Invalid session identifier "${identifier}".\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
     );
-    this.name = 'InvalidSessionIdentifierError';
   }
 }
 
@@ -392,7 +411,7 @@ export class SessionSelector {
     const sessions = await this.listSessions();
 
     if (sessions.length === 0) {
-      throw new NoSessionsFoundError();
+      throw SessionError.noSessionsFound();
     }
 
     // Sort by startTime (oldest first, so newest sessions get highest numbers)
@@ -420,7 +439,7 @@ export class SessionSelector {
       return sortedSessions[index - 1];
     }
 
-    throw new InvalidSessionIdentifierError(identifier);
+    throw SessionError.invalidSessionIdentifier(identifier);
   }
 
   /**
@@ -450,12 +469,8 @@ export class SessionSelector {
       try {
         selectedSession = await this.findSession(resumeArg);
       } catch (error) {
-        // NoSessionsFoundError and InvalidSessionIdentifierError already have
-        // detailed messages - just rethrow them
-        if (
-          error instanceof NoSessionsFoundError ||
-          error instanceof InvalidSessionIdentifierError
-        ) {
+        // SessionError already has detailed messages - just rethrow
+        if (error instanceof SessionError) {
           throw error;
         }
         // Wrap unexpected errors with context
