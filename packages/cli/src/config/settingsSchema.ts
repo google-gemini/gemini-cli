@@ -1224,6 +1224,16 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         items: { type: 'string' },
       },
+      enableEnvironmentVariableRedaction: {
+        type: 'boolean',
+        label: 'Enable Environment Variable Redaction',
+        category: 'Security',
+        requiresRestart: true,
+        default: true,
+        description:
+          'Enable redaction of environment variables that may contain secrets.',
+        showInDialog: true,
+      },
       auth: {
         type: 'object',
         label: 'Authentication',

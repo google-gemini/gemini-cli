@@ -16,6 +16,7 @@ import {
 const EMPTY_OPTIONS = {
   allowedEnvironmentVariables: [],
   blockedEnvironmentVariables: [],
+  enableEnvironmentVariableRedaction: true,
 };
 
 describe('sanitizeEnvironment', () => {
@@ -232,6 +233,7 @@ describe('sanitizeEnvironment', () => {
     const sanitized = sanitizeEnvironment(env, {
       allowedEnvironmentVariables: allowed,
       blockedEnvironmentVariables: [],
+      enableEnvironmentVariableRedaction: true,
     });
     expect(sanitized).toEqual({
       MY_TOKEN: 'secret-token',
@@ -247,6 +249,7 @@ describe('sanitizeEnvironment', () => {
     const sanitized = sanitizeEnvironment(env, {
       allowedEnvironmentVariables: [],
       blockedEnvironmentVariables: blocked,
+      enableEnvironmentVariableRedaction: true,
     });
     expect(sanitized).toEqual({
       SAFE_VAR: 'safe-value',
@@ -262,6 +265,7 @@ describe('sanitizeEnvironment', () => {
     const sanitized = sanitizeEnvironment(env, {
       allowedEnvironmentVariables: allowed,
       blockedEnvironmentVariables: blocked,
+      enableEnvironmentVariableRedaction: true,
     });
     expect(sanitized).toEqual({
       CONFLICT_VAR: 'value',
@@ -278,9 +282,28 @@ describe('sanitizeEnvironment', () => {
     const sanitized = sanitizeEnvironment(env, {
       allowedEnvironmentVariables: allowed,
       blockedEnvironmentVariables: blocked,
+      enableEnvironmentVariableRedaction: true,
     });
     expect(sanitized).toEqual({
       MY_TOKEN: 'secret-token',
     });
+  });
+
+  it('should not perform any redaction if enableEnvironmentVariableRedaction is false', () => {
+    const env = {
+      MY_API_TOKEN: 'token-value',
+      AppSecret: 'secret-value',
+      db_password: 'password-value',
+      RSA_KEY: '-----BEGIN RSA PRIVATE KEY-----...',
+      GITHUB_TOKEN_GHP: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      SAFE_VAR: 'is-safe',
+    };
+    const options = {
+      allowedEnvironmentVariables: [],
+      blockedEnvironmentVariables: [],
+      enableEnvironmentVariableRedaction: false,
+    };
+    const sanitized = sanitizeEnvironment(env, options);
+    expect(sanitized).toEqual(env);
   });
 });

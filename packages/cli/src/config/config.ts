@@ -618,9 +618,9 @@ export async function loadCliConfig(
     mcpServerCommand: settings.mcp?.serverCommand,
     mcpServers: settings.mcpServers,
     allowedMcpServers: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
-    blockedMcpServers: argv.allowedMcpServerNames
-      ? [] // explicitly allowed servers overrides everything
-      : settings.mcp?.excluded,
+    blockedEnvironmentVariables: settings.security?.blockedEnvironmentVariables,
+    enableEnvironmentVariableRedaction:
+      settings.security?.enableEnvironmentVariableRedaction,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,

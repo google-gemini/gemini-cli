@@ -38,6 +38,7 @@ import { coreEvents } from '../utils/events.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 
 const EMPTY_CONFIG: EnvironmentSanitizationConfig = {
+  enableEnvironmentVariableRedaction: true,
   allowedEnvironmentVariables: [],
   blockedEnvironmentVariables: [],
 };

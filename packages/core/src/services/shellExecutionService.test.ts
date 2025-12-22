@@ -84,6 +84,7 @@ const shellExecutionConfig: ShellExecutionConfig = {
   showColor: false,
   disableDynamicLineTrimming: true,
   sanitizationConfig: {
+    enableEnvironmentVariableRedaction: true,
     allowedEnvironmentVariables: [],
     blockedEnvironmentVariables: [],
   },
@@ -557,6 +558,7 @@ describe('ShellExecutionService', () => {
         true,
         {
           sanitizationConfig: {
+            enableEnvironmentVariableRedaction: true,
             allowedEnvironmentVariables: [],
             blockedEnvironmentVariables: [],
           },
@@ -1081,6 +1083,7 @@ describe('ShellExecutionService child_process fallback', () => {
         true,
         {
           sanitizationConfig: {
+            enableEnvironmentVariableRedaction: true,
             allowedEnvironmentVariables: [],
             blockedEnvironmentVariables: [],
           },
@@ -1274,6 +1277,7 @@ describe('ShellExecutionService execution method selection', () => {
       false, // shouldUseNodePty
       {
         sanitizationConfig: {
+          enableEnvironmentVariableRedaction: true,
           allowedEnvironmentVariables: [],
           blockedEnvironmentVariables: [],
         },

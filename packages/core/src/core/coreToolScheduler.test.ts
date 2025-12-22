@@ -252,6 +252,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
       terminalWidth: 90,
       terminalHeight: 30,
       sanitizationConfig: {
+        enableEnvironmentVariableRedaction: true,
         allowedEnvironmentVariables: [],
         blockedEnvironmentVariables: [],
       },
@@ -1449,6 +1450,7 @@ describe('CoreToolScheduler request queueing', () => {
         terminalWidth: 80,
         terminalHeight: 24,
         sanitizationConfig: {
+          enableEnvironmentVariableRedaction: true,
           allowedEnvironmentVariables: [],
           blockedEnvironmentVariables: [],
         },
@@ -1565,6 +1567,7 @@ describe('CoreToolScheduler request queueing', () => {
         terminalWidth: 80,
         terminalHeight: 24,
         sanitizationConfig: {
+          enableEnvironmentVariableRedaction: true,
           allowedEnvironmentVariables: [],
           blockedEnvironmentVariables: [],
         },

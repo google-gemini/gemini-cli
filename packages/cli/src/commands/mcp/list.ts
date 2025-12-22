@@ -61,6 +61,7 @@ async function testMCPConnection(
 
   const settings = loadSettings();
   const sanitizationConfig = {
+    enableEnvironmentVariableRedaction: true,
     allowedEnvironmentVariables: [],
     blockedEnvironmentVariables:
       settings.merged.advanced?.excludedEnvVars || [],

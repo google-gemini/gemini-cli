@@ -756,6 +756,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
   - **Requires restart:** Yes
 
+- **`security.enableEnvironmentVariableRedaction`** (boolean):
+  - **Description:** Enable redaction of environment variables that may contain
+    secrets.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`security.auth.selectedType`** (string):
   - **Description:** The currently selected authentication type.
   - **Default:** `undefined`

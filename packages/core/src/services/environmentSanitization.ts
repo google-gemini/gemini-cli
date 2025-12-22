@@ -29,12 +29,17 @@
 export type EnvironmentSanitizationConfig = {
   allowedEnvironmentVariables: string[];
   blockedEnvironmentVariables: string[];
+  enableEnvironmentVariableRedaction: boolean;
 };
 
 export function sanitizeEnvironment(
   processEnv: NodeJS.ProcessEnv,
   config: EnvironmentSanitizationConfig,
 ): NodeJS.ProcessEnv {
+  if (!config.enableEnvironmentVariableRedaction) {
+    return { ...processEnv };
+  }
+
   const results: NodeJS.ProcessEnv = {};
 
   const allowedSet = new Set(
