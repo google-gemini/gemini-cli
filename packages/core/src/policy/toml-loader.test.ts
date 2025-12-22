@@ -401,7 +401,7 @@ priority = 100
       expect(error.details).toContain('run_shell_command');
     });
 
-    it('should return a rule_validation error if commandPrefix and commandRegex are combined', async () => {
+    it('should return a rule_validation error and skip the rule if commandPrefix and commandRegex are combined', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
 toolName = "run_shell_command"
@@ -411,12 +411,13 @@ decision = "allow"
 priority = 100
 `);
       expect(result.errors).toHaveLength(1);
+      expect(result.rules).toHaveLength(0); // Ensure rule is skipped
       const error = result.errors[0];
       expect(error.errorType).toBe('rule_validation');
       expect(error.details).toContain('mutually exclusive');
     });
 
-    it('should return a rule_validation error if commandRegex and argsPattern are combined', async () => {
+    it('should return a rule_validation error and skip the rule if commandRegex and argsPattern are combined', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
 toolName = "run_shell_command"
@@ -426,6 +427,7 @@ decision = "allow"
 priority = 100
 `);
       expect(result.errors).toHaveLength(1);
+      expect(result.rules).toHaveLength(0); // Ensure rule is skipped
       const error = result.errors[0];
       expect(error.errorType).toBe('rule_validation');
       expect(error.details).toContain('mutually exclusive');
@@ -479,7 +481,7 @@ priority = 100
       expect(error.message).toContain('Failed to read policy directory');
     });
 
-    it('should return a rule_validation error if safety checker combines commandRegex and argsPattern', async () => {
+    it('should return a rule_validation error and skip the checker if safety checker combines commandRegex and argsPattern', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[safety_checker]]
 toolName = "run_shell_command"
@@ -489,6 +491,7 @@ priority = 100
 checker = { type = "in-process", name = "allowed-path" }
 `);
       expect(result.errors).toHaveLength(1);
+      expect(result.checkers).toHaveLength(0); // Ensure checker is skipped
       const error = result.errors[0];
       expect(error.errorType).toBe('rule_validation');
       expect(error.message).toContain(
@@ -497,7 +500,7 @@ checker = { type = "in-process", name = "allowed-path" }
       expect(error.details).toContain('mutually exclusive');
     });
 
-    it('should return a rule_validation error if safety checker combines commandPrefix and commandRegex', async () => {
+    it('should return a rule_validation error and skip the checker if safety checker combines commandPrefix and commandRegex', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[safety_checker]]
 toolName = "run_shell_command"
@@ -507,6 +510,7 @@ priority = 100
 checker = { type = "in-process", name = "allowed-path" }
 `);
       expect(result.errors).toHaveLength(1);
+      expect(result.checkers).toHaveLength(0); // Ensure checker is skipped
       const error = result.errors[0];
       expect(error.errorType).toBe('rule_validation');
       expect(error.message).toContain(

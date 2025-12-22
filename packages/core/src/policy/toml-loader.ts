@@ -311,10 +311,12 @@ export async function loadPoliciesFromToml(
 
         // Validate shell command convenience syntax
         const tomlRules = validationResult.data.rule ?? [];
+        const invalidRuleIndices = new Set<number>();
         for (let i = 0; i < tomlRules.length; i++) {
           const rule = tomlRules[i];
           const validationError = validateShellCommandSyntax(rule, i);
           if (validationError) {
+            invalidRuleIndices.add(i);
             errors.push({
               filePath,
               fileName: file,
@@ -324,12 +326,12 @@ export async function loadPoliciesFromToml(
               message: 'Invalid shell command syntax',
               details: validationError,
             });
-            // Continue to next rule, don't skip the entire file
           }
         }
 
         // Validate shell command convenience syntax for checkers
         const tomlCheckers = validationResult.data.safety_checker ?? [];
+        const invalidCheckerIndices = new Set<number>();
         for (let i = 0; i < tomlCheckers.length; i++) {
           const checker = tomlCheckers[i];
           const validationError = validateShellCommandSyntax(
@@ -338,6 +340,7 @@ export async function loadPoliciesFromToml(
             'Safety Checker',
           );
           if (validationError) {
+            invalidCheckerIndices.add(i);
             errors.push({
               filePath,
               fileName: file,
@@ -352,8 +355,10 @@ export async function loadPoliciesFromToml(
 
         // Transform rules
         const parsedRules: PolicyRule[] = (validationResult.data.rule ?? [])
-          .filter((rule) => {
-            // Filter by mode
+          .filter((rule, index) => {
+            if (invalidRuleIndices.has(index)) {
+              return false;
+            }
             if (!rule.modes || rule.modes.length === 0) {
               return true;
             }
@@ -459,7 +464,10 @@ export async function loadPoliciesFromToml(
         const parsedCheckers: SafetyCheckerRule[] = (
           validationResult.data.safety_checker ?? []
         )
-          .filter((checker) => {
+          .filter((checker, index) => {
+            if (invalidCheckerIndices.has(index)) {
+              return false;
+            }
             if (!checker.modes || checker.modes.length === 0) {
               return true;
             }
