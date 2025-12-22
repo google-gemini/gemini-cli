@@ -134,6 +134,13 @@ export class PolicyEngine {
   }
 
   /**
+   * Get the current approval mode.
+   */
+  getApprovalMode(): ApprovalMode {
+    return this.approvalMode;
+  }
+
+  /**
    * Check if a tool call is allowed based on the configured policies.
    * Returns the decision and the matching rule (if any).
    */

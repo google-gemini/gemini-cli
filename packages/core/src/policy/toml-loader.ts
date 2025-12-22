@@ -302,6 +302,8 @@ export async function loadPoliciesFromToml(
 
         // Validate shell command convenience syntax
         const tomlRules = validationResult.data.rule ?? [];
+        const tomlCheckers = validationResult.data.safety_checker ?? [];
+
         for (let i = 0; i < tomlRules.length; i++) {
           const rule = tomlRules[i];
           const validationError = validateShellCommandSyntax(rule, i);
@@ -316,6 +318,36 @@ export async function loadPoliciesFromToml(
               details: validationError,
             });
             // Continue to next rule, don't skip the entire file
+          }
+
+          if (tier > 1 && rule.modes && rule.modes.length > 0) {
+            errors.push({
+              filePath,
+              fileName: file,
+              tier: tierName,
+              ruleIndex: i,
+              errorType: 'rule_validation',
+              message: 'Restricted property "modes"',
+              details: `Rule #${i + 1}: The "modes" property is currently reserved for Tier 1 (system) policies and cannot be used in ${tierName} policies.`,
+              suggestion: 'Remove the "modes" property from this rule.',
+            });
+          }
+        }
+
+        for (let i = 0; i < tomlCheckers.length; i++) {
+          const checker = tomlCheckers[i];
+          if (tier > 1 && checker.modes && checker.modes.length > 0) {
+            errors.push({
+              filePath,
+              fileName: file,
+              tier: tierName,
+              ruleIndex: i,
+              errorType: 'rule_validation',
+              message: 'Restricted property "modes" in safety checker',
+              details: `Safety Checker #${i + 1}: The "modes" property is currently reserved for Tier 1 (system) policies and cannot be used in ${tierName} policies.`,
+              suggestion:
+                'Remove the "modes" property from this safety checker.',
+            });
           }
         }
 
@@ -367,7 +399,7 @@ export async function loadPoliciesFromToml(
                   toolName: effectiveToolName,
                   decision: rule.decision,
                   priority: transformPriority(rule.priority, tier),
-                  modes: rule.modes,
+                  modes: tier === 1 ? rule.modes : undefined,
                 };
 
                 // Compile regex pattern
@@ -444,7 +476,7 @@ export async function loadPoliciesFromToml(
                   toolName: effectiveToolName,
                   priority: checker.priority,
                   checker: checker.checker as SafetyCheckerConfig,
-                  modes: checker.modes,
+                  modes: tier === 1 ? checker.modes : undefined,
                 };
 
                 if (argsPattern) {
