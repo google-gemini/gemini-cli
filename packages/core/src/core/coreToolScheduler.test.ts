@@ -6,11 +6,15 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type { ToolCall, WaitingToolCall } from './coreToolScheduler.js';
 import {
   CoreToolScheduler,
   convertToFunctionResponse,
   truncateAndSaveToFile,
+} from './coreToolScheduler.js';
+import type {
+  ToolCall,
+  WaitingToolCall,
+  ErroredToolCall,
 } from './coreToolScheduler.js';
 import type {
   ToolCallConfirmationDetails,
@@ -42,6 +46,10 @@ import * as modifiableToolModule from '../tools/modifiable-tool.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isShellInvocationAllowlisted } from '../utils/shell-permissions.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL,
+} from '../config/models.js';
 
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
@@ -232,6 +240,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getSessionId: () => 'test-session-id',
     getUsageStatisticsEnabled: () => true,
     getDebugMode: () => false,
+    isInteractive: () => true,
     getApprovalMode: () => ApprovalMode.DEFAULT,
     setApprovalMode: () => {},
     getAllowedTools: () => [],
@@ -250,6 +259,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
     getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
     getToolRegistry: () => defaultToolRegistry,
+    getActiveModel: () => DEFAULT_GEMINI_MODEL,
     getUseSmartEdit: () => false,
     getGeminiClient: () => null,
     getEnableMessageBusIntegration: () => false,
@@ -353,7 +363,6 @@ describe('CoreToolScheduler', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      isInteractive: () => false,
       getHookSystem: () => undefined,
     });
 
@@ -455,7 +464,6 @@ describe('CoreToolScheduler', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      isInteractive: () => false,
       getHookSystem: () => undefined,
     });
 
@@ -582,6 +590,67 @@ describe('CoreToolScheduler', () => {
     expect(statuses).not.toContain('error');
   });
 
+  it('should error when tool requires confirmation in non-interactive mode', async () => {
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
+    const declarativeTool = mockTool;
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByName: () => declarativeTool,
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+      isInteractive: () => false,
+    });
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: 'mockTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-1',
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls[0].status).toBe('error');
+
+    const erroredCall = completedCalls[0] as ErroredToolCall;
+    const errorResponse = erroredCall.response;
+    const errorParts = errorResponse.responseParts;
+    // @ts-expect-error - accessing internal structure of FunctionResponsePart
+    const errorMessage = errorParts[0].functionResponse.response.error;
+    expect(errorMessage).toContain(
+      'Tool execution for "mockTool" requires user confirmation, which is not supported in non-interactive mode.',
+    );
+  });
+
   describe('getToolSuggestion', () => {
     it('should suggest the top N closest tool names for a typo', () => {
       // Create mocked tool registry
@@ -643,7 +712,6 @@ describe('CoreToolScheduler with payload', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      isInteractive: () => false,
     });
     const mockMessageBus = createMockMessageBus();
     mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
@@ -704,7 +772,12 @@ describe('convertToFunctionResponse', () => {
 
   it('should handle simple string llmContent', () => {
     const llmContent = 'Simple text output';
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      DEFAULT_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
@@ -718,7 +791,12 @@ describe('convertToFunctionResponse', () => {
 
   it('should handle llmContent as a single Part with text', () => {
     const llmContent: Part = { text: 'Text from Part object' };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      DEFAULT_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
@@ -732,7 +810,12 @@ describe('convertToFunctionResponse', () => {
 
   it('should handle llmContent as a PartListUnion array with a single text Part', () => {
     const llmContent: PartListUnion = [{ text: 'Text from array' }];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      DEFAULT_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
@@ -744,42 +827,120 @@ describe('convertToFunctionResponse', () => {
     ]);
   });
 
-  it('should handle llmContent with inlineData', () => {
-    const llmContent: Part = {
-      inlineData: { mimeType: 'image/png', data: 'base64...' },
-    };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+  it('should handle llmContent as a PartListUnion array with multiple Parts', () => {
+    const llmContent: PartListUnion = [{ text: 'part1' }, { text: 'part2' }];
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      DEFAULT_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: {
-            output: 'Binary content of type image/png was processed.',
-          },
+          response: { output: 'part1\npart2' },
+        },
+      },
+    ]);
+  });
+
+  it('should handle llmContent with fileData for Gemini 3 model (should be siblings)', () => {
+    const llmContent: Part = {
+      fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
+    };
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
+    expect(result).toEqual([
+      {
+        functionResponse: {
+          name: toolName,
+          id: callId,
+          response: { output: 'Binary content provided (1 item(s)).' },
         },
       },
       llmContent,
     ]);
   });
 
-  it('should handle llmContent with fileData', () => {
+  it('should handle llmContent with inlineData for Gemini 3 model (should be nested)', () => {
     const llmContent: Part = {
-      fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
+      inlineData: { mimeType: 'image/png', data: 'base64...' },
     };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: {
-            output: 'Binary content of type application/pdf was processed.',
-          },
+          response: { output: 'Binary content provided (1 item(s)).' },
+          parts: [llmContent],
+        },
+      },
+    ]);
+  });
+
+  it('should handle llmContent with fileData for non-Gemini 3 models', () => {
+    const llmContent: Part = {
+      fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
+    };
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      DEFAULT_GEMINI_MODEL,
+    );
+    expect(result).toEqual([
+      {
+        functionResponse: {
+          name: toolName,
+          id: callId,
+          response: { output: 'Binary content provided (1 item(s)).' },
         },
       },
       llmContent,
     ]);
+  });
+
+  it('should preserve existing functionResponse metadata', () => {
+    const innerId = 'inner-call-id';
+    const innerName = 'inner-tool-name';
+    const responseMetadata = {
+      flags: ['flag1'],
+      isError: false,
+      customData: { key: 'value' },
+    };
+    const input: Part = {
+      functionResponse: {
+        id: innerId,
+        name: innerName,
+        response: responseMetadata,
+      },
+    };
+
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      input,
+      DEFAULT_GEMINI_MODEL,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].functionResponse).toEqual({
+      id: callId,
+      name: toolName,
+      response: responseMetadata,
+    });
   });
 
   it('should handle llmContent as an array of multiple Parts (text and inlineData)', () => {
@@ -788,16 +949,25 @@ describe('convertToFunctionResponse', () => {
       { inlineData: { mimeType: 'image/jpeg', data: 'base64data...' } },
       { text: 'Another text part' },
     ];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { output: 'Tool execution succeeded.' },
+          response: {
+            output: 'Some textual description\nAnother text part',
+          },
+          parts: [
+            { inlineData: { mimeType: 'image/jpeg', data: 'base64data...' } },
+          ],
         },
       },
-      ...llmContent,
     ]);
   });
 
@@ -805,30 +975,38 @@ describe('convertToFunctionResponse', () => {
     const llmContent: PartListUnion = [
       { inlineData: { mimeType: 'image/gif', data: 'gifdata...' } },
     ];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: {
-            output: 'Binary content of type image/gif was processed.',
-          },
+          response: { output: 'Binary content provided (1 item(s)).' },
+          parts: llmContent,
         },
       },
-      ...llmContent,
     ]);
   });
 
   it('should handle llmContent as a generic Part (not text, inlineData, or fileData)', () => {
     const llmContent: Part = { functionCall: { name: 'test', args: {} } };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { output: 'Tool execution succeeded.' },
+          response: {},
         },
       },
     ]);
@@ -836,7 +1014,12 @@ describe('convertToFunctionResponse', () => {
 
   it('should handle empty string llmContent', () => {
     const llmContent = '';
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
@@ -850,13 +1033,18 @@ describe('convertToFunctionResponse', () => {
 
   it('should handle llmContent as an empty array', () => {
     const llmContent: PartListUnion = [];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { output: 'Tool execution succeeded.' },
+          response: {},
         },
       },
     ]);
@@ -864,13 +1052,18 @@ describe('convertToFunctionResponse', () => {
 
   it('should handle llmContent as a Part with undefined inlineData/fileData/text', () => {
     const llmContent: Part = {}; // An empty part object
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
+    const result = convertToFunctionResponse(
+      toolName,
+      callId,
+      llmContent,
+      PREVIEW_GEMINI_MODEL,
+    );
     expect(result).toEqual([
       {
         functionResponse: {
           name: toolName,
           id: callId,
-          response: { output: 'Tool execution succeeded.' },
+          response: {},
         },
       },
     ]);
@@ -950,7 +1143,6 @@ describe('CoreToolScheduler edit cancellation', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      isInteractive: () => false,
     });
     const mockMessageBus = createMockMessageBus();
     mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
@@ -1366,7 +1558,6 @@ describe('CoreToolScheduler request queueing', () => {
         terminalHeight: 24,
       }),
       getToolRegistry: () => toolRegistry,
-      isInteractive: () => false,
       getHookSystem: () => undefined,
     });
 
@@ -1423,7 +1614,6 @@ describe('CoreToolScheduler request queueing', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO,
-      isInteractive: () => false,
     });
     const mockMessageBus = createMockMessageBus();
     mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
@@ -1484,7 +1674,6 @@ describe('CoreToolScheduler request queueing', () => {
       setApprovalMode: (mode: ApprovalMode) => {
         approvalMode = mode;
       },
-      isInteractive: () => false,
     });
     const mockMessageBus = createMockMessageBus();
     mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
