@@ -33,6 +33,11 @@ import { CodeAssistServer } from '../code_assist/server.js';
 import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
 import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
+import {
+  shouldSimulate429,
+  createSimulated429Error,
+  shouldSimulateSlowServer,
+} from '../utils/testUtils.js';
 
 interface StructuredError {
   status: number;
@@ -178,6 +183,12 @@ export class LoggingContentGenerator implements ContentGenerator {
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<GenerateContentResponse> {
+    if (
+      shouldSimulateSlowServer() ||
+      shouldSimulate429(this.config.getContentGeneratorConfig()?.authType)
+    ) {
+      throw createSimulated429Error();
+    }
     return runInDevTraceSpan(
       {
         name: 'generateContent',
@@ -239,6 +250,12 @@ export class LoggingContentGenerator implements ContentGenerator {
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    if (
+      shouldSimulateSlowServer() ||
+      shouldSimulate429(this.config.getContentGeneratorConfig()?.authType)
+    ) {
+      throw createSimulated429Error();
+    }
     return runInDevTraceSpan(
       {
         name: 'generateContentStream',
@@ -349,12 +366,24 @@ export class LoggingContentGenerator implements ContentGenerator {
   }
 
   async countTokens(req: CountTokensParameters): Promise<CountTokensResponse> {
+    if (
+      shouldSimulateSlowServer() ||
+      shouldSimulate429(this.config.getContentGeneratorConfig()?.authType)
+    ) {
+      throw createSimulated429Error();
+    }
     return this.wrapped.countTokens(req);
   }
 
   async embedContent(
     req: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
+    if (
+      shouldSimulateSlowServer() ||
+      shouldSimulate429(this.config.getContentGeneratorConfig()?.authType)
+    ) {
+      throw createSimulated429Error();
+    }
     return runInDevTraceSpan(
       {
         name: 'embedContent',

@@ -72,6 +72,7 @@ export enum CoreEvent {
   ConsoleLog = 'console-log',
   Output = 'output',
   MemoryChanged = 'memory-changed',
+  Retry = 'retry',
   ExternalEditorClosed = 'external-editor-closed',
 }
 
@@ -81,6 +82,9 @@ export interface CoreEvents {
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
+  [CoreEvent.Retry]: [
+    { attempt: number; error: unknown; errorStatus?: number },
+  ];
   [CoreEvent.ExternalEditorClosed]: never[];
 }
 

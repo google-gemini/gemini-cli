@@ -16,6 +16,10 @@ import { promises } from 'node:fs';
 import type { ContentGenerator } from './contentGenerator.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import {
+  shouldSimulate429,
+  createSimulated429Error,
+} from '../utils/testUtils.js';
 
 export type FakeResponse =
   | {
@@ -77,6 +81,9 @@ export class FakeContentGenerator implements ContentGenerator {
     request: GenerateContentParameters,
     _userPromptId: string,
   ): Promise<GenerateContentResponse> {
+    if (shouldSimulate429()) {
+      throw createSimulated429Error();
+    }
     return Object.setPrototypeOf(
       this.getNextResponse('generateContent', request),
       GenerateContentResponse.prototype,
@@ -87,6 +94,9 @@ export class FakeContentGenerator implements ContentGenerator {
     request: GenerateContentParameters,
     _userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    if (shouldSimulate429()) {
+      throw createSimulated429Error();
+    }
     const responses = this.getNextResponse('generateContentStream', request);
     async function* stream() {
       for (const response of responses) {
@@ -102,12 +112,18 @@ export class FakeContentGenerator implements ContentGenerator {
   async countTokens(
     request: CountTokensParameters,
   ): Promise<CountTokensResponse> {
+    if (shouldSimulate429()) {
+      throw createSimulated429Error();
+    }
     return this.getNextResponse('countTokens', request);
   }
 
   async embedContent(
     request: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
+    if (shouldSimulate429()) {
+      throw createSimulated429Error();
+    }
     return Object.setPrototypeOf(
       this.getNextResponse('embedContent', request),
       EmbedContentResponse.prototype,

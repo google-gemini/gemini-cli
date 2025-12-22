@@ -575,6 +575,10 @@ export class GeminiClient {
             );
             return turn;
           }
+
+          // Notify UI that we are retrying due to an invalid stream
+          yield { type: GeminiEventType.Retry, value: 1 };
+
           const nextRequest = [{ text: 'System: Please continue.' }];
           yield* this.sendMessageStream(
             nextRequest,

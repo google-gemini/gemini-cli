@@ -18,7 +18,7 @@ import type {
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
 import { createUserContent, FinishReason } from '@google/genai';
-import { retryWithBackoff, isRetryableError } from '../utils/retry.js';
+import { retryWithBackoff } from '../utils/retry.js';
 import type { Config } from '../config/config.js';
 import {
   resolveModel,
@@ -300,10 +300,6 @@ export class GeminiChat {
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           let isConnectionPhase = true;
           try {
-            if (attempt > 0) {
-              yield { type: StreamEventType.RETRY, attempt };
-            }
-
             // If this is a retry, update the key with the new context.
             const currentConfigKey =
               attempt > 0
@@ -330,24 +326,21 @@ export class GeminiChat {
             }
             lastError = error;
             const isContentError = error instanceof InvalidStreamError;
-            const isRetryable = isRetryableError(
-              error,
-              this.config.getRetryFetchErrors(),
-            );
 
-            if (
-              (isContentError && isGemini2Model(model)) ||
-              (isRetryable && !signal.aborted)
-            ) {
+            if (isContentError && isGemini2Model(model)) {
               // Check if we have more attempts left.
               if (attempt < maxAttempts - 1) {
                 const delayMs = INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs;
-                const retryType = isContentError ? error.type : 'NETWORK_ERROR';
+                const retryType = error.type;
 
                 logContentRetry(
                   this.config,
-                  new ContentRetryEvent(attempt, retryType, delayMs, model),
+                  new ContentRetryEvent(attempt + 1, retryType, delayMs, model),
                 );
+
+                // Notify UI immediately that we are about to retry
+                yield { type: StreamEventType.RETRY, attempt: attempt + 1 };
+
                 await new Promise((res) =>
                   setTimeout(res, delayMs * (attempt + 1)),
                 );

@@ -39,6 +39,8 @@ import {
   EDIT_TOOL_NAMES,
   processRestorableToolCalls,
   recordToolCallInteractions,
+  coreEvents,
+  CoreEvent,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -122,6 +124,7 @@ export const useGeminiStream = (
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
+
   const storage = config.storage;
   const logger = useLogger(storage);
   const gitService = useMemo(() => {
@@ -277,6 +280,23 @@ export const useGeminiStream = (
     }
     return StreamingState.Idle;
   }, [isResponding, toolCalls]);
+
+  useEffect(() => {
+    const handleRetry = (payload: { attempt: number }) => {
+      // Only update retry count if we are currently in a state that could be retrying
+      if (
+        activeQueryIdRef.current &&
+        (streamingState === StreamingState.Responding ||
+          streamingState === StreamingState.WaitingForConfirmation)
+      ) {
+        setRetryCount(payload.attempt);
+      }
+    };
+    coreEvents.on(CoreEvent.Retry, handleRetry);
+    return () => {
+      coreEvents.off(CoreEvent.Retry, handleRetry);
+    };
+  }, [streamingState]);
 
   useEffect(() => {
     if (
@@ -859,7 +879,13 @@ export const useGeminiStream = (
             setRetryCount(event.value);
             break;
           case ServerGeminiEventType.InvalidStream:
-            // Will add the missing logic later
+            addItem(
+              {
+                type: MessageType.INFO,
+                text: '⚠️ Model produced an invalid response. Retrying...',
+              },
+              userMessageTimestamp,
+            );
             break;
           default: {
             // enforces exhaustive switch-case
@@ -884,6 +910,7 @@ export const useGeminiStream = (
       handleContextWindowWillOverflowEvent,
       handleCitationEvent,
       handleChatModelEvent,
+      addItem,
     ],
   );
   const submitQuery = useCallback(
