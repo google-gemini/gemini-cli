@@ -16,6 +16,7 @@ import {
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { safeRegexTest } from '../utils/safe-regex.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
 import type { HookExecutionRequest } from '../confirmation-bus/types.js';
@@ -52,7 +53,8 @@ function ruleMatches(
     if (!toolCall.args || typeof toolCall.args['command'] !== 'string') {
       return false;
     }
-    if (!rule.commandPattern.test(toolCall.args['command'])) {
+    // Use safeRegexTest to prevent ReDoS attacks from user-supplied regexes
+    if (!safeRegexTest(rule.commandPattern, toolCall.args['command'])) {
       return false;
     }
   }
