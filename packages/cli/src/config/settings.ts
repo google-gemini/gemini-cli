@@ -430,7 +430,10 @@ function getDefaultsFromSchema(
   for (const key in schema) {
     const definition = schema[key];
     if (definition.properties) {
-      defaults[key] = getDefaultsFromSchema(definition.properties);
+      const childDefaults = getDefaultsFromSchema(definition.properties);
+      if (Object.keys(childDefaults).length > 0) {
+        defaults[key] = childDefaults;
+      }
     } else if (definition.default !== undefined) {
       defaults[key] = definition.default;
     }

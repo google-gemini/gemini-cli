@@ -181,6 +181,9 @@ describe('Settings Loading and Merging', () => {
           enableAgents: false,
           extensionManagement: true,
           extensionReloading: false,
+          introspectionAgentSettings: {
+            enabled: false,
+          },
           jitContext: false,
         },
         extensions: {
@@ -221,7 +224,6 @@ describe('Settings Loading and Merging', () => {
           enabled: false,
           hasSeenNudge: false,
         },
-        mcp: {},
         mcpServers: {},
         model: {
           compressionThreshold: 0.5,
@@ -449,9 +451,9 @@ describe('Settings Loading and Merging', () => {
           usageStatisticsEnabled: true,
         },
         security: {
-          auth: {},
           blockGitExtensions: false,
           disableYoloMode: false,
+          enablePermanentToolApproval: false,
           folderTrust: {
             enabled: false,
           },
@@ -888,6 +890,9 @@ describe('Settings Loading and Merging', () => {
           enableAgents: false,
           extensionManagement: true,
           extensionReloading: false,
+          introspectionAgentSettings: {
+            enabled: false,
+          },
           jitContext: false,
         },
         extensions: {
@@ -928,7 +933,6 @@ describe('Settings Loading and Merging', () => {
           enabled: false,
           hasSeenNudge: false,
         },
-        mcp: {},
         mcpServers: {},
         model: {
           compressionThreshold: 0.5,
@@ -1156,9 +1160,9 @@ describe('Settings Loading and Merging', () => {
           usageStatisticsEnabled: true,
         },
         security: {
-          auth: {},
           blockGitExtensions: false,
           disableYoloMode: false,
+          enablePermanentToolApproval: false,
           folderTrust: {
             enabled: false,
           },
