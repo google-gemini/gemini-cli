@@ -30,7 +30,7 @@ export function safeRegexTest(
       { timeout: timeoutMs },
     );
 
-    return context.result as boolean;
+    return context['result'] as boolean;
   } catch (error) {
     debugLogger.debug(
       `[safeRegexTest] Regex execution failed or timed out: ${error}`,
