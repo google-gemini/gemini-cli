@@ -238,7 +238,7 @@ describe('Gemini Client (client.ts)', () => {
       getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/test-temp'),
       },
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getBaseLlmClient: vi.fn().mockReturnValue({

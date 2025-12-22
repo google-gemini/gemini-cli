@@ -146,7 +146,7 @@ describe('GeminiChat', () => {
       flashFallbackHandler: undefined,
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/test-temp'),
       },
       getToolRegistry: vi.fn().mockReturnValue({
         getTool: vi.fn(),

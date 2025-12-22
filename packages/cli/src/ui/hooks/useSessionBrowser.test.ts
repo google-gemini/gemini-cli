@@ -140,6 +140,49 @@ describe('useSessionBrowser', () => {
     expect(result.current.isSessionBrowserOpen).toBe(false);
     consoleErrorSpy.mockRestore();
   });
+
+  it('should resume a JSONL session by parsing JSONL content', async () => {
+    const MOCKED_FILENAME = 'session-2025-01-01-test-session-123.jsonl';
+    const metadata = {
+      type: 'session_metadata',
+      sessionId: 'existing-session-789',
+      projectHash: 'test-project-hash',
+      startTime: '2025-01-01T00:00:00.000Z',
+      lastUpdated: '2025-01-01T00:00:00.000Z',
+    };
+    const message = {
+      id: 'msg-1',
+      type: 'user',
+      content: 'Hello',
+      timestamp: '2025-01-01T00:00:01.000Z',
+    };
+    const jsonlContent = `${JSON.stringify(metadata)}\n${JSON.stringify(message)}\n`;
+
+    const mockSession = {
+      id: MOCKED_SESSION_ID,
+      fileName: MOCKED_FILENAME,
+    } as SessionInfo;
+    mockedGetSessionFiles.mockResolvedValue([mockSession]);
+    mockedFs.readFile.mockResolvedValue(jsonlContent);
+
+    const { result } = renderHook(() =>
+      useSessionBrowser(mockConfig, mockOnLoadHistory),
+    );
+
+    await act(async () => {
+      await result.current.handleResumeSession(mockSession);
+    });
+
+    expect(mockedFs.readFile).toHaveBeenCalledWith(
+      `${MOCKED_CHATS_DIR}/${MOCKED_FILENAME}`,
+      'utf8',
+    );
+    expect(mockConfig.setSessionId).toHaveBeenCalledWith(
+      'existing-session-789',
+    );
+    expect(result.current.isSessionBrowserOpen).toBe(false);
+    expect(mockOnLoadHistory).toHaveBeenCalled();
+  });
 });
 
 // The convertSessionToHistoryFormats tests are self-contained and do not need changes.

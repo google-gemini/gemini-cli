@@ -10,6 +10,7 @@ import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   SESSION_FILE_PREFIX,
+  parseJsonl,
   type ConversationRecord,
 } from './chatRecordingService.js';
 import fs from 'node:fs/promises';
@@ -18,15 +19,30 @@ import path from 'node:path';
 const MIN_MESSAGES_FOR_SUMMARY = 1;
 
 /**
+ * Parses a session file content based on its format.
+ */
+function parseSessionContent(
+  content: string,
+  sessionPath: string,
+): ConversationRecord {
+  if (sessionPath.endsWith('.jsonl')) {
+    return parseJsonl(content, '', '');
+  }
+  return JSON.parse(content);
+}
+
+/**
  * Generates and saves a summary for a session file.
  */
 async function generateAndSaveSummary(
   config: Config,
   sessionPath: string,
 ): Promise<void> {
+  const isJsonl = sessionPath.endsWith('.jsonl');
+
   // Read session file
   const content = await fs.readFile(sessionPath, 'utf-8');
-  const conversation: ConversationRecord = JSON.parse(content);
+  const conversation = parseSessionContent(content, sessionPath);
 
   // Skip if summary already exists
   if (conversation.summary) {
@@ -69,7 +85,8 @@ async function generateAndSaveSummary(
 
   // Re-read the file before writing to handle race conditions
   const freshContent = await fs.readFile(sessionPath, 'utf-8');
-  const freshConversation: ConversationRecord = JSON.parse(freshContent);
+  const freshStat = await fs.stat(sessionPath);
+  const freshConversation = parseSessionContent(freshContent, sessionPath);
 
   // Check if summary was added by another process
   if (freshConversation.summary) {
@@ -79,10 +96,29 @@ async function generateAndSaveSummary(
     return;
   }
 
-  // Add summary and write back
-  freshConversation.summary = summary;
-  freshConversation.lastUpdated = new Date().toISOString();
-  await fs.writeFile(sessionPath, JSON.stringify(freshConversation, null, 2));
+  if (isJsonl) {
+    // For JSONL: append metadata update (append-only approach)
+    const metadataUpdate = {
+      type: 'session_metadata',
+      summary,
+      lastUpdated: new Date().toISOString(),
+    };
+    await fs.appendFile(sessionPath, JSON.stringify(metadataUpdate) + '\n');
+  } else {
+    const currentStat = await fs.stat(sessionPath);
+    if (currentStat.mtimeMs !== freshStat.mtimeMs) {
+      debugLogger.debug(
+        `[SessionSummary] Session changed during summary generation for ${sessionPath}, skipping`,
+      );
+      return;
+    }
+    // For JSON: rewrite the file
+    freshConversation.summary = summary;
+    freshConversation.lastUpdated = new Date().toISOString();
+    const tmpPath = `${sessionPath}.tmp`;
+    await fs.writeFile(tmpPath, JSON.stringify(freshConversation, null, 2));
+    await fs.rename(tmpPath, sessionPath);
+  }
   debugLogger.debug(
     `[SessionSummary] Saved summary for ${sessionPath}: "${summary}"`,
   );
@@ -106,10 +142,12 @@ export async function getPreviousSession(
       return null;
     }
 
-    // List session files
+    // List session files (both .json and .jsonl)
     const allFiles = await fs.readdir(chatsDir);
     const sessionFiles = allFiles.filter(
-      (f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'),
+      (f) =>
+        f.startsWith(SESSION_FILE_PREFIX) &&
+        (f.endsWith('.json') || f.endsWith('.jsonl')),
     );
 
     if (sessionFiles.length === 0) {
@@ -127,7 +165,7 @@ export async function getPreviousSession(
 
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-      const conversation: ConversationRecord = JSON.parse(content);
+      const conversation = parseSessionContent(content, filePath);
 
       if (conversation.summary) {
         debugLogger.debug(

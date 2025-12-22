@@ -345,7 +345,7 @@ describe('deleteSession', () => {
 
     // Create mock methods
     mockListSessions = vi.fn();
-    mockDeleteSession = vi.fn();
+    mockDeleteSession = vi.fn().mockResolvedValue(undefined);
 
     // Mock SessionSelector constructor
     vi.mocked(SessionSelector).mockImplementation(
@@ -408,8 +408,6 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {});
-
     // Act
     await deleteSession(mockConfig, 'session-uuid-123');
 
@@ -455,8 +453,6 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {});
-
     // Act
     await deleteSession(mockConfig, '2');
 
@@ -637,9 +633,7 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {
-      throw new Error('File deletion failed');
-    });
+    mockDeleteSession.mockRejectedValue(new Error('File deletion failed'));
 
     // Act
     await deleteSession(mockConfig, '1');
@@ -670,10 +664,7 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {
-      // eslint-disable-next-line no-restricted-syntax
-      throw 'Unknown error type';
-    });
+    mockDeleteSession.mockRejectedValue('Unknown error type');
 
     // Act
     await deleteSession(mockConfig, '1');
@@ -730,8 +721,6 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {});
-
     // Act - delete index 1 (should be oldest session after sorting)
     await deleteSession(mockConfig, '1');
 
