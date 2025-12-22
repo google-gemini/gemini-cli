@@ -1521,7 +1521,6 @@ describe('CoreToolScheduler request queueing', () => {
           params: { command: 'git status && rm -rf /tmp/should-not-run' },
         } as unknown as AnyToolInvocation,
         ['run_shell_command(git)'],
-        { allowedEnvironmentVariables: [], blockedEnvironmentVariables: [] },
       ),
     ).toBe(false);
 

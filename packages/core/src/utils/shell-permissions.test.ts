@@ -58,10 +58,6 @@ beforeEach(() => {
     getAllowedTools: () => [],
     getApprovalMode: () => 'strict',
     isInteractive: () => false,
-    sanitizationConfig: {
-      allowedEnvironmentVariables: [],
-      blockedEnvironmentVariables: [],
-    },
   } as unknown as Config;
 });
 
@@ -486,11 +482,7 @@ describe('isShellInvocationAllowlisted', () => {
       'git status && rm -rf /tmp/should-not-run',
     );
     expect(
-      isShellInvocationAllowlisted(
-        invocation,
-        ['run_shell_command(git)'],
-        config.sanitizationConfig,
-      ),
+      isShellInvocationAllowlisted(invocation, ['run_shell_command(git)']),
     ).toBe(false);
   });
 
@@ -499,40 +491,30 @@ describe('isShellInvocationAllowlisted', () => {
       'git status && rm -rf /tmp/should-run && git diff',
     );
     expect(
-      isShellInvocationAllowlisted(
-        invocation,
-        ['run_shell_command(git)', 'run_shell_command(rm -rf)'],
-        config.sanitizationConfig,
-      ),
+      isShellInvocationAllowlisted(invocation, [
+        'run_shell_command(git)',
+        'run_shell_command(rm -rf)',
+      ]),
     ).toBe(true);
   });
 
   it('should return true when the allowlist contains a wildcard shell entry', () => {
     const invocation = createInvocation('git status && rm -rf /tmp/should-run');
     expect(
-      isShellInvocationAllowlisted(
-        invocation,
-        ['run_shell_command'],
-        config.sanitizationConfig,
-      ),
+      isShellInvocationAllowlisted(invocation, ['run_shell_command']),
     ).toBe(true);
   });
 
   it('should treat piped commands as separate segments that must be allowlisted', () => {
     const invocation = createInvocation('git status | tail -n 1');
     expect(
-      isShellInvocationAllowlisted(
-        invocation,
-        ['run_shell_command(git)'],
-        config.sanitizationConfig,
-      ),
+      isShellInvocationAllowlisted(invocation, ['run_shell_command(git)']),
     ).toBe(false);
     expect(
-      isShellInvocationAllowlisted(
-        invocation,
-        ['run_shell_command(git)', 'run_shell_command(tail)'],
-        config.sanitizationConfig,
-      ),
+      isShellInvocationAllowlisted(invocation, [
+        'run_shell_command(git)',
+        'run_shell_command(tail)',
+      ]),
     ).toBe(true);
   });
 });

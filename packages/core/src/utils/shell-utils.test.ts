@@ -21,11 +21,6 @@ import {
   stripShellWrapper,
 } from './shell-utils.js';
 
-const EMPTY_CONFIG = {
-  allowedEnvironmentVariables: [],
-  blockedEnvironmentVariables: [],
-};
-
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
 vi.mock('os', () => ({
@@ -63,57 +58,51 @@ afterEach(() => {
 
 describe('getCommandRoots', () => {
   it('should return a single command', () => {
-    expect(getCommandRoots('ls -l', EMPTY_CONFIG)).toEqual(['ls']);
+    expect(getCommandRoots('ls -l')).toEqual(['ls']);
   });
 
   it('should handle paths and return the binary name', () => {
-    expect(
-      getCommandRoots('/usr/local/bin/node script.js', EMPTY_CONFIG),
-    ).toEqual(['node']);
+    expect(getCommandRoots('/usr/local/bin/node script.js')).toEqual(['node']);
   });
 
   it('should return an empty array for an empty string', () => {
-    expect(getCommandRoots('', EMPTY_CONFIG)).toEqual([]);
+    expect(getCommandRoots('')).toEqual([]);
   });
 
   it('should handle a mix of operators', () => {
-    const result = getCommandRoots('a;b|c&&d||e&f', EMPTY_CONFIG);
+    const result = getCommandRoots('a;b|c&&d||e&f');
     expect(result).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
   });
 
   it('should correctly parse a chained command with quotes', () => {
-    const result = getCommandRoots(
-      'echo "hello" && git commit -m "feat"',
-      EMPTY_CONFIG,
-    );
+    const result = getCommandRoots('echo "hello" && git commit -m "feat"');
     expect(result).toEqual(['echo', 'git']);
   });
 
   it('should include nested command substitutions', () => {
-    const result = getCommandRoots('echo $(badCommand --danger)', EMPTY_CONFIG);
+    const result = getCommandRoots('echo $(badCommand --danger)');
     expect(result).toEqual(['echo', 'badCommand']);
   });
 
   it('should include process substitutions', () => {
-    const result = getCommandRoots('diff <(ls) <(ls -a)', EMPTY_CONFIG);
+    const result = getCommandRoots('diff <(ls) <(ls -a)');
     expect(result).toEqual(['diff', 'ls', 'ls']);
   });
 
   it('should include backtick substitutions', () => {
-    const result = getCommandRoots('echo `badCommand --danger`', EMPTY_CONFIG);
+    const result = getCommandRoots('echo `badCommand --danger`');
     expect(result).toEqual(['echo', 'badCommand']);
   });
 
   it('should treat parameter expansions with prompt transformations as unsafe', () => {
     const roots = getCommandRoots(
       'echo "${var1=aa\\140 env| ls -l\\140}${var1@P}"',
-      EMPTY_CONFIG,
     );
     expect(roots).toEqual([]);
   });
 
   it('should not return roots for prompt transformation expansions', () => {
-    const roots = getCommandRoots('echo ${foo@P}', EMPTY_CONFIG);
+    const roots = getCommandRoots('echo ${foo@P}');
     expect(roots).toEqual([]);
   });
 });
@@ -137,10 +126,7 @@ describeWindowsOnly('PowerShell integration', () => {
   });
 
   it('should return command roots using PowerShell AST output', () => {
-    const roots = getCommandRoots(
-      'Get-ChildItem | Select-Object Name',
-      EMPTY_CONFIG,
-    );
+    const roots = getCommandRoots('Get-ChildItem | Select-Object Name');
     expect(roots.length).toBeGreaterThan(0);
     expect(roots).toContain('Get-ChildItem');
   });

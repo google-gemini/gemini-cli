@@ -14,10 +14,6 @@ import {
 import type { Node } from 'web-tree-sitter';
 import { Language, Parser, Query } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
-import {
-  sanitizeEnvironment,
-  type EnvironmentSanitizationConfig,
-} from '../services/environmentSanitization.js';
 import { debugLogger } from './debugLogger.js';
 
 export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
@@ -348,7 +344,6 @@ function parseBashCommandDetails(command: string): CommandParseResult | null {
 function parsePowerShellCommandDetails(
   command: string,
   executable: string,
-  sanitizationConfig: EnvironmentSanitizationConfig,
 ): CommandParseResult | null {
   const trimmed = command.trim();
   if (!trimmed) {
@@ -370,7 +365,7 @@ function parsePowerShellCommandDetails(
       ],
       {
         env: {
-          ...sanitizeEnvironment(process.env, sanitizationConfig),
+          ...process.env,
           [POWERSHELL_COMMAND_ENV]: command,
         },
         encoding: 'utf-8',
@@ -430,16 +425,11 @@ function parsePowerShellCommandDetails(
 
 export function parseCommandDetails(
   command: string,
-  sanitizationConfig: EnvironmentSanitizationConfig,
 ): CommandParseResult | null {
   const configuration = getShellConfiguration();
 
   if (configuration.shell === 'powershell') {
-    return parsePowerShellCommandDetails(
-      command,
-      configuration.executable,
-      sanitizationConfig,
-    );
+    return parsePowerShellCommandDetails(command, configuration.executable);
   }
 
   if (configuration.shell === 'bash') {
@@ -524,11 +514,8 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
  * @param command The shell command string to parse
  * @returns An array of individual command strings
  */
-export function splitCommands(
-  command: string,
-  sanitizationConfig: EnvironmentSanitizationConfig,
-): string[] {
-  const parsed = parseCommandDetails(command, sanitizationConfig);
+export function splitCommands(command: string): string[] {
+  const parsed = parseCommandDetails(command);
   if (!parsed || parsed.hasError) {
     return [];
   }
@@ -544,11 +531,8 @@ export function splitCommands(
  * @example getCommandRoot("ls -la /tmp") returns "ls"
  * @example getCommandRoot("git status && npm test") returns "git"
  */
-export function getCommandRoot(
-  command: string,
-  sanitizationConfig: EnvironmentSanitizationConfig,
-): string | undefined {
-  const parsed = parseCommandDetails(command, sanitizationConfig);
+export function getCommandRoot(command: string): string | undefined {
+  const parsed = parseCommandDetails(command);
   if (!parsed || parsed.hasError || parsed.details.length === 0) {
     return undefined;
   }
@@ -556,15 +540,12 @@ export function getCommandRoot(
   return parsed.details[0]?.name;
 }
 
-export function getCommandRoots(
-  command: string,
-  sanitizationConfig: EnvironmentSanitizationConfig,
-): string[] {
+export function getCommandRoots(command: string): string[] {
   if (!command) {
     return [];
   }
 
-  const parsed = parseCommandDetails(command, sanitizationConfig);
+  const parsed = parseCommandDetails(command);
   if (!parsed || parsed.hasError) {
     return [];
   }
