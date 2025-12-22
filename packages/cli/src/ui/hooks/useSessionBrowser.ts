@@ -104,7 +104,7 @@ export const useSessionBrowser = (
             .getGeminiClient()
             ?.getChatRecordingService();
           if (chatRecordingService) {
-            await chatRecordingService.deleteSession(session.file);
+            await chatRecordingService.deleteSession(session.id);
           }
         } catch (error) {
           console.error('Error deleting session:', error);
