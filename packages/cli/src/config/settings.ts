@@ -112,7 +112,7 @@ const MIGRATION_MAP: Record<string, string> = {
   showCitations: 'ui.showCitations',
   ideMode: 'ide.enabled',
   includeDirectories: 'context.includeDirectories',
-  loadMemoryFromIncludeDirectories: 'context.loadFromIncludeDirectories',
+  loadMemoryFromIncludeDirectories: 'context.loadMemoryFromIncludeDirectories',
   maxSessionTurns: 'model.maxSessionTurns',
   mcpServers: 'mcpServers',
   mcpServerCommand: 'mcp.serverCommand',
