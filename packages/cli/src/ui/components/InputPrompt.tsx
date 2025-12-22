@@ -464,13 +464,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 await categorizePathsByType(sequence);
 
               if (imagePaths.length > 0 || nonImagePaths.length > 0) {
-                // Validate and register each image, collecting placeholders
+                // Validate all images in parallel
+                const validationResults = await Promise.all(
+                  imagePaths.map(async (imagePath) => ({
+                    imagePath,
+                    validation: await clipboardImages.validateImage(imagePath),
+                  })),
+                );
+
+                // Register valid images and collect errors
                 const placeholders: string[] = [];
                 const skippedImages: string[] = [];
 
-                for (const imagePath of imagePaths) {
-                  const validation =
-                    await clipboardImages.validateImage(imagePath);
+                for (const { imagePath, validation } of validationResults) {
                   if (validation.valid) {
                     placeholders.push(clipboardImages.registerImage(imagePath));
                   } else {

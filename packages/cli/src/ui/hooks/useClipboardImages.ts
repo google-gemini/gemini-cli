@@ -251,20 +251,27 @@ export function useClipboardImages(): UseClipboardImagesReturn {
     async (text: string): Promise<ImagePartsResult> => {
       // Use ref for synchronous access to current state
       const current = registryRef.current;
+
+      // Filter to only images whose tags are still present in the text
+      const imagesToProcess = current.images.filter((image) =>
+        text.includes(image.displayText),
+      );
+
+      // Process all images in parallel
+      const results = await Promise.all(
+        imagesToProcess.map(async (image) => {
+          const part = await readImageAsPart(image.path, image.displayText);
+          return { part, displayText: image.displayText };
+        }),
+      );
+
+      // Collect successful results
       const parts: PartUnion[] = [];
       const matchedDisplayTexts: string[] = [];
-
-      for (const image of current.images) {
-        // Use String.includes for faster tag checking (no regex compilation)
-        if (!text.includes(image.displayText)) {
-          // Tag was deleted - skip this image
-          continue;
-        }
-
-        const part = await readImageAsPart(image.path, image.displayText);
+      for (const { part, displayText } of results) {
         if (part) {
           parts.push(part);
-          matchedDisplayTexts.push(image.displayText);
+          matchedDisplayTexts.push(displayText);
         }
       }
 
