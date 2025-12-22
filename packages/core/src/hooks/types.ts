@@ -18,6 +18,16 @@ import type {
 import { defaultHookTranslator } from './hookTranslator.js';
 
 /**
+ * Configuration source levels in precedence order (highest to lowest)
+ */
+export enum ConfigSource {
+  Project = 'project',
+  User = 'user',
+  System = 'system',
+  Extensions = 'extensions',
+}
+
+/**
  * Event names for the hook system
  */
 export enum HookEventName {
@@ -43,6 +53,7 @@ export interface CommandHookConfig {
   name?: string;
   description?: string;
   timeout?: number;
+  source?: ConfigSource;
 }
 
 export type HookConfig = CommandHookConfig;
