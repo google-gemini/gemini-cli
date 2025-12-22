@@ -33,6 +33,7 @@ import {
   ApprovalMode,
   MockTool,
   HookSystem,
+  PREVIEW_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 import { ToolCallStatus } from '../types.js';
@@ -71,6 +72,7 @@ const mockConfig = {
   getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   getAllowedTools: vi.fn(() => []),
+  getActiveModel: () => PREVIEW_GEMINI_MODEL,
   getContentGeneratorConfig: () => ({
     model: 'test-model',
     authType: 'oauth-personal',

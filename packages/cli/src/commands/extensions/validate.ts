@@ -41,7 +41,7 @@ async function validateExtension(args: ValidateArgs) {
   });
   const absoluteInputPath = path.resolve(args.path);
   const extensionConfig: ExtensionConfig =
-    extensionManager.loadExtensionConfig(absoluteInputPath);
+    await extensionManager.loadExtensionConfig(absoluteInputPath);
   const warnings: string[] = [];
   const errors: string[] = [];
 

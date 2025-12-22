@@ -116,7 +116,7 @@ async function restoreAction(
       } else if (action.type === 'load_history' && loadHistory) {
         loadHistory(action.history);
         if (action.clientHistory) {
-          await config?.getGeminiClient()?.setHistory(action.clientHistory);
+          config?.getGeminiClient()?.setHistory(action.clientHistory);
         }
       }
     }

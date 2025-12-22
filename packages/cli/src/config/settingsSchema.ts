@@ -19,7 +19,7 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
-  GEMINI_MODEL_ALIAS_PRO,
+  GEMINI_MODEL_ALIAS_AUTO,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -1164,6 +1164,16 @@ const SETTINGS_SCHEMA = {
         description: 'Disable YOLO mode, even if enabled by a flag.',
         showInDialog: true,
       },
+      enablePermanentToolApproval: {
+        type: 'boolean',
+        label: 'Allow Permanent Tool Approval',
+        category: 'Security',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable the "Allow for all future sessions" option in tool confirmation dialogs.',
+        showInDialog: true,
+      },
       blockGitExtensions: {
         type: 'boolean',
         label: 'Blocks extensions from Git',
@@ -1301,7 +1311,8 @@ const SETTINGS_SCHEMA = {
         category: 'Experimental',
         requiresRestart: true,
         default: false,
-        description: 'Enable local and remote subagents.',
+        description:
+          'Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents',
         showInDialog: false,
       },
       extensionManagement: {
@@ -1321,15 +1332,6 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Enables extension loading/unloading within the CLI session.',
-        showInDialog: false,
-      },
-      isModelAvailabilityServiceEnabled: {
-        type: 'boolean',
-        label: 'Enable Model Availability Service',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: false,
-        description: 'Enable model routing using new availability service.',
         showInDialog: false,
       },
       jitContext: {
@@ -1394,10 +1396,30 @@ const SETTINGS_SCHEMA = {
             label: 'Model',
             category: 'Experimental',
             requiresRestart: true,
-            default: GEMINI_MODEL_ALIAS_PRO,
+            default: GEMINI_MODEL_ALIAS_AUTO,
             description:
               'The model to use for the Codebase Investigator agent.',
             showInDialog: false,
+          },
+        },
+      },
+      introspectionAgentSettings: {
+        type: 'object',
+        label: 'Introspection Agent Settings',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: {},
+        description: 'Configuration for Introspection Agent.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Introspection Agent',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description: 'Enable the Introspection Agent.',
+            showInDialog: true,
           },
         },
       },
@@ -1899,6 +1921,10 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
             type: 'object',
             description: 'Individual hook configuration.',
             properties: {
+              name: {
+                type: 'string',
+                description: 'Unique identifier for the hook.',
+              },
               type: {
                 type: 'string',
                 description:
@@ -1908,6 +1934,10 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
                 type: 'string',
                 description:
                   'Shell command to execute. Receives JSON input via stdin and returns JSON output via stdout.',
+              },
+              description: {
+                type: 'string',
+                description: 'A description of the hook.',
               },
               timeout: {
                 type: 'number',
@@ -1938,9 +1968,3 @@ type InferSettings<T extends SettingsSchema> = {
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;
-
-export interface FooterSettings {
-  hideCWD?: boolean;
-  hideSandboxStatus?: boolean;
-  hideModelInfo?: boolean;
-}
