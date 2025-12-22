@@ -40,6 +40,14 @@ vi.mock('../utils/events.js', () => ({
   coreEvents: mockCoreEvents,
 }));
 
+vi.mock('../telemetry/clearcut-logger/clearcut-logger.js', () => ({
+  ClearcutLogger: {
+    getInstance: vi.fn().mockReturnValue({
+      logHookCallEvent: vi.fn(),
+    }),
+  },
+}));
+
 describe('HookEventHandler', () => {
   let hookEventHandler: HookEventHandler;
   let mockConfig: Config;
