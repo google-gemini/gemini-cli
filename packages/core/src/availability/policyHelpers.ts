@@ -36,8 +36,6 @@ export function resolvePolicyChain(
   preferredModel?: string,
   wrapsAround: boolean = false,
 ): ModelPolicyChain {
-  // Availability uses the active/requested model directly. Legacy fallback logic
-  // (getEffectiveModel) only applies when availability is disabled.
   const modelFromConfig =
     preferredModel ?? config.getActiveModel?.() ?? config.getModel();
 

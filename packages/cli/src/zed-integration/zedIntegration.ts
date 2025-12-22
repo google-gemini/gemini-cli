@@ -27,7 +27,7 @@ import {
   ToolCallEvent,
   debugLogger,
   ReadManyFilesTool,
-  getEffectiveModel,
+  resolveModel,
   createWorkingStdio,
   startupProfiler,
 } from '@google/gemini-cli-core';
@@ -282,7 +282,7 @@ export class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const model = getEffectiveModel(
+        const model = resolveModel(
           this.config.getModel(),
           this.config.getPreviewFeatures(),
         );
