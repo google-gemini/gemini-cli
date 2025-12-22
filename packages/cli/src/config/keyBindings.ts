@@ -64,6 +64,7 @@ export enum Command {
   TOGGLE_COPY_MODE = 'toggleCopyMode',
   QUIT = 'quit',
   EXIT = 'exit',
+  SUSPEND = 'suspend',
   SHOW_MORE_LINES = 'showMoreLines',
 
   // Shell commands
@@ -205,6 +206,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
+  [Command.SUSPEND]: [{ key: 'z', ctrl: true }],
   [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],
 
   // Shell commands
@@ -311,7 +313,7 @@ export const commandCategories: readonly CommandCategory[] = [
   },
   {
     title: 'Session Control',
-    commands: [Command.QUIT, Command.EXIT],
+    commands: [Command.QUIT, Command.EXIT, Command.SUSPEND],
   },
 ];
 
@@ -356,6 +358,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Toggle copy mode when the terminal is using the alternate buffer.',
   [Command.QUIT]: 'Cancel the current request or quit the CLI.',
   [Command.EXIT]: 'Exit the CLI when the input buffer is empty.',
+  [Command.SUSPEND]: 'Suspend the CLI and move it to the background.',
   [Command.SHOW_MORE_LINES]:
     'Expand a height-constrained response to show additional lines.',
   [Command.REVERSE_SEARCH]: 'Start reverse search through history.',
