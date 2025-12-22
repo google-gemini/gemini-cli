@@ -27,7 +27,9 @@ vi.mock('./remote-invocation.js', () => ({
   RemoteAgentInvocation: vi.fn().mockImplementation(() => ({
     execute: vi
       .fn()
-      .mockResolvedValue({ content: [{ type: 'text', text: 'Remote Success' }] }),
+      .mockResolvedValue({
+        content: [{ type: 'text', text: 'Remote Success' }],
+      }),
     shouldConfirmExecute: vi.fn().mockResolvedValue(true),
   })),
 }));
@@ -69,6 +71,7 @@ describe('DelegateToAgentTool', () => {
   beforeEach(() => {
     config = {
       getDebugMode: () => false,
+      getActiveModel: () => 'test-model',
       modelConfigService: {
         registerRuntimeModelConfig: vi.fn(),
       },

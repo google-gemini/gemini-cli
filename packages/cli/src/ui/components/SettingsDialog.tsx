@@ -447,7 +447,7 @@ export function SettingsDialog({
   };
 
   // Height constraint calculations similar to ThemeDialog
-  const DIALOG_PADDING = 4;
+  const DIALOG_PADDING = 5;
   const SETTINGS_TITLE_HEIGHT = 2; // "Settings" title + spacing
   const SCROLL_ARROWS_HEIGHT = 2; // Up and down arrows
   const SPACING_HEIGHT = 1; // Space between settings list and scope

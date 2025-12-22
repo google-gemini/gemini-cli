@@ -52,27 +52,29 @@ export interface SubagentActivityEvent {
  * The base definition for an agent.
  * @template TOutput The specific Zod schema for the agent's final output object.
  */
-export interface BaseAgentDefinition {
+export interface BaseAgentDefinition<
+  TOutput extends z.ZodTypeAny = z.ZodUnknown,
+> {
   /** Unique identifier for the agent. */
   name: string;
   displayName?: string;
   description: string;
+  inputConfig: InputConfig;
+  outputConfig?: OutputConfig<TOutput>;
 }
 
 export interface LocalAgentDefinition<
   TOutput extends z.ZodTypeAny = z.ZodUnknown,
-> extends BaseAgentDefinition {
+> extends BaseAgentDefinition<TOutput> {
   kind: 'local';
 
   // Local agent required configs
   promptConfig: PromptConfig;
   modelConfig: ModelConfig;
   runConfig: RunConfig;
-  inputConfig: InputConfig;
 
   // Optional configs
   toolConfig?: ToolConfig;
-  outputConfig?: OutputConfig<TOutput>;
 
   /**
    * An optional function to process the raw output from the agent's final tool
@@ -84,15 +86,16 @@ export interface LocalAgentDefinition<
   processOutput?: (output: z.infer<TOutput>) => string;
 }
 
-export interface RemoteAgentDefinition extends BaseAgentDefinition {
+export interface RemoteAgentDefinition<
+  TOutput extends z.ZodTypeAny = z.ZodUnknown,
+> extends BaseAgentDefinition<TOutput> {
   kind: 'remote';
   agentCardUrl: string;
-  inputConfig: InputConfig;
 }
 
 export type AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> =
   | LocalAgentDefinition<TOutput>
-  | RemoteAgentDefinition;
+  | RemoteAgentDefinition<TOutput>;
 
 /**
  * Configures the initial prompt for the agent.
