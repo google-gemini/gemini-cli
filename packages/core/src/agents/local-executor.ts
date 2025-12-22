@@ -44,6 +44,7 @@ import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getModelConfigAlias } from './registry.js';
+import { getVersion } from '../utils/version.js';
 import { ApprovalMode } from '../policy/types.js';
 
 /** A callback function to report on agent activity. */
@@ -209,7 +210,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     const { nextMessage, submittedOutput, taskCompleted } =
       await this.processFunctionCalls(functionCalls, combinedSignal, promptId);
-
     if (taskCompleted) {
       const finalResult = submittedOutput ?? 'Task completed successfully.';
       return {
@@ -373,10 +373,18 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     let chat: GeminiChat | undefined;
     let tools: FunctionDeclaration[] | undefined;
     try {
+      // Inject standard runtime context into inputs
+      const augmentedInputs = {
+        ...inputs,
+        cliVersion: await getVersion(),
+        activeModel: this.runtimeContext.getActiveModel(),
+        today: new Date().toLocaleDateString(),
+      };
+
       tools = this.prepareToolsList();
-      chat = await this.createChatObject(inputs, tools);
+      chat = await this.createChatObject(augmentedInputs, tools);
       const query = this.definition.promptConfig.query
-        ? templateString(this.definition.promptConfig.query, inputs)
+        ? templateString(this.definition.promptConfig.query, augmentedInputs)
         : 'Get Started!';
       let currentMessage: Content = { role: 'user', parts: [{ text: query }] };
 
@@ -866,18 +874,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
       // Create a promise for the tool execution
       const executionPromise = (async () => {
-        // Force YOLO mode for subagents to prevent hanging on confirmation
-        const contextProxy = new Proxy(this.runtimeContext, {
-          get(target, prop, receiver) {
-            if (prop === 'getApprovalMode') {
-              return () => ApprovalMode.YOLO;
-            }
-            return Reflect.get(target, prop, receiver);
-          },
-        });
+        const agentContext = Object.create(this.runtimeContext);
+        agentContext.getToolRegistry = () => this.toolRegistry;
+        agentContext.getApprovalMode = () => ApprovalMode.YOLO;
 
         const { response: toolResponse } = await executeToolCall(
-          contextProxy,
+          agentContext,
           requestInfo,
           signal,
         );
