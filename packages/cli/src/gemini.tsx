@@ -20,7 +20,6 @@ import {
   loadSettings,
   migrateDeprecatedSettings,
   SettingScope,
-  applyRemoteAdminSettings,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
@@ -380,7 +379,6 @@ export async function main() {
     settings.merged.security?.auth?.selectedType &&
     !settings.merged.security?.auth?.useExternal
   ) {
-    // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
     try {
       const err = validateAuthMethod(
         settings.merged.security.auth.selectedType,
@@ -392,7 +390,9 @@ export async function main() {
         settings.merged.security.auth.selectedType,
       );
       if (partialConfig.getRemoteAdminSettings()) {
-        applyRemoteAdminSettings(partialConfig.getRemoteAdminSettings());
+        settings.applyRemoteAdminSettings(
+          partialConfig.getRemoteAdminSettings() ?? {},
+        );
       }
     } catch (err) {
       debugLogger.error('Error authenticating:', err);

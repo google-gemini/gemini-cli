@@ -20,7 +20,7 @@ import type {
   ConversationInteraction,
   StreamingLatency,
   RecordCodeAssistMetricsRequest,
-  Settings,
+  GeminiCodeAssistSetting,
 } from './types.js';
 import type {
   ListExperimentsRequest,
@@ -69,7 +69,7 @@ export class CodeAssistServer implements ContentGenerator {
     readonly httpOptions: HttpOptions = {},
     readonly sessionId?: string,
     readonly userTier?: UserTierId,
-    readonly settings?: Settings,
+    readonly settings?: GeminiCodeAssistSetting,
   ) {}
 
   async generateContentStream(

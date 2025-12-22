@@ -6,10 +6,10 @@
 
 import type {
   ClientMetadata,
+  GeminiCodeAssistSetting,
   GeminiUserTier,
   LoadCodeAssistResponse,
   OnboardUserRequest,
-  Settings,
 } from './types.js';
 import { UserTierId } from './types.js';
 import { CodeAssistServer } from './server.js';
@@ -26,7 +26,7 @@ export class ProjectIdRequiredError extends Error {
 export interface UserData {
   projectId: string;
   userTier: UserTierId;
-  settings?: Settings;
+  settings?: GeminiCodeAssistSetting;
 }
 
 /**

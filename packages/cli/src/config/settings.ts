@@ -9,15 +9,14 @@ import * as path from 'node:path';
 import { homedir, platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
-import type {
-  GeminiCodeAssistSetting} from '@google/gemini-cli-core';
+import type { GeminiCodeAssistSetting } from '@google/gemini-cli-core';
 import {
   debugLogger,
   FatalConfigError,
   GEMINI_DIR,
   getErrorMessage,
   Storage,
-  coreEvents
+  coreEvents,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -26,7 +25,7 @@ import { isWorkspaceTrusted } from './trustedFolders.js';
 import {
   type Settings,
   type MemoryImportFormat,
-  type MergeStrategy,
+  MergeStrategy,
   type SettingsSchema,
   type SettingDefinition,
   getSettingsSchema,
