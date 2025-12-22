@@ -10,14 +10,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { reportError } from './errorReporting.js';
 import { debugLogger } from './debugLogger.js';
-import { coreEvents } from './events.js';
 
 // Use a type alias for SpyInstance as it's not directly exported
 type SpyInstance = ReturnType<typeof vi.spyOn>;
 
 describe('reportError', () => {
   let debugLoggerErrorSpy: SpyInstance;
-  let emitFeedbackSpy: SpyInstance;
   let testDir: string;
   const MOCK_TIMESTAMP = '2025-01-01T00-00-00-000Z';
 
@@ -27,9 +25,6 @@ describe('reportError', () => {
     vi.resetAllMocks();
     debugLoggerErrorSpy = vi
       .spyOn(debugLogger, 'error')
-      .mockImplementation(() => {});
-    emitFeedbackSpy = vi
-      .spyOn(coreEvents, 'emitFeedback')
       .mockImplementation(() => {});
     vi.spyOn(Date.prototype, 'toISOString').mockReturnValue(MOCK_TIMESTAMP);
   });
@@ -63,8 +58,7 @@ describe('reportError', () => {
     });
 
     // Verify the user feedback
-    expect(emitFeedbackSpy).toHaveBeenCalledWith(
-      'error',
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Full report available at: ${expectedReportPath}`,
       error,
     );
@@ -85,8 +79,7 @@ describe('reportError', () => {
       error: { message: 'Test plain object error' },
     });
 
-    expect(emitFeedbackSpy).toHaveBeenCalledWith(
-      'error',
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Full report available at: ${expectedReportPath}`,
       error,
     );
@@ -107,8 +100,7 @@ describe('reportError', () => {
       error: { message: 'Just a string error' },
     });
 
-    expect(emitFeedbackSpy).toHaveBeenCalledWith(
-      'error',
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Full report available at: ${expectedReportPath}`,
       error,
     );
@@ -182,8 +174,7 @@ describe('reportError', () => {
       error: { message: error.message, stack: error.stack },
     });
 
-    expect(emitFeedbackSpy).toHaveBeenCalledWith(
-      'error',
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Partial report (excluding context) available at: ${expectedMinimalReportPath}`,
       error,
     );
@@ -205,8 +196,7 @@ describe('reportError', () => {
       error: { message: 'Error without context', stack: 'No context stack' },
     });
 
-    expect(emitFeedbackSpy).toHaveBeenCalledWith(
-      'error',
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Full report available at: ${expectedReportPath}`,
       error,
     );

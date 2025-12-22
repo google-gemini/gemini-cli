@@ -9,7 +9,6 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Content } from '@google/genai';
 import { debugLogger } from './debugLogger.js';
-import { coreEvents } from './events.js';
 
 interface ErrorReportData {
   error: { message: string; stack?: string } | { message: string };
@@ -18,7 +17,7 @@ interface ErrorReportData {
 }
 
 /**
- * Generates an error report, writes it to a temporary file, and logs information to console.error.
+ * Generates an error report, writes it to a temporary file, and logs information to user
  * @param error The error object.
  * @param context The relevant context (e.g., chat history, request contents).
  * @param type A string to identify the type of error (e.g., 'startChat', 'generateJson-api').
@@ -80,8 +79,7 @@ export async function reportError(
       stringifiedReportContent = JSON.stringify(minimalReportContent, null, 2);
       // Still try to write the minimal report
       await fs.writeFile(reportPath, stringifiedReportContent);
-      coreEvents.emitFeedback(
-        'error',
+      debugLogger.error(
         `${baseMessage} Partial report (excluding context) available at: ${reportPath}`,
         error,
       );
@@ -96,8 +94,7 @@ export async function reportError(
 
   try {
     await fs.writeFile(reportPath, stringifiedReportContent);
-    coreEvents.emitFeedback(
-      'error',
+    debugLogger.error(
       `${baseMessage} Full report available at: ${reportPath}`,
       error,
     );
