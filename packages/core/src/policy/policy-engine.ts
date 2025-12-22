@@ -53,6 +53,16 @@ function ruleMatches(
     }
   }
 
+  // Check command prefix if specified
+  if (rule.commandPrefix) {
+    if (!toolCall.args || typeof toolCall.args['command'] !== 'string') {
+      return false;
+    }
+    if (!toolCall.args['command'].startsWith(rule.commandPrefix)) {
+      return false;
+    }
+  }
+
   // Check command pattern if specified
   if (rule.commandPattern) {
     if (!toolCall.args || typeof toolCall.args['command'] !== 'string') {

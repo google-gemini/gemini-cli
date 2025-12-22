@@ -163,6 +163,64 @@ describe('PolicyEngine', () => {
       ).toBe(PolicyDecision.DENY);
     });
 
+    it('should match by command prefix for run_shell_command', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          commandPrefix: 'git status',
+          decision: PolicyDecision.ALLOW,
+        },
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.DENY,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Should match the prefix
+      expect(
+        (
+          await engine.check(
+            { name: 'run_shell_command', args: { command: 'git status' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      expect(
+        (
+          await engine.check(
+            { name: 'run_shell_command', args: { command: 'git status -s' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Should NOT match if not a prefix
+      expect(
+        (
+          await engine.check(
+            { name: 'run_shell_command', args: { command: 'git log' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.DENY);
+
+      // Should NOT match if prefix is in the middle (prevents command injection)
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'run_shell_command',
+              args: { command: 'echo hello; git status' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.DENY);
+    });
+
     it('should apply rules by priority', async () => {
       const rules: PolicyRule[] = [
         { toolName: 'shell', decision: PolicyDecision.DENY, priority: 1 },

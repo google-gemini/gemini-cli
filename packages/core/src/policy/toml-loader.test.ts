@@ -70,12 +70,8 @@ priority = 100
       expect(result.rules).toHaveLength(2);
       expect(result.rules[0].toolName).toBe('run_shell_command');
       expect(result.rules[1].toolName).toBe('run_shell_command');
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git status"}'),
-      ).toBe(true);
-      expect(result.rules[1].argsPattern?.test('{"command":"git log"}')).toBe(
-        true,
-      );
+      expect(result.rules[0].commandPrefix).toBe('git status');
+      expect(result.rules[1].commandPrefix).toBe('git log');
       expect(result.errors).toHaveLength(0);
     });
 
@@ -222,7 +218,7 @@ priority = 100
       expect(result.errors[0].details).toContain('git (status|branch');
     });
 
-    it('should escape regex special characters in commandPrefix', async () => {
+    it('should store commandPrefix as a literal string', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
 toolName = "run_shell_command"
@@ -232,13 +228,9 @@ priority = 100
 `);
 
       expect(result.rules).toHaveLength(1);
-      // The regex should have escaped the * and .
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git log file.txt"}'),
-      ).toBe(false);
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git log *.txt"}'),
-      ).toBe(true);
+      // It should be the exact string, no regex escaping/conversion
+      expect(result.rules[0].commandPrefix).toBe('git log *.txt');
+      expect(result.rules[0].argsPattern).toBeUndefined();
       expect(result.errors).toHaveLength(0);
     });
 
