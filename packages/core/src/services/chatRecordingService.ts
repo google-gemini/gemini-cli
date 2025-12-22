@@ -126,7 +126,11 @@ export class ChatRecordingService {
 
   private async enqueue<T>(operation: () => Promise<T>): Promise<T> {
     const res = this.operationQueue.then(operation);
-    this.operationQueue = res.catch(() => {});
+    // Ensure operationQueue always tracks a Promise<void> that resolves regardless of success/failure
+    this.operationQueue = res.then(
+      () => {},
+      () => {},
+    );
     return res;
   }
 
@@ -448,6 +452,11 @@ export class ChatRecordingService {
         conversation.lastUpdated = new Date().toISOString();
         const newContent = JSON.stringify(conversation, null, 2);
         this.cachedLastConvData = newContent;
+
+        // Ensure directory exists before writing, to prevent ENOENT if it was deleted
+        await fs.mkdir(path.dirname(this.conversationFile), {
+          recursive: true,
+        });
         await fs.writeFile(this.conversationFile, newContent);
       }
     } catch (error) {
@@ -524,7 +533,13 @@ export class ChatRecordingService {
           this.config.storage.getProjectTempDir(),
           'chats',
         );
-        const sessionPath = path.join(chatsDir, `${sessionId}.json`);
+        const sessionPath = path.resolve(chatsDir, `${sessionId}.json`);
+        const resolvedChatsDir = path.resolve(chatsDir);
+
+        if (!sessionPath.startsWith(resolvedChatsDir)) {
+          throw new Error(`Invalid session ID: ${sessionId}`);
+        }
+
         await fs.unlink(sessionPath);
       } catch (error) {
         debugLogger.error('Error deleting session file.', error);

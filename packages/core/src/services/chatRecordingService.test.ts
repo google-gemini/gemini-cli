@@ -415,5 +415,25 @@ describe('ChatRecordingService', () => {
         }),
       ).rejects.toThrow('Invalid conversation file path');
     });
+
+    it('should throw an error if deleteSession is called with a path traversal sessionId', async () => {
+      const maliciousSessionId = '../../target';
+
+      // Override default resolve mock for this test
+      vi.mocked(path.resolve).mockImplementation((...args) => {
+        const joined = args.join('/');
+        if (joined.includes('chats/../../target.json')) {
+          return '/test/project/root/.gemini/tmp/target.json';
+        }
+        if (joined.includes('chats')) {
+          return '/test/project/root/.gemini/tmp/chats';
+        }
+        return joined;
+      });
+
+      await expect(
+        chatRecordingService.deleteSession(maliciousSessionId),
+      ).rejects.toThrow('Invalid session ID');
+    });
   });
 });
