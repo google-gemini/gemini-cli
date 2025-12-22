@@ -12,7 +12,43 @@ import {
 import type { AgentInputs, RemoteAgentDefinition } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { A2AClientManager } from './a2a-client-manager.js';
-import { extractMessageText, extractTaskText } from './a2aUtils.js';
+import {
+  extractMessageText,
+  extractTaskText,
+  extractIdsFromResponse,
+} from './a2aUtils.js';
+import { GoogleAuth } from 'google-auth-library';
+import type { AuthenticationHandler } from '@a2a-js/sdk/client';
+import { debugLogger } from '../utils/debugLogger.js';
+
+/**
+ * Authentication handler implementation using Google Application Default Credentials (ADC).
+ */
+export class ADCHandler implements AuthenticationHandler {
+  private auth = new GoogleAuth({
+    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+  });
+
+  async headers(): Promise<Record<string, string>> {
+    try {
+      const client = await this.auth.getClient();
+      const token = await client.getAccessToken();
+      if (token.token) {
+        return { Authorization: `Bearer ${token.token}` };
+      }
+    } catch (e) {
+      debugLogger.log('ERROR', 'Failed to get ADC token:', e);
+    }
+    return {};
+  }
+
+  async shouldRetryWithHeaders(
+    _response: unknown,
+  ): Promise<Record<string, string> | undefined> {
+    // For ADC, we usually just re-fetch the token if needed.
+    return this.headers();
+  }
+}
 
 /**
  * A tool invocation that proxies to a remote A2A agent.
@@ -29,7 +65,8 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
   private taskId: string | undefined;
   // TODO: See if we can reuse the singleton from AppContainer or similar, but for now use getInstance directly
   // as per the current pattern in the codebase.
-  private readonly clientManager = A2AClientManager.getInstance({} as any); // Config not used yet
+  private readonly clientManager = A2AClientManager.getInstance();
+  private readonly authHandler = new ADCHandler();
 
   constructor(
     private readonly definition: RemoteAgentDefinition,
@@ -64,12 +101,10 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         await this.clientManager.loadAgent(
           this.definition.name,
           this.definition.agentCardUrl,
+          this.authHandler,
         );
       }
 
-      // 2. Construct the message from params.
-      // TODO: We need a standard way to map AgentInputs to a string message.
-      // For now, we'll assume there is a 'query' or 'prompt' field, or JSON stringify all params.
       // 2. Construct the message from params.
       // We aim to extract a single string message from the structured AgentInputs.
       // Priority:
@@ -85,7 +120,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       );
 
       if (primaryKey && typeof this.params[primaryKey] === 'string') {
-        message = this.params[primaryKey] as string;
+        message = this.params[primaryKey];
       } else if (
         paramKeys.length === 1 &&
         typeof this.params[paramKeys[0]] === 'string'
@@ -103,15 +138,14 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         );
 
         if (allPrimitives && paramKeys.length > 0) {
-          message = paramKeys
-            .map((k) => `${k}: ${this.params[k]}`)
-            .join('\n');
+          message = paramKeys.map((k) => `${k}: ${this.params[k]}`).join('\n');
         } else {
           message = JSON.stringify(this.params);
         }
       }
 
       // 3. Send the message, passing in our state
+      // The sendMessage method now unwraps the response and returns Message | Task directly.
       const response = await this.clientManager.sendMessage(
         this.definition.name,
         message,
@@ -122,11 +156,23 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       );
 
       // 4. Update our state
-      this.contextId = response.contextId;
-      this.taskId = response.taskId;
+      const { contextId, taskId } = extractIdsFromResponse(response);
 
-      // 5. Extract the result text
-      const resultData = (response as any).result;
+      if (contextId) {
+        this.contextId = contextId;
+      }
+
+      // Update taskId based on response kind
+      if (response.kind === 'task') {
+        // For task responses, taskId is authoritative (either new ID or undefined if complete)
+        this.taskId = taskId;
+      } else if (response.kind === 'message' && taskId) {
+        // For message responses, update if present (continuation)
+        this.taskId = taskId;
+      }
+
+      // 5. Extract the output text
+      const resultData = response;
       let outputText = '';
 
       if (resultData.kind === 'message') {
@@ -141,8 +187,8 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         llmContent: [{ text: outputText }],
         returnDisplay: outputText,
       };
-    } catch (error: any) {
-      const errorMessage = `Error calling remote agent: ${error.message}`;
+    } catch (error: unknown) {
+      const errorMessage = `Error calling remote agent: ${error instanceof Error ? error.message : String(error)}`;
       return {
         llmContent: [{ text: errorMessage }],
         returnDisplay: errorMessage,

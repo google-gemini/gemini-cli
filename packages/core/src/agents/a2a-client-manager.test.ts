@@ -13,50 +13,49 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import { A2AClientManager } from './a2a-client-manager.js';
+import {
+  A2AClientManager,
+  type SendMessageResult,
+} from './a2a-client-manager.js';
 import type { AgentCard } from '@a2a-js/sdk';
+import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { ClientFactory, DefaultAgentCardResolver } from '@a2a-js/sdk/client';
-import { GoogleAuth } from 'google-auth-library';
-
-import type { Config } from '../config/config.js';
 
 vi.mock('@a2a-js/sdk/client', () => {
   const ClientFactory = vi.fn();
   const DefaultAgentCardResolver = vi.fn();
   const RestTransportFactory = vi.fn();
   const JsonRpcTransportFactory = vi.fn();
+  const ClientFactoryOptions = {
+    default: {},
+    createFrom: vi.fn(),
+  };
+  const createAuthenticatingFetchWithRetry = vi.fn();
 
   // Mock instances
   DefaultAgentCardResolver.prototype.resolve = vi.fn();
 
-  // ClientFactory instance
+  // ClientFactory instance methods
   ClientFactory.prototype.createFromUrl = vi.fn();
 
   return {
     ClientFactory,
+    ClientFactoryOptions,
     DefaultAgentCardResolver,
     RestTransportFactory,
     JsonRpcTransportFactory,
-    // A2AClient is no longer directly mocked, its behavior is via ClientFactory
+    createAuthenticatingFetchWithRetry,
   };
 });
 
-vi.mock('google-auth-library', () => {
-  const GoogleAuth = vi.fn();
-  GoogleAuth.prototype.getClient = vi.fn();
-  // Ensure the instance returned by the constructor uses the prototype method
-  GoogleAuth.mockImplementation(() => ({
-    getClient: GoogleAuth.prototype.getClient,
-  }));
-  return { GoogleAuth };
-});
+import {
+  createAuthenticatingFetchWithRetry,
+  ClientFactoryOptions,
+} from '@a2a-js/sdk/client';
 
 describe('A2AClientManager', () => {
   let manager: A2AClientManager;
   const mockAgentCard: Partial<AgentCard> = { name: 'TestAgent' };
-  const mockConfig = {
-    getDebugMode: vi.fn().mockReturnValue(true),
-  } as unknown as Config;
 
   // Mock Client object returned by createFromUrl
   const mockClient = {
@@ -64,15 +63,18 @@ describe('A2AClientManager', () => {
     getTask: vi.fn(),
     cancelTask: vi.fn(),
     getExtendedAgentCard: vi.fn(),
+    getAgentCard: vi.fn(),
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
     A2AClientManager.resetInstanceForTesting();
-    manager = A2AClientManager.getInstance(mockConfig);
+    manager = A2AClientManager.getInstance();
 
     // Setup Factory mock
-    (ClientFactory.prototype.createFromUrl as Mock).mockResolvedValue(mockClient);
+    (ClientFactory.prototype.createFromUrl as Mock).mockResolvedValue(
+      mockClient,
+    );
 
     // Setup Resolver mock
     (DefaultAgentCardResolver.prototype.resolve as Mock).mockResolvedValue({
@@ -80,42 +82,52 @@ describe('A2AClientManager', () => {
       url: 'http://test.agent/real/endpoint',
     });
 
+    // Setup ClientFactoryOptions mock
+    (ClientFactoryOptions.createFrom as Mock).mockImplementation(
+      (_defaults, overrides) => overrides,
+    );
+
+    // Setup createAuthenticatingFetchWithRetry to return a mock fetch
+    (createAuthenticatingFetchWithRetry as Mock).mockReturnValue(vi.fn());
+
     // Setup Client mocks
     mockClient.getExtendedAgentCard.mockResolvedValue({
-        ...mockAgentCard,
-        url: 'http://test.agent/real/endpoint',
+      ...mockAgentCard,
+      url: 'http://test.agent/real/endpoint',
     });
 
+    mockClient.getAgentCard.mockResolvedValue({
+      ...mockAgentCard,
+      url: 'http://test.agent/real/endpoint',
+    });
+
+    // Mock successful sendMessage response (direct result)
     mockClient.sendMessage.mockResolvedValue({
       kind: 'message',
       messageId: 'a',
       parts: [],
       role: 'agent',
-    });
+    } as SendMessageResult);
 
     mockClient.getTask.mockResolvedValue({
-        id: 'task123',
-        contextId: 'a',
-        kind: 'task',
-        status: { state: 'completed' },
+      id: 'task123',
+      contextId: 'a',
+      kind: 'task',
+      status: { state: 'completed' },
     });
 
     mockClient.cancelTask.mockResolvedValue({
-        id: 'task123',
-        contextId: 'a',
-        kind: 'task',
-        status: { state: 'canceled' },
+      id: 'task123',
+      contextId: 'a',
+      kind: 'task',
+      status: { state: 'canceled' },
     });
 
-    // Mock global.fetch for ADC tests
+    // Mock global.fetch for tests
     vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({}),
     } as Response);
-    // Mock GoogleAuth
-    (GoogleAuth.prototype.getClient as Mock).mockResolvedValue({
-      getAccessToken: vi.fn().mockResolvedValue({ token: 'adc-token' }),
-    });
   });
 
   afterEach(() => {
@@ -123,8 +135,8 @@ describe('A2AClientManager', () => {
   });
 
   it('should enforce the singleton pattern', () => {
-    const instance1 = A2AClientManager.getInstance(mockConfig);
-    const instance2 = A2AClientManager.getInstance(mockConfig);
+    const instance1 = A2AClientManager.getInstance();
+    const instance2 = A2AClientManager.getInstance();
     expect(instance1).toBe(instance2);
   });
 
@@ -146,51 +158,29 @@ describe('A2AClientManager', () => {
       ).rejects.toThrow("Agent with name 'TestAgent' is already loaded.");
     });
 
-    it('should use ADC token when no access token is provided', async () => {
+    it('should use native fetch by default', async () => {
       await manager.loadAgent('TestAgent', 'http://test.agent/card');
 
-      // The factory is created with options containing fetchImpl
-      // We can grab the fetchImpl from the constructor call
-      const constructorCalls = vi.mocked(ClientFactory).mock.calls;
-      const options = constructorCalls[0][0]!;
-
-      // Call fetchImpl
-      // @ts-expect-error - fetchImpl is private or derived but accessing for test
-      await options.transports![0]['options'].fetchImpl!('https://example.com/some/api', {
-        method: undefined,
-      });
-
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-      const fetchCalls = (global.fetch as Mock).mock.calls;
-      const [url, init] = fetchCalls[0];
-      expect(url).toBe('https://example.com/some/api');
-      expect((init.headers as Headers).get('Authorization')).toBe(
-        'Bearer adc-token',
-      );
+      // createAuthenticatingFetchWithRetry should NOT be called
+      expect(createAuthenticatingFetchWithRetry).not.toHaveBeenCalled();
     });
 
-    it('should use provided access token and NOT ADC when token is provided', async () => {
+    it('should use provided custom authentication handler', async () => {
+      const customAuthHandler = {
+        headers: vi.fn(),
+        shouldRetryWithHeaders: vi.fn(),
+      };
       await manager.loadAgent(
-        'TestAgent',
-        'http://test.agent',
-        'provided-token',
+        'CustomAuthAgent',
+        'http://custom.agent/card',
+        customAuthHandler as unknown as AuthenticationHandler,
       );
 
-      const constructorCalls = vi.mocked(ClientFactory).mock.calls;
-      const options = constructorCalls[0][0]!;
-
-      // @ts-expect-error - testing fetchImpl
-      await options.transports![0]['options'].fetchImpl!('https://example.com/api');
-
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-      const fetchCalls = (global.fetch as Mock).mock.calls;
-      const [url, init] = fetchCalls[0];
-      expect(url).toBe('https://example.com/api');
-      expect((init.headers as Headers).get('Authorization')).toBe(
-        'Bearer provided-token',
+      expect(createAuthenticatingFetchWithRetry).toHaveBeenCalledWith(
+        expect.anything(),
+        customAuthHandler,
       );
     });
-
   });
 
   describe('sendMessage', () => {
@@ -220,21 +210,32 @@ describe('A2AClientManager', () => {
       expect(call.message.taskId).toBe(expectedTaskId);
     });
 
-    it('should return contextId and taskId from the response', async () => {
+    it('should return result from client', async () => {
       await manager.loadAgent('TestAgent', 'http://test.agent');
 
-      // Mock response with IDs
-      mockClient.sendMessage.mockResolvedValueOnce({
+      const mockResult = {
         contextId: 'server-context-id',
         id: 'ctx-1',
         kind: 'task',
         status: { state: 'working' },
-      });
+      };
+
+      // Mock client returning the result directly (mimics SendMessageResult cast)
+      mockClient.sendMessage.mockResolvedValueOnce(mockResult);
 
       const response = await manager.sendMessage('TestAgent', 'Hello');
 
-      expect(response.contextId).toBe('server-context-id');
-      expect(response.taskId).toBe('ctx-1');
+      expect(response).toEqual(mockResult);
+    });
+
+    it('should throw prefixed error on failure', async () => {
+      await manager.loadAgent('TestAgent', 'http://test.agent');
+
+      mockClient.sendMessage.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(manager.sendMessage('TestAgent', 'Hello')).rejects.toThrow(
+        'A2AClient SendMessage Error: Network error',
+      );
     });
 
     it('should throw an error if the agent is not found', async () => {

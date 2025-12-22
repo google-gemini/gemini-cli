@@ -122,12 +122,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
 
       agentToolRegistry.sortTools();
-      // Validate that all registered tools are safe for non-interactive
-      // execution.
-      await LocalAgentExecutor.validateTools(
-        agentToolRegistry,
-        definition.name,
-      );
     }
 
     // Get the parent prompt ID from context

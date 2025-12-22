@@ -30,7 +30,9 @@ export function extractMessageText(message: Message | undefined): string {
     return '';
   }
 
-  const parts = message.parts.map((part) => extractPartText(part)).filter(Boolean);
+  const parts = message.parts
+    .map((part) => extractPartText(part))
+    .filter(Boolean);
   return parts.join('\n');
 }
 
@@ -83,9 +85,9 @@ export function extractTaskText(task: Task): string {
       if (artifact.parts && artifact.parts.length > 0) {
         // Treat artifact parts as a message for extraction
         const artifactContent = artifact.parts
-            .map((p) => extractPartText(p))
-            .filter(Boolean)
-            .join('\n');
+          .map((p) => extractPartText(p))
+          .filter(Boolean)
+          .join('\n');
 
         if (artifactContent) {
           // Indent content for readability
@@ -111,4 +113,38 @@ function isDataPart(part: Part): part is DataPart {
 
 function isFilePart(part: Part): part is FilePart {
   return part.kind === 'file';
+}
+
+/**
+ * Extracts contextId and taskId from a Message or Task response.
+ * Follows the pattern from the A2A CLI sample to maintain conversational continuity.
+ */
+export function extractIdsFromResponse(result: Message | Task): {
+  contextId?: string;
+  taskId?: string;
+} {
+  let contextId: string | undefined;
+  let taskId: string | undefined;
+
+  if (result.kind === 'message') {
+    taskId = result.taskId;
+    contextId = result.contextId;
+  } else if (result.kind === 'task') {
+    taskId = result.id;
+    contextId = result.contextId;
+
+    // If the task is in a final state (and not input-required), we clear the taskId
+    // so that the next interaction starts a fresh task (or keeps context without being bound to the old task).
+    if (
+      result.status &&
+      result.status.state !== 'input-required' &&
+      (result.status.state === 'completed' ||
+        result.status.state === 'failed' ||
+        result.status.state === 'canceled')
+    ) {
+      taskId = undefined;
+    }
+  }
+
+  return { contextId, taskId };
 }

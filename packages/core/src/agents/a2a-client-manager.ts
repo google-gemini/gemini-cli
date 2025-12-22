@@ -4,27 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  AgentCard,
-  Message,
-  MessageSendParams,
-  Task,
-} from '@a2a-js/sdk';
+import type { AgentCard, Message, MessageSendParams, Task } from '@a2a-js/sdk';
 import {
   type Client,
   ClientFactory,
+  ClientFactoryOptions,
   DefaultAgentCardResolver,
   RestTransportFactory,
   JsonRpcTransportFactory,
+  type AuthenticationHandler,
+  createAuthenticatingFetchWithRetry,
 } from '@a2a-js/sdk/client';
-import { GoogleAuth } from 'google-auth-library';
 import { v4 as uuidv4 } from 'uuid';
-import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
-// Auth is handled via GoogleAuth / ADC in the fetchImpl.
-// See createFetchImpl for details.
-type SendMessageResult = Message | Task;
+export type SendMessageResult = Message | Task;
+
 /**
  * Manages A2A clients and caches loaded agent information.
  * Follows a singleton pattern to ensure a single client instance.
@@ -36,23 +31,14 @@ export class A2AClientManager {
   private clients = new Map<string, Client>();
   private agentCards = new Map<string, AgentCard>();
 
-  private auth = new GoogleAuth({
-    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-  });
-
-  private constructor(_config: Config) {
-    // Config currently unused by A2AClientManager but kept for Singleton signature
-  }
+  private constructor() {}
 
   /**
    * Gets the singleton instance of the A2AClientManager.
    */
-  static getInstance(config?: Config): A2AClientManager {
+  static getInstance(): A2AClientManager {
     if (!A2AClientManager.instance) {
-      if (!config) {
-        throw new Error('A2AClientManager requires config to be initialized.');
-      }
-      A2AClientManager.instance = new A2AClientManager(config);
+      A2AClientManager.instance = new A2AClientManager();
     }
     return A2AClientManager.instance;
   }
@@ -69,39 +55,46 @@ export class A2AClientManager {
   /**
    * Loads an agent by fetching its AgentCard and caches the client.
    * @param name The name to assign to the agent.
-   * @param agentCardUrl The base URL (Agent Card URL) of the agent.
-   * @param accessToken Optional bearer token for authentication.
+   * @param agentCardUrl The full URL to the agent's card.
+   * @param authHandler Optional authentication handler to use for this agent.
    * @returns The loaded AgentCard.
    */
   async loadAgent(
     name: string,
     agentCardUrl: string,
-    accessToken?: string,
+    authHandler?: AuthenticationHandler,
   ): Promise<AgentCard> {
     if (this.clients.has(name)) {
       throw new Error(`Agent with name '${name}' is already loaded.`);
     }
 
-    const fetchImpl = this.createFetchImpl(accessToken);
+    let fetchImpl = fetch;
+    if (authHandler) {
+      fetchImpl = createAuthenticatingFetchWithRetry(fetch, authHandler);
+    }
+
     const resolver = new DefaultAgentCardResolver({ fetchImpl });
-    const factory = new ClientFactory({
-      cardResolver: resolver,
-      transports: [
-        new RestTransportFactory({ fetchImpl }),
-        new JsonRpcTransportFactory({ fetchImpl }),
-      ],
-    });
+
+    const options = ClientFactoryOptions.createFrom(
+      ClientFactoryOptions.default,
+      {
+        transports: [
+          new RestTransportFactory({ fetchImpl }),
+          new JsonRpcTransportFactory({ fetchImpl }),
+        ],
+        cardResolver: resolver,
+      },
+    );
+
+    const factory = new ClientFactory(options);
 
     // Pass empty string as path to indicate that agentCardUrl is the full URL
+    // The factory will use the resolver internally if we createdFromUrl?
+    // Actually factory.createFromUrl uses the resolver.
     const client = await factory.createFromUrl(agentCardUrl, '');
-    // Fetch the card explicitly to cache it, as Client might not expose it directly
-    const agentCard = await resolver.resolve(agentCardUrl);
 
-    debugLogger.log(
-      'INFO',
-      `Loaded AgentCard for ${name}:`,
-      JSON.stringify(agentCard, null, 2),
-    );
+    // Fetch the card from the client directly
+    const agentCard = await client.getAgentCard();
 
     this.clients.set(name, client);
     this.agentCards.set(name, agentCard);
@@ -114,13 +107,14 @@ export class A2AClientManager {
    * @param agentName The name of the agent to send the message to.
    * @param message The message content.
    * @param options Optional context and task IDs to maintain conversation state.
-   * @returns The response from the agent, including updated context and task IDs.
+   * @returns The response from the agent (Message or Task).
+   * @throws Error if the agent returns an error response.
    */
   async sendMessage(
     agentName: string,
     message: string,
     options?: { contextId?: string; taskId?: string },
-  ): Promise<SendMessageResult & { contextId?: string; taskId?: string }> {
+  ): Promise<SendMessageResult> {
     const client = this.clients.get(agentName);
     if (!client) {
       throw new Error(`Agent '${agentName}' not found.`);
@@ -146,50 +140,26 @@ export class A2AClientManager {
       JSON.stringify(messageParams, null, 2),
     );
 
-    const response = await client.sendMessage(messageParams);
+    try {
+      const response = await client.sendMessage(messageParams);
 
+      debugLogger.log(
+        'INFO',
+        'DEBUG: A2AClientManager.sendMessage response:',
+        JSON.stringify(response, null, 2),
+      );
 
-
-    debugLogger.log(
-      'INFO',
-      'DEBUG: A2AClientManager.sendMessage response:',
-      JSON.stringify(response, null, 2),
-    );
-
-    // Response is already SendMessageResult (Message | Task)
-    const result = response;
-
-    let responseContextId: string | undefined = options?.contextId;
-    let responseTaskId: string | undefined = options?.taskId;
-
-    // Capture IDs
-    if ('contextId' in result && result.contextId) {
-      responseContextId = result.contextId;
+      return response;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        // Prefix the error message as requested
+        error.message = `A2AClient SendMessage Error: ${error.message}`;
+        throw error;
+      }
+      throw new Error(
+        `A2AClient SendMessage Error: Unexpected error during sendMessage: ${error}`,
+      );
     }
-
-    if ('kind' in result && result.kind === 'task') {
-       // It's a Task
-       if (result.id) {
-         responseTaskId = result.id;
-       }
-
-       // Check for task completion
-       if (result.status && (result.status.state === 'completed')) {
-          responseTaskId = undefined;
-       }
-    } else if ('kind' in result && result.kind === 'message') {
-       // It's a Message
-       if (result.taskId) {
-         responseTaskId = result.taskId;
-       }
-    }
-
-    // Return the result with forced IDs
-    return {
-      ...result,
-      contextId: responseContextId,
-      taskId: responseTaskId,
-    } as SendMessageResult & { contextId?: string; taskId?: string };
   }
 
   /**
@@ -230,61 +200,11 @@ export class A2AClientManager {
    * @param taskId The ID of the task to cancel.
    * @returns The cancellation response.
    */
-  async cancelTask(
-    agentName: string,
-    taskId: string,
-  ): Promise<Task> {
+  async cancelTask(agentName: string, taskId: string): Promise<Task> {
     const client = this.clients.get(agentName);
     if (!client) {
       throw new Error(`Agent '${agentName}' not found.`);
     }
     return client.cancelTask({ id: taskId });
-  }
-
-  private createFetchImpl(accessToken?: string) {
-    return async (
-      input: RequestInfo | URL,
-      init?: RequestInit,
-    ): Promise<Response> => {
-      let urlStr =
-        typeof input === 'string'
-          ? input
-          : input instanceof URL
-            ? input.toString()
-            : input.url;
-
-      const headers = new Headers(init?.headers);
-      if (accessToken) {
-        headers.set('Authorization', `Bearer ${accessToken}`);
-      } else {
-        try {
-          const client = await this.auth.getClient();
-          const token = await client.getAccessToken();
-          if (token.token) {
-            headers.set('Authorization', `Bearer ${token.token}`);
-          }
-        } catch (e) {
-          debugLogger.log('ERROR', 'Failed to get ADC token:', e);
-        }
-      }
-      const newInit = { ...init, headers };
-
-      const response = await fetch(urlStr, newInit);
-
-      if (!response.ok) {
-        try {
-          const errorBody = await response.clone().text();
-          debugLogger.log(
-            'ERROR',
-            `A2AClient fetch error response: ${response.status} ${response.statusText}`,
-            errorBody,
-          );
-        } catch (e) {
-          debugLogger.log('ERROR', 'Failed to read error response body:', e);
-        }
-      }
-
-      return response;
-    };
   }
 }
