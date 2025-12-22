@@ -124,7 +124,7 @@ export async function createPolicyEngineConfig(
     rules: tomlRules,
     checkers: tomlCheckers,
     errors,
-  } = await loadPoliciesFromToml(approvalMode, policyDirs, (dir) =>
+  } = await loadPoliciesFromToml(policyDirs, (dir) =>
     getPolicyTier(dir, defaultPoliciesDir),
   );
 
@@ -236,6 +236,7 @@ export async function createPolicyEngineConfig(
     rules,
     checkers,
     defaultDecision: PolicyDecision.ASK_USER,
+    approvalMode,
   };
 }
 

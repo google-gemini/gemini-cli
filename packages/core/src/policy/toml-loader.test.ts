@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ApprovalMode, PolicyDecision } from './types.js';
+import { PolicyDecision } from './types.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -36,7 +36,7 @@ describe('policy-toml-loader', () => {
   ): Promise<PolicyLoadResult> {
     await fs.writeFile(path.join(tempDir, fileName), tomlContent);
     const getPolicyTier = (_dir: string) => 1;
-    return loadPoliciesFromToml(ApprovalMode.DEFAULT, [tempDir], getPolicyTier);
+    return loadPoliciesFromToml([tempDir], getPolicyTier);
   }
 
   describe('loadPoliciesFromToml', () => {
@@ -133,7 +133,7 @@ priority = 100
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should filter rules by mode', async () => {
+    it('should NOT filter rules by mode at load time but preserve modes property', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
 toolName = "glob"
@@ -148,10 +148,37 @@ priority = 100
 modes = ["yolo"]
 `);
 
-      // Only the first rule should be included (modes includes "default")
-      expect(result.rules).toHaveLength(1);
+      // Both rules should be included
+      expect(result.rules).toHaveLength(2);
       expect(result.rules[0].toolName).toBe('glob');
+      expect(result.rules[0].modes).toEqual(['default', 'yolo']);
+      expect(result.rules[1].toolName).toBe('grep');
+      expect(result.rules[1].modes).toEqual(['yolo']);
       expect(result.errors).toHaveLength(0);
+    });
+
+    it('should return error if modes property is used for Tier 2 and Tier 3 policies', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'tier2.toml'),
+        `
+[[rule]]
+toolName = "tier2-tool"
+decision = "allow"
+priority = 100
+modes = ["autoEdit"]
+`,
+      );
+
+      const getPolicyTier = (_dir: string) => 2; // Tier 2
+      const result = await loadPoliciesFromToml([tempDir], getPolicyTier);
+
+      // It still transforms the rule, but it should also report an error
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('tier2-tool');
+      expect(result.rules[0].modes).toBeUndefined(); // Should be restricted
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].errorType).toBe('rule_validation');
+      expect(result.errors[0].message).toContain('Restricted property "modes"');
     });
 
     it('should handle TOML parse errors', async () => {
@@ -267,11 +294,7 @@ priority = -1
       );
 
       const getPolicyTier = (_dir: string) => 1;
-      const result = await loadPoliciesFromToml(
-        ApprovalMode.DEFAULT,
-        [tempDir],
-        getPolicyTier,
-      );
+      const result = await loadPoliciesFromToml([tempDir], getPolicyTier);
 
       expect(result.rules).toHaveLength(1);
       expect(result.rules[0].toolName).toBe('glob');
@@ -439,11 +462,7 @@ priority = 100
       await fs.writeFile(filePath, 'content');
 
       const getPolicyTier = (_dir: string) => 1;
-      const result = await loadPoliciesFromToml(
-        ApprovalMode.DEFAULT,
-        [filePath],
-        getPolicyTier,
-      );
+      const result = await loadPoliciesFromToml([filePath], getPolicyTier);
 
       expect(result.errors).toHaveLength(1);
       const error = result.errors[0];
