@@ -131,8 +131,7 @@ describe('mcp add command', () => {
       'mcpServers',
       {
         'http-server': {
-          url: 'https://example.com/mcp',
-          type: 'http',
+          httpUrl: 'https://example.com/mcp',
           headers: { Authorization: 'Bearer your-token' },
         },
       },
@@ -163,8 +162,7 @@ describe('mcp add command', () => {
       'mcpServers',
       {
         'http-server': {
-          url: 'https://example.com/mcp',
-          type: 'http',
+          httpUrl: 'https://example.com/mcp',
           headers: { Authorization: 'Bearer your-token' },
         },
       },
