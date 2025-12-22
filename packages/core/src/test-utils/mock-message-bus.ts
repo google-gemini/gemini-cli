@@ -33,12 +33,12 @@ export class MockMessageBus {
 
     // Capture hook-specific messages
     if (message.type === MessageBusType.HOOK_EXECUTION_REQUEST) {
-      this.hookRequests.push(message as HookExecutionRequest);
+      this.hookRequests.push(message);
 
       // Auto-respond with success for testing
       const response: HookExecutionResponse = {
         type: MessageBusType.HOOK_EXECUTION_RESPONSE,
-        correlationId: (message as HookExecutionRequest).correlationId,
+        correlationId: message.correlationId,
         success: true,
         output: {
           decision: 'allow',

@@ -24,7 +24,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ...actual,
     writeToStdout: vi.fn(),
     patchStdio: vi.fn(() => () => {}),
-    createInkStdio: vi.fn(() => ({
+    createWorkingStdio: vi.fn(() => ({
       stdout: {
         write: vi.fn(),
         columns: 80,
@@ -186,6 +186,7 @@ describe('gemini.tsx main function cleanup', () => {
       getDebugMode: vi.fn(() => false),
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: vi.fn(() => false),
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -209,6 +210,7 @@ describe('gemini.tsx main function cleanup', () => {
       getFileFilteringRespectGitIgnore: vi.fn(() => true),
       getOutputFormat: vi.fn(() => 'text'),
       getUsageStatisticsEnabled: vi.fn(() => false),
+      setTerminalBackground: vi.fn(),
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     try {

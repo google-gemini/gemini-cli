@@ -43,6 +43,7 @@ import {
   logAgentFinish,
   logWebFetchFallbackAttempt,
   logExtensionUpdateEvent,
+  logHookCall,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -87,6 +88,8 @@ import {
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
   EVENT_EXTENSION_UPDATE,
+  HookCallEvent,
+  EVENT_HOOK_CALL,
 } from './types.js';
 import * as metrics from './metrics.js';
 import { FileOperation } from './metrics.js';
@@ -117,6 +120,7 @@ describe('loggers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(true);
+    vi.spyOn(sdk, 'bufferTelemetryEvent').mockImplementation((cb) => cb());
     vi.spyOn(logs, 'getLogger').mockReturnValue(mockLogger);
     vi.spyOn(uiTelemetry.uiTelemetryService, 'addEvent').mockImplementation(
       mockUiEvent.addEvent,
@@ -1719,6 +1723,7 @@ describe('loggers', () => {
 
     it('should only log to Clearcut if OTEL SDK is not initialized', () => {
       vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(false);
+      vi.spyOn(sdk, 'bufferTelemetryEvent').mockImplementation(() => {});
       const event = new ModelRoutingEvent(
         'gemini-pro',
         'default',
@@ -1758,6 +1763,7 @@ describe('loggers', () => {
     it('should log extension install event', async () => {
       const event = new ExtensionInstallEvent(
         'testing',
+        'testing-hash',
         'testing-id',
         '0.1.0',
         'git',
@@ -1808,6 +1814,7 @@ describe('loggers', () => {
     it('should log extension update event', async () => {
       const event = new ExtensionUpdateEvent(
         'testing',
+        'testing-hash',
         'testing-id',
         '0.1.0',
         '0.1.1',
@@ -1859,6 +1866,7 @@ describe('loggers', () => {
     it('should log extension uninstall event', async () => {
       const event = new ExtensionUninstallEvent(
         'testing',
+        'testing-hash',
         'testing-id',
         'success',
       );
@@ -1901,7 +1909,12 @@ describe('loggers', () => {
     });
 
     it('should log extension enable event', async () => {
-      const event = new ExtensionEnableEvent('testing', 'testing-id', 'user');
+      const event = new ExtensionEnableEvent(
+        'testing',
+        'testing-hash',
+        'testing-id',
+        'user',
+      );
 
       await logExtensionEnable(mockConfig, event);
 
@@ -1941,7 +1954,12 @@ describe('loggers', () => {
     });
 
     it('should log extension disable event', async () => {
-      const event = new ExtensionDisableEvent('testing', 'testing-id', 'user');
+      const event = new ExtensionDisableEvent(
+        'testing',
+        'testing-hash',
+        'testing-id',
+        'user',
+      );
 
       await logExtensionDisable(mockConfig, event);
 
@@ -2084,6 +2102,81 @@ describe('loggers', () => {
           reason: 'private_ip',
         },
       });
+    });
+  });
+
+  describe('logHookCall', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      isInteractive: () => false,
+      getTelemetryLogPromptsEnabled: () => false,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logHookCallEvent');
+      vi.spyOn(metrics, 'recordHookCallMetrics');
+    });
+
+    it('should log hook call event to Clearcut and OTEL', () => {
+      const event = new HookCallEvent(
+        'before-tool',
+        'command',
+        '/path/to/script.sh',
+        { arg: 'val' },
+        150,
+        true,
+        { out: 'res' },
+        0,
+      );
+
+      logHookCall(mockConfig, event);
+
+      expect(ClearcutLogger.prototype.logHookCallEvent).toHaveBeenCalledWith(
+        event,
+      );
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Hook call before-tool./path/to/script.sh succeeded in 150ms',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          'event.name': EVENT_HOOK_CALL,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
+          hook_event_name: 'before-tool',
+          hook_type: 'command',
+          hook_name: 'script.sh', // Sanitized because logPrompts is false
+          duration_ms: 150,
+          success: true,
+          exit_code: 0,
+        },
+      });
+
+      expect(metrics.recordHookCallMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        'before-tool',
+        '/path/to/script.sh',
+        150,
+        true,
+      );
+    });
+  });
+
+  describe('Telemetry Buffering', () => {
+    it('should buffer events when SDK is not initialized', () => {
+      vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(false);
+      const bufferSpy = vi
+        .spyOn(sdk, 'bufferTelemetryEvent')
+        .mockImplementation(() => {});
+
+      const mockConfig = makeFakeConfig();
+      const event = new StartSessionEvent(mockConfig);
+      logCliConfiguration(mockConfig, event);
+
+      expect(bufferSpy).toHaveBeenCalled();
+      expect(mockLogger.emit).not.toHaveBeenCalled();
     });
   });
 });

@@ -21,7 +21,6 @@ import {
   migrateDeprecatedSettings,
   SettingScope,
 } from './config/settings.js';
-import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -31,8 +30,8 @@ import {
   registerCleanup,
   registerSyncCleanup,
   runExitCleanup,
+  registerTelemetryConfig,
 } from './utils/cleanup.js';
-import { getCliVersion } from './utils/version.js';
 import {
   type Config,
   type ResumedSessionData,
@@ -47,7 +46,7 @@ import {
   recordSlowRender,
   coreEvents,
   CoreEvent,
-  createInkStdio,
+  createWorkingStdio,
   patchStdio,
   writeToStdout,
   writeToStderr,
@@ -56,7 +55,13 @@ import {
   enterAlternateScreen,
   disableLineWrapping,
   shouldEnterAlternateScreen,
+  startupProfiler,
   ExitCodes,
+  SessionStartSource,
+  SessionEndReason,
+  fireSessionStartHook,
+  fireSessionEndHook,
+  getVersion,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -67,7 +72,6 @@ import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
 import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
-import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
@@ -92,6 +96,7 @@ import { requestConsentNonInteractive } from './config/extensions/consent.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
+import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 
 const SLOW_RENDER_MS = 200;
@@ -190,7 +195,7 @@ export async function startInteractiveUI(
     });
   }
 
-  const version = await getCliVersion();
+  const version = await getVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
   const consolePatcher = new ConsolePatcher({
@@ -202,7 +207,7 @@ export async function startInteractiveUI(
   consolePatcher.patch();
   registerCleanup(consolePatcher.cleanup);
 
-  const { stdout: inkStdout, stderr: inkStderr } = createInkStdio();
+  const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio();
 
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
@@ -281,6 +286,7 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
+  const cliStartupHandle = startupProfiler.start('cli_startup');
   const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
@@ -289,7 +295,11 @@ export async function main() {
   });
 
   setupUnhandledRejectionHandler();
+  const loadSettingsHandle = startupProfiler.start('load_settings');
   const settings = loadSettings();
+  loadSettingsHandle?.end();
+
+  const migrateHandle = startupProfiler.start('migrate_settings');
   migrateDeprecatedSettings(
     settings,
     // Temporary extension manager only used during this non-interactive UI phase.
@@ -301,9 +311,12 @@ export async function main() {
       requestSetting: null,
     }),
   );
+  migrateHandle?.end();
   await cleanupCheckpoints();
 
+  const parseArgsHandle = startupProfiler.start('parse_arguments');
   const argv = await parseArguments(settings.merged);
+  parseArgsHandle?.end();
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
@@ -342,19 +355,6 @@ export async function main() {
         SettingScope.User,
         'selectedAuthType',
         AuthType.COMPUTE_ADC,
-      );
-    }
-  }
-
-  // Load custom themes from settings
-  themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
-
-  if (settings.merged.ui?.theme) {
-    if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
-      // If the theme is not found during initial load, log a warning and continue.
-      // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
-      debugLogger.warn(
-        `Warning: Theme "${settings.merged.ui?.theme}" not found.`,
       );
     }
   }
@@ -446,11 +446,25 @@ export async function main() {
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
   {
+    const loadConfigHandle = startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv);
+    loadConfigHandle?.end();
+
+    // Register config for telemetry shutdown
+    // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit
+    registerTelemetryConfig(config);
 
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
     createPolicyUpdater(policyEngine, messageBus);
+
+    // Register SessionEnd hook to fire on graceful exit
+    // This runs before telemetry shutdown in runExitCleanup()
+    if (config.getEnableHooks() && messageBus) {
+      registerCleanup(async () => {
+        await fireSessionEndHook(messageBus, SessionEndReason.Exit);
+      });
+    }
 
     // Cleanup sessions after config initialization
     try {
@@ -470,6 +484,20 @@ export async function main() {
 
     // Handle --list-sessions flag
     if (config.getListSessions()) {
+      // Attempt auth for summary generation (gracefully skips if not configured)
+      const authType = settings.merged.security?.auth?.selectedType;
+      if (authType) {
+        try {
+          await config.refreshAuth(authType);
+        } catch (e) {
+          // Auth failed - continue without summary generation capability
+          debugLogger.debug(
+            'Auth failed for --list-sessions, summaries may not be generated:',
+            e,
+          );
+        }
+      }
+
       await listSessions(config);
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
@@ -508,13 +536,14 @@ export async function main() {
       process.on('SIGINT', () => {
         process.stdin.setRawMode(wasRaw);
       });
-
-      // Detect and enable Kitty keyboard protocol once at startup.
-      await detectAndEnableKittyProtocol();
     }
 
+    await setupTerminalAndTheme(config, settings);
+
     setMaxSizedBoxDebugging(isDebugMode);
+    const initAppHandle = startupProfiler.start('initialize_app');
     const initializationResult = await initializeApp(config, settings);
+    initAppHandle?.end();
 
     if (
       settings.merged.security?.auth?.selectedType ===
@@ -556,6 +585,7 @@ export async function main() {
       }
     }
 
+    cliStartupHandle?.end();
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
       await startInteractiveUI(
@@ -570,6 +600,23 @@ export async function main() {
     }
 
     await config.initialize();
+    startupProfiler.flush(config);
+
+    // Fire SessionStart hook through MessageBus (only if hooks are enabled)
+    // Must be called AFTER config.initialize() to ensure HookRegistry is loaded
+    const hooksEnabled = config.getEnableHooks();
+    const hookMessageBus = config.getMessageBus();
+    if (hooksEnabled && hookMessageBus) {
+      const sessionStartSource = resumedSessionData
+        ? SessionStartSource.Resume
+        : SessionStartSource.Startup;
+      await fireSessionStartHook(hookMessageBus, sessionStartSource);
+
+      // Register SessionEnd hook for graceful exit
+      registerCleanup(async () => {
+        await fireSessionEndHook(hookMessageBus, SessionEndReason.Exit);
+      });
+    }
 
     // If not a TTY, read from stdin
     // This is for cases where the user pipes input directly into the command

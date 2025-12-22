@@ -45,6 +45,7 @@ describe('<SessionSummaryDisplay />', () => {
         'gemini-2.5-pro': {
           api: { totalRequests: 10, totalErrors: 1, totalLatencyMs: 50234 },
           tokens: {
+            input: 500,
             prompt: 1000,
             candidates: 2000,
             total: 3500,

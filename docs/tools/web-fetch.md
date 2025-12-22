@@ -1,4 +1,4 @@
-# Web Fetch Tool (`web_fetch`)
+# Web fetch tool (`web_fetch`)
 
 This document describes the `web_fetch` tool for the Gemini CLI.
 

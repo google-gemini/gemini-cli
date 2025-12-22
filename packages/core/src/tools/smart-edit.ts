@@ -681,7 +681,11 @@ class EditToolInvocation
       newContent: editData.newContent,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          // No need to publish a policy update as the default policy for
+          // AUTO_EDIT already reflects always approving smart-edit.
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+        } else {
+          await this.publishPolicyUpdate(outcome);
         }
 
         if (ideConfirmation) {
@@ -966,7 +970,7 @@ A good instruction should concisely answer:
       getFilePath: (params: EditToolParams) => params.file_path,
       getCurrentContent: async (params: EditToolParams): Promise<string> => {
         try {
-          return this.config
+          return await this.config
             .getFileSystemService()
             .readTextFile(params.file_path);
         } catch (err) {

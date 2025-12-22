@@ -45,6 +45,16 @@ describe('Storage – additional helpers', () => {
     expect(storage.getProjectCommandsDir()).toBe(expected);
   });
 
+  it('getUserAgentsDir returns ~/.gemini/agents', () => {
+    const expected = path.join(os.homedir(), GEMINI_DIR, 'agents');
+    expect(Storage.getUserAgentsDir()).toBe(expected);
+  });
+
+  it('getProjectAgentsDir returns project/.gemini/agents', () => {
+    const expected = path.join(projectRoot, GEMINI_DIR, 'agents');
+    expect(storage.getProjectAgentsDir()).toBe(expected);
+  });
+
   it('getMcpOAuthTokensPath returns ~/.gemini/mcp-oauth-tokens.json', () => {
     const expected = path.join(
       os.homedir(),

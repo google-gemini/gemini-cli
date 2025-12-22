@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ModelHealthStatus, ModelId } from './modelAvailabilityService.js';
+import type {
+  ModelAvailabilityService,
+  ModelHealthStatus,
+  ModelId,
+} from './modelAvailabilityService.js';
 
 /**
  * Whether to prompt the user or fallback silently on a model API failure.
@@ -49,3 +53,11 @@ export interface ModelPolicy {
  * The first model in the chain is the primary model.
  */
 export type ModelPolicyChain = ModelPolicy[];
+
+/**
+ * Context required by retry logic to apply availability policies on failure.
+ */
+export interface RetryAvailabilityContext {
+  service: ModelAvailabilityService;
+  policy: ModelPolicy;
+}

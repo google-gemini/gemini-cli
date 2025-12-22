@@ -35,7 +35,6 @@ import {
   type IdeContext,
   type UserTierId,
   type UserFeedbackPayload,
-  DEFAULT_GEMINI_FLASH_MODEL,
   IdeClient,
   ideContextStore,
   getErrorMessage,
@@ -50,7 +49,6 @@ import {
   coreEvents,
   CoreEvent,
   refreshServerHierarchicalMemory,
-  type ModelChangedPayload,
   type MemoryChangedPayload,
   writeToStdout,
   disableMouseEvents,
@@ -58,6 +56,12 @@ import {
   enableMouseEvents,
   disableLineWrapping,
   shouldEnterAlternateScreen,
+  startupProfiler,
+  SessionStartSource,
+  SessionEndReason,
+  fireSessionStartHook,
+  fireSessionEndHook,
+  generateSummary,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -117,8 +121,10 @@ import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
-import { enableSupportedProtocol } from './utils/kittyProtocolDetector.js';
+import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
+import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { enableBracketedPaste } from './utils/bracketedPaste.js';
+import { useBanner } from './hooks/useBanner.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -197,6 +203,16 @@ export const AppContainer = (props: AppContainerProps) => {
   const [warningBannerText, setWarningBannerText] = useState('');
   const [bannerVisible, setBannerVisible] = useState(true);
 
+  const bannerData = useMemo(
+    () => ({
+      defaultText: defaultBannerText,
+      warningText: warningBannerText,
+    }),
+    [defaultBannerText, warningBannerText],
+  );
+
+  const { bannerText } = useBanner(bannerData, config);
+
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
   extensionManager.setRequestConsent((description) =>
@@ -237,22 +253,15 @@ export const AppContainer = (props: AppContainerProps) => {
     [],
   );
 
-  // Helper to determine the effective model, considering the fallback state.
-  const getEffectiveModel = useCallback(() => {
-    if (config.isInFallbackMode()) {
-      return DEFAULT_GEMINI_FLASH_MODEL;
-    }
-    return config.getModel();
-  }, [config]);
-
-  const [currentModel, setCurrentModel] = useState(getEffectiveModel());
+  const [currentModel, setCurrentModel] = useState(config.getModel());
 
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
 
   const logger = useLogger(config.storage);
-  const [userMessages, setUserMessages] = useState<string[]>([]);
+  const { inputHistory, addInput, initializeFromLogger } =
+    useInputHistoryStore();
 
   // Terminal and layout hooks
   const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
@@ -275,19 +284,44 @@ export const AppContainer = (props: AppContainerProps) => {
   const staticExtraHeight = 3;
 
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
       // Note: the program will not work if this fails so let errors be
       // handled by the global catch.
       await config.initialize();
       setConfigInitialized(true);
+      startupProfiler.flush(config);
+
+      // Fire SessionStart hook through MessageBus (only if hooks are enabled)
+      // Must be called AFTER config.initialize() to ensure HookRegistry is loaded
+      const hooksEnabled = config.getEnableHooks();
+      const hookMessageBus = config.getMessageBus();
+      if (hooksEnabled && hookMessageBus) {
+        const sessionStartSource = resumedSessionData
+          ? SessionStartSource.Resume
+          : SessionStartSource.Startup;
+        await fireSessionStartHook(hookMessageBus, sessionStartSource);
+      }
+
+      // Fire-and-forget: generate summary for previous session in background
+      generateSummary(config).catch((e) => {
+        debugLogger.warn('Background summary generation failed:', e);
+      });
     })();
     registerCleanup(async () => {
       // Turn off mouse scroll.
       disableMouseEvents();
       const ideClient = await IdeClient.getInstance();
       await ideClient.disconnect();
+
+      // Fire SessionEnd hook on cleanup (only if hooks are enabled)
+      const hooksEnabled = config.getEnableHooks();
+      const hookMessageBus = config.getMessageBus();
+      if (hooksEnabled && hookMessageBus) {
+        await fireSessionEndHook(hookMessageBus, SessionEndReason.Exit);
+      }
     });
-  }, [config]);
+  }, [config, resumedSessionData]);
 
   useEffect(
     () => setUpdateHandler(historyManager.addItem, setUpdateInfo),
@@ -296,22 +330,15 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Subscribe to fallback mode and model changes from core
   useEffect(() => {
-    const handleFallbackModeChanged = () => {
-      const effectiveModel = getEffectiveModel();
-      setCurrentModel(effectiveModel);
+    const handleModelChanged = () => {
+      setCurrentModel(config.getModel());
     };
 
-    const handleModelChanged = (payload: ModelChangedPayload) => {
-      setCurrentModel(payload.model);
-    };
-
-    coreEvents.on(CoreEvent.FallbackModeChanged, handleFallbackModeChanged);
     coreEvents.on(CoreEvent.ModelChanged, handleModelChanged);
     return () => {
-      coreEvents.off(CoreEvent.FallbackModeChanged, handleFallbackModeChanged);
       coreEvents.off(CoreEvent.ModelChanged, handleModelChanged);
     };
-  }, [getEffectiveModel]);
+  }, [config]);
 
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();
@@ -343,35 +370,11 @@ export const AppContainer = (props: AppContainerProps) => {
     shellModeActive,
   });
 
+  // Initialize input history from logger (past sessions)
   useEffect(() => {
-    const fetchUserMessages = async () => {
-      const pastMessagesRaw = (await logger?.getPreviousUserMessages()) || [];
-      const currentSessionUserMessages = historyManager.history
-        .filter(
-          (item): item is HistoryItem & { type: 'user'; text: string } =>
-            item.type === 'user' &&
-            typeof item.text === 'string' &&
-            item.text.trim() !== '',
-        )
-        .map((item) => item.text)
-        .reverse();
-      const combinedMessages = [
-        ...currentSessionUserMessages,
-        ...pastMessagesRaw,
-      ];
-      const deduplicatedMessages: string[] = [];
-      if (combinedMessages.length > 0) {
-        deduplicatedMessages.push(combinedMessages[0]);
-        for (let i = 1; i < combinedMessages.length; i++) {
-          if (combinedMessages[i] !== combinedMessages[i - 1]) {
-            deduplicatedMessages.push(combinedMessages[i]);
-          }
-        }
-      }
-      setUserMessages(deduplicatedMessages.reverse());
-    };
-    fetchUserMessages();
-  }, [historyManager.history, logger]);
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    initializeFromLogger(logger);
+  }, [logger, initializeFromLogger]);
 
   const refreshStatic = useCallback(() => {
     if (!isAlternateBuffer) {
@@ -379,6 +382,7 @@ export const AppContainer = (props: AppContainerProps) => {
     }
     setHistoryRemountKey((prev) => prev + 1);
   }, [setHistoryRemountKey, isAlternateBuffer, stdout]);
+
   const handleEditorClose = useCallback(() => {
     if (
       shouldEnterAlternateScreen(isAlternateBuffer, config.getScreenReader())
@@ -391,7 +395,7 @@ export const AppContainer = (props: AppContainerProps) => {
       app.rerender();
     }
     enableBracketedPaste();
-    enableSupportedProtocol();
+    terminalCapabilityManager.enableKittyProtocol();
     refreshStatic();
   }, [refreshStatic, isAlternateBuffer, app, config]);
 
@@ -401,6 +405,18 @@ export const AppContainer = (props: AppContainerProps) => {
       coreEvents.off(CoreEvent.ExternalEditorClosed, handleEditorClose);
     };
   }, [handleEditorClose]);
+
+  useEffect(() => {
+    if (
+      !(settings.merged.ui?.hideBanner || config.getScreenReader()) &&
+      bannerVisible &&
+      bannerText
+    ) {
+      // The header should show a banner but the Header is rendered in static
+      // so we must trigger a static refresh for it to be visible.
+      refreshStatic();
+    }
+  }, [bannerVisible, bannerText, settings, config, refreshStatic]);
 
   const {
     isThemeDialogOpen,
@@ -549,6 +565,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settings.merged.security?.auth?.selectedType &&
       !settings.merged.security?.auth?.useExternal
     ) {
+      // We skip validation for Gemini API key here because it might be stored
+      // in the keychain, which we can't check synchronously.
+      // The useAuth hook handles validation for this case.
+      if (settings.merged.security.auth.selectedType === AuthType.USE_GEMINI) {
+        return;
+      }
+
       const error = validateAuthMethod(
         settings.merged.security.auth.selectedType,
       );
@@ -710,7 +733,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       const lastHistoryUserMsg = historyManager.history.findLast(
         (h) => h.type === 'user',
       );
-      const lastUserMsg = userMessages.at(-1);
+      const lastUserMsg = inputHistory.at(-1);
 
       if (
         !lastHistoryUserMsg ||
@@ -721,7 +744,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setPendingRestorePrompt(false);
       }
     }
-  }, [pendingRestorePrompt, userMessages, historyManager.history]);
+  }, [pendingRestorePrompt, inputHistory, historyManager.history]);
 
   const {
     streamingState,
@@ -785,7 +808,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
-      const lastUserMessage = userMessages.at(-1);
+      const lastUserMessage = inputHistory.at(-1);
       let textToSet = shouldRestorePrompt ? lastUserMessage || '' : '';
 
       const queuedText = getQueuedMessagesText();
@@ -800,7 +823,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     },
     [
       buffer,
-      userMessages,
+      inputHistory,
       getQueuedMessagesText,
       clearQueue,
       pendingSlashCommandHistoryItems,
@@ -811,8 +834,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
       addMessage(submittedValue);
+      addInput(submittedValue); // Track input for up-arrow history
     },
-    [addMessage],
+    [addMessage, addInput],
   );
 
   const handleClearScreen = useCallback(() => {
@@ -852,11 +876,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useLayoutEffect(() => {
     if (mainControlsRef.current) {
       const fullFooterMeasurement = measureElement(mainControlsRef.current);
-      if (fullFooterMeasurement.height > 0) {
+      if (
+        fullFooterMeasurement.height > 0 &&
+        fullFooterMeasurement.height !== controlsHeight
+      ) {
         setControlsHeight(fullFooterMeasurement.height);
       }
     }
-  }, [buffer, terminalWidth, terminalHeight]);
+  }, [buffer, terminalWidth, terminalHeight, controlsHeight]);
 
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = Math.max(
@@ -953,6 +980,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       const currentIde = ideClient.getCurrentIde();
       setCurrentIDE(currentIde || null);
     };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     getIde();
   }, []);
   const shouldShowIdePrompt = Boolean(
@@ -1078,6 +1106,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       recordExitFail(config);
     }
     if (ctrlCPressCount > 1) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       handleSlashCommand('/quit', undefined, undefined, false);
     } else {
       ctrlCTimerRef.current = setTimeout(() => {
@@ -1096,6 +1125,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       recordExitFail(config);
     }
     if (ctrlDPressCount > 1) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       handleSlashCommand('/quit', undefined, undefined, false);
     } else {
       ctrlDTimerRef.current = setTimeout(() => {
@@ -1112,6 +1142,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const handleIdePromptComplete = useCallback(
     (result: IdeIntegrationNudgeResult) => {
       if (result.userSelection === 'yes') {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleSlashCommand('/ide install');
         settings.setValue(
           SettingScope.User,
@@ -1194,6 +1225,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         config.getIdeMode() &&
         ideContextState
       ) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleSlashCommand('/ide status');
       } else if (
         keyMatchers[Command.SHOW_MORE_LINES](key) &&
@@ -1383,18 +1415,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setDefaultBannerText(defaultBanner);
         setWarningBannerText(warningBanner);
         setBannerVisible(true);
-        refreshStatic();
         const authType = config.getContentGeneratorConfig()?.authType;
         if (
           authType === AuthType.USE_GEMINI ||
           authType === AuthType.USE_VERTEX_AI
         ) {
           setDefaultBannerText(
-            'Gemini 3 is now available.\nTo use Gemini 3, enable "Preview features" in /settings\nLearn more at https://goo.gle/enable-preview-features',
+            'Gemini 3 Flash and Pro are now available. \nEnable "Preview features" in /settings. \nLearn more at https://goo.gle/enable-preview-features',
           );
         }
       }
     };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     fetchBannerTexts();
 
     return () => {
@@ -1438,7 +1470,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingGeminiHistoryItems,
       thought,
       shellModeActive,
-      userMessages,
+      userMessages: inputHistory,
       buffer,
       inputWidth,
       suggestionsWidth,
@@ -1492,11 +1524,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       customDialog,
       copyModeEnabled,
       warningMessage,
-      bannerData: {
-        defaultText: defaultBannerText,
-        warningText: warningBannerText,
-      },
+      bannerData,
       bannerVisible,
+      terminalBackgroundColor: config.getTerminalBackground(),
     }),
     [
       isThemeDialogOpen,
@@ -1529,7 +1559,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingGeminiHistoryItems,
       thought,
       shellModeActive,
-      userMessages,
+      inputHistory,
       buffer,
       inputWidth,
       suggestionsWidth,
@@ -1586,9 +1616,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       authState,
       copyModeEnabled,
       warningMessage,
-      defaultBannerText,
-      warningBannerText,
+      bannerData,
       bannerVisible,
+      config,
     ],
   );
 

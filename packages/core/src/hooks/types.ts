@@ -40,6 +40,8 @@ export enum HookEventName {
 export interface CommandHookConfig {
   type: HookType.Command;
   command: string;
+  name?: string;
+  description?: string;
   timeout?: number;
 }
 
@@ -463,7 +465,6 @@ export enum SessionStartSource {
   Startup = 'startup',
   Resume = 'resume',
   Clear = 'clear',
-  Compress = 'compress',
 }
 
 /**

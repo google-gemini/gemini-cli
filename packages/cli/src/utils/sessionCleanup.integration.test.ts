@@ -166,7 +166,7 @@ describe('Session Cleanup Integration', () => {
       oldSessionFile,
       JSON.stringify({
         sessionId: 'old12345',
-        messages: [],
+        messages: [{ type: 'user', content: 'test message' }],
         startTime: oldDate.toISOString(),
         lastUpdated: oldDate.toISOString(),
       }),
@@ -181,7 +181,7 @@ describe('Session Cleanup Integration', () => {
       recentSessionFile,
       JSON.stringify({
         sessionId: 'recent789',
-        messages: [],
+        messages: [{ type: 'user', content: 'test message' }],
         startTime: recentDate.toISOString(),
         lastUpdated: recentDate.toISOString(),
       }),
@@ -196,7 +196,7 @@ describe('Session Cleanup Integration', () => {
       currentSessionFile,
       JSON.stringify({
         sessionId: 'current123',
-        messages: [],
+        messages: [{ type: 'user', content: 'test message' }],
         startTime: now.toISOString(),
         lastUpdated: now.toISOString(),
       }),

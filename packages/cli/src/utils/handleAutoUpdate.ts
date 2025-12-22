@@ -68,11 +68,13 @@ export function handleAutoUpdate(
     '@latest',
     isNightly ? '@nightly' : `@${info.update.latest}`,
   );
-  const updateProcess = spawnFn(updateCommand, { stdio: 'pipe', shell: true });
-  let errorOutput = '';
-  updateProcess.stderr.on('data', (data) => {
-    errorOutput += data.toString();
+  const updateProcess = spawnFn(updateCommand, {
+    stdio: 'ignore',
+    shell: true,
+    detached: true,
   });
+  // Un-reference the child process to allow the parent to exit independently.
+  updateProcess.unref();
 
   updateProcess.on('close', (code) => {
     if (code === 0) {
@@ -82,7 +84,7 @@ export function handleAutoUpdate(
       });
     } else {
       updateEventEmitter.emit('update-failed', {
-        message: `Automatic update failed. Please try updating manually. (command: ${updateCommand}, stderr: ${errorOutput.trim()})`,
+        message: `Automatic update failed. Please try updating manually. (command: ${updateCommand})`,
       });
     }
   });

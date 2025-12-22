@@ -15,7 +15,6 @@ import type { ApprovalMode } from '../policy/types.js';
 
 import type { CompletedToolCall } from '../core/coreToolScheduler.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import type { FileDiff } from '../tools/tools.js';
 import { AuthType } from '../core/contentGenerator.js';
 import type { LogAttributes, LogRecord } from '@opentelemetry/api-logs';
 import {
@@ -115,9 +114,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
         .getAllTools()
         .filter((tool) => tool instanceof DiscoveredMCPTool);
       this.mcp_tools_count = mcpTools.length;
-      this.mcp_tools = mcpTools
-        .map((tool) => (tool as DiscoveredMCPTool).name)
-        .join(',');
+      this.mcp_tools = mcpTools.map((tool) => tool.name).join(',');
     }
   }
 
@@ -299,7 +296,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
         call.response.resultDisplay !== null &&
         'diffStat' in call.response.resultDisplay
       ) {
-        const diffStat = (call.response.resultDisplay as FileDiff).diffStat;
+        const diffStat = call.response.resultDisplay.diffStat;
         if (diffStat) {
           this.metadata = {
             model_added_lines: diffStat.model_added_lines,
@@ -1234,6 +1231,7 @@ export class ExtensionInstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_install';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   extension_version: string;
   extension_source: string;
@@ -1241,6 +1239,7 @@ export class ExtensionInstallEvent implements BaseTelemetryEvent {
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     extension_version: string,
     extension_source: string,
@@ -1249,6 +1248,7 @@ export class ExtensionInstallEvent implements BaseTelemetryEvent {
     this['event.name'] = 'extension_install';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.extension_version = extension_version;
     this.extension_source = extension_source;
@@ -1328,17 +1328,20 @@ export class ExtensionUninstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_uninstall';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   status: 'success' | 'error';
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     status: 'success' | 'error',
   ) {
     this['event.name'] = 'extension_uninstall';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.status = status;
   }
@@ -1363,6 +1366,7 @@ export class ExtensionUpdateEvent implements BaseTelemetryEvent {
   'event.name': 'extension_update';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   extension_previous_version: string;
   extension_version: string;
@@ -1371,6 +1375,7 @@ export class ExtensionUpdateEvent implements BaseTelemetryEvent {
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     extension_version: string,
     extension_previous_version: string,
@@ -1380,6 +1385,7 @@ export class ExtensionUpdateEvent implements BaseTelemetryEvent {
     this['event.name'] = 'extension_update';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.extension_version = extension_version;
     this.extension_previous_version = extension_previous_version;
@@ -1410,17 +1416,20 @@ export class ExtensionEnableEvent implements BaseTelemetryEvent {
   'event.name': 'extension_enable';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   setting_scope: string;
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     settingScope: string,
   ) {
     this['event.name'] = 'extension_enable';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.setting_scope = settingScope;
   }
@@ -1538,6 +1547,7 @@ export type TelemetryEvent =
   | AgentFinishEvent
   | RecoveryAttemptEvent
   | LlmLoopCheckEvent
+  | StartupStatsEvent
   | WebFetchFallbackAttemptEvent;
 
 export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
@@ -1545,17 +1555,20 @@ export class ExtensionDisableEvent implements BaseTelemetryEvent {
   'event.name': 'extension_disable';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   setting_scope: string;
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     settingScope: string,
   ) {
     this['event.name'] = 'extension_disable';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.setting_scope = settingScope;
   }
@@ -1624,6 +1637,55 @@ export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Smart Edit Tool Correction: ${this.correction}`;
+  }
+}
+
+export interface StartupPhaseStats {
+  name: string;
+  duration_ms: number;
+  cpu_usage_user_usec: number;
+  cpu_usage_system_usec: number;
+  start_time_usec: number;
+  end_time_usec: number;
+}
+
+export const EVENT_STARTUP_STATS = 'gemini_cli.startup_stats';
+export class StartupStatsEvent implements BaseTelemetryEvent {
+  'event.name': 'startup_stats';
+  'event.timestamp': string;
+  phases: StartupPhaseStats[];
+  os_platform: string;
+  os_release: string;
+  is_docker: boolean;
+
+  constructor(
+    phases: StartupPhaseStats[],
+    os_platform: string,
+    os_release: string,
+    is_docker: boolean,
+  ) {
+    this['event.name'] = 'startup_stats';
+    this['event.timestamp'] = new Date().toISOString();
+    this.phases = phases;
+    this.os_platform = os_platform;
+    this.os_release = os_release;
+    this.is_docker = is_docker;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_STARTUP_STATS,
+      'event.timestamp': this['event.timestamp'],
+      phases: JSON.stringify(this.phases),
+      os_platform: this.os_platform,
+      os_release: this.os_release,
+      is_docker: this.is_docker,
+    };
+  }
+
+  toLogBody(): string {
+    return `Startup stats: ${this.phases.length} phases recorded.`;
   }
 }
 

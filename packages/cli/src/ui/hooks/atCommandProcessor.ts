@@ -7,7 +7,11 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { PartListUnion, PartUnion } from '@google/genai';
-import type { AnyToolInvocation, Config } from '@google/gemini-cli-core';
+import type {
+  AnyToolInvocation,
+  Config,
+  DiscoveredMCPResource,
+} from '@google/gemini-cli-core';
 import {
   debugLogger,
   getErrorMessage,
@@ -15,6 +19,7 @@ import {
   unescapePath,
   ReadManyFilesTool,
 } from '@google/gemini-cli-core';
+import { Buffer } from 'node:buffer';
 import type { HistoryItem, IndividualToolCallDisplay } from '../types.js';
 import { ToolCallStatus } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -30,7 +35,7 @@ interface HandleAtCommandParams {
 
 interface HandleAtCommandResult {
   processedQuery: PartListUnion | null;
-  shouldProceed: boolean;
+  error?: string;
 }
 
 interface AtCommandPart {
@@ -113,13 +118,14 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
 }
 
 /**
- * Processes user input potentially containing one or more '@<path>' commands.
- * If found, it attempts to read the specified files/directories using the
- * 'read_many_files' tool. The user query is modified to include resolved paths,
- * and the content of the files is appended in a structured block.
+ * Processes user input containing one or more '@<path>' commands.
+ * - Workspace paths are read via the 'read_many_files' tool.
+ * - MCP resource URIs are read via each server's `resources/read`.
+ * The user query is updated with inline content blocks so the LLM receives the
+ * referenced context directly.
  *
  * @returns An object indicating whether the main hook should proceed with an
- *          LLM call and the processed query parts (including file content).
+ *          LLM call and the processed query parts (including file/resource content).
  */
 export async function handleAtCommand({
   query,
@@ -129,13 +135,16 @@ export async function handleAtCommand({
   messageId: userMessageTimestamp,
   signal,
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {
+  const resourceRegistry = config.getResourceRegistry();
+  const mcpClientManager = config.getMcpClientManager();
+
   const commandParts = parseAllAtCommands(query);
   const atPathCommandParts = commandParts.filter(
     (part) => part.type === 'atPath',
   );
 
   if (atPathCommandParts.length === 0) {
-    return { processedQuery: [{ text: query }], shouldProceed: true };
+    return { processedQuery: [{ text: query }] };
   }
 
   // Get centralized file discovery service
@@ -144,8 +153,9 @@ export async function handleAtCommand({
   const respectFileIgnore = config.getFileFilteringOptions();
 
   const pathSpecsToRead: string[] = [];
+  const resourceAttachments: DiscoveredMCPResource[] = [];
   const atPathToResolvedSpecMap = new Map<string, string>();
-  const contentLabelsForDisplay: string[] = [];
+  const fileLabelsForDisplay: string[] = [];
   const absoluteToRelativePathMap = new Map<string, string>();
   const ignoredByReason: Record<string, string[]> = {
     git: [],
@@ -162,7 +172,10 @@ export async function handleAtCommand({
       { type: 'error', text: 'Error: read_many_files tool not found.' },
       userMessageTimestamp,
     );
-    return { processedQuery: null, shouldProceed: false };
+    return {
+      processedQuery: null,
+      error: 'Error: read_many_files tool not found.',
+    };
   }
 
   for (const atPathPart of atPathCommandParts) {
@@ -179,19 +192,26 @@ export async function handleAtCommand({
     if (!pathName) {
       // This case should ideally not be hit if parseAllAtCommands ensures content after @
       // but as a safeguard:
+      const errMsg = `Error: Invalid @ command '${originalAtPath}'. No path specified.`;
       addItem(
         {
           type: 'error',
-          text: `Error: Invalid @ command '${originalAtPath}'. No path specified.`,
+          text: errMsg,
         },
         userMessageTimestamp,
       );
       // Decide if this is a fatal error for the whole command or just skip this @ part
       // For now, let's be strict and fail the command if one @path is malformed.
-      return { processedQuery: null, shouldProceed: false };
+      return { processedQuery: null, error: errMsg };
     }
 
-    // Check if path should be ignored based on filtering options
+    // Check if this is an MCP resource reference (serverName:uri format)
+    const resourceMatch = resourceRegistry.findResourceByUri(pathName);
+    if (resourceMatch) {
+      resourceAttachments.push(resourceMatch);
+      atPathToResolvedSpecMap.set(originalAtPath, pathName);
+      continue;
+    }
 
     const workspaceContext = config.getWorkspaceContext();
     if (!workspaceContext.isPathWithinWorkspace(pathName)) {
@@ -324,7 +344,7 @@ export async function handleAtCommand({
         pathSpecsToRead.push(currentPathSpec);
         atPathToResolvedSpecMap.set(originalAtPath, currentPathSpec);
         const displayPath = path.isAbsolute(pathName) ? relativePath : pathName;
-        contentLabelsForDisplay.push(displayPath);
+        fileLabelsForDisplay.push(displayPath);
         break;
       }
     }
@@ -397,23 +417,108 @@ export async function handleAtCommand({
   }
 
   // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
-  if (pathSpecsToRead.length === 0) {
+  if (pathSpecsToRead.length === 0 && resourceAttachments.length === 0) {
     onDebugMessage('No valid file paths found in @ commands to read.');
     if (initialQueryText === '@' && query.trim() === '@') {
       // If the only thing was a lone @, pass original query (which might have spaces)
-      return { processedQuery: [{ text: query }], shouldProceed: true };
+      return { processedQuery: [{ text: query }] };
     } else if (!initialQueryText && query) {
       // If all @-commands were invalid and no surrounding text, pass original query
-      return { processedQuery: [{ text: query }], shouldProceed: true };
+      return { processedQuery: [{ text: query }] };
     }
     // Otherwise, proceed with the (potentially modified) query text that doesn't involve file reading
-    return {
-      processedQuery: [{ text: initialQueryText || query }],
-      shouldProceed: true,
-    };
+    return { processedQuery: [{ text: initialQueryText || query }] };
   }
 
-  const processedQueryParts: PartUnion[] = [{ text: initialQueryText }];
+  const processedQueryParts: PartListUnion = [{ text: initialQueryText }];
+
+  const resourcePromises = resourceAttachments.map(async (resource) => {
+    const uri = resource.uri;
+    const client = mcpClientManager?.getClient(resource.serverName);
+    try {
+      if (!client) {
+        throw new Error(
+          `MCP client for server '${resource.serverName}' is not available or not connected.`,
+        );
+      }
+      const response = await client.readResource(uri);
+      const parts = convertResourceContentsToParts(response);
+      return {
+        success: true,
+        parts,
+        uri,
+        display: {
+          callId: `mcp-resource-${resource.serverName}-${uri}`,
+          name: `resources/read (${resource.serverName})`,
+          description: uri,
+          status: ToolCallStatus.Success,
+          resultDisplay: `Successfully read resource ${uri}`,
+          confirmationDetails: undefined,
+        } as IndividualToolCallDisplay,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        parts: [],
+        uri,
+        display: {
+          callId: `mcp-resource-${resource.serverName}-${uri}`,
+          name: `resources/read (${resource.serverName})`,
+          description: uri,
+          status: ToolCallStatus.Error,
+          resultDisplay: `Error reading resource ${uri}: ${getErrorMessage(error)}`,
+          confirmationDetails: undefined,
+        } as IndividualToolCallDisplay,
+      };
+    }
+  });
+
+  const resourceResults = await Promise.all(resourcePromises);
+  const resourceReadDisplays: IndividualToolCallDisplay[] = [];
+  let resourceErrorOccurred = false;
+
+  for (const result of resourceResults) {
+    resourceReadDisplays.push(result.display);
+    if (result.success) {
+      processedQueryParts.push({ text: `\nContent from @${result.uri}:\n` });
+      processedQueryParts.push(...result.parts);
+    } else {
+      resourceErrorOccurred = true;
+    }
+  }
+
+  if (resourceErrorOccurred) {
+    addItem(
+      { type: 'tool_group', tools: resourceReadDisplays } as Omit<
+        HistoryItem,
+        'id'
+      >,
+      userMessageTimestamp,
+    );
+    // Find the first error to report
+    const firstError = resourceReadDisplays.find(
+      (d) => d.status === ToolCallStatus.Error,
+    )!;
+    const errorMessages = resourceReadDisplays
+      .filter((d) => d.status === ToolCallStatus.Error)
+      .map((d) => d.resultDisplay);
+    console.error(errorMessages);
+    const errorMsg = `Exiting due to an error processing the @ command: ${firstError.resultDisplay}`;
+    return { processedQuery: null, error: errorMsg };
+  }
+
+  if (pathSpecsToRead.length === 0) {
+    if (resourceReadDisplays.length > 0) {
+      addItem(
+        { type: 'tool_group', tools: resourceReadDisplays } as Omit<
+          HistoryItem,
+          'id'
+        >,
+        userMessageTimestamp,
+      );
+    }
+    return { processedQuery: processedQueryParts };
+  }
 
   const toolArgs = {
     include: pathSpecsToRead,
@@ -423,20 +528,20 @@ export async function handleAtCommand({
     },
     // Use configuration setting
   };
-  let toolCallDisplay: IndividualToolCallDisplay;
+  let readManyFilesDisplay: IndividualToolCallDisplay | undefined;
 
   let invocation: AnyToolInvocation | undefined = undefined;
   try {
     invocation = readManyFilesTool.build(toolArgs);
     const result = await invocation.execute(signal);
-    toolCallDisplay = {
+    readManyFilesDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
       description: invocation.getDescription(),
       status: ToolCallStatus.Success,
       resultDisplay:
         result.returnDisplay ||
-        `Successfully read: ${contentLabelsForDisplay.join(', ')}`,
+        `Successfully read: ${fileLabelsForDisplay.join(', ')}`,
       confirmationDetails: undefined,
     };
 
@@ -486,32 +591,70 @@ export async function handleAtCommand({
       );
     }
 
-    addItem(
-      { type: 'tool_group', tools: [toolCallDisplay] } as Omit<
-        HistoryItem,
-        'id'
-      >,
-      userMessageTimestamp,
-    );
-    return { processedQuery: processedQueryParts, shouldProceed: true };
+    if (resourceReadDisplays.length > 0 || readManyFilesDisplay) {
+      addItem(
+        {
+          type: 'tool_group',
+          tools: [
+            ...resourceReadDisplays,
+            ...(readManyFilesDisplay ? [readManyFilesDisplay] : []),
+          ],
+        } as Omit<HistoryItem, 'id'>,
+        userMessageTimestamp,
+      );
+    }
+    return { processedQuery: processedQueryParts };
   } catch (error: unknown) {
-    toolCallDisplay = {
+    readManyFilesDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
       description:
         invocation?.getDescription() ??
         'Error attempting to execute tool to read files',
       status: ToolCallStatus.Error,
-      resultDisplay: `Error reading files (${contentLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
+      resultDisplay: `Error reading files (${fileLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
       confirmationDetails: undefined,
     };
     addItem(
-      { type: 'tool_group', tools: [toolCallDisplay] } as Omit<
-        HistoryItem,
-        'id'
-      >,
+      {
+        type: 'tool_group',
+        tools: [...resourceReadDisplays, readManyFilesDisplay],
+      } as Omit<HistoryItem, 'id'>,
       userMessageTimestamp,
     );
-    return { processedQuery: null, shouldProceed: false };
+    return {
+      processedQuery: null,
+      error: `Exiting due to an error processing the @ command: ${readManyFilesDisplay.resultDisplay}`,
+    };
   }
+}
+
+function convertResourceContentsToParts(response: {
+  contents?: Array<{
+    text?: string;
+    blob?: string;
+    mimeType?: string;
+    resource?: {
+      text?: string;
+      blob?: string;
+      mimeType?: string;
+    };
+  }>;
+}): PartUnion[] {
+  const parts: PartUnion[] = [];
+  for (const content of response.contents ?? []) {
+    const candidate = content.resource ?? content;
+    if (candidate.text) {
+      parts.push({ text: candidate.text });
+      continue;
+    }
+    if (candidate.blob) {
+      const sizeBytes = Buffer.from(candidate.blob, 'base64').length;
+      const mimeType = candidate.mimeType ?? 'application/octet-stream';
+      parts.push({
+        text: `[Binary resource content ${mimeType}, ${sizeBytes} bytes]`,
+      });
+    }
+  }
+  return parts;
 }

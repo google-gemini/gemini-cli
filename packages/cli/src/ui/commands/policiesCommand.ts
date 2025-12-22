@@ -11,6 +11,7 @@ const listPoliciesCommand: SlashCommand = {
   name: 'list',
   description: 'List all active policies',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async (context) => {
     const { config } = context.services;
     if (!config) {
@@ -72,5 +73,6 @@ export const policiesCommand: SlashCommand = {
   name: 'policies',
   description: 'Manage policies',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   subCommands: [listPoliciesCommand],
 };

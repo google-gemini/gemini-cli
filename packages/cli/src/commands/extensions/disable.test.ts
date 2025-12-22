@@ -14,7 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import { format } from 'node:util';
-import { type CommandModule, type Argv } from 'yargs';
+import { type Argv } from 'yargs';
 import { handleDisable, disableCommand } from './disable.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import {
@@ -148,7 +148,7 @@ describe('extensions disable command', () => {
   });
 
   describe('disableCommand', () => {
-    const command = disableCommand as CommandModule;
+    const command = disableCommand;
 
     it('should have correct command and describe', () => {
       expect(command.command).toBe('disable [--scope] <name>');
@@ -228,7 +228,9 @@ describe('extensions disable command', () => {
         _: [],
         $0: '',
       };
-      await (command.handler as unknown as (args: TestArgv) => void)(argv);
+      await (command.handler as unknown as (args: TestArgv) => Promise<void>)(
+        argv,
+      );
       expect(mockExtensionManager).toHaveBeenCalledWith(
         expect.objectContaining({
           workspaceDir: '/test/dir',
