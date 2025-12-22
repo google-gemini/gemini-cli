@@ -38,7 +38,7 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => (
       </Text>
       <Text color={theme.status.warning}>
         Hooks can execute arbitrary commands on your system. Only use hooks from
-        sources you trust. Review hook scripts before enabling them.
+        sources you trust. Review hook scripts carefully.
       </Text>
     </Box>
 
