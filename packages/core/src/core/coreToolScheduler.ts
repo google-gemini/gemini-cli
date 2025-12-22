@@ -798,7 +798,7 @@ export class CoreToolScheduler {
       }
     } else {
       // If the client provided new content, apply it before scheduling.
-      if (payload?.newContent && toolCall) {
+      if (payload?.newContent !== undefined && toolCall) {
         await this._applyInlineModify(
           toolCall as WaitingToolCall,
           payload,
@@ -833,7 +833,7 @@ export class CoreToolScheduler {
       toolCall.request.args,
     );
 
-    const newContent = payload.newContent || currentContent;
+    const newContent = payload.newContent ?? currentContent;
 
     const updatedParams = modifyContext.createUpdatedParams(
       currentContent,

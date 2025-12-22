@@ -88,7 +88,10 @@ export const ToolConfirmationMessage: React.FC<
     if (confirmationDetails.type === 'edit') {
       if (config.getIdeMode() && isDiffingEnabled) {
         const cliOutcome =
-          outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
+          outcome === ToolConfirmationOutcome.Cancel ||
+          outcome === ToolConfirmationOutcome.Feedback
+            ? 'rejected'
+            : 'accepted';
         await ideClient?.resolveDiffFromCli(
           confirmationDetails.filePath,
           cliOutcome,

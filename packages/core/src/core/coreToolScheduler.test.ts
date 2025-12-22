@@ -724,6 +724,83 @@ describe('CoreToolScheduler with payload', () => {
       newContent: 'final version',
     });
   });
+
+  it('should allow clearing content (empty string) via payload', async () => {
+    const mockTool = new MockModifiableTool();
+    mockTool.executeFn = vi.fn();
+    const declarativeTool = mockTool;
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByName: () => declarativeTool,
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: 'mockModifiableTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-3',
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    const awaitingCall = (await waitForStatus(
+      onToolCallsUpdate,
+      'awaiting_approval',
+    )) as WaitingToolCall;
+    const confirmationDetails = awaitingCall.confirmationDetails;
+
+    if (confirmationDetails) {
+      // Send empty string as newContent to verify it's not treated as falsy
+      const payload: ToolConfirmationPayload = { newContent: '' };
+      await confirmationDetails.onConfirm(
+        ToolConfirmationOutcome.ProceedOnce,
+        payload,
+      );
+    }
+
+    // Wait for the tool execution to complete
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls[0].status).toBe('success');
+    expect(mockTool.executeFn).toHaveBeenCalledWith({
+      newContent: '',
+    });
+  });
 });
 
 class MockEditToolInvocation extends BaseToolInvocation<
