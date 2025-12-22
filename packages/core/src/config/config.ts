@@ -361,7 +361,6 @@ export class Config {
   private userMemory: string;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
-  private approvalMode: ApprovalMode;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
@@ -481,7 +480,6 @@ export class Config {
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
-    this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
     this.accessibility = params.accessibility ?? {};
     this.telemetrySettings = {
@@ -596,7 +594,11 @@ export class Config {
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
-    this.policyEngine = new PolicyEngine(params.policyEngineConfig);
+    this.policyEngine = new PolicyEngine({
+      ...params.policyEngineConfig,
+      approvalMode:
+        params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+    });
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
@@ -1127,7 +1129,7 @@ export class Config {
   }
 
   getApprovalMode(): ApprovalMode {
-    return this.approvalMode;
+    return this.policyEngine.getApprovalMode();
   }
 
   setApprovalMode(mode: ApprovalMode): void {
@@ -1136,7 +1138,7 @@ export class Config {
         'Cannot enable privileged approval modes in an untrusted folder.',
       );
     }
-    this.approvalMode = mode;
+    this.policyEngine.setApprovalMode(mode);
   }
 
   isYoloModeDisabled(): boolean {
