@@ -18,6 +18,7 @@ import type {
   Config,
   ConversationRecord,
   MessageRecord,
+  GeminiClient,
 } from '@google/gemini-cli-core';
 
 // Mock modules
@@ -46,7 +47,7 @@ describe('useSessionBrowser', () => {
       getChatRecordingService: vi.fn().mockReturnValue({
         deleteSession: mockDeleteSession,
       }),
-    }),
+    } as unknown as GeminiClient),
   } as unknown as Config;
 
   const mockOnLoadHistory = vi.fn();
@@ -57,7 +58,7 @@ describe('useSessionBrowser', () => {
       getChatRecordingService: vi.fn().mockReturnValue({
         deleteSession: mockDeleteSession,
       }),
-    });
+    } as unknown as GeminiClient);
     mockedPath.join.mockImplementation((...args) => args.join('/'));
     vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue(
       MOCKED_PROJECT_TEMP_DIR,
