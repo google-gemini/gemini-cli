@@ -20,13 +20,12 @@ import {
  */
 interface TomlBaseAgentDefinition {
   name: string;
-  description: string;
   display_name?: string;
-  kind?: 'local' | 'remote';
 }
 
 interface TomlLocalAgentDefinition extends TomlBaseAgentDefinition {
-  kind?: 'local';
+  kind: 'local';
+  description: string;
   tools?: string[];
   prompts: {
     system_prompt: string;
@@ -43,6 +42,7 @@ interface TomlLocalAgentDefinition extends TomlBaseAgentDefinition {
 }
 
 interface TomlRemoteAgentDefinition extends TomlBaseAgentDefinition {
+  description?: string;
   kind: 'remote';
   agent_card_url: string;
 }
@@ -108,27 +108,58 @@ const localAgentSchema = z
 
 const remoteAgentSchema = z
   .object({
-    kind: z.literal('remote'),
+    kind: z.literal('remote').optional().default('remote'),
     name: nameSchema,
-    description: z.string().min(1),
+    description: z.string().optional(),
     display_name: z.string().optional(),
     agent_card_url: z.string().url(),
   })
   .strict();
 
-const agentSchema = z.union([remoteAgentSchema, localAgentSchema]);
+const remoteAgentsConfigSchema = z
+  .object({
+    remote_agents: z.array(remoteAgentSchema),
+  })
+  .strict();
 
-const tomlSchema = z.union([
-  agentSchema,
-  z
-    .object({
-      agents: z.array(agentSchema),
-    })
-    .strict(),
+// Use a Zod union to automatically discriminate between local and remote
+// agent types. This is more robust than manually checking the 'kind' field,
+// as it correctly handles cases where 'kind' is omitted by relying on
+// the presence of unique fields like `agent_card_url` or `prompts`.
+const agentUnionOptions = [
+  { schema: localAgentSchema, label: 'Local Agent' },
+  { schema: remoteAgentSchema, label: 'Remote Agent' },
+] as const;
+
+const singleAgentSchema = z.union([
+  agentUnionOptions[0].schema,
+  agentUnionOptions[1].schema,
 ]);
 
+function formatZodError(error: z.ZodError, context: string): string {
+  const issues = error.issues
+    .map((i) => {
+      // Handle union errors specifically to give better context
+      if (i.code === z.ZodIssueCode.invalid_union) {
+        return i.unionErrors
+          .map((unionError, index) => {
+            const label =
+              agentUnionOptions[index]?.label ?? `Agent type #${index + 1}`;
+            const unionIssues = unionError.issues
+              .map((u) => `${u.path.join('.')}: ${u.message}`)
+              .join(', ');
+            return `(${label}) ${unionIssues}`;
+          })
+          .join('\n');
+      }
+      return `${i.path.join('.')}: ${i.message}`;
+    })
+    .join('\n');
+  return `${context}:\n${issues}`;
+}
+
 /**
- * Parses and validates an agent TOML file.
+ * Parses and validates an agent TOML file. Returns a validated array of RemoteAgentDefinitions or a single LocalAgentDefinition.
  *
  * @param filePath Path to the TOML file.
  * @returns An array of parsed and validated TomlAgentDefinitions.
@@ -157,28 +188,43 @@ export async function parseAgentToml(
     );
   }
 
-  const result = tomlSchema.safeParse(raw);
-  if (!result.success) {
-    const issues = result.error.issues
-      .map((i) => `${i.path.join('.')}: ${i.message}`)
-      .join(', ');
-    throw new AgentLoadError(filePath, `Validation failed: ${issues}`);
-  }
-
-  const data = result.data;
-  const tomls = 'agents' in data ? data.agents : [data];
-
-  for (const toml of tomls) {
-    // Prevent sub-agents from delegating to other agents (to prevent recursion/complexity)
-    if ('tools' in toml && toml.tools?.includes(DELEGATE_TO_AGENT_TOOL_NAME)) {
+  // Check for `remote_agents` array
+  if (
+    typeof raw === 'object' &&
+    raw !== null &&
+    'remote_agents' in (raw as Record<string, unknown>)
+  ) {
+    const result = remoteAgentsConfigSchema.safeParse(raw);
+    if (!result.success) {
       throw new AgentLoadError(
         filePath,
-        `Validation failed: tools list cannot include '${DELEGATE_TO_AGENT_TOOL_NAME}'. Sub-agents cannot delegate to other agents.`,
+        `Validation failed: ${formatZodError(result.error, 'Remote Agents Config')}`,
       );
     }
+    return result.data.remote_agents as TomlAgentDefinition[];
   }
 
-  return tomls as TomlAgentDefinition[];
+  // Single Agent Logic
+  const result = singleAgentSchema.safeParse(raw);
+
+  if (!result.success) {
+    throw new AgentLoadError(
+      filePath,
+      `Validation failed: ${formatZodError(result.error, 'Agent Definition')}`,
+    );
+  }
+
+  const toml = result.data as TomlAgentDefinition;
+
+  // Prevent sub-agents from delegating to other agents (to prevent recursion/complexity)
+  if ('tools' in toml && toml.tools?.includes(DELEGATE_TO_AGENT_TOOL_NAME)) {
+    throw new AgentLoadError(
+      filePath,
+      `Validation failed: tools list cannot include '${DELEGATE_TO_AGENT_TOOL_NAME}'. Sub-agents cannot delegate to other agents.`,
+    );
+  }
+
+  return [toml];
 }
 
 /**
@@ -204,7 +250,7 @@ export function tomlToAgentDefinition(
     return {
       kind: 'remote',
       name: toml.name,
-      description: toml.description,
+      description: toml.description || '(Loading description...)',
       displayName: toml.display_name,
       agentCardUrl: toml.agent_card_url,
       inputConfig,
