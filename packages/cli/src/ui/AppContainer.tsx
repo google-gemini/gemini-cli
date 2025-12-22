@@ -169,6 +169,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
+  const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [quittingMessages, setQuittingMessages] = useState<
     HistoryItem[] | null
@@ -392,7 +393,7 @@ export const AppContainer = (props: AppContainerProps) => {
       enterAlternateScreen();
       enableMouseEvents();
       disableLineWrapping();
-      app.rerender();
+      (app as unknown as { rerender: () => void }).rerender();
     }
     enableBracketedPaste();
     terminalCapabilityManager.enableKittyProtocol();
@@ -1194,6 +1195,49 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
         setCtrlDPressCount((prev) => prev + 1);
         return;
+      } else if (keyMatchers[Command.SUSPEND](key)) {
+        if (process.platform !== 'win32') {
+          // Cleanup before suspend
+          writeToStdout('\x1b[?25h'); // Show cursor
+          disableMouseEvents();
+          terminalCapabilityManager.disableKittyProtocol();
+
+          if (process.stdin.isTTY) {
+            process.stdin.setRawMode(false);
+          }
+          setRawMode(false);
+
+          const onResume = () => {
+            // Restore terminal state
+            if (process.stdin.isTTY) {
+              process.stdin.setRawMode(true);
+              process.stdin.resume();
+              process.stdin.ref();
+            }
+            setRawMode(true);
+
+            terminalCapabilityManager.enableKittyProtocol();
+            writeToStdout('\x1b[?25l'); // Hide cursor
+            enableMouseEvents();
+
+            // Force Ink to do a complete repaint by:
+            // 1. Emitting a resize event (tricks Ink into full redraw)
+            // 2. Remounting components via state changes
+            process.stdout.emit('resize');
+
+            // Give a tick for resize to process, then trigger remount
+            setImmediate(() => {
+              refreshStatic();
+              setForceRerenderKey((prev) => prev + 1);
+            });
+
+            process.off('SIGCONT', onResume);
+          };
+          process.on('SIGCONT', onResume);
+
+          process.kill(0, 'SIGTSTP');
+        }
+        return;
       }
 
       let enteringConstrainHeightMode = false;
@@ -1246,6 +1290,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       embeddedShellFocused,
       settings.merged.general?.debugKeystrokeLogging,
       refreshStatic,
+      setRawMode,
       setCopyModeEnabled,
       copyModeEnabled,
       isAlternateBuffer,
@@ -1704,7 +1749,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
             }}
           >
             <ShellFocusContext.Provider value={isFocused}>
-              <App />
+              <App key={`app-${forceRerenderKey}`} />
             </ShellFocusContext.Provider>
           </AppContext.Provider>
         </ConfigContext.Provider>
