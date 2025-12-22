@@ -46,13 +46,54 @@ describe('toml-loader', () => {
       `);
 
       const result = await parseAgentToml(filePath);
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
         name: 'test-agent',
         description: 'A test agent',
         prompts: {
           system_prompt: 'You are a test agent.',
         },
       });
+    });
+
+    it('should parse a valid remote agent TOML file', async () => {
+      const filePath = await writeAgentToml(`
+        kind = "remote"
+        name = "remote-agent"
+        description = "A remote agent"
+        agent_card_url = "https://example.com/card"
+      `);
+
+      const result = await parseAgentToml(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        kind: 'remote',
+        name: 'remote-agent',
+        description: 'A remote agent',
+        agent_card_url: 'https://example.com/card',
+      });
+    });
+
+    it('should parse multiple agents in one file', async () => {
+      const filePath = await writeAgentToml(`
+        [[agents]]
+        name = "agent-1"
+        description = "Local 1"
+        [agents.prompts]
+        system_prompt = "Prompt 1"
+
+        [[agents]]
+        kind = "remote"
+        name = "agent-2"
+        description = "Remote 2"
+        agent_card_url = "https://example.com/2"
+      `);
+
+      const result = await parseAgentToml(filePath);
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('agent-1');
+      expect(result[1].name).toBe('agent-2');
+      expect(result[1].kind).toBe('remote');
     });
 
     it('should throw AgentLoadError if file reading fails', async () => {

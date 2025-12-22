@@ -18,10 +18,15 @@ import {
 /**
  * DTO for TOML parsing - represents the raw structure of the TOML file.
  */
-interface TomlAgentDefinition {
+interface TomlBaseAgentDefinition {
   name: string;
   description: string;
   display_name?: string;
+  kind?: 'local' | 'remote';
+}
+
+interface TomlLocalAgentDefinition extends TomlBaseAgentDefinition {
+  kind?: 'local';
   tools?: string[];
   prompts: {
     system_prompt: string;
@@ -36,6 +41,13 @@ interface TomlAgentDefinition {
     timeout_mins?: number;
   };
 }
+
+interface TomlRemoteAgentDefinition extends TomlBaseAgentDefinition {
+  kind: 'remote';
+  agent_card_url: string;
+}
+
+type TomlAgentDefinition = TomlLocalAgentDefinition | TomlRemoteAgentDefinition;
 
 /**
  * Error thrown when an agent definition is invalid or cannot be loaded.
@@ -58,8 +70,13 @@ export interface AgentLoadResult {
   errors: AgentLoadError[];
 }
 
-const tomlSchema = z.object({
-  name: z.string().regex(/^[a-z0-9-_]+$/, 'Name must be a valid slug'),
+const nameSchema = z
+  .string()
+  .regex(/^[a-z0-9-_]+$/, 'Name must be a valid slug');
+
+const localAgentSchema = z.object({
+  kind: z.literal('local').optional().default('local'),
+  name: nameSchema,
   description: z.string().min(1),
   display_name: z.string().optional(),
   tools: z
@@ -87,16 +104,33 @@ const tomlSchema = z.object({
     .optional(),
 });
 
+const remoteAgentSchema = z.object({
+  kind: z.literal('remote'),
+  name: nameSchema,
+  description: z.string().min(1),
+  display_name: z.string().optional(),
+  agent_card_url: z.string().url(),
+});
+
+const agentSchema = z.union([remoteAgentSchema, localAgentSchema]);
+
+const tomlSchema = z.union([
+  agentSchema,
+  z.object({
+    agents: z.array(agentSchema),
+  }),
+]);
+
 /**
  * Parses and validates an agent TOML file.
  *
  * @param filePath Path to the TOML file.
- * @returns The parsed and validated TomlAgentDefinition.
+ * @returns An array of parsed and validated TomlAgentDefinitions.
  * @throws AgentLoadError if parsing or validation fails.
  */
 export async function parseAgentToml(
   filePath: string,
-): Promise<TomlAgentDefinition> {
+): Promise<TomlAgentDefinition[]> {
   let content: string;
   try {
     content = await fs.readFile(filePath, 'utf-8');
@@ -125,17 +159,20 @@ export async function parseAgentToml(
     throw new AgentLoadError(filePath, `Validation failed: ${issues}`);
   }
 
-  const definition = result.data as TomlAgentDefinition;
+  const data = result.data;
+  const tomls = 'agents' in data ? data.agents : [data];
 
-  // Prevent sub-agents from delegating to other agents (to prevent recursion/complexity)
-  if (definition.tools?.includes(DELEGATE_TO_AGENT_TOOL_NAME)) {
-    throw new AgentLoadError(
-      filePath,
-      `Validation failed: tools list cannot include '${DELEGATE_TO_AGENT_TOOL_NAME}'. Sub-agents cannot delegate to other agents.`,
-    );
+  for (const toml of tomls) {
+    // Prevent sub-agents from delegating to other agents (to prevent recursion/complexity)
+    if ('tools' in toml && toml.tools?.includes(DELEGATE_TO_AGENT_TOOL_NAME)) {
+      throw new AgentLoadError(
+        filePath,
+        `Validation failed: tools list cannot include '${DELEGATE_TO_AGENT_TOOL_NAME}'. Sub-agents cannot delegate to other agents.`,
+      );
+    }
   }
 
-  return definition;
+  return tomls as TomlAgentDefinition[];
 }
 
 /**
@@ -147,6 +184,27 @@ export async function parseAgentToml(
 export function tomlToAgentDefinition(
   toml: TomlAgentDefinition,
 ): AgentDefinition {
+  const inputConfig = {
+    inputs: {
+      query: {
+        type: 'string' as const,
+        description: 'The task for the agent.',
+        required: false,
+      },
+    },
+  };
+
+  if (toml.kind === 'remote') {
+    return {
+      kind: 'remote',
+      name: toml.name,
+      description: toml.description,
+      displayName: toml.display_name,
+      agentCardUrl: toml.agent_card_url,
+      inputConfig,
+    };
+  }
+
   // If a model is specified, use it. Otherwise, inherit
   const modelName = toml.model?.model || 'inherit';
 
@@ -173,16 +231,7 @@ export function tomlToAgentDefinition(
           tools: toml.tools,
         }
       : undefined,
-    // Default input config for MVA
-    inputConfig: {
-      inputs: {
-        query: {
-          type: 'string',
-          description: 'The task for the agent.',
-          required: false,
-        },
-      },
-    },
+    inputConfig,
   };
 }
 
@@ -230,9 +279,11 @@ export async function loadAgentsFromDirectory(
   for (const file of files) {
     const filePath = path.join(dir, file);
     try {
-      const toml = await parseAgentToml(filePath);
-      const agent = tomlToAgentDefinition(toml);
-      result.agents.push(agent);
+      const tomls = await parseAgentToml(filePath);
+      for (const toml of tomls) {
+        const agent = tomlToAgentDefinition(toml);
+        result.agents.push(agent);
+      }
     } catch (error) {
       if (error instanceof AgentLoadError) {
         result.errors.push(error);

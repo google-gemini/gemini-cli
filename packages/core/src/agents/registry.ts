@@ -203,7 +203,11 @@ export class AgentRegistry {
     }
 
     // Register configured remote A2A agents.
-    // TODO: Implement remote agent registration.
+    if (definition.kind === 'remote' && this.config.getDebugMode()) {
+      debugLogger.log(
+        `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,
+      );
+    }
   }
 
   /**
