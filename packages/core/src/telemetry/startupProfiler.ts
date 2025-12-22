@@ -145,7 +145,7 @@ export class StartupProfiler {
    * Flushes buffered metrics to the telemetry system.
    */
   flush(config: Config): void {
-    debugLogger.log(
+    debugLogger.debug(
       '[STARTUP] StartupProfiler.flush() called with',
       this.phases.size,
       'phases',
@@ -181,7 +181,7 @@ export class StartupProfiler {
           ...phase.details,
         };
 
-        debugLogger.log(
+        debugLogger.debug(
           '[STARTUP] Recording metric for phase:',
           phase.name,
           'duration:',
@@ -192,7 +192,7 @@ export class StartupProfiler {
           details,
         });
       } else {
-        debugLogger.log(
+        debugLogger.debug(
           '[STARTUP] Skipping phase without measure:',
           phase.name,
         );
