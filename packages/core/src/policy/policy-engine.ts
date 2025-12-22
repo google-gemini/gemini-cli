@@ -67,7 +67,7 @@ function ruleMatches(
     // Use stable JSON stringification with sorted keys to ensure consistent matching
     if (
       stringifiedArgs === undefined ||
-      !rule.argsPattern.test(stringifiedArgs)
+      !safeRegexTest(rule.argsPattern, stringifiedArgs)
     ) {
       return false;
     }
