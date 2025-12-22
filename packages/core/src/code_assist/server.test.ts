@@ -184,6 +184,9 @@ describe('CodeAssistServer', () => {
                 firstMessageLatency: expect.stringMatching(/\d+s/),
               }),
             }),
+            timestamp: expect.stringMatching(
+              /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/,
+            ),
           }),
         ]),
       }),
@@ -244,6 +247,9 @@ describe('CodeAssistServer', () => {
             conversationOffered: expect.objectContaining({
               traceId: 'stream-trace-id',
             }),
+            timestamp: expect.stringMatching(
+              /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/,
+            ),
           }),
         ]),
       }),
@@ -266,6 +272,9 @@ describe('CodeAssistServer', () => {
         metrics: expect.arrayContaining([
           expect.objectContaining({
             conversationInteraction: interaction,
+            timestamp: expect.stringMatching(
+              /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/,
+            ),
           }),
         ]),
       }),
