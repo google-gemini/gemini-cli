@@ -55,8 +55,6 @@ export interface SessionInfo {
   lastUpdated: string;
   /** Display name for the session (typically first user message) */
   displayName: string;
-  /** Cleaned first user message content */
-  firstUserMessage: string;
   /** Whether this is the currently active session */
   isCurrentSession: boolean;
   /** Display index in the list */
@@ -262,10 +260,11 @@ export const getAllSessionFiles = async (
             startTime: content.startTime,
             lastUpdated: content.lastUpdated,
             messageCount: content.messages.length,
-            displayName: content.summary
-              ? stripUnsafeCharacters(content.summary)
-              : firstUserMessage,
-            firstUserMessage,
+            displayName: content.displayName
+              ? stripUnsafeCharacters(content.displayName)
+              : content.summary
+                ? stripUnsafeCharacters(content.summary)
+                : firstUserMessage,
             isCurrentSession,
             index: 0, // Will be set after sorting valid sessions
             summary: content.summary,
@@ -398,6 +397,22 @@ export class SessionSelector {
       return sortedSessions[index - 1];
     }
 
+    // Try to find by display name or summary
+    // Filter sessions where displayName or summary matches identifier
+    const sessionsByName = sortedSessions.filter(
+      (session) =>
+        session.displayName === identifier || session.summary === identifier,
+    );
+
+    if (sessionsByName.length > 0) {
+      // Sort by lastUpdated descending (newest first)
+      sessionsByName.sort(
+        (a, b) =>
+          new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime(),
+      );
+      return sessionsByName[0];
+    }
+
     throw new Error(
       `Invalid session identifier "${identifier}". Use --list-sessions to see available sessions.`,
     );
@@ -432,7 +447,7 @@ export class SessionSelector {
       } catch (error) {
         // Re-throw with more detailed message for resume command
         throw new Error(
-          `Invalid session identifier "${resumeArg}". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.  Error: ${error}`,
+          `Invalid session identifier "${resumeArg}". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, --resume "{name or summary}" or --resume latest.  Error: ${error}`,
         );
       }
     }
@@ -457,7 +472,7 @@ export class SessionSelector {
         await fs.readFile(sessionPath, 'utf8'),
       );
 
-      const displayInfo = `Session ${sessionInfo.index}: ${sessionInfo.firstUserMessage} (${sessionInfo.messageCount} messages, ${formatRelativeTime(sessionInfo.lastUpdated)})`;
+      const displayInfo = `Session ${sessionInfo.index}: ${sessionInfo.displayName} (${sessionInfo.messageCount} messages, ${formatRelativeTime(sessionInfo.lastUpdated)})`;
 
       return {
         sessionPath,

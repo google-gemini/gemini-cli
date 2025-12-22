@@ -100,9 +100,7 @@ describe('ChatRecordingService', () => {
 
       chatRecordingService.initialize({
         filePath: '/test/project/root/.gemini/tmp/chats/session.json',
-        conversation: {
-          sessionId: 'old-session-id',
-        } as ConversationRecord,
+        sessionId: 'old-session-id',
       });
 
       expect(mkdirSyncSpy).not.toHaveBeenCalled();
