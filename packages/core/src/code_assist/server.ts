@@ -241,7 +241,7 @@ export class CodeAssistServer implements ContentGenerator {
     await this.recordCodeAssistMetrics({
       project: this.projectId,
       metadata: await getClientMetadata(),
-      metrics: [{ conversationOffered }],
+      metrics: [{ conversationOffered, timestamp: new Date().toISOString() }],
     });
   }
 
@@ -255,7 +255,12 @@ export class CodeAssistServer implements ContentGenerator {
     await this.recordCodeAssistMetrics({
       project: this.projectId,
       metadata: await getClientMetadata(),
-      metrics: [{ conversationInteraction: interaction }],
+      metrics: [
+        {
+          conversationInteraction: interaction,
+          timestamp: new Date().toISOString(),
+        },
+      ],
     });
   }
 
