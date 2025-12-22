@@ -253,10 +253,7 @@ export const AppContainer = (props: AppContainerProps) => {
     [],
   );
 
-  // Helper to determine the effective model, considering the fallback state.
-  const getEffectiveModel = useCallback(() => config.getModel(), [config]);
-
-  const [currentModel, setCurrentModel] = useState(getEffectiveModel());
+  const [currentModel, setCurrentModel] = useState(config.getModel());
 
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
 
@@ -341,7 +338,7 @@ export const AppContainer = (props: AppContainerProps) => {
     return () => {
       coreEvents.off(CoreEvent.ModelChanged, handleModelChanged);
     };
-  }, [getEffectiveModel, config]);
+  }, [config]);
 
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();

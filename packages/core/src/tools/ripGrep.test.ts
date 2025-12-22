@@ -252,6 +252,7 @@ describe('RipGrepTool', () => {
     getTargetDir: () => tempRootDir,
     getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
     getDebugMode: () => false,
+    getFileFilteringRespectGeminiIgnore: () => true,
   } as unknown as Config;
 
   beforeEach(async () => {
@@ -735,6 +736,7 @@ describe('RipGrepTool', () => {
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
+        getFileFilteringRespectGeminiIgnore: () => true,
       } as unknown as Config;
 
       // Setup specific mock for this test - multi-directory search for 'world'
@@ -876,6 +878,7 @@ describe('RipGrepTool', () => {
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
+        getFileFilteringRespectGeminiIgnore: () => true,
       } as unknown as Config;
 
       // Setup specific mock for this test - searching in 'sub' should only return matches from that directory
@@ -1644,6 +1647,80 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('L1: secret log entry');
     });
 
+    it('should add .geminiignore when enabled and patterns exist', async () => {
+      const geminiIgnorePath = path.join(tempRootDir, '.geminiignore');
+      await fs.writeFile(geminiIgnorePath, 'ignored.log');
+      const configWithGeminiIgnore = {
+        getTargetDir: () => tempRootDir,
+        getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+        getDebugMode: () => false,
+        getFileFilteringRespectGeminiIgnore: () => true,
+      } as unknown as Config;
+      const geminiIgnoreTool = new RipGrepTool(configWithGeminiIgnore);
+
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'ignored.log' },
+                line_number: 1,
+                lines: { text: 'secret log entry\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'secret' };
+      const invocation = geminiIgnoreTool.build(params);
+      await invocation.execute(abortSignal);
+
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.arrayContaining(['--ignore-file', geminiIgnorePath]),
+        expect.anything(),
+      );
+    });
+
+    it('should skip .geminiignore when disabled', async () => {
+      const geminiIgnorePath = path.join(tempRootDir, '.geminiignore');
+      await fs.writeFile(geminiIgnorePath, 'ignored.log');
+      const configWithoutGeminiIgnore = {
+        getTargetDir: () => tempRootDir,
+        getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+        getDebugMode: () => false,
+        getFileFilteringRespectGeminiIgnore: () => false,
+      } as unknown as Config;
+      const geminiIgnoreTool = new RipGrepTool(configWithoutGeminiIgnore);
+
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'ignored.log' },
+                line_number: 1,
+                lines: { text: 'secret log entry\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'secret' };
+      const invocation = geminiIgnoreTool.build(params);
+      await invocation.execute(abortSignal);
+
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.not.arrayContaining(['--ignore-file', geminiIgnorePath]),
+        expect.anything(),
+      );
+    });
+
     it('should handle context parameters', async () => {
       mockSpawn.mockImplementationOnce(
         createMockSpawn({
@@ -1761,6 +1838,7 @@ describe('RipGrepTool', () => {
     });
   });
 });
+
 afterAll(() => {
   storageSpy.mockRestore();
 });
