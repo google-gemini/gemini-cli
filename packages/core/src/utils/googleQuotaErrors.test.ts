@@ -325,7 +325,7 @@ describe('classifyGoogleError', () => {
     expect(result).toBeInstanceOf(TerminalQuotaError);
   });
 
-  it('should return original error for 429 without specific details', () => {
+  it('should return RetryableQuotaError for any 429', () => {
     const apiError: GoogleApiError = {
       code: 429,
       message: 'Too many requests',
@@ -340,7 +340,10 @@ describe('classifyGoogleError', () => {
     vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
     const originalError = new Error();
     const result = classifyGoogleError(originalError);
-    expect(result).toBe(originalError);
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.retryDelayMs).toBe(5000);
+    }
   });
 
   it('should classify nested JSON string 404 error as ModelNotFoundError', () => {
@@ -387,6 +390,63 @@ describe('classifyGoogleError', () => {
         message: 'Resource exhausted. Please retry in 5s',
         details: [],
       });
+    }
+  });
+
+  it('should return RetryableQuotaError with 5s fallback for generic 429 without specific message', () => {
+    const generic429 = {
+      status: 429,
+      message: 'Resource exhausted. No specific retry info.',
+    };
+
+    const result = classifyGoogleError(generic429);
+
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.retryDelayMs).toBe(5000);
+    }
+  });
+
+  it('should return RetryableQuotaError with 5s fallback for 429 with empty details and no regex match', () => {
+    const errorWithEmptyDetails = {
+      error: {
+        code: 429,
+        message: 'A generic 429 error with no retry message.',
+        details: [],
+      },
+    };
+
+    const result = classifyGoogleError(errorWithEmptyDetails);
+
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.retryDelayMs).toBe(5000);
+    }
+  });
+
+  it('should return RetryableQuotaError with 5s fallback for 429 with some detail', () => {
+    const errorWithEmptyDetails = {
+      error: {
+        code: 429,
+        message: 'A generic 429 error with no retry message.',
+        details: [
+          {
+            '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+            reason: 'QUOTA_EXCEEDED',
+            domain: 'googleapis.com',
+            metadata: {
+              quota_limit: '',
+            },
+          },
+        ],
+      },
+    };
+
+    const result = classifyGoogleError(errorWithEmptyDetails);
+
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.retryDelayMs).toBe(5000);
     }
   });
 });

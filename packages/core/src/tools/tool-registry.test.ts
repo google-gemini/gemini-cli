@@ -11,11 +11,8 @@ import type { ConfigParameters } from '../config/config.js';
 import { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 
-import {
-  ToolRegistry,
-  DiscoveredTool,
-  DISCOVERED_TOOL_PREFIX,
-} from './tool-registry.js';
+import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
+import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import type { FunctionDeclaration, CallableTool } from '@google/genai';
 import { mcpToTool } from '@google/genai';
