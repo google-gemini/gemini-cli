@@ -53,6 +53,11 @@ describe('useSessionBrowser', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(mockConfig.getGeminiClient).mockReturnValue({
+      getChatRecordingService: vi.fn().mockReturnValue({
+        deleteSession: mockDeleteSession,
+      }),
+    });
     mockedPath.join.mockImplementation((...args) => args.join('/'));
     vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue(
       MOCKED_PROJECT_TEMP_DIR,
