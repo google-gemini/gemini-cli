@@ -13,6 +13,7 @@ import {
   type HookCheckerRule,
   type HookExecutionContext,
   getHookSource,
+  ApprovalMode,
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -30,7 +31,15 @@ function ruleMatches(
   toolCall: FunctionCall,
   stringifiedArgs: string | undefined,
   serverName: string | undefined,
+  currentApprovalMode: ApprovalMode,
 ): boolean {
+  // Check if rule applies to current approval mode
+  if (rule.modes && rule.modes.length > 0) {
+    if (!rule.modes.includes(currentApprovalMode)) {
+      return false;
+    }
+  }
+
   // Check tool name if specified
   if (rule.toolName) {
     // Support wildcard patterns: "serverName__*" matches "serverName__anyTool"
@@ -98,6 +107,7 @@ export class PolicyEngine {
   private readonly nonInteractive: boolean;
   private readonly checkerRunner?: CheckerRunner;
   private readonly allowHooks: boolean;
+  private approvalMode: ApprovalMode;
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
     this.rules = (config.rules ?? []).sort(
@@ -113,6 +123,21 @@ export class PolicyEngine {
     this.nonInteractive = config.nonInteractive ?? false;
     this.checkerRunner = checkerRunner;
     this.allowHooks = config.allowHooks ?? true;
+    this.approvalMode = config.approvalMode ?? ApprovalMode.DEFAULT;
+  }
+
+  /**
+   * Update the current approval mode.
+   */
+  setApprovalMode(mode: ApprovalMode): void {
+    this.approvalMode = mode;
+  }
+
+  /**
+   * Get the current approval mode.
+   */
+  getApprovalMode(): ApprovalMode {
+    return this.approvalMode;
   }
 
   /**
@@ -145,7 +170,15 @@ export class PolicyEngine {
     let decision: PolicyDecision | undefined;
 
     for (const rule of this.rules) {
-      if (ruleMatches(rule, toolCall, stringifiedArgs, serverName)) {
+      if (
+        ruleMatches(
+          rule,
+          toolCall,
+          stringifiedArgs,
+          serverName,
+          this.approvalMode,
+        )
+      ) {
         debugLogger.debug(
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
@@ -225,7 +258,15 @@ export class PolicyEngine {
     // If decision is not DENY, run safety checkers
     if (decision !== PolicyDecision.DENY && this.checkerRunner) {
       for (const checkerRule of this.checkers) {
-        if (ruleMatches(checkerRule, toolCall, stringifiedArgs, serverName)) {
+        if (
+          ruleMatches(
+            checkerRule,
+            toolCall,
+            stringifiedArgs,
+            serverName,
+            this.approvalMode,
+          )
+        ) {
           debugLogger.debug(
             `[PolicyEngine.check] Running safety checker: ${checkerRule.checker.name}`,
           );

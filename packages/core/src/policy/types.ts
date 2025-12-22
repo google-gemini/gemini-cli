@@ -117,6 +117,12 @@ export interface PolicyRule {
    * Default is 0.
    */
   priority?: number;
+
+  /**
+   * Approval modes this rule applies to.
+   * If undefined or empty, it applies to all modes.
+   */
+  modes?: ApprovalMode[];
 }
 
 export interface SafetyCheckerRule {
@@ -143,6 +149,12 @@ export interface SafetyCheckerRule {
    * additional validation of a tool call.
    */
   checker: SafetyCheckerConfig;
+
+  /**
+   * Approval modes this rule applies to.
+   * If undefined or empty, it applies to all modes.
+   */
+  modes?: ApprovalMode[];
 }
 
 export interface HookExecutionContext {
@@ -215,6 +227,12 @@ export interface PolicyEngineConfig {
    * Defaults to true.
    */
   allowHooks?: boolean;
+
+  /**
+   * Current approval mode.
+   * Used to filter rules that have specific 'modes' defined.
+   */
+  approvalMode?: ApprovalMode;
 }
 
 export interface PolicySettings {
