@@ -156,6 +156,26 @@ describe('toml-loader', () => {
         /Validation failed: tools.0: Invalid tool name/,
       );
     });
+
+    it('should throw AgentLoadError if file contains both single and multiple agents', async () => {
+      const filePath = await writeAgentToml(`
+        name = "top-level-agent"
+        description = "I should not be here"
+        [prompts]
+        system_prompt = "..."
+
+        [[agents]]
+        name = "array-agent"
+        description = "I am in an array"
+        [agents.prompts]
+        system_prompt = "..."
+      `);
+
+      // Zod union errors can be verbose, but it should definitely fail validation
+      await expect(parseAgentToml(filePath)).rejects.toThrow(
+        /Validation failed/,
+      );
+    });
   });
 
   describe('tomlToAgentDefinition', () => {

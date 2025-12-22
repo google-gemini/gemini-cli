@@ -74,51 +74,57 @@ const nameSchema = z
   .string()
   .regex(/^[a-z0-9-_]+$/, 'Name must be a valid slug');
 
-const localAgentSchema = z.object({
-  kind: z.literal('local').optional().default('local'),
-  name: nameSchema,
-  description: z.string().min(1),
-  display_name: z.string().optional(),
-  tools: z
-    .array(
-      z.string().refine((val) => isValidToolName(val), {
-        message: 'Invalid tool name',
-      }),
-    )
-    .optional(),
-  prompts: z.object({
-    system_prompt: z.string().min(1),
-    query: z.string().optional(),
-  }),
-  model: z
-    .object({
-      model: z.string().optional(),
-      temperature: z.number().optional(),
-    })
-    .optional(),
-  run: z
-    .object({
-      max_turns: z.number().int().positive().optional(),
-      timeout_mins: z.number().int().positive().optional(),
-    })
-    .optional(),
-});
+const localAgentSchema = z
+  .object({
+    kind: z.literal('local').optional().default('local'),
+    name: nameSchema,
+    description: z.string().min(1),
+    display_name: z.string().optional(),
+    tools: z
+      .array(
+        z.string().refine((val) => isValidToolName(val), {
+          message: 'Invalid tool name',
+        }),
+      )
+      .optional(),
+    prompts: z.object({
+      system_prompt: z.string().min(1),
+      query: z.string().optional(),
+    }),
+    model: z
+      .object({
+        model: z.string().optional(),
+        temperature: z.number().optional(),
+      })
+      .optional(),
+    run: z
+      .object({
+        max_turns: z.number().int().positive().optional(),
+        timeout_mins: z.number().int().positive().optional(),
+      })
+      .optional(),
+  })
+  .strict();
 
-const remoteAgentSchema = z.object({
-  kind: z.literal('remote'),
-  name: nameSchema,
-  description: z.string().min(1),
-  display_name: z.string().optional(),
-  agent_card_url: z.string().url(),
-});
+const remoteAgentSchema = z
+  .object({
+    kind: z.literal('remote'),
+    name: nameSchema,
+    description: z.string().min(1),
+    display_name: z.string().optional(),
+    agent_card_url: z.string().url(),
+  })
+  .strict();
 
 const agentSchema = z.union([remoteAgentSchema, localAgentSchema]);
 
 const tomlSchema = z.union([
   agentSchema,
-  z.object({
-    agents: z.array(agentSchema),
-  }),
+  z
+    .object({
+      agents: z.array(agentSchema),
+    })
+    .strict(),
 ]);
 
 /**
