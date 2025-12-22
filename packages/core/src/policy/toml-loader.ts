@@ -87,6 +87,11 @@ const PolicyFileSchema = z.object({
 type PolicyRuleToml = z.infer<typeof PolicyRuleSchema>;
 
 /**
+ * Type for a raw safety checker rule from TOML.
+ */
+type SafetyCheckerRuleToml = z.infer<typeof SafetyCheckerRuleSchema>;
+
+/**
  * Types of errors that can occur while loading policy files.
  */
 export type PolicyFileErrorType =
@@ -120,17 +125,6 @@ export interface PolicyLoadResult {
 }
 
 /**
- * Escapes special regex characters in a string for use in a regex pattern.
- * This is used for commandPrefix to ensure literal string matching.
- *
- * @param str The string to escape
- * @returns The escaped string safe for use in a regex
- */
-export function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
  * Converts a tier number to a human-readable tier name.
  */
 function getTierName(tier: number): 'default' | 'user' | 'admin' {
@@ -158,8 +152,9 @@ function formatSchemaError(error: ZodError, ruleIndex: number): string {
  * Returns an error message if invalid, or null if valid.
  */
 function validateShellCommandSyntax(
-  rule: PolicyRuleToml,
-  ruleIndex: number,
+  rule: PolicyRuleToml | SafetyCheckerRuleToml,
+  index: number,
+  itemType: 'Rule' | 'Safety Checker' = 'Rule',
 ): string | null {
   const hasCommandPrefix = rule.commandPrefix !== undefined;
   const hasCommandRegex = rule.commandRegex !== undefined;
@@ -169,7 +164,7 @@ function validateShellCommandSyntax(
     // Must have exactly toolName = "run_shell_command"
     if (rule.toolName !== 'run_shell_command' || Array.isArray(rule.toolName)) {
       return (
-        `Rule #${ruleIndex + 1}: commandPrefix and commandRegex can only be used with toolName = "run_shell_command"\n` +
+        `${itemType} #${index + 1}: commandPrefix and commandRegex can only be used with toolName = "run_shell_command"\n` +
         `  Found: toolName = ${JSON.stringify(rule.toolName)}\n` +
         `  Fix: Set toolName = "run_shell_command" (not an array)`
       );
@@ -178,7 +173,7 @@ function validateShellCommandSyntax(
     // Can't combine with argsPattern
     if (hasArgsPattern) {
       return (
-        `Rule #${ruleIndex + 1}: cannot use both commandPrefix/commandRegex and argsPattern\n` +
+        `${itemType} #${index + 1}: cannot use both commandPrefix/commandRegex and argsPattern\n` +
         `  These fields are mutually exclusive\n` +
         `  Fix: Use either commandPrefix/commandRegex OR argsPattern, not both`
       );
@@ -187,7 +182,7 @@ function validateShellCommandSyntax(
     // Can't use both commandPrefix and commandRegex
     if (hasCommandPrefix && hasCommandRegex) {
       return (
-        `Rule #${ruleIndex + 1}: cannot use both commandPrefix and commandRegex\n` +
+        `${itemType} #${index + 1}: cannot use both commandPrefix and commandRegex\n` +
         `  These fields are mutually exclusive\n` +
         `  Fix: Use either commandPrefix OR commandRegex, not both`
       );
@@ -207,6 +202,153 @@ function validateShellCommandSyntax(
  */
 function transformPriority(priority: number, tier: number): number {
   return tier + priority / 1000;
+}
+
+/**
+ * Generic function to process policy items (rules or checkers).
+ * Handles validation, filtering, expansion, and regex compilation.
+ */
+function processPolicyItems<
+  TInput extends PolicyRuleToml | SafetyCheckerRuleToml,
+  TOutput extends PolicyRule | SafetyCheckerRule,
+>(
+  items: TInput[],
+  approvalMode: ApprovalMode,
+  context: {
+    filePath: string;
+    fileName: string;
+    tier: number;
+    tierName: 'default' | 'user' | 'admin';
+  },
+  errors: PolicyFileError[],
+  itemType: 'Rule' | 'Safety Checker',
+  createOutput: (
+    item: TInput,
+    toolName: string | undefined,
+    commandPrefix: string | undefined,
+    argsPattern: RegExp | undefined,
+    commandPattern: RegExp | undefined,
+  ) => TOutput,
+): TOutput[] {
+  const invalidIndices = new Set<number>();
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const validationError = validateShellCommandSyntax(item, i, itemType);
+    if (validationError) {
+      invalidIndices.add(i);
+      errors.push({
+        filePath: context.filePath,
+        fileName: context.fileName,
+        tier: context.tierName,
+        ruleIndex: i,
+        errorType: 'rule_validation',
+        message:
+          itemType === 'Safety Checker'
+            ? 'Invalid shell command syntax in safety checker'
+            : 'Invalid shell command syntax',
+        details: validationError,
+      });
+    }
+  }
+
+  return items
+    .filter((item, index) => {
+      if (invalidIndices.has(index)) {
+        return false;
+      }
+      if (!item.modes || item.modes.length === 0) {
+        return true;
+      }
+      return item.modes.includes(approvalMode);
+    })
+    .flatMap((item) => {
+      let commandPattern: RegExp | undefined;
+      if (item.commandRegex) {
+        try {
+          commandPattern = new RegExp(item.commandRegex);
+        } catch (e) {
+          const error = e as Error;
+          errors.push({
+            filePath: context.filePath,
+            fileName: context.fileName,
+            tier: context.tierName,
+            errorType: 'regex_compilation',
+            message:
+              itemType === 'Safety Checker'
+                ? 'Invalid command regex pattern in safety checker'
+                : 'Invalid command regex pattern',
+            details: `Pattern: ${item.commandRegex}\nError: ${error.message}`,
+            suggestion:
+              'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
+          });
+          return null;
+        }
+      }
+
+      const commandPrefixes: string[] = [];
+      if (item.commandPrefix) {
+        const prefixes = Array.isArray(item.commandPrefix)
+          ? item.commandPrefix
+          : [item.commandPrefix];
+        commandPrefixes.push(...prefixes);
+      }
+
+      const expansionList: Array<{ prefix?: string; patternString?: string }> =
+        commandPrefixes.length > 0
+          ? commandPrefixes.map((prefix) => ({ prefix }))
+          : [{ patternString: item.argsPattern }];
+
+      return expansionList.flatMap(({ prefix, patternString }) => {
+        let argsPattern: RegExp | undefined;
+        if (patternString) {
+          try {
+            argsPattern = new RegExp(patternString);
+          } catch (e) {
+            const error = e as Error;
+            errors.push({
+              filePath: context.filePath,
+              fileName: context.fileName,
+              tier: context.tierName,
+              errorType: 'regex_compilation',
+              message:
+                itemType === 'Safety Checker'
+                  ? 'Invalid regex pattern in safety checker'
+                  : 'Invalid regex pattern',
+              details: `Pattern: ${patternString}\nError: ${error.message}`,
+              suggestion:
+                'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
+            });
+            return null;
+          }
+        }
+
+        const toolNames: Array<string | undefined> = item.toolName
+          ? Array.isArray(item.toolName)
+            ? item.toolName
+            : [item.toolName]
+          : [undefined];
+
+        return toolNames.map((toolName) => {
+          let effectiveToolName: string | undefined;
+          if (item.mcpName && toolName) {
+            effectiveToolName = `${item.mcpName}__${toolName}`;
+          } else if (item.mcpName) {
+            effectiveToolName = `${item.mcpName}__*`;
+          } else {
+            effectiveToolName = toolName;
+          }
+
+          return createOutput(
+            item,
+            effectiveToolName,
+            prefix,
+            argsPattern,
+            commandPattern,
+          );
+        });
+      });
+    })
+    .filter((result): result is TOutput => result !== null);
 }
 
 /**
@@ -303,191 +445,55 @@ export async function loadPoliciesFromToml(
           continue;
         }
 
-        // Validate shell command convenience syntax
-        const tomlRules = validationResult.data.rule ?? [];
-        for (let i = 0; i < tomlRules.length; i++) {
-          const rule = tomlRules[i];
-          const validationError = validateShellCommandSyntax(rule, i);
-          if (validationError) {
-            errors.push({
-              filePath,
-              fileName: file,
-              tier: tierName,
-              ruleIndex: i,
-              errorType: 'rule_validation',
-              message: 'Invalid shell command syntax',
-              details: validationError,
-            });
-            // Continue to next rule, don't skip the entire file
-          }
-        }
+        const context = { filePath, fileName: file, tier, tierName };
 
-        // Transform rules
-        const parsedRules: PolicyRule[] = (validationResult.data.rule ?? [])
-          .filter((rule) => {
-            // Filter by mode
-            if (!rule.modes || rule.modes.length === 0) {
-              return true;
-            }
-            return rule.modes.includes(approvalMode);
-          })
-          .flatMap((rule) => {
-            // Transform commandPrefix/commandRegex to argsPattern
-            let effectiveArgsPattern = rule.argsPattern;
-            const commandPrefixes: string[] = [];
-
-            if (rule.commandPrefix) {
-              const prefixes = Array.isArray(rule.commandPrefix)
-                ? rule.commandPrefix
-                : [rule.commandPrefix];
-              commandPrefixes.push(...prefixes);
-            } else if (rule.commandRegex) {
-              effectiveArgsPattern = `"command":"${rule.commandRegex}`;
-            }
-
-            // Expand command prefixes to multiple patterns
-            const argsPatterns: Array<string | undefined> =
-              commandPrefixes.length > 0
-                ? commandPrefixes.map(
-                    (prefix) => `"command":"${escapeRegex(prefix)}(?:[\\s"]|$)`,
-                  )
-                : [effectiveArgsPattern];
-
-            // For each argsPattern, expand toolName arrays
-            return argsPatterns.flatMap((argsPattern) => {
-              const toolNames: Array<string | undefined> = rule.toolName
-                ? Array.isArray(rule.toolName)
-                  ? rule.toolName
-                  : [rule.toolName]
-                : [undefined];
-
-              // Create a policy rule for each tool name
-              return toolNames.map((toolName) => {
-                // Transform mcpName field to composite toolName format
-                let effectiveToolName: string | undefined;
-                if (rule.mcpName && toolName) {
-                  effectiveToolName = `${rule.mcpName}__${toolName}`;
-                } else if (rule.mcpName) {
-                  effectiveToolName = `${rule.mcpName}__*`;
-                } else {
-                  effectiveToolName = toolName;
-                }
-
-                const policyRule: PolicyRule = {
-                  toolName: effectiveToolName,
-                  decision: rule.decision,
-                  priority: transformPriority(rule.priority, tier),
-                };
-
-                // Compile regex pattern
-                if (argsPattern) {
-                  try {
-                    policyRule.argsPattern = new RegExp(argsPattern);
-                  } catch (e) {
-                    const error = e as Error;
-                    errors.push({
-                      filePath,
-                      fileName: file,
-                      tier: tierName,
-                      errorType: 'regex_compilation',
-                      message: 'Invalid regex pattern',
-                      details: `Pattern: ${argsPattern}\nError: ${error.message}`,
-                      suggestion:
-                        'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
-                    });
-                    // Skip this rule if regex compilation fails
-                    return null;
-                  }
-                }
-
-                return policyRule;
-              });
-            });
-          })
-          .filter((rule): rule is PolicyRule => rule !== null);
-
+        const parsedRules = processPolicyItems(
+          validationResult.data.rule ?? [],
+          approvalMode,
+          context,
+          errors,
+          'Rule',
+          (
+            item,
+            toolName,
+            commandPrefix,
+            argsPattern,
+            commandPattern,
+          ): PolicyRule => ({
+            toolName,
+            decision: item.decision,
+            priority: transformPriority(item.priority, tier),
+            commandPrefix,
+            argsPattern,
+            commandPattern,
+          }),
+        );
         rules.push(...parsedRules);
 
-        // Transform checkers
-        const parsedCheckers: SafetyCheckerRule[] = (
-          validationResult.data.safety_checker ?? []
-        )
-          .filter((checker) => {
-            if (!checker.modes || checker.modes.length === 0) {
-              return true;
-            }
-            return checker.modes.includes(approvalMode);
-          })
-          .flatMap((checker) => {
-            let effectiveArgsPattern = checker.argsPattern;
-            const commandPrefixes: string[] = [];
-
-            if (checker.commandPrefix) {
-              const prefixes = Array.isArray(checker.commandPrefix)
-                ? checker.commandPrefix
-                : [checker.commandPrefix];
-              commandPrefixes.push(...prefixes);
-            } else if (checker.commandRegex) {
-              effectiveArgsPattern = `"command":"${checker.commandRegex}`;
-            }
-
-            const argsPatterns: Array<string | undefined> =
-              commandPrefixes.length > 0
-                ? commandPrefixes.map(
-                    (prefix) => `"command":"${escapeRegex(prefix)}(?:[\\s"]|$)`,
-                  )
-                : [effectiveArgsPattern];
-
-            return argsPatterns.flatMap((argsPattern) => {
-              const toolNames: Array<string | undefined> = checker.toolName
-                ? Array.isArray(checker.toolName)
-                  ? checker.toolName
-                  : [checker.toolName]
-                : [undefined];
-
-              return toolNames.map((toolName) => {
-                let effectiveToolName: string | undefined;
-                if (checker.mcpName && toolName) {
-                  effectiveToolName = `${checker.mcpName}__${toolName}`;
-                } else if (checker.mcpName) {
-                  effectiveToolName = `${checker.mcpName}__*`;
-                } else {
-                  effectiveToolName = toolName;
-                }
-
-                const safetyCheckerRule: SafetyCheckerRule = {
-                  toolName: effectiveToolName,
-                  priority: checker.priority,
-                  checker: checker.checker as SafetyCheckerConfig,
-                };
-
-                if (argsPattern) {
-                  try {
-                    safetyCheckerRule.argsPattern = new RegExp(argsPattern);
-                  } catch (e) {
-                    const error = e as Error;
-                    errors.push({
-                      filePath,
-                      fileName: file,
-                      tier: tierName,
-                      errorType: 'regex_compilation',
-                      message: 'Invalid regex pattern in safety checker',
-                      details: `Pattern: ${argsPattern}\nError: ${error.message}`,
-                    });
-                    return null;
-                  }
-                }
-
-                return safetyCheckerRule;
-              });
-            });
-          })
-          .filter((checker): checker is SafetyCheckerRule => checker !== null);
-
+        const parsedCheckers = processPolicyItems(
+          validationResult.data.safety_checker ?? [],
+          approvalMode,
+          context,
+          errors,
+          'Safety Checker',
+          (
+            item,
+            toolName,
+            commandPrefix,
+            argsPattern,
+            commandPattern,
+          ): SafetyCheckerRule => ({
+            toolName,
+            priority: item.priority,
+            checker: item.checker as SafetyCheckerConfig,
+            commandPrefix,
+            argsPattern,
+            commandPattern,
+          }),
+        );
         checkers.push(...parsedCheckers);
       } catch (e) {
         const error = e as NodeJS.ErrnoException;
-        // Catch-all for unexpected errors
         if (error.code !== 'ENOENT') {
           errors.push({
             filePath,

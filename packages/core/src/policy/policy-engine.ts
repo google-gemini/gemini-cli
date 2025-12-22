@@ -16,6 +16,7 @@ import {
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { safeRegexTest } from '../utils/safe-regex.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
 import type { HookExecutionRequest } from '../confirmation-bus/types.js';
@@ -52,6 +53,26 @@ function ruleMatches(
     }
   }
 
+  // Check command prefix if specified
+  if (rule.commandPrefix) {
+    if (!toolCall.args || typeof toolCall.args['command'] !== 'string') {
+      return false;
+    }
+    if (!toolCall.args['command'].startsWith(rule.commandPrefix)) {
+      return false;
+    }
+  }
+
+  // Check command pattern if specified
+  if (rule.commandPattern) {
+    if (!toolCall.args || typeof toolCall.args['command'] !== 'string') {
+      return false;
+    }
+    if (!safeRegexTest(rule.commandPattern, toolCall.args['command'])) {
+      return false;
+    }
+  }
+
   // Check args pattern if specified
   if (rule.argsPattern) {
     // If rule has an args pattern but tool has no args, no match
@@ -61,7 +82,7 @@ function ruleMatches(
     // Use stable JSON stringification with sorted keys to ensure consistent matching
     if (
       stringifiedArgs === undefined ||
-      !rule.argsPattern.test(stringifiedArgs)
+      !safeRegexTest(rule.argsPattern, stringifiedArgs)
     ) {
       return false;
     }
