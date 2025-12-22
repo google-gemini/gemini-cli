@@ -20,6 +20,7 @@ import type {
   Config,
   ToolRegistry,
   AnyToolInvocation,
+  ToolCallResponseInfo,
 } from '../index.js';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -849,6 +850,96 @@ describe('CoreToolScheduler edit cancellation', () => {
       '--- test.txt\n+++ test.txt\n@@ -1,1 +1,1 @@\n-old content\n+new content',
     );
     expect(cancelledCall.response.resultDisplay.fileName).toBe('test.txt');
+  });
+
+  it('should handle user feedback correctly', async () => {
+    const mockEditTool = new MockEditTool();
+    const mockToolRegistry = {
+      getTool: () => mockEditTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByName: () => mockEditTool,
+      getToolByDisplayName: () => mockEditTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: 'feedback-1',
+      name: 'mockEditTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-feedback',
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    const awaitingCall = (await waitForStatus(
+      onToolCallsUpdate,
+      'awaiting_approval',
+    )) as WaitingToolCall;
+
+    // Provide feedback
+    const confirmationDetails = awaitingCall.confirmationDetails;
+    if (confirmationDetails) {
+      await confirmationDetails.onConfirm(ToolConfirmationOutcome.Feedback, {
+        feedback: 'Please use a different file name',
+      });
+    }
+
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+
+    expect(completedCalls[0].status).toBe('success');
+    const response = (
+      completedCalls[0] as unknown as {
+        response: ToolCallResponseInfo;
+      }
+    ).response;
+    expect(response.error).toBeDefined();
+    expect(response.errorType).toBe('user_feedback');
+    expect(response.resultDisplay).toBe(
+      'Feedback provided: Please use a different file name',
+    );
+    const functionResponse = response.responseParts[0].functionResponse;
+    expect(functionResponse).toBeDefined();
+    // @ts-expect-error accessing internal structure
+    const llmOutput = functionResponse.response['output'];
+    expect(llmOutput).toContain(
+      '[User Feedback] Please use a different file name',
+    );
+    expect(llmOutput).toContain(
+      'Instruction: The user provided corrective feedback',
+    );
   });
 });
 

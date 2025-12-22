@@ -13,7 +13,11 @@ import type {
   ToolCallConfirmationDetails,
   Config,
 } from '@google/gemini-cli-core';
-import { IdeClient, ToolConfirmationOutcome } from '@google/gemini-cli-core';
+import {
+  IdeClient,
+  ToolConfirmationOutcome,
+  debugLogger,
+} from '@google/gemini-cli-core';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
@@ -21,6 +25,9 @@ import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+import { TextInput } from '../shared/TextInput.js';
+import { useTextBuffer } from '../shared/text-buffer.js';
+import { keyMatchers, Command } from '../../keyMatchers.js';
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
@@ -48,6 +55,13 @@ export const ToolConfirmationMessage: React.FC<
 
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
   const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
+  const [isFeedbackMode, setIsFeedbackMode] = useState(false);
+
+  const feedbackBuffer = useTextBuffer({
+    viewport: { width: terminalWidth, height: 1 }, // Height grows dynamically in TextInput but buffer needs a viewport
+    singleLine: true,
+    isValidPath: () => false,
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -67,7 +81,10 @@ export const ToolConfirmationMessage: React.FC<
     };
   }, [config]);
 
-  const handleConfirm = async (outcome: ToolConfirmationOutcome) => {
+  const handleConfirm = async (
+    outcome: ToolConfirmationOutcome,
+    feedback?: string,
+  ) => {
     if (confirmationDetails.type === 'edit') {
       if (config.getIdeMode() && isDiffingEnabled) {
         const cliOutcome =
@@ -79,7 +96,7 @@ export const ToolConfirmationMessage: React.FC<
       }
     }
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    onConfirm(outcome);
+    onConfirm(outcome, feedback ? { feedback } : undefined);
   };
 
   const isTrustedFolder = config.isTrustedFolder();
@@ -87,20 +104,66 @@ export const ToolConfirmationMessage: React.FC<
   useKeypress(
     (key) => {
       if (!isFocused) return;
-      if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+
+      if (isFeedbackMode) {
+        // TextInput handles its own keys, but we need to catch Escape to cancel feedback mode
+        // Handled by onCancel prop of TextInput
+        return;
+      }
+
+      if (keyMatchers[Command.ESCAPE](key) || keyMatchers[Command.QUIT](key)) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleConfirm(ToolConfirmationOutcome.Cancel);
+      }
+
+      if (keyMatchers[Command.TOGGLE_FEEDBACK](key)) {
+        feedbackBuffer.setText('');
+        setIsFeedbackMode(true);
       }
     },
     { isActive: isFocused },
   );
 
-  const handleSelect = (item: ToolConfirmationOutcome) => handleConfirm(item);
+  const handleSelect = (item: ToolConfirmationOutcome) => {
+    if (item === ToolConfirmationOutcome.Feedback) {
+      feedbackBuffer.setText('');
+      setIsFeedbackMode(true);
+    } else {
+      handleConfirm(item).catch((e) => {
+        debugLogger.error('Failed to handle confirmation selection', e);
+      });
+    }
+  };
+
+  const handleFeedbackSubmit = (value: string) => {
+    setIsFeedbackMode(false);
+    handleConfirm(ToolConfirmationOutcome.Feedback, value).catch((e) => {
+      debugLogger.error('Failed to submit feedback', e);
+    });
+  };
+
+  const handleFeedbackCancel = () => {
+    setIsFeedbackMode(false);
+    feedbackBuffer.setText('');
+  };
 
   const { question, bodyContent, options } = useMemo(() => {
     let bodyContent: React.ReactNode | null = null;
     let question = '';
     const options: Array<RadioSelectItem<ToolConfirmationOutcome>> = [];
+
+    const addCommonOptions = () => {
+      options.push({
+        label: 'Give feedback (f)',
+        value: ToolConfirmationOutcome.Feedback,
+        key: 'Give feedback (f)',
+      });
+      options.push({
+        label: 'No, suggest changes (esc)',
+        value: ToolConfirmationOutcome.Cancel,
+        key: 'No, suggest changes (esc)',
+      });
+    };
 
     if (confirmationDetails.type === 'edit') {
       if (!confirmationDetails.isModifying) {
@@ -131,12 +194,7 @@ export const ToolConfirmationMessage: React.FC<
             key: 'Modify with external editor',
           });
         }
-
-        options.push({
-          label: 'No, suggest changes (esc)',
-          value: ToolConfirmationOutcome.Cancel,
-          key: 'No, suggest changes (esc)',
-        });
+        addCommonOptions();
       }
     } else if (confirmationDetails.type === 'exec') {
       const executionProps = confirmationDetails;
@@ -161,11 +219,7 @@ export const ToolConfirmationMessage: React.FC<
           });
         }
       }
-      options.push({
-        label: 'No, suggest changes (esc)',
-        value: ToolConfirmationOutcome.Cancel,
-        key: 'No, suggest changes (esc)',
-      });
+      addCommonOptions();
     } else if (confirmationDetails.type === 'info') {
       question = `Do you want to proceed?`;
       options.push({
@@ -187,11 +241,7 @@ export const ToolConfirmationMessage: React.FC<
           });
         }
       }
-      options.push({
-        label: 'No, suggest changes (esc)',
-        value: ToolConfirmationOutcome.Cancel,
-        key: 'No, suggest changes (esc)',
-      });
+      addCommonOptions();
     } else {
       // mcp tool confirmation
       const mcpProps = confirmationDetails;
@@ -220,17 +270,11 @@ export const ToolConfirmationMessage: React.FC<
           });
         }
       }
-      options.push({
-        label: 'No, suggest changes (esc)',
-        value: ToolConfirmationOutcome.Cancel,
-        key: 'No, suggest changes (esc)',
-      });
+      addCommonOptions();
     }
 
     function availableBodyContentHeight() {
       if (options.length === 0) {
-        // Should not happen if we populated options correctly above for all types
-        // except when isModifying is true, but in that case we don't call this because we don't enter the if block for it.
         return undefined;
       }
 
@@ -376,13 +420,33 @@ export const ToolConfirmationMessage: React.FC<
         <Text color={theme.text.primary}>{question}</Text>
       </Box>
 
-      {/* Select Input for Options */}
+      {/* Select Input for Options or Feedback Input */}
       <Box flexShrink={0}>
-        <RadioButtonSelect
-          items={options}
-          onSelect={handleSelect}
-          isFocused={isFocused}
-        />
+        {isFeedbackMode ? (
+          <Box flexDirection="column">
+            <Text color={theme.text.primary}>
+              Provide feedback to the agent:
+            </Text>
+            <Box borderStyle="round" borderColor={theme.border.default}>
+              <TextInput
+                buffer={feedbackBuffer}
+                onSubmit={handleFeedbackSubmit}
+                onCancel={handleFeedbackCancel}
+                focus={isFocused}
+                placeholder="Type your instructions here..."
+              />
+            </Box>
+            <Text color={theme.text.secondary}>
+              (Enter to submit, Esc to cancel)
+            </Text>
+          </Box>
+        ) : (
+          <RadioButtonSelect
+            items={options}
+            onSelect={handleSelect}
+            isFocused={isFocused}
+          />
+        )}
       </Box>
     </Box>
   );
