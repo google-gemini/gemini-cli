@@ -37,6 +37,7 @@ import {
   type ResumedSessionData,
   type OutputPayload,
   type ConsoleLogPayload,
+  type UserFeedbackPayload,
   sessionId,
   logUserPrompt,
   AuthType,
@@ -705,6 +706,14 @@ export function initializeOutputListenersAndFlush() {
         writeToStderr(payload.content);
       } else {
         writeToStdout(payload.content);
+      }
+    });
+
+    coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
+      if (payload.severity === 'error' || payload.severity === 'warning') {
+        writeToStderr(payload.message);
+      } else {
+        writeToStdout(payload.message);
       }
     });
   }
