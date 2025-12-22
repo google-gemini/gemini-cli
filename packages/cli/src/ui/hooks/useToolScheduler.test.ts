@@ -533,6 +533,7 @@ describe('useReactToolScheduler', () => {
 
     expect(mockOnUserConfirmForToolConfirmation).toHaveBeenCalledWith(
       ToolConfirmationOutcome.ProceedOnce,
+      undefined,
     );
     expect(mockToolRequiresConfirmation.execute).toHaveBeenCalled();
 
@@ -578,6 +579,7 @@ describe('useReactToolScheduler', () => {
 
     expect(mockOnUserConfirmForToolConfirmation).toHaveBeenCalledWith(
       ToolConfirmationOutcome.Cancel,
+      undefined,
     );
 
     const completedCalls = onComplete.mock.calls[0][0] as ToolCall[];

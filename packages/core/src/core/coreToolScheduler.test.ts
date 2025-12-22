@@ -801,6 +801,96 @@ describe('CoreToolScheduler with payload', () => {
       newContent: '',
     });
   });
+
+  it('should pass payload to onConfirm handler', async () => {
+    const onConfirmSpy = vi.fn();
+    const mockTool = new MockModifiableTool();
+    mockTool.executeFn = vi.fn();
+
+    // Monkey-patch createInvocation to return invocation with spied onConfirm
+    // @ts-expect-error - overriding protected method for testing
+    const originalCreateInvocation = mockTool.createInvocation.bind(mockTool);
+    // @ts-expect-error - overriding protected method for testing
+    mockTool.createInvocation = (params) => {
+      const invocation = originalCreateInvocation(params);
+      invocation.shouldConfirmExecute = async () => ({
+        type: 'edit',
+        title: 'Confirm',
+        fileName: 'test.txt',
+        filePath: 'test.txt',
+        fileDiff: 'diff',
+        originalContent: 'old',
+        newContent: 'new',
+        onConfirm: onConfirmSpy,
+      });
+      return invocation;
+    };
+
+    const declarativeTool = mockTool;
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByName: () => declarativeTool,
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: 'mockModifiableTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-payload-check',
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    const awaitingCall = (await waitForStatus(
+      onToolCallsUpdate,
+      'awaiting_approval',
+    )) as WaitingToolCall;
+    const confirmationDetails = awaitingCall.confirmationDetails;
+
+    if (confirmationDetails) {
+      const payload: ToolConfirmationPayload = { newContent: 'updated' };
+      await confirmationDetails.onConfirm(
+        ToolConfirmationOutcome.ProceedOnce,
+        payload,
+      );
+
+      expect(onConfirmSpy).toHaveBeenCalledWith(
+        ToolConfirmationOutcome.ProceedOnce,
+        payload,
+      );
+    }
+  });
 });
 
 class MockEditToolInvocation extends BaseToolInvocation<
