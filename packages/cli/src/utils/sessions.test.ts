@@ -413,7 +413,7 @@ describe('deleteSession', () => {
 
     // Assert
     expect(mockListSessions).toHaveBeenCalledOnce();
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-123');
+    expect(mockDeleteSession).toHaveBeenCalledWith('session-uuid-123');
     expect(consoleLogSpy).toHaveBeenCalledWith(
       'Deleted session 1: Test session (some time ago)',
     );
@@ -458,7 +458,7 @@ describe('deleteSession', () => {
 
     // Assert
     expect(mockListSessions).toHaveBeenCalledOnce();
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-2');
+    expect(mockDeleteSession).toHaveBeenCalledWith('session-2');
     expect(consoleLogSpy).toHaveBeenCalledWith(
       'Deleted session 2: Second session (some time ago)',
     );
@@ -639,7 +639,7 @@ describe('deleteSession', () => {
     await deleteSession(mockConfig, '1');
 
     // Assert
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-1');
+    expect(mockDeleteSession).toHaveBeenCalledWith('session-1');
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       'Failed to delete session: File deletion failed',
     );
@@ -725,7 +725,7 @@ describe('deleteSession', () => {
     await deleteSession(mockConfig, '1');
 
     // Assert
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-1');
+    expect(mockDeleteSession).toHaveBeenCalledWith('session-1');
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining('Oldest session'),
     );

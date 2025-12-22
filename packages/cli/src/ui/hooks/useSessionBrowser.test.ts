@@ -34,6 +34,7 @@ describe('useSessionBrowser', () => {
   const mockedFs = vi.mocked(fs);
   const mockedPath = vi.mocked(path);
   const mockedGetSessionFiles = vi.mocked(getSessionFiles);
+  const mockDeleteSession = vi.fn();
 
   const mockConfig = {
     storage: {
@@ -43,7 +44,7 @@ describe('useSessionBrowser', () => {
     getSessionId: vi.fn(),
     getGeminiClient: vi.fn().mockReturnValue({
       getChatRecordingService: vi.fn().mockReturnValue({
-        deleteSession: vi.fn(),
+        deleteSession: mockDeleteSession,
       }),
     }),
   } as unknown as Config;
@@ -182,6 +183,23 @@ describe('useSessionBrowser', () => {
     );
     expect(result.current.isSessionBrowserOpen).toBe(false);
     expect(mockOnLoadHistory).toHaveBeenCalled();
+  });
+
+  it('should delete a session by id', async () => {
+    const mockSession = {
+      id: MOCKED_SESSION_ID,
+      fileName: 'session-2025-01-01-test-session-123.json',
+    } as SessionInfo;
+
+    const { result } = renderHook(() =>
+      useSessionBrowser(mockConfig, mockOnLoadHistory),
+    );
+
+    await act(async () => {
+      await result.current.handleDeleteSession(mockSession);
+    });
+
+    expect(mockDeleteSession).toHaveBeenCalledWith(MOCKED_SESSION_ID);
   });
 });
 
