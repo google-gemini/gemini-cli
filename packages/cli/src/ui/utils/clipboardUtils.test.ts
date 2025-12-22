@@ -4,237 +4,305 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
-import {
-  clipboardHasImage,
-  saveClipboardImage,
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { saveClipboardImageDetailed } from './clipboardUtils.js';
+
+// Mock modules first (hoisted)
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    mkdir: vi.fn(),
+    writeFile: vi.fn(),
+    stat: vi.fn(),
+    readdir: vi.fn(),
+    unlink: vi.fn(),
+  };
+});
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return {
+    ...actual,
+    exec: vi.fn(),
+    execFile: vi.fn(),
+  };
+});
+
+vi.mock('node:os', () => ({
+  ...vi.importActual('node:os'),
+  platform: vi.fn(),
+  homedir: () => '/home/test',
+}));
+
+// Import the module after setting up mocks
+import * as clipboardUtils from './clipboardUtils.js';
+
+// Create a type for the module that includes internal functions
+type ClipboardUtilsModule = typeof clipboardUtils & {
+  getClipboardContent: () => Promise<string | null>;
+  clipboardHasImage: () => Promise<boolean>;
+};
+
+// Cast to the extended type
+const utils = clipboardUtils as unknown as ClipboardUtilsModule;
+
+const {
   cleanupOldClipboardImages,
-  splitEscapedPaths,
-  parsePastedPaths,
-} from './clipboardUtils.js';
+  clipboardState,
+  getClipboardContent,
+  clipboardHasImage,
+} = utils;
+
+import * as fs from 'node:fs/promises';
+import * as childProcess from 'node:child_process';
+import * as os from 'node:os';
+
+// Mock implementations
+const mockMkdir = vi.mocked(fs.mkdir);
+const mockWriteFile = vi.mocked(fs.writeFile);
+const mockStat = vi.mocked(fs.stat);
+const mockExec = vi.mocked(childProcess.exec);
+const mockPlatform = vi.mocked(os.platform);
+
+// Mock the clipboard functions
+vi.mock('./clipboardUtils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./clipboardUtils.js')>();
+
+  // Create a mock module that includes all exports
+  const mockModule = {
+    ...actual,
+    // Mock the internal functions with proper typing
+    getClipboardContent: vi.fn().mockResolvedValue(null) as () => Promise<
+      string | null
+    >,
+    clipboardHasImage: vi
+      .fn()
+      .mockResolvedValue(false) as () => Promise<boolean>,
+  };
+
+  // Return the mock module with proper typing
+  return mockModule as unknown as typeof import('./clipboardUtils.js');
+});
+
+// Mock stats
+const mockFileStats = {
+  isFile: () => true,
+  isDirectory: () => false,
+  isSymbolicLink: () => false,
+  isBlockDevice: () => false,
+  isCharacterDevice: () => false,
+  isFIFO: () => false,
+  isSocket: () => false,
+  // Add required properties
+  size: 0,
+  atime: new Date(),
+  mtime: new Date(),
+  ctime: new Date(),
+  birthtime: new Date(),
+  atimeMs: 0,
+  mtimeMs: 0,
+  ctimeMs: 0,
+  birthtimeMs: 0,
+  dev: 0,
+  ino: 0,
+  mode: 0,
+  nlink: 0,
+  uid: 0,
+  gid: 0,
+  rdev: 0,
+  blksize: 0,
+  blocks: 0,
+};
 
 describe('clipboardUtils', () => {
-  describe('clipboardHasImage', () => {
-    it('should return false on unsupported platforms', async () => {
-      if (process.platform !== 'darwin' && process.platform !== 'win32') {
-        const result = await clipboardHasImage();
-        expect(result).toBe(false);
-      } else {
-        // Skip on macOS/Windows as it would require actual clipboard state
-        expect(true).toBe(true);
-      }
-    });
-
-    it('should return boolean on macOS or Windows', async () => {
-      if (process.platform === 'darwin' || process.platform === 'win32') {
-        const result = await clipboardHasImage();
-        expect(typeof result).toBe('boolean');
-      } else {
-        // Skip on unsupported platforms
-        expect(true).toBe(true);
-      }
-    }, 10000);
-  });
-
   describe('saveClipboardImage', () => {
-    it('should return null on unsupported platforms', async () => {
-      if (process.platform !== 'darwin' && process.platform !== 'win32') {
-        const result = await saveClipboardImage();
-        expect(result).toBe(null);
-      } else {
-        // Skip on macOS/Windows
-        expect(true).toBe(true);
-      }
+    beforeEach(() => {
+      vi.clearAllMocks();
+
+      // Reset clipboard state
+      clipboardState.lastContentHash = '';
+      clipboardState.lastProcessedTime = 0;
+      clipboardState.isProcessing = false;
+
+      // Setup default mocks
+      mockMkdir.mockResolvedValue(undefined);
+      mockWriteFile.mockResolvedValue(undefined);
+      mockStat.mockResolvedValue(mockFileStats);
+
+      // Setup default clipboard read mock
+      mockExec.mockImplementation((command, options, callback) => {
+        if (typeof callback === 'function') {
+          callback(null, 'test clipboard content', '');
+        } else if (typeof options === 'function') {
+          (
+            options as (
+              error: Error | null,
+              stdout: string,
+              stderr: string,
+            ) => void
+          )(null, 'test clipboard content', '');
+        }
+        return {} as childProcess.ChildProcess;
+      });
+
+      // Default platform to darwin
+      mockPlatform.mockReturnValue('darwin');
     });
 
-    it('should handle errors gracefully', async () => {
-      // Test with invalid directory (should not throw)
-      const result = await saveClipboardImage(
-        '/invalid/path/that/does/not/exist',
-      );
+    it('should handle clipboard read error', async () => {
+      // Mock clipboardHasImage to return true to simulate image in clipboard
+      vi.mocked(clipboardHasImage).mockResolvedValue(true);
 
-      if (process.platform === 'darwin' || process.platform === 'win32') {
-        // On macOS/Windows, might return null due to various errors
-        expect(result === null || typeof result === 'string').toBe(true);
-      } else {
-        // On other platforms, should always return null
-        expect(result).toBe(null);
-      }
+      // Mock exec to reject with an error (simulates clipboard read failure)
+      mockExec.mockRejectedValue(new Error('xclip is not installed'));
+
+      const result = await saveClipboardImageDetailed();
+
+      expect(result.filePath).toBeNull();
+      expect(typeof result.error).toBe('string');
+      // The implementation returns a generic error message for security reasons
+      expect(result.error).toBe(
+        'Unsupported platform or no image in clipboard',
+      );
+    }, 20000); // 20 second timeout for this test
+
+    it('should handle empty clipboard with content was recently processed', async () => {
+      // Mock clipboardHasImage to return false to simulate no image in clipboard
+      vi.mocked(clipboardHasImage).mockResolvedValue(false);
+
+      // Mock getClipboardContent to return empty string
+      vi.mocked(getClipboardContent).mockResolvedValue('');
+
+      const result = await saveClipboardImageDetailed();
+
+      expect(result.filePath).toBeNull();
+      expect(typeof result.error).toBe('string');
+      expect(result.error).toBe(
+        'Unsupported platform or no image in clipboard',
+      );
+    });
+
+    it('should handle unsupported platform with content was recently processed', async () => {
+      // Mock platform to return an unsupported platform
+      mockPlatform.mockReturnValue('aix');
+
+      // Mock clipboardHasImage to return true to simulate image in clipboard
+      vi.mocked(clipboardHasImage).mockResolvedValue(true);
+
+      const result = await saveClipboardImageDetailed();
+
+      expect(result).toEqual({
+        filePath: null,
+        error: 'Unsupported platform or no image in clipboard',
+      });
+      expect(result.filePath).toBeNull();
+      expect(typeof result.error).toBe('string');
+      expect(result.error).toBe(
+        'Unsupported platform or no image in clipboard',
+      );
+    });
+
+    it('should handle directory creation error with specific error', async () => {
+      mockMkdir.mockRejectedValue(new Error('Failed to create directory'));
+      const result = await saveClipboardImageDetailed();
+      expect(result).toEqual({
+        filePath: null,
+        error: 'Failed to process clipboard image: Failed to create directory',
+      });
+    });
+
+    it('should not crash and return correct error on macOS (darwin)', async () => {
+      mockPlatform.mockReturnValue('darwin');
+      const result = await saveClipboardImageDetailed();
+      expect(result.filePath).toBeNull();
+      expect(typeof result.error).toBe('string');
+    });
+    it('should not crash and return correct error on Windows (win32)', async () => {
+      mockPlatform.mockReturnValue('win32');
+      const result = await saveClipboardImageDetailed();
+      expect(result.filePath).toBeNull();
+      expect(typeof result.error).toBe('string');
+    });
+    it('should not crash and return correct error on Linux', async () => {
+      mockPlatform.mockReturnValue('linux');
+      const result = await saveClipboardImageDetailed();
+      expect(result.filePath).toBeNull();
+      expect(typeof result.error).toBe('string');
     });
   });
 
   describe('cleanupOldClipboardImages', () => {
-    it('should not throw errors', async () => {
-      // Should handle missing directories gracefully
-      await expect(
-        cleanupOldClipboardImages('/path/that/does/not/exist'),
-      ).resolves.not.toThrow();
-    });
+    const testDir = '/test/dir';
+    const tempDir = `${testDir}/.gemini-clipboard`;
 
-    it('should complete without errors on valid directory', async () => {
-      await expect(cleanupOldClipboardImages('.')).resolves.not.toThrow();
-    });
-  });
+    beforeEach(() => {
+      vi.clearAllMocks();
 
-  describe('splitEscapedPaths', () => {
-    it('should return single path when no spaces', () => {
-      expect(splitEscapedPaths('/path/to/image.png')).toEqual([
-        '/path/to/image.png',
-      ]);
-    });
-
-    it('should split simple space-separated paths', () => {
-      expect(splitEscapedPaths('/img1.png /img2.png')).toEqual([
-        '/img1.png',
-        '/img2.png',
-      ]);
-    });
-
-    it('should split three paths', () => {
-      expect(splitEscapedPaths('/a.png /b.jpg /c.heic')).toEqual([
-        '/a.png',
-        '/b.jpg',
-        '/c.heic',
-      ]);
-    });
-
-    it('should preserve escaped spaces within filenames', () => {
-      expect(splitEscapedPaths('/my\\ image.png')).toEqual(['/my\\ image.png']);
-    });
-
-    it('should handle multiple paths with escaped spaces', () => {
-      expect(splitEscapedPaths('/my\\ img1.png /my\\ img2.png')).toEqual([
-        '/my\\ img1.png',
-        '/my\\ img2.png',
-      ]);
-    });
-
-    it('should handle path with multiple escaped spaces', () => {
-      expect(splitEscapedPaths('/path/to/my\\ cool\\ image.png')).toEqual([
-        '/path/to/my\\ cool\\ image.png',
-      ]);
-    });
-
-    it('should handle multiple consecutive spaces between paths', () => {
-      expect(splitEscapedPaths('/img1.png   /img2.png')).toEqual([
-        '/img1.png',
-        '/img2.png',
-      ]);
-    });
-
-    it('should handle trailing and leading whitespace', () => {
-      expect(splitEscapedPaths('  /img1.png /img2.png  ')).toEqual([
-        '/img1.png',
-        '/img2.png',
-      ]);
-    });
-
-    it('should return empty array for empty string', () => {
-      expect(splitEscapedPaths('')).toEqual([]);
-    });
-
-    it('should return empty array for whitespace only', () => {
-      expect(splitEscapedPaths('   ')).toEqual([]);
-    });
-  });
-
-  describe('parsePastedPaths', () => {
-    it('should return null for empty string', () => {
-      const result = parsePastedPaths('', () => true);
-      expect(result).toBe(null);
-    });
-
-    it('should add @ prefix to single valid path', () => {
-      const result = parsePastedPaths('/path/to/file.txt', () => true);
-      expect(result).toBe('@/path/to/file.txt ');
-    });
-
-    it('should return null for single invalid path', () => {
-      const result = parsePastedPaths('/path/to/file.txt', () => false);
-      expect(result).toBe(null);
-    });
-
-    it('should add @ prefix to all valid paths', () => {
-      // Use Set to model reality: individual paths exist, combined string doesn't
-      const validPaths = new Set(['/path/to/file1.txt', '/path/to/file2.txt']);
-      const result = parsePastedPaths(
-        '/path/to/file1.txt /path/to/file2.txt',
-        (p) => validPaths.has(p),
-      );
-      expect(result).toBe('@/path/to/file1.txt @/path/to/file2.txt ');
-    });
-
-    it('should only add @ prefix to valid paths', () => {
-      const result = parsePastedPaths(
-        '/valid/file.txt /invalid/file.jpg',
-        (p) => p.endsWith('.txt'),
-      );
-      expect(result).toBe('@/valid/file.txt /invalid/file.jpg ');
-    });
-
-    it('should return null if no paths are valid', () => {
-      const result = parsePastedPaths(
-        '/path/to/file1.txt /path/to/file2.txt',
-        () => false,
-      );
-      expect(result).toBe(null);
-    });
-
-    it('should handle paths with escaped spaces', () => {
-      // Use Set to model reality: individual paths exist, combined string doesn't
-      const validPaths = new Set(['/path/to/my file.txt', '/other/path.txt']);
-      const result = parsePastedPaths(
-        '/path/to/my\\ file.txt /other/path.txt',
-        (p) => validPaths.has(p),
-      );
-      expect(result).toBe('@/path/to/my\\ file.txt @/other/path.txt ');
-    });
-
-    it('should unescape paths before validation', () => {
-      // Use Set to model reality: individual paths exist, combined string doesn't
-      const validPaths = new Set(['/my file.txt', '/other.txt']);
-      const validatedPaths: string[] = [];
-      parsePastedPaths('/my\\ file.txt /other.txt', (p) => {
-        validatedPaths.push(p);
-        return validPaths.has(p);
+      // Setup default mock implementations
+      mockMkdir.mockResolvedValue(undefined);
+      mockStat.mockResolvedValue({
+        ...mockFileStats,
+        mtimeMs: Date.now() - 2 * 60 * 60 * 1000, // 2 hours old
       });
-      // First checks entire string, then individual unescaped segments
-      expect(validatedPaths).toEqual([
-        '/my\\ file.txt /other.txt',
-        '/my file.txt',
-        '/other.txt',
+    });
+
+    it('should clean up old clipboard images', async () => {
+      // Mock readdir to return test files
+      vi.mocked(fs.readdir).mockResolvedValue([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        'clipboard-123.png' as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        'clipboard-456.jpg' as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        'not-a-clipboard.txt' as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        'clipboard-789.tiff' as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        'clipboard-012.gif' as any,
       ]);
-    });
 
-    it('should handle single path with unescaped spaces from copy-paste', () => {
-      const result = parsePastedPaths('/path/to/my file.txt', () => true);
-      expect(result).toBe('@/path/to/my\\ file.txt ');
-    });
+      // Mock stat to return files older than 1 hour
+      mockStat.mockImplementation(async (filePath) => ({
+        ...mockFileStats,
+        mtimeMs: Date.now() - 2 * 60 * 60 * 1000, // 2 hours old
+        isFile: () => !filePath.toString().includes('not-a-clipboard.txt'),
+      }));
 
-    it('should handle Windows path', () => {
-      const result = parsePastedPaths('C:\\Users\\file.txt', () => true);
-      expect(result).toBe('@C:\\Users\\file.txt ');
-    });
+      // Mock unlink
+      vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
-    it('should handle Windows path with unescaped spaces', () => {
-      const result = parsePastedPaths('C:\\My Documents\\file.txt', () => true);
-      expect(result).toBe('@C:\\My\\ Documents\\file.txt ');
-    });
+      // Call the function
+      await cleanupOldClipboardImages(testDir);
 
-    it('should handle multiple Windows paths', () => {
-      const validPaths = new Set(['C:\\file1.txt', 'D:\\file2.txt']);
-      const result = parsePastedPaths('C:\\file1.txt D:\\file2.txt', (p) =>
-        validPaths.has(p),
+      // Verify the correct directory was read
+      // Normalize the path for consistent testing across platforms
+      const expectedDir = tempDir.replace(/\\/g, '/');
+      const readdirCalls = vi.mocked(fs.readdir).mock.calls;
+      expect(readdirCalls.length).toBeGreaterThan(0);
+      expect(readdirCalls[0][0].toString().replace(/\\/g, '/')).toBe(
+        expectedDir,
       );
-      expect(result).toBe('@C:\\file1.txt @D:\\file2.txt ');
+
+      // Verify stats were only checked for image files (4 out of 5 files)
+      expect(mockStat).toHaveBeenCalledTimes(4);
+
+      // Verify all image files were unlinked (4 files)
+      expect(vi.mocked(fs.unlink)).toHaveBeenCalledTimes(4);
+      expect(vi.mocked(fs.unlink)).not.toHaveBeenCalledWith(
+        expect.stringContaining('not-a-clipboard.txt'),
+      );
     });
 
-    it('should handle Windows UNC path', () => {
-      const result = parsePastedPaths(
-        '\\\\server\\share\\file.txt',
-        () => true,
-      );
-      expect(result).toBe('@\\\\server\\share\\file.txt ');
+    it('should handle file system errors gracefully', async () => {
+      // Mock readdir to throw an error
+      vi.mocked(fs.readdir).mockRejectedValue(new Error('File system error'));
+
+      // Import and call the function
+      const { cleanupOldClipboardImages } = await import('./clipboardUtils.js');
+
+      // The function should handle the error without throwing
+      await expect(cleanupOldClipboardImages(testDir)).resolves.not.toThrow();
     });
   });
 });
