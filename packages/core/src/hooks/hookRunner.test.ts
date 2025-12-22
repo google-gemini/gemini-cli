@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { HookRunner } from './hookRunner.js';
-import { HookEventName, HookType } from './types.js';
+import { HookEventName, HookType, ConfigSource } from './types.js';
 import type { HookConfig } from './types.js';
 import type { HookInput } from './types.js';
 import type { Readable, Writable } from 'node:stream';
@@ -54,6 +54,7 @@ vi.stubGlobal('console', mockConsole);
 describe('HookRunner', () => {
   let hookRunner: HookRunner;
   let mockSpawn: MockChildProcessWithoutNullStreams;
+  let mockConfig: Config;
 
   const mockInput: HookInput = {
     session_id: 'test-session',
@@ -66,10 +67,10 @@ describe('HookRunner', () => {
   beforeEach(() => {
     vi.resetAllMocks();
 
-    const mockConfig = {
+    mockConfig = {
+      isTrustedFolder: vi.fn().mockReturnValue(true),
       sanitizationConfig: {
-        allowedEnvironmentVariables: [],
-        blockedEnvironmentVariables: [],
+        enableEnvironmentVariableRedaction: true,
       },
     } as unknown as Config;
 
@@ -108,6 +109,89 @@ describe('HookRunner', () => {
   });
 
   describe('executeHook', () => {
+    describe('security checks', () => {
+      it('should block project hooks in untrusted folders', async () => {
+        vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(false);
+
+        const projectHookConfig: HookConfig = {
+          type: HookType.Command,
+          command: './hooks/test.sh',
+          source: ConfigSource.Project,
+        };
+
+        const result = await hookRunner.executeHook(
+          projectHookConfig,
+          HookEventName.BeforeTool,
+          mockInput,
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error?.message).toContain(
+          'Security: Blocked execution of project hook in untrusted folder',
+        );
+        expect(mockDebugLogger.warn).toHaveBeenCalledWith(
+          expect.stringContaining('Security: Blocked execution'),
+        );
+        expect(spawn).not.toHaveBeenCalled();
+      });
+
+      it('should allow project hooks in trusted folders', async () => {
+        vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(true);
+
+        const projectHookConfig: HookConfig = {
+          type: HookType.Command,
+          command: './hooks/test.sh',
+          source: ConfigSource.Project,
+        };
+
+        // Mock successful execution
+        mockSpawn.mockProcessOn.mockImplementation(
+          (event: string, callback: (code: number) => void) => {
+            if (event === 'close') {
+              setTimeout(() => callback(0), 10);
+            }
+          },
+        );
+
+        const result = await hookRunner.executeHook(
+          projectHookConfig,
+          HookEventName.BeforeTool,
+          mockInput,
+        );
+
+        expect(result.success).toBe(true);
+        expect(spawn).toHaveBeenCalled();
+      });
+
+      it('should allow non-project hooks even in untrusted folders', async () => {
+        vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(false);
+
+        const systemHookConfig: HookConfig = {
+          type: HookType.Command,
+          command: './hooks/test.sh',
+          source: ConfigSource.System,
+        };
+
+        // Mock successful execution
+        mockSpawn.mockProcessOn.mockImplementation(
+          (event: string, callback: (code: number) => void) => {
+            if (event === 'close') {
+              setTimeout(() => callback(0), 10);
+            }
+          },
+        );
+
+        const result = await hookRunner.executeHook(
+          systemHookConfig,
+          HookEventName.BeforeTool,
+          mockInput,
+        );
+
+        expect(result.success).toBe(true);
+        expect(spawn).toHaveBeenCalled();
+      });
+    });
+
     describe('command hooks', () => {
       const commandConfig: HookConfig = {
         type: HookType.Command,
