@@ -36,6 +36,13 @@ export enum TrustLevel {
   DO_NOT_TRUST = 'DO_NOT_TRUST',
 }
 
+export function isTrustLevel(value: unknown): value is TrustLevel {
+  return (
+    typeof value === 'string' &&
+    Object.values(TrustLevel).includes(value as TrustLevel)
+  );
+}
+
 export interface TrustRule {
   path: string;
   trustLevel: TrustLevel;
@@ -151,7 +158,7 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
   }
 
   const errors: TrustedFoldersError[] = [];
-  let userConfig: Record<string, TrustLevel> = {};
+  const userConfig: Record<string, TrustLevel> = {};
 
   const userPath = getTrustedFoldersPath();
 
@@ -171,7 +178,17 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
           path: userPath,
         });
       } else {
-        userConfig = parsed as Record<string, TrustLevel>;
+        for (const [path, trustLevel] of Object.entries(parsed)) {
+          if (isTrustLevel(trustLevel)) {
+            userConfig[path] = trustLevel;
+          } else {
+            const possibleValues = Object.values(TrustLevel).join(', ');
+            errors.push({
+              message: `Invalid trust level "${trustLevel}" for path "${path}". Possible values are: ${possibleValues}.`,
+              path: userPath,
+            });
+          }
+        }
       }
     }
   } catch (error: unknown) {
