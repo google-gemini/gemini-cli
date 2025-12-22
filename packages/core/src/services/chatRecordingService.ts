@@ -418,6 +418,7 @@ export class ChatRecordingService {
         conversation.lastUpdated = new Date().toISOString();
         const newContent = JSON.stringify(conversation, null, 2);
         this.cachedLastConvData = newContent;
+        fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
         fs.writeFileSync(this.conversationFile, newContent);
       }
     } catch (error) {
