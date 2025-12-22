@@ -309,7 +309,6 @@ export async function loadPoliciesFromToml(
           continue;
         }
 
-        // Validate shell command convenience syntax
         const tomlRules = validationResult.data.rule ?? [];
         const invalidRuleIndices = new Set<number>();
         for (let i = 0; i < tomlRules.length; i++) {
@@ -329,7 +328,6 @@ export async function loadPoliciesFromToml(
           }
         }
 
-        // Validate shell command convenience syntax for checkers
         const tomlCheckers = validationResult.data.safety_checker ?? [];
         const invalidCheckerIndices = new Set<number>();
         for (let i = 0; i < tomlCheckers.length; i++) {
@@ -353,7 +351,6 @@ export async function loadPoliciesFromToml(
           }
         }
 
-        // Transform rules
         const parsedRules: PolicyRule[] = (validationResult.data.rule ?? [])
           .filter((rule, index) => {
             if (invalidRuleIndices.has(index)) {
@@ -365,7 +362,6 @@ export async function loadPoliciesFromToml(
             return rule.modes.includes(approvalMode);
           })
           .flatMap((rule) => {
-            // Transform commandPrefix/commandRegex to argsPattern
             const effectiveArgsPattern = rule.argsPattern;
             const commandPrefixes: string[] = [];
 
@@ -376,7 +372,6 @@ export async function loadPoliciesFromToml(
               commandPrefixes.push(...prefixes);
             }
 
-            // Expand command prefixes to multiple patterns
             const argsPatterns: Array<string | undefined> =
               commandPrefixes.length > 0
                 ? commandPrefixes.map(
@@ -384,7 +379,6 @@ export async function loadPoliciesFromToml(
                   )
                 : [effectiveArgsPattern];
 
-            // For each argsPattern, expand toolName arrays
             return argsPatterns.flatMap((argsPattern) => {
               const toolNames: Array<string | undefined> = rule.toolName
                 ? Array.isArray(rule.toolName)
@@ -392,9 +386,7 @@ export async function loadPoliciesFromToml(
                   : [rule.toolName]
                 : [undefined];
 
-              // Create a policy rule for each tool name
               return toolNames.map((toolName) => {
-                // Transform mcpName field to composite toolName format
                 let effectiveToolName: string | undefined;
                 if (rule.mcpName && toolName) {
                   effectiveToolName = `${rule.mcpName}__${toolName}`;
@@ -410,7 +402,6 @@ export async function loadPoliciesFromToml(
                   priority: transformPriority(rule.priority, tier),
                 };
 
-                // Compile regex pattern
                 if (argsPattern) {
                   try {
                     policyRule.argsPattern = new RegExp(argsPattern);
@@ -426,12 +417,10 @@ export async function loadPoliciesFromToml(
                       suggestion:
                         'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
                     });
-                    // Skip this rule if regex compilation fails
                     return null;
                   }
                 }
 
-                // Compile command regex pattern
                 if (rule.commandRegex) {
                   try {
                     policyRule.commandPattern = new RegExp(rule.commandRegex);
@@ -447,7 +436,6 @@ export async function loadPoliciesFromToml(
                       suggestion:
                         'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
                     });
-                    // Skip this rule if regex compilation fails
                     return null;
                   }
                 }
@@ -460,7 +448,6 @@ export async function loadPoliciesFromToml(
 
         rules.push(...parsedRules);
 
-        // Transform checkers
         const parsedCheckers: SafetyCheckerRule[] = (
           validationResult.data.safety_checker ?? []
         )
@@ -564,7 +551,6 @@ export async function loadPoliciesFromToml(
         checkers.push(...parsedCheckers);
       } catch (e) {
         const error = e as NodeJS.ErrnoException;
-        // Catch-all for unexpected errors
         if (error.code !== 'ENOENT') {
           errors.push({
             filePath,

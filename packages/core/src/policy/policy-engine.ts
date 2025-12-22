@@ -53,7 +53,6 @@ function ruleMatches(
     if (!toolCall.args || typeof toolCall.args['command'] !== 'string') {
       return false;
     }
-    // Use safeRegexTest to prevent ReDoS attacks from user-supplied regexes
     if (!safeRegexTest(rule.commandPattern, toolCall.args['command'])) {
       return false;
     }
