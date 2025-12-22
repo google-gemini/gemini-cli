@@ -1485,6 +1485,46 @@ ${JSON.stringify(
         );
       });
 
+      it('should NOT stick to modelOverride for subsequent turns', async () => {
+        const overrideModel = 'gemini-2.5-flash';
+        const routedModel = 'routed-model';
+
+        // Turn 1: With Override
+        const stream1 = client.sendMessageStream(
+          [{ text: 'Hi with override' }],
+          new AbortController().signal,
+          'prompt-sticky-test',
+          MAX_TURNS,
+          false,
+          overrideModel,
+        );
+        await fromAsync(stream1);
+
+        expect(mockTurnRunFn).toHaveBeenLastCalledWith(
+          { model: overrideModel },
+          expect.anything(),
+          expect.anything(),
+        );
+
+        // Turn 2: Without Override (should revert to default/routed)
+        const stream2 = client.sendMessageStream(
+          [{ text: 'Hi again' }],
+          new AbortController().signal,
+          'prompt-sticky-test', // Same prompt ID to test session stickiness
+          MAX_TURNS,
+          false,
+          undefined,
+        );
+        await fromAsync(stream2);
+
+        // Should use the routed model, NOT the override from previous turn
+        expect(mockTurnRunFn).toHaveBeenLastCalledWith(
+          { model: routedModel },
+          expect.anything(),
+          expect.anything(),
+        );
+      });
+
       it('should use the same model for subsequent turns in the same prompt (stickiness)', async () => {
         // First turn
         let stream = client.sendMessageStream(

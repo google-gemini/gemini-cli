@@ -550,7 +550,11 @@ export class GeminiClient {
       signal,
     };
 
-    debugLogger.log(`[GeminiClient] Sending message with ${modelOverride}"`);
+    if (modelOverride) {
+      debugLogger.log(
+        `[GeminiClient] Sending message with model override: "${modelOverride}"`,
+      );
+    }
 
     let modelToUse: string;
     const resolvedOverrideModel = modelOverride
@@ -577,7 +581,9 @@ export class GeminiClient {
     );
     modelToUse = finalModel;
 
-    this.currentSequenceModel = modelToUse;
+    if (!resolvedOverrideModel) {
+      this.currentSequenceModel = modelToUse;
+    }
     yield { type: GeminiEventType.ModelInfo, value: modelToUse };
 
     const resultStream = turn.run(modelConfigKey, request, linkedSignal);
