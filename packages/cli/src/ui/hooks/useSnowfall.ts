@@ -63,7 +63,7 @@ export const useSnowfall = (displayTitle: string): string => {
 
   const currentTheme = themeManager.getActiveTheme();
   const { columns: terminalWidth } = useTerminalSize();
-  const { history } = useUIState();
+  const { history, historyRemountKey } = useUIState();
 
   const hasStartedChat = history.some((item) => item.type === 'user');
   const widthOfShortLogo = getAsciiArtWidth(shortAsciiLogo);
@@ -71,13 +71,14 @@ export const useSnowfall = (displayTitle: string): string => {
   const [showSnow, setShowSnow] = useState(true);
 
   useEffect(() => {
+    setShowSnow(true);
     const timer = setTimeout(() => {
       setShowSnow(false);
-    }, 10000);
+    }, 15000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [historyRemountKey]);
 
-  const enabled =
+  const showAnimation =
     isHolidaySeason &&
     currentTheme.name === Holiday.name &&
     terminalWidth >= widthOfShortLogo &&
@@ -85,11 +86,11 @@ export const useSnowfall = (displayTitle: string): string => {
     showSnow;
 
   const displayArt = useMemo(() => {
-    if (enabled) {
+    if (showAnimation) {
       return addHolidayTrees(displayTitle);
     }
     return displayTitle;
-  }, [displayTitle, enabled]);
+  }, [displayTitle, showAnimation]);
 
   const [snowflakes, setSnowflakes] = useState<Snowflake[]>([]);
   // We don't need 'frame' state if we just use functional updates for snowflakes,
@@ -100,7 +101,7 @@ export const useSnowfall = (displayTitle: string): string => {
   const width = getAsciiArtWidth(displayArt);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!showAnimation) {
       setSnowflakes([]);
       return;
     }
@@ -137,11 +138,12 @@ export const useSnowfall = (displayTitle: string): string => {
       debugState.debugNumAnimatedComponents--;
       clearInterval(timer);
     };
-  }, [height, width, enabled]);
+  }, [height, width, showAnimation]);
 
-  if (!enabled) return displayArt;
+  if (!showAnimation) return displayTitle;
 
   // Render current frame
+  if (snowflakes.length === 0) return displayArt;
   const grid = lines.map((line) => line.padEnd(width, ' ').split(''));
 
   snowflakes.forEach((flake) => {
