@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 import { getShellConfiguration } from '../packages/core/src/utils/shell-utils.js';
 
@@ -84,15 +84,21 @@ function getChainedEchoCommand(): { allowPattern: string; command: string } {
 }
 
 describe('run_shell_command', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
   it('should be able to run a shell command', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to run a shell command', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
 
     const prompt = `Please run the command "echo hello-world" and show me the output`;
 
-    const result = await rig.run(prompt);
+    const result = await rig.run({ args: prompt });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command');
 
@@ -119,7 +125,6 @@ describe('run_shell_command', () => {
   });
 
   it('should be able to run a shell command via stdin', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to run a shell command via stdin', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
@@ -149,7 +154,6 @@ describe('run_shell_command', () => {
   });
 
   it.skip('should run allowed sub-command in non-interactive mode', async () => {
-    const rig = new TestRig();
     await rig.setup('should run allowed sub-command in non-interactive mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
@@ -157,13 +161,11 @@ describe('run_shell_command', () => {
     const prompt = `use ${command} to tell me how many lines there are in ${testFile}`;
 
     // Provide the prompt via stdin to simulate non-interactive mode
-    const result = await rig.run(
-      {
-        stdin: prompt,
-        yolo: false,
-      },
-      `--allowed-tools=run_shell_command(${tool})`,
-    );
+    const result = await rig.run({
+      args: [`--allowed-tools=run_shell_command(${tool})`],
+      stdin: prompt,
+      yolo: false,
+    });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
 
@@ -196,20 +198,17 @@ describe('run_shell_command', () => {
   });
 
   it.skip('should succeed with no parens in non-interactive mode', async () => {
-    const rig = new TestRig();
     await rig.setup('should succeed with no parens in non-interactive mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
     const { command } = getLineCountCommand();
     const prompt = `use ${command} to tell me how many lines there are in ${testFile}`;
 
-    const result = await rig.run(
-      {
-        stdin: prompt,
-        yolo: false,
-      },
-      '--allowed-tools=run_shell_command',
-    );
+    const result = await rig.run({
+      args: '--allowed-tools=run_shell_command',
+      stdin: prompt,
+      yolo: false,
+    });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
 
@@ -233,7 +232,6 @@ describe('run_shell_command', () => {
   });
 
   it('should succeed with --yolo mode', async () => {
-    const rig = new TestRig();
     await rig.setup('should succeed with --yolo mode', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
@@ -243,7 +241,7 @@ describe('run_shell_command', () => {
     const prompt = `use ${command} to tell me how many lines there are in ${testFile}`;
 
     const result = await rig.run({
-      prompt: prompt,
+      args: prompt,
       yolo: true,
     });
 
@@ -269,20 +267,17 @@ describe('run_shell_command', () => {
   });
 
   it.skip('should work with ShellTool alias', async () => {
-    const rig = new TestRig();
     await rig.setup('should work with ShellTool alias');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
     const { tool, command } = getLineCountCommand();
     const prompt = `use ${command} to tell me how many lines there are in ${testFile}`;
 
-    const result = await rig.run(
-      {
-        stdin: prompt,
-        yolo: false,
-      },
-      `--allowed-tools=ShellTool(${tool})`,
-    );
+    const result = await rig.run({
+      args: `--allowed-tools=ShellTool(${tool})`,
+      stdin: prompt,
+      yolo: false,
+    });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
 
@@ -317,7 +312,6 @@ describe('run_shell_command', () => {
   // TODO(#11062): Un-skip this once we can make it reliable by using hard coded
   // model responses.
   it.skip('should combine multiple --allowed-tools flags', async () => {
-    const rig = new TestRig();
     await rig.setup('should combine multiple --allowed-tools flags');
 
     const { tool, command } = getLineCountCommand();
@@ -325,14 +319,14 @@ describe('run_shell_command', () => {
       `use both ${command} and ls to count the number of lines in files in this ` +
       `directory. Do not pipe these commands into each other, run them separately.`;
 
-    const result = await rig.run(
-      {
-        stdin: prompt,
-        yolo: false,
-      },
-      `--allowed-tools=run_shell_command(${tool})`,
-      '--allowed-tools=run_shell_command(ls)',
-    );
+    const result = await rig.run({
+      args: [
+        `--allowed-tools=run_shell_command(${tool})`,
+        '--allowed-tools=run_shell_command(ls)',
+      ],
+      stdin: prompt,
+      yolo: false,
+    });
 
     for (const expected in ['ls', tool]) {
       const foundToolCall = await rig.waitForToolCall(
@@ -367,7 +361,6 @@ describe('run_shell_command', () => {
   });
 
   it('should reject commands not on the allowlist', async () => {
-    const rig = new TestRig();
     await rig.setup('should reject commands not on the allowlist', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
@@ -381,13 +374,11 @@ describe('run_shell_command', () => {
       `If the command fails because it is not permitted, respond with the single word FAIL. ` +
       `If it succeeds, respond with SUCCESS.`;
 
-    const result = await rig.run(
-      {
-        stdin: prompt,
-        yolo: false,
-      },
-      `--allowed-tools=run_shell_command(${allowedCommand})`,
-    );
+    const result = await rig.run({
+      args: `--allowed-tools=run_shell_command(${allowedCommand})`,
+      stdin: prompt,
+      yolo: false,
+    });
 
     if (!result.toLowerCase().includes('fail')) {
       printDebugInfo(rig, result, {
@@ -437,7 +428,6 @@ describe('run_shell_command', () => {
 
   // TODO(#11966): Deflake this test and re-enable once the underlying race is resolved.
   it.skip('should reject chained commands when only the first segment is allowlisted in non-interactive mode', async () => {
-    const rig = new TestRig();
     await rig.setup(
       'should reject chained commands when only the first segment is allowlisted',
     );
@@ -445,13 +435,11 @@ describe('run_shell_command', () => {
     const chained = getChainedEchoCommand();
     const shellInjection = `!{${chained.command}}`;
 
-    await rig.run(
-      {
-        stdin: `${shellInjection}\n`,
-        yolo: false,
-      },
-      `--allowed-tools=ShellTool(${chained.allowPattern})`,
-    );
+    await rig.run({
+      args: `--allowed-tools=ShellTool(${chained.allowPattern})`,
+      stdin: `${shellInjection}\n`,
+      yolo: false,
+    });
 
     // CLI should refuse to execute the chained command without scheduling run_shell_command.
     const toolLogs = rig
@@ -466,7 +454,6 @@ describe('run_shell_command', () => {
   });
 
   it('should allow all with "ShellTool" and other specific tools', async () => {
-    const rig = new TestRig();
     await rig.setup(
       'should allow all with "ShellTool" and other specific tools',
       {
@@ -477,14 +464,14 @@ describe('run_shell_command', () => {
     const { tool } = getLineCountCommand();
     const prompt = `Please run the command "echo test-allow-all" and show me the output`;
 
-    const result = await rig.run(
-      {
-        stdin: prompt,
-        yolo: false,
-      },
-      `--allowed-tools=run_shell_command(${tool})`,
-      '--allowed-tools=run_shell_command',
-    );
+    const result = await rig.run({
+      args: [
+        `--allowed-tools=run_shell_command(${tool})`,
+        '--allowed-tools=run_shell_command',
+      ],
+      stdin: prompt,
+      yolo: false,
+    });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
 
@@ -516,7 +503,6 @@ describe('run_shell_command', () => {
   });
 
   it('should propagate environment variables to the child process', async () => {
-    const rig = new TestRig();
     await rig.setup('should propagate environment variables', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
@@ -527,7 +513,7 @@ describe('run_shell_command', () => {
 
     try {
       const prompt = `Use echo to learn the value of the environment variable named ${varName} and tell me what it is.`;
-      const result = await rig.run(prompt);
+      const result = await rig.run({ args: prompt });
 
       const foundToolCall = await rig.waitForToolCall('run_shell_command');
 
@@ -550,13 +536,12 @@ describe('run_shell_command', () => {
   });
 
   it.skip('should run a platform-specific file listing command', async () => {
-    const rig = new TestRig();
     await rig.setup('should run platform-specific file listing');
     const fileName = `test-file-${Math.random().toString(36).substring(7)}.txt`;
     rig.createFile(fileName, 'test content');
 
     const prompt = `Run a shell command to list the files in the current directory and tell me what they are.`;
-    const result = await rig.run(prompt);
+    const result = await rig.run({ args: prompt });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command');
 
@@ -578,14 +563,13 @@ describe('run_shell_command', () => {
   });
 
   it('rejects invalid shell expressions', async () => {
-    const rig = new TestRig();
     await rig.setup('rejects invalid shell expressions', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
     const invalidCommand = getInvalidCommand();
-    const result = await rig.run(
-      `I am testing the error handling of the run_shell_command tool. Please attempt to run the following command, which I know has invalid syntax: \`${invalidCommand}\`. If the command fails as expected, please return the word FAIL, otherwise return the word SUCCESS.`,
-    );
+    const result = await rig.run({
+      args: `I am testing the error handling of the run_shell_command tool. Please attempt to run the following command, which I know has invalid syntax: \`${invalidCommand}\`. If the command fails as expected, please return the word FAIL, otherwise return the word SUCCESS.`,
+    });
     expect(result).toContain('FAIL');
 
     const escapedInvalidCommand = JSON.stringify(invalidCommand).slice(1, -1);

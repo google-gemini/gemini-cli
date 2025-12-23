@@ -24,7 +24,7 @@
         "slug": "docs/get-started"
       },
       {
-        "label": "Gemini 3 Pro on Gemini CLI",
+        "label": "Gemini 3 on Gemini CLI",
         "slug": "docs/get-started/gemini-3"
       },
       {
@@ -115,6 +115,10 @@
       {
         "label": "Uninstall",
         "slug": "docs/cli/uninstall"
+      },
+      {
+        "label": "System prompt override",
+        "slug": "docs/cli/system-prompt"
       }
     ]
   },
@@ -203,6 +207,10 @@
       {
         "label": "Writing hooks",
         "slug": "docs/hooks/writing-hooks"
+      },
+      {
+        "label": "Hooks reference",
+        "slug": "docs/hooks/reference"
       },
       {
         "label": "Best practices",

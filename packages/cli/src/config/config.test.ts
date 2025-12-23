@@ -25,13 +25,11 @@ import { ExtensionManager } from './extension-manager.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 vi.mock('./trustedFolders.js', () => ({
-  isWorkspaceTrusted: vi
-    .fn()
-    .mockReturnValue({ isTrusted: true, source: 'file' }), // Default to trusted
+  isWorkspaceTrusted: vi.fn(() => ({ isTrusted: true, source: 'file' })), // Default to trusted
 }));
 
 vi.mock('./sandboxConfig.js', () => ({
-  loadSandboxConfig: vi.fn().mockResolvedValue(undefined),
+  loadSandboxConfig: vi.fn(async () => undefined),
 }));
 
 vi.mock('fs', async (importOriginal) => {
@@ -1283,7 +1281,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('auto');
+    expect(config.getModel()).toBe('auto-gemini-2.5');
   });
 
   it('always prefers model from argv', async () => {
