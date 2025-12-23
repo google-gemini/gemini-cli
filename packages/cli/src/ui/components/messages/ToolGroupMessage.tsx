@@ -14,7 +14,10 @@ import { ShellToolMessage } from './ShellToolMessage.js';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { SHELL_COMMAND_NAME, SHELL_NAME } from '../../constants.js';
-import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
+import {
+  ACTIVATE_SKILL_TOOL_NAME,
+  SHELL_TOOL_NAME,
+} from '@google/gemini-cli-core';
 import { useConfig } from '../../contexts/ConfigContext.js';
 
 interface ToolGroupMessageProps {
@@ -52,15 +55,25 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const isShellCommand = toolCalls.some(
     (t) => t.name === SHELL_COMMAND_NAME || t.name === SHELL_NAME,
   );
-  const borderColor =
-    (isShellCommand && hasPending) || isEmbeddedShellFocused
+  const isSkillActivation = toolCalls.some(
+    (t) =>
+      t.name === ACTIVATE_SKILL_TOOL_NAME ||
+      t.name === 'ActivateSkill' ||
+      t.name === 'Activate Skill' ||
+      t.name.startsWith('Skill: '),
+  );
+  const borderColor = isSkillActivation
+    ? theme.text.link
+    : (isShellCommand && hasPending) || isEmbeddedShellFocused
       ? theme.ui.symbol
       : hasPending
         ? theme.status.warning
         : theme.border.default;
 
   const borderDimColor =
-    hasPending && (!isShellCommand || !isEmbeddedShellFocused);
+    hasPending &&
+    (!isShellCommand || !isEmbeddedShellFocused) &&
+    !isSkillActivation;
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
 
