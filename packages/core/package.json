@@ -64,9 +64,8 @@
     "strip-ansi": "^7.1.0",
     "tree-sitter-bash": "^0.25.0",
     "undici": "^7.10.0",
+    "uuid": "^13.0.0",
     "web-tree-sitter": "^0.25.10",
-    "ws": "^8.18.0",
-    "@a2a-js/sdk": "0.3.7",
     "zod": "^3.25.76"
   },
   "optionalDependencies": {
@@ -84,8 +83,6 @@
     "@types/fast-levenshtein": "^0.0.4",
     "@types/minimatch": "^5.1.2",
     "@types/picomatch": "^4.0.1",
-    "@types/ws": "^8.5.10",
-    "@types/uuid": "^9.0.8",
     "msw": "^2.3.4",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"
