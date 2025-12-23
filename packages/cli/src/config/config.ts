@@ -621,9 +621,10 @@ export async function loadCliConfig(
     blockedMcpServers: argv.allowedMcpServerNames
       ? undefined
       : settings.mcp?.excluded,
-    blockedEnvironmentVariables: settings.security?.blockedEnvironmentVariables,
+    blockedEnvironmentVariables:
+      settings.security?.environmentVariableRedaction?.blocked,
     enableEnvironmentVariableRedaction:
-      settings.security?.enableEnvironmentVariableRedaction,
+      settings.security?.environmentVariableRedaction?.enabled,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,

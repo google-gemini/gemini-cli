@@ -746,17 +746,17 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`security.allowedEnvironmentVariables`** (array):
+- **`security.environmentVariableRedaction.allowed`** (array):
   - **Description:** Environment variables to always allow (bypass redaction).
   - **Default:** `[]`
   - **Requires restart:** Yes
 
-- **`security.blockedEnvironmentVariables`** (array):
+- **`security.environmentVariableRedaction.blocked`** (array):
   - **Description:** Environment variables to always redact.
   - **Default:** `[]`
   - **Requires restart:** Yes
 
-- **`security.enableEnvironmentVariableRedaction`** (boolean):
+- **`security.environmentVariableRedaction.enabled`** (boolean):
   - **Description:** Enable redaction of environment variables that may contain
     secrets.
   - **Default:** `false`
