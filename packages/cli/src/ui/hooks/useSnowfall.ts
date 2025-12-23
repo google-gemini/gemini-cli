@@ -4,8 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getAsciiArtWidth } from '../utils/textUtils.js';
+import { debugState } from '../debug.js';
+import { themeManager } from '../themes/theme-manager.js';
+import { Holiday } from '../themes/holiday.js';
 
 interface Snowflake {
   x: number;
@@ -14,22 +17,79 @@ interface Snowflake {
 }
 
 const SNOW_CHARS = ['*', '.', '·', '+'];
-const FRAME_RATE = 100; // ms
+const FRAME_RATE = 150; // ms
 
-export const useSnowfall = (art: string, enabled: boolean): string => {
+// Check if current month is December (11) or Jan (0)
+const isHolidaySeason =
+  new Date().getMonth() === 11 || new Date().getMonth() === 0;
+
+const addHolidayTrees = (art: string): string => {
+  const holidayTree = `
+      *
+     ***
+    *****
+   *******
+  *********
+     |_|`;
+
+  const treeLines = holidayTree.split('\n').filter((l) => l.length > 0);
+  const treeWidth = getAsciiArtWidth(holidayTree);
+  const logoWidth = getAsciiArtWidth(art);
+
+  // Create three trees side by side
+  const treeSpacing = '        ';
+  const tripleTreeLines = treeLines.map((line) => {
+    const paddedLine = line.padEnd(treeWidth, ' ');
+    return `${paddedLine}${treeSpacing}${paddedLine}${treeSpacing}${paddedLine}`;
+  });
+
+  const tripleTreeWidth = treeWidth * 3 + treeSpacing.length * 2;
+  const paddingCount = Math.max(
+    0,
+    Math.floor((logoWidth - tripleTreeWidth) / 2),
+  );
+  const treePadding = ' '.repeat(paddingCount);
+
+  const centeredTripleTrees = tripleTreeLines
+    .map((line) => treePadding + line)
+    .join('\n');
+
+  // Add vertical padding and the trees below the logo
+  return `\n\n${art}\n${centeredTripleTrees}\n\n`;
+};
+
+export const useSnowfall = (
+  art: string,
+  options: { enabled?: boolean } = {},
+): string => {
+  const currentTheme = themeManager.getActiveTheme();
+
+  const enabled =
+    isHolidaySeason &&
+    currentTheme.name === Holiday.name &&
+    (options.enabled ?? true);
+
+  const displayArt = useMemo(() => {
+    if (enabled) {
+      return addHolidayTrees(art);
+    }
+    return art;
+  }, [art, enabled]);
+
   const [snowflakes, setSnowflakes] = useState<Snowflake[]>([]);
   // We don't need 'frame' state if we just use functional updates for snowflakes,
   // but we need a trigger. A simple interval is fine.
 
-  const lines = art.split('\n');
+  const lines = displayArt.split('\n');
   const height = lines.length;
-  const width = getAsciiArtWidth(art);
+  const width = getAsciiArtWidth(displayArt);
 
   useEffect(() => {
     if (!enabled) {
       setSnowflakes([]);
       return;
     }
+    debugState.debugNumAnimatedComponents++;
 
     const timer = setInterval(() => {
       setSnowflakes((prev) => {
@@ -58,10 +118,13 @@ export const useSnowfall = (art: string, enabled: boolean): string => {
         return [...moved, ...newFlakes];
       });
     }, FRAME_RATE);
-    return () => clearInterval(timer);
+    return () => {
+      debugState.debugNumAnimatedComponents--;
+      clearInterval(timer);
+    };
   }, [height, width, enabled]);
 
-  if (!enabled) return art;
+  if (!enabled) return displayArt;
 
   // Render current frame
   const grid = lines.map((line) => line.padEnd(width, ' ').split(''));

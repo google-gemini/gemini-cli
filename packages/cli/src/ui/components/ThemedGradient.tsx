@@ -9,16 +9,8 @@ import { Text, type TextProps } from 'ink';
 import Gradient from 'ink-gradient';
 import { theme } from '../semantic-colors.js';
 
-interface ThemedGradientProps extends TextProps {
-  colors?: string[];
-}
-
-export const ThemedGradient: React.FC<ThemedGradientProps> = ({
-  children,
-  colors,
-  ...props
-}) => {
-  const gradient = colors || theme.ui.gradient;
+export const ThemedGradient: React.FC<TextProps> = ({ children, ...props }) => {
+  const gradient = theme.ui.gradient;
 
   if (gradient && gradient.length >= 2) {
     return (

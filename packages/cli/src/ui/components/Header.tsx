@@ -19,6 +19,7 @@ import { getAsciiArtWidth } from '../utils/textUtils.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { getTerminalProgram } from '../utils/terminalSetup.js';
 import { useSnowfall } from '../hooks/useSnowfall.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 
 interface HeaderProps {
   customAsciiArt?: string; // For user-defined ASCII art
@@ -48,49 +49,10 @@ export const Header: React.FC<HeaderProps> = ({
   }
 
   const artWidth = getAsciiArtWidth(displayTitle);
-  const isHolidaySeason = new Date().getMonth() === 11;
+  const { history } = useUIState();
+  const hasStartedChat = history.some((item) => item.type === 'user');
 
-  let paddedTitle = displayTitle;
-
-  if (isHolidaySeason) {
-    const holidayTree = `
-      *
-     ***
-    *****
-   *******
-  *********
-     |_|`;
-
-    const treeLines = holidayTree.split('\n').filter((l) => l.length > 0);
-    const treeWidth = getAsciiArtWidth(holidayTree);
-    const logoWidth = getAsciiArtWidth(displayTitle);
-
-    // Create three trees side by side
-    const treeSpacing = '        ';
-    const tripleTreeLines = treeLines.map((line) => {
-      const paddedLine = line.padEnd(treeWidth, ' ');
-      return `${paddedLine}${treeSpacing}${paddedLine}${treeSpacing}${paddedLine}`;
-    });
-
-    const tripleTreeWidth = treeWidth * 3 + treeSpacing.length * 2;
-    const paddingCount = Math.max(
-      0,
-      Math.floor((logoWidth - tripleTreeWidth) / 2),
-    );
-    const treePadding = ' '.repeat(paddingCount);
-
-    const centeredTripleTrees = tripleTreeLines
-      .map((line) => treePadding + line)
-      .join('\n');
-
-    // Add vertical padding and the trees below the logo
-    paddedTitle = `\n\n${displayTitle}\n${centeredTripleTrees}\n\n`;
-  } else {
-    paddedTitle = displayTitle;
-  }
-
-  const snowTitle = useSnowfall(paddedTitle, isHolidaySeason);
-  const holidayColors = ['#D6001C', '#00873E']; // Red and Green
+  const snowTitle = useSnowfall(displayTitle, { enabled: !hasStartedChat });
 
   return (
     <Box
@@ -99,9 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
       flexShrink={0}
       flexDirection="column"
     >
-      <ThemedGradient colors={isHolidaySeason ? holidayColors : undefined}>
-        {snowTitle}
-      </ThemedGradient>
+      <ThemedGradient>{snowTitle}</ThemedGradient>
       {nightly && (
         <Box width="100%" flexDirection="row" justifyContent="flex-end">
           <ThemedGradient>v{version}</ThemedGradient>
