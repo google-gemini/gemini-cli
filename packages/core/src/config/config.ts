@@ -489,7 +489,7 @@ export class Config {
     this.allowedEnvironmentVariables = params.allowedEnvironmentVariables ?? [];
     this.blockedEnvironmentVariables = params.blockedEnvironmentVariables ?? [];
     this.enableEnvironmentVariableRedaction =
-      params.enableEnvironmentVariableRedaction ?? true;
+      params.enableEnvironmentVariableRedaction ?? false;
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
