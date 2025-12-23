@@ -219,7 +219,7 @@ describe('settings-validation', () => {
       }
     });
 
-    it('should validate mcpServers with type field for all transport types', () => {
+    it('should validate mcpServers with type field for SSE and HTTP transports', () => {
       const validSettings = {
         mcpServers: {
           'sse-server': {
@@ -230,10 +230,6 @@ describe('settings-validation', () => {
           'http-server': {
             url: 'https://example.com/mcp',
             type: 'http',
-          },
-          'stdio-server': {
-            command: '/usr/bin/mcp-server',
-            type: 'stdio',
           },
         },
       };
@@ -254,6 +250,23 @@ describe('settings-validation', () => {
 
       const result = validateSettings(invalidSettings);
       expect(result.success).toBe(false);
+    });
+
+    it('should validate mcpServers without type field', () => {
+      const validSettings = {
+        mcpServers: {
+          'stdio-server': {
+            command: '/usr/bin/mcp-server',
+            args: ['--port', '8080'],
+          },
+          'url-server': {
+            url: 'https://example.com/mcp',
+          },
+        },
+      };
+
+      const result = validateSettings(validSettings);
+      expect(result.success).toBe(true);
     });
 
     it('should validate complex nested customThemes configuration', () => {

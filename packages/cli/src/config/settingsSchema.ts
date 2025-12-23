@@ -1723,8 +1723,8 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       type: {
         type: 'string',
         description:
-          'Transport type. Use "stdio" for local command, "sse" for Server-Sent Events, or "http" for Streamable HTTP.',
-        enum: ['stdio', 'sse', 'http'],
+          'Transport type for URL-based transports. Use "sse" for Server-Sent Events or "http" for Streamable HTTP.',
+        enum: ['sse', 'http'],
       },
       timeout: {
         type: 'number',
