@@ -177,6 +177,7 @@ import {
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
+import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 
 export type { FileFilteringOptions };
 export {
@@ -284,6 +285,9 @@ export interface ConfigParameters {
   enableExtensionReloading?: boolean;
   allowedMcpServers?: string[];
   blockedMcpServers?: string[];
+  allowedEnvironmentVariables?: string[];
+  blockedEnvironmentVariables?: string[];
+  enableEnvironmentVariableRedaction?: boolean;
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   folderTrust?: boolean;
@@ -333,6 +337,7 @@ export interface ConfigParameters {
   previewFeatures?: boolean;
   enableAgents?: boolean;
   experimentalJitContext?: boolean;
+  onModelChange?: (model: string) => void;
 }
 
 export class Config {
@@ -340,6 +345,9 @@ export class Config {
   private mcpClientManager?: McpClientManager;
   private allowedMcpServers: string[];
   private blockedMcpServers: string[];
+  private allowedEnvironmentVariables: string[];
+  private blockedEnvironmentVariables: string[];
+  private readonly enableEnvironmentVariableRedaction: boolean;
   private promptRegistry!: PromptRegistry;
   private resourceRegistry!: ResourceRegistry;
   private agentRegistry!: AgentRegistry;
@@ -365,7 +373,6 @@ export class Config {
   private userMemory: string;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
-  private approvalMode: ApprovalMode;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
@@ -451,6 +458,7 @@ export class Config {
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
+  private readonly onModelChange: ((model: string) => void) | undefined;
 
   private readonly enableAgents: boolean;
 
@@ -480,10 +488,13 @@ export class Config {
     this.mcpServers = params.mcpServers;
     this.allowedMcpServers = params.allowedMcpServers ?? [];
     this.blockedMcpServers = params.blockedMcpServers ?? [];
+    this.allowedEnvironmentVariables = params.allowedEnvironmentVariables ?? [];
+    this.blockedEnvironmentVariables = params.blockedEnvironmentVariables ?? [];
+    this.enableEnvironmentVariableRedaction =
+      params.enableEnvironmentVariableRedaction ?? false;
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
-    this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
     this.accessibility = params.accessibility ?? {};
     this.telemetrySettings = {
@@ -549,6 +560,7 @@ export class Config {
       terminalHeight: params.shellExecutionConfig?.terminalHeight ?? 24,
       showColor: params.shellExecutionConfig?.showColor ?? false,
       pager: params.shellExecutionConfig?.pager ?? 'cat',
+      sanitizationConfig: this.sanitizationConfig,
     };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
@@ -600,7 +612,11 @@ export class Config {
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
-    this.policyEngine = new PolicyEngine(params.policyEngineConfig);
+    this.policyEngine = new PolicyEngine({
+      ...params.policyEngineConfig,
+      approvalMode:
+        params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+    });
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
@@ -609,6 +625,7 @@ export class Config {
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
     this.experiments = params.experiments;
+    this.onModelChange = params.onModelChange;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -865,6 +882,9 @@ export class Config {
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
+      if (this.onModelChange) {
+        this.onModelChange(newModel);
+      }
     }
     this.modelAvailabilityService.reset();
   }
@@ -1067,6 +1087,15 @@ export class Config {
     return this.blockedMcpServers;
   }
 
+  get sanitizationConfig(): EnvironmentSanitizationConfig {
+    return {
+      allowedEnvironmentVariables: this.allowedEnvironmentVariables,
+      blockedEnvironmentVariables: this.blockedEnvironmentVariables,
+      enableEnvironmentVariableRedaction:
+        this.enableEnvironmentVariableRedaction,
+    };
+  }
+
   setMcpServers(mcpServers: Record<string, MCPServerConfig>): void {
     this.mcpServers = mcpServers;
   }
@@ -1126,7 +1155,7 @@ export class Config {
   }
 
   getApprovalMode(): ApprovalMode {
-    return this.approvalMode;
+    return this.policyEngine.getApprovalMode();
   }
 
   setApprovalMode(mode: ApprovalMode): void {
@@ -1135,7 +1164,7 @@ export class Config {
         'Cannot enable privileged approval modes in an untrusted folder.',
       );
     }
-    this.approvalMode = mode;
+    this.policyEngine.setApprovalMode(mode);
   }
 
   isYoloModeDisabled(): boolean {
@@ -1486,6 +1515,9 @@ export class Config {
         config.terminalHeight ?? this.shellExecutionConfig.terminalHeight,
       showColor: config.showColor ?? this.shellExecutionConfig.showColor,
       pager: config.pager ?? this.shellExecutionConfig.pager,
+      sanitizationConfig:
+        config.sanitizationConfig ??
+        this.shellExecutionConfig.sanitizationConfig,
     };
   }
   getScreenReader(): boolean {
