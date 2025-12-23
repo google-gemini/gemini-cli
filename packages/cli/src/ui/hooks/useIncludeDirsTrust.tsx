@@ -8,7 +8,10 @@ import { useEffect } from 'react';
 import type { Config } from '@google/gemini-cli-core';
 import { loadTrustedFolders } from '../../config/trustedFolders.js';
 import { expandHomeDir } from '../utils/directoryUtils.js';
-import { refreshServerHierarchicalMemory } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  refreshServerHierarchicalMemory,
+} from '@google/gemini-cli-core';
 import { MultiFolderTrustDialog } from '../components/MultiFolderTrustDialog.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType, type HistoryItem } from '../types.js';
@@ -133,7 +136,7 @@ export function useIncludeDirsTrust(
     }
 
     if (undefinedTrustDirs.length > 0) {
-      console.log(
+      debugLogger.log(
         'Creating custom dialog with undecidedDirs:',
         undefinedTrustDirs,
       );

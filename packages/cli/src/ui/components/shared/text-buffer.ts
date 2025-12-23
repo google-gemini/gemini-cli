@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import pathMod from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
-import { coreEvents, CoreEvent } from '@google/gemini-cli-core';
+import { coreEvents, CoreEvent, debugLogger } from '@google/gemini-cli-core';
 import {
   toCodePoints,
   cpLen,
@@ -1202,7 +1202,7 @@ function textBufferReducerLogic(
             break;
           default: {
             const exhaustiveCheck: never = dir;
-            console.error(
+            debugLogger.error(
               `Unknown visual movement direction: ${exhaustiveCheck}`,
             );
             return state;
@@ -1530,7 +1530,7 @@ function textBufferReducerLogic(
 
     default: {
       const exhaustiveCheck: never = action;
-      console.error(`Unknown action encountered: ${exhaustiveCheck}`);
+      debugLogger.error(`Unknown action encountered: ${exhaustiveCheck}`);
       return state;
     }
   }
@@ -1911,7 +1911,11 @@ export function useTextBuffer({
         newText = newText.replace(/\r\n?/g, '\n');
         dispatch({ type: 'set_text', payload: newText, pushToUndo: false });
       } catch (err) {
-        console.error('[useTextBuffer] external editor error', err);
+        coreEvents.emitFeedback(
+          'error',
+          '[useTextBuffer] external editor error',
+          err,
+        );
       } finally {
         coreEvents.emit(CoreEvent.ExternalEditorClosed);
         if (wasRaw) setRawMode?.(true);

@@ -14,6 +14,7 @@ import {
   type HookPolicyDecision,
 } from './types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export class MessageBus extends EventEmitter {
   constructor(
@@ -45,7 +46,7 @@ export class MessageBus extends EventEmitter {
 
   async publish(message: Message): Promise<void> {
     if (this.debug) {
-      console.debug(`[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`);
+      debugLogger.debug(`[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`);
     }
     try {
       if (!this.isValidMessage(message)) {

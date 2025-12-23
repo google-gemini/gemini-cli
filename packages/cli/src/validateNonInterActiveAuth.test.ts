@@ -21,6 +21,7 @@ import {
   makeFakeConfig,
   debugLogger,
   ExitCodes,
+  coreEvents,
 } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import * as auth from './config/auth.js';
@@ -36,8 +37,8 @@ describe('validateNonInterActiveAuth', () => {
   let originalEnvGeminiApiKey: string | undefined;
   let originalEnvVertexAi: string | undefined;
   let originalEnvGcp: string | undefined;
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let debugLoggerErrorSpy: ReturnType<typeof vi.spyOn>;
+  let coreEventsEmitFeedbackSpy: MockInstance;
   let processExitSpy: MockInstance;
   let refreshAuthMock: Mock;
   let mockSettings: LoadedSettings;
@@ -49,9 +50,11 @@ describe('validateNonInterActiveAuth', () => {
     delete process.env['GEMINI_API_KEY'];
     delete process.env['GOOGLE_GENAI_USE_VERTEXAI'];
     delete process.env['GOOGLE_GENAI_USE_GCA'];
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     debugLoggerErrorSpy = vi
       .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+    coreEventsEmitFeedbackSpy = vi
+      .spyOn(coreEvents, 'emitFeedback')
       .mockImplementation(() => {});
     processExitSpy = vi
       .spyOn(process, 'exit')
@@ -302,6 +305,7 @@ describe('validateNonInterActiveAuth', () => {
 
     expect(validateAuthMethodSpy).not.toHaveBeenCalled();
     expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
+    expect(coreEventsEmitFeedbackSpy).not.toHaveBeenCalled();
     expect(processExitSpy).not.toHaveBeenCalled();
     // We still expect refreshAuth to be called with the (invalid) type
     expect(refreshAuthMock).toHaveBeenCalledWith('invalid-auth-type');
@@ -404,7 +408,8 @@ describe('validateNonInterActiveAuth', () => {
       expect(thrown?.message).toBe(
         `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
       );
-      const errorArg = consoleErrorSpy.mock.calls[0]?.[0] as string;
+      // Checking coreEventsEmitFeedbackSpy arguments
+      const errorArg = coreEventsEmitFeedbackSpy.mock.calls[0]?.[1] as string;
       const payload = JSON.parse(errorArg);
       expect(payload.error.type).toBe('Error');
       expect(payload.error.code).toBe(ExitCodes.FATAL_AUTHENTICATION_ERROR);
@@ -439,7 +444,8 @@ describe('validateNonInterActiveAuth', () => {
         `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
       );
       {
-        const errorArg = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        // Checking coreEventsEmitFeedbackSpy arguments
+        const errorArg = coreEventsEmitFeedbackSpy.mock.calls[0]?.[1] as string;
         const payload = JSON.parse(errorArg);
         expect(payload.error.type).toBe('Error');
         expect(payload.error.code).toBe(ExitCodes.FATAL_AUTHENTICATION_ERROR);
@@ -477,7 +483,8 @@ describe('validateNonInterActiveAuth', () => {
         `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
       );
       {
-        const errorArg = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        // Checking coreEventsEmitFeedbackSpy arguments
+        const errorArg = coreEventsEmitFeedbackSpy.mock.calls[0]?.[1] as string;
         const payload = JSON.parse(errorArg);
         expect(payload.error.type).toBe('Error');
         expect(payload.error.code).toBe(ExitCodes.FATAL_AUTHENTICATION_ERROR);

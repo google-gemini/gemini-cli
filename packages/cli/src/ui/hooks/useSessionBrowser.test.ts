@@ -19,6 +19,7 @@ import type {
   ConversationRecord,
   MessageRecord,
 } from '@google/gemini-cli-core';
+import { coreEvents } from '@google/gemini-cli-core';
 
 // Mock modules
 vi.mock('fs/promises');
@@ -52,6 +53,7 @@ describe('useSessionBrowser', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(coreEvents, 'emitFeedback').mockImplementation(() => {});
     mockedPath.join.mockImplementation((...args) => args.join('/'));
     vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue(
       MOCKED_PROJECT_TEMP_DIR,
@@ -100,9 +102,6 @@ describe('useSessionBrowser', () => {
       fileName: MOCKED_FILENAME,
     } as SessionInfo;
     mockedFs.readFile.mockRejectedValue(new Error('File not found'));
-    const consoleErrorSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
 
     const { result } = renderHook(() =>
       useSessionBrowser(mockConfig, mockOnLoadHistory),
@@ -112,9 +111,12 @@ describe('useSessionBrowser', () => {
       await result.current.handleResumeSession(mockSession);
     });
 
-    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      'error',
+      'Error resuming session:',
+      expect.any(Error),
+    );
     expect(result.current.isSessionBrowserOpen).toBe(false);
-    consoleErrorSpy.mockRestore();
   });
 
   it('should handle JSON parse error', async () => {
@@ -124,9 +126,6 @@ describe('useSessionBrowser', () => {
       fileName: MOCKED_FILENAME,
     } as SessionInfo;
     mockedFs.readFile.mockResolvedValue('invalid json');
-    const consoleErrorSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
 
     const { result } = renderHook(() =>
       useSessionBrowser(mockConfig, mockOnLoadHistory),
@@ -136,9 +135,12 @@ describe('useSessionBrowser', () => {
       await result.current.handleResumeSession(mockSession);
     });
 
-    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      'error',
+      'Error resuming session:',
+      expect.any(Error),
+    );
     expect(result.current.isSessionBrowserOpen).toBe(false);
-    consoleErrorSpy.mockRestore();
   });
 });
 

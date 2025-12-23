@@ -6,6 +6,8 @@
 
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
+import { debugLogger } from '../../utils/debugLogger.js';
+import { coreEvents } from '../../utils/events.js';
 import type {
   RoutingContext,
   RoutingDecision,
@@ -59,7 +61,7 @@ export class CompositeStrategy implements TerminalStrategy {
           return this.finalizeDecision(decision, startTime);
         }
       } catch (error) {
-        console.error(
+        debugLogger.warn(
           `[Routing] Strategy '${strategy.name}' failed. Continuing to next strategy. Error:`,
           error,
         );
@@ -76,7 +78,8 @@ export class CompositeStrategy implements TerminalStrategy {
 
       return this.finalizeDecision(decision, startTime);
     } catch (error) {
-      console.error(
+      coreEvents.emitFeedback(
+        'error',
         `[Routing] Critical Error: Terminal strategy '${terminalStrategy.name}' failed. Routing cannot proceed. Error:`,
         error,
       );

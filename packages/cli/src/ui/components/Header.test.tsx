@@ -159,7 +159,8 @@ describe('<Header />', () => {
     render(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).not.toHaveBeenCalled();
     const textCalls = (Text as Mock).mock.calls;
-    console.log(JSON.stringify(textCalls, null, 2));
+    // eslint-disable-next-line no-console
+    console.log(JSON.stringify(textCalls, null, 2)); // debugging output that got committed
     expect(textCalls.length).toBe(1);
     expect(textCalls[0][0]).toHaveProperty('color', singleColor);
   });
