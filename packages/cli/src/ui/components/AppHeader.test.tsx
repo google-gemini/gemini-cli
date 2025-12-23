@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { AppHeader } from './AppHeader.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { makeFakeConfig } from '@google/gemini-cli-core';
+import crypto from 'node:crypto';
 
 vi.mock('../utils/terminalSetup.js', () => ({
   getTerminalProgram: () => null,
@@ -146,7 +147,8 @@ describe('<AppHeader />', () => {
     (
       persistentState.get as unknown as ReturnType<typeof vi.fn>
     ).mockReturnValue({
-      e1a84b6fb88e50f1a51826f94630ca087a6a6504b409948344fcb67f8569a72c: 5,
+      [crypto.createHash('sha256').update('Standard Banner \n').digest('hex')]:
+        5,
     });
     const mockConfig = makeFakeConfig();
     const uiState = {
