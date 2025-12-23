@@ -219,6 +219,43 @@ describe('settings-validation', () => {
       }
     });
 
+    it('should validate mcpServers with type field for all transport types', () => {
+      const validSettings = {
+        mcpServers: {
+          'sse-server': {
+            url: 'https://example.com/sse',
+            type: 'sse',
+            headers: { 'X-API-Key': 'key' },
+          },
+          'http-server': {
+            url: 'https://example.com/mcp',
+            type: 'http',
+          },
+          'stdio-server': {
+            command: '/usr/bin/mcp-server',
+            type: 'stdio',
+          },
+        },
+      };
+
+      const result = validateSettings(validSettings);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject invalid type values in mcpServers', () => {
+      const invalidSettings = {
+        mcpServers: {
+          'bad-server': {
+            url: 'https://example.com/mcp',
+            type: 'invalid-type',
+          },
+        },
+      };
+
+      const result = validateSettings(invalidSettings);
+      expect(result.success).toBe(false);
+    });
+
     it('should validate complex nested customThemes configuration', () => {
       const invalidSettings = {
         ui: {
