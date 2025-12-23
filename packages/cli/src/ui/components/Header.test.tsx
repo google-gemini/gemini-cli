@@ -5,7 +5,15 @@
  */
 
 import { render } from '../../test-utils/render.js';
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { Header } from './Header.js';
 import * as useTerminalSize from '../hooks/useTerminalSize.js';
 import { longAsciiLogo, longAsciiLogoIde } from './AsciiArt.js';
@@ -15,6 +23,9 @@ import { Text } from 'ink';
 import type React from 'react';
 
 vi.mock('../hooks/useTerminalSize.js');
+vi.mock('../hooks/useSnowfall.js', () => ({
+  useSnowfall: vi.fn((art) => art),
+}));
 vi.mock('../utils/terminalSetup.js', () => ({
   getTerminalProgram: vi.fn(),
 }));
@@ -39,6 +50,12 @@ describe('<Header />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(terminalSetup.getTerminalProgram).mockReturnValue(null);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-06-15T12:00:00Z')); // June - definitely not December
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('renders the long logo on a wide terminal', () => {
@@ -174,6 +191,47 @@ describe('<Header />', () => {
     expect(Gradient.default).toHaveBeenCalledWith(
       expect.objectContaining({
         colors: gradientColors,
+      }),
+      undefined,
+    );
+  });
+
+  it('renders with holiday colors during December', async () => {
+    vi.setSystemTime(new Date('2025-12-25')); // December
+    const Gradient = await import('ink-gradient');
+    render(<Header version="1.0.0" nightly={false} />);
+
+    // Check for holiday colors (Red and Green)
+    // The exact check depends on how I defined them in Header.tsx: ['#D6001C', '#00873E']
+    expect(Gradient.default).toHaveBeenCalledWith(
+      expect.objectContaining({
+        colors: ['#D6001C', '#00873E'],
+      }),
+      undefined,
+    );
+  });
+
+  it('renders with holiday trees during December', () => {
+    vi.setSystemTime(new Date('2025-12-25')); // December
+    vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
+      columns: 120,
+      rows: 20,
+    });
+    render(<Header version="1.0.0" nightly={false} />);
+
+    const treePart = `*****`;
+
+    // Should contain the tree part
+    expect(Text).toHaveBeenCalledWith(
+      expect.objectContaining({
+        children: expect.stringContaining(treePart),
+      }),
+      undefined,
+    );
+    // Should still contain parts of the logo
+    expect(Text).toHaveBeenCalledWith(
+      expect.objectContaining({
+        children: expect.stringContaining('██'),
       }),
       undefined,
     );
