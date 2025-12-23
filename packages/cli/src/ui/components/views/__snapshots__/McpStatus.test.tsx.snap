@@ -82,6 +82,39 @@ A test server
 "
 `;
 
+exports[`McpStatus > renders correctly with many resources (truncated) 1`] = `
+"Configured MCP servers:
+
+🟢 server-1 - Ready (1 tool, 25 resources)
+A test server
+  Tools:
+  - tool-1
+    A test tool
+  Resources:
+  - resource-1 (file:///tmp/resource-1.txt)
+    Resource 1 description
+  - resource-2 (file:///tmp/resource-2.txt)
+    Resource 2 description
+  - resource-3 (file:///tmp/resource-3.txt)
+    Resource 3 description
+  - resource-4 (file:///tmp/resource-4.txt)
+    Resource 4 description
+  - resource-5 (file:///tmp/resource-5.txt)
+    Resource 5 description
+  - resource-6 (file:///tmp/resource-6.txt)
+    Resource 6 description
+  - resource-7 (file:///tmp/resource-7.txt)
+    Resource 7 description
+  - resource-8 (file:///tmp/resource-8.txt)
+    Resource 8 description
+  - resource-9 (file:///tmp/resource-9.txt)
+    Resource 9 description
+  - resource-10 (file:///tmp/resource-10.txt)
+    Resource 10 description
+    ... 15 resources hidden
+"
+`;
+
 exports[`McpStatus > renders correctly with parametersJsonSchema 1`] = `
 "Configured MCP servers:
 
