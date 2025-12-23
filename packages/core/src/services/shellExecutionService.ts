@@ -885,23 +885,25 @@ export class ShellExecutionService {
    */
   static kill(pid: number): void {
     const activePty = this.activePtys.get(pid);
-    if (activePty) {
-      try {
-        if (os.platform() === 'win32') {
-          activePty.ptyProcess.kill();
-        } else {
-          try {
-            process.kill(-pid, 'SIGKILL');
-          } catch {
-            activePty.ptyProcess.kill('SIGKILL');
-          }
+    if (!activePty) return;
+
+    try {
+      if (os.platform() === 'win32') {
+        activePty.ptyProcess.kill();
+      } else {
+        // Try killing the process group first
+        try {
+          process.kill(-pid, 'SIGKILL');
+        } catch {
+          // Fallback to killing the specific process
+          activePty.ptyProcess.kill('SIGKILL');
         }
-      } catch {
-        // Ignore errors if process is already dead
       }
-      this.activePtys.delete(pid);
-      this.activeResolvers.delete(pid);
+    } catch {
+      // Ignore errors if process is already dead
     }
+    this.activePtys.delete(pid);
+    this.activeResolvers.delete(pid);
   }
 
   /**

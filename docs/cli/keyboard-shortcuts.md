@@ -122,8 +122,7 @@ available combinations.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
 - `Ctrl+Delete` / `Meta+Delete`: Delete the word to the right of the cursor.
-- `Ctrl+B` or `Left Arrow`: Move the cursor one character to the left while
-  editing text.
+- `Left Arrow`: Move the cursor one character to the left while editing text.
 - `Ctrl+F` or `Right Arrow`: Move the cursor one character to the right; with an
   embedded shell attached, `Ctrl+F` still toggles focus.
 - `Ctrl+D` or `Delete`: Remove the character immediately to the right of the

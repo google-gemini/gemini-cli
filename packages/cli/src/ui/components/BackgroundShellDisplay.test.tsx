@@ -115,7 +115,7 @@ describe('<BackgroundShellDisplay />', () => {
       <BackgroundShellDisplay
         shells={mockShells}
         activePid={shell1.pid}
-        width={80}
+        width={100}
         height={24}
         isFocused={false}
         isListOpenProp={false}
@@ -193,7 +193,7 @@ describe('<BackgroundShellDisplay />', () => {
     );
 
     expect(lastFrame()).toContain('Select Process');
-    expect(lastFrame()).toContain('>  1: npm start (PID: 1001)');
+    expect(lastFrame()).toContain('> 1: npm start (PID: 1001)');
     expect(lastFrame()).toContain('   2: tail -f log.txt (PID: 1002)');
   });
 

@@ -493,7 +493,7 @@ describe('ShellTool', () => {
     describe('Streaming to `updateOutput`', () => {
       let updateOutputMock: Mock;
       beforeEach(() => {
-        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
         updateOutputMock = vi.fn();
       });
       afterEach(() => {
@@ -541,6 +541,27 @@ describe('ShellTool', () => {
           pid: 12345,
           executionMethod: 'child_process',
         });
+        await promise;
+      });
+
+      it('should NOT call updateOutput if the command is backgrounded', async () => {
+        const invocation = shellTool.build({
+          command: 'sleep 10',
+          is_background: true,
+        });
+        const promise = invocation.execute(mockAbortSignal, updateOutputMock);
+
+        mockShellOutputCallback({ type: 'data', chunk: 'some output' });
+        expect(updateOutputMock).not.toHaveBeenCalled();
+
+        // We need to provide a PID for the background logic to trigger
+        resolveShellExecution({ pid: 12345 });
+
+        // Advance time to trigger the background timeout
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(mockShellBackground).toHaveBeenCalledWith(12345);
+
         await promise;
       });
     });

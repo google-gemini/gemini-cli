@@ -10,12 +10,7 @@ import type {
 } from '../types.js';
 import { ToolCallStatus } from '../types.js';
 import { useCallback, useState, useRef } from 'react';
-import type {
-  AnsiOutput,
-  Config,
-  GeminiClient,
-  ShellExecutionResult,
-} from '@google/gemini-cli-core';
+import type { AnsiOutput, Config, GeminiClient } from '@google/gemini-cli-core';
 import { isBinary, ShellExecutionService } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -230,9 +225,7 @@ export const useShellCommandProcessor = (
         commandToExecute = `{ ${command} }; __code=$?; pwd > "${pwdFilePath}"; exit $__code`;
       }
 
-      const executeCommand = async (
-        resolve: (value: void | PromiseLike<void>) => void,
-      ) => {
+      const executeCommand = async () => {
         let cumulativeStdout: string | AnsiOutput = '';
         let isBinaryStream = false;
         let binaryBytesReceived = 0;
@@ -272,100 +265,87 @@ export const useShellCommandProcessor = (
             defaultBg: activeTheme.colors.Background,
           };
 
-          const { pid, result } = await ShellExecutionService.execute(
-            commandToExecute,
-            targetDir,
-            (event) => {
-              let shouldUpdate = false;
+          const { pid, result: resultPromise } =
+            await ShellExecutionService.execute(
+              commandToExecute,
+              targetDir,
+              (event) => {
+                let shouldUpdate = false;
 
-              switch (event.type) {
-                case 'data':
-                  // Do not process text data if we've already switched to binary mode.
-                  if (isBinaryStream) break;
-                  // PTY provides the full screen state, so we just replace.
-                  // Child process provides chunks, so we append.
-                  if (config.getEnableInteractiveShell()) {
-                    cumulativeStdout = event.chunk;
+                switch (event.type) {
+                  case 'data':
+                    if (isBinaryStream) break;
+                    if (config.getEnableInteractiveShell()) {
+                      cumulativeStdout = event.chunk;
+                      shouldUpdate = true;
+                    } else if (
+                      typeof event.chunk === 'string' &&
+                      typeof cumulativeStdout === 'string'
+                    ) {
+                      cumulativeStdout += event.chunk;
+                      shouldUpdate = true;
+                    }
+                    break;
+                  case 'binary_detected':
+                    isBinaryStream = true;
                     shouldUpdate = true;
-                  } else if (
-                    typeof event.chunk === 'string' &&
-                    typeof cumulativeStdout === 'string'
-                  ) {
-                    cumulativeStdout += event.chunk;
+                    break;
+                  case 'binary_progress':
+                    isBinaryStream = true;
+                    binaryBytesReceived = event.bytesReceived;
                     shouldUpdate = true;
-                  }
-                  break;
-                case 'binary_detected':
-                  isBinaryStream = true;
-                  // Force an immediate UI update to show the binary detection message.
-                  shouldUpdate = true;
-                  break;
-                case 'binary_progress':
-                  isBinaryStream = true;
-                  binaryBytesReceived = event.bytesReceived;
-                  shouldUpdate = true;
-                  break;
-                default: {
-                  throw new Error('An unhandled ShellOutputEvent was found.');
+                    break;
+                  default:
+                    throw new Error('An unhandled ShellOutputEvent was found.');
                 }
-              }
 
-              if (
-                executionPid &&
-                backgroundShellsRef.current.has(executionPid)
-              ) {
-                const existingShell =
-                  backgroundShellsRef.current.get(executionPid)!;
-                backgroundShellsRef.current.set(executionPid, {
-                  pid: executionPid,
-                  command: rawQuery as string,
-                  output: cumulativeStdout,
-                  isBinary: isBinaryStream,
-                  binaryBytesReceived,
-                  status: existingShell.status,
-                  exitCode: existingShell.exitCode,
-                });
-                setTick((t) => t + 1);
-                return;
-              }
-
-              // Compute the display string based on the *current* state.
-              let currentDisplayOutput: string | AnsiOutput;
-              if (isBinaryStream) {
-                if (binaryBytesReceived > 0) {
-                  currentDisplayOutput = `[Receiving binary output... ${formatMemoryUsage(
+                if (
+                  executionPid &&
+                  backgroundShellsRef.current.has(executionPid)
+                ) {
+                  const existingShell =
+                    backgroundShellsRef.current.get(executionPid)!;
+                  backgroundShellsRef.current.set(executionPid, {
+                    ...existingShell,
+                    output: cumulativeStdout,
+                    isBinary: isBinaryStream,
                     binaryBytesReceived,
-                  )} received]`;
-                } else {
-                  currentDisplayOutput =
-                    '[Binary output detected. Halting stream...]';
+                  });
+                  setTick((t) => t + 1);
+                  return;
                 }
-              } else {
-                currentDisplayOutput = cumulativeStdout;
-              }
 
-              // Throttle pending UI updates, but allow forced updates.
-              if (shouldUpdate) {
-                setLastShellOutputTime(Date.now());
-                setPendingHistoryItem((prevItem) => {
-                  if (prevItem?.type === 'tool_group') {
-                    return {
-                      ...prevItem,
-                      tools: prevItem.tools.map((tool) =>
-                        tool.callId === callId
-                          ? { ...tool, resultDisplay: currentDisplayOutput }
-                          : tool,
-                      ),
-                    };
-                  }
-                  return prevItem;
-                });
-              }
-            },
-            abortSignal,
-            config.getEnableInteractiveShell(),
-            shellExecutionConfig,
-          );
+                let currentDisplayOutput: string | AnsiOutput;
+                if (isBinaryStream) {
+                  currentDisplayOutput =
+                    binaryBytesReceived > 0
+                      ? `[Receiving binary output... ${formatMemoryUsage(binaryBytesReceived)} received]`
+                      : '[Binary output detected. Halting stream...]';
+                } else {
+                  currentDisplayOutput = cumulativeStdout;
+                }
+
+                if (shouldUpdate) {
+                  setLastShellOutputTime(Date.now());
+                  setPendingHistoryItem((prevItem) => {
+                    if (prevItem?.type === 'tool_group') {
+                      return {
+                        ...prevItem,
+                        tools: prevItem.tools.map((tool) =>
+                          tool.callId === callId
+                            ? { ...tool, resultDisplay: currentDisplayOutput }
+                            : tool,
+                        ),
+                      };
+                    }
+                    return prevItem;
+                  });
+                }
+              },
+              abortSignal,
+              config.getEnableInteractiveShell(),
+              shellExecutionConfig,
+            );
 
           executionPid = pid;
           if (pid) {
@@ -383,123 +363,89 @@ export const useShellCommandProcessor = (
             });
           }
 
-          result
-            .then((result: ShellExecutionResult) => {
-              setPendingHistoryItem(null);
+          const result = await resultPromise;
+          setPendingHistoryItem(null);
 
-              if (result.backgrounded && result.pid) {
-                backgroundShellsRef.current.set(result.pid, {
-                  pid: result.pid,
-                  command: rawQuery as string,
-                  output: cumulativeStdout,
-                  isBinary: isBinaryStream,
-                  binaryBytesReceived,
-                  status: 'running',
-                });
-                setBackgroundShellCount(countRunningShells());
-                setActiveShellPtyId(null);
-
-                ShellExecutionService.onExit(result.pid, (code) => {
-                  if (backgroundShellsRef.current.has(result.pid!)) {
-                    const shell = backgroundShellsRef.current.get(result.pid!);
-                    if (shell) {
-                      shell.status = 'exited';
-                      shell.exitCode = code;
-                    }
-                    setBackgroundShellCount(countRunningShells());
-                    setTick((t) => t + 1);
-                  }
-                });
-              }
-
-              let mainContent: string;
-
-              if (isBinary(result.rawOutput)) {
-                mainContent =
-                  '[Command produced binary output, which is not shown.]';
-              } else {
-                mainContent =
-                  result.output.trim() || '(Command produced no output)';
-              }
-
-              let finalOutput = mainContent;
-              let finalStatus = ToolCallStatus.Success;
-
-              if (result.error) {
-                finalStatus = ToolCallStatus.Error;
-                finalOutput = `${result.error.message}\n${finalOutput}`;
-              } else if (result.aborted) {
-                finalStatus = ToolCallStatus.Canceled;
-                finalOutput = `Command was cancelled.\n${finalOutput}`;
-              } else if (result.backgrounded) {
-                finalStatus = ToolCallStatus.Success;
-                finalOutput = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
-              } else if (result.signal) {
-                finalStatus = ToolCallStatus.Error;
-                finalOutput = `Command terminated by signal: ${result.signal}.\n${finalOutput}`;
-              } else if (result.exitCode !== 0) {
-                finalStatus = ToolCallStatus.Error;
-                finalOutput = `Command exited with code ${result.exitCode}.\n${finalOutput}`;
-              }
-
-              if (pwdFilePath && fs.existsSync(pwdFilePath)) {
-                const finalPwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
-                if (finalPwd && finalPwd !== targetDir) {
-                  const warning = `WARNING: shell mode is stateless; the directory change to '${finalPwd}' will not persist.`;
-                  finalOutput = `${warning}\n\n${finalOutput}`;
-                }
-              }
-
-              const finalToolDisplay: IndividualToolCallDisplay = {
-                ...initialToolDisplay,
-                status: finalStatus,
-                resultDisplay: finalOutput,
-              };
-
-              // Add the complete, contextual result to the local UI history.
-              // We skip this for cancelled commands because useGeminiStream handles the
-              // immediate addition of the cancelled item to history to prevent flickering/duplicates.
-              if (finalStatus !== ToolCallStatus.Canceled) {
-                addItemToHistory(
-                  {
-                    type: 'tool_group',
-                    tools: [finalToolDisplay],
-                  } as HistoryItemWithoutId,
-                  userMessageTimestamp,
-                );
-              }
-
-              // Add the same complete, contextual result to the LLM's history.
-              addShellCommandToGeminiHistory(
-                geminiClient,
-                rawQuery,
-                finalOutput,
-              );
-            })
-            .catch((err) => {
-              setPendingHistoryItem(null);
-              const errorMessage =
-                err instanceof Error ? err.message : String(err);
-              addItemToHistory(
-                {
-                  type: 'error',
-                  text: `An unexpected error occurred: ${errorMessage}`,
-                },
-                userMessageTimestamp,
-              );
-            })
-            .finally(() => {
-              abortSignal.removeEventListener('abort', abortHandler);
-              if (pwdFilePath && fs.existsSync(pwdFilePath)) {
-                fs.unlinkSync(pwdFilePath);
-              }
-
-              setActiveShellPtyId(null);
-              setShellInputFocused(false);
-              resolve();
+          if (result.backgrounded && result.pid) {
+            backgroundShellsRef.current.set(result.pid, {
+              pid: result.pid,
+              command: rawQuery,
+              output: cumulativeStdout,
+              isBinary: isBinaryStream,
+              binaryBytesReceived,
+              status: 'running',
             });
+            setBackgroundShellCount(countRunningShells());
+            setActiveShellPtyId(null);
+
+            ShellExecutionService.onExit(result.pid, (code) => {
+              if (backgroundShellsRef.current.has(result.pid!)) {
+                const shell = backgroundShellsRef.current.get(result.pid!);
+                if (shell) {
+                  shell.status = 'exited';
+                  shell.exitCode = code;
+                }
+                setBackgroundShellCount(countRunningShells());
+                setTick((t) => t + 1);
+              }
+            });
+          }
+
+          let mainContent: string;
+          if (isBinary(result.rawOutput)) {
+            mainContent =
+              '[Command produced binary output, which is not shown.]';
+          } else {
+            mainContent =
+              result.output.trim() || '(Command produced no output)';
+          }
+
+          let finalOutput = mainContent;
+          let finalStatus = ToolCallStatus.Success;
+
+          if (result.error) {
+            finalStatus = ToolCallStatus.Error;
+            finalOutput = `${result.error.message}\n${finalOutput}`;
+          } else if (result.aborted) {
+            finalStatus = ToolCallStatus.Canceled;
+            finalOutput = `Command was cancelled.\n${finalOutput}`;
+          } else if (result.backgrounded) {
+            finalStatus = ToolCallStatus.Success;
+            finalOutput = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+          } else if (result.signal) {
+            finalStatus = ToolCallStatus.Error;
+            finalOutput = `Command terminated by signal: ${result.signal}.\n${finalOutput}`;
+          } else if (result.exitCode !== 0) {
+            finalStatus = ToolCallStatus.Error;
+            finalOutput = `Command exited with code ${result.exitCode}.\n${finalOutput}`;
+          }
+
+          if (pwdFilePath && fs.existsSync(pwdFilePath)) {
+            const finalPwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
+            if (finalPwd && finalPwd !== targetDir) {
+              const warning = `WARNING: shell mode is stateless; the directory change to '${finalPwd}' will not persist.`;
+              finalOutput = `${warning}\n\n${finalOutput}`;
+            }
+          }
+
+          const finalToolDisplay: IndividualToolCallDisplay = {
+            ...initialToolDisplay,
+            status: finalStatus,
+            resultDisplay: finalOutput,
+          };
+
+          if (finalStatus !== ToolCallStatus.Canceled) {
+            addItemToHistory(
+              {
+                type: 'tool_group',
+                tools: [finalToolDisplay],
+              } as HistoryItemWithoutId,
+              userMessageTimestamp,
+            );
+          }
+
+          addShellCommandToGeminiHistory(geminiClient, rawQuery, finalOutput);
         } catch (err) {
-          // This block handles synchronous errors from `execute`
           setPendingHistoryItem(null);
           const errorMessage = err instanceof Error ? err.message : String(err);
           addItemToHistory(
@@ -509,23 +455,18 @@ export const useShellCommandProcessor = (
             },
             userMessageTimestamp,
           );
-
-          // Perform cleanup here as well
+        } finally {
+          abortSignal.removeEventListener('abort', abortHandler);
           if (pwdFilePath && fs.existsSync(pwdFilePath)) {
             fs.unlinkSync(pwdFilePath);
           }
+
           setActiveShellPtyId(null);
           setShellInputFocused(false);
-          resolve(); // Resolve the promise to unblock `onExec`
         }
       };
 
-      const execPromise = new Promise<void>((resolve) => {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        executeCommand(resolve);
-      });
-
-      onExec(execPromise);
+      onExec(executeCommand());
       return true;
     },
     [

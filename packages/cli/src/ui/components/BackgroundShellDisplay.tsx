@@ -28,7 +28,10 @@ interface BackgroundShellDisplayProps {
 
 const CONTENT_PADDING_X = 1;
 const RIGHT_TEXT = 'Ctrl+B Hide | Ctrl+K Kill';
-// 2 for borders, 2 for padding
+const BORDER_WIDTH = 2; // Left and Right border
+const HEADER_HEIGHT = 3; // 2 for border, 1 for header
+const TAB_PADDING = 2; // Spaces around tab text
+const PID_TEXT_ESTIMATE = 25; // " (PID: 123456) (Focused)"
 const TAB_DISPLAY_HORIZONTAL_PADDING = 4;
 
 export const BackgroundShellDisplay = ({
@@ -46,18 +49,16 @@ export const BackgroundShellDisplay = ({
   } = useUIActions();
   const activeShell = shells.get(activePid);
   const [output, setOutput] = useState<string | AnsiOutput>('');
-  // Track internal selection for the list view
   const [listSelectionIndex, setListSelectionIndex] = useState(0);
 
   useEffect(() => {
     if (!shells.has(activePid)) return;
-    // Resize the active PTY
-    // 2 for borders, plus padding on both sides
+
     const ptyWidth = Math.max(
       1,
       width - TAB_DISPLAY_HORIZONTAL_PADDING / 2 - CONTENT_PADDING_X * 2,
     );
-    const ptyHeight = Math.max(1, height - 3); // -2 for border, -1 for header
+    const ptyHeight = Math.max(1, height - HEADER_HEIGHT);
     ShellExecutionService.resizePty(activePid, ptyWidth, ptyHeight);
   }, [activePid, width, height, shells]);
 
@@ -67,7 +68,6 @@ export const BackgroundShellDisplay = ({
     }
   }, [activeShell]);
 
-  // Sync list selection with active PID when opening list
   useEffect(() => {
     if (isListOpenProp && activeShell) {
       const shellPids = Array.from(shells.keys());
@@ -78,7 +78,6 @@ export const BackgroundShellDisplay = ({
     }
   }, [isListOpenProp, activeShell, shells]);
 
-  // Auto-open list if multiple shells exist on mount, or auto-focus single shell
   useEffect(() => {
     if (shells.size === 1) {
       setIsBackgroundShellListOpen(false);
@@ -117,7 +116,6 @@ export const BackgroundShellDisplay = ({
           setIsBackgroundShellListOpen(false);
           return;
         }
-        // Handle Ctrl+O to select current and close list (toggle behavior)
         if (key.ctrl && key.name === 'o') {
           const selectedPid = shellPids[listSelectionIndex];
           if (selectedPid) {
@@ -126,7 +124,6 @@ export const BackgroundShellDisplay = ({
           setIsBackgroundShellListOpen(false);
           return;
         }
-        // Don't let other keys bleed through when list is open
         return;
       }
 
@@ -134,19 +131,16 @@ export const BackgroundShellDisplay = ({
         return;
       }
 
-      // Ctrl+K to dismiss
       if (key.ctrl && key.name === 'k') {
         dismissBackgroundShell(activeShell.pid);
         return;
       }
 
-      // If we want to toggle list via keyboard - this is redundant with global shortcut but good for focused context
       if (key.ctrl && key.name === 'o') {
         setIsBackgroundShellListOpen(true);
         return;
       }
 
-      // Forward input to PTY
       if (key.name === 'return') {
         ShellExecutionService.writeToPty(activeShell.pid, '\r');
       } else if (key.name === 'backspace') {
@@ -159,22 +153,18 @@ export const BackgroundShellDisplay = ({
   );
 
   const renderTabs = () => {
-    const tabs = [];
     const shellList = Array.from(shells.values()).filter(
       (s) => s.status === 'running',
     );
 
-    // Calculate available width for tabs
-    // width - borders(2) - padding(2) - rightText - pidText - spacing
-    // PID text approx: " (PID: 123456) (Focused)" -> ~25 chars
-    const pidTextEstimate = 25;
     const availableWidth =
       width -
       TAB_DISPLAY_HORIZONTAL_PADDING -
       RIGHT_TEXT.length -
-      pidTextEstimate;
+      PID_TEXT_ESTIMATE;
 
     let currentWidth = 0;
+    const tabs = [];
     let overflow = false;
 
     for (let i = 0; i < shellList.length; i++) {
@@ -182,8 +172,8 @@ export const BackgroundShellDisplay = ({
       const commandFirstLine = shell.command.split('\n')[0];
       const maxTabLabelLength = Math.max(
         1,
-        Math.floor(availableWidth / shellList.length) - 2,
-      ); // -2 for padding
+        Math.floor(availableWidth / shellList.length) - TAB_PADDING,
+      );
       const truncatedCommand =
         commandFirstLine.length > maxTabLabelLength
           ? `${commandFirstLine.substring(0, maxTabLabelLength - 3)}...`
@@ -225,7 +215,10 @@ export const BackgroundShellDisplay = ({
   const renderProcessList = () => {
     const shellList = Array.from(shells.values());
     const headerText = 'Select Process (Enter to select, Esc to cancel):';
-    const maxCommandLength = Math.max(0, width - 2 - headerText.length - 10); // 2 for padding, 10 for PID/Exit Code
+    const maxCommandLength = Math.max(
+      0,
+      width - BORDER_WIDTH - headerText.length - 10,
+    );
 
     return (
       <Box flexDirection="column" padding={1}>
@@ -249,7 +242,7 @@ export const BackgroundShellDisplay = ({
                 <Text
                   color={
                     isSelected
-                      ? theme.text.primary // When selected, display exit code in primary text color
+                      ? theme.text.primary
                       : shell.exitCode === 0
                         ? theme.status.success
                         : theme.status.error
@@ -302,8 +295,8 @@ export const BackgroundShellDisplay = ({
         ) : (
           <AnsiOutputText
             data={output}
-            width={Math.max(1, width - 2 - CONTENT_PADDING_X * 2)}
-            availableTerminalHeight={Math.max(1, height - 3)}
+            width={Math.max(1, width - BORDER_WIDTH - CONTENT_PADDING_X * 2)}
+            availableTerminalHeight={Math.max(1, height - HEADER_HEIGHT)}
           />
         )}
       </Box>

@@ -102,7 +102,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     }
     return `${backgroundProcessCount} Background process${
       backgroundProcessCount > 1 ? 'es' : ''
-    } (Ctrl+B)`;
+    }`;
   })();
 
   const summaryParts = [

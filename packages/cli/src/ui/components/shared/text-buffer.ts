@@ -2221,7 +2221,6 @@ export function useTextBuffer({
       )
         newline();
       else if (key.name === 'left' && !key.meta && !key.ctrl) move('left');
-      else if (key.ctrl && key.name === 'b') move('left');
       else if (key.name === 'right' && !key.meta && !key.ctrl) move('right');
       else if (key.ctrl && key.name === 'f') move('right');
       else if (key.name === 'up') move('up');
