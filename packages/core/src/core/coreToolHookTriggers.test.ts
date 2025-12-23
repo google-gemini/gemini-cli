@@ -78,7 +78,9 @@ describe('executeToolWithHooks', () => {
     );
 
     // Verify result reflects modified input
-    expect(result.llmContent).toBe('key: modified');
+    expect(result.llmContent).toBe(
+      'key: modified\n\n[System] Tool input parameters (key) were modified by a hook before execution.',
+    );
     // Verify params object was modified in place
     expect(invocation.params.key).toBe('modified');
 
