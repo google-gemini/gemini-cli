@@ -18,6 +18,7 @@ import type {
 } from './types.js';
 import type { LLMRequest } from './hookTranslator.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { sanitizeEnvironment } from '../services/environmentSanitization.js';
 import {
   escapeShellArg,
   getShellConfiguration,
@@ -238,7 +239,7 @@ export class HookRunner {
 
       // Set up environment variables
       const env = {
-        ...process.env,
+        ...sanitizeEnvironment(process.env, this.config.sanitizationConfig),
         GEMINI_PROJECT_DIR: input.cwd,
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
       };
