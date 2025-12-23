@@ -98,11 +98,13 @@ they appear in the UI.
 
 ### Security
 
-| UI Label                   | Setting                        | Description                                        | Default |
-| -------------------------- | ------------------------------ | -------------------------------------------------- | ------- |
-| Disable YOLO Mode          | `security.disableYoloMode`     | Disable YOLO mode, even if enabled by a flag.      | `false` |
-| Blocks extensions from Git | `security.blockGitExtensions`  | Blocks installing and loading extensions from Git. | `false` |
-| Folder Trust               | `security.folderTrust.enabled` | Setting to track whether Folder trust is enabled.  | `false` |
+| UI Label                      | Setting                                         | Description                                               | Default |
+| ----------------------------- | ----------------------------------------------- | --------------------------------------------------------- | ------- |
+| Disable YOLO Mode             | `security.disableYoloMode`                      | Disable YOLO mode, even if enabled by a flag.             | `false` |
+| Blocks extensions from Git    | `security.blockGitExtensions`                   | Blocks installing and loading extensions from Git.        | `false` |
+| Folder Trust                  | `security.folderTrust.enabled`                  | Setting to track whether Folder trust is enabled.         | `false` |
+| Allowed Environment Variables | `security.environmentVariableRedaction.allowed` | Environment variables to always allow (bypass redaction). | `[]`    |
+| Blocked Environment Variables | `security.environmentVariableRedaction.blocked` | Environment variables to always redact.                   | `[]`    |
 
 ### Experimental
 

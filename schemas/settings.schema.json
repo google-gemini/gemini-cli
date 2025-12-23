@@ -1231,6 +1231,43 @@
           },
           "additionalProperties": false
         },
+        "environmentVariableRedaction": {
+          "title": "Environment Variable Redaction",
+          "description": "Settings for environment variable redaction.",
+          "markdownDescription": "Settings for environment variable redaction.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "allowed": {
+              "title": "Allowed Environment Variables",
+              "description": "Environment variables to always allow (bypass redaction).",
+              "markdownDescription": "Environment variables to always allow (bypass redaction).\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `[]`",
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "blocked": {
+              "title": "Blocked Environment Variables",
+              "description": "Environment variables to always redact.",
+              "markdownDescription": "Environment variables to always redact.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `[]`",
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "enabled": {
+              "title": "Enable Environment Variable Redaction",
+              "description": "Enable redaction of environment variables that may contain secrets.",
+              "markdownDescription": "Enable redaction of environment variables that may contain secrets.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "auth": {
           "title": "Authentication",
           "description": "Authentication settings.",
