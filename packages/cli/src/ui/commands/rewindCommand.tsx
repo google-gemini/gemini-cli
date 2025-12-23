@@ -97,7 +97,7 @@ export const rewindCommand: SlashCommand = {
               client.setHistory(clientHistory as Content[]);
 
               // Reset context manager as we are rewinding history
-              config.getContextManager()?.reset();
+              await config.getContextManager()?.refresh();
 
               // Update UI History
               // We generate IDs based on index for the rewind history

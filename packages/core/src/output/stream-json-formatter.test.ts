@@ -270,6 +270,7 @@ describe('StreamJsonFormatter', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     });
 
     it('should aggregate token counts from single model', () => {
@@ -436,6 +437,7 @@ describe('StreamJsonFormatter', () => {
           totalLinesAdded: 0,
           totalLinesRemoved: 0,
         },
+        rewinds: 0,
       };
 
       const result = formatter.convertToStreamStats(metrics, 1000);
@@ -463,6 +465,7 @@ describe('StreamJsonFormatter', () => {
           totalLinesAdded: 0,
           totalLinesRemoved: 0,
         },
+        rewinds: 0,
       };
 
       const result = formatter.convertToStreamStats(metrics, 5000);
