@@ -63,8 +63,8 @@ export async function runZedIntegration(
 
   // SIGTERM/SIGINT handlers (in sdk.ts) don't fire when stdin closes.
   // We must explicitly await the connection close to flush telemetry.
-  await connection.closed;
-  await runExitCleanup();
+  // Use finally() to ensure cleanup runs even on stream errors.
+  await connection.closed.finally(runExitCleanup);
 }
 
 export class GeminiAgent {
