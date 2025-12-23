@@ -219,7 +219,7 @@ describe('settings-validation', () => {
       }
     });
 
-    it('should validate mcpServers with type field for SSE and HTTP transports', () => {
+    it('should validate mcpServers with type field for all transport types', () => {
       const validSettings = {
         mcpServers: {
           'sse-server': {
@@ -230,6 +230,10 @@ describe('settings-validation', () => {
           'http-server': {
             url: 'https://example.com/mcp',
             type: 'http',
+          },
+          'stdio-server': {
+            command: '/usr/bin/mcp-server',
+            type: 'stdio',
           },
         },
       };
