@@ -1203,6 +1203,48 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      environmentVariableRedaction: {
+        type: 'object',
+        label: 'Environment Variable Redaction',
+        category: 'Security',
+        requiresRestart: false,
+        default: {},
+        description: 'Settings for environment variable redaction.',
+        showInDialog: false,
+        properties: {
+          allowed: {
+            type: 'array',
+            label: 'Allowed Environment Variables',
+            category: 'Security',
+            requiresRestart: true,
+            default: [] as string[],
+            description:
+              'Environment variables to always allow (bypass redaction).',
+            showInDialog: false,
+            items: { type: 'string' },
+          },
+          blocked: {
+            type: 'array',
+            label: 'Blocked Environment Variables',
+            category: 'Security',
+            requiresRestart: true,
+            default: [] as string[],
+            description: 'Environment variables to always redact.',
+            showInDialog: false,
+            items: { type: 'string' },
+          },
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Environment Variable Redaction',
+            category: 'Security',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Enable redaction of environment variables that may contain secrets.',
+            showInDialog: true,
+          },
+        },
+      },
       auth: {
         type: 'object',
         label: 'Authentication',
