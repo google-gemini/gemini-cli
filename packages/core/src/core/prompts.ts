@@ -17,6 +17,7 @@ import {
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
   DELEGATE_TO_AGENT_TOOL_NAME,
+  ACTIVATE_SKILL_TOOL_NAME,
 } from '../tools/tool-names.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
@@ -77,10 +78,10 @@ export function resolvePathFromEnv(envVar?: string): {
   };
 }
 
-export function getCoreSystemPrompt(
+export async function getCoreSystemPrompt(
   config: Config,
   userMemory?: string,
-): string {
+): Promise<string> {
   // A flag to indicate whether the system prompt override is active.
   let systemMdEnabled = false;
   // The default path for the system prompt file. This can be overridden.
@@ -130,6 +131,29 @@ export function getCoreSystemPrompt(
 
   const interactiveMode = config.isInteractiveShellEnabled();
 
+  const skills = config.getSkillManager().getSkills();
+  let skillsPrompt = '';
+  if (skills.length > 0) {
+    const skillsJson = JSON.stringify(
+      skills.map((skill) => ({
+        name: skill.name,
+        description: skill.description,
+        location: skill.location,
+      })),
+      null,
+      2,
+    );
+    skillsPrompt = `
+# Available Agent Skills
+
+You have access to the following specialized skills. To activate a skill and receive its detailed instructions, you MUST first call the \`${ACTIVATE_SKILL_TOOL_NAME}\` tool with the skill's name. You MUST then follow those detailed instructions strictly.
+
+\`\`\`json
+${skillsJson}
+\`\`\`
+`;
+  }
+
   let basePrompt: string;
   if (systemMdEnabled) {
     basePrompt = fs.readFileSync(systemMdPath, 'utf8');
@@ -147,14 +171,19 @@ export function getCoreSystemPrompt(
 - **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.
 - ${interactiveMode ? `**Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.` : `**Handle Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request.`}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandatesVariant}${
+- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${
+        skills.length > 0
+          ? `
+- **Skill Guidance:** Once a skill is activated via \`${ACTIVATE_SKILL_TOOL_NAME}\`, its instructions provide the primary procedural framework for the task. You should prioritize these specialized rules and workflows over your general internal defaults. While following these instructions strictly, you must still exercise professional judgment and adhere to your core safety and security mandates.`
+          : ''
+      }${mandatesVariant}${
         !interactiveMode
           ? `
   - **Continue the work** You are not to interact with the user. Do your best to complete the task at hand, using your best judgement and avoid asking user for any additional information.`
           : ''
       }
 
-${config.getAgentRegistry().getDirectoryContext()}`,
+${config.getAgentRegistry().getDirectoryContext()}${skillsPrompt}`,
       primaryWorkflows_prefix: `
 # Primary Workflows
 
