@@ -269,9 +269,7 @@ describe('settings-validation', () => {
         expect(formatted).toContain('/path/to/settings.json');
         expect(formatted).toContain('model.name');
         expect(formatted).toContain('Expected: string, but received: object');
-        expect(formatted).toContain(
-          'Please fix the configuration and try again.',
-        );
+        expect(formatted).toContain('Please fix the configuration.');
         expect(formatted).toContain(
           'https://github.com/google-gemini/gemini-cli',
         );
