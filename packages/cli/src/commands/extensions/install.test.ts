@@ -4,11 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, type MockInstance, type Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+  type Mock,
+} from 'vitest';
 import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
-import type { ExtensionManager } from '../../config/extension-manager.js';
+import type {
+  ExtensionManager,
+  inferInstallMetadata,
+} from '../../config/extension-manager.js';
 import type { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import type * as fs from 'node:fs/promises';
 import type { Stats } from 'node:fs';
@@ -20,12 +32,15 @@ const mockRequestConsentNonInteractive: Mock<
   typeof requestConsentNonInteractive
 > = vi.hoisted(() => vi.fn());
 const mockStat: Mock<typeof fs.stat> = vi.hoisted(() => vi.fn());
+const mockInferInstallMetadata: Mock<typeof inferInstallMetadata> = vi.hoisted(
+  () => vi.fn(),
+);
 
 vi.mock('../../config/extensions/consent.js', () => ({
   requestConsentNonInteractive: mockRequestConsentNonInteractive,
 }));
 
-vi.mock('../../config/extension-manager.ts', async (importOriginal) => {
+vi.mock('../../config/extension-manager.js', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('../../config/extension-manager.js')>();
   return {
@@ -34,6 +49,7 @@ vi.mock('../../config/extension-manager.ts', async (importOriginal) => {
       installOrUpdateExtension: mockInstallOrUpdateExtension,
       loadExtensions: vi.fn(),
     })),
+    inferInstallMetadata: mockInferInstallMetadata,
   };
 });
 
@@ -72,12 +88,31 @@ describe('handleInstall', () => {
     processSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation(() => undefined as never);
+
+    mockInferInstallMetadata.mockImplementation(async (source, args) => {
+      if (
+        source.startsWith('http://') ||
+        source.startsWith('https://') ||
+        source.startsWith('git@') ||
+        source.startsWith('sso://')
+      ) {
+        return {
+          source,
+          type: 'git',
+          ref: args?.ref,
+          autoUpdate: args?.autoUpdate,
+          allowPreRelease: args?.allowPreRelease,
+        };
+      }
+      return { source, type: 'local' };
+    });
   });
 
   afterEach(() => {
     mockInstallOrUpdateExtension.mockClear();
     mockRequestConsentNonInteractive.mockClear();
     mockStat.mockClear();
+    mockInferInstallMetadata.mockClear();
     vi.clearAllMocks();
   });
 
@@ -124,7 +159,9 @@ describe('handleInstall', () => {
   });
 
   it('throws an error from an unknown source', async () => {
-    mockStat.mockRejectedValue(new Error('ENOENT: no such file or directory'));
+    mockInferInstallMetadata.mockRejectedValue(
+      new Error('Install source not found.'),
+    );
     await handleInstall({
       source: 'test://google.com',
     });
