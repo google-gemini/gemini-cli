@@ -239,6 +239,14 @@ export class CodeAssistServer implements ContentGenerator {
     );
   }
 
+  async receiveEvents(): Promise<ReceiveEventsResponse> {
+    const response: ReceiveEventsResponse = await this.requestGet(
+      METHOD_WITH_PARAMS,
+      false,
+    );
+    return response;
+  }
+
   async recordConversationOffered(
     conversationOffered: ConversationOffered,
   ): Promise<void> {
@@ -277,11 +285,7 @@ export class CodeAssistServer implements ContentGenerator {
   ): Promise<void> {
     return this.requestPost<void>('recordCodeAssistMetrics', request);
   }
-  async receiveEvents(req: ReceiveEventRequest): Promise<void> {
-    const res = await this.requestPost('event:receive', req);
-    console.log(res);
-  }
-
+  
   async requestPost<T>(
     method: string,
     req: object,

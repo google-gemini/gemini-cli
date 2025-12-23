@@ -38,7 +38,7 @@ export function useBanner(bannerData: BannerData, config: Config) {
   const [bannerCounts] = useState(
     () => persistentState.get('defaultBannerShownCount') || {},
   );
-  const defaultText = title + body;
+  const defaultText = title + ' \n' + body;
   const hashedText = crypto
     .createHash('sha256')
     .update(defaultText)

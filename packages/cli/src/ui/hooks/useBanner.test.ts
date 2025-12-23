@@ -16,6 +16,7 @@ import { renderHook } from '../../test-utils/render.js';
 import { useBanner } from './useBanner.js';
 import type { Config } from '@google/gemini-cli-core';
 import { persistentState } from '../../utils/persistentState.js';
+import crypto from 'node:crypto';
 
 vi.mock('../../utils/persistentState.js', () => ({
   persistentState: {
@@ -58,6 +59,15 @@ describe('useBanner', () => {
     isWarning: false,
   };
 
+  const hashedText = crypto
+    .createHash('sha256')
+    .update(
+      defaultBannerData.bannerText.title +
+        ' \n' +
+        defaultBannerData.bannerText.body,
+    )
+    .digest('hex');
+
   beforeEach(() => {
     vi.resetAllMocks();
 
@@ -92,8 +102,7 @@ describe('useBanner', () => {
     expect(mockedPersistentState.set).toHaveBeenCalledWith(
       'defaultBannerShownCount',
       expect.objectContaining({
-        // Hash for "Standard Banner"
-        e1a84b6fb88e50f1a51826f94630ca087a6a6504b409948344fcb67f8569a72c: 1,
+        [hashedText]: 1,
       }),
     );
   });
@@ -101,7 +110,7 @@ describe('useBanner', () => {
   it('should NOT show banner if it has been shown max times', () => {
     // 20 is the DEFAULT_MAX_BANNER_SHOWN_COUNT
     mockedPersistentState.get.mockReturnValue({
-      e1a84b6fb88e50f1a51826f94630ca087a6a6504b409948344fcb67f8569a72c: 5,
+      [hashedText]: 5,
     });
 
     const { result } = renderHook(() =>
@@ -114,7 +123,7 @@ describe('useBanner', () => {
 
   it('should show banner if it has been shown less than max times', () => {
     mockedPersistentState.get.mockReturnValue({
-      e1a84b6fb88e50f1a51826f94630ca087a6a6504b409948344fcb67f8569a72c: 4,
+      [hashedText]: 4,
     });
 
     const { result } = renderHook(() =>
@@ -125,7 +134,7 @@ describe('useBanner', () => {
     expect(mockedPersistentState.set).toHaveBeenCalledWith(
       'defaultBannerShownCount',
       expect.objectContaining({
-        e1a84b6fb88e50f1a51826f94630ca087a6a6504b409948344fcb67f8569a72c: 5,
+        [hashedText]: 5,
       }),
     );
   });
