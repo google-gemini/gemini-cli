@@ -65,7 +65,9 @@ export const useSnowfall = (displayTitle: string): string => {
   const { columns: terminalWidth } = useTerminalSize();
   const { history, historyRemountKey } = useUIState();
 
-  const hasStartedChat = history.some((item) => item.type === 'user');
+  const hasStartedChat = history.some(
+    (item) => item.type === 'user' && item.text !== '/theme',
+  );
   const widthOfShortLogo = getAsciiArtWidth(shortAsciiLogo);
 
   const [showSnow, setShowSnow] = useState(true);
