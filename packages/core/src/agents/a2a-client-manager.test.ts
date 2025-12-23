@@ -9,8 +9,8 @@ import {
   A2AClientManager,
   type SendMessageResult,
 } from './a2a-client-manager.js';
-import type { AgentCard, Client, Task } from '@a2a-js/sdk';
-import type { AuthenticationHandler } from '@a2a-js/sdk/client';
+import type { AgentCard, Task } from '@a2a-js/sdk';
+import type { AuthenticationHandler, Client } from '@a2a-js/sdk/client';
 import { ClientFactory, DefaultAgentCardResolver } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
@@ -88,7 +88,7 @@ describe('A2AClientManager', () => {
     } as AgentCard);
 
     vi.mocked(ClientFactoryOptions.createFrom).mockImplementation(
-      (_defaults, overrides) => overrides,
+      (_defaults, overrides) => overrides as ClientFactoryOptions,
     );
 
     vi.mocked(createAuthenticatingFetchWithRetry).mockReturnValue(
