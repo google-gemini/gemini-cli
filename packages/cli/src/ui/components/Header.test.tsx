@@ -5,15 +5,7 @@
  */
 
 import { render } from '../../test-utils/render.js';
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  type Mock,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { Header } from './Header.js';
 import * as useTerminalSize from '../hooks/useTerminalSize.js';
 import { longAsciiLogo, longAsciiLogoIde } from './AsciiArt.js';
@@ -50,13 +42,6 @@ describe('<Header />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(terminalSetup.getTerminalProgram).mockReturnValue(null);
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2025-06-15T12:00:00Z')); // June - definitely not December
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.useRealTimers();
   });
 
   it('renders the long logo on a wide terminal', () => {
