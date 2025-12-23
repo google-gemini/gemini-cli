@@ -14,6 +14,7 @@ import {
   createHookOutput,
   NotificationType,
   type DefaultHookOutput,
+  BeforeToolHookOutput,
 } from '../hooks/types.js';
 import type {
   ToolCallConfirmationDetails,
@@ -292,6 +293,17 @@ export async function executeToolWithHooks(
           message: `Agent execution stopped: ${reason}`,
         },
       };
+    }
+
+    // Check if hook requested to update tool input
+    if (beforeOutput instanceof BeforeToolHookOutput) {
+      const modifiedInput = beforeOutput.getModifiedToolInput();
+      if (modifiedInput) {
+        // We modify the toolInput object in-place, which should be the same reference as invocation.params
+        // We use Object.assign to update properties
+        Object.assign(toolInput, modifiedInput);
+        debugLogger.debug(`Tool input modified by hook for ${toolName}`);
+      }
     }
   }
 

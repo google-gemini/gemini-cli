@@ -93,6 +93,11 @@ describe('Hook Output Classes', () => {
       const output = createHookOutput(HookEventName.BeforeToolSelection, {});
       expect(output).toBeInstanceOf(BeforeToolSelectionHookOutput);
     });
+
+    it('should return BeforeToolHookOutput for BeforeTool event', () => {
+      const output = createHookOutput(HookEventName.BeforeTool, {});
+      expect(output).toBeInstanceOf(BeforeToolHookOutput);
+    });
   });
 
   describe('DefaultHookOutput', () => {

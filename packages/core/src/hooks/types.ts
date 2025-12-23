@@ -113,6 +113,8 @@ export function createHookOutput(
       return new AfterModelHookOutput(data);
     case 'BeforeToolSelection':
       return new BeforeToolSelectionHookOutput(data);
+    case 'BeforeTool':
+      return new BeforeToolHookOutput(data);
     default:
       return new DefaultHookOutput(data);
   }
@@ -252,6 +254,23 @@ export class BeforeToolHookOutput extends DefaultHookOutput {
 
     return super.isBlockingDecision();
   }
+
+  /**
+   * Get modified tool input if provided by hook
+   */
+  getModifiedToolInput(): Record<string, unknown> | undefined {
+    if (this.hookSpecificOutput && 'tool_input' in this.hookSpecificOutput) {
+      const input = this.hookSpecificOutput['tool_input'];
+      if (
+        typeof input === 'object' &&
+        input !== null &&
+        !Array.isArray(input)
+      ) {
+        return input as Record<string, unknown>;
+      }
+    }
+    return undefined;
+  }
 }
 
 /**
@@ -386,6 +405,7 @@ export interface BeforeToolOutput extends HookOutput {
     hookEventName: 'BeforeTool';
     permissionDecision?: HookDecision;
     permissionDecisionReason?: string;
+    tool_input?: Record<string, unknown>;
   };
 }
 
