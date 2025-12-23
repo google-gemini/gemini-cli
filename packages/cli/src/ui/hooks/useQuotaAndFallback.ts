@@ -132,7 +132,8 @@ export function useQuotaAndFallback({
       if (choice === 'retry_always') {
         // Explicitly set the model to the fallback model to persist the user's choice.
         // This ensures the Footer updates and future turns use this model.
-        config.setModel(proQuotaRequest.fallbackModel);
+        // Passing true value ensures we do not persist the fallback model.
+        config.setModel(proQuotaRequest.fallbackModel, true);
 
         historyManager.addItem(
           {
