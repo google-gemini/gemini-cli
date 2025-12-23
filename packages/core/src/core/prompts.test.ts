@@ -72,7 +72,44 @@ describe('Core System Prompt (prompts.ts)', () => {
       getAgentRegistry: vi.fn().mockReturnValue({
         getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
       }),
+      getSkillManager: vi.fn().mockReturnValue({
+        getSkills: vi.fn().mockReturnValue([]),
+      }),
     } as unknown as Config;
+  });
+
+  it('should include available_skills when provided in config', () => {
+    const skills = [
+      {
+        name: 'test-skill',
+        description: 'A test skill description',
+        location: '/path/to/test-skill/SKILL.md',
+        body: 'Skill content',
+      },
+    ];
+    vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue(skills);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# Available Agent Skills');
+    expect(prompt).toContain(
+      "To activate a skill and receive its detailed instructions, you can call the `activate_skill` tool with the skill's name.",
+    );
+    expect(prompt).toContain('Skill Guidance');
+    expect(prompt).toContain('```json');
+    expect(prompt).toContain('"name": "test-skill"');
+    expect(prompt).toContain('"description": "A test skill description"');
+    expect(prompt).toContain('"location": "/path/to/test-skill/SKILL.md"');
+    expect(prompt).toContain('```');
+    expect(prompt).toMatchSnapshot();
+  });
+
+  it('should NOT include skill guidance or available_skills when NO skills are provided', () => {
+    vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue([]);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).not.toContain('# Available Agent Skills');
+    expect(prompt).not.toContain('Skill Guidance');
+    expect(prompt).not.toContain('activate_skill');
   });
 
   it('should use chatty system prompt for preview model', () => {
@@ -88,7 +125,9 @@ describe('Core System Prompt (prompts.ts)', () => {
       PREVIEW_GEMINI_FLASH_MODEL,
     );
     const prompt = getCoreSystemPrompt(mockConfig);
-    expect(prompt).toContain('Do not call tools in silence');
+    expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
+    expect(prompt).not.toContain('No Chitchat:');
+    expect(prompt).toMatchSnapshot();
   });
 
   it.each([
@@ -175,6 +214,9 @@ describe('Core System Prompt (prompts.ts)', () => {
         getAgentRegistry: vi.fn().mockReturnValue({
           getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
         }),
+        getSkillManager: vi.fn().mockReturnValue({
+          getSkills: vi.fn().mockReturnValue([]),
+        }),
       } as unknown as Config;
 
       const prompt = getCoreSystemPrompt(testConfig);
@@ -194,6 +236,7 @@ describe('Core System Prompt (prompts.ts)', () => {
           "Use 'search_file_content' and 'glob' search tools extensively",
         );
       }
+      expect(prompt).toMatchSnapshot();
     },
   );
 
