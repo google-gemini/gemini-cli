@@ -37,6 +37,7 @@ import {
   type OutputFormat,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
+import { saveModelChange, loadSettings } from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
@@ -397,6 +398,8 @@ export async function loadCliConfig(
   const { cwd = process.cwd(), projectHooks } = options;
   const debugMode = isDebugMode(argv);
 
+  const loadedSettings = loadSettings(cwd);
+
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
   }
@@ -629,8 +632,12 @@ export async function loadCliConfig(
     mcpServers: settings.mcpServers,
     allowedMcpServers: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
     blockedMcpServers: argv.allowedMcpServerNames
-      ? [] // explicitly allowed servers overrides everything
+      ? undefined
       : settings.mcp?.excluded,
+    blockedEnvironmentVariables:
+      settings.security?.environmentVariableRedaction?.blocked,
+    enableEnvironmentVariableRedaction:
+      settings.security?.environmentVariableRedaction?.enabled,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,
@@ -700,6 +707,7 @@ export async function loadCliConfig(
     enableHooks: settings.tools?.enableHooks ?? false,
     hooks: settings.hooks || {},
     projectHooks: projectHooks || {},
+    onModelChange: (model: string) => saveModelChange(loadedSettings, model),
   });
 }
 
