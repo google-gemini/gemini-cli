@@ -19,7 +19,6 @@ import { getAsciiArtWidth } from '../utils/textUtils.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { getTerminalProgram } from '../utils/terminalSetup.js';
 import { useSnowfall } from '../hooks/useSnowfall.js';
-import { useUIState } from '../contexts/UIStateContext.js';
 
 interface HeaderProps {
   customAsciiArt?: string; // For user-defined ASCII art
@@ -49,10 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
   }
 
   const artWidth = getAsciiArtWidth(displayTitle);
-  const { history } = useUIState();
-  const hasStartedChat = history.some((item) => item.type === 'user');
-
-  const snowTitle = useSnowfall(displayTitle, { enabled: !hasStartedChat });
+  const title = useSnowfall(displayTitle);
 
   return (
     <Box
@@ -61,7 +57,7 @@ export const Header: React.FC<HeaderProps> = ({
       flexShrink={0}
       flexDirection="column"
     >
-      <ThemedGradient>{snowTitle}</ThemedGradient>
+      <ThemedGradient>{title}</ThemedGradient>
       {nightly && (
         <Box width="100%" flexDirection="row" justifyContent="flex-end">
           <ThemedGradient>v{version}</ThemedGradient>

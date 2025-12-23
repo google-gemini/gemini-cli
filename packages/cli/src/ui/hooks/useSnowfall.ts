@@ -9,6 +9,9 @@ import { getAsciiArtWidth } from '../utils/textUtils.js';
 import { debugState } from '../debug.js';
 import { themeManager } from '../themes/theme-manager.js';
 import { Holiday } from '../themes/holiday.js';
+import { useUIState } from '../contexts/UIStateContext.js';
+import { useTerminalSize } from './useTerminalSize.js';
+import { shortAsciiLogo } from '../components/AsciiArt.js';
 
 interface Snowflake {
   x: number;
@@ -18,10 +21,6 @@ interface Snowflake {
 
 const SNOW_CHARS = ['*', '.', '·', '+'];
 const FRAME_RATE = 150; // ms
-
-// Check if current month is December (11) or Jan (0)
-const isHolidaySeason =
-  new Date().getMonth() === 11 || new Date().getMonth() === 0;
 
 const addHolidayTrees = (art: string): string => {
   const holidayTree = `
@@ -58,23 +57,39 @@ const addHolidayTrees = (art: string): string => {
   return `\n\n${art}\n${centeredTripleTrees}\n\n`;
 };
 
-export const useSnowfall = (
-  art: string,
-  options: { enabled?: boolean } = {},
-): string => {
+export const useSnowfall = (displayTitle: string): string => {
+  const isHolidaySeason =
+    new Date().getMonth() === 11 || new Date().getMonth() === 0;
+
   const currentTheme = themeManager.getActiveTheme();
+  const { columns: terminalWidth } = useTerminalSize();
+  const { history } = useUIState();
+
+  const hasStartedChat = history.some((item) => item.type === 'user');
+  const widthOfShortLogo = getAsciiArtWidth(shortAsciiLogo);
+
+  const [showSnow, setShowSnow] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSnow(false);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const enabled =
     isHolidaySeason &&
     currentTheme.name === Holiday.name &&
-    (options.enabled ?? true);
+    terminalWidth >= widthOfShortLogo &&
+    !hasStartedChat &&
+    showSnow;
 
   const displayArt = useMemo(() => {
     if (enabled) {
-      return addHolidayTrees(art);
+      return addHolidayTrees(displayTitle);
     }
-    return art;
-  }, [art, enabled]);
+    return displayTitle;
+  }, [displayTitle, enabled]);
 
   const [snowflakes, setSnowflakes] = useState<Snowflake[]>([]);
   // We don't need 'frame' state if we just use functional updates for snowflakes,

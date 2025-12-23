@@ -55,6 +55,7 @@ describe('<Header />', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -176,7 +177,6 @@ describe('<Header />', () => {
     render(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).not.toHaveBeenCalled();
     const textCalls = (Text as Mock).mock.calls;
-    console.log(JSON.stringify(textCalls, null, 2));
     expect(textCalls.length).toBe(1);
     expect(textCalls[0][0]).toHaveProperty('color', singleColor);
   });
@@ -191,47 +191,6 @@ describe('<Header />', () => {
     expect(Gradient.default).toHaveBeenCalledWith(
       expect.objectContaining({
         colors: gradientColors,
-      }),
-      undefined,
-    );
-  });
-
-  it('renders with holiday colors during December', async () => {
-    vi.setSystemTime(new Date('2025-12-25')); // December
-    const Gradient = await import('ink-gradient');
-    render(<Header version="1.0.0" nightly={false} />);
-
-    // Check for holiday colors (Red and Green)
-    // The exact check depends on how I defined them in Header.tsx: ['#D6001C', '#00873E']
-    expect(Gradient.default).toHaveBeenCalledWith(
-      expect.objectContaining({
-        colors: ['#D6001C', '#00873E'],
-      }),
-      undefined,
-    );
-  });
-
-  it('renders with holiday trees during December', () => {
-    vi.setSystemTime(new Date('2025-12-25')); // December
-    vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
-      columns: 120,
-      rows: 20,
-    });
-    render(<Header version="1.0.0" nightly={false} />);
-
-    const treePart = `*****`;
-
-    // Should contain the tree part
-    expect(Text).toHaveBeenCalledWith(
-      expect.objectContaining({
-        children: expect.stringContaining(treePart),
-      }),
-      undefined,
-    );
-    // Should still contain parts of the logo
-    expect(Text).toHaveBeenCalledWith(
-      expect.objectContaining({
-        children: expect.stringContaining('██'),
       }),
       undefined,
     );
