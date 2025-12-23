@@ -1071,20 +1071,38 @@ describe('ChatRecordingService', () => {
       expect(unlinkSpy).not.toHaveBeenCalled();
     });
 
-    it('should delete both jsonl and json in fallback path', async () => {
-      const sessionId = 'abcd1234-efgh-5678-ijkl-9012mnop3456';
-      const expectedJsonlPath = `/test/project/root/.gemini/tmp/chats/${sessionId}.jsonl`;
-      const expectedJsonPath = `/test/project/root/.gemini/tmp/chats/${sessionId}.json`;
+    it('should delete by scanning for non-UUID sessionId', async () => {
+      const sessionId = 'legacy-session-id';
+      const expectedFiles = [
+        'session-2025-01-01T10-00-abcd1234.jsonl',
+        'session-2025-01-01T09-00-abcd1234.json',
+      ];
 
-      const accessSpy = vi
-        .spyOn(fsPromises, 'access')
+      accessSpy.mockImplementation(async (filePath) => {
+        if (String(filePath).endsWith('/chats')) return;
+        throw makeEnoent();
+      });
+
+      const readdirSpy = vi
+        .spyOn(fsPromises, 'readdir')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .mockResolvedValue(expectedFiles as any);
+
+      const readFileSpy = vi
+        .spyOn(fsPromises, 'readFile')
         .mockImplementation(async (filePath) => {
           const file = String(filePath);
-          if (file === expectedJsonlPath || file === expectedJsonPath) {
-            return;
+          if (file.endsWith('.jsonl')) {
+            return (
+              JSON.stringify({
+                type: 'session_metadata',
+                sessionId,
+                startTime: new Date().toISOString(),
+                lastUpdated: new Date().toISOString(),
+              }) + '\n'
+            );
           }
-          // Force shortId scan to be skipped
-          throw makeEnoent();
+          return JSON.stringify({ sessionId, messages: [] });
         });
 
       const unlinkSpy = vi
@@ -1094,8 +1112,68 @@ describe('ChatRecordingService', () => {
       await chatRecordingService.deleteSession(sessionId);
 
       expect(accessSpy).toHaveBeenCalled();
-      expect(unlinkSpy).toHaveBeenCalledWith(expectedJsonlPath);
-      expect(unlinkSpy).toHaveBeenCalledWith(expectedJsonPath);
+      expect(readdirSpy).toHaveBeenCalledWith(
+        '/test/project/root/.gemini/tmp/chats',
+      );
+      expect(readFileSpy).toHaveBeenCalled();
+      for (const file of expectedFiles) {
+        expect(unlinkSpy).toHaveBeenCalledWith(
+          `/test/project/root/.gemini/tmp/chats/${file}`,
+        );
+      }
+    });
+
+    it('should delete by shortId prefix when provided', async () => {
+      const shortId = 'abcd1234';
+      const sessionId = `${shortId}-5678-1234-9abc-1234567890ab`;
+      const expectedFiles = [
+        'session-2025-01-01T10-00-abcd1234.jsonl',
+        'session-2025-01-01T09-00-abcd1234.json',
+      ];
+
+      accessSpy.mockImplementation(async (filePath) => {
+        if (String(filePath).endsWith('/chats')) return;
+        throw makeEnoent();
+      });
+
+      const readdirSpy = vi
+        .spyOn(fsPromises, 'readdir')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .mockResolvedValue(expectedFiles as any);
+
+      const readFileSpy = vi
+        .spyOn(fsPromises, 'readFile')
+        .mockImplementation(async (filePath) => {
+          const file = String(filePath);
+          if (file.endsWith('.jsonl')) {
+            return (
+              JSON.stringify({
+                type: 'session_metadata',
+                sessionId,
+                startTime: new Date().toISOString(),
+                lastUpdated: new Date().toISOString(),
+              }) + '\n'
+            );
+          }
+          return JSON.stringify({ sessionId, messages: [] });
+        });
+
+      const unlinkSpy = vi
+        .spyOn(fsPromises, 'unlink')
+        .mockResolvedValue(undefined);
+
+      await chatRecordingService.deleteSession(shortId);
+
+      expect(accessSpy).toHaveBeenCalled();
+      expect(readdirSpy).toHaveBeenCalledWith(
+        '/test/project/root/.gemini/tmp/chats',
+      );
+      expect(readFileSpy).toHaveBeenCalled();
+      for (const file of expectedFiles) {
+        expect(unlinkSpy).toHaveBeenCalledWith(
+          `/test/project/root/.gemini/tmp/chats/${file}`,
+        );
+      }
     });
   });
 });

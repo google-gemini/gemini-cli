@@ -881,41 +881,58 @@ export class ChatRecordingService {
       // Session files use the first 8 chars of the UUID in the filename
       // Pattern: session-{timestamp}-{sessionId.slice(0,8)}.jsonl
       const shortId = sessionId.slice(0, 8);
-      const shortIdIsHex = /^[0-9a-fA-F]{8}$/.test(shortId);
+      const isShortId = /^[0-9a-fA-F]{8}$/.test(sessionId);
+      const isUuid =
+        /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+          sessionId,
+        );
+      const shortIdIsHex = isUuid || isShortId;
+      const sessionMatches = async (filePath: string): Promise<boolean> => {
+        try {
+          const content = await fsPromises.readFile(filePath, 'utf8');
+          if (filePath.endsWith('.jsonl')) {
+            const parsed = parseJsonl(content, '', '');
+            if (isShortId) {
+              return parsed.sessionId?.startsWith(sessionId) ?? false;
+            }
+            return parsed.sessionId === sessionId;
+          }
+          const parsed = JSON.parse(content) as ConversationRecord;
+          if (isShortId) {
+            return parsed.sessionId?.startsWith(sessionId) ?? false;
+          }
+          return parsed.sessionId === sessionId;
+        } catch (error) {
+          debugLogger.warn(
+            `[SessionRecording] Failed to verify sessionId for ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          return false;
+        }
+      };
 
       // Scan chats directory for matching files
-      if (shortIdIsHex && (await fileExists(chatsDir))) {
+      if (await fileExists(chatsDir)) {
         const files = await fsPromises.readdir(chatsDir);
         let deleted = false;
         const jsonlSuffix = `-${shortId}.jsonl`;
         const jsonSuffix = `-${shortId}.json`;
-        const sessionMatches = async (filePath: string): Promise<boolean> => {
-          try {
-            const content = await fsPromises.readFile(filePath, 'utf8');
-            if (filePath.endsWith('.jsonl')) {
-              const parsed = parseJsonl(content, '', '');
-              return parsed.sessionId === sessionId;
-            }
-            const parsed = JSON.parse(content) as ConversationRecord;
-            return parsed.sessionId === sessionId;
-          } catch (error) {
-            debugLogger.warn(
-              `[SessionRecording] Failed to verify sessionId for ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+        const candidates = shortIdIsHex
+          ? files.filter(
+              (file) =>
+                file.startsWith(SESSION_FILE_PREFIX) &&
+                (file.endsWith(jsonlSuffix) || file.endsWith(jsonSuffix)),
+            )
+          : files.filter(
+              (file) =>
+                file.startsWith(SESSION_FILE_PREFIX) &&
+                (file.endsWith('.jsonl') || file.endsWith('.json')),
             );
-            return false;
-          }
-        };
-        for (const file of files) {
+        for (const file of candidates) {
           // Match files that end with the short session ID segment
-          if (
-            file.startsWith(SESSION_FILE_PREFIX) &&
-            (file.endsWith(jsonlSuffix) || file.endsWith(jsonSuffix))
-          ) {
-            const filePath = path.join(chatsDir, file);
-            if (await sessionMatches(filePath)) {
-              await fsPromises.unlink(filePath);
-              deleted = true;
-            }
+          const filePath = path.join(chatsDir, file);
+          if (await sessionMatches(filePath)) {
+            await fsPromises.unlink(filePath);
+            deleted = true;
           }
         }
         if (deleted) {
@@ -927,10 +944,10 @@ export class ChatRecordingService {
       const jsonlPath = path.join(chatsDir, `${sessionId}.jsonl`);
       const jsonPath = path.join(chatsDir, `${sessionId}.json`);
 
-      if (await fileExists(jsonlPath)) {
+      if ((await fileExists(jsonlPath)) && (await sessionMatches(jsonlPath))) {
         await fsPromises.unlink(jsonlPath);
       }
-      if (await fileExists(jsonPath)) {
+      if ((await fileExists(jsonPath)) && (await sessionMatches(jsonPath))) {
         await fsPromises.unlink(jsonPath);
       }
     } catch (error) {
