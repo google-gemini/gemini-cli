@@ -105,6 +105,7 @@ import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
+import { useClipboardImages } from './hooks/useClipboardImages.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
@@ -127,6 +128,7 @@ import { enableBracketedPaste } from './utils/bracketedPaste.js';
 import { useBanner } from './hooks/useBanner.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
+const IMAGE_WARNING_DURATION_MS = 3000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
@@ -342,6 +344,9 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();
+
+  // Clipboard images for pasted images in the input
+  const clipboardImages = useClipboardImages();
 
   const mainAreaWidth = calculateMainAreaWidth(terminalWidth, settings);
   // Derive widths for InputPrompt using shared helper
@@ -776,6 +781,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     terminalWidth,
     terminalHeight,
     embeddedShellFocused,
+    clipboardImages,
   );
 
   // Auto-accept indicator
@@ -1020,14 +1026,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
 
-    const handleWarning = (message: string) => {
+    const handleWarning = (
+      message: string,
+      durationMs = WARNING_PROMPT_DURATION_MS,
+    ) => {
       setWarningMessage(message);
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
       timeoutId = setTimeout(() => {
         setWarningMessage(null);
-      }, WARNING_PROMPT_DURATION_MS);
+      }, durationMs);
     };
 
     const handleSelectionWarning = () => {
@@ -1036,11 +1045,25 @@ Logging in with Google... Restarting Gemini CLI to continue.
     const handlePasteTimeout = () => {
       handleWarning('Paste Timed out. Possibly due to slow connection.');
     };
+    const handleImageWarning = (message: string) => {
+      handleWarning(message, IMAGE_WARNING_DURATION_MS);
+    };
+    const handleImageProcessing = (message: string) => {
+      if (message) {
+        setWarningMessage(message);
+      } else {
+        setWarningMessage(null);
+      }
+    };
     appEvents.on(AppEvent.SelectionWarning, handleSelectionWarning);
     appEvents.on(AppEvent.PasteTimeout, handlePasteTimeout);
+    appEvents.on(AppEvent.ImageWarning, handleImageWarning);
+    appEvents.on(AppEvent.ImageProcessing, handleImageProcessing);
     return () => {
       appEvents.off(AppEvent.SelectionWarning, handleSelectionWarning);
       appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
+      appEvents.off(AppEvent.ImageWarning, handleImageWarning);
+      appEvents.off(AppEvent.ImageProcessing, handleImageProcessing);
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
@@ -1527,6 +1550,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       warningMessage,
       bannerData,
       bannerVisible,
+      clipboardImages,
       terminalBackgroundColor: config.getTerminalBackground(),
     }),
     [
@@ -1619,6 +1643,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       warningMessage,
       bannerData,
       bannerVisible,
+      clipboardImages,
       config,
     ],
   );

@@ -28,6 +28,7 @@ import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
 import type { UpdateObject } from '../utils/updateCheck.js';
+import type { UseClipboardImagesReturn } from '../hooks/useClipboardImages.js';
 
 export interface ProQuotaDialogRequest {
   failedModel: string;
@@ -137,6 +138,7 @@ export interface UIState {
   };
   bannerVisible: boolean;
   customDialog: React.ReactNode | null;
+  clipboardImages: UseClipboardImagesReturn;
   terminalBackgroundColor: TerminalBackgroundColor;
 }
 

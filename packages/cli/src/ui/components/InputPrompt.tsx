@@ -24,7 +24,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode, debugLogger } from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
   buildSegmentsForVisualSlice,
@@ -34,7 +34,11 @@ import {
   clipboardHasImage,
   saveClipboardImage,
   cleanupOldClipboardImages,
+  mayContainImagePaths,
+  categorizePathsByType,
 } from '../utils/clipboardUtils.js';
+import type { UseClipboardImagesReturn } from '../hooks/useClipboardImages.js';
+import { appEvents, AppEvent } from '../../utils/events.js';
 import {
   isAutoExecutableCommand,
   isSlashCommand,
@@ -86,6 +90,7 @@ export interface InputPromptProps {
   popAllMessages?: () => string | undefined;
   suggestionsPosition?: 'above' | 'below';
   setBannerVisible: (visible: boolean) => void;
+  clipboardImages?: UseClipboardImagesReturn;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -128,6 +133,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   popAllMessages,
   suggestionsPosition = 'below',
   setBannerVisible,
+  clipboardImages,
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
@@ -316,22 +322,46 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const handleClipboardPaste = useCallback(async () => {
     try {
       if (await clipboardHasImage()) {
+        // Show processing indicator immediately
+        appEvents.emit(AppEvent.ImageProcessing, 'Processing image...');
+
         const imagePath = await saveClipboardImage(config.getTargetDir());
+
+        // Clear processing indicator
+        appEvents.emit(AppEvent.ImageProcessing, '');
+
         if (imagePath) {
           // Clean up old images
           cleanupOldClipboardImages(config.getTargetDir()).catch(() => {
             // Ignore cleanup errors
           });
 
-          // Get relative path from current directory
-          const relativePath = path.relative(config.getTargetDir(), imagePath);
+          // Register image and get display text (e.g., "[Image #1]")
+          // If clipboardImages is not provided, fall back to the old @path behavior
+          let insertText: string;
+          if (clipboardImages) {
+            // Validate image before registration
+            const validation = await clipboardImages.validateImage(imagePath);
+            if (!validation.valid) {
+              appEvents.emit(
+                AppEvent.ImageWarning,
+                validation.error ?? 'Invalid image',
+              );
+              return;
+            }
+            insertText = clipboardImages.registerImage(imagePath);
+          } else {
+            const relativePath = path.relative(
+              config.getTargetDir(),
+              imagePath,
+            );
+            insertText = `@${relativePath}`;
+          }
 
-          // Insert @path reference at cursor position
-          const insertText = `@${relativePath}`;
           const currentText = buffer.text;
           const offset = buffer.getOffset();
 
-          // Add spaces around the path if needed
+          // Add spaces around the display text if needed
           let textToInsert = insertText;
           const charBefore = offset > 0 ? currentText[offset - 1] : '';
           const charAfter =
@@ -354,9 +384,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       const offset = buffer.getOffset();
       buffer.replaceRangeByOffset(offset, offset, textToInsert);
     } catch (error) {
-      console.error('Error handling clipboard image:', error);
+      debugLogger.error('Error handling clipboard image:', error);
     }
-  }, [buffer, config]);
+  }, [buffer, config, clipboardImages]);
 
   useMouseClick(
     innerBoxRef,
@@ -414,6 +444,98 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             pasteTimeoutRef.current = null;
           }, 40);
         }
+
+        // Check if pasted content could be image file path(s) (drag and drop)
+        // Use synchronous check first to avoid async handling for normal text
+        if (
+          clipboardImages &&
+          key.sequence &&
+          mayContainImagePaths(key.sequence)
+        ) {
+          // Capture state at paste time to handle the async operation correctly
+          const sequence = key.sequence;
+          const pasteOffset = buffer.getOffset();
+          const currentText = buffer.text;
+
+          // Only go async for potential image paths to verify file existence
+          void (async () => {
+            try {
+              const { imagePaths, nonImagePaths } =
+                await categorizePathsByType(sequence);
+
+              if (imagePaths.length > 0 || nonImagePaths.length > 0) {
+                // Validate all images in parallel
+                const validationResults = await Promise.all(
+                  imagePaths.map(async (imagePath) => ({
+                    imagePath,
+                    validation: await clipboardImages.validateImage(imagePath),
+                  })),
+                );
+
+                // Register valid images and collect errors
+                const placeholders: string[] = [];
+                const skippedImages: string[] = [];
+
+                for (const { imagePath, validation } of validationResults) {
+                  if (validation.valid) {
+                    placeholders.push(clipboardImages.registerImage(imagePath));
+                  } else {
+                    skippedImages.push(validation.error ?? 'Invalid image');
+                  }
+                }
+
+                // Show warnings for skipped images
+                for (const error of skippedImages) {
+                  appEvents.emit(AppEvent.ImageWarning, error);
+                }
+
+                // Non-image files use @path syntax for file references
+                const atPrefixedPaths = nonImagePaths.map((p) => `@${p}`);
+
+                // Build insertion text: image placeholders + @path references
+                const insertParts = [...placeholders, ...atPrefixedPaths];
+
+                // If all images were invalid but we have non-image paths, still insert those
+                if (insertParts.length === 0) {
+                  // All paths were invalid images with no non-image files
+                  return;
+                }
+
+                let insertText = insertParts.join(' ');
+
+                // Add spacing around the insert text based on context at paste time
+                const charBefore =
+                  pasteOffset > 0 ? currentText[pasteOffset - 1] : '';
+                const charAfter =
+                  pasteOffset < currentText.length
+                    ? currentText[pasteOffset]
+                    : '';
+
+                if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
+                  insertText = ' ' + insertText;
+                }
+                if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
+                  insertText = insertText + ' ';
+                }
+
+                // Insert at the original paste position
+                buffer.replaceRangeByOffset(
+                  pasteOffset,
+                  pasteOffset,
+                  insertText,
+                );
+              } else {
+                // No valid paths found, insert as normal text
+                buffer.replaceRangeByOffset(pasteOffset, pasteOffset, sequence);
+              }
+            } catch {
+              // On error, insert as normal text
+              buffer.replaceRangeByOffset(pasteOffset, pasteOffset, sequence);
+            }
+          })();
+          return;
+        }
+
         // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
         return;
@@ -863,6 +985,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       tryLoadQueuedMessages,
       setBannerVisible,
+      clipboardImages,
     ],
   );
 
@@ -1154,7 +1277,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   }
 
                   const color =
-                    seg.type === 'command' || seg.type === 'file'
+                    seg.type === 'command' ||
+                    seg.type === 'file' ||
+                    seg.type === 'image'
                       ? theme.text.accent
                       : theme.text.primary;
 
