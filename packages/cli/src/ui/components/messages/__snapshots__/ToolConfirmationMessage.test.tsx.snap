@@ -8,10 +8,9 @@ URLs to fetch:
 
 Do you want to proceed?
 
-● 1. Yes, allow once
-  2. Yes, allow always
-  3. Yes, allow always and save to policy
-  4. No, suggest changes (esc)
+● 1. Allow once
+  2. Allow for this session
+  3. No, suggest changes (esc)
 "
 `;
 
@@ -20,10 +19,9 @@ exports[`ToolConfirmationMessage > should not display urls if prompt and url are
 
 Do you want to proceed?
 
-● 1. Yes, allow once
-  2. Yes, allow always
-  3. Yes, allow always and save to policy
-  4. No, suggest changes (esc)
+● 1. Allow once
+  2. Allow for this session
+  3. No, suggest changes (esc)
 "
 `;
 
@@ -36,7 +34,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' 
 
 Apply this change?
 
-● 1. Yes, allow once
+● 1. Allow once
   2. Modify with external editor
   3. No, suggest changes (esc)
 "
@@ -51,11 +49,10 @@ exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' 
 
 Apply this change?
 
-● 1. Yes, allow once
-  2. Yes, allow always
-  3. Yes, allow always and save to policy
-  4. Modify with external editor
-  5. No, suggest changes (esc)
+● 1. Allow once
+  2. Allow for this session
+  3. Modify with external editor
+  4. No, suggest changes (esc)
 "
 `;
 
@@ -64,7 +61,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' 
 
 Allow execution of: 'echo'?
 
-● 1. Yes, allow once
+● 1. Allow once
   2. No, suggest changes (esc)
 "
 `;
@@ -74,10 +71,9 @@ exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' 
 
 Allow execution of: 'echo'?
 
-● 1. Yes, allow once
-  2. Yes, allow always ...
-  3. Yes, allow always and save to policy
-  4. No, suggest changes (esc)
+● 1. Allow once
+  2. Allow for this session
+  3. No, suggest changes (esc)
 "
 `;
 
@@ -86,7 +82,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for info confirmations' 
 
 Do you want to proceed?
 
-● 1. Yes, allow once
+● 1. Allow once
   2. No, suggest changes (esc)
 "
 `;
@@ -96,10 +92,9 @@ exports[`ToolConfirmationMessage > with folder trust > 'for info confirmations' 
 
 Do you want to proceed?
 
-● 1. Yes, allow once
-  2. Yes, allow always
-  3. Yes, allow always and save to policy
-  4. No, suggest changes (esc)
+● 1. Allow once
+  2. Allow for this session
+  3. No, suggest changes (esc)
 "
 `;
 
@@ -109,7 +104,7 @@ Tool: test-tool
 
 Allow execution of MCP tool "test-tool" from server "test-server"?
 
-● 1. Yes, allow once
+● 1. Allow once
   2. No, suggest changes (esc)
 "
 `;
@@ -120,10 +115,9 @@ Tool: test-tool
 
 Allow execution of MCP tool "test-tool" from server "test-server"?
 
-● 1. Yes, allow once
-  2. Yes, always allow tool "test-tool" from server "test-server"
-  3. Yes, always allow all tools from server "test-server"
-  4. Yes, allow always tool "test-tool" and save to policy
-  5. No, suggest changes (esc)
+● 1. Allow once
+  2. Allow tool for this session
+  3. Allow all server tools for this session
+  4. No, suggest changes (esc)
 "
 `;

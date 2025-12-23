@@ -4,15 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Storage } from '../config/storage.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
+import { loadAgentsFromDirectory } from './toml-loader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
+import { IntrospectionAgent } from './introspection-agent.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
-  DEFAULT_GEMINI_MODEL_AUTO,
-  GEMINI_MODEL_ALIAS_PRO,
-  PREVIEW_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  GEMINI_MODEL_ALIAS_AUTO,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  isPreviewModel,
 } from '../config/models.js';
 import type { ModelConfigAlias } from '../services/modelConfigService.js';
 
@@ -41,6 +46,50 @@ export class AgentRegistry {
   async initialize(): Promise<void> {
     this.loadBuiltInAgents();
 
+    coreEvents.on(CoreEvent.ModelChanged, () => {
+      this.refreshAgents();
+    });
+
+    if (!this.config.isAgentsEnabled()) {
+      return;
+    }
+
+    // Load user-level agents: ~/.gemini/agents/
+    const userAgentsDir = Storage.getUserAgentsDir();
+    const userAgents = await loadAgentsFromDirectory(userAgentsDir);
+    for (const error of userAgents.errors) {
+      debugLogger.warn(
+        `[AgentRegistry] Error loading user agent: ${error.message}`,
+      );
+      coreEvents.emitFeedback('error', `Agent loading error: ${error.message}`);
+    }
+    for (const agent of userAgents.agents) {
+      this.registerAgent(agent);
+    }
+
+    // Load project-level agents: .gemini/agents/ (relative to Project Root)
+    const folderTrustEnabled = this.config.getFolderTrust();
+    const isTrustedFolder = this.config.isTrustedFolder();
+
+    if (!folderTrustEnabled || isTrustedFolder) {
+      const projectAgentsDir = this.config.storage.getProjectAgentsDir();
+      const projectAgents = await loadAgentsFromDirectory(projectAgentsDir);
+      for (const error of projectAgents.errors) {
+        coreEvents.emitFeedback(
+          'error',
+          `Agent loading error: ${error.message}`,
+        );
+      }
+      for (const agent of projectAgents.agents) {
+        this.registerAgent(agent);
+      }
+    } else {
+      coreEvents.emitFeedback(
+        'info',
+        'Skipping project agents due to untrusted folder. To enable, ensure that the project root is trusted.',
+      );
+    }
+
     if (this.config.getDebugMode()) {
       debugLogger.log(
         `[AgentRegistry] Initialized with ${this.agents.size} agents.`,
@@ -50,22 +99,21 @@ export class AgentRegistry {
 
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
+    const introspectionSettings = this.config.getIntrospectionAgentSettings();
 
     // Only register the agent if it's enabled in the settings.
     if (investigatorSettings?.enabled) {
-      let model =
-        investigatorSettings.model ??
-        CodebaseInvestigatorAgent.modelConfig.model;
-
-      // If the user is using the preview model for the main agent, force the sub-agent to use it too
-      // if it's configured to use 'pro' or 'auto'.
-      if (this.config.getModel() === PREVIEW_GEMINI_MODEL) {
-        if (
-          model === GEMINI_MODEL_ALIAS_PRO ||
-          model === DEFAULT_GEMINI_MODEL_AUTO
-        ) {
-          model = PREVIEW_GEMINI_MODEL;
-        }
+      let model;
+      const settingsModel = investigatorSettings.model;
+      // Check if the user explicitly set a model in the settings.
+      if (settingsModel && settingsModel !== GEMINI_MODEL_ALIAS_AUTO) {
+        model = settingsModel;
+      } else {
+        // Use Preview Flash model if the main model is any of the preview models
+        // If the main model is not preview model, use default pro model.
+        model = isPreviewModel(this.config.getModel())
+          ? PREVIEW_GEMINI_FLASH_MODEL
+          : DEFAULT_GEMINI_MODEL;
       }
 
       const agentDef = {
@@ -88,6 +136,18 @@ export class AgentRegistry {
         },
       };
       this.registerAgent(agentDef);
+    }
+
+    // Register the introspection agent if it's explicitly enabled.
+    if (introspectionSettings.enabled) {
+      this.registerAgent(IntrospectionAgent);
+    }
+  }
+
+  private refreshAgents(): void {
+    this.loadBuiltInAgents();
+    for (const agent of this.agents.values()) {
+      this.registerAgent(agent);
     }
   }
 
@@ -115,26 +175,35 @@ export class AgentRegistry {
 
     // Register model config.
     // TODO(12916): Migrate sub-agents where possible to static configs.
-    const modelConfig = definition.modelConfig;
+    if (definition.kind === 'local') {
+      const modelConfig = definition.modelConfig;
+      let model = modelConfig.model;
+      if (model === 'inherit') {
+        model = this.config.getModel();
+      }
 
-    const runtimeAlias: ModelConfigAlias = {
-      modelConfig: {
-        model: modelConfig.model,
-        generateContentConfig: {
-          temperature: modelConfig.temp,
-          topP: modelConfig.top_p,
-          thinkingConfig: {
-            includeThoughts: true,
-            thinkingBudget: modelConfig.thinkingBudget ?? -1,
+      const runtimeAlias: ModelConfigAlias = {
+        modelConfig: {
+          model,
+          generateContentConfig: {
+            temperature: modelConfig.temp,
+            topP: modelConfig.top_p,
+            thinkingConfig: {
+              includeThoughts: true,
+              thinkingBudget: modelConfig.thinkingBudget ?? -1,
+            },
           },
         },
-      },
-    };
+      };
 
-    this.config.modelConfigService.registerRuntimeModelConfig(
-      getModelConfigAlias(definition),
-      runtimeAlias,
-    );
+      this.config.modelConfigService.registerRuntimeModelConfig(
+        getModelConfigAlias(definition),
+        runtimeAlias,
+      );
+    }
+
+    // Register configured remote A2A agents.
+    // TODO: Implement remote agent registration.
   }
 
   /**
@@ -172,10 +241,7 @@ export class AgentRegistry {
       .map(([name, def]) => `- **${name}**: ${def.description}`)
       .join('\n');
 
-    return `Delegates a task to a specialized sub-agent.
-
-Available agents:
-${agentDescriptions}`;
+    return `Delegates a task to a specialized sub-agent.\n\nAvailable agents:\n${agentDescriptions}`;
   }
 
   /**
@@ -191,7 +257,7 @@ ${agentDescriptions}`;
     context +=
       'Use `delegate_to_agent` for complex tasks requiring specialized analysis.\n\n';
 
-    for (const [name, def] of this.agents.entries()) {
+    for (const [name, def] of this.agents) {
       context += `- **${name}**: ${def.description}\n`;
     }
     return context;
