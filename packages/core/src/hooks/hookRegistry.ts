@@ -111,13 +111,11 @@ export class HookRegistry {
       );
 
       if (untrusted.length > 0) {
-        const message = `
-WARNING: The following project-level hooks have been detected in this workspace:
+        const message = `WARNING: The following project-level hooks have been detected in this workspace:
 ${untrusted.map((h) => `  - ${h}`).join('\n')}
 
 These hooks will be executed. If you did not configure these hooks or do not trust this project,
-please review the project settings (.gemini/settings.json) and remove them.
-`;
+please review the project settings (.gemini/settings.json) and remove them.`;
         coreEvents.emitFeedback('warning', message);
 
         // Trust them so we don't warn again
