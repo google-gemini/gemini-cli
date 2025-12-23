@@ -135,13 +135,12 @@ export class A2AClientManager {
     try {
       return await client.sendMessage(messageParams);
     } catch (error: unknown) {
+      const prefix = `A2AClient SendMessage Error [${agentName}]`;
       if (error instanceof Error) {
-        // Prefix the error message as requested
-        error.message = `A2AClient SendMessage Error: ${error.message}`;
-        throw error;
+        throw new Error(`${prefix}: ${error.message}`, { cause: error });
       }
       throw new Error(
-        `A2AClient SendMessage Error: Unexpected error during sendMessage: ${error}`,
+        `${prefix}: Unexpected error during sendMessage: ${String(error)}`,
       );
     }
   }
@@ -175,7 +174,15 @@ export class A2AClientManager {
     if (!client) {
       throw new Error(`Agent '${agentName}' not found.`);
     }
-    return client.getTask({ id: taskId });
+    try {
+      return await client.getTask({ id: taskId });
+    } catch (error: unknown) {
+      const prefix = `A2AClient getTask Error [${agentName}]`;
+      if (error instanceof Error) {
+        throw new Error(`${prefix}: ${error.message}`, { cause: error });
+      }
+      throw new Error(`${prefix}: Unexpected error: ${String(error)}`);
+    }
   }
 
   /**
@@ -189,6 +196,14 @@ export class A2AClientManager {
     if (!client) {
       throw new Error(`Agent '${agentName}' not found.`);
     }
-    return client.cancelTask({ id: taskId });
+    try {
+      return await client.cancelTask({ id: taskId });
+    } catch (error: unknown) {
+      const prefix = `A2AClient cancelTask Error [${agentName}]`;
+      if (error instanceof Error) {
+        throw new Error(`${prefix}: ${error.message}`, { cause: error });
+      }
+      throw new Error(`${prefix}: Unexpected error: ${String(error)}`);
+    }
   }
 }

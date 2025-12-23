@@ -224,7 +224,7 @@ describe('A2AClientManager', () => {
       sendMessageMock.mockRejectedValueOnce(new Error('Network error'));
 
       await expect(manager.sendMessage('TestAgent', 'Hello')).rejects.toThrow(
-        'A2AClient SendMessage Error: Network error',
+        'A2AClient SendMessage Error [TestAgent]: Network error',
       );
     });
 
@@ -254,6 +254,14 @@ describe('A2AClientManager', () => {
       });
     });
 
+    it('should throw prefixed error on failure', async () => {
+      getTaskMock.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(manager.getTask('TestAgent', 'task123')).rejects.toThrow(
+        'A2AClient getTask Error [TestAgent]: Network error',
+      );
+    });
+
     it('should throw an error if the agent is not found', async () => {
       await expect(
         manager.getTask('NonExistentAgent', 'task123'),
@@ -278,6 +286,14 @@ describe('A2AClientManager', () => {
       expect(cancelTaskMock).toHaveBeenCalledWith({
         id: 'task123',
       });
+    });
+
+    it('should throw prefixed error on failure', async () => {
+      cancelTaskMock.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(manager.cancelTask('TestAgent', 'task123')).rejects.toThrow(
+        'A2AClient cancelTask Error [TestAgent]: Network error',
+      );
     });
 
     it('should throw an error if the agent is not found', async () => {
