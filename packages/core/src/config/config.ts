@@ -731,6 +731,13 @@ export class Config {
         this.storage.getProjectSkillsDir(),
       ];
 
+      const activeExtensions = this.getExtensions()
+        .filter((ext) => ext.isActive)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      for (const ext of activeExtensions) {
+        skillPaths.push(path.join(ext.path, 'skills'));
+      }
+
       await this.getSkillManager().discoverSkills(skillPaths);
       this.getSkillManager().setDisabledSkills(this.disabledSkills);
 

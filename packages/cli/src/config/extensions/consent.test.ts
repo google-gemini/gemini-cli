@@ -116,6 +116,7 @@ describe('consent', () => {
         baseConfig,
         requestConsent,
         false,
+        [],
         undefined,
       );
       expect(requestConsent).toHaveBeenCalledTimes(1);
@@ -127,8 +128,10 @@ describe('consent', () => {
         baseConfig,
         requestConsent,
         false,
+        [],
         baseConfig,
         false,
+        [],
       );
       expect(requestConsent).not.toHaveBeenCalled();
     });
@@ -136,7 +139,7 @@ describe('consent', () => {
     it('should throw an error if consent is denied', async () => {
       const requestConsent = vi.fn().mockResolvedValue(false);
       await expect(
-        maybeRequestConsentOrFail(baseConfig, requestConsent, false, undefined),
+        maybeRequestConsentOrFail(baseConfig, requestConsent, false, []),
       ).rejects.toThrow('Installation cancelled for "test-ext".');
     });
 
@@ -156,6 +159,7 @@ describe('consent', () => {
           config,
           requestConsent,
           false,
+          ['skill1', 'skill2'],
           undefined,
         );
 
@@ -167,6 +171,7 @@ describe('consent', () => {
           '  * server2 (remote): https://remote.com',
           'This extension will append info to your gemini.md context using my-context.md',
           'This extension will exclude the following core tools: tool1,tool2',
+          'This extension will install the following agent skills: skill1, skill2',
         ].join('\n');
 
         expect(requestConsent).toHaveBeenCalledWith(expectedConsentString);
@@ -183,8 +188,10 @@ describe('consent', () => {
           newConfig,
           requestConsent,
           false,
+          [],
           prevConfig,
           false,
+          [],
         );
         expect(requestConsent).toHaveBeenCalledTimes(1);
       });
@@ -200,8 +207,10 @@ describe('consent', () => {
           newConfig,
           requestConsent,
           false,
+          [],
           prevConfig,
           false,
+          [],
         );
         expect(requestConsent).toHaveBeenCalledTimes(1);
       });
@@ -210,15 +219,17 @@ describe('consent', () => {
         const prevConfig: ExtensionConfig = { ...baseConfig };
         const newConfig: ExtensionConfig = {
           ...baseConfig,
-          excludeTools: ['new-tool'],
+          excludeTools: ['tool1'],
         };
         const requestConsent = vi.fn().mockResolvedValue(true);
         await maybeRequestConsentOrFail(
           newConfig,
           requestConsent,
           false,
+          [],
           prevConfig,
           false,
+          [],
         );
         expect(requestConsent).toHaveBeenCalledTimes(1);
       });
@@ -229,13 +240,12 @@ describe('consent', () => {
           baseConfig,
           requestConsent,
           true,
+          [],
           undefined,
         );
 
-        expect(requestConsent).toHaveBeenCalledWith(
-          expect.stringContaining(
-            '⚠️  This extension contains Hooks which can automatically execute commands.',
-          ),
+        expect(requestConsent.mock.calls[0][0]).toContain(
+          '⚠️  This extension contains Hooks which can automatically execute commands.',
         );
       });
 
@@ -245,8 +255,24 @@ describe('consent', () => {
           baseConfig,
           requestConsent,
           true,
+          [],
           baseConfig,
           false,
+          [],
+        );
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+      });
+
+      it('should request consent if skills change', async () => {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          baseConfig,
+          requestConsent,
+          false,
+          ['skill1'],
+          baseConfig,
+          false,
+          [],
         );
         expect(requestConsent).toHaveBeenCalledTimes(1);
       });

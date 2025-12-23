@@ -263,12 +263,41 @@ export class ExtensionManager extends ExtensionLoader {
           previousHasHooks = Object.keys(previous.hooks).length > 0;
         }
 
+        const skillsDir = path.join(localSourcePath, 'skills');
+        const skills: string[] = [];
+        if (fs.existsSync(skillsDir) && fs.statSync(skillsDir).isDirectory()) {
+          const skillFiles = fs.readdirSync(skillsDir);
+          for (const skillFile of skillFiles) {
+            const skillPath = path.join(skillsDir, skillFile, 'SKILL.md');
+            if (fs.existsSync(skillPath)) {
+              skills.push(skillFile);
+            }
+          }
+        }
+
+        let previousSkills: string[] = [];
+        if (isUpdate && previous) {
+          const prevSkillsDir = path.join(previous.path, 'skills');
+          if (
+            fs.existsSync(prevSkillsDir) &&
+            fs.statSync(prevSkillsDir).isDirectory()
+          ) {
+            previousSkills = fs
+              .readdirSync(prevSkillsDir)
+              .filter((f) =>
+                fs.existsSync(path.join(prevSkillsDir, f, 'SKILL.md')),
+              );
+          }
+        }
+
         await maybeRequestConsentOrFail(
           newExtensionConfig,
           this.requestConsent,
           newHasHooks,
+          skills,
           previousExtensionConfig,
           previousHasHooks,
+          previousSkills,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);
         const destinationPath = new ExtensionStorage(

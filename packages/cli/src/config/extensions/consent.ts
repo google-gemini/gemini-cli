@@ -106,6 +106,7 @@ async function promptForConsentInteractive(
 function extensionConsentString(
   extensionConfig: ExtensionConfig,
   hasHooks: boolean,
+  skills: string[] = [],
 ): string {
   const sanitizedConfig = escapeAnsiCtrlCodes(extensionConfig);
   const output: string[] = [];
@@ -138,6 +139,13 @@ function extensionConsentString(
       '⚠️  This extension contains Hooks which can automatically execute commands.',
     );
   }
+  if (skills.length > 0) {
+    output.push(
+      `This extension will install the following agent skills: ${skills.join(
+        ', ',
+      )}`,
+    );
+  }
   return output.join('\n');
 }
 
@@ -154,14 +162,21 @@ export async function maybeRequestConsentOrFail(
   extensionConfig: ExtensionConfig,
   requestConsent: (consent: string) => Promise<boolean>,
   hasHooks: boolean,
+  skills: string[],
   previousExtensionConfig?: ExtensionConfig,
   previousHasHooks?: boolean,
+  previousSkills: string[] = [],
 ) {
-  const extensionConsent = extensionConsentString(extensionConfig, hasHooks);
+  const extensionConsent = extensionConsentString(
+    extensionConfig,
+    hasHooks,
+    skills,
+  );
   if (previousExtensionConfig) {
     const previousExtensionConsent = extensionConsentString(
       previousExtensionConfig,
       previousHasHooks ?? false,
+      previousSkills,
     );
     if (previousExtensionConsent === extensionConsent) {
       return;
