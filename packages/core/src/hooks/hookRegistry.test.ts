@@ -30,7 +30,6 @@ vi.mock('../utils/debugLogger.js', () => ({
   debugLogger: mockDebugLogger,
 }));
 
-// Mock TrustedHooksManager and coreEvents using vi.hoisted
 const { mockTrustedHooksManager, mockCoreEvents } = vi.hoisted(() => ({
   mockTrustedHooksManager: {
     getUntrustedHooks: vi.fn().mockReturnValue([]),
@@ -584,6 +583,7 @@ describe('HookRegistry', () => {
           },
         ],
       };
+      mockTrustedHooksManager.getUntrustedHooks.mockReturnValue([]);
 
       vi.mocked(mockConfig.getHooks).mockReturnValue(
         malformedConfig as unknown as {
@@ -594,8 +594,7 @@ describe('HookRegistry', () => {
       await hookRegistry.initialize();
 
       expect(hookRegistry.getAllHooks()).toHaveLength(0);
-      // One warning for each invalid hookConfig
-      expect(mockDebugLogger.warn).toHaveBeenCalled();
+      expect(mockDebugLogger.warn).toHaveBeenCalledTimes(3); // One warning for each invalid hookConfig
     });
 
     it('should handle mixed valid and invalid hook configurations', async () => {
