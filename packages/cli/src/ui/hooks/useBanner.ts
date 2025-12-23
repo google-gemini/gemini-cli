@@ -9,7 +9,7 @@ import type { Config } from '@google/gemini-cli-core';
 import crypto from 'node:crypto';
 import { persistentState } from '../../utils/persistentState.js';
 
-const DEFAULT_MAX_BANNER_SHOWN_COUNT = 20;
+const DEFAULT_MAX_BANNER_SHOWN_COUNT = 5;
 
 interface BannerContent {
   title: string;

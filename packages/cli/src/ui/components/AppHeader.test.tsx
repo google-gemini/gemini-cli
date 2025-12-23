@@ -146,7 +146,7 @@ describe('<AppHeader />', () => {
     (
       persistentState.get as unknown as ReturnType<typeof vi.fn>
     ).mockReturnValue({
-      e1a84b6fb88e50f1a51826f94630ca087a6a6504b409948344fcb67f8569a72c: 20,
+      e1a84b6fb88e50f1a51826f94630ca087a6a6504b409948344fcb67f8569a72c: 5,
     });
     const mockConfig = makeFakeConfig();
     const uiState = {

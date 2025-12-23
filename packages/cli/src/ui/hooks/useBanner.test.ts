@@ -101,7 +101,7 @@ describe('useBanner', () => {
   it('should NOT show banner if it has been shown max times', () => {
     // 20 is the DEFAULT_MAX_BANNER_SHOWN_COUNT
     mockedPersistentState.get.mockReturnValue({
-      e1a84b6fb88e50f1a51826f94630ca087a6a6504b409948344fcb67f8569a72c: 20,
+      e1a84b6fb88e50f1a51826f94630ca087a6a6504b409948344fcb67f8569a72c: 5,
     });
 
     const { result } = renderHook(() =>
@@ -114,7 +114,7 @@ describe('useBanner', () => {
 
   it('should show banner if it has been shown less than max times', () => {
     mockedPersistentState.get.mockReturnValue({
-      e1a84b6fb88e50f1a51826f94630ca087a6a6504b409948344fcb67f8569a72c: 19,
+      e1a84b6fb88e50f1a51826f94630ca087a6a6504b409948344fcb67f8569a72c: 4,
     });
 
     const { result } = renderHook(() =>
@@ -125,7 +125,7 @@ describe('useBanner', () => {
     expect(mockedPersistentState.set).toHaveBeenCalledWith(
       'defaultBannerShownCount',
       expect.objectContaining({
-        e1a84b6fb88e50f1a51826f94630ca087a6a6504b409948344fcb67f8569a72c: 20,
+        e1a84b6fb88e50f1a51826f94630ca087a6a6504b409948344fcb67f8569a72c: 5,
       }),
     );
   });
