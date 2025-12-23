@@ -393,6 +393,7 @@ export async function main() {
         settings.merged,
         sessionId,
         argv,
+        { projectHooks: settings.workspace.settings.hooks },
       );
 
       if (
@@ -464,7 +465,9 @@ export async function main() {
   // may have side effects.
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
-    const config = await loadCliConfig(settings.merged, sessionId, argv);
+    const config = await loadCliConfig(settings.merged, sessionId, argv, {
+      projectHooks: settings.workspace.settings.hooks,
+    });
     loadConfigHandle?.end();
 
     // Register config for telemetry shutdown
