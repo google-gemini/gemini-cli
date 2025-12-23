@@ -26,22 +26,33 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8'));
 
+const isCompletion = process.argv.some(
+  (arg) =>
+    arg === 'completion' ||
+    arg === 'completion-internal' ||
+    arg === '--get-yargs-completions',
+);
+
 // check build status, write warnings to file for app to display if needed
-execSync('node ./scripts/check-build-status.js', {
-  stdio: 'inherit',
-  cwd: root,
-});
+if (!isCompletion) {
+  execSync('node ./scripts/check-build-status.js', {
+    stdio: 'inherit',
+    cwd: root,
+  });
+}
 
 const nodeArgs = [];
 let sandboxCommand = undefined;
-try {
-  sandboxCommand = execSync('node scripts/sandbox_command.js', {
-    cwd: root,
-  })
-    .toString()
-    .trim();
-} catch {
-  // ignore
+if (!isCompletion) {
+  try {
+    sandboxCommand = execSync('node scripts/sandbox_command.js', {
+      cwd: root,
+    })
+      .toString()
+      .trim();
+  } catch {
+    // ignore
+  }
 }
 // if debugging is enabled and sandboxing is disabled, use --inspect-brk flag
 // note with sandboxing this flag is passed to the binary inside the sandbox
