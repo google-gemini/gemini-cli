@@ -417,17 +417,25 @@ export class GeminiClient {
     if (hooksEnabled && messageBus) {
       const hookOutput = await fireBeforeAgentHook(messageBus, request);
 
-      if (
-        hookOutput?.isBlockingDecision() ||
-        hookOutput?.shouldStopExecution()
-      ) {
+      // Stage 1: Security/Policy Decision
+      if (hookOutput?.isBlockingDecision()) {
         yield {
           type: GeminiEventType.Error,
           value: {
             error: new Error(
-              `BeforeAgent hook blocked processing: ${hookOutput.getEffectiveReason()}`,
+              `Policy Block: ${hookOutput.getEffectiveReason()}`,
             ),
           },
+        };
+        return new Turn(this.getChat(), prompt_id);
+      }
+
+      // Stage 2: Workflow Lifecycle Control
+      if (hookOutput?.shouldStopExecution()) {
+        const stopReason = hookOutput.getEffectiveReason();
+        yield {
+          type: GeminiEventType.Content,
+          value: `Execution stopped: ${stopReason}`,
         };
         return new Turn(this.getChat(), prompt_id);
       }
@@ -641,13 +649,21 @@ export class GeminiClient {
         responseText,
       );
 
-      // For AfterAgent hooks, blocking/stop execution should force continuation
-      if (
-        hookOutput?.isBlockingDecision() ||
-        hookOutput?.shouldStopExecution()
-      ) {
-        const continueReason = hookOutput.getEffectiveReason();
-        const continueRequest = [{ text: continueReason }];
+      // Stage 1: Security/Policy Decision (Force continuation as policy violation)
+      if (hookOutput?.isBlockingDecision()) {
+        const blockReason = `Policy Violation: ${hookOutput.getEffectiveReason()}`;
+        const continueRequest = [{ text: blockReason }];
+        yield* this.sendMessageStream(
+          continueRequest,
+          signal,
+          prompt_id,
+          boundedTurns - 1,
+        );
+      }
+      // Stage 2: Workflow Lifecycle Control (Force continuation as manual stop)
+      else if (hookOutput?.shouldStopExecution()) {
+        const stopReason = hookOutput.getEffectiveReason();
+        const continueRequest = [{ text: stopReason }];
         yield* this.sendMessageStream(
           continueRequest,
           signal,

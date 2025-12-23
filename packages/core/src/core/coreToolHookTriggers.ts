@@ -268,28 +268,28 @@ export async function executeToolWithHooks(
       toolInput,
     );
 
-    // Check if hook blocked the tool execution
+    // Stage 1: Security/Policy Decision
     const blockingError = beforeOutput?.getBlockingError();
     if (blockingError?.blocked) {
       return {
-        llmContent: `Tool execution blocked: ${blockingError.reason}`,
-        returnDisplay: `Tool execution blocked: ${blockingError.reason}`,
+        llmContent: `Policy Block: ${blockingError.reason}`,
+        returnDisplay: `Policy Block: ${blockingError.reason}`,
         error: {
-          type: ToolErrorType.EXECUTION_FAILED,
+          type: ToolErrorType.PERMISSION_DENIED,
           message: blockingError.reason,
         },
       };
     }
 
-    // Check if hook requested to stop entire agent execution
+    // Stage 2: Workflow Lifecycle Control
     if (beforeOutput?.shouldStopExecution()) {
       const reason = beforeOutput.getEffectiveReason();
       return {
-        llmContent: `Agent execution stopped by hook: ${reason}`,
-        returnDisplay: `Agent execution stopped by hook: ${reason}`,
+        llmContent: `Execution stopped: ${reason}`,
+        returnDisplay: `Execution stopped: ${reason}`,
         error: {
           type: ToolErrorType.EXECUTION_FAILED,
-          message: `Agent execution stopped: ${reason}`,
+          message: `Execution stopped: ${reason}`,
         },
       };
     }
@@ -329,11 +329,11 @@ export async function executeToolWithHooks(
     if (afterOutput?.shouldStopExecution()) {
       const reason = afterOutput.getEffectiveReason();
       return {
-        llmContent: `Agent execution stopped by hook: ${reason}`,
-        returnDisplay: `Agent execution stopped by hook: ${reason}`,
+        llmContent: `Execution stopped: ${reason}`,
+        returnDisplay: `Execution stopped: ${reason}`,
         error: {
           type: ToolErrorType.EXECUTION_FAILED,
-          message: `Agent execution stopped: ${reason}`,
+          message: `Execution stopped: ${reason}`,
         },
       };
     }

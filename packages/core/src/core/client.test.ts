@@ -47,8 +47,12 @@ import type {
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { HookSystem } from '../hooks/hookSystem.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
+import * as clientHookTriggers from './clientHookTriggers.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { DefaultHookOutput } from '../hooks/types.js';
 
 vi.mock('../services/chatCompressionService.js');
+vi.mock('./clientHookTriggers.js');
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -90,6 +94,7 @@ vi.mock('./turn', async (importOriginal) => {
     pendingToolCalls = [];
     // The run method is a property that holds our mock function
     run = mockTurnRunFn;
+    getResponseText = vi.fn().mockReturnValue('Mock Response');
 
     constructor() {
       // The constructor can be empty or do some mock setup
@@ -143,6 +148,130 @@ async function fromAsync<T>(promise: AsyncGenerator<T>): Promise<readonly T[]> {
   return results;
 }
 
+function createGeminiClient(): GeminiClient {
+  const fileService = new FileDiscoveryService('/test/dir');
+  const contentGeneratorConfig: ContentGeneratorConfig = {
+    apiKey: 'test-key',
+    vertexai: false,
+    authType: AuthType.USE_GEMINI,
+  };
+  const mockToolRegistry = {
+    getFunctionDeclarations: vi.fn().mockReturnValue([]),
+    getTool: vi.fn().mockReturnValue(null),
+  };
+  const mockRouterService = {
+    route: vi
+      .fn()
+      .mockResolvedValue({ model: 'default-routed-model', reason: 'test' }),
+  };
+  const mockContentGenerator = {
+    generateContent: vi.fn(),
+    generateContentStream: vi.fn(),
+    batchEmbedContents: vi.fn(),
+    countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
+  } as unknown as ContentGenerator;
+
+  const mockConfig = {
+    getContentGeneratorConfig: vi.fn().mockReturnValue(contentGeneratorConfig),
+    getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+    getModel: vi.fn().mockReturnValue('test-model'),
+    getUserTier: vi.fn().mockReturnValue(undefined),
+    getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+    getApiKey: vi.fn().mockReturnValue('test-key'),
+    getVertexAI: vi.fn().mockReturnValue(false),
+    getUserAgent: vi.fn().mockReturnValue('test-agent'),
+    getUserMemory: vi.fn().mockReturnValue(''),
+    getGlobalMemory: vi.fn().mockReturnValue(''),
+    getEnvironmentMemory: vi.fn().mockReturnValue(''),
+    isJitContextEnabled: vi.fn().mockReturnValue(false),
+    getSessionId: vi.fn().mockReturnValue('test-session-id'),
+    getProxy: vi.fn().mockReturnValue(undefined),
+    getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
+    getFileService: vi.fn().mockReturnValue(fileService),
+    getMaxSessionTurns: vi.fn().mockReturnValue(0),
+    getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
+    setQuotaErrorOccurred: vi.fn(),
+    getNoBrowser: vi.fn().mockReturnValue(false),
+    getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
+    getIdeModeFeature: vi.fn().mockReturnValue(false),
+    getIdeMode: vi.fn().mockReturnValue(true),
+    getDebugMode: vi.fn().mockReturnValue(false),
+    getPreviewFeatures: vi.fn().mockReturnValue(false),
+    getWorkspaceContext: vi.fn().mockReturnValue({
+      getDirectories: vi.fn().mockReturnValue(['/test/dir']),
+    }),
+    getGeminiClient: vi.fn(),
+    getModelRouterService: vi
+      .fn()
+      .mockReturnValue(mockRouterService as unknown as ModelRouterService),
+    getMessageBus: vi.fn().mockReturnValue(undefined),
+    getEnableHooks: vi.fn().mockReturnValue(false),
+    getChatCompression: vi.fn().mockReturnValue(undefined),
+    getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
+    getUseSmartEdit: vi.fn().mockReturnValue(false),
+    getShowModelInfoInChat: vi.fn().mockReturnValue(false),
+    getContinueOnFailedApiCall: vi.fn(),
+    getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
+    storage: {
+      getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
+    },
+    getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
+    getBaseLlmClient: vi.fn().mockReturnValue({
+      generateJson: vi.fn().mockResolvedValue({
+        next_speaker: 'user',
+        reasoning: 'test',
+      }),
+    }),
+    modelConfigService: {
+      getResolvedConfig(modelConfigKey: ModelConfigKey) {
+        return {
+          model: modelConfigKey.model,
+          generateContentConfig: {
+            temperature: 0,
+            topP: 1,
+          } as unknown as ResolvedModelConfig,
+        };
+      },
+    },
+    isInteractive: vi.fn().mockReturnValue(false),
+    getExperiments: () => {},
+    getActiveModel: vi.fn().mockReturnValue('test-model'),
+    setActiveModel: vi.fn(),
+    resetTurn: vi.fn(),
+    getModelAvailabilityService: vi
+      .fn()
+      .mockReturnValue(createAvailabilityServiceMock()),
+  } as unknown as Config;
+  (mockConfig as unknown as { getHookSystem: Mock }).getHookSystem = vi
+    .fn()
+    .mockReturnValue({ fireSessionStartEvent: vi.fn() });
+
+  const clientInstance = new GeminiClient(mockConfig);
+  const mockTurnInstance = {
+    getResponseText: vi.fn().mockReturnValue('Hello back'),
+    finishReason: 'STOP',
+  };
+  (clientInstance as unknown as { chat: object }).chat = {
+    addHistory: vi.fn(),
+    getHistory: vi.fn().mockReturnValue([]),
+    getLastPromptTokenCount: vi.fn().mockReturnValue(0),
+    getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
+  };
+  (clientInstance as unknown as { loopDetector: object }).loopDetector = {
+    reset: vi.fn(),
+    turnStarted: vi.fn().mockResolvedValue(false),
+    addAndCheck: vi.fn().mockReturnValue(false),
+  };
+  // Mock Turn.run to return a generator that eventually returns the mock turn instance
+  mockTurnRunFn.mockImplementation(() =>
+    (async function* () {
+      yield { type: GeminiEventType.Content, value: 'Hello back' };
+      return mockTurnInstance;
+    })(),
+  );
+  vi.mocked(mockConfig.getGeminiClient).mockReturnValue(clientInstance);
+  return clientInstance;
+}
 describe('Gemini Client (client.ts)', () => {
   let mockContentGenerator: ContentGenerator;
   let mockConfig: Config;
@@ -595,6 +724,151 @@ describe('Gemini Client (client.ts)', () => {
         originalTokenCount: 50,
         newTokenCount: 50,
       });
+    });
+  });
+
+  describe('sendMessageStream - Two-Stage Hook Validation', () => {
+    let clientInstance: GeminiClient;
+    const initialRequest = [{ text: 'Hello' }];
+    const signal = new AbortController().signal;
+    const promptId = 'test-prompt-id';
+
+    beforeEach(async () => {
+      // Create a dedicated client for these tests to ensure clean state
+      clientInstance = createGeminiClient();
+      vi.mocked(clientHookTriggers.fireBeforeAgentHook).mockResolvedValue(
+        undefined,
+      );
+      vi.mocked(clientHookTriggers.fireAfterAgentHook).mockResolvedValue(
+        undefined,
+      );
+      vi.spyOn(clientInstance['config'], 'getEnableHooks').mockReturnValue(
+        true,
+      );
+      vi.spyOn(clientInstance['config'], 'getMessageBus').mockReturnValue(
+        {} as unknown as MessageBus,
+      );
+    });
+
+    it('BeforeAgent Stage 1: should yield Error when isBlockingDecision is true', async () => {
+      vi.mocked(clientHookTriggers.fireBeforeAgentHook).mockResolvedValue({
+        isBlockingDecision: () => true,
+        shouldStopExecution: () => false,
+        getEffectiveReason: () => 'Security violation',
+        getAdditionalContext: () => undefined,
+      } as unknown as DefaultHookOutput);
+
+      const events = [];
+      for await (const event of clientInstance.sendMessageStream(
+        initialRequest,
+        signal,
+        promptId,
+      )) {
+        events.push(event);
+      }
+
+      expect(events[0].type).toBe(GeminiEventType.Error);
+      expect(
+        (events[0] as unknown as { value: { error: { message: string } } })
+          .value.error.message,
+      ).toContain('Policy Block: Security violation');
+    });
+
+    it('BeforeAgent Stage 2: should yield Content when shouldStopExecution is true', async () => {
+      vi.mocked(clientHookTriggers.fireBeforeAgentHook).mockResolvedValue({
+        isBlockingDecision: () => false,
+        shouldStopExecution: () => true,
+        getEffectiveReason: () => 'Task finished early',
+        getAdditionalContext: () => undefined,
+      } as unknown as DefaultHookOutput);
+
+      const events = [];
+      for await (const event of clientInstance.sendMessageStream(
+        initialRequest,
+        signal,
+        promptId,
+      )) {
+        events.push(event);
+      }
+
+      expect(events[0].type).toBe(GeminiEventType.Content);
+      expect((events[0] as unknown as { value: string }).value).toBe(
+        'Execution stopped: Task finished early',
+      );
+    });
+
+    it('AfterAgent Stage 1: should force continuation with Policy Violation prefix when isBlockingDecision is true', async () => {
+      vi.mocked(clientHookTriggers.fireAfterAgentHook)
+        .mockResolvedValueOnce({
+          isBlockingDecision: () => true,
+          shouldStopExecution: () => false,
+          getEffectiveReason: () => 'Unsafe output',
+        } as unknown as DefaultHookOutput)
+        .mockResolvedValue({
+          isBlockingDecision: () => false,
+          shouldStopExecution: () => false,
+        } as unknown as DefaultHookOutput);
+
+      // Recursive call for continuation
+      const sendMessageStreamSpy = vi.spyOn(
+        clientInstance,
+        'sendMessageStream',
+      );
+
+      const stream = clientInstance.sendMessageStream(
+        initialRequest,
+        signal,
+        promptId,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      // Check if sendMessageStream was called recursively with the reason
+      expect(sendMessageStreamSpy).toHaveBeenCalledTimes(2);
+      expect(sendMessageStreamSpy).toHaveBeenNthCalledWith(
+        2,
+        [{ text: 'Policy Violation: Unsafe output' }],
+        signal,
+        promptId,
+        expect.any(Number),
+      );
+    });
+
+    it('AfterAgent Stage 2: should force continuation without prefix when shouldStopExecution is true', async () => {
+      vi.mocked(clientHookTriggers.fireAfterAgentHook)
+        .mockResolvedValueOnce({
+          isBlockingDecision: () => false,
+          shouldStopExecution: () => true,
+          getEffectiveReason: () => 'Please elaborate more',
+        } as unknown as DefaultHookOutput)
+        .mockResolvedValue({
+          isBlockingDecision: () => false,
+          shouldStopExecution: () => false,
+        } as unknown as DefaultHookOutput);
+
+      const sendMessageStreamSpy = vi.spyOn(
+        clientInstance,
+        'sendMessageStream',
+      );
+
+      const stream = clientInstance.sendMessageStream(
+        initialRequest,
+        signal,
+        promptId,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(sendMessageStreamSpy).toHaveBeenCalledTimes(2);
+      expect(sendMessageStreamSpy).toHaveBeenNthCalledWith(
+        2,
+        [{ text: 'Please elaborate more' }],
+        signal,
+        promptId,
+        expect.any(Number),
+      );
     });
   });
 

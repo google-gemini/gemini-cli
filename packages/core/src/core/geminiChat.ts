@@ -407,6 +407,8 @@ export class GeminiChat {
     // Track initial active model to detect fallback changes
     const initialActiveModel = this.config.getActiveModel();
 
+    const blockingStatus = { blocked: false, hasSynthetic: false };
+
     const apiCall = async () => {
       // Default to the last used model (which respects arguments/availability selection)
       let modelToUse = resolveModel(
@@ -459,9 +461,11 @@ export class GeminiChat {
 
         // Check if hook blocked the model call
         if (beforeModelResult.blocked) {
+          blockingStatus.blocked = true;
           // Return a synthetic response generator
           const syntheticResponse = beforeModelResult.syntheticResponse;
           if (syntheticResponse) {
+            blockingStatus.hasSynthetic = true;
             return (async function* () {
               yield syntheticResponse;
             })();
@@ -533,6 +537,10 @@ export class GeminiChat {
       maxAttempts: availabilityMaxAttempts,
       getAvailabilityContext,
     });
+
+    if (blockingStatus.blocked && !blockingStatus.hasSynthetic) {
+      return streamResponse;
+    }
 
     // Store the original request for AfterModel hooks
     const originalRequest: GenerateContentParameters = {
@@ -748,7 +756,11 @@ export class GeminiChat {
           originalRequest,
           chunk,
         );
-        yield hookResult.response;
+        if (hookResult?.response) {
+          yield hookResult.response;
+        } else {
+          yield chunk;
+        }
       } else {
         yield chunk; // Yield every chunk to the UI immediately.
       }

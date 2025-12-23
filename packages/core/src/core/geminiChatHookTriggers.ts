@@ -94,17 +94,25 @@ export async function fireBeforeModelHook(
 
     const hookOutput = beforeResultFinalOutput;
 
-    // Check if hook blocked the model call or requested to stop execution
+    // Stage 1: Security/Policy Decision
     const blockingError = hookOutput?.getBlockingError();
-    if (blockingError?.blocked || hookOutput?.shouldStopExecution()) {
+    if (blockingError?.blocked) {
+      return {
+        blocked: true,
+        reason: `Policy Block: ${blockingError.reason}`,
+      };
+    }
+
+    // Stage 2: Workflow Lifecycle Control
+    if (hookOutput?.shouldStopExecution()) {
       const beforeModelOutput = hookOutput as BeforeModelHookOutput;
       const syntheticResponse = beforeModelOutput.getSyntheticResponse();
       const reason =
-        hookOutput?.getEffectiveReason() || 'Model call blocked by hook';
+        hookOutput?.getEffectiveReason() || 'Execution stopped by hook';
 
       return {
         blocked: true,
-        reason,
+        reason: `Execution stopped: ${reason}`,
         syntheticResponse,
       };
     }

@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Content, GenerateContentResponse } from '@google/genai';
+import type {
+  Content,
+  GenerateContentResponse,
+  FinishReason,
+} from '@google/genai';
 import { ApiError, ThinkingLevel } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
@@ -28,6 +32,9 @@ import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import * as policyHelpers from '../availability/policyHelpers.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
+import type { ModelConfigKey } from '../services/modelConfigService.js';
+import type { Part } from '@google/genai';
+import * as geminiChatHookTriggers from './geminiChatHookTriggers.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -58,6 +65,8 @@ vi.mock('node:fs', () => {
     ...fsModule,
   };
 });
+
+vi.mock('./geminiChatHookTriggers.js');
 
 const { mockHandleFallback } = vi.hoisted(() => ({
   mockHandleFallback: vi.fn(),
@@ -218,6 +227,72 @@ describe('GeminiChat', () => {
     it('should initialize lastPromptTokenCount for empty history', () => {
       const chatEmpty = new GeminiChat(mockConfig);
       expect(chatEmpty.getLastPromptTokenCount()).toBe(0);
+    });
+  });
+
+  describe('sendMessageStream - BeforeModel Hook Validation', () => {
+    const signal = new AbortController().signal;
+
+    beforeEach(() => {
+      vi.spyOn(mockConfig, 'getEnableHooks').mockReturnValue(true);
+      vi.mocked(geminiChatHookTriggers.fireBeforeModelHook).mockResolvedValue({
+        blocked: false,
+      });
+      vi.mocked(
+        geminiChatHookTriggers.fireBeforeToolSelectionHook,
+      ).mockResolvedValue({});
+    });
+
+    it('BeforeModel Stage 1: should return synthetic response when blocked by policy', async () => {
+      const syntheticResponse: GenerateContentResponse = {
+        candidates: [
+          {
+            content: { role: 'model', parts: [{ text: 'Blocked by policy' }] },
+            finishReason: 'STOP' as unknown as FinishReason,
+          },
+        ],
+      } as unknown as GenerateContentResponse;
+      vi.mocked(geminiChatHookTriggers.fireBeforeModelHook).mockResolvedValue({
+        blocked: true,
+        reason: 'Policy Block: Forbidden prompt',
+        syntheticResponse,
+      });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' } as unknown as ModelConfigKey,
+        'Hi' as unknown as Part[],
+        'prompt-id',
+        signal,
+      );
+      const chunks = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toHaveLength(1);
+      expect(
+        (chunks[0] as unknown as { value: GenerateContentResponse }).value,
+      ).toEqual(syntheticResponse);
+    });
+
+    it('BeforeModel Stage 2: should return empty generator when execution is stopped', async () => {
+      vi.mocked(geminiChatHookTriggers.fireBeforeModelHook).mockResolvedValue({
+        blocked: true,
+        reason: 'Execution stopped: Done for now',
+      });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' } as unknown as ModelConfigKey,
+        'Hi' as unknown as Part[],
+        'prompt-id',
+        signal,
+      );
+      const chunks = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toHaveLength(0);
     });
   });
 
