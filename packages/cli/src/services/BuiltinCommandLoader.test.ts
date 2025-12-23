@@ -99,6 +99,9 @@ describe('BuiltinCommandLoader', () => {
       getEnableMessageBusIntegration: () => false,
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
+      getSkillManager: vi.fn().mockReturnValue({
+        getAllSkills: vi.fn().mockReturnValue([]),
+      }),
     } as unknown as Config;
 
     restoreCommandMock.mockReturnValue({
@@ -205,6 +208,9 @@ describe('BuiltinCommandLoader profile', () => {
       getEnableMessageBusIntegration: () => false,
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
+      getSkillManager: vi.fn().mockReturnValue({
+        getAllSkills: vi.fn().mockReturnValue([]),
+      }),
     } as unknown as Config;
   });
 
