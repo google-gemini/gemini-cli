@@ -92,12 +92,16 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
               : `${stats.fileCount} files affected`}
           </Text>
           <Box flexDirection="row">
-            <Text color="green">Lines added: {stats.addedLines} </Text>
-            <Text color="red">Lines removed: {stats.removedLines}</Text>
+            <Text color={theme.status.success}>
+              Lines added: {stats.addedLines}{' '}
+            </Text>
+            <Text color={theme.status.error}>
+              Lines removed: {stats.removedLines}
+            </Text>
           </Box>
           <Box marginTop={1}>
             <Text color={theme.status.warning}>
-              Rewinding does not affect files edited manually or via bash.
+              ℹ Rewinding does not affect files edited manually or via bash.
             </Text>
           </Box>
         </Box>
