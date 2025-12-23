@@ -1255,7 +1255,7 @@
           "title": "Enable Environment Variable Redaction",
           "description": "Enable redaction of environment variables that may contain secrets.",
           "markdownDescription": "Enable redaction of environment variables that may contain secrets.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
+          "default": false,
           "type": "boolean"
         },
         "auth": {
