@@ -469,6 +469,14 @@ export class ChatRecordingService {
   }
 
   /**
+   * Gets the path to the current conversation file.
+   * Returns null if the service hasn't been initialized yet.
+   */
+  getConversationFilePath(): string | null {
+    return this.conversationFile;
+  }
+
+  /**
    * Deletes a session file by session ID.
    */
   deleteSession(sessionId: string): void {

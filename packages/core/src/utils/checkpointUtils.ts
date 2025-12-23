@@ -48,7 +48,7 @@ export function getToolCallDataSchema(historyItemSchema?: z.ZodTypeAny) {
 export function generateCheckpointFileName(
   toolCall: ToolCallRequestInfo,
 ): string | null {
-  const toolArgs = toolCall.args as Record<string, unknown>;
+  const toolArgs = toolCall.args;
   const toolFilePath = toolArgs['file_path'] as string;
 
   if (!toolFilePath) {
@@ -125,7 +125,7 @@ export async function processRestorableToolCalls<HistoryType>(
         continue;
       }
 
-      const clientHistory = await geminiClient.getHistory();
+      const clientHistory = geminiClient.getHistory();
       const checkpointData: ToolCallData<HistoryType> = {
         history,
         clientHistory,

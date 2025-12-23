@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import pathMod from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
-import { unescapePath, coreEvents, CoreEvent } from '@google/gemini-cli-core';
+import { coreEvents, CoreEvent } from '@google/gemini-cli-core';
 import {
   toCodePoints,
   cpLen,
@@ -17,10 +17,10 @@ import {
   stripUnsafeCharacters,
   getCachedStringWidth,
 } from '../../utils/textUtils.js';
+import { parsePastedPaths } from '../../utils/clipboardUtils.js';
 import type { Key } from '../../contexts/KeypressContext.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
-import { enableSupportedProtocol } from '../../utils/kittyProtocolDetector.js';
 
 export type Direction =
   | 'left'
@@ -1675,8 +1675,10 @@ export function useTextBuffer({
         }
 
         potentialPath = potentialPath.trim();
-        if (isValidPath(unescapePath(potentialPath))) {
-          ch = `@${potentialPath} `;
+
+        const processed = parsePastedPaths(potentialPath, isValidPath);
+        if (processed) {
+          ch = processed;
         }
       }
 
@@ -1911,7 +1913,6 @@ export function useTextBuffer({
       } catch (err) {
         console.error('[useTextBuffer] external editor error', err);
       } finally {
-        enableSupportedProtocol();
         coreEvents.emit(CoreEvent.ExternalEditorClosed);
         if (wasRaw) setRawMode?.(true);
         try {

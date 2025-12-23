@@ -31,6 +31,7 @@ import { InvalidStreamError } from './geminiChat.js';
 import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { createUserContent } from '@google/genai';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { getCitations } from '../utils/generateContentResponseUtilities.js';
 
 // Define a structure for tools passed to the server
 export interface ServerTool {
@@ -108,6 +109,7 @@ export interface ToolCallRequestInfo {
   isClientInitiated: boolean;
   prompt_id: string;
   checkpoint?: string;
+  traceId?: string;
 }
 
 export interface ToolCallResponseInfo {
@@ -264,7 +266,7 @@ export class Turn {
         }
 
         // Assuming other events are chunks with a `value` property
-        const resp = streamEvent.value as GenerateContentResponse;
+        const resp = streamEvent.value;
         if (!resp) continue; // Skip if there's no response body
 
         this.debugResponses.push(resp);
@@ -290,7 +292,7 @@ export class Turn {
         // Handle function calls (requesting tool execution)
         const functionCalls = resp.functionCalls ?? [];
         for (const fnCall of functionCalls) {
-          const event = this.handlePendingFunctionCall(fnCall);
+          const event = this.handlePendingFunctionCall(fnCall, traceId);
           if (event) {
             yield event;
           }
@@ -369,12 +371,13 @@ export class Turn {
 
   private handlePendingFunctionCall(
     fnCall: FunctionCall,
+    traceId?: string,
   ): ServerGeminiStreamEvent | null {
     const callId =
       fnCall.id ??
       `${fnCall.name}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const name = fnCall.name || 'undefined_tool_name';
-    const args = (fnCall.args || {}) as Record<string, unknown>;
+    const args = fnCall.args || {};
 
     const toolCallRequest: ToolCallRequestInfo = {
       callId,
@@ -382,6 +385,7 @@ export class Turn {
       args,
       isClientInitiated: false,
       prompt_id: this.prompt_id,
+      traceId,
     };
 
     this.pendingToolCalls.push(toolCallRequest);
@@ -404,15 +408,4 @@ export class Turn {
       .filter((text): text is string => text !== null)
       .join(' ');
   }
-}
-
-function getCitations(resp: GenerateContentResponse): string[] {
-  return (resp.candidates?.[0]?.citationMetadata?.citations ?? [])
-    .filter((citation) => citation.uri !== undefined)
-    .map((citation) => {
-      if (citation.title) {
-        return `(${citation.title}) ${citation.uri}`;
-      }
-      return citation.uri!;
-    });
 }

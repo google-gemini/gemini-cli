@@ -94,15 +94,17 @@ they appear in the UI.
 | Enable Tool Output Truncation    | `tools.enableToolOutputTruncation`   | Enable truncation of large tool outputs.                                                                        | `true`  |
 | Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Truncate tool output if it is larger than this many characters. Set to -1 to disable.                           | `10000` |
 | Tool Output Truncation Lines     | `tools.truncateToolOutputLines`      | The number of lines to keep when truncating tool output.                                                        | `100`   |
-| Enable Message Bus Integration   | `tools.enableMessageBusIntegration`  | Enable policy-based tool confirmation via message bus integration.                                              | `false` |
+| Enable Message Bus Integration   | `tools.enableMessageBusIntegration`  | Enable policy-based tool confirmation via message bus integration.                                              | `true`  |
 
 ### Security
 
-| UI Label                   | Setting                        | Description                                        | Default |
-| -------------------------- | ------------------------------ | -------------------------------------------------- | ------- |
-| Disable YOLO Mode          | `security.disableYoloMode`     | Disable YOLO mode, even if enabled by a flag.      | `false` |
-| Blocks extensions from Git | `security.blockGitExtensions`  | Blocks installing and loading extensions from Git. | `false` |
-| Folder Trust               | `security.folderTrust.enabled` | Setting to track whether Folder trust is enabled.  | `false` |
+| UI Label                      | Setting                                         | Description                                               | Default |
+| ----------------------------- | ----------------------------------------------- | --------------------------------------------------------- | ------- |
+| Disable YOLO Mode             | `security.disableYoloMode`                      | Disable YOLO mode, even if enabled by a flag.             | `false` |
+| Blocks extensions from Git    | `security.blockGitExtensions`                   | Blocks installing and loading extensions from Git.        | `false` |
+| Folder Trust                  | `security.folderTrust.enabled`                  | Setting to track whether Folder trust is enabled.         | `false` |
+| Allowed Environment Variables | `security.environmentVariableRedaction.allowed` | Environment variables to always allow (bypass redaction). | `[]`    |
+| Blocked Environment Variables | `security.environmentVariableRedaction.blocked` | Environment variables to always redact.                   | `[]`    |
 
 ### Experimental
 

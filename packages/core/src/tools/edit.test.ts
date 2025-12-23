@@ -156,12 +156,12 @@ describe('EditTool', () => {
         const problematicSnippet =
           snippetMatch && snippetMatch[1] ? snippetMatch[1] : '';
 
-        if (((schema as any).properties as any)?.corrected_target_snippet) {
+        if ((schema as any).properties?.corrected_target_snippet) {
           return Promise.resolve({
             corrected_target_snippet: problematicSnippet,
           });
         }
-        if (((schema as any).properties as any)?.corrected_new_string) {
+        if ((schema as any).properties?.corrected_new_string) {
           // For new_string correction, we might need more sophisticated logic,
           // but for now, returning original is a safe default if not specified by a test.
           const originalNewStringMatch = promptText.match(

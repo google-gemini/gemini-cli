@@ -141,7 +141,9 @@ export class HookPlanner {
    * Generate a unique key for a hook entry
    */
   private getHookKey(entry: HookRegistryEntry): string {
-    return `command:${entry.config.command}`;
+    const name = entry.config.name || '';
+    const command = entry.config.command || '';
+    return `${name}:${command}`;
   }
 }
 

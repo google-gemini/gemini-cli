@@ -1,12 +1,31 @@
 # Policy engine
 
-:::note This feature is currently in testing. To enable it, set
-`tools.enableMessageBusIntegration` to `true` in your `settings.json` file. :::
-
 The Gemini CLI includes a powerful policy engine that provides fine-grained
 control over tool execution. It allows users and administrators to define rules
 that determine whether a tool call should be allowed, denied, or require user
 confirmation.
+
+## Quick start
+
+To create your first policy:
+
+1.  **Create the policy directory** if it doesn't exist:
+    ```bash
+    mkdir -p ~/.gemini/policies
+    ```
+2.  **Create a new policy file** (e.g., `~/.gemini/policies/my-rules.toml`). You
+    can use any filename ending in `.toml`; all such files in this directory
+    will be loaded and combined:
+    ```toml
+    [[rule]]
+    toolName = "run_shell_command"
+    commandPrefix = "git status"
+    decision = "allow"
+    priority = 100
+    ```
+3.  **Run a command** that triggers the policy (e.g., ask Gemini CLI to
+    `git status`). The tool will now execute automatically without prompting for
+    confirmation.
 
 ## Core concepts
 
@@ -239,6 +258,8 @@ The Gemini CLI ships with a set of default policies to provide a safe
 out-of-the-box experience.
 
 - **Read-only tools** (like `read_file`, `glob`) are generally **allowed**.
+- **Agent delegation** (like `delegate_to_agent`) is **allowed** (sub-agent
+  actions are checked individually).
 - **Write tools** (like `write_file`, `run_shell_command`) default to
   **`ask_user`**.
 - In **`yolo`** mode, a high-priority rule allows all tools.

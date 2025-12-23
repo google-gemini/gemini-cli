@@ -1120,7 +1120,7 @@ describe('useSlashCommandProcessor', () => {
 
     // We should not see a change until we fire an event.
     await waitFor(() => expect(result.current.slashCommands).toEqual([]));
-    await act(() => {
+    act(() => {
       appEvents.emit('extensionsStarting');
     });
     await waitFor(() =>
