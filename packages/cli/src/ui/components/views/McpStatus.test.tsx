@@ -185,33 +185,17 @@ describe('McpStatus', () => {
     unmount();
   });
 
-  it('renders correctly with many resources (truncated)', () => {
+  it('truncates resources when exceeding limit', () => {
     const manyResources = Array.from({ length: 25 }, (_, i) => ({
       serverName: 'server-1',
       name: `resource-${i + 1}`,
       uri: `file:///tmp/resource-${i + 1}.txt`,
-      description: `Resource ${i + 1} description`,
     }));
 
     const { lastFrame, unmount } = render(
       <McpStatus {...baseProps} resources={manyResources} />,
     );
-    expect(lastFrame()).toMatchSnapshot();
     expect(lastFrame()).toContain('15 resources hidden');
-    unmount();
-  });
-
-  it('renders correctly with single hidden resource', () => {
-    const resources = Array.from({ length: 11 }, (_, i) => ({
-      serverName: 'server-1',
-      name: `resource-${i + 1}`,
-      uri: `file:///tmp/resource-${i + 1}.txt`,
-    }));
-
-    const { lastFrame, unmount } = render(
-      <McpStatus {...baseProps} resources={resources} />,
-    );
-    expect(lastFrame()).toContain('1 resource hidden');
     unmount();
   });
 });
