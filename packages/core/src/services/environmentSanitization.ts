@@ -4,28 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// This file implements a best effort secret redaction for use whenever
-// configuring the environment for another process.
-//
-// Use the following guidance when updating the list to redact new secret
-// types:
-//
-// - Try to update NEVER_ALLOWED_NAME_PATTERNS first so that we can keep
-//   this set as minimal as possible. Take care not to add patterns that
-//   are likely to redact non-secret variables.
-//
-// - Fallback to updating NEVER_ALLOWED_VALUE_PATTERNS for variables with
-//   unassuming names but distinct credential patterns. Take care not to
-//   add patterns that are too broad.
-//
-// - If all else fails, add the name to the never allowed or always allowed
-//   list.
-//
-// If this file ends up being changed frequently or receives a lot of
-// contributions we should consider replacing this with a user-driven
-// feature that lets extensions declare the env vars they need and enables
-// the user to accept/reject them.
-
 export type EnvironmentSanitizationConfig = {
   allowedEnvironmentVariables: string[];
   blockedEnvironmentVariables: string[];
