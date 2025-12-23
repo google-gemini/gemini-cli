@@ -87,17 +87,15 @@ export class A2AClientManager {
     );
 
     const factory = new ClientFactory(options);
-
-    // Pass empty string as path to indicate that agentCardUrl is the full URL
-    // The factory will use the resolver internally if we createdFromUrl?
-    // Actually factory.createFromUrl uses the resolver.
     const client = await factory.createFromUrl(agentCardUrl, '');
-
-    // Fetch the card from the client directly
     const agentCard = await client.getAgentCard();
 
     this.clients.set(name, client);
     this.agentCards.set(name, agentCard);
+
+    debugLogger.debug(
+      `[A2AClientManager] Loaded agent '${name}' from ${agentCardUrl}`,
+    );
 
     return agentCard;
   }
@@ -134,22 +132,8 @@ export class A2AClientManager {
       },
     };
 
-    debugLogger.log(
-      'INFO',
-      'DEBUG: A2AClientManager.sendMessage params:',
-      JSON.stringify(messageParams, null, 2),
-    );
-
     try {
-      const response = await client.sendMessage(messageParams);
-
-      debugLogger.log(
-        'INFO',
-        'DEBUG: A2AClientManager.sendMessage response:',
-        JSON.stringify(response, null, 2),
-      );
-
-      return response;
+      return await client.sendMessage(messageParams);
     } catch (error: unknown) {
       if (error instanceof Error) {
         // Prefix the error message as requested
