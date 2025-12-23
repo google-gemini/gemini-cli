@@ -189,7 +189,7 @@ describe('oauth2', () => {
         end: vi.fn(),
       } as unknown as http.ServerResponse;
 
-      await requestCallback(mockReq, mockRes);
+      requestCallback(mockReq, mockRes);
 
       const client = await clientPromise;
       expect(client).toBe(mockOAuth2Client);
@@ -203,7 +203,9 @@ describe('oauth2', () => {
 
       // Manually trigger the 'tokens' event listener
       if (tokensListener) {
-        await tokensListener(mockTokens);
+        await (
+          tokensListener as unknown as (tokens: Credentials) => Promise<void>
+        )(mockTokens);
       }
 
       // Verify Google Account was cached
@@ -575,9 +577,7 @@ describe('oauth2', () => {
         const mockExternalAccountClient = {
           getAccessToken: vi.fn().mockResolvedValue({ token: 'byoid-token' }),
         };
-        const mockFromJSON = vi
-          .fn()
-          .mockResolvedValue(mockExternalAccountClient);
+        const mockFromJSON = vi.fn().mockReturnValue(mockExternalAccountClient);
         const mockGoogleAuthInstance = {
           fromJSON: mockFromJSON,
         };
@@ -834,7 +834,7 @@ describe('oauth2', () => {
         } as unknown as http.ServerResponse;
 
         await expect(async () => {
-          await requestCallback(mockReq, mockRes);
+          requestCallback(mockReq, mockRes);
           await clientPromise;
         }).rejects.toThrow(
           'Google OAuth error: access_denied. User denied access',
@@ -891,7 +891,7 @@ describe('oauth2', () => {
         } as unknown as http.ServerResponse;
 
         await expect(async () => {
-          await requestCallback(mockReq, mockRes);
+          requestCallback(mockReq, mockRes);
           await clientPromise;
         }).rejects.toThrow(
           'Google OAuth error: server_error. No additional details provided',
@@ -954,7 +954,7 @@ describe('oauth2', () => {
         } as unknown as http.ServerResponse;
 
         await expect(async () => {
-          await requestCallback(mockReq, mockRes);
+          requestCallback(mockReq, mockRes);
           await clientPromise;
         }).rejects.toThrow(
           'Failed to exchange authorization code for tokens: Token exchange failed',
@@ -1038,7 +1038,7 @@ describe('oauth2', () => {
           end: vi.fn(),
         } as unknown as http.ServerResponse;
 
-        await requestCallback(mockReq, mockRes);
+        requestCallback(mockReq, mockRes);
         const client = await clientPromise;
 
         // Authentication should succeed even if fetchAndCacheUserInfo fails

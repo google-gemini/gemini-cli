@@ -39,7 +39,7 @@ export async function fireSessionStartHook(
       MessageBusType.HOOK_EXECUTION_RESPONSE,
     );
   } catch (error) {
-    debugLogger.warn(`SessionStart hook failed:`, error);
+    debugLogger.debug(`SessionStart hook failed:`, error);
   }
 }
 
@@ -65,7 +65,7 @@ export async function fireSessionEndHook(
       MessageBusType.HOOK_EXECUTION_RESPONSE,
     );
   } catch (error) {
-    debugLogger.warn(`SessionEnd hook failed:`, error);
+    debugLogger.debug(`SessionEnd hook failed:`, error);
   }
 }
 
@@ -91,6 +91,6 @@ export async function firePreCompressHook(
       MessageBusType.HOOK_EXECUTION_RESPONSE,
     );
   } catch (error) {
-    debugLogger.warn(`PreCompress hook failed:`, error);
+    debugLogger.debug(`PreCompress hook failed:`, error);
   }
 }
