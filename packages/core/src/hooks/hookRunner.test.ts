@@ -7,12 +7,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { HookRunner } from './hookRunner.js';
-import { HookEventName, HookType } from './types.js';
+import { HookEventName, HookType, ConfigSource } from './types.js';
 import type { HookConfig } from './types.js';
 import type { HookInput } from './types.js';
 import type { Readable, Writable } from 'node:stream';
 import type { Config } from '../config/config.js';
-import { ConfigSource } from './types.js';
 
 // Mock type for the child_process spawn
 type MockChildProcessWithoutNullStreams = ChildProcessWithoutNullStreams & {
@@ -70,6 +69,9 @@ describe('HookRunner', () => {
 
     mockConfig = {
       isTrustedFolder: vi.fn().mockReturnValue(true),
+      sanitizationConfig: {
+        enableEnvironmentVariableRedaction: true,
+      },
     } as unknown as Config;
 
     hookRunner = new HookRunner(mockConfig);
