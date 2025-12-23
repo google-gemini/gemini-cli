@@ -73,6 +73,7 @@ describe('<ModelStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     });
 
     expect(lastFrame()).toContain(
@@ -114,6 +115,7 @@ describe('<ModelStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     });
 
     const output = lastFrame();
@@ -168,6 +170,7 @@ describe('<ModelStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     });
 
     const output = lastFrame();
@@ -222,6 +225,7 @@ describe('<ModelStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     });
 
     const output = lastFrame();
@@ -267,6 +271,7 @@ describe('<ModelStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     });
 
     expect(lastFrame()).toMatchSnapshot();
@@ -305,6 +310,7 @@ describe('<ModelStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     });
 
     const output = lastFrame();

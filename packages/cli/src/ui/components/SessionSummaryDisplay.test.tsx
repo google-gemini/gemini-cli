@@ -72,6 +72,7 @@ describe('<SessionSummaryDisplay />', () => {
         totalLinesAdded: 42,
         totalLinesRemoved: 15,
       },
+      rewinds: 0,
     };
 
     const { lastFrame } = renderWithMockedStats(metrics);

@@ -60,6 +60,7 @@ describe('<ToolStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     });
 
     expect(lastFrame()).toContain(
@@ -101,6 +102,7 @@ describe('<ToolStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     });
 
     const output = lastFrame();
@@ -153,6 +155,7 @@ describe('<ToolStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     });
 
     const output = lastFrame();
@@ -194,6 +197,7 @@ describe('<ToolStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     });
 
     expect(lastFrame()).toMatchSnapshot();
@@ -232,6 +236,7 @@ describe('<ToolStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     });
 
     const output = lastFrame();
