@@ -75,6 +75,15 @@ export enum HookType {
 }
 
 /**
+ * Generate a unique key for a hook configuration
+ */
+export function getHookKey(hook: HookConfig): string {
+  const name = hook.name || '';
+  const command = hook.command || '';
+  return `${name}:${command}`;
+}
+
+/**
  * Decision types for hook outputs
  */
 export type HookDecision =

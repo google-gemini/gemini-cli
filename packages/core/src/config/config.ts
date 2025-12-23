@@ -323,13 +323,10 @@ export interface ConfigParameters {
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   experiments?: Experiments;
-  hooks?:
-    | {
-        [K in HookEventName]?: HookDefinition[];
-      }
-    | ({
-        [K in HookEventName]?: HookDefinition[];
-      } & { disabled?: string[] });
+  hooks?: { [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] };
+  projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
+    disabled?: string[];
+  };
   previewFeatures?: boolean;
   enableAgents?: boolean;
   experimentalJitContext?: boolean;
@@ -446,6 +443,9 @@ export class Config {
   private readonly enableHooks: boolean;
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
+    | undefined;
+  private readonly projectHooks:
+    | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
     | undefined;
   private readonly disabledHooks: string[];
   private experiments: Experiments | undefined;
@@ -608,6 +608,7 @@ export class Config {
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
+    this.projectHooks = params.projectHooks;
     this.experiments = params.experiments;
 
     if (params.contextFileName) {
@@ -1680,6 +1681,15 @@ export class Config {
    */
   getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.hooks;
+  }
+
+  /**
+   * Get project-specific hooks configuration
+   */
+  getProjectHooks():
+    | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
+    | undefined {
+    return this.projectHooks;
   }
 
   /**

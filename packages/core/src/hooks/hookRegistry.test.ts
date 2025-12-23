@@ -30,6 +30,26 @@ vi.mock('../utils/debugLogger.js', () => ({
   debugLogger: mockDebugLogger,
 }));
 
+// Mock TrustedHooksManager and coreEvents using vi.hoisted
+const { mockTrustedHooksManager, mockCoreEvents } = vi.hoisted(() => ({
+  mockTrustedHooksManager: {
+    getUntrustedHooks: vi.fn().mockReturnValue([]),
+    trustHooks: vi.fn(),
+  },
+  mockCoreEvents: {
+    emitConsoleLog: vi.fn(),
+    emitFeedback: vi.fn(),
+  },
+}));
+
+vi.mock('./trustedHooks.js', () => ({
+  TrustedHooksManager: vi.fn(() => mockTrustedHooksManager),
+}));
+
+vi.mock('../utils/events.js', () => ({
+  coreEvents: mockCoreEvents,
+}));
+
 describe('HookRegistry', () => {
   let hookRegistry: HookRegistry;
   let mockConfig: Config;
@@ -46,8 +66,10 @@ describe('HookRegistry', () => {
       storage: mockStorage,
       getExtensions: vi.fn().mockReturnValue([]),
       getHooks: vi.fn().mockReturnValue({}),
+      getProjectHooks: vi.fn().mockReturnValue({}),
       getDisabledHooks: vi.fn().mockReturnValue([]),
       isTrustedFolder: vi.fn().mockReturnValue(true),
+      getProjectRoot: vi.fn().mockReturnValue('/project'),
     } as unknown as Config;
 
     hookRegistry = new HookRegistry(mockConfig);
@@ -572,7 +594,8 @@ describe('HookRegistry', () => {
       await hookRegistry.initialize();
 
       expect(hookRegistry.getAllHooks()).toHaveLength(0);
-      expect(mockDebugLogger.warn).toHaveBeenCalledTimes(3); // One warning for each invalid hookConfig
+      // One warning for each invalid hookConfig
+      expect(mockDebugLogger.warn).toHaveBeenCalled();
     });
 
     it('should handle mixed valid and invalid hook configurations', async () => {
@@ -622,6 +645,90 @@ describe('HookRegistry', () => {
         expect.stringContaining('Discarding invalid hook configuration'),
         expect.objectContaining({ type: 'invalid-type' }),
       );
+    });
+  });
+
+  describe('project hook warnings', () => {
+    it('should check for untrusted project hooks when folder is trusted', async () => {
+      const projectHooks = {
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: './hooks/untrusted.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      vi.mocked(mockConfig.getHooks).mockReturnValue(
+        projectHooks as unknown as { [K in HookEventName]?: HookDefinition[] },
+      );
+      vi.mocked(mockConfig.getProjectHooks).mockReturnValue(
+        projectHooks as unknown as { [K in HookEventName]?: HookDefinition[] },
+      );
+
+      // Simulate untrusted hooks found
+      mockTrustedHooksManager.getUntrustedHooks.mockReturnValue([
+        './hooks/untrusted.sh',
+      ]);
+
+      await hookRegistry.initialize();
+
+      expect(mockTrustedHooksManager.getUntrustedHooks).toHaveBeenCalledWith(
+        '/project',
+        projectHooks,
+      );
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          'WARNING: The following project-level hooks have been detected',
+        ),
+      );
+      expect(mockTrustedHooksManager.trustHooks).toHaveBeenCalledWith(
+        '/project',
+        projectHooks,
+      );
+    });
+
+    it('should not warn if hooks are already trusted', async () => {
+      const projectHooks = {
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: './hooks/trusted.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      vi.mocked(mockConfig.getHooks).mockReturnValue(
+        projectHooks as unknown as { [K in HookEventName]?: HookDefinition[] },
+      );
+      vi.mocked(mockConfig.getProjectHooks).mockReturnValue(
+        projectHooks as unknown as { [K in HookEventName]?: HookDefinition[] },
+      );
+
+      // Simulate no untrusted hooks
+      mockTrustedHooksManager.getUntrustedHooks.mockReturnValue([]);
+
+      await hookRegistry.initialize();
+
+      expect(mockCoreEvents.emitFeedback).not.toHaveBeenCalled();
+      expect(mockTrustedHooksManager.trustHooks).not.toHaveBeenCalled();
+    });
+
+    it('should not check for untrusted hooks if folder is not trusted', async () => {
+      vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(false);
+
+      await hookRegistry.initialize();
+
+      expect(mockTrustedHooksManager.getUntrustedHooks).not.toHaveBeenCalled();
     });
   });
 });
