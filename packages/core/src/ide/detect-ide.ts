@@ -16,6 +16,16 @@ export const IDE_DEFINITIONS = {
   vscodefork: { name: 'vscodefork', displayName: 'IDE' },
   antigravity: { name: 'antigravity', displayName: 'Antigravity' },
   sublimetext: { name: 'sublimetext', displayName: 'Sublime Text' },
+  jetbrains: { name: 'jetbrains', displayName: 'JetBrains IDE' },
+  intellijidea: { name: 'intellijidea', displayName: 'IntelliJ IDEA' },
+  webstorm: { name: 'webstorm', displayName: 'WebStorm' },
+  pycharm: { name: 'pycharm', displayName: 'PyCharm' },
+  goland: { name: 'goland', displayName: 'GoLand' },
+  androidstudio: { name: 'androidstudio', displayName: 'Android Studio' },
+  clion: { name: 'clion', displayName: 'CLion' },
+  rustrover: { name: 'rustrover', displayName: 'RustRover' },
+  datagrip: { name: 'datagrip', displayName: 'DataGrip' },
+  phpstorm: { name: 'phpstorm', displayName: 'PhpStorm' },
 } as const;
 
 export interface IdeInfo {
@@ -55,6 +65,9 @@ export function detectIdeFromEnv(): IdeInfo {
   if (process.env['TERM_PROGRAM'] === 'sublime') {
     return IDE_DEFINITIONS.sublimetext;
   }
+  if (process.env['TERMINAL_EMULATOR']?.includes('JetBrains')) {
+    return IDE_DEFINITIONS.jetbrains;
+  }
   return IDE_DEFINITIONS.vscode;
 }
 
@@ -77,6 +90,49 @@ function verifyVSCode(
   return IDE_DEFINITIONS.vscodefork;
 }
 
+function verifyJetBrains(
+  ide: IdeInfo,
+  ideProcessInfo: {
+    pid: number;
+    command: string;
+  },
+): IdeInfo {
+  if (ide.name !== IDE_DEFINITIONS.jetbrains.name || !ideProcessInfo?.command) {
+    return ide;
+  }
+
+  const command = ideProcessInfo.command.toLowerCase();
+  if (command.includes('idea')) {
+    return IDE_DEFINITIONS.intellijidea;
+  }
+  if (command.includes('webstorm')) {
+    return IDE_DEFINITIONS.webstorm;
+  }
+  if (command.includes('pycharm')) {
+    return IDE_DEFINITIONS.pycharm;
+  }
+  if (command.includes('goland')) {
+    return IDE_DEFINITIONS.goland;
+  }
+  if (command.includes('studio')) {
+    return IDE_DEFINITIONS.androidstudio;
+  }
+  if (command.includes('clion')) {
+    return IDE_DEFINITIONS.clion;
+  }
+  if (command.includes('rustrover')) {
+    return IDE_DEFINITIONS.rustrover;
+  }
+  if (command.includes('datagrip')) {
+    return IDE_DEFINITIONS.datagrip;
+  }
+  if (command.includes('phpstorm')) {
+    return IDE_DEFINITIONS.phpstorm;
+  }
+
+  return ide;
+}
+
 export function detectIde(
   ideProcessInfo: {
     pid: number;
@@ -91,14 +147,17 @@ export function detectIde(
     };
   }
 
-  // Only VS Code and Sublime Text integrations are currently supported.
+  // Only VS Code, Sublime Text and JetBrains integrations are currently supported.
   if (
     process.env['TERM_PROGRAM'] !== 'vscode' &&
-    process.env['TERM_PROGRAM'] !== 'sublime'
+    process.env['TERM_PROGRAM'] !== 'sublime' &&
+    !process.env['TERMINAL_EMULATOR']?.includes('JetBrains')
   ) {
     return undefined;
   }
 
   const ide = detectIdeFromEnv();
-  return verifyVSCode(ide, ideProcessInfo);
+  return process.env['TERMINAL_EMULATOR']?.includes('JetBrains')
+    ? verifyJetBrains(ide, ideProcessInfo)
+    : verifyVSCode(ide, ideProcessInfo);
 }
