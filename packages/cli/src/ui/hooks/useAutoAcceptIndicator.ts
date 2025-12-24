@@ -14,12 +14,14 @@ export interface UseAutoAcceptIndicatorArgs {
   config: Config;
   addItem?: (item: HistoryItemWithoutId, timestamp: number) => void;
   onApprovalModeChange?: (mode: ApprovalMode) => void;
+  isActive?: boolean;
 }
 
 export function useAutoAcceptIndicator({
   config,
   addItem,
   onApprovalModeChange,
+  isActive = true,
 }: UseAutoAcceptIndicatorArgs): ApprovalMode {
   const currentConfigValue = config.getApprovalMode();
   const [showAutoAcceptIndicator, setShowAutoAcceptIndicator] =
@@ -81,7 +83,7 @@ export function useAutoAcceptIndicator({
         }
       }
     },
-    { isActive: true },
+    { isActive },
   );
 
   return showAutoAcceptIndicator;
