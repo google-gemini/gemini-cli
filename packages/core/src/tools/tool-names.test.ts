@@ -30,9 +30,14 @@ describe('tool-names', () => {
       expect(isValidToolName('my-server__my-tool')).toBe(true);
     });
 
+    it('should validate generic slug names (unprefixed tools)', () => {
+      expect(isValidToolName('search_for_files_codesearch')).toBe(true);
+      expect(isValidToolName('simple-tool-name')).toBe(true);
+      expect(isValidToolName('tool_with_underscores')).toBe(true);
+    });
+
     it('should reject invalid tool names', () => {
       expect(isValidToolName('')).toBe(false);
-      expect(isValidToolName('invalid-name')).toBe(false);
       expect(isValidToolName('server__')).toBe(false);
       expect(isValidToolName('__tool')).toBe(false);
       expect(isValidToolName('server__tool__extra')).toBe(false);
