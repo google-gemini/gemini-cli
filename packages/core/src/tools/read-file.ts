@@ -48,6 +48,10 @@ export interface ReadFileToolParams {
 }
 
 function formatWithLineNumbers(content: string, startLine: number): string {
+  if (!content) {
+    return '';
+  }
+
   const lines = content.split('\n');
   const maxLine = startLine + lines.length - 1;
   const width = Math.max(4, String(maxLine).length);
@@ -117,11 +121,9 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     } else if (result.isTruncated) {
       const [start, end] = result.linesShown!;
       const total = result.originalLineCount!;
-      const nextOffset = this.params.offset
-        ? this.params.offset + end - start + 1
-        : end;
+      const nextOffset = (this.params.offset ?? 0) + (end - start + 1);
 
-      const startLine = this.params.offset ? this.params.offset + 1 : start;
+      const startLine = start;
       const fileContent = this.params.showLineNumbers
         ? formatWithLineNumbers(result.llmContent, startLine)
         : result.llmContent;
@@ -131,10 +133,13 @@ IMPORTANT: The file content has been truncated.
 Status: Showing lines ${start}-${end} of ${total} total lines.
 Action: To read more of the file, you can use the 'offset' and 'limit' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use offset: ${nextOffset}.
 
---- FILE CONTENT (truncated) ---
-${fileContent}`;
+--- FILE CONTENT (truncated; untrusted) ---
+${'```'}
+${fileContent}
+${'```'}
+`;
     } else {
-      const startLine = this.params.offset ? this.params.offset + 1 : 1;
+      const startLine = (this.params.offset ?? 0) + 1;
       llmContent = this.params.showLineNumbers
         ? formatWithLineNumbers(result.llmContent, startLine)
         : result.llmContent;
