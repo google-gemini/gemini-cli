@@ -10,6 +10,8 @@ import { AtomOneDark } from './atom-one-dark.js';
 import { Dracula } from './dracula.js';
 import { GitHubDark } from './github-dark.js';
 import { GitHubLight } from './github-light.js';
+import { GitHubDarkColorblind } from './github-dark-colorblind.js';
+import { GitHubLightColorblind } from './github-light-colorblind.js';
 import { GoogleCode } from './googlecode.js';
 import { Holiday } from './holiday.js';
 import { DefaultLight } from './default-light.js';
@@ -50,6 +52,8 @@ class ThemeManager {
       DefaultDark,
       GitHubDark,
       GitHubLight,
+      GitHubDarkColorblind,
+      GitHubLightColorblind,
       GoogleCode,
       Holiday,
       ShadesOfPurple,
