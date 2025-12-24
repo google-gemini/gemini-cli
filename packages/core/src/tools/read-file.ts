@@ -40,6 +40,24 @@ export interface ReadFileToolParams {
    * The number of lines to read (optional)
    */
   limit?: number;
+
+  /**
+   * When true, prefixes each text line with a virtual 1-based line number.
+   */
+  showLineNumbers?: boolean;
+}
+
+function formatWithLineNumbers(content: string, startLine: number): string {
+  const lines = content.split('\n');
+  const maxLine = startLine + lines.length - 1;
+  const width = Math.max(4, String(maxLine).length);
+  return lines
+    .map((line, index) => {
+      const lineNo = startLine + index;
+      const padded = String(lineNo).padStart(width, ' ');
+      return `${padded}| ${line}`;
+    })
+    .join('\n');
 }
 
 class ReadFileToolInvocation extends BaseToolInvocation<
@@ -94,21 +112,32 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     }
 
     let llmContent: PartUnion;
-    if (result.isTruncated) {
+    if (typeof result.llmContent !== 'string') {
+      llmContent = result.llmContent;
+    } else if (result.isTruncated) {
       const [start, end] = result.linesShown!;
       const total = result.originalLineCount!;
       const nextOffset = this.params.offset
         ? this.params.offset + end - start + 1
         : end;
+
+      const startLine = this.params.offset ? this.params.offset + 1 : start;
+      const fileContent = this.params.showLineNumbers
+        ? formatWithLineNumbers(result.llmContent, startLine)
+        : result.llmContent;
+
       llmContent = `
 IMPORTANT: The file content has been truncated.
 Status: Showing lines ${start}-${end} of ${total} total lines.
 Action: To read more of the file, you can use the 'offset' and 'limit' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use offset: ${nextOffset}.
 
 --- FILE CONTENT (truncated) ---
-${result.llmContent}`;
+${fileContent}`;
     } else {
-      llmContent = result.llmContent || '';
+      const startLine = this.params.offset ? this.params.offset + 1 : 1;
+      llmContent = this.params.showLineNumbers
+        ? formatWithLineNumbers(result.llmContent, startLine)
+        : result.llmContent;
     }
 
     const lines =
@@ -171,6 +200,11 @@ export class ReadFileTool extends BaseDeclarativeTool<
             description:
               "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
             type: 'number',
+          },
+          showLineNumbers: {
+            description:
+              'Optional: When true, prefixes each line of the returned text with a left-padded virtual line number and a separator bar (for example, " 294| const x = 1;"). This numbering is not part of the underlying file; it is only a visual aid. Recommended when you need to precisely understand line numbers in large files for subsequent editing operations.',
+            type: 'boolean',
           },
         },
         required: ['file_path'],

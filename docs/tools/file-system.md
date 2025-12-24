@@ -50,14 +50,32 @@ Other binary file types are generally skipped.
   - `limit` (number, optional): For text files, the maximum number of lines to
     read. If omitted, reads a default maximum (e.g., 2000 lines) or the entire
     file if feasible.
+  - `showLineNumbers` (boolean, optional): When true, prefixes each line of the
+    returned text with a left-padded virtual line number and a separator bar
+    (for example, `294|            occurrences = 0;`). This numbering is not
+    part of the underlying file; it is only a visual aid.
 - **Behavior:**
   - For text files: Returns the content. If `offset` and `limit` are used,
     returns only that slice of lines. Indicates if content was truncated due to
     line limits or line length limits.
+
+  - When `showLineNumbers` is true, each text line is returned with a virtual
+    line number prefix, for example:
+
+    ```text
+     294|            occurrences = 0;
+     295|          } else {
+     296|            const lineText = lines[replaceLine - 1];
+    ```
+
+    This virtual numbering is not part of the file itself; it is a visual aid
+    for precise navigation and editing.
+
   - For image, audio, and PDF files: Returns the file content as a
     base64-encoded data structure suitable for model consumption.
   - For other binary files: Attempts to identify and skip them, returning a
     message indicating it's a generic binary file.
+
 - **Output:** (`llmContent`):
   - For text files: The file content, potentially prefixed with a truncation
     message (e.g.,
