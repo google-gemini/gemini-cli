@@ -107,7 +107,7 @@ describe('toml-loader', () => {
       const filePath = await writeAgentToml(`
         name = "test-agent"
         description = "A test agent"
-        tools = ["not-a-tool"]
+        tools = ["tool!"]
         [prompts]
         system_prompt = "You are a test agent."
       `);
