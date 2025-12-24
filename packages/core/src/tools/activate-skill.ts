@@ -9,7 +9,12 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import * as path from 'node:path';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import type { ToolResult } from './tools.js';
+import type {
+  ToolResult,
+  ToolCallConfirmationDetails,
+  ToolInvocation,
+  ToolConfirmationOutcome,
+} from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import type { Config } from '../config/config.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from './tool-names.js';
@@ -24,7 +29,10 @@ export interface ActivateSkillToolParams {
   name: string;
 }
 
-class ActivateSkillToolInvocation extends BaseToolInvocation<ActivateSkillToolParams> {
+class ActivateSkillToolInvocation extends BaseToolInvocation<
+  ActivateSkillToolParams,
+  ToolResult
+> {
   constructor(
     private config: Config,
     params: ActivateSkillToolParams,

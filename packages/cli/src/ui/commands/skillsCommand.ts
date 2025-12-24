@@ -7,6 +7,7 @@
 import {
   type CommandContext,
   type SlashCommand,
+  type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
 import { MessageType, type HistoryItemSkillsList } from '../types.js';
@@ -22,8 +23,12 @@ export const skillsCommand: SlashCommand = {
     {
       name: 'list',
       description: 'List available agent skills. Usage: /skills list [nodesc]',
-      action: async (context: CommandContext, args?: string): Promise<void> => {
-        const subCommand = args?.trim();
+      kind: CommandKind.BUILT_IN,
+      action: async (
+        context: CommandContext,
+        args: string,
+      ): Promise<void | SlashCommandActionReturn> => {
+        const subCommand = args.trim();
 
         // Default to SHOWING descriptions. The user can hide them with 'nodesc'.
         let useShowDescriptions = true;
@@ -61,8 +66,12 @@ export const skillsCommand: SlashCommand = {
     {
       name: 'disable',
       description: 'Disable a skill by name. Usage: /skills disable <name>',
-      action: async (context: CommandContext, args?: string): Promise<void> => {
-        const skillName = args?.trim();
+      kind: CommandKind.BUILT_IN,
+      action: async (
+        context: CommandContext,
+        args: string,
+      ): Promise<void | SlashCommandActionReturn> => {
+        const skillName = args.trim();
         if (!skillName) {
           context.ui.addItem(
             {
@@ -124,8 +133,12 @@ export const skillsCommand: SlashCommand = {
       name: 'enable',
       description:
         'Enable a disabled skill by name. Usage: /skills enable <name>',
-      action: async (context: CommandContext, args?: string): Promise<void> => {
-        const skillName = args?.trim();
+      kind: CommandKind.BUILT_IN,
+      action: async (
+        context: CommandContext,
+        args: string,
+      ): Promise<void | SlashCommandActionReturn> => {
+        const skillName = args.trim();
         if (!skillName) {
           context.ui.addItem(
             {
@@ -172,38 +185,41 @@ export const skillsCommand: SlashCommand = {
       },
     },
   ],
-  action: async (context: CommandContext, args?: string): Promise<void> => {
-    const subCommand = args?.trim();
+  action: async (
+    context: CommandContext,
+    args: string,
+  ): Promise<void | SlashCommandActionReturn> => {
+    const subCommand = args.trim();
 
-    if (subCommand?.startsWith('list ')) {
-      return skillsCommand.subCommands![0].action(
+    if (subCommand.startsWith('list ')) {
+      return skillsCommand.subCommands![0].action!(
         context,
         subCommand.slice('list '.length),
       );
     }
     if (subCommand === 'list') {
-      return skillsCommand.subCommands![0].action(context, '');
+      return skillsCommand.subCommands![0].action!(context, '');
     }
-    if (subCommand?.startsWith('disable ')) {
-      return skillsCommand.subCommands![1].action(
+    if (subCommand.startsWith('disable ')) {
+      return skillsCommand.subCommands![1].action!(
         context,
         subCommand.slice('disable '.length),
       );
     }
     if (subCommand === 'disable') {
-      return skillsCommand.subCommands![1].action(context, '');
+      return skillsCommand.subCommands![1].action!(context, '');
     }
-    if (subCommand?.startsWith('enable ')) {
-      return skillsCommand.subCommands![2].action(
+    if (subCommand.startsWith('enable ')) {
+      return skillsCommand.subCommands![2].action!(
         context,
         subCommand.slice('enable '.length),
       );
     }
     if (subCommand === 'enable') {
-      return skillsCommand.subCommands![2].action(context, '');
+      return skillsCommand.subCommands![2].action!(context, '');
     }
 
     // Default to 'list' if no other subcommand matches
-    return skillsCommand.subCommands![0].action(context, subCommand);
+    return skillsCommand.subCommands![0].action!(context, subCommand);
   },
 };

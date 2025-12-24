@@ -38,7 +38,7 @@ describe('skillsCommand', () => {
   });
 
   it('should add a SKILLS_LIST item to UI with descriptions by default', async () => {
-    await skillsCommand.action(context);
+    await skillsCommand.action!(context, '');
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -54,7 +54,7 @@ describe('skillsCommand', () => {
   });
 
   it('should list skills when "list" subcommand is used', async () => {
-    await skillsCommand.action(context, 'list');
+    await skillsCommand.action!(context, 'list');
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -70,7 +70,7 @@ describe('skillsCommand', () => {
   });
 
   it('should disable descriptions if "nodesc" arg is provided to list', async () => {
-    await skillsCommand.action(context, 'list nodesc');
+    await skillsCommand.action!(context, 'list nodesc');
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -91,7 +91,7 @@ describe('skillsCommand', () => {
     });
 
     it('should disable a skill', async () => {
-      await skillsCommand.action(context, 'disable skill1');
+      await skillsCommand.action!(context, 'disable skill1');
 
       expect(context.services.settings.setValue).toHaveBeenCalledWith(
         SettingScope.Workspace,
@@ -109,7 +109,7 @@ describe('skillsCommand', () => {
 
     it('should enable a skill', async () => {
       context.services.settings.merged.skills = { disabled: ['skill1'] };
-      await skillsCommand.action(context, 'enable skill1');
+      await skillsCommand.action!(context, 'enable skill1');
 
       expect(context.services.settings.setValue).toHaveBeenCalledWith(
         SettingScope.Workspace,
@@ -126,7 +126,7 @@ describe('skillsCommand', () => {
     });
 
     it('should show error if skill not found during disable', async () => {
-      await skillsCommand.action(context, 'disable non-existent');
+      await skillsCommand.action!(context, 'disable non-existent');
 
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({

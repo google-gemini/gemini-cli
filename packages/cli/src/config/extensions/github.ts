@@ -549,7 +549,7 @@ export async function extractFile(file: string, dest: string): Promise<void> {
       file,
       cwd: dest,
     });
-  } else if (file.endsWith('.zip')) {
+  } else if (file.endsWith('.zip') || file.endsWith('.skill')) {
     await extract(file, { dir: dest });
   } else {
     throw new Error(`Unsupported file extension for extraction: ${file}`);
