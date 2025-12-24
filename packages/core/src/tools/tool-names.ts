@@ -88,5 +88,7 @@ export function isValidToolName(
     return slugRegex.test(server) && slugRegex.test(tool);
   }
 
-  return false;
+  // Allow any valid slug to support unprefixed MCP tools or other dynamic tools
+  const slugRegex = /^[a-z0-9-_]+$/i;
+  return slugRegex.test(name);
 }
