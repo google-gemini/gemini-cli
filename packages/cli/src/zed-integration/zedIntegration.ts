@@ -44,6 +44,7 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
+import { runExitCleanup } from '../utils/cleanup.js';
 
 export async function runZedIntegration(
   config: Config,
@@ -55,10 +56,15 @@ export async function runZedIntegration(
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
   const stream = acp.ndJsonStream(stdout, stdin);
-  new acp.AgentSideConnection(
+  const connection = new acp.AgentSideConnection(
     (connection) => new GeminiAgent(config, settings, argv, connection),
     stream,
   );
+
+  // SIGTERM/SIGINT handlers (in sdk.ts) don't fire when stdin closes.
+  // We must explicitly await the connection close to flush telemetry.
+  // Use finally() to ensure cleanup runs even on stream errors.
+  await connection.closed.finally(runExitCleanup);
 }
 
 export class GeminiAgent {

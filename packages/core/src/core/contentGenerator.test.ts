@@ -61,7 +61,9 @@ describe('createContentGenerator', () => {
     expect(FakeContentGenerator.fromFile).toHaveBeenCalledWith(
       fakeResponsesFile,
     );
-    expect(generator).toEqual(mockGenerator);
+    expect(generator).toEqual(
+      new LoggingContentGenerator(mockGenerator, mockConfigWithFake),
+    );
   });
 
   it('should create a RecordingContentGenerator', async () => {
