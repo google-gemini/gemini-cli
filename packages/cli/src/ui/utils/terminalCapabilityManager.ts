@@ -76,15 +76,6 @@ export class TerminalCapabilityManager {
     }
 
     return new Promise((resolve) => {
-      // tmux doesn't respond to modifyOtherKeys query, but supports it via extended-keys
-      // Check if we're in tmux and assume support immediately
-      if (process.env['TMUX']) {
-        this.modifyOtherKeysSupported = true;
-        debugLogger.log(
-          'Detected tmux environment, assuming modifyOtherKeys support',
-        );
-      }
-
       const originalRawMode = process.stdin.isRaw;
       if (!originalRawMode) {
         process.stdin.setRawMode(true);
