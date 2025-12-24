@@ -451,3 +451,10 @@ export interface ActiveHook {
   index?: number;
   total?: number;
 }
+export interface RenewSessionConfirmationResult {
+  userSelection: 'compress_session' | 'new_session';
+}
+
+export interface RenewSessionConfirmationRequest {
+  onComplete: (result: RenewSessionConfirmationResult) => void;
+}

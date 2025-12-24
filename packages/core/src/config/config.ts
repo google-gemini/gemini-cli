@@ -338,6 +338,7 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   maxSessionTurns?: number;
+  renewSessionTurnsThreshold?: number;
   experimentalZedIntegration?: boolean;
   listSessions?: boolean;
   deleteSession?: string;
@@ -483,6 +484,7 @@ export class Config {
 
   private _activeModel: string;
   private readonly maxSessionTurns: number;
+  private readonly renewSessionTurnsThreshold: number;
   private readonly listSessions: boolean;
   private readonly deleteSession: string | undefined;
   private readonly listExtensions: boolean;
@@ -654,6 +656,7 @@ export class Config {
     this.previewFeatures = params.previewFeatures ?? undefined;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
+    this.renewSessionTurnsThreshold = params.renewSessionTurnsThreshold ?? -1;
     this.experimentalZedIntegration =
       params.experimentalZedIntegration ?? false;
     this.listSessions = params.listSessions ?? false;
@@ -1115,6 +1118,10 @@ export class Config {
 
   getMaxSessionTurns(): number {
     return this.maxSessionTurns;
+  }
+
+  getRenewSessionTurnsThreshold(): number {
+    return this.renewSessionTurnsThreshold;
   }
 
   setQuotaErrorOccurred(value: boolean): void {

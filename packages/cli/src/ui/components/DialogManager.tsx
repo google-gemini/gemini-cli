@@ -7,6 +7,7 @@
 import { Box, Text } from 'ink';
 import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
+import { RenewSessionDialog } from './RenewSessionDialog.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
 import { ConsentPrompt } from './ConsentPrompt.js';
 import { ThemeDialog } from './ThemeDialog.js';
@@ -124,6 +125,21 @@ export const DialogManager = ({
       <FolderTrustDialog
         onSelect={uiActions.handleFolderTrustSelect}
         isRestarting={uiState.isRestarting}
+      />
+    );
+  }
+  if (uiState.shellConfirmationRequest) {
+    return (
+      <ShellConfirmationDialog request={uiState.shellConfirmationRequest} />
+    );
+  }
+  if (uiState.RenewSessionConfirmationRequest) {
+    return (
+      <RenewSessionDialog
+        maxSessionTurns={
+          settings.merged.model?.renewSessionTurnsThreshold ?? -1
+        }
+        onComplete={uiState.RenewSessionConfirmationRequest.onComplete}
       />
     );
   }

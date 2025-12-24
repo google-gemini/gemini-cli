@@ -219,6 +219,7 @@ describe('Gemini Client (client.ts)', () => {
       getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
       getFileService: vi.fn().mockReturnValue(fileService),
       getMaxSessionTurns: vi.fn().mockReturnValue(0),
+      getRenewSessionTurnsThreshold: vi.fn().mockReturnValue(-1),
       getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
       setQuotaErrorOccurred: vi.fn(),
       getNoBrowser: vi.fn().mockReturnValue(false),

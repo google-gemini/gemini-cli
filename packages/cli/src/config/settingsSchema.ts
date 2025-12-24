@@ -700,6 +700,16 @@ const SETTINGS_SCHEMA = {
           'Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.',
         showInDialog: true,
       },
+      renewSessionTurnsThreshold: {
+        type: 'number',
+        label: 'Renew Session Turn Threshold',
+        category: 'Model',
+        requiresRestart: false,
+        default: -1,
+        description:
+          'Number of conversation turns after which to prompt the user to start a new session or compress. Set to -1 to disable.',
+        showInDialog: true,
+      },
       summarizeToolOutput: {
         type: 'object',
         label: 'Summarize Tool Output',

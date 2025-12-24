@@ -196,63 +196,58 @@ describe('useGeminiStream', () => {
     getMcpServerCount: vi.fn().mockReturnValue(0),
   };
 
-  const mockConfig: Config = {
-    apiKey: 'test-api-key',
-    model: 'gemini-pro',
-    sandbox: false,
-    targetDir: '/test/dir',
-    debugMode: false,
-    question: undefined,
-    coreTools: [],
-    toolDiscoveryCommand: undefined,
-    toolCallCommand: undefined,
-    mcpServerCommand: undefined,
-    mcpServers: undefined,
-    userAgent: 'test-agent',
-    userMemory: '',
-    geminiMdFileCount: 0,
-    alwaysSkipModificationConfirmation: false,
-    vertexai: false,
-    showMemoryUsage: false,
-    contextFileName: undefined,
-    storage: {
-      getProjectTempDir: vi.fn(() => '/test/temp'),
-      getProjectTempCheckpointsDir: vi.fn(() => '/test/temp/checkpoints'),
-    } as any,
-    getToolRegistry: vi.fn(
-      () => ({ getToolSchemaList: vi.fn(() => []) }) as any,
-    ),
-    getProjectRoot: vi.fn(() => '/test/dir'),
-    getCheckpointingEnabled: vi.fn(() => false),
-    getGeminiClient: mockGetGeminiClient,
-    getMcpClientManager: () => mockMcpClientManager as any,
-    getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
-    getUsageStatisticsEnabled: () => true,
-    getDebugMode: () => false,
-    addHistory: vi.fn(),
-    getSessionId: vi.fn(() => 'test-session-id'),
-    setQuotaErrorOccurred: vi.fn(),
-    getQuotaErrorOccurred: vi.fn(() => false),
-    getModel: vi.fn(() => 'gemini-2.5-pro'),
-    getContentGeneratorConfig: vi.fn(() => ({
+    const contentGeneratorConfig = {
       model: 'test-model',
       apiKey: 'test-key',
       vertexai: false,
       authType: AuthType.USE_GEMINI,
-    })),
-    getContentGenerator: vi.fn(),
-    isInteractive: () => false,
-    getExperiments: () => {},
-    isEventDrivenSchedulerEnabled: vi.fn(() => false),
-    getMaxSessionTurns: vi.fn(() => 100),
-    isJitContextEnabled: vi.fn(() => false),
-    getGlobalMemory: vi.fn(() => ''),
-    getUserMemory: vi.fn(() => ''),
-    getIdeMode: vi.fn(() => false),
-    getEnableHooks: vi.fn(() => false),
-  } as unknown as Config;
+    };
 
-  beforeEach(() => {
+    const mockConfig: Config ={
+      apiKey: 'test-api-key',
+      model: 'gemini-pro',
+      sandbox: false,
+      targetDir: '/test/dir',
+      debugMode: false,
+      question: undefined,
+
+      coreTools: [],
+      toolDiscoveryCommand: undefined,
+      toolCallCommand: undefined,
+      mcpServerCommand: undefined,
+      mcpServers: undefined,
+      userAgent: 'test-agent',
+      userMemory: '',
+      geminiMdFileCount: 0,
+      alwaysSkipModificationConfirmation: false,
+      vertexai: false,
+      showMemoryUsage: false,
+      contextFileName: undefined,
+      getToolRegistry: vi.fn(
+        () => ({ getToolSchemaList: vi.fn(() => []) }) as any,
+      ),
+      getProjectRoot: vi.fn(() => '/test/dir'),
+      getCheckpointingEnabled: vi.fn(() => false),
+      getGeminiClient: mockGetGeminiClient,
+      getMcpClientManager: () => mockMcpClientManager as any,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      addHistory: vi.fn(),
+      getSessionId() {
+        return 'test-session-id';
+      },
+      setQuotaErrorOccurred: vi.fn(),
+      getQuotaErrorOccurred: vi.fn(() => false),
+      getModel: vi.fn(() => 'gemini-2.5-pro'),
+      getContentGeneratorConfig: vi
+        .fn()
+        .mockReturnValue(contentGeneratorConfig),
+      isInteractive: () => false,
+      getExperiments: () => {},
+    } as unknown as Config;
+
+    beforeEach(() => {
     vi.clearAllMocks(); // Clear mocks before each test
     mockAddItem = vi.fn();
     mockOnDebugMessage = vi.fn();
@@ -3112,6 +3107,47 @@ describe('useGeminiStream', () => {
       // Then verify loop detection confirmation request was set
       await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+    });
+
+    describe('Session Renewal halting', () => {
+      it('should stop processing stream after RenewSession event', async () => {
+        mockSendMessageStream.mockReturnValue(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.Content,
+              value: 'Initial content',
+            };
+            yield {
+              type: ServerGeminiEventType.RenewSession,
+            };
+            yield {
+              type: ServerGeminiEventType.Content,
+              value: 'Should be ignored',
+            };
+          })(),
+        );
+
+        const { result } = renderHookWithDefaults();
+
+        await act(async () => {
+          await result.current.submitQuery('Test renew halt');
+        });
+
+        await waitFor(() => {
+          expect(mockAddItem).toHaveBeenCalledWith(
+            expect.objectContaining({ text: 'Initial content' }),
+            expect.any(Number),
+          );
+        });
+
+        // The second content event should NOT have triggered addItem
+        expect(mockAddItem).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining('Should be ignored'),
+          }),
+          expect.any(Number),
+        );
       });
     });
   });
