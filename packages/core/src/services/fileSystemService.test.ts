@@ -7,8 +7,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import { StandardFileSystemService } from './fileSystemService.js';
+import * as fileUtils from '../utils/fileUtils.js';
 
 vi.mock('fs/promises');
+vi.mock('../utils/fileUtils.js', () => ({
+  readFileWithEncoding: vi.fn(),
+}));
 
 describe('StandardFileSystemService', () => {
   let fileSystem: StandardFileSystemService;
@@ -23,19 +27,21 @@ describe('StandardFileSystemService', () => {
   });
 
   describe('readTextFile', () => {
-    it('should read file content using fs', async () => {
+    it('should read file content using BOM-aware reader', async () => {
       const testContent = 'Hello, World!';
-      vi.mocked(fs.readFile).mockResolvedValue(testContent);
+      vi.mocked(fileUtils.readFileWithEncoding).mockResolvedValue(testContent);
 
       const result = await fileSystem.readTextFile('/test/file.txt');
 
-      expect(fs.readFile).toHaveBeenCalledWith('/test/file.txt', 'utf-8');
+      expect(fileUtils.readFileWithEncoding).toHaveBeenCalledWith(
+        '/test/file.txt',
+      );
       expect(result).toBe(testContent);
     });
 
-    it('should propagate fs.readFile errors', async () => {
+    it('should propagate readFileWithEncoding errors', async () => {
       const error = new Error('ENOENT: File not found');
-      vi.mocked(fs.readFile).mockRejectedValue(error);
+      vi.mocked(fileUtils.readFileWithEncoding).mockRejectedValue(error);
 
       await expect(fileSystem.readTextFile('/test/file.txt')).rejects.toThrow(
         'ENOENT: File not found',

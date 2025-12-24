@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
 import { AcpFileSystemService } from './fileSystemService.js';
 import type { AgentSideConnection } from '@agentclientprotocol/sdk';
 import type { FileSystemService } from '@google/gemini-cli-core';
+import { RequestError } from './connection.js';
 
 describe('AcpFileSystemService', () => {
   let mockConnection: Mocked<AgentSideConnection>;
@@ -69,6 +70,27 @@ describe('AcpFileSystemService', () => {
 
       expect(result).toBe('content');
       verify();
+    });
+
+    it('should convert RESOURCE_NOT_FOUND to ENOENT', async () => {
+      service = new AcpFileSystemService(
+        mockClient,
+        'session-1',
+        { readTextFile: true, writeTextFile: true },
+        mockFallback,
+      );
+      mockClient.readTextFile.mockRejectedValue({
+        code: RequestError.RESOURCE_NOT_FOUND,
+        message: 'File not found',
+      });
+
+      await expect(service.readTextFile('/missing/file')).rejects.toMatchObject(
+        {
+          code: 'ENOENT',
+          syscall: 'open',
+          path: '/missing/file',
+        },
+      );
     });
   });
 
