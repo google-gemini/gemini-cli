@@ -409,3 +409,11 @@ export interface ConfirmationRequest {
 export interface LoopDetectionConfirmationRequest {
   onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
 }
+
+export interface RenewSessionConfirmationResult {
+  userSelection: 'compress_session' | 'new_session';
+}
+
+export interface RenewSessionConfirmationRequest {
+  onComplete: (result: RenewSessionConfirmationResult) => void;
+}

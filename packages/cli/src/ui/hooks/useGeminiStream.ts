@@ -212,6 +212,18 @@ export const useGeminiStream = (
     onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
   } | null>(null);
 
+  const [RenewSessionConfirmationRequest, setRenewSessionConfirmationRequest] =
+    useState<{
+      onComplete: (result: {
+        userSelection: 'compress_session' | 'new_session';
+      }) => void;
+    } | null>(null);
+
+  const handleSlashCommandRef = useRef(handleSlashCommand);
+  useEffect(() => {
+    handleSlashCommandRef.current = handleSlashCommand;
+  }, [handleSlashCommand]);
+
   const onExec = useCallback(async (done: Promise<void>) => {
     setIsResponding(true);
     await done;
@@ -428,9 +440,14 @@ export const useGeminiStream = (
 
         if (!shellModeActive) {
           // Handle UI-only commands first
-          const slashCommandResult = isSlashCommand(trimmedQuery)
-            ? await handleSlashCommand(trimmedQuery)
-            : false;
+          let slashCommandResult: SlashCommandProcessorResult | false = false;
+          if (isSlashCommand(trimmedQuery)) {
+            if (trimmedQuery.startsWith('/clear')) {
+              cancelOngoingRequest();
+              geminiClient.resetSessionTurnCount();
+            }
+            slashCommandResult = await handleSlashCommand(trimmedQuery);
+          }
 
           if (slashCommandResult) {
             switch (slashCommandResult.type) {
@@ -516,6 +533,7 @@ export const useGeminiStream = (
     },
     [
       config,
+      geminiClient,
       addItem,
       onDebugMessage,
       handleShellCommand,
@@ -523,6 +541,7 @@ export const useGeminiStream = (
       logger,
       shellModeActive,
       scheduleToolCalls,
+      cancelOngoingRequest,
     ],
   );
 
@@ -731,6 +750,38 @@ export const useGeminiStream = (
     [addItem, pendingHistoryItemRef, setPendingHistoryItem],
   );
 
+  const handleRenewSessionEvent = useCallback((): void => {
+    if (RenewSessionConfirmationRequest) {
+      return;
+    }
+
+    if (pendingHistoryItemRef.current) {
+      addItem(pendingHistoryItemRef.current, Date.now());
+      setPendingHistoryItem(null);
+    }
+    geminiClient.resetSessionTurnCount();
+
+    setRenewSessionConfirmationRequest({
+      onComplete: (result: {
+        userSelection: 'compress_session' | 'new_session';
+      }) => {
+        setRenewSessionConfirmationRequest(null);
+
+        if (result.userSelection === 'compress_session') {
+          void handleSlashCommandRef.current('/compress');
+        } else if (result.userSelection === 'new_session') {
+          void handleSlashCommandRef.current('/clear');
+        }
+      },
+    });
+  }, [
+    addItem,
+    geminiClient,
+    RenewSessionConfirmationRequest,
+    pendingHistoryItemRef,
+    setPendingHistoryItem,
+  ]);
+
   const handleMaxSessionTurnsEvent = useCallback(
     () =>
       addItem(
@@ -831,6 +882,9 @@ export const useGeminiStream = (
           case ServerGeminiEventType.MaxSessionTurns:
             handleMaxSessionTurnsEvent();
             break;
+          case ServerGeminiEventType.RenewSession:
+            handleRenewSessionEvent();
+            return StreamProcessingStatus.Completed;
           case ServerGeminiEventType.ContextWindowWillOverflow:
             handleContextWindowWillOverflowEvent(
               event.value.estimatedRequestTokenCount,
@@ -878,6 +932,7 @@ export const useGeminiStream = (
       handleContextWindowWillOverflowEvent,
       handleCitationEvent,
       handleChatModelEvent,
+      handleRenewSessionEvent,
     ],
   );
   const submitQuery = useCallback(
@@ -1310,6 +1365,7 @@ export const useGeminiStream = (
     handleApprovalModeChange,
     activePtyId,
     loopDetectionConfirmationRequest,
+    RenewSessionConfirmationRequest,
     lastOutputTime,
   };
 };

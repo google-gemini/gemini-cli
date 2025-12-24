@@ -58,6 +58,7 @@ import {
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
+import { ApprovalMode } from '../policy/types.js';
 
 const MAX_TURNS = 100;
 
@@ -161,6 +162,14 @@ export class GeminiClient {
 
   getCurrentSequenceModel(): string | null {
     return this.currentSequenceModel;
+  }
+
+  getSessionTurnCount(): number {
+    return this.sessionTurnCount;
+  }
+
+  resetSessionTurnCount() {
+    this.sessionTurnCount = 0;
   }
 
   async addDirectoryContext(): Promise<void> {
@@ -453,6 +462,14 @@ export class GeminiClient {
       yield { type: GeminiEventType.MaxSessionTurns };
       return new Turn(this.getChat(), prompt_id);
     }
+    if (
+      this.config.getRenewSessionTurnsThreshold() > 0 &&
+      this.sessionTurnCount > this.config.getRenewSessionTurnsThreshold() &&
+      this.config.getApprovalMode() !== ApprovalMode.YOLO
+    ) {
+      yield { type: GeminiEventType.RenewSession };
+    }
+
     // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
     const boundedTurns = Math.min(turns, MAX_TURNS);
     if (!boundedTurns) {
