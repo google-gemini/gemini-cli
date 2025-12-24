@@ -782,6 +782,8 @@ export async function loadCliConfig(
     enableHooksUI: settings.tools?.enableHooks ?? true,
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
+    renewSessionTurnsThreshold:
+      settings.model?.renewSessionTurnsThreshold ?? -1,
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
     onReload: async () => {

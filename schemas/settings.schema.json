@@ -427,6 +427,13 @@
           "default": -1,
           "type": "number"
         },
+        "renewSessionTurnsThreshold": {
+          "title": "Renew Session Turn Threshold",
+          "description": "Number of conversation turns after which to prompt the user to start a new session or compress. Set to -1 to disable.",
+          "markdownDescription": "Number of conversation turns after which to prompt the user to start a new session or compress. Set to -1 to disable.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `-1`",
+          "default": -1,
+          "type": "number"
+        },
         "summarizeToolOutput": {
           "title": "Summarize Tool Output",
           "description": "Enables or disables summarization of tool output. Configure per-tool token budgets (for example {\"run_shell_command\": {\"tokenBudget\": 2000}}). Currently only the run_shell_command tool supports summarization.",

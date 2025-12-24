@@ -68,6 +68,7 @@ export enum GeminiEventType {
   ModelInfo = 'model_info',
   AgentExecutionStopped = 'agent_execution_stopped',
   AgentExecutionBlocked = 'agent_execution_blocked',
+  RenewSession = 'renew_session',
 }
 
 export type ServerGeminiRetryEvent = {
@@ -208,6 +209,10 @@ export type ServerGeminiCitationEvent = {
   value: string;
 };
 
+export type ServerGeminiRenewSessionEvent = {
+  type: GeminiEventType.RenewSession;
+};
+
 // The original union type, now composed of the individual types
 export type ServerGeminiStreamEvent =
   | ServerGeminiChatCompressedEvent
@@ -227,7 +232,8 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiInvalidStreamEvent
   | ServerGeminiModelInfoEvent
   | ServerGeminiAgentExecutionStoppedEvent
-  | ServerGeminiAgentExecutionBlockedEvent;
+  | ServerGeminiAgentExecutionBlockedEvent
+  | ServerGeminiRenewSessionEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {

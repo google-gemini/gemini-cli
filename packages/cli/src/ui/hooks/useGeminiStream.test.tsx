@@ -218,6 +218,7 @@ describe('useGeminiStream', () => {
       getCheckpointingEnabled: vi.fn(() => false),
       getGeminiClient: mockGetGeminiClient,
       getMcpClientManager: () => mockMcpClientManager as any,
+      getMaxSessionTurns: vi.fn(() => 10),
       getApprovalMode: () => ApprovalMode.DEFAULT,
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
@@ -3060,6 +3061,47 @@ describe('useGeminiStream', () => {
       // Then verify loop detection confirmation request was set
       await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+    });
+
+    describe('Session Renewal halting', () => {
+      it('should stop processing stream after RenewSession event', async () => {
+        mockSendMessageStream.mockReturnValue(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.Content,
+              value: 'Initial content',
+            };
+            yield {
+              type: ServerGeminiEventType.RenewSession,
+            };
+            yield {
+              type: ServerGeminiEventType.Content,
+              value: 'Should be ignored',
+            };
+          })(),
+        );
+
+        const { result } = renderHookWithDefaults();
+
+        await act(async () => {
+          await result.current.submitQuery('Test renew halt');
+        });
+
+        await waitFor(() => {
+          expect(mockAddItem).toHaveBeenCalledWith(
+            expect.objectContaining({ text: 'Initial content' }),
+            expect.any(Number),
+          );
+        });
+
+        // The second content event should NOT have triggered addItem
+        expect(mockAddItem).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining('Should be ignored'),
+          }),
+          expect.any(Number),
+        );
       });
     });
   });
