@@ -9,6 +9,8 @@ import {
   debugLogger,
   enableKittyKeyboardProtocol,
   disableKittyKeyboardProtocol,
+  enableModifyOtherKeys,
+  disableModifyOtherKeys,
 } from '@google/gemini-cli-core';
 
 export type TerminalBackgroundColor = string | undefined;
@@ -20,6 +22,7 @@ export class TerminalCapabilityManager {
   private static readonly OSC_11_QUERY = '\x1b]11;?\x1b\\';
   private static readonly TERMINAL_NAME_QUERY = '\x1b[>q';
   private static readonly DEVICE_ATTRIBUTES_QUERY = '\x1b[c';
+  private static readonly MODIFY_OTHER_KEYS_QUERY = '\x1b[>4;?m';
 
   // Kitty keyboard flags: CSI ? flags u
   // eslint-disable-next-line no-control-regex
@@ -34,12 +37,17 @@ export class TerminalCapabilityManager {
   private static readonly OSC_11_REGEX =
     // eslint-disable-next-line no-control-regex
     /\x1b\]11;rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})(\x1b\\|\x07)?/;
+  // modifyOtherKeys response: CSI > 4 ; level m
+  // eslint-disable-next-line no-control-regex
+  private static readonly MODIFY_OTHER_KEYS_REGEX = /\x1b\[>4;(\d+)m/;
 
   private terminalBackgroundColor: TerminalBackgroundColor;
   private kittySupported = false;
   private kittyEnabled = false;
   private detectionComplete = false;
   private terminalName: string | undefined;
+  private modifyOtherKeysSupported = false;
+  private modifyOtherKeysEnabled = false;
 
   private constructor() {}
 
@@ -68,6 +76,15 @@ export class TerminalCapabilityManager {
     }
 
     return new Promise((resolve) => {
+      // tmux doesn't respond to modifyOtherKeys query, but supports it via extended-keys
+      // Check if we're in tmux and assume support immediately
+      if (process.env['TMUX']) {
+        this.modifyOtherKeysSupported = true;
+        debugLogger.log(
+          'Detected tmux environment, assuming modifyOtherKeys support',
+        );
+      }
+
       const originalRawMode = process.stdin.isRaw;
       if (!originalRawMode) {
         process.stdin.setRawMode(true);
@@ -78,6 +95,7 @@ export class TerminalCapabilityManager {
       let terminalNameReceived = false;
       let deviceAttributesReceived = false;
       let bgReceived = false;
+      let modifyOtherKeysReceived = false;
       // eslint-disable-next-line prefer-const
       let timeoutId: NodeJS.Timeout;
 
@@ -96,6 +114,10 @@ export class TerminalCapabilityManager {
           this.enableKittyProtocol();
           process.on('exit', () => this.disableKittyProtocol());
           process.on('SIGTERM', () => this.disableKittyProtocol());
+        } else if (this.modifyOtherKeysSupported) {
+          this.enableModifyOtherKeys();
+          process.on('exit', () => this.disableModifyOtherKeys());
+          process.on('SIGTERM', () => this.disableModifyOtherKeys());
         }
 
         resolve();
@@ -161,6 +183,20 @@ export class TerminalCapabilityManager {
             cleanup();
           }
         }
+
+        if (!modifyOtherKeysReceived) {
+          const match = buffer.match(
+            TerminalCapabilityManager.MODIFY_OTHER_KEYS_REGEX,
+          );
+          if (match) {
+            modifyOtherKeysReceived = true;
+            const level = parseInt(match[1], 10);
+            this.modifyOtherKeysSupported = level >= 2;
+            debugLogger.log(
+              `Detected modifyOtherKeys support: ${this.modifyOtherKeysSupported} (level ${level})`,
+            );
+          }
+        }
       };
 
       process.stdin.on('data', onData);
@@ -171,6 +207,7 @@ export class TerminalCapabilityManager {
           TerminalCapabilityManager.KITTY_QUERY +
             TerminalCapabilityManager.OSC_11_QUERY +
             TerminalCapabilityManager.TERMINAL_NAME_QUERY +
+            TerminalCapabilityManager.MODIFY_OTHER_KEYS_QUERY +
             TerminalCapabilityManager.DEVICE_ATTRIBUTES_QUERY,
         );
       } catch (e) {
@@ -212,6 +249,32 @@ export class TerminalCapabilityManager {
     } catch (e) {
       debugLogger.warn('Failed to disable Kitty protocol:', e);
     }
+  }
+
+  enableModifyOtherKeys(): void {
+    try {
+      if (this.modifyOtherKeysSupported) {
+        enableModifyOtherKeys();
+        this.modifyOtherKeysEnabled = true;
+      }
+    } catch (e) {
+      debugLogger.warn('Failed to enable modifyOtherKeys protocol:', e);
+    }
+  }
+
+  disableModifyOtherKeys(): void {
+    try {
+      if (this.modifyOtherKeysEnabled) {
+        disableModifyOtherKeys();
+        this.modifyOtherKeysEnabled = false;
+      }
+    } catch (e) {
+      debugLogger.warn('Failed to disable modifyOtherKeys protocol:', e);
+    }
+  }
+
+  isModifyOtherKeysEnabled(): boolean {
+    return this.modifyOtherKeysEnabled;
   }
 
   private parseColor(rHex: string, gHex: string, bHex: string): string {
