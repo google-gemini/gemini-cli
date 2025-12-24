@@ -454,6 +454,8 @@ export function SettingsDialog({
   const SCOPE_SELECTION_HEIGHT = 4; // Apply To section height
   const BOTTOM_HELP_TEXT_HEIGHT = 1; // Help text
   const RESTART_PROMPT_HEIGHT = showRestartPrompt ? 1 : 0;
+  // Description text area for active setting (allows for wrapping)
+  const DESCRIPTION_HEIGHT = 3;
 
   let currentAvailableTerminalHeight =
     availableTerminalHeight ?? Number.MAX_SAFE_INTEGER;
@@ -465,6 +467,7 @@ export function SettingsDialog({
     SETTINGS_TITLE_HEIGHT +
     SCROLL_ARROWS_HEIGHT +
     SPACING_HEIGHT +
+    DESCRIPTION_HEIGHT +
     BOTTOM_HELP_TEXT_HEIGHT +
     RESTART_PROMPT_HEIGHT;
 
@@ -1023,6 +1026,16 @@ export function SettingsDialog({
               </Box>
             )}
           </>
+        )}
+
+        {/* Description for active setting */}
+        {items[activeSettingIndex] && (
+          <Box marginTop={1}>
+            <Text color={theme.text.secondary} wrap="wrap">
+              {getSettingDefinition(items[activeSettingIndex].value)
+                ?.description || ''}
+            </Text>
+          </Box>
         )}
 
         <Box height={1} />
