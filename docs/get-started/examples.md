@@ -217,3 +217,33 @@ describe('Login component', () => {
   });
 });
 ```
+
+## Use specialized expertise with Agent Skills
+
+Scenario: You are working on a project that requires specialized knowledge or a
+specific procedural workflow (e.g., a security audit, a specific migration, or a
+complex deployment).
+
+1.  **Discover Skills:** Use the `/skills` command to see available expertise.
+
+    ```cli
+
+    /skills
+
+    ```
+
+2.  **Request a Task:** When you ask for a task that matches a skill's
+    description, Gemini will automatically recognize its relevance.
+
+    ```cli
+
+    Perform a security audit of my current project.
+
+    ```
+
+3.  **Result:** Gemini will identify that it has a 'security-audit' skill and
+    request permission to employ it. Once approved, the model will follow its
+    specialized instructions to perform the audit.
+
+For more information on how to create and manage skills, see the
+**[Agent Skills documentation](../cli/skills.md)**.

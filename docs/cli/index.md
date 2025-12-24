@@ -29,6 +29,8 @@ overview of Gemini CLI, see the [main documentation page](../index.md).
   CLI in an enterprise environment.
 - **[Sandboxing](./sandbox.md):** Isolate tool execution in a secure,
   containerized environment.
+- **[Agent Skills](./skills.md):** Equip the model with specialized knowledge
+  and procedural workflows.
 - **[Telemetry](./telemetry.md):** Configure observability to monitor usage and
   performance.
 - **[Token caching](./token-caching.md):** Optimize API costs by caching tokens.

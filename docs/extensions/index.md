@@ -263,6 +263,29 @@ Would provide these commands:
 - `/deploy` - Shows as `[gcp] Custom command from deploy.toml` in help
 - `/gcs:sync` - Shows as `[gcp] Custom command from sync.toml` in help
 
+### Skills
+
+Extensions can provide specialized expertise by including an
+**[Agent Skill](../cli/skills.md)**. To add a skill to an extension, create a
+`skills/` directory within the extension directory. Each subdirectory within
+`skills/` represents a skill and must contain a `SKILL.md` file.
+
+**Example**
+
+An extension named `web-tools` with the following structure:
+
+```
+.gemini/extensions/web-tools/
+├── gemini-extension.json
+└── skills/
+    └── lighthouse-audit/
+        └── SKILL.md
+```
+
+Would provide the `lighthouse-audit` skill. Users will be informed about the
+available skills during the extension installation process. For more information
+on how skills work, see the **[Agent Skills documentation](../cli/skills.md)**.
+
 ### Conflict resolution
 
 Extension commands have the lowest precedence. When a conflict occurs with user

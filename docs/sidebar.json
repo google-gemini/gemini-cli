@@ -93,6 +93,10 @@
         "slug": "docs/cli/settings"
       },
       {
+        "label": "Agent Skills",
+        "slug": "docs/cli/skills"
+      },
+      {
         "label": "Telemetry",
         "slug": "docs/cli/telemetry"
       },

@@ -58,6 +58,8 @@ This documentation is organized into the following sections:
   containerized environment.
 - **[Settings](./cli/settings.md):** Configure various aspects of the CLI's
   behavior and appearance with `/settings`.
+- **[Agent Skills](./cli/skills.md):** Equip the model with specialized
+  knowledge and procedural workflows.
 - **[Telemetry](./cli/telemetry.md):** Overview of telemetry in the CLI.
 - **[Themes](./cli/themes.md):** Themes for Gemini CLI.
 - **[Token caching](./cli/token-caching.md):** Token caching and optimization.
