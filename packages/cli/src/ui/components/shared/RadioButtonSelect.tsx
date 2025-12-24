@@ -7,7 +7,10 @@
 import type React from 'react';
 import { Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
-import { BaseSelectionList } from './BaseSelectionList.js';
+import {
+  BaseSelectionList,
+  type RenderItemContext,
+} from './BaseSelectionList.js';
 import type { SelectionListItem } from '../../hooks/useSelectionList.js';
 
 /**
@@ -41,6 +44,11 @@ export interface RadioButtonSelectProps<T> {
   maxItemsToShow?: number;
   /** Whether to show numbers next to items. */
   showNumbers?: boolean;
+  /** Optional custom renderer for items. */
+  renderItem?: (
+    item: RadioSelectItem<T>,
+    context: RenderItemContext,
+  ) => React.ReactNode;
 }
 
 /**
@@ -58,6 +66,7 @@ export function RadioButtonSelect<T>({
   showScrollArrows = false,
   maxItemsToShow = 10,
   showNumbers = true,
+  renderItem,
 }: RadioButtonSelectProps<T>): React.JSX.Element {
   return (
     <BaseSelectionList<T, RadioSelectItem<T>>
@@ -69,23 +78,28 @@ export function RadioButtonSelect<T>({
       showNumbers={showNumbers}
       showScrollArrows={showScrollArrows}
       maxItemsToShow={maxItemsToShow}
-      renderItem={(item, { titleColor }) => {
-        // Handle special theme display case for ThemeDialog compatibility
-        if (item.themeNameDisplay && item.themeTypeDisplay) {
+      renderItem={
+        renderItem ||
+        ((item, { titleColor }) => {
+          // Handle special theme display case for ThemeDialog compatibility
+          if (item.themeNameDisplay && item.themeTypeDisplay) {
+            return (
+              <Text color={titleColor} wrap="truncate" key={item.key}>
+                {item.themeNameDisplay}{' '}
+                <Text color={theme.text.secondary}>
+                  {item.themeTypeDisplay}
+                </Text>
+              </Text>
+            );
+          }
+          // Regular label display
           return (
-            <Text color={titleColor} wrap="truncate" key={item.key}>
-              {item.themeNameDisplay}{' '}
-              <Text color={theme.text.secondary}>{item.themeTypeDisplay}</Text>
+            <Text color={titleColor} wrap="truncate">
+              {item.label}
             </Text>
           );
-        }
-        // Regular label display
-        return (
-          <Text color={titleColor} wrap="truncate">
-            {item.label}
-          </Text>
-        );
-      }}
+        })
+      }
     />
   );
 }

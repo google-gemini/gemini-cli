@@ -24,7 +24,7 @@ Rename the photos in my "photos" directory based on their contents.
 
 Result: Gemini will ask for permission to rename your files.
 
-Select **Yes, allow once.** and your files will be renamed:
+Select **Allow once** and your files will be renamed:
 
 ```bash
 photos/yellow_flowers.png

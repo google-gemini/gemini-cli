@@ -47,6 +47,7 @@ describe('DelegateToAgentTool', () => {
   beforeEach(() => {
     config = {
       getDebugMode: () => false,
+      getActiveModel: () => 'test-model',
       modelConfigService: {
         registerRuntimeModelConfig: vi.fn(),
       },

@@ -577,7 +577,7 @@ export async function refreshServerHierarchicalMemory(config: Config) {
   config.setUserMemory(finalMemory);
   config.setGeminiMdFileCount(result.fileCount);
   config.setGeminiMdFilePaths(result.filePaths);
-  coreEvents.emit(CoreEvent.MemoryChanged, result);
+  coreEvents.emit(CoreEvent.MemoryChanged, { fileCount: result.fileCount });
   return result;
 }
 

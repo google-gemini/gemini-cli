@@ -100,6 +100,10 @@ vi.mock('../core/nonInteractiveToolExecutor.js', () => ({
   executeToolCall: mockExecuteToolCall,
 }));
 
+vi.mock('../utils/version.js', () => ({
+  getVersion: vi.fn().mockResolvedValue('1.2.3'),
+}));
+
 vi.mock('../utils/environmentContext.js');
 
 vi.mock('../telemetry/loggers.js', () => ({
@@ -194,9 +198,7 @@ let parentToolRegistry: ToolRegistry;
  * Type-safe helper to create agent definitions for tests.
  */
 
-export const createTestDefinition = <
-  TOutput extends z.ZodTypeAny = z.ZodUnknown,
->(
+const createTestDefinition = <TOutput extends z.ZodTypeAny = z.ZodUnknown>(
   tools: Array<string | MockTool> = [LS_TOOL_NAME],
   runConfigOverrides: Partial<LocalAgentDefinition<TOutput>['runConfig']> = {},
   outputConfigMode: 'default' | 'none' = 'default',

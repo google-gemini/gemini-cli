@@ -92,6 +92,7 @@ describe('getEnvironmentContext', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getFileService: vi.fn(),
+      getEnvironmentMemory: vi.fn().mockReturnValue('Mock Environment Memory'),
 
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       storage: {
@@ -122,6 +123,7 @@ describe('getEnvironmentContext', () => {
     expect(context).toContain(
       'Here is the folder structure of the current working directories:\n\nMock Folder Structure',
     );
+    expect(context).toContain('Mock Environment Memory');
     expect(getFolderStructure).toHaveBeenCalledWith('/test/dir', {
       fileService: undefined,
     });

@@ -9,6 +9,16 @@ import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 /**
+ * Error thrown when the discovered resource metadata does not match the expected resource.
+ */
+export class ResourceMismatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ResourceMismatchError';
+  }
+}
+
+/**
  * OAuth authorization server metadata as per RFC 8414.
  */
 export interface OAuthAuthorizationServerMetadata {
@@ -243,6 +253,18 @@ export class OAuthUtils {
         }
       }
 
+      if (resourceMetadata) {
+        // RFC 9728 Section 7.3: The client MUST ensure that the resource identifier URL
+        // it is using as the prefix for the metadata request exactly matches the value
+        // of the resource metadata parameter in the protected resource metadata document.
+        const expectedResource = this.buildResourceParameter(serverUrl);
+        if (resourceMetadata.resource !== expectedResource) {
+          throw new ResourceMismatchError(
+            `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
+          );
+        }
+      }
+
       if (resourceMetadata?.authorization_servers?.length) {
         // Use the first authorization server
         const authServerUrl = resourceMetadata.authorization_servers[0];
@@ -279,6 +301,9 @@ export class OAuthUtils {
 
       return null;
     } catch (error) {
+      if (error instanceof ResourceMismatchError) {
+        throw error;
+      }
       debugLogger.debug(
         `Failed to discover OAuth configuration: ${getErrorMessage(error)}`,
       );
@@ -305,10 +330,12 @@ export class OAuthUtils {
    * Discover OAuth configuration from WWW-Authenticate header.
    *
    * @param wwwAuthenticate The WWW-Authenticate header value
+   * @param mcpServerUrl Optional MCP server URL to validate against the resource metadata
    * @returns The discovered OAuth configuration or null if not available
    */
   static async discoverOAuthFromWWWAuthenticate(
     wwwAuthenticate: string,
+    mcpServerUrl?: string,
   ): Promise<MCPOAuthConfig | null> {
     const resourceMetadataUri =
       this.parseWWWAuthenticateHeader(wwwAuthenticate);
@@ -318,6 +345,17 @@ export class OAuthUtils {
 
     const resourceMetadata =
       await this.fetchProtectedResourceMetadata(resourceMetadataUri);
+
+    if (resourceMetadata && mcpServerUrl) {
+      // Validate resource parameter per RFC 9728 Section 7.3
+      const expectedResource = this.buildResourceParameter(mcpServerUrl);
+      if (resourceMetadata.resource !== expectedResource) {
+        throw new ResourceMismatchError(
+          `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
+        );
+      }
+    }
+
     if (!resourceMetadata?.authorization_servers?.length) {
       return null;
     }

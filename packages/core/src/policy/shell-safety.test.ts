@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PolicyEngine } from './policy-engine.js';
-import { PolicyDecision } from './types.js';
+import { PolicyDecision, ApprovalMode } from './types.js';
 import type { FunctionCall } from '@google/genai';
 
 describe('Shell Safety Policy', () => {
@@ -25,6 +25,7 @@ describe('Shell Safety Policy', () => {
         },
       ],
       defaultDecision: PolicyDecision.ASK_USER,
+      approvalMode: ApprovalMode.DEFAULT,
     });
   });
 

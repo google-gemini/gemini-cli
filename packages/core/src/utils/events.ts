@@ -5,7 +5,6 @@
  */
 
 import { EventEmitter } from 'node:events';
-import type { LoadServerHierarchicalMemoryResponse } from './memoryDiscovery.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -64,7 +63,9 @@ export interface OutputPayload {
 /**
  * Payload for the 'memory-changed' event.
  */
-export type MemoryChangedPayload = LoadServerHierarchicalMemoryResponse;
+export interface MemoryChangedPayload {
+  fileCount: number;
+}
 
 export enum CoreEvent {
   UserFeedback = 'user-feedback',

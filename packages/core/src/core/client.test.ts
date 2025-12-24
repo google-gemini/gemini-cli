@@ -208,6 +208,9 @@ describe('Gemini Client (client.ts)', () => {
       getVertexAI: vi.fn().mockReturnValue(false),
       getUserAgent: vi.fn().mockReturnValue('test-agent'),
       getUserMemory: vi.fn().mockReturnValue(''),
+      getGlobalMemory: vi.fn().mockReturnValue(''),
+      getEnvironmentMemory: vi.fn().mockReturnValue(''),
+      isJitContextEnabled: vi.fn().mockReturnValue(false),
 
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProxy: vi.fn().mockReturnValue(undefined),
@@ -1530,6 +1533,39 @@ ${JSON.stringify(
           expect.any(AbortSignal),
         );
       });
+    });
+
+    it('should use getGlobalMemory for system instruction when JIT is enabled', async () => {
+      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(true);
+      vi.mocked(mockConfig.getGlobalMemory).mockReturnValue(
+        'Global JIT Memory',
+      );
+      vi.mocked(mockConfig.getUserMemory).mockReturnValue('Full JIT Memory');
+
+      const { getCoreSystemPrompt } = await import('./prompts.js');
+      const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
+
+      await client.updateSystemInstruction();
+
+      expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
+        mockConfig,
+        'Global JIT Memory',
+      );
+    });
+
+    it('should use getUserMemory for system instruction when JIT is disabled', async () => {
+      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(false);
+      vi.mocked(mockConfig.getUserMemory).mockReturnValue('Legacy Memory');
+
+      const { getCoreSystemPrompt } = await import('./prompts.js');
+      const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
+
+      await client.updateSystemInstruction();
+
+      expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
+        mockConfig,
+        'Legacy Memory',
+      );
     });
 
     it('should recursively call sendMessageStream with "Please continue." when InvalidStream event is received', async () => {

@@ -59,10 +59,23 @@ async function testMCPConnection(
     version: '0.0.1',
   });
 
+  const settings = loadSettings();
+  const sanitizationConfig = {
+    enableEnvironmentVariableRedaction: true,
+    allowedEnvironmentVariables: [],
+    blockedEnvironmentVariables:
+      settings.merged.advanced?.excludedEnvVars || [],
+  };
+
   let transport;
   try {
     // Use the same transport creation logic as core
-    transport = await createTransport(serverName, config, false);
+    transport = await createTransport(
+      serverName,
+      config,
+      false,
+      sanitizationConfig,
+    );
   } catch (_error) {
     await client.close();
     return MCPServerStatus.DISCONNECTED;

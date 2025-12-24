@@ -124,7 +124,7 @@ export async function fireBeforeModelHook(
 
     return { blocked: false };
   } catch (error) {
-    debugLogger.warn(`BeforeModel hook failed:`, error);
+    debugLogger.debug(`BeforeModel hook failed:`, error);
     return { blocked: false };
   }
 }
@@ -178,7 +178,7 @@ export async function fireBeforeToolSelectionHook(
 
     return {};
   } catch (error) {
-    debugLogger.warn(`BeforeToolSelection hook failed:`, error);
+    debugLogger.debug(`BeforeToolSelection hook failed:`, error);
     return {};
   }
 }
@@ -228,7 +228,7 @@ export async function fireAfterModelHook(
 
     return { response: chunk };
   } catch (error) {
-    debugLogger.warn(`AfterModel hook failed:`, error);
+    debugLogger.debug(`AfterModel hook failed:`, error);
     // On error, return original chunk to avoid interrupting the stream.
     return { response: chunk };
   }

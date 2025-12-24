@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   ApprovalMode,
   PolicyDecision,
@@ -12,6 +12,21 @@ import {
 } from '@google/gemini-cli-core';
 import { createPolicyEngineConfig } from './policy.js';
 import type { Settings } from './settings.js';
+
+// Mock Storage to ensure tests are hermetic and don't read from user's home directory
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const Storage = actual.Storage;
+  // Monkey-patch static methods
+  Storage.getUserPoliciesDir = () => '/non-existent/user/policies';
+  Storage.getSystemPoliciesDir = () => '/non-existent/system/policies';
+
+  return {
+    ...actual,
+    Storage,
+  };
+});
 
 describe('Policy Engine Integration Tests', () => {
   describe('Policy configuration produces valid PolicyEngine config', () => {

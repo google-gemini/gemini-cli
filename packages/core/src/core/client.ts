@@ -179,8 +179,10 @@ export class GeminiClient {
       return;
     }
 
-    const userMemory = this.config.getUserMemory();
-    const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+    const systemMemory = this.config.isJitContextEnabled()
+      ? this.config.getGlobalMemory()
+      : this.config.getUserMemory();
+    const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
     this.getChat().setSystemInstruction(systemInstruction);
   }
 
@@ -198,8 +200,10 @@ export class GeminiClient {
     const history = await getInitialChatHistory(this.config, extraHistory);
 
     try {
-      const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+      const systemMemory = this.config.isJitContextEnabled()
+        ? this.config.getGlobalMemory()
+        : this.config.getUserMemory();
+      const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
       return new GeminiChat(
         this.config,
         systemInstruction,
@@ -386,7 +390,7 @@ export class GeminiClient {
     }
   }
 
-  private _getEffectiveModelForCurrentTurn(): string {
+  private _getActiveModelForCurrentTurn(): string {
     if (this.currentSequenceModel) {
       return this.currentSequenceModel;
     }
@@ -456,7 +460,7 @@ export class GeminiClient {
     }
 
     // Check for context window overflow
-    const modelForLimitCheck = this._getEffectiveModelForCurrentTurn();
+    const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
     // Estimate tokens. For text-only requests, we estimate based on character length.
     // For requests with non-text parts (like images, tools), we use the countTokens API.
@@ -758,7 +762,7 @@ export class GeminiClient {
     // If the model is 'auto', we will use a placeholder model to check.
     // Compression occurs before we choose a model, so calling `count_tokens`
     // before the model is chosen would result in an error.
-    const model = this._getEffectiveModelForCurrentTurn();
+    const model = this._getActiveModelForCurrentTurn();
 
     const { newHistory, info } = await this.compressionService.compress(
       this.getChat(),

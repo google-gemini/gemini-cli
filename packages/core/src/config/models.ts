@@ -33,7 +33,7 @@ export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 export const DEFAULT_THINKING_MODE = 8192;
 
 /**
- * Resolves the requested model alias (e.g., 'auto', 'pro', 'flash', 'flash-lite')
+ * Resolves the requested model alias (e.g., 'auto-gemini-3', 'pro', 'flash', 'flash-lite')
  * to a concrete model name, considering preview features.
  *
  * @param requestedModel The model alias or concrete model name requested by the user.
@@ -100,21 +100,6 @@ export function resolveClassifierModel(
   }
   return resolveModel(requestedModel, previewFeaturesEnabled);
 }
-
-/**
- * Determines the effective model to use.
- *
- * @param requestedModel The model that was originally requested.
- * @param previewFeaturesEnabled A boolean indicating if preview features are enabled.
- * @returns The effective model name.
- */
-export function getEffectiveModel(
-  requestedModel: string,
-  previewFeaturesEnabled: boolean | undefined,
-): string {
-  return resolveModel(requestedModel, previewFeaturesEnabled);
-}
-
 export function getDisplayString(
   model: string,
   previewFeaturesEnabled: boolean = false,

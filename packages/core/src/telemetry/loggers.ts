@@ -672,6 +672,7 @@ export function logLlmLoopCheck(
 }
 
 export function logHookCall(config: Config, event: HookCallEvent): void {
+  ClearcutLogger.getInstance(config)?.logHookCallEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {

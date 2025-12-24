@@ -251,6 +251,11 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getShellExecutionConfig: () => ({
       terminalWidth: 90,
       terminalHeight: 30,
+      sanitizationConfig: {
+        enableEnvironmentVariableRedaction: true,
+        allowedEnvironmentVariables: [],
+        blockedEnvironmentVariables: [],
+      },
     }),
     storage: {
       getProjectTempDir: () => '/tmp',
@@ -1444,6 +1449,11 @@ describe('CoreToolScheduler request queueing', () => {
       getShellExecutionConfig: () => ({
         terminalWidth: 80,
         terminalHeight: 24,
+        sanitizationConfig: {
+          enableEnvironmentVariableRedaction: true,
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+        },
       }),
       isInteractive: () => false,
     });
@@ -1556,6 +1566,11 @@ describe('CoreToolScheduler request queueing', () => {
       getShellExecutionConfig: () => ({
         terminalWidth: 80,
         terminalHeight: 24,
+        sanitizationConfig: {
+          enableEnvironmentVariableRedaction: true,
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+        },
       }),
       getToolRegistry: () => toolRegistry,
       getHookSystem: () => undefined,

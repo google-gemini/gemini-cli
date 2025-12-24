@@ -39,6 +39,7 @@ import type {
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
   LlmLoopCheckEvent,
+  HookCallEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -95,6 +96,7 @@ export enum EventNames {
   RECOVERY_ATTEMPT = 'recovery_attempt',
   WEB_FETCH_FALLBACK_ATTEMPT = 'web_fetch_fallback_attempt',
   LLM_LOOP_CHECK = 'llm_loop_check',
+  HOOK_CALL = 'hook_call',
 }
 
 export interface LogResponse {
@@ -1378,6 +1380,33 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.LLM_LOOP_CHECK, data));
+    this.flushIfNeeded();
+  }
+
+  logHookCallEvent(event: HookCallEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_HOOK_EVENT_NAME,
+        value: event.hook_event_name,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_HOOK_DURATION_MS,
+        value: event.duration_ms.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_HOOK_SUCCESS,
+        value: event.success.toString(),
+      },
+    ];
+
+    if (event.exit_code !== undefined) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_HOOK_EXIT_CODE,
+        value: event.exit_code.toString(),
+      });
+    }
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.HOOK_CALL, data));
     this.flushIfNeeded();
   }
 

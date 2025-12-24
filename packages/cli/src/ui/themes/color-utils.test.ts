@@ -11,6 +11,7 @@ import {
   interpolateColor,
   CSS_NAME_TO_HEX_MAP,
   INK_SUPPORTED_NAMES,
+  getThemeTypeFromBackgroundColor,
 } from './color-utils.js';
 
 describe('Color Utils', () => {
@@ -253,6 +254,29 @@ describe('Color Utils', () => {
       expect(interpolateColor('', '', 0.5)).toBe('');
       expect(interpolateColor('', '#ffffff', 0)).toBe('');
       expect(interpolateColor('#ffffff', '', 1)).toBe('');
+    });
+  });
+
+  describe('getThemeTypeFromBackgroundColor', () => {
+    it('should return light for light backgrounds', () => {
+      expect(getThemeTypeFromBackgroundColor('#ffffff')).toBe('light');
+      expect(getThemeTypeFromBackgroundColor('#f0f0f0')).toBe('light');
+      expect(getThemeTypeFromBackgroundColor('#cccccc')).toBe('light');
+    });
+
+    it('should return dark for dark backgrounds', () => {
+      expect(getThemeTypeFromBackgroundColor('#000000')).toBe('dark');
+      expect(getThemeTypeFromBackgroundColor('#1a1a1a')).toBe('dark');
+      expect(getThemeTypeFromBackgroundColor('#333333')).toBe('dark');
+    });
+
+    it('should return undefined for undefined background', () => {
+      expect(getThemeTypeFromBackgroundColor(undefined)).toBeUndefined();
+    });
+
+    it('should handle colors without # prefix', () => {
+      expect(getThemeTypeFromBackgroundColor('ffffff')).toBe('light');
+      expect(getThemeTypeFromBackgroundColor('000000')).toBe('dark');
     });
   });
 });

@@ -12,6 +12,7 @@ import {
   type PolicyEngineConfig,
   type SafetyCheckerRule,
   InProcessCheckerType,
+  ApprovalMode,
 } from './types.js';
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
@@ -25,7 +26,10 @@ describe('PolicyEngine', () => {
     mockCheckerRunner = {
       runChecker: vi.fn(),
     } as unknown as CheckerRunner;
-    engine = new PolicyEngine({}, mockCheckerRunner);
+    engine = new PolicyEngine(
+      { approvalMode: ApprovalMode.DEFAULT },
+      mockCheckerRunner,
+    );
   });
 
   describe('constructor', () => {
@@ -162,6 +166,41 @@ describe('PolicyEngine', () => {
       expect(
         (await engine.check({ name: 'unknown-tool' }, undefined)).decision,
       ).toBe(PolicyDecision.DENY);
+    });
+
+    it('should dynamically switch between modes and respect rule modes', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'edit',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+        {
+          toolName: 'edit',
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+          modes: [ApprovalMode.AUTO_EDIT],
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Default mode: priority 20 rule doesn't match, falls back to priority 10
+      expect((await engine.check({ name: 'edit' }, undefined)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+
+      // Switch to autoEdit mode
+      engine.setApprovalMode(ApprovalMode.AUTO_EDIT);
+      expect((await engine.check({ name: 'edit' }, undefined)).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+
+      // Switch back to default
+      engine.setApprovalMode(ApprovalMode.DEFAULT);
+      expect((await engine.check({ name: 'edit' }, undefined)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
     });
   });
 

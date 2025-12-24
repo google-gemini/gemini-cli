@@ -180,7 +180,7 @@ describe('GeminiAgent', () => {
       }),
       'test-session-id',
       mockArgv,
-      '/tmp',
+      { cwd: '/tmp' },
     );
   });
 

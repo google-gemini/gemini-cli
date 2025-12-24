@@ -184,4 +184,18 @@ describe('McpStatus', () => {
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
+
+  it('truncates resources when exceeding limit', () => {
+    const manyResources = Array.from({ length: 25 }, (_, i) => ({
+      serverName: 'server-1',
+      name: `resource-${i + 1}`,
+      uri: `file:///tmp/resource-${i + 1}.txt`,
+    }));
+
+    const { lastFrame, unmount } = render(
+      <McpStatus {...baseProps} resources={manyResources} />,
+    );
+    expect(lastFrame()).toContain('15 resources hidden');
+    unmount();
+  });
 });

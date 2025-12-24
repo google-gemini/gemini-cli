@@ -13,7 +13,7 @@ import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { OAuthUtils } from './oauth-utils.js';
+import { OAuthUtils, ResourceMismatchError } from './oauth-utils.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
@@ -744,6 +744,7 @@ export class MCPOAuthProvider {
             const discoveredConfig =
               await OAuthUtils.discoverOAuthFromWWWAuthenticate(
                 wwwAuthenticate,
+                mcpServerUrl,
               );
             if (discoveredConfig) {
               // Merge discovered config with existing config, preserving clientId and clientSecret
@@ -760,6 +761,11 @@ export class MCPOAuthProvider {
           }
         }
       } catch (error) {
+        // Re-throw security validation errors
+        if (error instanceof ResourceMismatchError) {
+          throw error;
+        }
+
         debugLogger.debug(
           `Failed to check endpoint for authentication requirements: ${getErrorMessage(error)}`,
         );

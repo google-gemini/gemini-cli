@@ -157,12 +157,14 @@ describe('memoryCommand', () => {
     let mockSetUserMemory: Mock;
     let mockSetGeminiMdFileCount: Mock;
     let mockSetGeminiMdFilePaths: Mock;
+    let mockContextManagerRefresh: Mock;
 
     beforeEach(() => {
       refreshCommand = getSubCommand('refresh');
       mockSetUserMemory = vi.fn();
       mockSetGeminiMdFileCount = vi.fn();
       mockSetGeminiMdFilePaths = vi.fn();
+      mockContextManagerRefresh = vi.fn().mockResolvedValue(undefined);
 
       const mockConfig = {
         setUserMemory: mockSetUserMemory,
@@ -185,6 +187,12 @@ describe('memoryCommand', () => {
         updateSystemInstructionIfInitialized: vi
           .fn()
           .mockResolvedValue(undefined),
+        isJitContextEnabled: vi.fn().mockReturnValue(false),
+        getContextManager: vi.fn().mockReturnValue({
+          refresh: mockContextManagerRefresh,
+        }),
+        getUserMemory: vi.fn().mockReturnValue(''),
+        getGeminiMdFileCount: vi.fn().mockReturnValue(0),
       };
 
       mockContext = createMockCommandContext({
@@ -203,7 +211,32 @@ describe('memoryCommand', () => {
       mockRefreshServerHierarchicalMemory.mockClear();
     });
 
-    it('should display success message when memory is refreshed with content', async () => {
+    it('should use ContextManager.refresh when JIT is enabled', async () => {
+      if (!refreshCommand.action) throw new Error('Command has no action');
+
+      // Enable JIT in mock config
+      const config = mockContext.services.config;
+      if (!config) throw new Error('Config is undefined');
+
+      vi.mocked(config.isJitContextEnabled).mockReturnValue(true);
+      vi.mocked(config.getUserMemory).mockReturnValue('JIT Memory Content');
+      vi.mocked(config.getGeminiMdFileCount).mockReturnValue(3);
+
+      await refreshCommand.action(mockContext, '');
+
+      expect(mockContextManagerRefresh).toHaveBeenCalledOnce();
+      expect(mockRefreshServerHierarchicalMemory).not.toHaveBeenCalled();
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'Memory refreshed successfully. Loaded 18 characters from 3 file(s).',
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should display success message when memory is refreshed with content (Legacy)', async () => {
       if (!refreshCommand.action) throw new Error('Command has no action');
 
       const refreshResult: LoadServerHierarchicalMemoryResponse = {
