@@ -11,6 +11,7 @@ import { Box, Text, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
+import type { UsePromptStashReturn } from '../hooks/usePromptStash.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 import { logicalPosToOffset } from './shared/text-buffer.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
@@ -86,6 +87,7 @@ export interface InputPromptProps {
   popAllMessages?: () => string | undefined;
   suggestionsPosition?: 'above' | 'below';
   setBannerVisible: (visible: boolean) => void;
+  promptStash: UsePromptStashReturn;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -128,6 +130,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   popAllMessages,
   suggestionsPosition = 'below',
   setBannerVisible,
+  promptStash,
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
@@ -420,6 +423,33 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (vimHandleInput && vimHandleInput(key)) {
+        return;
+      }
+
+      // Prompt stashing - Ctrl+Z to stash current input
+      if (keyMatchers[Command.STASH_PROMPT](key)) {
+        if (buffer.text.trim()) {
+          if (promptStash.stash(buffer.text)) {
+            buffer.setText('');
+            resetCompletionState();
+          }
+        }
+        return;
+      }
+
+      // Pop stash - Ctrl+Y to restore stashed input
+      if (keyMatchers[Command.POP_STASH](key)) {
+        const stashed = promptStash.pop();
+        if (stashed) {
+          // If there's current input, swap it with the stash
+          const currentText = buffer.text.trim();
+          buffer.setText(stashed);
+          if (currentText) {
+            // Re-stash the current input so user can swap back
+            promptStash.stash(currentText);
+          }
+          resetCompletionState();
+        }
         return;
       }
 
@@ -863,6 +893,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       tryLoadQueuedMessages,
       setBannerVisible,
+      promptStash,
     ],
   );
 
@@ -1059,6 +1090,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           color={statusColor ?? theme.text.accent}
           aria-label={statusText || undefined}
         >
+          {promptStash.hasStash && <Text color={theme.status.warning}>📌</Text>}
           {shellModeActive ? (
             reverseSearchActive ? (
               <Text
