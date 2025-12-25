@@ -314,6 +314,7 @@ export interface ConfigParameters {
   output?: OutputSettings;
   enableMessageBusIntegration?: boolean;
   disableModelRouterForAuth?: AuthType[];
+  geminiApiKey?: string;
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   introspectionAgentSettings?: IntrospectionAgentSettings;
   continueOnFailedApiCall?: boolean;
