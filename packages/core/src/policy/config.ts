@@ -16,11 +16,8 @@ import {
   type PolicySettings,
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
-import {
-  loadPoliciesFromToml,
-  type PolicyFileError,
-  escapeRegex,
-} from './toml-loader.js';
+import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
+import { buildArgsPatterns } from './utils.js';
 import toml from '@iarna/toml';
 import {
   MessageBusType,
@@ -266,8 +263,10 @@ export function createPolicyUpdater(
       if (message.commandPrefix) {
         // Convert commandPrefix to argsPattern for in-memory rule
         // This mimics what toml-loader does
-        const escapedPrefix = escapeRegex(message.commandPrefix);
-        argsPattern = new RegExp(`"command":"${escapedPrefix}`);
+        const patterns = buildArgsPatterns(undefined, message.commandPrefix);
+        if (patterns[0]) {
+          argsPattern = new RegExp(patterns[0]);
+        }
       }
 
       policyEngine.addRule({

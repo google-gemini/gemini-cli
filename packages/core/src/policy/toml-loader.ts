@@ -12,6 +12,7 @@ import {
   type SafetyCheckerRule,
   InProcessCheckerType,
 } from './types.js';
+import { buildArgsPatterns } from './utils.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import toml from '@iarna/toml';
@@ -117,17 +118,6 @@ export interface PolicyLoadResult {
   rules: PolicyRule[];
   checkers: SafetyCheckerRule[];
   errors: PolicyFileError[];
-}
-
-/**
- * Escapes special regex characters in a string for use in a regex pattern.
- * This is used for commandPrefix to ensure literal string matching.
- *
- * @param str The string to escape
- * @returns The escaped string safe for use in a regex
- */
-export function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
@@ -355,25 +345,11 @@ export async function loadPoliciesFromToml(
         const parsedRules: PolicyRule[] = (validationResult.data.rule ?? [])
           .flatMap((rule) => {
             // Transform commandPrefix/commandRegex to argsPattern
-            let effectiveArgsPattern = rule.argsPattern;
-            const commandPrefixes: string[] = [];
-
-            if (rule.commandPrefix) {
-              const prefixes = Array.isArray(rule.commandPrefix)
-                ? rule.commandPrefix
-                : [rule.commandPrefix];
-              commandPrefixes.push(...prefixes);
-            } else if (rule.commandRegex) {
-              effectiveArgsPattern = `"command":"${rule.commandRegex}`;
-            }
-
-            // Expand command prefixes to multiple patterns
-            const argsPatterns: Array<string | undefined> =
-              commandPrefixes.length > 0
-                ? commandPrefixes.map(
-                    (prefix) => `"command":"${escapeRegex(prefix)}(?:[\\s"]|$)`,
-                  )
-                : [effectiveArgsPattern];
+            const argsPatterns = buildArgsPatterns(
+              rule.argsPattern,
+              rule.commandPrefix,
+              rule.commandRegex,
+            );
 
             // For each argsPattern, expand toolName arrays
             return argsPatterns.flatMap((argsPattern) => {
@@ -407,14 +383,14 @@ export async function loadPoliciesFromToml(
                   try {
                     policyRule.argsPattern = new RegExp(argsPattern);
                   } catch (e) {
-                    const error = e as Error;
+                    const message = e instanceof Error ? e.message : String(e);
                     errors.push({
                       filePath,
                       fileName: file,
                       tier: tierName,
                       errorType: 'regex_compilation',
                       message: 'Invalid regex pattern',
-                      details: `Pattern: ${argsPattern}\nError: ${error.message}`,
+                      details: `Pattern: ${argsPattern}\nError: ${message}`,
                       suggestion:
                         'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
                     });
@@ -436,24 +412,11 @@ export async function loadPoliciesFromToml(
           validationResult.data.safety_checker ?? []
         )
           .flatMap((checker) => {
-            let effectiveArgsPattern = checker.argsPattern;
-            const commandPrefixes: string[] = [];
-
-            if (checker.commandPrefix) {
-              const prefixes = Array.isArray(checker.commandPrefix)
-                ? checker.commandPrefix
-                : [checker.commandPrefix];
-              commandPrefixes.push(...prefixes);
-            } else if (checker.commandRegex) {
-              effectiveArgsPattern = `"command":"${checker.commandRegex}`;
-            }
-
-            const argsPatterns: Array<string | undefined> =
-              commandPrefixes.length > 0
-                ? commandPrefixes.map(
-                    (prefix) => `"command":"${escapeRegex(prefix)}(?:[\\s"]|$)`,
-                  )
-                : [effectiveArgsPattern];
+            const argsPatterns = buildArgsPatterns(
+              checker.argsPattern,
+              checker.commandPrefix,
+              checker.commandRegex,
+            );
 
             return argsPatterns.flatMap((argsPattern) => {
               const toolNames: Array<string | undefined> = checker.toolName
@@ -483,14 +446,14 @@ export async function loadPoliciesFromToml(
                   try {
                     safetyCheckerRule.argsPattern = new RegExp(argsPattern);
                   } catch (e) {
-                    const error = e as Error;
+                    const message = e instanceof Error ? e.message : String(e);
                     errors.push({
                       filePath,
                       fileName: file,
                       tier: tierName,
                       errorType: 'regex_compilation',
                       message: 'Invalid regex pattern in safety checker',
-                      details: `Pattern: ${argsPattern}\nError: ${error.message}`,
+                      details: `Pattern: ${argsPattern}\nError: ${message}`,
                     });
                     return null;
                   }
