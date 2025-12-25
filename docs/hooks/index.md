@@ -520,14 +520,49 @@ Use the `/hooks panel` command to view all registered hooks:
 
 This command displays:
 
+- **Hooks System Status**: Shows whether the hooks system is globally enabled or
+  disabled
 - All active hooks organized by event
 - Hook source (user, project, system)
 - Hook type (command or plugin)
 - Execution status and recent output
 
-### Enable and disable hooks
+The status indicator at the top shows the overall state of your hooks:
 
-You can temporarily enable or disable individual hooks using commands:
+- **"Enabled"** - At least one hook is currently enabled and ready to run
+- **"Disabled"** - All hooks are currently disabled (none will execute)
+
+This indicator automatically updates based on the actual state of your
+individual hooks.
+
+### Enable and disable the hooks system
+
+To enable or disable the entire hooks system, use the interactive settings
+dialog:
+
+```bash
+/settings
+```
+
+Navigate to the "Advanced" category and toggle "Enable Hooks System". **Note:**
+A restart is required for the changes to take effect.
+
+### Enable and disable all hooks at once
+
+You can enable or disable all individual hooks at once using commands:
+
+```bash
+/hooks enable-all
+/hooks disable-all
+```
+
+These commands enable or disable all configured hooks by managing the individual
+hook settings. The status indicator will automatically update to reflect the new
+state. Changes take effect immediately without requiring a restart.
+
+### Enable and disable individual hooks
+
+You can enable or disable individual hooks using commands:
 
 ```bash
 /hooks enable hook-name
@@ -536,7 +571,9 @@ You can temporarily enable or disable individual hooks using commands:
 
 These commands allow you to control hook execution without editing configuration
 files. The hook name should match the `name` field in your hook configuration.
-Changes made via these commands are persisted to your global User settings
+Changes made via these commands are persisted to your settings and will
+automatically update the status indicator. The settings are saved to workspace
+scope if available, otherwise to your global user settings
 (`~/.gemini/settings.json`).
 
 ### Disabled hooks configuration
@@ -555,6 +592,20 @@ To permanently disable hooks, add them to the `hooks.disabled` array in your
 **Note:** The `hooks.disabled` array uses a UNION merge strategy. Disabled hooks
 from all configuration levels (user, project, system) are combined and
 deduplicated, meaning a hook disabled at any level remains disabled.
+
+### Verifying hooks system status
+
+To check if the hooks system is enabled:
+
+1. **Via `/hooks panel`**: The status indicator at the top shows "Hooks System
+   Status: Enabled" or "Hooks System Status: Disabled"
+2. **Via `/settings`**: Navigate to the "Advanced" category and check the
+   "Enable Hooks System" setting
+3. **Via settings file**: Check the `tools.enableHooks` value in your
+   `settings.json` file
+
+The hooks system must be enabled for any hooks to execute, even if individual
+hooks are configured and enabled.
 
 ## Migration from Claude Code
 

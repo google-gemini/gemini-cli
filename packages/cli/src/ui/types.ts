@@ -277,6 +277,7 @@ export type HistoryItemHooksList = HistoryItemBase & {
     sequential?: boolean;
     enabled: boolean;
   }>;
+  hooksEnabled?: boolean;
 };
 
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
