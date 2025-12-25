@@ -9,7 +9,7 @@ import { InitCommand } from './init.js';
 import { RestoreCommand } from './restore.js';
 import type { Command } from './types.js';
 
-class CommandRegistry {
+export class CommandRegistry {
   private readonly commands = new Map<string, Command>();
 
   constructor() {
