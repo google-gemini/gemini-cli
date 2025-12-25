@@ -204,36 +204,37 @@ export function setTargetDir(agentSettings: AgentSettings | undefined): string {
 }
 
 export function loadEnvironment(): void {
-  const envFilePath = findEnvFile(process.cwd());
-  if (envFilePath) {
-    dotenv.config({ path: envFilePath, override: true });
+  const envFiles = findEnvFiles(process.cwd());
+  for (const envFilePath of envFiles) {
+    dotenv.config({ path: envFilePath, override: false });
   }
 }
 
-function findEnvFile(startDir: string): string | null {
+function findEnvFiles(startDir: string): string[] {
+  const envFiles = new Set<string>();
   let currentDir = path.resolve(startDir);
   while (true) {
     // prefer gemini-specific .env under GEMINI_DIR
     const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
     if (fs.existsSync(geminiEnvPath)) {
-      return geminiEnvPath;
+      envFiles.add(geminiEnvPath);
     }
     const envPath = path.join(currentDir, '.env');
     if (fs.existsSync(envPath)) {
-      return envPath;
+      envFiles.add(envPath);
     }
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
       // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(process.cwd(), GEMINI_DIR, '.env');
+      const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
       if (fs.existsSync(homeGeminiEnvPath)) {
-        return homeGeminiEnvPath;
+        envFiles.add(homeGeminiEnvPath);
       }
       const homeEnvPath = path.join(homedir(), '.env');
       if (fs.existsSync(homeEnvPath)) {
-        return homeEnvPath;
+        envFiles.add(homeEnvPath);
       }
-      return null;
+      return [...envFiles];
     }
     currentDir = parentDir;
   }

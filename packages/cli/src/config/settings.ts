@@ -494,37 +494,38 @@ export class LoadedSettings {
   }
 }
 
-function findEnvFile(startDir: string): string | null {
+function findEnvFiles(startDir: string): string[] {
+  const envFiles = new Set<string>();
   let currentDir = path.resolve(startDir);
   while (true) {
     // prefer gemini-specific .env under GEMINI_DIR
     const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
     if (fs.existsSync(geminiEnvPath)) {
-      return geminiEnvPath;
+      envFiles.add(geminiEnvPath);
     }
     const envPath = path.join(currentDir, '.env');
     if (fs.existsSync(envPath)) {
-      return envPath;
+      envFiles.add(envPath);
     }
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
       // check .env under home as fallback, again preferring gemini-specific .env
       const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
       if (fs.existsSync(homeGeminiEnvPath)) {
-        return homeGeminiEnvPath;
+        envFiles.add(homeGeminiEnvPath);
       }
       const homeEnvPath = path.join(homedir(), '.env');
       if (fs.existsSync(homeEnvPath)) {
-        return homeEnvPath;
+        envFiles.add(homeEnvPath);
       }
-      return null;
+      return [...envFiles];
     }
     currentDir = parentDir;
   }
 }
 
 export function setUpCloudShellEnvironment(
-  envFilePath: string | null,
+  envFiles: string[],
   isTrusted: boolean,
   isSandboxed: boolean,
 ): void {
@@ -535,17 +536,25 @@ export function setUpCloudShellEnvironment(
   // one of the .env files, we set the Cloud Shell-specific default here.
   let value = 'cloudshell-gca';
 
-  if (envFilePath && fs.existsSync(envFilePath)) {
-    const envFileContent = fs.readFileSync(envFilePath);
-    const parsedEnv = dotenv.parse(envFileContent);
-    if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
-      // .env file takes precedence in Cloud Shell
-      value = parsedEnv['GOOGLE_CLOUD_PROJECT'];
-      if (!isTrusted && isSandboxed) {
-        value = sanitizeEnvVar(value);
+  for (const envFilePath of envFiles) {
+    try {
+      if (fs.existsSync(envFilePath)) {
+        const envFileContent = fs.readFileSync(envFilePath);
+        const parsedEnv = dotenv.parse(envFileContent);
+        if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
+          // .env file takes precedence in Cloud Shell
+          value = parsedEnv['GOOGLE_CLOUD_PROJECT'];
+          if (!isTrusted && isSandboxed) {
+            value = sanitizeEnvVar(value);
+          }
+          break;
+        }
       }
+    } catch (_e) {
+      // Ignore errors reading individual files
     }
   }
+
   process.env['GOOGLE_CLOUD_PROJECT'] = value;
 }
 
@@ -554,7 +563,7 @@ export function loadEnvironment(
   workspaceDir: string,
   isWorkspaceTrustedFn = isWorkspaceTrusted,
 ): void {
-  const envFilePath = findEnvFile(workspaceDir);
+  const envFiles = findEnvFiles(workspaceDir);
   const trustResult = isWorkspaceTrustedFn(settings, workspaceDir);
 
   const isTrusted = trustResult.isTrusted ?? false;
@@ -575,10 +584,10 @@ export function loadEnvironment(
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
-    setUpCloudShellEnvironment(envFilePath, isTrusted, isSandboxed);
+    setUpCloudShellEnvironment(envFiles, isTrusted, isSandboxed);
   }
 
-  if (envFilePath) {
+  for (const envFilePath of envFiles) {
     // Manually parse and load environment variables to handle exclusions correctly.
     // This avoids modifying environment variables that were already set from the shell.
     try {
