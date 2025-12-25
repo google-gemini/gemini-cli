@@ -535,7 +535,7 @@ Use this tool when the user's query implies needing the content of several files
     return new ReadManyFilesToolInvocation(
       this.config,
       params,
-      messageBus,
+      messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );

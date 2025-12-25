@@ -290,11 +290,11 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.mcpTool,
       this.serverName,
       this.serverToolName,
-      this.displayName,
+      _displayName ?? this.displayName,
       this.trust,
       params,
       this.cliConfig,
-      _messageBus,
+      _messageBus ?? this.messageBus,
     );
   }
 }
