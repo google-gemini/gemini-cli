@@ -236,7 +236,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
 
   const handleSubmit = useCallback(
-    (submittedValue: string) => {
+    (value: string) => {
+      const submittedValue = value.replace(/\\@/g, '@');
       const trimmedMessage = submittedValue.trim();
       const isSlash = isSlashCommand(trimmedMessage);
 
