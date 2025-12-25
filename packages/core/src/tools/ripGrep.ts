@@ -192,7 +192,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     private readonly config: Config,
     private readonly geminiIgnoreParser: GeminiIgnoreParser,
     params: RipGrepToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
@@ -493,7 +493,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
 
   constructor(
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(
       RipGrepTool.Name,
@@ -551,9 +551,9 @@ export class RipGrepTool extends BaseDeclarativeTool<
         required: ['pattern'],
         type: 'object',
       },
+      messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
-      messageBus,
     );
     this.geminiIgnoreParser = new GeminiIgnoreParser(config.getTargetDir());
   }
@@ -586,7 +586,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: RipGrepToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<RipGrepToolParams, ToolResult> {

@@ -82,7 +82,7 @@ class GetInternalDocsInvocation extends BaseToolInvocation<
 > {
   constructor(
     params: GetInternalDocsParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
@@ -161,7 +161,7 @@ export class GetInternalDocsTool extends BaseDeclarativeTool<
 > {
   static readonly Name = GET_INTERNAL_DOCS_TOOL_NAME;
 
-  constructor(messageBus?: MessageBus) {
+  constructor(messageBus: MessageBus) {
     super(
       GetInternalDocsTool.Name,
       'GetInternalDocs',
@@ -177,21 +177,21 @@ export class GetInternalDocsTool extends BaseDeclarativeTool<
           },
         },
       },
+      messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ false,
-      messageBus,
     );
   }
 
   protected createInvocation(
     params: GetInternalDocsParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<GetInternalDocsParams, ToolResult> {
     return new GetInternalDocsInvocation(
       params,
-      messageBus ?? this.messageBus,
+      messageBus,
       _toolName ?? GetInternalDocsTool.Name,
       _toolDisplayName,
     );

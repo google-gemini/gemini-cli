@@ -25,7 +25,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
   constructor(
     private readonly definition: RemoteAgentDefinition,
     params: AgentInputs,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
