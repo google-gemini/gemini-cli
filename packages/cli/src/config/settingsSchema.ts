@@ -1704,7 +1704,8 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       },
       url: {
         type: 'string',
-        description: 'SSE transport URL.',
+        description:
+          'URL for SSE or HTTP transport. Use with "type" field to specify transport type.',
       },
       httpUrl: {
         type: 'string',
@@ -1718,6 +1719,12 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       tcp: {
         type: 'string',
         description: 'TCP address for websocket transport.',
+      },
+      type: {
+        type: 'string',
+        description:
+          'Transport type. Use "stdio" for local command, "sse" for Server-Sent Events, or "http" for Streamable HTTP.',
+        enum: ['stdio', 'sse', 'http'],
       },
       timeout: {
         type: 'number',
