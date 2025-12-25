@@ -700,7 +700,7 @@ export async function loadCliConfig(
       settings.experimental?.introspectionAgentSettings,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
-    retryFetchErrors: settings.general?.retryFetchErrors ?? false,
+    retryFetchErrors: settings.general?.retryFetchErrors ?? true,
     ptyInfo: ptyInfo?.name,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
