@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 export interface UsePromptStashReturn {
   /** The currently stashed prompt text, or null if nothing is stashed */
@@ -25,23 +25,27 @@ export interface UsePromptStashReturn {
  */
 export function usePromptStash(): UsePromptStashReturn {
   const [stashedPrompt, setStashedPrompt] = useState<string | null>(null);
+  const stashedPromptRef = useRef<string | null>(null);
 
   const stash = useCallback((text: string): boolean => {
     const trimmedText = text.trim();
     if (!trimmedText) {
       return false; // Don't stash empty input
     }
+    stashedPromptRef.current = trimmedText;
     setStashedPrompt(trimmedText);
     return true;
   }, []);
 
   const pop = useCallback((): string | null => {
-    const current = stashedPrompt;
+    const current = stashedPromptRef.current;
+    stashedPromptRef.current = null;
     setStashedPrompt(null);
     return current;
-  }, [stashedPrompt]);
+  }, []);
 
   const clear = useCallback(() => {
+    stashedPromptRef.current = null;
     setStashedPrompt(null);
   }, []);
 
