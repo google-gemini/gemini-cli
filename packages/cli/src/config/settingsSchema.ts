@@ -492,7 +492,7 @@ const SETTINGS_SCHEMA = {
         label: 'Show Citations',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description: 'Show citations for generated text in the chat.',
         showInDialog: true,
       },
