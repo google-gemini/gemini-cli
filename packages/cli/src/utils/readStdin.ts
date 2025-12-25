@@ -62,6 +62,13 @@ export async function readStdin(): Promise<string> {
       process.stdin.removeListener('readable', onReadable);
       process.stdin.removeListener('end', onEnd);
       process.stdin.removeListener('error', onError);
+
+      // Add a no-op error listener if no other error listeners are present to prevent
+      // unhandled 'error' events (like EIO) from crashing the process after we stop reading.
+      // This is especially important for background execution where TTY might cause EIO.
+      if (process.stdin.listenerCount('error') === 0) {
+        process.stdin.on('error', noopErrorHandler);
+      }
     };
 
     process.stdin.on('readable', onReadable);
@@ -69,3 +76,5 @@ export async function readStdin(): Promise<string> {
     process.stdin.on('error', onError);
   });
 }
+
+function noopErrorHandler() {}

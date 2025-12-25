@@ -1629,6 +1629,18 @@ describe('Config getHooks', () => {
       expect(config.getModel()).toBe(originalModel);
       expect(config.getActiveModel()).toBe(originalModel);
     });
+
+    it('should call onModelChange when a new model is set', () => {
+      const onModelChange = vi.fn();
+      const config = new Config({
+        ...baseParams,
+        onModelChange,
+      });
+
+      config.setModel(DEFAULT_GEMINI_MODEL);
+
+      expect(onModelChange).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+    });
   });
 });
 

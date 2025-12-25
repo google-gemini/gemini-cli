@@ -17,7 +17,7 @@ export { HookEventHandler } from './hookEventHandler.js';
 
 // Export interfaces and enums
 export type { HookRegistryEntry } from './hookRegistry.js';
-export { ConfigSource } from './hookRegistry.js';
+export { ConfigSource } from './types.js';
 export type { AggregatedHookResult } from './hookAggregator.js';
 export type { HookEventContext } from './hookPlanner.js';
 

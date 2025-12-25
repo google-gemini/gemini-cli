@@ -17,6 +17,10 @@ import dns from 'node:dns';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
 import {
+  loadTrustedFolders,
+  type TrustedFoldersError,
+} from './config/trustedFolders.js';
+import {
   loadSettings,
   migrateDeprecatedSettings,
   SettingScope,
@@ -299,6 +303,19 @@ export async function main() {
   const settings = loadSettings();
   loadSettingsHandle?.end();
 
+  // Report settings errors once during startup
+  settings.errors.forEach((error) => {
+    coreEvents.emitFeedback('warning', error.message);
+  });
+
+  const trustedFolders = loadTrustedFolders();
+  trustedFolders.errors.forEach((error: TrustedFoldersError) => {
+    coreEvents.emitFeedback(
+      'warning',
+      `Error in ${error.path}: ${error.message}`,
+    );
+  });
+
   const migrateHandle = startupProfiler.start('migrate_settings');
   migrateDeprecatedSettings(
     settings,
@@ -376,6 +393,7 @@ export async function main() {
         settings.merged,
         sessionId,
         argv,
+        { projectHooks: settings.workspace.settings.hooks },
       );
 
       if (
@@ -447,7 +465,9 @@ export async function main() {
   // may have side effects.
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
-    const config = await loadCliConfig(settings.merged, sessionId, argv);
+    const config = await loadCliConfig(settings.merged, sessionId, argv, {
+      projectHooks: settings.workspace.settings.hooks,
+    });
     loadConfigHandle?.end();
 
     // Register config for telemetry shutdown

@@ -27,6 +27,10 @@ class MockConfig {
   getDebugMode() {
     return true;
   }
+
+  getFileFilteringRespectGeminiIgnore() {
+    return true;
+  }
 }
 
 describe('ripgrep-real-direct', () => {

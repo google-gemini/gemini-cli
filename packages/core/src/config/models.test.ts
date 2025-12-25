@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  getEffectiveModel,
+  resolveModel,
   resolveClassifierModel,
   isGemini2Model,
   DEFAULT_GEMINI_MODEL,
@@ -38,69 +38,69 @@ describe('supportsMultimodalFunctionResponse', () => {
   });
 });
 
-describe('getEffectiveModel', () => {
-  describe('delegation to resolveModel', () => {
+describe('resolveModel', () => {
+  describe('delegation logic', () => {
     it('should return the Preview Pro model when auto-gemini-3 is requested', () => {
-      const model = getEffectiveModel(PREVIEW_GEMINI_MODEL_AUTO, false);
+      const model = resolveModel(PREVIEW_GEMINI_MODEL_AUTO, false);
       expect(model).toBe(PREVIEW_GEMINI_MODEL);
     });
 
     it('should return the Default Pro model when auto-gemini-2.5 is requested', () => {
-      const model = getEffectiveModel(DEFAULT_GEMINI_MODEL_AUTO, false);
+      const model = resolveModel(DEFAULT_GEMINI_MODEL_AUTO, false);
       expect(model).toBe(DEFAULT_GEMINI_MODEL);
     });
 
     it('should return the requested model as-is for explicit specific models', () => {
-      expect(getEffectiveModel(DEFAULT_GEMINI_MODEL, false)).toBe(
+      expect(resolveModel(DEFAULT_GEMINI_MODEL, false)).toBe(
         DEFAULT_GEMINI_MODEL,
       );
-      expect(getEffectiveModel(DEFAULT_GEMINI_FLASH_MODEL, false)).toBe(
+      expect(resolveModel(DEFAULT_GEMINI_FLASH_MODEL, false)).toBe(
         DEFAULT_GEMINI_FLASH_MODEL,
       );
-      expect(getEffectiveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL, false)).toBe(
+      expect(resolveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL, false)).toBe(
         DEFAULT_GEMINI_FLASH_LITE_MODEL,
       );
     });
 
     it('should return a custom model name when requested', () => {
       const customModel = 'custom-model-v1';
-      const model = getEffectiveModel(customModel, false);
+      const model = resolveModel(customModel, false);
       expect(model).toBe(customModel);
     });
 
     describe('with preview features', () => {
       it('should return the preview model when pro alias is requested', () => {
-        const model = getEffectiveModel(GEMINI_MODEL_ALIAS_PRO, true);
+        const model = resolveModel(GEMINI_MODEL_ALIAS_PRO, true);
         expect(model).toBe(PREVIEW_GEMINI_MODEL);
       });
 
       it('should return the default pro model when pro alias is requested and preview is off', () => {
-        const model = getEffectiveModel(GEMINI_MODEL_ALIAS_PRO, false);
+        const model = resolveModel(GEMINI_MODEL_ALIAS_PRO, false);
         expect(model).toBe(DEFAULT_GEMINI_MODEL);
       });
 
       it('should return the flash model when flash is requested and preview is on', () => {
-        const model = getEffectiveModel(GEMINI_MODEL_ALIAS_FLASH, true);
+        const model = resolveModel(GEMINI_MODEL_ALIAS_FLASH, true);
         expect(model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
       });
 
       it('should return the flash model when lite is requested and preview is on', () => {
-        const model = getEffectiveModel(GEMINI_MODEL_ALIAS_FLASH_LITE, true);
+        const model = resolveModel(GEMINI_MODEL_ALIAS_FLASH_LITE, true);
         expect(model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
       });
 
       it('should return the flash model when the flash model name is explicitly requested and preview is on', () => {
-        const model = getEffectiveModel(DEFAULT_GEMINI_FLASH_MODEL, true);
+        const model = resolveModel(DEFAULT_GEMINI_FLASH_MODEL, true);
         expect(model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
       });
 
       it('should return the lite model when the lite model name is requested and preview is on', () => {
-        const model = getEffectiveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL, true);
+        const model = resolveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL, true);
         expect(model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
       });
 
       it('should return the default gemini model when the model is explicitly set and preview is on', () => {
-        const model = getEffectiveModel(DEFAULT_GEMINI_MODEL, true);
+        const model = resolveModel(DEFAULT_GEMINI_MODEL, true);
         expect(model).toBe(DEFAULT_GEMINI_MODEL);
       });
     });

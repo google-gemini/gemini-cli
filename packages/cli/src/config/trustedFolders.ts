@@ -161,7 +161,6 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
   const userConfig: Record<string, TrustLevel> = {};
 
   const userPath = getTrustedFoldersPath();
-
   // Load user trusted folders
   try {
     if (fs.existsSync(userPath)) {

@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 133
+  // Next ID: 137
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -501,4 +501,20 @@ export enum EventMetadataKey {
 
   // Logs the model that confirmed the loop.
   GEMINI_CLI_LOOP_DETECTED_CONFIRMED_BY_MODEL = 129,
+
+  // ==========================================================================
+  // Hook Call Event Keys
+  // ==========================================================================
+
+  // Logs the name of the hook event (e.g., 'BeforeTool', 'AfterModel').
+  GEMINI_CLI_HOOK_EVENT_NAME = 133,
+
+  // Logs the duration of the hook execution in milliseconds.
+  GEMINI_CLI_HOOK_DURATION_MS = 134,
+
+  // Logs whether the hook execution was successful.
+  GEMINI_CLI_HOOK_SUCCESS = 135,
+
+  // Logs the exit code of the hook script (if applicable).
+  GEMINI_CLI_HOOK_EXIT_CODE = 136,
 }
