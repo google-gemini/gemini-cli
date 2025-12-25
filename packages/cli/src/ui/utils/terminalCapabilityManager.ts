@@ -175,6 +175,7 @@ export class TerminalCapabilityManager {
           }
         }
 
+        // check for modifyOtherKeys support
         if (!modifyOtherKeysReceived) {
           const match = buffer.match(
             TerminalCapabilityManager.MODIFY_OTHER_KEYS_REGEX,
