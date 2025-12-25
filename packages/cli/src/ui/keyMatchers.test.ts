@@ -21,6 +21,8 @@ describe('keyMatchers', () => {
     ...mods,
   });
 
+
+
   // Test data for each command with positive and negative test cases
   const testCases = [
     // Basic bindings
@@ -337,6 +339,18 @@ describe('keyMatchers', () => {
       command: Command.TOGGLE_AUTO_EDIT,
       positive: [createKey('tab', { shift: true })],
       negative: [createKey('tab')],
+    },
+
+    // Prompt stashing - Ctrl+Q toggles (same key for stash/pop)
+    {
+      command: Command.STASH_PROMPT,
+      positive: [createKey('q', { ctrl: true })],
+      negative: [createKey('q'), createKey('s', { ctrl: true })],
+    },
+    {
+      command: Command.POP_STASH,
+      positive: [createKey('q', { ctrl: true })],
+      negative: [createKey('q'), createKey('s', { ctrl: true })],
     },
   ];
 
