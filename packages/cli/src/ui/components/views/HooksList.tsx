@@ -22,13 +22,54 @@ interface HooksListProps {
     sequential?: boolean;
     enabled: boolean;
   }>;
+  hooksEnabled?: boolean;
 }
 
-export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
+export const HooksList: React.FC<HooksListProps> = ({
+  hooks,
+  hooksEnabled,
+}) => {
+  const isEnabled = hooksEnabled !== undefined ? hooksEnabled : true;
+  const systemStatusColor = isEnabled ? 'green' : 'red';
+  const systemStatusText = isEnabled ? 'Enabled' : 'Disabled';
+
+  if (hooksEnabled === false) {
+    return (
+      <Box flexDirection="column" marginTop={1} marginBottom={1}>
+        <Box marginBottom={1}>
+          <Text bold>Hooks System Status: </Text>
+          <Text color={systemStatusColor} bold>
+            {systemStatusText}
+          </Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>
+            All hooks are currently disabled. Use{' '}
+            <Text bold>/hooks enable-all</Text> or enable individual hooks to
+            activate them.
+          </Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>
+            Note: Restart is required after enabling the hooks system.
+          </Text>
+        </Box>
+      </Box>
+    );
+  }
+
   if (hooks.length === 0) {
     return (
-      <Box marginTop={1} marginBottom={1}>
-        <Text>No hooks configured.</Text>
+      <Box flexDirection="column" marginTop={1} marginBottom={1}>
+        <Box marginBottom={1}>
+          <Text bold>Hooks System Status: </Text>
+          <Text color={systemStatusColor} bold>
+            {systemStatusText}
+          </Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text>No hooks configured.</Text>
+        </Box>
       </Box>
     );
   }
@@ -47,7 +88,15 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
 
   return (
     <Box flexDirection="column" marginTop={1} marginBottom={1}>
-      <Text bold>Configured Hooks:</Text>
+      <Box marginBottom={1}>
+        <Text bold>Hooks System Status: </Text>
+        <Text color={systemStatusColor} bold>
+          {systemStatusText}
+        </Text>
+      </Box>
+      <Box marginTop={1}>
+        <Text bold>Configured Hooks:</Text>
+      </Box>
       <Box flexDirection="column" paddingLeft={2} marginTop={1}>
         {Object.entries(hooksByEvent).map(([eventName, eventHooks]) => (
           <Box key={eventName} flexDirection="column" marginBottom={1}>
@@ -93,8 +142,10 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
       </Box>
       <Box marginTop={1}>
         <Text dimColor>
-          Tip: Use `/hooks enable {'<hook-name>'}` or `/hooks disable{' '}
-          {'<hook-name>'}` to toggle hooks
+          Tip: Use <Text bold>/hooks enable {'<hook-name>'}</Text> or{' '}
+          <Text bold>/hooks disable {'<hook-name>'}</Text> to toggle individual
+          hooks. Use <Text bold>/hooks enable-all</Text> or{' '}
+          <Text bold>/hooks disable-all</Text> to toggle all hooks at once.
         </Text>
       </Box>
     </Box>
