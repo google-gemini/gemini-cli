@@ -13,6 +13,7 @@ import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
 import { InputPrompt } from './InputPrompt.js';
+import { usePromptStash } from '../hooks/usePromptStash.js';
 import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
@@ -40,6 +41,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
+  const promptStash = usePromptStash();
 
   const isAlternateBuffer = useAlternateBuffer();
   const { showApprovalModeIndicator } = uiState;
@@ -152,6 +154,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           streamingState={uiState.streamingState}
           suggestionsPosition={suggestionsPosition}
           onSuggestionsVisibilityChange={setSuggestionsVisible}
+          promptStash={promptStash}
         />
       )}
 

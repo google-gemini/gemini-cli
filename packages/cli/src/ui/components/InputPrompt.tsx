@@ -12,6 +12,7 @@ import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
+import type { UsePromptStashReturn } from '../hooks/usePromptStash.js';
 import {
   type TextBuffer,
   logicalPosToOffset,
@@ -104,6 +105,7 @@ export interface InputPromptProps {
   popAllMessages?: () => string | undefined;
   suggestionsPosition?: 'above' | 'below';
   setBannerVisible: (visible: boolean) => void;
+  promptStash: UsePromptStashReturn;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -146,6 +148,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   popAllMessages,
   suggestionsPosition = 'below',
   setBannerVisible,
+  promptStash,
 }) => {
   const { stdout } = useStdout();
   const { merged: settings } = useSettings();
@@ -254,6 +257,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       onSubmit(processedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
+
+      // Auto-restore stashed prompt immediately after submitting
+      if (promptStash.hasStash) {
+        const stashed = promptStash.pop();
+        if (stashed) {
+          buffer.setText(stashed);
+        }
+      }
     },
     [
       onSubmit,
@@ -262,6 +273,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellModeActive,
       shellHistory,
       resetReverseSearchCompletionState,
+      promptStash,
     ],
   );
 
@@ -420,9 +432,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       const logicalPos = isPastEndOfLine
         ? null
         : buffer.getLogicalPositionFromVisual(
-            buffer.visualScrollRow + relY,
-            relX,
-          );
+          buffer.visualScrollRow + relY,
+          relX,
+        );
 
       // Check for paste placeholder (collapsed state)
       if (logicalPos) {
@@ -507,6 +519,33 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (vimHandleInput && vimHandleInput(key)) {
         return true;
+      }
+
+      // Prompt stashing - Ctrl+Z to stash current input
+      if (keyMatchers[Command.STASH_PROMPT](key)) {
+        if (buffer.text.trim()) {
+          if (promptStash.stash(buffer.text)) {
+            buffer.setText('');
+            resetCompletionState();
+          }
+        }
+        return;
+      }
+
+      // Pop stash - Ctrl+Y to restore stashed input
+      if (keyMatchers[Command.POP_STASH](key)) {
+        const stashed = promptStash.pop();
+        if (stashed) {
+          // If there's current input, swap it with the stash
+          const currentText = buffer.text.trim();
+          buffer.setText(stashed);
+          if (currentText) {
+            // Re-stash the current input so user can swap back
+            promptStash.stash(currentText);
+          }
+          resetCompletionState();
+        }
+        return;
       }
 
       // Reset ESC count and hide prompt on any non-ESC key
@@ -968,6 +1007,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       activePtyId,
       setEmbeddedShellFocused,
       history,
+      promptStash,
     ],
   );
 
@@ -1158,8 +1198,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           completion.completionMode === CompletionMode.AT
             ? 'reverse'
             : buffer.text.startsWith('/') &&
-                !reverseSearchActive &&
-                !commandSearchActive
+              !reverseSearchActive &&
+              !commandSearchActive
               ? 'slash'
               : 'reverse'
         }
@@ -1210,6 +1250,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           borderLeft={!useBackgroundColor}
           borderRight={!useBackgroundColor}
         >
+          {promptStash.hasStash && <Text color={theme.status.warning}>📌</Text>}
           <Text
             color={statusColor ?? theme.text.accent}
             aria-label={statusText || undefined}
@@ -1326,8 +1367,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
                     const color =
                       seg.type === 'command' ||
-                      seg.type === 'file' ||
-                      seg.type === 'paste'
+                        seg.type === 'file' ||
+                        seg.type === 'paste'
                         ? theme.text.accent
                         : theme.text.primary;
 
@@ -1398,22 +1439,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 )
             )}
           </Box>
-        </Box>
-      </HalfLinePaddedBox>
-      {useLineFallback ? (
-        <Box
-          borderStyle="round"
-          borderTop={false}
-          borderBottom={true}
-          borderLeft={false}
-          borderRight={false}
-          borderColor={borderColor}
-          width={terminalWidth}
-          flexDirection="row"
-          alignItems="flex-start"
-          height={0}
-        />
-      ) : null}
+        </Box >
+      </HalfLinePaddedBox >
+      {
+        useLineFallback ? (
+          <Box
+            borderStyle="round"
+            borderTop={false}
+            borderBottom={true}
+            borderLeft={false}
+            borderRight={false}
+            borderColor={borderColor}
+            width={terminalWidth}
+            flexDirection="row"
+            alignItems="flex-start"
+            height={0}
+          />
+        ) : null
+      }
       {suggestionsPosition === 'below' && suggestionsNode}
     </>
   );
