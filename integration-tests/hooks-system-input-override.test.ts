@@ -23,14 +23,11 @@ describe('Hooks System - Input Override', () => {
   });
 
   it('should override tool input parameters via BeforeTool hook', async () => {
+    // 1. First setup to get the test directory and prepare the hook script
+    // We do a partial setup just to get the directory, but we'll do the full setup
+    // with settings and fake responses in one go later.
     await rig.setup(
       'should override tool input parameters via BeforeTool hook',
-      {
-        fakeResponsesPath: join(
-          import.meta.dirname,
-          'hooks-system.input-modification.responses',
-        ),
-      },
     );
 
     // Create a hook script that overrides the tool input
@@ -53,9 +50,14 @@ echo '{
     const { execSync } = await import('node:child_process');
     execSync(`chmod +x "${scriptPath}"`);
 
+    // 2. Full setup with settings and fake responses
     await rig.setup(
       'should override tool input parameters via BeforeTool hook',
       {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.input-modification.responses',
+        ),
         settings: {
           tools: {
             enableHooks: true,
