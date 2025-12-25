@@ -515,6 +515,15 @@ export class LoadedSettings {
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
   }
+
+  applyCliOverrides(overrides: Partial<Settings>): void {
+    this._merged = customDeepMerge(
+      getMergeStrategyForPath,
+      {},
+      this._merged,
+      overrides,
+    ) as Settings;
+  }
 }
 
 function findEnvFile(startDir: string): string | null {

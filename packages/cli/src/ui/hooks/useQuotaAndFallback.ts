@@ -20,12 +20,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType } from '../types.js';
 import { type ProQuotaDialogRequest } from '../contexts/UIStateContext.js';
+import { type LoadedSettings } from '../../config/settings.js';
 
 interface UseQuotaAndFallbackArgs {
   config: Config;
   historyManager: UseHistoryManagerReturn;
   userTier: UserTierId | undefined;
   setModelSwitchedFromQuotaError: (value: boolean) => void;
+  settings: LoadedSettings;
 }
 
 export function useQuotaAndFallback({
@@ -33,6 +35,7 @@ export function useQuotaAndFallback({
   historyManager,
   userTier,
   setModelSwitchedFromQuotaError,
+  settings,
 }: UseQuotaAndFallbackArgs) {
   const [proQuotaRequest, setProQuotaRequest] =
     useState<ProQuotaDialogRequest | null>(null);
@@ -51,6 +54,10 @@ export function useQuotaAndFallback({
         !contentGeneratorConfig ||
         contentGeneratorConfig.authType !== AuthType.LOGIN_WITH_GOOGLE
       ) {
+        return null;
+      }
+
+      if (settings.merged.general?.disableModelFallback) {
         return null;
       }
 
@@ -118,7 +125,13 @@ export function useQuotaAndFallback({
     };
 
     config.setFallbackModelHandler(fallbackHandler);
-  }, [config, historyManager, userTier, setModelSwitchedFromQuotaError]);
+  }, [
+    config,
+    historyManager,
+    userTier,
+    setModelSwitchedFromQuotaError,
+    settings,
+  ]);
 
   const handleProQuotaChoice = useCallback(
     (choice: FallbackIntent) => {
