@@ -887,26 +887,22 @@ export class ChatRecordingService {
           sessionId,
         );
       const shortIdIsHex = isUuid || isShortId;
-      const sessionMatches = async (filePath: string): Promise<boolean> => {
+      const readSessionId = async (
+        filePath: string,
+      ): Promise<string | undefined> => {
         try {
           const content = await fsPromises.readFile(filePath, 'utf8');
           if (filePath.endsWith('.jsonl')) {
             const parsed = parseJsonl(content, '', '');
-            if (isShortId) {
-              return parsed.sessionId?.startsWith(sessionId) ?? false;
-            }
-            return parsed.sessionId === sessionId;
+            return parsed.sessionId ?? undefined;
           }
           const parsed = JSON.parse(content) as ConversationRecord;
-          if (isShortId) {
-            return parsed.sessionId?.startsWith(sessionId) ?? false;
-          }
-          return parsed.sessionId === sessionId;
+          return parsed.sessionId ?? undefined;
         } catch (error) {
           debugLogger.warn(
             `[SessionRecording] Failed to verify sessionId for ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
           );
-          return false;
+          return undefined;
         }
       };
 
@@ -927,10 +923,31 @@ export class ChatRecordingService {
                 file.startsWith(SESSION_FILE_PREFIX) &&
                 (file.endsWith('.jsonl') || file.endsWith('.json')),
             );
+        const matchedSessions = new Map<string, string[]>();
         for (const file of candidates) {
-          // Match files that end with the short session ID segment
           const filePath = path.join(chatsDir, file);
-          if (await sessionMatches(filePath)) {
+          const parsedSessionId = await readSessionId(filePath);
+          if (!parsedSessionId) {
+            continue;
+          }
+          const matches = isShortId
+            ? parsedSessionId.startsWith(sessionId)
+            : parsedSessionId === sessionId;
+          if (matches) {
+            const entry = matchedSessions.get(parsedSessionId) ?? [];
+            entry.push(filePath);
+            matchedSessions.set(parsedSessionId, entry);
+          }
+        }
+
+        if (isShortId && matchedSessions.size > 1) {
+          throw new Error(
+            `Multiple sessions found for identifier "${sessionId}". Please use a more specific ID to delete a session.`,
+          );
+        }
+
+        for (const filePaths of matchedSessions.values()) {
+          for (const filePath of filePaths) {
             await fsPromises.unlink(filePath);
             deleted = true;
           }
@@ -944,11 +961,17 @@ export class ChatRecordingService {
       const jsonlPath = path.join(chatsDir, `${sessionId}.jsonl`);
       const jsonPath = path.join(chatsDir, `${sessionId}.json`);
 
-      if ((await fileExists(jsonlPath)) && (await sessionMatches(jsonlPath))) {
-        await fsPromises.unlink(jsonlPath);
+      if (await fileExists(jsonlPath)) {
+        const parsedSessionId = await readSessionId(jsonlPath);
+        if (parsedSessionId === sessionId) {
+          await fsPromises.unlink(jsonlPath);
+        }
       }
-      if ((await fileExists(jsonPath)) && (await sessionMatches(jsonPath))) {
-        await fsPromises.unlink(jsonPath);
+      if (await fileExists(jsonPath)) {
+        const parsedSessionId = await readSessionId(jsonPath);
+        if (parsedSessionId === sessionId) {
+          await fsPromises.unlink(jsonPath);
+        }
       }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);

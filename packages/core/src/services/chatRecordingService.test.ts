@@ -1175,5 +1175,49 @@ describe('ChatRecordingService', () => {
         );
       }
     });
+
+    it('should throw when shortId matches multiple sessions', async () => {
+      const shortId = 'abcd1234';
+      const sessionIdA = `${shortId}-1111-1111-1111-111111111111`;
+      const sessionIdB = `${shortId}-2222-2222-2222-222222222222`;
+      const expectedFiles = [
+        'session-2025-01-01T10-00-abcd1234.jsonl',
+        'session-2025-01-01T09-00-abcd1234.json',
+      ];
+
+      accessSpy.mockImplementation(async (filePath) => {
+        if (String(filePath).endsWith('/chats')) return;
+        throw makeEnoent();
+      });
+
+      vi.spyOn(fsPromises, 'readdir')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .mockResolvedValue(expectedFiles as any);
+
+      vi.spyOn(fsPromises, 'readFile').mockImplementation(async (filePath) => {
+        const file = String(filePath);
+        const sessionId = file.endsWith('.jsonl') ? sessionIdA : sessionIdB;
+        if (file.endsWith('.jsonl')) {
+          return (
+            JSON.stringify({
+              type: 'session_metadata',
+              sessionId,
+              startTime: new Date().toISOString(),
+              lastUpdated: new Date().toISOString(),
+            }) + '\n'
+          );
+        }
+        return JSON.stringify({ sessionId, messages: [] });
+      });
+
+      const unlinkSpy = vi
+        .spyOn(fsPromises, 'unlink')
+        .mockResolvedValue(undefined);
+
+      await expect(chatRecordingService.deleteSession(shortId)).rejects.toThrow(
+        `Multiple sessions found for identifier "${shortId}". Please use a more specific ID to delete a session.`,
+      );
+      expect(unlinkSpy).not.toHaveBeenCalled();
+    });
   });
 });
