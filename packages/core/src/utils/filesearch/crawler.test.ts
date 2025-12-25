@@ -45,12 +45,7 @@ describe('crawler', () => {
     });
 
     expect(results).toEqual(
-      expect.arrayContaining([
-        '.',
-        'src/',
-        '.geminiignore',
-        'src/not-ignored.js',
-      ]),
+      expect.arrayContaining(['src/', '.geminiignore', 'src/not-ignored.js']),
     );
   });
 
@@ -80,7 +75,6 @@ describe('crawler', () => {
 
     expect(results).toEqual(
       expect.arrayContaining([
-        '.',
         'src/',
         '.geminiignore',
         '.gitignore',
@@ -110,9 +104,7 @@ describe('crawler', () => {
       cacheTtl: 0,
     });
 
-    expect(results).toEqual(
-      expect.arrayContaining(['.', 'src/', 'src/main.js']),
-    );
+    expect(results).toEqual(expect.arrayContaining(['src/', 'src/main.js']));
   });
 
   it('should handle negated directories', async () => {
@@ -144,7 +136,6 @@ describe('crawler', () => {
 
     expect(results).toEqual(
       expect.arrayContaining([
-        '.',
         'build/',
         'build/public/',
         'src/',
@@ -178,7 +169,7 @@ describe('crawler', () => {
     });
 
     expect(results).toEqual(
-      expect.arrayContaining(['.', '.gitignore', 'Foo.mk', 'bar.mk']),
+      expect.arrayContaining(['.gitignore', 'Foo.mk', 'bar.mk']),
     );
   });
 
@@ -217,7 +208,6 @@ describe('crawler', () => {
 
     expect(results).toEqual(
       expect.arrayContaining([
-        '.',
         'third_party/',
         'third_party/foo/',
         'third_party/foo/bar/',
@@ -251,7 +241,6 @@ describe('crawler', () => {
 
     expect(results).toEqual(
       expect.arrayContaining([
-        '.',
         'dist/',
         'src/',
         '.gitignore',
@@ -280,9 +269,7 @@ describe('crawler', () => {
       cache: false,
       cacheTtl: 0,
     });
-    expect(results).toEqual(
-      expect.arrayContaining(['.', 'src/', 'src/file1.js']),
-    );
+    expect(results).toEqual(expect.arrayContaining(['src/', 'src/file1.js']));
   });
 
   it('should handle empty or commented-only ignore files', async () => {
@@ -307,7 +294,7 @@ describe('crawler', () => {
     });
 
     expect(results).toEqual(
-      expect.arrayContaining(['.', 'src/', '.gitignore', 'src/main.js']),
+      expect.arrayContaining(['src/', '.gitignore', 'src/main.js']),
     );
   });
 
@@ -332,9 +319,7 @@ describe('crawler', () => {
       cacheTtl: 0,
     });
 
-    expect(results).toEqual(
-      expect.arrayContaining(['.', 'src/', 'src/main.js']),
-    );
+    expect(results).toEqual(expect.arrayContaining(['src/', 'src/main.js']));
   });
 
   describe('with in-memory cache', () => {
@@ -404,9 +389,7 @@ describe('crawler', () => {
       // Initial crawl to populate the cache
       const ignore1 = getIgnore();
       const results1 = await crawl(getOptions(ignore1));
-      expect(results1).toEqual(
-        expect.arrayContaining(['.', '.gitignore', 'b.txt']),
-      );
+      expect(results1).toEqual(expect.arrayContaining(['.gitignore', 'b.txt']));
 
       // Modify the ignore file
       await fs.writeFile(path.join(tmpDir, '.gitignore'), 'b.txt');
@@ -414,9 +397,7 @@ describe('crawler', () => {
       // Second crawl should miss the cache and trigger a recrawl
       const ignore2 = getIgnore();
       const results2 = await crawl(getOptions(ignore2));
-      expect(results2).toEqual(
-        expect.arrayContaining(['.', '.gitignore', 'a.txt']),
-      );
+      expect(results2).toEqual(expect.arrayContaining(['.gitignore', 'a.txt']));
     });
 
     it('should miss the cache after TTL expires', async () => {
@@ -523,7 +504,7 @@ describe('crawler', () => {
     it('should only crawl top-level files when maxDepth is 0', async () => {
       const results = await getCrawlResults(0);
       expect(results).toEqual(
-        expect.arrayContaining(['.', 'level1/', 'file-root.txt']),
+        expect.arrayContaining(['level1/', 'file-root.txt']),
       );
     });
 
@@ -531,7 +512,6 @@ describe('crawler', () => {
       const results = await getCrawlResults(1);
       expect(results).toEqual(
         expect.arrayContaining([
-          '.',
           'level1/',
           'level1/level2/',
           'file-root.txt',
@@ -544,7 +524,6 @@ describe('crawler', () => {
       const results = await getCrawlResults(2);
       expect(results).toEqual(
         expect.arrayContaining([
-          '.',
           'level1/',
           'level1/level2/',
           'level1/level2/level3/',
@@ -559,7 +538,6 @@ describe('crawler', () => {
       const results = await getCrawlResults(undefined);
       expect(results).toEqual(
         expect.arrayContaining([
-          '.',
           'level1/',
           'level1/level2/',
           'level1/level2/level3/',
@@ -569,6 +547,45 @@ describe('crawler', () => {
           'level1/level2/level3/file-level3.txt',
         ]),
       );
+    });
+  });
+
+  describe('when cwd is different from crawlDirectory', () => {
+    beforeEach(async () => {
+      tmpDir = await createTmpDir({
+        '.geminiignore': 'ignored_dir/',
+        src: {
+          'file1.js': '',
+          'file2.ts': '',
+        },
+        ignored_dir: {
+          'ignored_file.js': '',
+        },
+        sub_dir: {
+          'file3.js': '',
+        },
+      });
+    });
+
+    it('should return paths relative to cwd when crawlDirectory is a descendant of cwd', async () => {
+      const ignore = loadIgnoreRules({
+        projectRoot: tmpDir,
+        useGitignore: false,
+        useGeminiignore: true,
+        ignoreDirs: [],
+      });
+
+      const crawlDirectory = path.join(tmpDir, 'src');
+
+      const results = await crawl({
+        crawlDirectory,
+        cwd: tmpDir,
+        ignore,
+        cache: false,
+        cacheTtl: 0,
+      });
+
+      expect(results).toEqual(['src/file1.js', 'src/file2.ts']);
     });
   });
 });
