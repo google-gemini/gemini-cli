@@ -482,6 +482,10 @@ export class Session {
           case ToolConfirmationOutcome.ProceedAlwaysTool:
           case ToolConfirmationOutcome.ModifyWithEditor:
             break;
+          case ToolConfirmationOutcome.Feedback:
+            return errorResponse(
+              new Error('Tool execution rejected with feedback.'),
+            );
           default: {
             const resultOutcome: never = outcome;
             throw new Error(`Unexpected: ${resultOutcome}`);

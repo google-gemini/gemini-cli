@@ -683,7 +683,8 @@ export interface ToolEditConfirmationDetails {
 export interface ToolConfirmationPayload {
   // used to override `modifiedProposedContent` for modifiable tools in the
   // inline modify flow
-  newContent: string;
+  newContent?: string;
+  feedback?: string;
 }
 
 export interface ToolExecuteConfirmationDetails {
@@ -725,6 +726,7 @@ export enum ToolConfirmationOutcome {
   ProceedAlwaysTool = 'proceed_always_tool',
   ModifyWithEditor = 'modify_with_editor',
   Cancel = 'cancel',
+  Feedback = 'feedback',
 }
 
 export enum Kind {

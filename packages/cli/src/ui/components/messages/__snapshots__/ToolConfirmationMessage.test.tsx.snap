@@ -10,7 +10,8 @@ Do you want to proceed?
 
 ● 1. Allow once
   2. Allow for this session
-  3. No, suggest changes (esc)
+  3. Give feedback (f)
+  4. No, suggest changes (esc)
 "
 `;
 
@@ -21,7 +22,8 @@ Do you want to proceed?
 
 ● 1. Allow once
   2. Allow for this session
-  3. No, suggest changes (esc)
+  3. Give feedback (f)
+  4. No, suggest changes (esc)
 "
 `;
 
@@ -36,7 +38,8 @@ Apply this change?
 
 ● 1. Allow once
   2. Modify with external editor
-  3. No, suggest changes (esc)
+  3. Give feedback (f)
+  4. No, suggest changes (esc)
 "
 `;
 
@@ -52,7 +55,8 @@ Apply this change?
 ● 1. Allow once
   2. Allow for this session
   3. Modify with external editor
-  4. No, suggest changes (esc)
+  4. Give feedback (f)
+  5. No, suggest changes (esc)
 "
 `;
 
@@ -62,7 +66,8 @@ exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' 
 Allow execution of: 'echo'?
 
 ● 1. Allow once
-  2. No, suggest changes (esc)
+  2. Give feedback (f)
+  3. No, suggest changes (esc)
 "
 `;
 
@@ -73,7 +78,8 @@ Allow execution of: 'echo'?
 
 ● 1. Allow once
   2. Allow for this session
-  3. No, suggest changes (esc)
+  3. Give feedback (f)
+  4. No, suggest changes (esc)
 "
 `;
 
@@ -83,7 +89,8 @@ exports[`ToolConfirmationMessage > with folder trust > 'for info confirmations' 
 Do you want to proceed?
 
 ● 1. Allow once
-  2. No, suggest changes (esc)
+  2. Give feedback (f)
+  3. No, suggest changes (esc)
 "
 `;
 
@@ -94,7 +101,8 @@ Do you want to proceed?
 
 ● 1. Allow once
   2. Allow for this session
-  3. No, suggest changes (esc)
+  3. Give feedback (f)
+  4. No, suggest changes (esc)
 "
 `;
 
@@ -105,7 +113,8 @@ Tool: test-tool
 Allow execution of MCP tool "test-tool" from server "test-server"?
 
 ● 1. Allow once
-  2. No, suggest changes (esc)
+  2. Give feedback (f)
+  3. No, suggest changes (esc)
 "
 `;
 
@@ -118,6 +127,7 @@ Allow execution of MCP tool "test-tool" from server "test-server"?
 ● 1. Allow once
   2. Allow tool for this session
   3. Allow all server tools for this session
-  4. No, suggest changes (esc)
+  4. Give feedback (f)
+  5. No, suggest changes (esc)
 "
 `;

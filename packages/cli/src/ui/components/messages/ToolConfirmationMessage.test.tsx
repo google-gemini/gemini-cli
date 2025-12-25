@@ -10,16 +10,68 @@ import type {
   ToolCallConfirmationDetails,
   Config,
 } from '@google/gemini-cli-core';
+import { ToolConfirmationOutcome } from '@google/gemini-cli-core';
 import {
   renderWithProviders,
   createMockSettings,
 } from '../../../test-utils/render.js';
+import { waitFor } from '../../../test-utils/async.js';
+import { act } from 'react';
 
 describe('ToolConfirmationMessage', () => {
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
   } as unknown as Config;
+
+  it('should allow providing feedback', async () => {
+    const onConfirm = vi.fn();
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Execution',
+      command: 'echo "hello"',
+      rootCommand: 'echo',
+      onConfirm,
+    };
+
+    const { lastFrame, stdin } = renderWithProviders(
+      <ToolConfirmationMessage
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+
+    // Initial state check
+    expect(lastFrame()).toContain('Give feedback (f)');
+
+    // Enter feedback mode
+    await act(async () => {
+      stdin.write('f');
+    });
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Provide feedback to the agent:');
+    });
+
+    // Type feedback
+    await act(async () => {
+      stdin.write('Use lower case');
+    });
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Use lower case');
+    });
+    await act(async () => {
+      stdin.write('\r'); // Enter
+    });
+
+    // Expect callback
+    await waitFor(() => {
+      expect(onConfirm).toHaveBeenCalledWith(ToolConfirmationOutcome.Feedback, {
+        feedback: 'Use lower case',
+      });
+    });
+  });
 
   it('should not display urls if prompt and url are the same', () => {
     const confirmationDetails: ToolCallConfirmationDetails = {

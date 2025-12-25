@@ -988,7 +988,10 @@ export class CoreToolScheduler {
 
   async handleConfirmationResponse(
     callId: string,
-    originalOnConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>,
+    originalOnConfirm: (
+      outcome: ToolConfirmationOutcome,
+      payload?: ToolConfirmationPayload,
+    ) => Promise<void>,
     outcome: ToolConfirmationOutcome,
     signal: AbortSignal,
     payload?: ToolConfirmationPayload,
@@ -998,7 +1001,7 @@ export class CoreToolScheduler {
     );
 
     if (toolCall && toolCall.status === 'awaiting_approval') {
-      await originalOnConfirm(outcome);
+      await originalOnConfirm(outcome, payload);
     }
 
     this.setToolCallOutcome(callId, outcome);
@@ -1007,6 +1010,34 @@ export class CoreToolScheduler {
       // Instead of just cancelling one tool, trigger the full cancel cascade.
       this.cancelAll(signal);
       return; // `cancelAll` calls `checkAndNotifyCompletion`, so we can exit here.
+    } else if (outcome === ToolConfirmationOutcome.Feedback) {
+      const feedback =
+        payload?.feedback ||
+        'User denied this action with unspecified feedback.';
+
+      const toolName = toolCall?.request.name || 'unknown_tool';
+      const requestCallId = toolCall?.request.callId || callId;
+
+      // Create a result that looks like a tool execution but contains the feedback
+      const feedbackResponse: ToolCallResponseInfo = {
+        callId: requestCallId,
+        responseParts: convertToFunctionResponse(
+          toolName,
+          requestCallId,
+          `[User Feedback] ${feedback}\nInstruction: The user provided corrective feedback for this specific tool call. Do not repeat the exact same call. Adjust your plan and parameters based on this feedback.`,
+          this.config.getActiveModel(),
+        ),
+        // We set an error property so consumers know it wasn't a "success" in the traditional sense,
+        // but the scheduler treats it as a "success" status because the *operation of handling the tool* is complete.
+        resultDisplay: `Feedback provided: ${feedback}`,
+        error: new Error(feedback),
+        errorType: ToolErrorType.USER_FEEDBACK,
+        contentLength: feedback.length,
+      };
+
+      this.setStatusInternal(callId, 'success', signal, feedbackResponse);
+      await this.checkAndNotifyCompletion(signal);
+      return;
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;
       if (isModifiableDeclarativeTool(waitingToolCall.tool)) {
@@ -1048,7 +1079,7 @@ export class CoreToolScheduler {
       }
     } else {
       // If the client provided new content, apply it before scheduling.
-      if (payload?.newContent && toolCall) {
+      if (payload?.newContent !== undefined && toolCall) {
         await this._applyInlineModify(
           toolCall as WaitingToolCall,
           payload,
@@ -1083,15 +1114,17 @@ export class CoreToolScheduler {
       toolCall.request.args,
     );
 
+    const newContent = payload.newContent ?? currentContent;
+
     const updatedParams = modifyContext.createUpdatedParams(
       currentContent,
-      payload.newContent,
+      newContent,
       toolCall.request.args,
     );
     const updatedDiff = Diff.createPatch(
       modifyContext.getFilePath(toolCall.request.args),
       currentContent,
-      payload.newContent,
+      newContent,
       'Current',
       'Proposed',
     );
