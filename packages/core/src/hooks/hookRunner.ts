@@ -6,7 +6,8 @@
 
 import { spawn } from 'node:child_process';
 import type { HookConfig } from './types.js';
-import { HookEventName } from './types.js';
+import { HookEventName, ConfigSource } from './types.js';
+import type { Config } from '../config/config.js';
 import type {
   HookInput,
   HookOutput,
@@ -17,6 +18,7 @@ import type {
 } from './types.js';
 import type { LLMRequest } from './hookTranslator.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { sanitizeEnvironment } from '../services/environmentSanitization.js';
 import {
   escapeShellArg,
   getShellConfiguration,
@@ -39,7 +41,11 @@ const EXIT_CODE_NON_BLOCKING_ERROR = 1;
  * Hook runner that executes command hooks
  */
 export class HookRunner {
-  constructor() {}
+  private readonly config: Config;
+
+  constructor(config: Config) {
+    this.config = config;
+  }
 
   /**
    * Execute a single hook
@@ -50,6 +56,23 @@ export class HookRunner {
     input: HookInput,
   ): Promise<HookExecutionResult> {
     const startTime = Date.now();
+
+    // Secondary security check: Ensure project hooks are not executed in untrusted folders
+    if (
+      hookConfig.source === ConfigSource.Project &&
+      !this.config.isTrustedFolder()
+    ) {
+      const errorMessage =
+        'Security: Blocked execution of project hook in untrusted folder';
+      debugLogger.warn(errorMessage);
+      return {
+        hookConfig,
+        eventName,
+        success: false,
+        error: new Error(errorMessage),
+        duration: 0,
+      };
+    }
 
     try {
       return await this.executeCommandHook(
@@ -216,7 +239,7 @@ export class HookRunner {
 
       // Set up environment variables
       const env = {
-        ...process.env,
+        ...sanitizeEnvironment(process.env, this.config.sanitizationConfig),
         GEMINI_PROJECT_DIR: input.cwd,
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
       };
