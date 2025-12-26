@@ -118,10 +118,13 @@ describe('ShellTool', () => {
     // Simulate policy update
     bus.subscribe(MessageBusType.UPDATE_POLICY, (msg: UpdatePolicy) => {
       if (msg.commandPrefix) {
+        const prefixes = Array.isArray(msg.commandPrefix)
+          ? msg.commandPrefix
+          : [msg.commandPrefix];
         const current = mockConfig.getAllowedTools() || [];
         (mockConfig.getAllowedTools as Mock).mockReturnValue([
           ...current,
-          msg.commandPrefix,
+          ...prefixes,
         ]);
         // Simulate Policy Engine allowing the tool after update
         mockBus.defaultToolDecision = 'allow';

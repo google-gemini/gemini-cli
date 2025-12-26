@@ -242,7 +242,7 @@ interface TomlRule {
   mcpName?: string;
   decision?: string;
   priority?: number;
-  commandPrefix?: string;
+  commandPrefix?: string | string[];
   argsPattern?: string;
   // Index signature to satisfy Record type if needed for toml.stringify
   [key: string]: unknown;
@@ -256,28 +256,35 @@ export function createPolicyUpdater(
     MessageBusType.UPDATE_POLICY,
     async (message: UpdatePolicy) => {
       const toolName = message.toolName;
-      let argsPattern = message.argsPattern
-        ? new RegExp(message.argsPattern)
-        : undefined;
 
       if (message.commandPrefix) {
-        // Convert commandPrefix to argsPattern for in-memory rule
-        // This mimics what toml-loader does
+        // Convert commandPrefix(es) to argsPatterns for in-memory rules
         const patterns = buildArgsPatterns(undefined, message.commandPrefix);
-        if (patterns[0]) {
-          argsPattern = new RegExp(patterns[0]);
+        for (const pattern of patterns) {
+          if (pattern) {
+            policyEngine.addRule({
+              toolName,
+              decision: PolicyDecision.ALLOW,
+              priority: 2.95,
+              argsPattern: new RegExp(pattern),
+            });
+          }
         }
-      }
+      } else {
+        const argsPattern = message.argsPattern
+          ? new RegExp(message.argsPattern)
+          : undefined;
 
-      policyEngine.addRule({
-        toolName,
-        decision: PolicyDecision.ALLOW,
-        // User tier (2) + high priority (950/1000) = 2.95
-        // This ensures user "always allow" selections are high priority
-        // but still lose to admin policies (3.xxx) and settings excludes (200)
-        priority: 2.95,
-        argsPattern,
-      });
+        policyEngine.addRule({
+          toolName,
+          decision: PolicyDecision.ALLOW,
+          // User tier (2) + high priority (950/1000) = 2.95
+          // This ensures user "always allow" selections are high priority
+          // but still lose to admin policies (3.xxx) and settings excludes (200)
+          priority: 2.95,
+          argsPattern,
+        });
+      }
 
       if (message.persist) {
         try {

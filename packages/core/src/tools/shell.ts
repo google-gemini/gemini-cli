@@ -87,6 +87,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
       outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
       outcome === ToolConfirmationOutcome.ProceedAlways
     ) {
+      const command = stripShellWrapper(this.params.command);
+      const rootCommands = [...new Set(getCommandRoots(command))];
+      if (rootCommands.length > 0) {
+        return { commandPrefix: rootCommands };
+      }
       return { commandPrefix: this.params.command };
     }
     return undefined;
