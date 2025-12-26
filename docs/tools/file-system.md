@@ -46,22 +46,29 @@ Other binary file types are generally skipped.
 - **Parameters:**
   - `path` (string, required): The absolute path to the file to read.
   - `offset` (number, optional): For text files, the 0-based line number to
-    start reading from. Requires `limit` to be set.
+    start reading from.
   - `limit` (number, optional): For text files, the maximum number of lines to
-    read. If omitted, reads a default maximum (e.g., 2000 lines) or the entire
-    file if feasible.
+    read. Use `limit=-1` to explicitly read the entire file.
 - **Behavior:**
   - For text files: Returns the content. If `offset` and `limit` are used,
-    returns only that slice of lines. Indicates if content was truncated due to
-    line limits or line length limits.
+    returns only that slice of lines.
+  - **Large file handling:** To prevent context pollution from overly-broad
+    reads, text files exceeding 512 KiB will fail with guidance to read in
+    chunks (using `offset`/`limit`) or use surgical tools like `grep`, `head`,
+    `tail`, or `jq`. Specifying any `limit` parameter bypasses this check — the
+    agent can use a specific line count for chunked reading, or `limit=-1` to
+    read the entire file intentionally. This threshold is configurable via the
+    `GEMINI_TEXT_FILE_READ_THRESHOLD_BYTES` environment variable (set to `-1` to
+    disable).
   - For image, audio, and PDF files: Returns the file content as a
     base64-encoded data structure suitable for model consumption.
   - For other binary files: Attempts to identify and skip them, returning a
     message indicating it's a generic binary file.
 - **Output:** (`llmContent`):
-  - For text files: The file content, potentially prefixed with a truncation
-    message (e.g.,
-    `[File content truncated: showing lines 1-100 of 500 total lines...]\nActual file content...`).
+  - For text files: The file content. If reading a partial range via
+    `offset`/`limit`, indicates which lines are shown.
+  - For files exceeding the size threshold: An error message guiding the agent
+    to use chunked reading or bypass with an explicit `limit`.
   - For image/audio/PDF files: An object containing `inlineData` with `mimeType`
     and base64 `data` (e.g.,
     `{ inlineData: { mimeType: 'image/png', data: 'base64encodedstring' } }`).
