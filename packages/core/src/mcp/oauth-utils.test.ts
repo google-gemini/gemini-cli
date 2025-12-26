@@ -185,6 +185,9 @@ describe('OAuthUtils', () => {
           ok: false,
         })
         .mockResolvedValueOnce({
+          ok: false,
+        })
+        .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockAuthServerMetadata),
         });
@@ -205,6 +208,10 @@ describe('OAuthUtils', () => {
       );
       expect(mockFetch).nthCalledWith(
         3,
+        'https://auth.example.com/mcp/.well-known/oauth-authorization-server',
+      );
+      expect(mockFetch).nthCalledWith(
+        4,
         'https://auth.example.com/mcp/.well-known/openid-configuration',
       );
     });
