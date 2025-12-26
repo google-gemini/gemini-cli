@@ -26,6 +26,14 @@ export function disableKittyKeyboardProtocol() {
   writeToStdout('\x1b[<u');
 }
 
+export function enableModifyOtherKeys() {
+  writeToStdout('\x1b[>4;2m');
+}
+
+export function disableModifyOtherKeys() {
+  writeToStdout('\x1b[>4;0m');
+}
+
 export function enableLineWrapping() {
   writeToStdout('\x1b[?7h');
 }
