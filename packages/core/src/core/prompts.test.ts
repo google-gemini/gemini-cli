@@ -72,6 +72,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       getAgentRegistry: vi.fn().mockReturnValue({
         getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
       }),
+      isRealTimeHintsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
   });
 
@@ -153,6 +154,22 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot(); // Use snapshot for base prompt structure
   });
 
+  it('should include real-time hints instructions when enabled', () => {
+    vi.mocked(mockConfig.isRealTimeHintsEnabled).mockReturnValue(true);
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain(
+      'You may receive real-time hints from the user while executing tools',
+    );
+  });
+
+  it('should not include real-time hints instructions when disabled', () => {
+    vi.mocked(mockConfig.isRealTimeHintsEnabled).mockReturnValue(false);
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).not.toContain(
+      'You may receive real-time hints from the user while executing tools',
+    );
+  });
+
   it.each([
     [[CodebaseInvestigatorAgent.name], true],
     [[], false],
@@ -175,6 +192,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         getAgentRegistry: vi.fn().mockReturnValue({
           getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
         }),
+        isRealTimeHintsEnabled: vi.fn().mockReturnValue(false),
       } as unknown as Config;
 
       const prompt = getCoreSystemPrompt(testConfig);

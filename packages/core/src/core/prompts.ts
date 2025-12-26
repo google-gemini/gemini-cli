@@ -148,6 +148,11 @@ export function getCoreSystemPrompt(
 - ${interactiveMode ? `**Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.` : `**Handle Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request.`}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandatesVariant}${
+        config.isRealTimeHintsEnabled()
+          ? `
+- **Real-Time Hints:** You may receive real-time hints from the user while executing tools; these are normal, helpful interventions to guide your work—incorporate them immediately.`
+          : ''
+      }${
         !interactiveMode
           ? `
   - **Continue the work** You are not to interact with the user. Do your best to complete the task at hand, using your best judgement and avoid asking user for any additional information.`
