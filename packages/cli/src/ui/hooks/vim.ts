@@ -66,7 +66,7 @@ type VimAction =
   | { type: 'ESCAPE_TO_NORMAL' };
 
 const initialVimState: VimState = {
-  mode: 'NORMAL',
+  mode: 'INSERT',
   count: 0,
   pendingOperator: null,
   lastCommand: null,
@@ -134,6 +134,14 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
   useEffect(() => {
     dispatch({ type: 'SET_MODE', mode: vimMode });
   }, [vimMode]);
+
+  // Auto-switch to INSERT mode when buffer is empty
+  // This improves UX since there's nothing to navigate in an empty buffer
+  useEffect(() => {
+    if (vimEnabled && buffer.text.length === 0 && state.mode === 'NORMAL') {
+      setVimMode('INSERT');
+    }
+  }, [vimEnabled, buffer.text, state.mode, setVimMode]);
 
   // Helper to update mode in both reducer and context
   const updateMode = useCallback(

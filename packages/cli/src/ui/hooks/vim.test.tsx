@@ -20,6 +20,8 @@ import type {
 import { textBufferReducer } from '../components/shared/text-buffer.js';
 
 // Mock the VimModeContext
+// Note: Production defaults to INSERT mode, but tests override to NORMAL in beforeEach
+// since most tests verify NORMAL mode operations (navigation, editing, etc.)
 const mockVimContext = {
   vimEnabled: true,
   vimMode: 'NORMAL' as VimMode,
@@ -197,6 +199,8 @@ describe('useVim hook', () => {
     mockHandleFinalSubmit = vi.fn();
     mockBuffer = createMockBuffer();
     // Reset mock context to default state
+    // Note: Most tests need NORMAL mode to test navigation/edit commands
+    // Tests for INSERT mode as default need to explicitly set mockVimContext.vimMode = 'INSERT'
     mockVimContext.vimEnabled = true;
     mockVimContext.vimMode = 'NORMAL';
     mockVimContext.toggleVimEnabled.mockClear();
@@ -204,9 +208,23 @@ describe('useVim hook', () => {
   });
 
   describe('Mode switching', () => {
-    it('should start in NORMAL mode', () => {
+    it('should start in INSERT mode for better UX with empty buffer', () => {
+      // Production default is INSERT mode for immediate typing
+      mockVimContext.vimMode = 'INSERT';
       const { result } = renderVimHook();
-      expect(result.current.mode).toBe('NORMAL');
+      expect(result.current.mode).toBe('INSERT');
+    });
+
+    it('should auto-switch to INSERT mode when buffer becomes empty', async () => {
+      // Start in NORMAL mode with empty buffer
+      mockVimContext.vimMode = 'NORMAL';
+      const emptyBuffer = createMockBuffer('');
+      renderVimHook(emptyBuffer);
+
+      // The useEffect should trigger setVimMode('INSERT') for empty buffer
+      await waitFor(() => {
+        expect(mockVimContext.setVimMode).toHaveBeenCalledWith('INSERT');
+      });
     });
 
     it('should switch to INSERT mode with i command', () => {
