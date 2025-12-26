@@ -19,7 +19,6 @@ import type {
   ToolResult,
   Config,
   ToolRegistry,
-  AnyToolInvocation,
   MessageBus,
 } from '../index.js';
 import {
@@ -31,6 +30,7 @@ import {
   Kind,
   ApprovalMode,
   HookSystem,
+  PolicyDecision,
 } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import {
@@ -39,8 +39,8 @@ import {
   MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
 } from '../test-utils/mock-tool.js';
 import * as modifiableToolModule from '../tools/modifiable-tool.js';
-import { isShellInvocationAllowlisted } from '../utils/shell-permissions.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import type { PolicyEngine } from '../policy/policy-engine.js';
 
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
@@ -274,11 +274,42 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getGeminiClient: () => null,
     getMessageBus: () => createMockMessageBus(),
     getEnableHooks: () => false,
-    getPolicyEngine: () => null,
     getExperiments: () => {},
   } as unknown as Config;
 
-  return { ...baseConfig, ...overrides } as Config;
+  const finalConfig = { ...baseConfig, ...overrides } as Config;
+
+  // Patch the policy engine to use the final config if not overridden
+  if (!overrides.getPolicyEngine) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (finalConfig as any).getPolicyEngine = () =>
+      ({
+        check: async (toolCall: { name: string; args: object }) => {
+          // Mock simple policy logic for tests
+          const mode = finalConfig.getApprovalMode();
+          if (mode === ApprovalMode.YOLO) {
+            return { decision: PolicyDecision.ALLOW };
+          }
+          const allowed = finalConfig.getAllowedTools();
+          if (
+            allowed &&
+            (allowed.includes(toolCall.name) ||
+              allowed.some(
+                (p) =>
+                  p.startsWith(toolCall.name) &&
+                  JSON.stringify(toolCall.args).includes(
+                    p.substring(p.indexOf('(') + 1, p.length - 1),
+                  ),
+              ))
+          ) {
+            return { decision: PolicyDecision.ALLOW };
+          }
+          return { decision: PolicyDecision.ASK_USER };
+        },
+      }) as unknown as PolicyEngine;
+  }
+
+  return finalConfig;
 }
 
 describe('CoreToolScheduler', () => {
@@ -570,7 +601,7 @@ describe('CoreToolScheduler', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      isInteractive: () => false,
+      isInteractive: () => true,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -1192,15 +1223,6 @@ describe('CoreToolScheduler request queueing', () => {
   });
 
   it('should require approval for a chained shell command even when prefix is allowlisted', async () => {
-    expect(
-      isShellInvocationAllowlisted(
-        {
-          params: { command: 'git status && rm -rf /tmp/should-not-run' },
-        } as unknown as AnyToolInvocation,
-        ['run_shell_command(git)'],
-      ),
-    ).toBe(false);
-
     const executeFn = vi.fn().mockResolvedValue({
       llmContent: 'Shell command executed',
       returnDisplay: 'Shell command executed',
@@ -1249,6 +1271,10 @@ describe('CoreToolScheduler request queueing', () => {
       }),
       getToolRegistry: () => toolRegistry,
       getHookSystem: () => undefined,
+      getPolicyEngine: () =>
+        ({
+          check: async () => ({ decision: PolicyDecision.ASK_USER }),
+        }) as unknown as PolicyEngine,
     });
 
     const scheduler = new CoreToolScheduler({

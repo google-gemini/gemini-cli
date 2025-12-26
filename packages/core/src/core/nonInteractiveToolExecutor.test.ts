@@ -20,10 +20,12 @@ import {
   ApprovalMode,
   HookSystem,
   PREVIEW_GEMINI_MODEL,
+  PolicyDecision,
 } from '../index.js';
 import type { Part } from '@google/genai';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import type { PolicyEngine } from '../policy/policy-engine.js';
 
 describe('executeToolCall', () => {
   let mockToolRegistry: ToolRegistry;
@@ -65,7 +67,10 @@ describe('executeToolCall', () => {
       getActiveModel: () => PREVIEW_GEMINI_MODEL,
       getGeminiClient: () => null, // No client needed for these tests
       getMessageBus: () => null,
-      getPolicyEngine: () => null,
+      getPolicyEngine: () =>
+        ({
+          check: async () => ({ decision: PolicyDecision.ALLOW }),
+        }) as unknown as PolicyEngine,
       isInteractive: () => false,
       getExperiments: () => {},
       getEnableHooks: () => false,
