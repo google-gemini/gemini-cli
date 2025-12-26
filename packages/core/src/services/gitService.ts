@@ -67,7 +67,14 @@ export class GitService {
     await fs.writeFile(gitConfigPath, gitConfigContent);
 
     const repo = simpleGit(repoDir);
-    const isRepoDefined = await repo.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
+    let isRepoDefined = false;
+    try {
+      isRepoDefined = await repo.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
+    } catch (_error) {
+      // If checkIsRepo fails (e.g., on certain Git versions like macOS 2.39.5),
+      // assume repo is not defined and proceed with initialization
+      isRepoDefined = false;
+    }
 
     if (!isRepoDefined) {
       await repo.init(false, {

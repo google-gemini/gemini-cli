@@ -248,6 +248,17 @@ describe('GitService', () => {
       await service.setupShadowGitRepository();
       expect(hoistedMockCommit).not.toHaveBeenCalled();
     });
+
+    it('should handle checkIsRepo failure gracefully and initialize repo', async () => {
+      // Simulate checkIsRepo failing (e.g., on certain Git versions like macOS 2.39.5)
+      hoistedMockCheckIsRepo.mockRejectedValue(
+        new Error('git rev-parse --is-inside-work-tree failed'),
+      );
+      const service = new GitService(projectRoot, storage);
+      await service.setupShadowGitRepository();
+      // Should proceed to initialize the repo since checkIsRepo failed
+      expect(hoistedMockInit).toHaveBeenCalled();
+    });
   });
 
   describe('createFileSnapshot', () => {
