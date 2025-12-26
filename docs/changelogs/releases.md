@@ -38,8 +38,8 @@ on GitHub.
   https://github.com/google-gemini/gemini-cli/pull/13864
 - feat: enable message bus integration by default by @allenhutchison in
   https://github.com/google-gemini/gemini-cli/pull/14329
-- docs: Recommend using --debug intead of --verbose for CLI debugging by @bbiggs
-  in https://github.com/google-gemini/gemini-cli/pull/14334
+- docs: Recommend using --debug instead of --verbose for CLI debugging by
+  @bbiggs in https://github.com/google-gemini/gemini-cli/pull/14334
 - feat: consolidate remote MCP servers to use `url` in config by
   @jackwotherspoon in https://github.com/google-gemini/gemini-cli/pull/13762
 - Restrict integration tests tools by @scidomino in
@@ -107,7 +107,7 @@ on GitHub.
   @jackwotherspoon in https://github.com/google-gemini/gemini-cli/pull/14510
 - fix(shell): cursor visibility when using interactive mode by @aswinashok44 in
   https://github.com/google-gemini/gemini-cli/pull/14095
-- Adding session id as part of json o/p by @MJjainam in
+- Adding session id as part of json output by @MJjainam in
   https://github.com/google-gemini/gemini-cli/pull/14504
 - fix(extensions): resolve GitHub API 415 error for source tarballs by
   @jpoehnelt in https://github.com/google-gemini/gemini-cli/pull/13319

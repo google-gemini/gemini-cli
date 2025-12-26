@@ -77,7 +77,8 @@ on GitHub.
 
 - 🎉 **New extensions:**
   - **Google Workspace**: Integrate Gemini CLI with your Workspace data. Write
-    docs, build slides, chat with others or even get your calc on in sheets:
+    docs, build slides, chat with others or even get your calculations in
+    sheets:
     `gemini extensions install https://github.com/gemini-cli-extensions/workspace`
     - Blog:
       [https://allen.hutchison.org/2025/11/19/bringing-the-office-to-the-terminal/](https://allen.hutchison.org/2025/11/19/bringing-the-office-to-the-terminal/)
