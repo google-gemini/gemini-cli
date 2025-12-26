@@ -24,6 +24,7 @@ export class MockMessageBus {
   publishedMessages: Message[] = [];
   hookRequests: HookExecutionRequest[] = [];
   hookResponses: HookExecutionResponse[] = [];
+  defaultToolDecision: 'allow' | 'deny' | 'ask_user' = 'allow';
 
   /**
    * Mock publish method that captures messages and simulates responses
@@ -50,6 +51,34 @@ export class MockMessageBus {
       // Emit response to subscribers
       this.emit(MessageBusType.HOOK_EXECUTION_RESPONSE, response);
     }
+
+    // Handle tool confirmation requests
+    if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
+      if (this.defaultToolDecision === 'allow') {
+        this.emit(MessageBusType.TOOL_CONFIRMATION_RESPONSE, {
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: message.correlationId,
+          confirmed: true,
+        });
+      } else if (this.defaultToolDecision === 'deny') {
+        this.emit(MessageBusType.TOOL_CONFIRMATION_RESPONSE, {
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: message.correlationId,
+          confirmed: false,
+        });
+      } else {
+        // ask_user
+        this.emit(MessageBusType.TOOL_CONFIRMATION_RESPONSE, {
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: message.correlationId,
+          confirmed: false,
+          requiresUserConfirmation: true,
+        });
+      }
+    }
+
+    // Emit the message to subscribers (mimicking real MessageBus behavior)
+    this.emit(message.type, message);
   });
 
   /**
