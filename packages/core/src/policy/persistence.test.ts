@@ -126,7 +126,9 @@ describe('createPolicyUpdater', () => {
     const addedRule = rules.find((r) => r.toolName === toolName);
     expect(addedRule).toBeDefined();
     expect(addedRule?.priority).toBe(2.95);
-    expect(addedRule?.argsPattern).toEqual(new RegExp(`"command":"git status`));
+    expect(addedRule?.argsPattern).toEqual(
+      new RegExp(`"command":"git status(?:[\\s"]|$)`),
+    );
 
     // Verify file written
     expect(fs.writeFile).toHaveBeenCalledWith(
