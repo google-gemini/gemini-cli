@@ -715,11 +715,10 @@ export class Config {
       this.mcpClientManager.startConfiguredMcpServers(),
       this.getExtensionLoader().start(this),
     ])
-      .then(() => {
-        initMcpHandle?.end();
-      })
       .catch((error) => {
         debugLogger.error('Error initializing MCP clients:', error);
+      })
+      .finally(() => {
         initMcpHandle?.end();
       });
 
