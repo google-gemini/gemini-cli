@@ -4,17 +4,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
-} from '../core/turn.js';
+import type { Part } from '@google/genai';
 import type {
   AnyDeclarativeTool,
   AnyToolInvocation,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
+  ToolResultDisplay,
 } from '../tools/tools.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
+import type { ToolErrorType } from '../tools/tool-error.js';
+
+export interface ToolCallRequestInfo {
+  callId: string;
+  name: string;
+  args: Record<string, unknown>;
+  isClientInitiated: boolean;
+  prompt_id: string;
+  checkpoint?: string;
+  traceId?: string;
+}
+
+export interface ToolCallResponseInfo {
+  callId: string;
+  responseParts: Part[];
+  resultDisplay: ToolResultDisplay | undefined;
+  error: Error | undefined;
+  errorType: ToolErrorType | undefined;
+  outputFile?: string | undefined;
+  contentLength?: number;
+}
 
 export type ValidatingToolCall = {
   status: 'validating';

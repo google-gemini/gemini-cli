@@ -13,7 +13,6 @@ import {
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
 } from '../tools/tools.js';
-import type { ToolCallRequestInfo, ToolCallResponseInfo } from './turn.js';
 import type { EditorType } from '../utils/editor.js';
 import type { Config } from '../config/config.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
@@ -58,6 +57,8 @@ import {
   type OutputUpdateHandler,
   type AllToolCallsCompleteHandler,
   type ToolCallsUpdateHandler,
+  type ToolCallRequestInfo,
+  type ToolCallResponseInfo,
 } from '../scheduler/types.js';
 import { saveTruncatedContent } from '../utils/fileUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
@@ -77,6 +78,8 @@ export type {
   OutputUpdateHandler,
   AllToolCallsCompleteHandler,
   ToolCallsUpdateHandler,
+  ToolCallRequestInfo,
+  ToolCallResponseInfo,
 };
 
 const createErrorResponse = (
