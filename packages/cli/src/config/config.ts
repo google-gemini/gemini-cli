@@ -78,6 +78,7 @@ export interface CliArgs {
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
+  forceInteractive: boolean | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -241,6 +242,12 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
           hidden: true,
+        })
+        .option('force-interactive', {
+          type: 'boolean',
+          description:
+            'Force interactive mode even when stdin is not a TTY (for programmatic usage)',
+          default: false,
         })
         .deprecateOption(
           'prompt',
@@ -548,12 +555,15 @@ export async function loadCliConfig(
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
 
-  // Interactive mode: explicit -i flag or (TTY + no args + no -p flag)
+  const isInteractiveModeAllowed =
+    process.stdin.isTTY || !!argv.forceInteractive;
+
+  // Interactive mode: explicit -i flag or (TTY/forced + no args + no -p flag)
   const hasQuery = !!argv.query;
   const interactive =
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
-    (process.stdin.isTTY && !hasQuery && !argv.prompt);
+    (isInteractiveModeAllowed && !hasQuery && !argv.prompt);
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive) {

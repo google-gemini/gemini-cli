@@ -74,29 +74,24 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-vi.mock('ink', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('ink')>();
-  return {
-    ...actual,
-    render: vi.fn((_node, options) => {
-      if (options.alternateBuffer) {
-        options.stdout.write('\x1b[?7l');
-      }
-      // Simulate rendering time for recordSlowRender test
-      const start = performance.now();
-      const end = performance.now();
-      if (options.onRender) {
-        options.onRender({ renderTime: end - start });
-      }
-      return {
-        unmount: vi.fn(),
-        rerender: vi.fn(),
-        cleanup: vi.fn(),
-        waitUntilExit: vi.fn(),
-      };
-    }),
-  };
-});
+vi.mock('ink', () => ({
+  render: vi.fn((_node, options) => {
+    if (options.alternateBuffer) {
+      options.stdout.write('\x1b[?7l');
+    }
+    const start = performance.now();
+    const end = performance.now();
+    if (options.onRender) {
+      options.onRender({ renderTime: end - start });
+    }
+    return {
+      unmount: vi.fn(),
+      rerender: vi.fn(),
+      cleanup: vi.fn(),
+      waitUntilExit: vi.fn(),
+    };
+  }),
+}));
 
 // Custom error to identify mock process.exit calls
 class MockProcessExitError extends Error {
@@ -552,6 +547,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       outputFormat: undefined,
       fakeResponses: undefined,
       recordResponses: undefined,
+      forceInteractive: undefined,
     });
 
     await act(async () => {
@@ -1109,6 +1105,96 @@ describe('gemini.tsx main function exit codes', () => {
       expect(e).toBeInstanceOf(MockProcessExitError);
       expect((e as MockProcessExitError).code).toBe(42);
     }
+  });
+
+  it('should start simple interactive mode when --force-interactive is set on non-TTY', async () => {
+    const { loadCliConfig, parseArguments } = await import(
+      './config/config.js'
+    );
+    const { loadSettings } = await import('./config/settings.js');
+    const simpleInteractiveModule = await import('./simpleInteractiveCli.js');
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    const startSimpleInteractiveSpy = vi
+      .spyOn(simpleInteractiveModule, 'startSimpleInteractive')
+      .mockResolvedValue(undefined);
+    vi.mocked(loadSettings).mockReturnValue({
+      merged: { security: { auth: {} }, ui: {} },
+      setValue: vi.fn(),
+      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      errors: [],
+    } as never);
+    vi.mocked(parseArguments).mockResolvedValue({
+      promptInteractive: true,
+      forceInteractive: true,
+    } as unknown as CliArgs);
+
+    const mockConfig = {
+      isInteractive: () => true,
+      getQuestion: () => '',
+      getSandbox: () => false,
+      getDebugMode: () => false,
+      getPolicyEngine: vi.fn(),
+      getMessageBus: () => ({ subscribe: vi.fn() }),
+      initialize: vi.fn(),
+      getContentGeneratorConfig: vi.fn(),
+      getMcpServers: () => ({}),
+      getMcpClientManager: vi.fn(),
+      getIdeMode: () => false,
+      getExperimentalZedIntegration: () => false,
+      getScreenReader: () => false,
+      getGeminiMdFileCount: () => 0,
+      getProjectRoot: () => '/',
+      getListExtensions: () => false,
+      getListSessions: () => false,
+      getDeleteSession: () => undefined,
+      getToolRegistry: vi.fn(),
+      getExtensions: () => [],
+      getModel: () => 'gemini-pro',
+      getEmbeddingModel: () => 'embedding-001',
+      getApprovalMode: () => 'default',
+      getCoreTools: () => [],
+      getTelemetryEnabled: () => false,
+      getTelemetryLogPromptsEnabled: () => false,
+      getFileFilteringRespectGitIgnore: () => true,
+      getOutputFormat: () => 'text',
+      getUsageStatisticsEnabled: () => false,
+      getSessionId: () => 'session-id',
+      setSessionId: vi.fn(),
+      getGeminiClient: vi.fn(),
+      getTargetDir: () => process.cwd(),
+    } as unknown as Config;
+    vi.mocked(loadCliConfig).mockResolvedValue(mockConfig);
+
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    expect(startSimpleInteractiveSpy).toHaveBeenCalledTimes(1);
+    expect(startSimpleInteractiveSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: mockConfig,
+      }),
+    );
+    expect(processExitSpy).not.toHaveBeenCalled();
+
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
+    startSimpleInteractiveSpy.mockRestore();
+    processExitSpy.mockRestore();
   });
 
   it('should exit with 41 for auth failure during sandbox setup', async () => {
