@@ -243,6 +243,16 @@ export interface SettingsFile {
   rawJson?: string;
 }
 
+export interface LoadedSettingsSnapshot {
+  system: SettingsFile;
+  systemDefaults: SettingsFile;
+  user: SettingsFile;
+  workspace: SettingsFile;
+  isTrusted: boolean;
+  migratedInMemoryScopes: Set<SettingScope>;
+  merged: Settings;
+}
+
 function setNestedProperty(
   obj: Record<string, unknown>,
   path: string,
@@ -467,6 +477,7 @@ export class LoadedSettings {
     this.migratedInMemoryScopes = migratedInMemoryScopes;
     this.errors = errors;
     this._merged = this.computeMergedSettings();
+    this._snapshot = this.computeSnapshot();
   }
 
   readonly system: SettingsFile;
@@ -478,6 +489,9 @@ export class LoadedSettings {
   readonly errors: SettingsError[];
 
   private _merged: Settings;
+
+  private readonly listeners = new Set<() => void>();
+  private _snapshot: LoadedSettingsSnapshot;
 
   get merged(): Settings {
     return this._merged;
@@ -491,6 +505,41 @@ export class LoadedSettings {
       this.workspace.settings,
       this.isTrusted,
     );
+  }
+
+  private computeSnapshot(): LoadedSettingsSnapshot {
+    const cloneSettingsFile = (file: SettingsFile): SettingsFile => ({
+      path: file.path,
+      rawJson: file.rawJson,
+      settings: structuredClone(file.settings),
+      originalSettings: structuredClone(file.originalSettings),
+    });
+    return {
+      system: cloneSettingsFile(this.system),
+      systemDefaults: cloneSettingsFile(this.systemDefaults),
+      user: cloneSettingsFile(this.user),
+      workspace: cloneSettingsFile(this.workspace),
+      isTrusted: this.isTrusted,
+      migratedInMemoryScopes: new Set(this.migratedInMemoryScopes),
+      merged: structuredClone(this._merged),
+    };
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private emitChange(): void {
+    for (const listener of this.listeners) {
+      listener();
+    }
+  }
+
+  getSnapshot(): LoadedSettingsSnapshot {
+    return this._snapshot;
   }
 
   forScope(scope: LoadableSettingScope): SettingsFile {
@@ -513,6 +562,8 @@ export class LoadedSettings {
     setNestedProperty(settingsFile.settings, key, value);
     setNestedProperty(settingsFile.originalSettings, key, value);
     this._merged = this.computeMergedSettings();
+    this._snapshot = this.computeSnapshot();
+    this.emitChange();
     saveSettings(settingsFile);
   }
 }
