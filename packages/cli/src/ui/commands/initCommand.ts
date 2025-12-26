@@ -13,10 +13,11 @@ import type {
 } from './types.js';
 import { CommandKind } from './types.js';
 import { performInit } from '@google/gemini-cli-core';
+import { getCurrentGeminiMdFilename } from '@google/gemini-cli-core';
 
 export const initCommand: SlashCommand = {
   name: 'init',
-  description: 'Analyzes the project and creates a tailored GEMINI.md file',
+  description: 'Analyzes the project and creates a tailored context file',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (
@@ -31,18 +32,19 @@ export const initCommand: SlashCommand = {
       };
     }
     const targetDir = context.services.config.getTargetDir();
-    const geminiMdPath = path.join(targetDir, 'GEMINI.md');
+    const contextFileName = getCurrentGeminiMdFilename();
+    const contextFilePath = path.resolve(targetDir, contextFileName);
 
-    const result = performInit(fs.existsSync(geminiMdPath));
+    const result = performInit(fs.existsSync(contextFilePath));
 
     if (result.type === 'submit_prompt') {
-      // Create an empty GEMINI.md file
+      // Create an empty GEMINI.md file or relevant context file
       fs.writeFileSync(geminiMdPath, '', 'utf8');
 
       context.ui.addItem(
         {
           type: 'info',
-          text: 'Empty GEMINI.md created. Now analyzing the project to populate it.',
+          text: `Empty ${contextFileName} created. Now analyzing the project to populate it.`,
         },
         Date.now(),
       );
