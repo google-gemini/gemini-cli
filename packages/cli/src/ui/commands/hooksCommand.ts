@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SlashCommand, CommandContext } from './types.js';
+import React from 'react';
+import type {
+  SlashCommand,
+  CommandContext,
+  OpenCustomDialogActionReturn,
+} from './types.js';
 import { CommandKind } from './types.js';
 import { MessageType, type HistoryItemHooksList } from '../types.js';
 import type {
@@ -13,6 +18,7 @@ import type {
 } from '@google/gemini-cli-core';
 import { getErrorMessage } from '@google/gemini-cli-core';
 import { SettingScope } from '../../config/settings.js';
+import { HookConfigurationWizard } from '../components/hooks/HookConfigurationWizard.js';
 
 /**
  * Display a formatted list of hooks with their status
@@ -242,10 +248,45 @@ const disableCommand: SlashCommand = {
   completion: completeHookNames,
 };
 
+/**
+ * Add a new hook via interactive wizard
+ */
+function addAction(context: CommandContext): OpenCustomDialogActionReturn {
+  const { settings } = context.services;
+
+  return {
+    type: 'custom_dialog',
+    component: React.createElement(HookConfigurationWizard, {
+      settings,
+      onComplete: (success: boolean, message?: string) => {
+        if (message) {
+          context.ui.addItem(
+            {
+              type: success ? MessageType.INFO : MessageType.ERROR,
+              text: message,
+            },
+            Date.now(),
+          );
+        }
+        context.ui.removeComponent();
+      },
+    }),
+  };
+}
+
+const addCommand: SlashCommand = {
+  name: 'add',
+  altNames: ['new', 'create'],
+  description: 'Add a new hook via interactive wizard',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: addAction,
+};
+
 export const hooksCommand: SlashCommand = {
   name: 'hooks',
   description: 'Manage hooks',
   kind: CommandKind.BUILT_IN,
-  subCommands: [panelCommand, enableCommand, disableCommand],
+  subCommands: [panelCommand, addCommand, enableCommand, disableCommand],
   action: async (context: CommandContext) => panelCommand.action!(context, ''),
 };

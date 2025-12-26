@@ -6,6 +6,7 @@
 
 import type { CommandModule } from 'yargs';
 import { migrateCommand } from './hooks/migrate.js';
+import { addCommand } from './hooks/add.js';
 import { initializeOutputListenersAndFlush } from '../gemini.js';
 
 export const hooksCommand: CommandModule = {
@@ -15,6 +16,7 @@ export const hooksCommand: CommandModule = {
   builder: (yargs) =>
     yargs
       .middleware(() => initializeOutputListenersAndFlush())
+      .command(addCommand)
       .command(migrateCommand)
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
