@@ -28,6 +28,8 @@ import {
   ToolConfirmationOutcome,
   Storage,
   IdeClient,
+  addMCPStatusChangeListener,
+  removeMCPStatusChangeListener,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
@@ -275,6 +277,10 @@ export const useSlashCommandProcessor = (
       ideClient.addStatusChangeListener(listener);
     })();
 
+    // Listen for MCP server status changes (e.g. connection, discovery completion)
+    // to reload slash commands (since they may include MCP prompts).
+    addMCPStatusChangeListener(listener);
+
     // TODO: Ideally this would happen more directly inside the ExtensionLoader,
     // but the CommandService today is not conducive to that since it isn't a
     // long lived service but instead gets fully re-created based on reload
@@ -295,6 +301,7 @@ export const useSlashCommandProcessor = (
         const ideClient = await IdeClient.getInstance();
         ideClient.removeStatusChangeListener(listener);
       })();
+      removeMCPStatusChangeListener(listener);
       appEvents.off('extensionsStarting', extensionEventListener);
       appEvents.off('extensionsStopping', extensionEventListener);
     };

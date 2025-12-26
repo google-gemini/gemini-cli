@@ -261,6 +261,51 @@ describe('Server Config (config.ts)', () => {
       );
     });
 
+    it('should not await MCP initialization', async () => {
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+      });
+
+      // Access the mock directly since we're using a class mock
+      // But getMcpClientManager is undefined before initialize is called.
+      // We need to spy on the class constructor or the method prototype.
+      // However, vi.mock at the top file mocks the module.
+
+      // Let's rely on the mock definition at the top of the file
+      // vi.mock('../tools/mcp-client-manager.js', () => ({
+      //   McpClientManager: vi.fn().mockImplementation(() => ({
+      //     startConfiguredMcpServers: vi.fn(),
+      //     getMcpInstructions: vi.fn().mockReturnValue('MCP Instructions'),
+      //   })),
+      // }));
+
+      // We need to update the mock implementation for this specific test.
+      // Since McpClientManager is instantiated inside initialize(), we need to control the instance it creates.
+
+      const { McpClientManager } = await import(
+        '../tools/mcp-client-manager.js'
+      );
+      let mcpStarted = false;
+
+      (McpClientManager as unknown as Mock).mockImplementation(() => ({
+        startConfiguredMcpServers: vi.fn().mockImplementation(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          mcpStarted = true;
+        }),
+        getMcpInstructions: vi.fn(),
+      }));
+
+      await config.initialize();
+
+      // Should return immediately, before MCP finishes (50ms delay)
+      expect(mcpStarted).toBe(false);
+
+      // Wait for it to eventually finish to avoid open handles
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(mcpStarted).toBe(true);
+    });
+
     describe('getCompressionThreshold', () => {
       it('should return the local compression threshold if it is set', async () => {
         const config = new Config({
