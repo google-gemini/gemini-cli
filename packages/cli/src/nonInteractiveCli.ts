@@ -27,6 +27,7 @@ import {
   coreEvents,
   CoreEvent,
   createWorkingStdio,
+  recordToolCallInteractions,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -230,7 +231,7 @@ export async function runNonInteractive({
       }
 
       if (!query) {
-        const { processedQuery, shouldProceed } = await handleAtCommand({
+        const { processedQuery, error } = await handleAtCommand({
           query: input,
           config,
           addItem: (_item, _timestamp) => 0,
@@ -239,11 +240,11 @@ export async function runNonInteractive({
           signal: abortController.signal,
         });
 
-        if (!shouldProceed || !processedQuery) {
+        if (error || !processedQuery) {
           // An error occurred during @include processing (e.g., file not found).
           // The error message is already logged by handleAtCommand.
           throw new FatalInputError(
-            'Exiting due to an error processing the @ command.',
+            error || 'Exiting due to an error processing the @ command.',
           );
         }
         query = processedQuery as Part[];
@@ -407,6 +408,8 @@ export async function runNonInteractive({
             geminiClient
               .getChat()
               .recordCompletedToolCalls(currentModel, completedToolCalls);
+
+            await recordToolCallInteractions(config, completedToolCalls);
           } catch (error) {
             debugLogger.error(
               `Error recording completed tool call information: ${error}`,

@@ -13,6 +13,7 @@ import {
   afterEach,
   beforeAll,
   afterAll,
+  beforeEach,
 } from 'vitest';
 import type { LogEvent, LogEventEntry } from './clearcut-logger.js';
 import { ClearcutLogger, EventNames, TEST_ONLY } from './clearcut-logger.js';
@@ -32,6 +33,7 @@ import {
   AgentStartEvent,
   AgentFinishEvent,
   WebFetchFallbackAttemptEvent,
+  HookCallEvent,
 } from '../types.js';
 import { AgentTerminateMode } from '../../agents/types.js';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
@@ -99,6 +101,11 @@ vi.mock('../../utils/installationManager.js');
 const mockUserAccount = vi.mocked(UserAccountManager.prototype);
 const mockInstallMgr = vi.mocked(InstallationManager.prototype);
 
+beforeEach(() => {
+  // Ensure Antigravity detection doesn't interfere with other tests
+  vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+});
+
 // TODO(richieforeman): Consider moving this to test setup globally.
 beforeAll(() => {
   server.listen({});
@@ -129,6 +136,20 @@ describe('ClearcutLogger', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  beforeEach(() => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+    vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('CODESPACES', '');
+    vi.stubEnv('VSCODE_IPC_HOOK_CLI', '');
+    vi.stubEnv('EDITOR_IN_CLOUD_SHELL', '');
+    vi.stubEnv('CLOUD_SHELL', '');
+    vi.stubEnv('TERM_PRODUCT', '');
+    vi.stubEnv('MONOSPACE_ENV', '');
+    vi.stubEnv('REPLIT_USER', '');
+    vi.stubEnv('__COG_BASHRC_SOURCED', '');
   });
 
   function setup({
@@ -1079,6 +1100,46 @@ describe('ClearcutLogger', () => {
       expect(events[0]).toHaveMetadataValue([
         EventMetadataKey.GEMINI_CLI_WEB_FETCH_FALLBACK_REASON,
         'private_ip',
+      ]);
+    });
+  });
+
+  describe('logHookCallEvent', () => {
+    it('logs an event with proper fields', () => {
+      const { logger } = setup();
+      const hookName = '/path/to/my/script.sh';
+
+      const event = new HookCallEvent(
+        'before-tool',
+        'command',
+        hookName,
+        {}, // input
+        150, // duration
+        true, // success
+        {}, // output
+        0, // exit code
+      );
+
+      logger?.logHookCallEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.HOOK_CALL);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_HOOK_EVENT_NAME,
+        'before-tool',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_HOOK_DURATION_MS,
+        '150',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_HOOK_SUCCESS,
+        'true',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_HOOK_EXIT_CODE,
+        '0',
       ]);
     });
   });

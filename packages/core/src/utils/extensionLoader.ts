@@ -111,6 +111,7 @@ export abstract class ExtensionLoader {
       // reload memory, this is somewhat expensive and also busts the context
       // cache, we want to only do it once.
       await refreshServerHierarchicalMemory(this.config);
+      await this.config.getHookSystem()?.initialize();
     }
   }
 
@@ -134,13 +135,12 @@ export abstract class ExtensionLoader {
    * then calls `startExtension` to include all extension features into the
    * program.
    */
-  protected maybeStartExtension(
+  protected async maybeStartExtension(
     extension: GeminiCLIExtension,
-  ): Promise<void> | undefined {
+  ): Promise<void> {
     if (this.config && this.config.getEnableExtensionReloading()) {
-      return this.startExtension(extension);
+      await this.startExtension(extension);
     }
-    return;
   }
 
   /**
@@ -192,13 +192,12 @@ export abstract class ExtensionLoader {
    * then this also performs all necessary steps to remove all extension
    * features from the rest of the system.
    */
-  protected maybeStopExtension(
+  protected async maybeStopExtension(
     extension: GeminiCLIExtension,
-  ): Promise<void> | undefined {
+  ): Promise<void> {
     if (this.config && this.config.getEnableExtensionReloading()) {
-      return this.stopExtension(extension);
+      await this.stopExtension(extension);
     }
-    return;
   }
 
   async restartExtension(extension: GeminiCLIExtension): Promise<void> {

@@ -19,6 +19,10 @@ import {
   serializeTerminalToObject,
   type AnsiOutput,
 } from '../utils/terminalSerializer.js';
+import {
+  sanitizeEnvironment,
+  type EnvironmentSanitizationConfig,
+} from './environmentSanitization.js';
 const { Terminal } = pkg;
 
 const SIGKILL_TIMEOUT_MS = 200;
@@ -80,6 +84,7 @@ export interface ShellExecutionConfig {
   showColor?: boolean;
   defaultFg?: string;
   defaultBg?: string;
+  sanitizationConfig: EnvironmentSanitizationConfig;
   // Used for testing
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
@@ -148,58 +153,6 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
   return lines.join('\n');
 };
 
-function getSanitizedEnv(): NodeJS.ProcessEnv {
-  const isRunningInGithub =
-    process.env['GITHUB_SHA'] || process.env['SURFACE'] === 'Github';
-
-  if (!isRunningInGithub) {
-    // For local runs, we want to preserve the user's full environment.
-    return { ...process.env };
-  }
-
-  // For CI runs (GitHub), we sanitize the environment for security.
-  const env: NodeJS.ProcessEnv = {};
-  const essentialVars = [
-    // Cross-platform
-    'PATH',
-    // Windows specific
-    'Path',
-    'SYSTEMROOT',
-    'SystemRoot',
-    'COMSPEC',
-    'ComSpec',
-    'PATHEXT',
-    'WINDIR',
-    'TEMP',
-    'TMP',
-    'USERPROFILE',
-    'SYSTEMDRIVE',
-    'SystemDrive',
-    // Unix/Linux/macOS specific
-    'HOME',
-    'LANG',
-    'SHELL',
-    'TMPDIR',
-    'USER',
-    'LOGNAME',
-  ];
-
-  for (const key of essentialVars) {
-    if (process.env[key] !== undefined) {
-      env[key] = process.env[key];
-    }
-  }
-
-  // Always carry over test-specific variables for our own integration tests.
-  for (const key in process.env) {
-    if (key.startsWith('GEMINI_CLI_TEST')) {
-      env[key] = process.env[key];
-    }
-  }
-
-  return env;
-}
-
 /**
  * A centralized service for executing shell commands with robust process
  * management, cross-platform compatibility, and streaming output capabilities.
@@ -249,6 +202,7 @@ export class ShellExecutionService {
       cwd,
       onOutputEvent,
       abortSignal,
+      shellExecutionConfig.sanitizationConfig,
     );
   }
 
@@ -287,6 +241,7 @@ export class ShellExecutionService {
     cwd: string,
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
+    sanitizationConfig: EnvironmentSanitizationConfig,
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
@@ -301,7 +256,7 @@ export class ShellExecutionService {
         shell: false,
         detached: !isWindows,
         env: {
-          ...getSanitizedEnv(),
+          ...sanitizeEnvironment(process.env, sanitizationConfig),
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: 'cat',
@@ -515,7 +470,10 @@ export class ShellExecutionService {
         cols,
         rows,
         env: {
-          ...getSanitizedEnv(),
+          ...sanitizeEnvironment(
+            process.env,
+            shellExecutionConfig.sanitizationConfig,
+          ),
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: shellExecutionConfig.pager ?? 'cat',
@@ -715,9 +673,7 @@ export class ShellExecutionService {
                 error,
                 aborted: abortSignal.aborted,
                 pid: ptyProcess.pid,
-                executionMethod:
-                  (ptyInfo?.name as 'node-pty' | 'lydell-node-pty') ??
-                  'node-pty',
+                executionMethod: ptyInfo?.name ?? 'node-pty',
               });
             };
 
