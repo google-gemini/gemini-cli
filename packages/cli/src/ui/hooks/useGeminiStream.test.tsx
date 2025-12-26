@@ -2706,4 +2706,233 @@ describe('useGeminiStream', () => {
       });
     });
   });
+
+  describe('HINTS', () => {
+    it('should drain queued messages as hints before sending tool responses', async () => {
+      const queuedHint = 'This is a hint';
+      const mockPopAllMessages = vi.fn().mockReturnValue(queuedHint);
+
+      const completedToolCall: TrackedToolCall = {
+        request: {
+          callId: 'call1',
+          name: 'test_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+        status: 'success',
+        responseSubmittedToGemini: false,
+        response: {
+          callId: 'call1',
+          responseParts: [{ text: 'tool response' }],
+        },
+        tool: {
+          displayName: 'Test Tool',
+        },
+        invocation: {
+          getDescription: () => 'Test Description',
+        },
+      } as any;
+
+      let capturedOnComplete: any;
+      mockUseReactToolScheduler.mockImplementation((onComplete: any) => {
+        capturedOnComplete = onComplete;
+        return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted, vi.fn()];
+      });
+
+      renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+          () => false,
+          mockPopAllMessages,
+        ),
+      );
+
+      // Trigger onComplete
+      await act(async () => {
+        if (capturedOnComplete) {
+          await capturedOnComplete([completedToolCall]);
+        }
+      });
+
+      // Verify hint was added to history
+      expect(mockAddItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.USER,
+          text: queuedHint,
+        },
+        expect.any(Number),
+      );
+
+      // Verify tool response was submitted
+      await waitFor(() => {
+        expect(mockSendMessageStream).toHaveBeenCalledWith(
+          [{ text: 'tool response' }],
+          expect.any(AbortSignal),
+          'prompt-1',
+        );
+      });
+    });
+
+    it('should not add hints if popAllMessages returns undefined', async () => {
+      const mockPopAllMessages = vi.fn().mockReturnValue(undefined);
+
+      const completedToolCall: TrackedToolCall = {
+        request: {
+          callId: 'call1',
+          name: 'test_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+        status: 'success',
+        responseSubmittedToGemini: false,
+        response: {
+          callId: 'call1',
+          responseParts: [{ text: 'tool response' }],
+        },
+        tool: {
+          displayName: 'Test Tool',
+        },
+        invocation: {
+          getDescription: () => 'Test Description',
+        },
+      } as any;
+
+      let capturedOnComplete: any;
+      mockUseReactToolScheduler.mockImplementation((onComplete: any) => {
+        capturedOnComplete = onComplete;
+        return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted, vi.fn()];
+      });
+
+      renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+          () => false,
+          mockPopAllMessages,
+        ),
+      );
+
+      await act(async () => {
+        if (capturedOnComplete) {
+          await capturedOnComplete([completedToolCall]);
+        }
+      });
+
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: MessageType.USER }),
+        expect.any(Number),
+      );
+
+      await waitFor(() => {
+        expect(mockSendMessageStream).toHaveBeenCalled();
+      });
+    });
+
+    it('should ignore hints that look like commands', async () => {
+      const commandHint = '/quit';
+      const mockPopAllMessages = vi.fn().mockReturnValue(commandHint);
+
+      const completedToolCall: TrackedToolCall = {
+        request: {
+          callId: 'call1',
+          name: 'test_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+        status: 'success',
+        responseSubmittedToGemini: false,
+        response: {
+          callId: 'call1',
+          responseParts: [{ text: 'tool response' }],
+        },
+        tool: {
+          displayName: 'Test Tool',
+        },
+        invocation: {
+          getDescription: () => 'Test Description',
+        },
+      } as any;
+
+      let capturedOnComplete: any;
+      mockUseReactToolScheduler.mockImplementation((onComplete: any) => {
+        capturedOnComplete = onComplete;
+        return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted, vi.fn()];
+      });
+
+      renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+          () => false,
+          mockPopAllMessages,
+        ),
+      );
+
+      await act(async () => {
+        if (capturedOnComplete) {
+          await capturedOnComplete([completedToolCall]);
+        }
+      });
+
+      // Verify hint was NOT added to history
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({ text: commandHint }),
+        expect.any(Number),
+      );
+
+      // Verify tool response was still submitted
+      await waitFor(() => {
+        expect(mockSendMessageStream).toHaveBeenCalled();
+      });
+    });
+  });
 });

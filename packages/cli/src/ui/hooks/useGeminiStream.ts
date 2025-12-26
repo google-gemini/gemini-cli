@@ -110,6 +110,7 @@ export const useGeminiStream = (
   terminalWidth: number,
   terminalHeight: number,
   isShellFocused?: boolean,
+  popAllMessages?: () => string | undefined, // For draining hints
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -1205,6 +1206,42 @@ export const useGeminiStream = (
 
       markToolsAsSubmitted(callIdsToMarkAsSubmitted);
 
+      // HINTS: Drain any queued messages as hints before sending tool responses
+      // Messages typed while the system is busy become hints that influence the current turn
+      if (popAllMessages) {
+        const queuedMessages = popAllMessages();
+        if (queuedMessages) {
+          // SANITIZATION: Only inject hints that are not commands
+          // Commands should not be injected as literal text mid-turn
+          const isCommand =
+            isSlashCommand(queuedMessages) || isAtCommand(queuedMessages);
+
+          if (!isCommand) {
+            // Add queued messages as user messages to history before tool responses
+            // This injects them mid-turn, allowing them to influence the model's next response
+            addItem(
+              {
+                type: MessageType.USER,
+                text: queuedMessages,
+              },
+              Date.now(),
+            );
+            try {
+              await geminiClient.addHistory({
+                role: 'user',
+                parts: [{ text: queuedMessages }],
+              });
+            } catch (error) {
+              debugLogger.error('Failed to add hint to history:', error);
+            }
+          } else {
+            onDebugMessage(
+              `Hint ignored because it looks like a command: ${queuedMessages}`,
+            );
+          }
+        }
+      }
+
       // Don't continue if model was switched due to quota error
       if (modelSwitchedFromQuotaError) {
         return;
@@ -1226,6 +1263,8 @@ export const useGeminiStream = (
       performMemoryRefresh,
       modelSwitchedFromQuotaError,
       addItem,
+      popAllMessages,
+      onDebugMessage,
     ],
   );
 
