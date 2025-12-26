@@ -53,7 +53,7 @@ the default way that the CLI executes tools that might have side effects.
   (using the standard installation described above), you can instruct it to run
   inside the sandbox container.
   ```bash
-  gemini --sandbox -y -p "your prompt here"
+  gemini --sandbox -y "your prompt here"
   ```
 
 ### 3. Run from source (recommended for Gemini CLI contributors)

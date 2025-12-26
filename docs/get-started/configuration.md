@@ -1238,20 +1238,21 @@ You can customize this behavior in your `settings.json` file:
 Arguments passed directly when running the CLI can override other configurations
 for that specific session.
 
-- **`--model <model_name>`** (**`-m <model_name>`**):
-  - Specifies the Gemini model to use for this session.
-  - Example: `npm start -- --model gemini-1.5-pro-latest`
-- **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
-  - Used to pass a prompt directly to the command. This invokes Gemini CLI in a
+- **`[query]`**:
+  - Positional argument. Used to pass a prompt directly to the command. This invokes Gemini CLI in a
     non-interactive mode.
   - For scripting examples, use the `--output-format json` flag to get
     structured output.
+  - Example: `gemini "Explain the architecture of this codebase"`
+- **`--model <model_name>`** (**`-m <model_name>`**):
+  - Specifies the Gemini model to use for this session.
+  - Example: `npm start -- --model gemini-1.5-pro-latest`
 - **`--prompt-interactive <your_prompt>`** (**`-i <your_prompt>`**):
   - Starts an interactive session with the provided prompt as the initial input.
   - The prompt is processed within the interactive session, not before it.
   - Cannot be used when piping input from stdin.
-  - Example: `gemini -i "explain this code"`
-- **`--output-format <format>`**:
+  - Example: `gemini -i "Explain the architecture of this codebase"`
+- **`--output-format <format>`** (**`-o <format>`**):
   - **Description:** Specifies the format of the CLI output for non-interactive
     mode.
   - **Values:**
@@ -1265,7 +1266,7 @@ for that specific session.
 - **`--debug`** (**`-d`**):
   - Enables debug mode for this session, providing more verbose output.
 
-- **`--help`** (or **`-h`**):
+- **`--help`** (**`-h`**):
   - Displays help information about command-line arguments.
 - **`--yolo`**:
   - Enables YOLO mode, which automatically approves all tool calls.
@@ -1275,7 +1276,7 @@ for that specific session.
     - `auto_edit`: Automatically approve edit tools (replace, write_file) while
       prompting for others
     - `yolo`: Automatically approve all tool calls (equivalent to `--yolo`)
-  - Cannot be used together with `--yolo`. Use `--approval-mode=yolo` instead of
+  - Cannot be used together with `--yolo`. Use `--approval-mode yolo` instead of
     `--yolo` for the new unified approach.
   - Example: `gemini --approval-mode auto_edit`
 - **`--allowed-tools <tool1,tool2,...>`**:
