@@ -60,6 +60,15 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
+const hoistedMockDebugLogger = vi.hoisted(() => ({
+  debug: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+vi.mock('../utils/debugLogger.js', () => ({
+  debugLogger: hoistedMockDebugLogger,
+}));
+
 describe('GitService', () => {
   let testRootDir: string;
   let projectRoot: string;
@@ -247,6 +256,21 @@ describe('GitService', () => {
       const service = new GitService(projectRoot, storage);
       await service.setupShadowGitRepository();
       expect(hoistedMockCommit).not.toHaveBeenCalled();
+    });
+
+    it('should handle checkIsRepo failure gracefully and initialize repo', async () => {
+      // Simulate checkIsRepo failing (e.g., on certain Git versions like macOS 2.39.5)
+      hoistedMockCheckIsRepo.mockRejectedValue(
+        new Error('git rev-parse --is-inside-work-tree failed'),
+      );
+      const service = new GitService(projectRoot, storage);
+      await service.setupShadowGitRepository();
+      // Should proceed to initialize the repo since checkIsRepo failed
+      expect(hoistedMockInit).toHaveBeenCalled();
+      // Should log the error using debugLogger
+      expect(hoistedMockDebugLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('checkIsRepo failed'),
+      );
     });
   });
 
