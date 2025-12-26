@@ -60,6 +60,15 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
+const hoistedMockDebugLogger = vi.hoisted(() => ({
+  debug: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+vi.mock('../utils/debugLogger.js', () => ({
+  debugLogger: hoistedMockDebugLogger,
+}));
+
 describe('GitService', () => {
   let testRootDir: string;
   let projectRoot: string;
@@ -258,6 +267,10 @@ describe('GitService', () => {
       await service.setupShadowGitRepository();
       // Should proceed to initialize the repo since checkIsRepo failed
       expect(hoistedMockInit).toHaveBeenCalled();
+      // Should log the error using debugLogger
+      expect(hoistedMockDebugLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('checkIsRepo failed'),
+      );
     });
   });
 
