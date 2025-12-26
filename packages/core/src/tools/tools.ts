@@ -417,7 +417,7 @@ export abstract class DeclarativeTool<
    * A convenience method that builds and executes the tool in one step.
    * Never throws.
    * @param params The raw, untrusted parameters from the model.
-   * @params abortSignal a signal to abort.
+   * @param abortSignal a signal to abort.
    * @returns The result of the tool execution.
    */
   async validateBuildAndExecute(
