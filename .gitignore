@@ -56,3 +56,5 @@ patch_output.log
 
 .genkit
 .gemini-clipboard/
+sea-config.json
+

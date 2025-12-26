@@ -232,8 +232,14 @@ describe('run_shell_command', () => {
   });
 
   it('should succeed with --yolo mode', async () => {
+    const isWindows = process.platform === 'win32';
     await rig.setup('should succeed with --yolo mode', {
-      settings: { tools: { core: ['run_shell_command'] } },
+      settings: {
+        tools: {
+          core: ['run_shell_command'],
+          shell: isWindows ? { enableInteractiveShell: false } : undefined,
+        },
+      },
     });
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
