@@ -19,6 +19,7 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
 } from '../config/models.js';
 import * as tomlLoader from './toml-loader.js';
+import { A2AClientManager } from './a2a-client-manager.js';
 
 vi.mock('./toml-loader.js', () => ({
   loadAgentsFromDirectory: vi
@@ -26,10 +27,16 @@ vi.mock('./toml-loader.js', () => ({
     .mockResolvedValue({ agents: [], errors: [] }),
 }));
 
+vi.mock('./a2a-client-manager.js', () => ({
+  A2AClientManager: {
+    getInstance: vi.fn(),
+  },
+}));
+
 // A test-only subclass to expose the protected `registerAgent` method.
 class TestableAgentRegistry extends AgentRegistry {
-  testRegisterAgent(definition: AgentDefinition): void {
-    this.registerAgent(definition);
+  async testRegisterAgent(definition: AgentDefinition): Promise<void> {
+    await this.registerAgent(definition);
   }
 }
 
@@ -92,7 +99,7 @@ describe('AgentRegistry', () => {
 
       const agentCount = debugRegistry.getAllDefinitions().length;
       expect(debugLogSpy).toHaveBeenCalledWith(
-        `[AgentRegistry] Initialized with ${agentCount} agents.`,
+        `[AgentRegistry] Initialized with ${agentCount} agents.`, 
       );
     });
 
@@ -237,8 +244,8 @@ describe('AgentRegistry', () => {
   });
 
   describe('registration logic', () => {
-    it('should register a valid agent definition', () => {
-      registry.testRegisterAgent(MOCK_AGENT_V1);
+    it('should register a valid agent definition', async () => {
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
       expect(registry.getDefinition('MockAgent')).toEqual(MOCK_AGENT_V1);
       expect(
         mockConfig.modelConfigService.getResolvedConfig({
@@ -257,24 +264,24 @@ describe('AgentRegistry', () => {
       });
     });
 
-    it('should handle special characters in agent names', () => {
+    it('should handle special characters in agent names', async () => {
       const specialAgent = {
         ...MOCK_AGENT_V1,
         name: 'Agent-123_$pecial.v2',
       };
-      registry.testRegisterAgent(specialAgent);
+      await registry.testRegisterAgent(specialAgent);
       expect(registry.getDefinition('Agent-123_$pecial.v2')).toEqual(
         specialAgent,
       );
     });
 
-    it('should reject an agent definition missing a name', () => {
+    it('should reject an agent definition missing a name', async () => {
       const invalidAgent = { ...MOCK_AGENT_V1, name: '' };
       const debugWarnSpy = vi
         .spyOn(debugLogger, 'warn')
         .mockImplementation(() => {});
 
-      registry.testRegisterAgent(invalidAgent);
+      await registry.testRegisterAgent(invalidAgent);
 
       expect(registry.getDefinition('MockAgent')).toBeUndefined();
       expect(debugWarnSpy).toHaveBeenCalledWith(
@@ -282,13 +289,13 @@ describe('AgentRegistry', () => {
       );
     });
 
-    it('should reject an agent definition missing a description', () => {
+    it('should reject an agent definition missing a description', async () => {
       const invalidAgent = { ...MOCK_AGENT_V1, description: '' };
       const debugWarnSpy = vi
         .spyOn(debugLogger, 'warn')
         .mockImplementation(() => {});
 
-      registry.testRegisterAgent(invalidAgent as AgentDefinition);
+      await registry.testRegisterAgent(invalidAgent as AgentDefinition);
 
       expect(registry.getDefinition('MockAgent')).toBeUndefined();
       expect(debugWarnSpy).toHaveBeenCalledWith(
@@ -296,44 +303,44 @@ describe('AgentRegistry', () => {
       );
     });
 
-    it('should overwrite an existing agent definition', () => {
-      registry.testRegisterAgent(MOCK_AGENT_V1);
+    it('should overwrite an existing agent definition', async () => {
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
       expect(registry.getDefinition('MockAgent')?.description).toBe(
         'Mock Description V1',
       );
 
-      registry.testRegisterAgent(MOCK_AGENT_V2);
+      await registry.testRegisterAgent(MOCK_AGENT_V2);
       expect(registry.getDefinition('MockAgent')?.description).toBe(
         'Mock Description V2 (Updated)',
       );
       expect(registry.getAllDefinitions()).toHaveLength(1);
     });
 
-    it('should log overwrites when in debug mode', () => {
+    it('should log overwrites when in debug mode', async () => {
       const debugConfig = makeFakeConfig({ debugMode: true });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
       const debugLogSpy = vi
         .spyOn(debugLogger, 'log')
         .mockImplementation(() => {});
 
-      debugRegistry.testRegisterAgent(MOCK_AGENT_V1);
-      debugRegistry.testRegisterAgent(MOCK_AGENT_V2);
+      await debugRegistry.testRegisterAgent(MOCK_AGENT_V1);
+      await debugRegistry.testRegisterAgent(MOCK_AGENT_V2);
 
       expect(debugLogSpy).toHaveBeenCalledWith(
-        `[AgentRegistry] Overriding agent 'MockAgent'`,
+        `[AgentRegistry] Overriding agent 'MockAgent'`, 
       );
     });
 
-    it('should not log overwrites when not in debug mode', () => {
+    it('should not log overwrites when not in debug mode', async () => {
       const debugLogSpy = vi
         .spyOn(debugLogger, 'log')
         .mockImplementation(() => {});
 
-      registry.testRegisterAgent(MOCK_AGENT_V1);
-      registry.testRegisterAgent(MOCK_AGENT_V2);
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+      await registry.testRegisterAgent(MOCK_AGENT_V2);
 
       expect(debugLogSpy).not.toHaveBeenCalledWith(
-        `[AgentRegistry] Overriding agent 'MockAgent'`,
+        `[AgentRegistry] Overriding agent 'MockAgent'`, 
       );
     });
 
@@ -350,10 +357,93 @@ describe('AgentRegistry', () => {
       await Promise.all(promises);
       expect(registry.getAllDefinitions()).toHaveLength(100);
     });
+
+    describe('remote agents', () => {
+      it('should load remote agent and update description from skills', async () => {
+        const mockAgentCard = {
+          skills: [
+            { name: 'Skill1', description: 'Description1' },
+            { name: 'Skill2', description: 'Description2' },
+          ],
+        };
+        const mockClientManager = {
+          loadAgent: vi.fn().mockResolvedValue(mockAgentCard),
+        };
+
+        vi.mocked(A2AClientManager.getInstance).mockReturnValue(
+          mockClientManager as any,
+        );
+
+        const remoteAgent: AgentDefinition = {
+          kind: 'remote',
+          name: 'RemoteAgent',
+          description: 'Original Description',
+          agentCardUrl: 'http://example.com/card',
+        };
+
+        await registry.testRegisterAgent(remoteAgent);
+
+        expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
+          'RemoteAgent',
+          'http://example.com/card',
+        );
+        expect(registry.getDefinition('RemoteAgent')?.description).toBe(
+          'Skill1: Description1\nSkill2: Description2',
+        );
+      });
+
+      it('should keep original description if remote agent has no skills', async () => {
+        const mockAgentCard = { skills: [] };
+        const mockClientManager = {
+          loadAgent: vi.fn().mockResolvedValue(mockAgentCard),
+        };
+
+        vi.mocked(A2AClientManager.getInstance).mockReturnValue(
+          mockClientManager as any,
+        );
+
+        const remoteAgent: AgentDefinition = {
+          kind: 'remote',
+          name: 'RemoteAgent',
+          description: 'Original Description',
+          agentCardUrl: 'http://example.com/card',
+        };
+
+        await registry.testRegisterAgent(remoteAgent);
+
+        expect(registry.getDefinition('RemoteAgent')?.description).toBe(
+          'Original Description',
+        );
+      });
+
+      it('should not fail registration if loading remote agent fails', async () => {
+        const mockClientManager = {
+          loadAgent: vi.fn().mockRejectedValue(new Error('Network error')),
+        };
+
+        vi.mocked(A2AClientManager.getInstance).mockReturnValue(
+          mockClientManager as any,
+        );
+
+        const remoteAgent: AgentDefinition = {
+          kind: 'remote',
+          name: 'RemoteAgent',
+          description: 'Original Description',
+          agentCardUrl: 'http://example.com/card',
+        };
+
+        await registry.testRegisterAgent(remoteAgent);
+
+        expect(registry.getDefinition('RemoteAgent')).toBeDefined();
+        expect(registry.getDefinition('RemoteAgent')?.description).toBe(
+          'Original Description',
+        );
+      });
+    });
   });
 
   describe('inheritance and refresh', () => {
-    it('should resolve "inherit" to the current model from configuration', () => {
+    it('should resolve "inherit" to the current model from configuration', async () => {
       const config = makeFakeConfig({ model: 'current-model' });
       const registry = new TestableAgentRegistry(config);
 
@@ -381,7 +471,7 @@ describe('AgentRegistry', () => {
         modelConfig: { ...MOCK_AGENT_V1.modelConfig, model: 'inherit' },
       };
 
-      registry.testRegisterAgent(agent);
+      await registry.testRegisterAgent(agent);
 
       // Verify initial state
       let resolved = config.modelConfigService.getResolvedConfig({
@@ -396,10 +486,12 @@ describe('AgentRegistry', () => {
       });
 
       // Verify refreshed state
-      resolved = config.modelConfigService.getResolvedConfig({
-        model: getModelConfigAlias(agent),
+      await vi.waitFor(() => {
+        resolved = config.modelConfigService.getResolvedConfig({
+          model: getModelConfigAlias(agent),
+        });
+        expect(resolved.model).toBe('new-model');
       });
-      expect(resolved.model).toBe('new-model');
     });
   });
 
@@ -409,9 +501,9 @@ describe('AgentRegistry', () => {
       name: 'AnotherAgent',
     };
 
-    beforeEach(() => {
-      registry.testRegisterAgent(MOCK_AGENT_V1);
-      registry.testRegisterAgent(ANOTHER_AGENT);
+    beforeEach(async () => {
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+      await registry.testRegisterAgent(ANOTHER_AGENT);
     });
 
     it('getDefinition should return the correct definition', () => {
@@ -438,9 +530,9 @@ describe('AgentRegistry', () => {
       );
     });
 
-    it('should return formatted list of agents when agents are available', () => {
-      registry.testRegisterAgent(MOCK_AGENT_V1);
-      registry.testRegisterAgent({
+    it('should return formatted list of agents when agents are available', async () => {
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+      await registry.testRegisterAgent({
         ...MOCK_AGENT_V2,
         name: 'AnotherAgent',
         description: 'Another agent description',
