@@ -50,12 +50,20 @@ export class ResourceRegistry {
    */
   findResourceByUri(identifier: string): MCPResource | undefined {
     const colonIndex = identifier.indexOf(':');
-    if (colonIndex <= 0) {
-      return undefined;
+    if (colonIndex > 0) {
+      const server = identifier.slice(0, colonIndex);
+      const uri = identifier.slice(colonIndex + 1);
+      const prefixedResource = this.resources.get(resourceKey(server, uri));
+      if (prefixedResource) {
+        return prefixedResource;
+      }
     }
-    const serverName = identifier.substring(0, colonIndex);
-    const uri = identifier.substring(colonIndex + 1);
-    return this.resources.get(resourceKey(serverName, uri));
+
+    // Allow bare URIs if they uniquely match a single resource across servers.
+    const matches = Array.from(this.resources.values()).filter(
+      (resource) => resource.uri === identifier,
+    );
+    return matches.length === 1 ? matches[0] : undefined;
   }
 
   removeResourcesByServer(serverName: string): void {
