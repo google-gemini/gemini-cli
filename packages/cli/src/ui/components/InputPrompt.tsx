@@ -432,9 +432,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       const logicalPos = isPastEndOfLine
         ? null
         : buffer.getLogicalPositionFromVisual(
-          buffer.visualScrollRow + relY,
-          relX,
-        );
+            buffer.visualScrollRow + relY,
+            relX,
+          );
 
       // Check for paste placeholder (collapsed state)
       if (logicalPos) {
@@ -521,7 +521,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      // Prompt stashing - Ctrl+Z to stash current input
+      // Prompt stashing - Ctrl+Q to stash/pop (toggle)
       if (keyMatchers[Command.STASH_PROMPT](key)) {
         if (buffer.text.trim()) {
           if (promptStash.stash(buffer.text)) {
@@ -532,7 +532,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Pop stash - Ctrl+Y to restore stashed input
+      // Pop stash - Ctrl+Q to restore stashed input (same key toggles)
       if (keyMatchers[Command.POP_STASH](key)) {
         const stashed = promptStash.pop();
         if (stashed) {
@@ -542,6 +542,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           if (currentText) {
             // Re-stash the current input so user can swap back
             promptStash.stash(currentText);
+            // Notify user that content was swapped
+            setQueueErrorMessage(
+              '📌 Swapped with stash (press again to swap back)',
+            );
           }
           resetCompletionState();
         }
@@ -1008,6 +1012,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       setEmbeddedShellFocused,
       history,
       promptStash,
+      setQueueErrorMessage,
     ],
   );
 
@@ -1198,8 +1203,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           completion.completionMode === CompletionMode.AT
             ? 'reverse'
             : buffer.text.startsWith('/') &&
-              !reverseSearchActive &&
-              !commandSearchActive
+                !reverseSearchActive &&
+                !commandSearchActive
               ? 'slash'
               : 'reverse'
         }
@@ -1367,8 +1372,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
                     const color =
                       seg.type === 'command' ||
-                        seg.type === 'file' ||
-                        seg.type === 'paste'
+                      seg.type === 'file' ||
+                      seg.type === 'paste'
                         ? theme.text.accent
                         : theme.text.primary;
 
@@ -1439,24 +1444,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 )
             )}
           </Box>
-        </Box >
-      </HalfLinePaddedBox >
-      {
-        useLineFallback ? (
-          <Box
-            borderStyle="round"
-            borderTop={false}
-            borderBottom={true}
-            borderLeft={false}
-            borderRight={false}
-            borderColor={borderColor}
-            width={terminalWidth}
-            flexDirection="row"
-            alignItems="flex-start"
-            height={0}
-          />
-        ) : null
-      }
+        </Box>
+      </HalfLinePaddedBox>
+      {useLineFallback ? (
+        <Box
+          borderStyle="round"
+          borderTop={false}
+          borderBottom={true}
+          borderLeft={false}
+          borderRight={false}
+          borderColor={borderColor}
+          width={terminalWidth}
+          flexDirection="row"
+          alignItems="flex-start"
+          height={0}
+        />
+      ) : null}
       {suggestionsPosition === 'below' && suggestionsNode}
     </>
   );
