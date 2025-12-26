@@ -532,6 +532,13 @@ export function getMCPDiscoveryState(): MCPDiscoveryState {
 }
 
 /**
+ * Set the current MCP discovery state
+ */
+export function setMCPDiscoveryState(state: MCPDiscoveryState): void {
+  mcpDiscoveryState = state;
+}
+
+/**
  * Extract WWW-Authenticate header from error message string.
  * This is a more robust approach than regex matching.
  *

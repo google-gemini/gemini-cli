@@ -14,6 +14,7 @@ import {
   McpClient,
   MCPDiscoveryState,
   populateMcpServerCommand,
+  setMCPDiscoveryState,
 } from './mcp-client.js';
 import { getErrorMessage, isAuthenticationError } from '../utils/errors.js';
 import type { EventEmitter } from 'node:events';
@@ -230,6 +231,7 @@ export class McpClientManager {
       );
     } else {
       this.discoveryState = MCPDiscoveryState.IN_PROGRESS;
+      setMCPDiscoveryState(MCPDiscoveryState.IN_PROGRESS);
       this.discoveryPromise = currentDiscoveryPromise;
     }
     this.eventEmitter?.emit('mcp-client-update', this.clients);
@@ -241,6 +243,7 @@ export class McpClientManager {
       if (currentPromise === this.discoveryPromise) {
         this.discoveryPromise = undefined;
         this.discoveryState = MCPDiscoveryState.COMPLETED;
+        setMCPDiscoveryState(MCPDiscoveryState.COMPLETED);
       }
     });
     return currentPromise;
