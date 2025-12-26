@@ -83,6 +83,11 @@ const shellExecutionConfig: ShellExecutionConfig = {
   pager: 'cat',
   showColor: false,
   disableDynamicLineTrimming: true,
+  sanitizationConfig: {
+    enableEnvironmentVariableRedaction: true,
+    allowedEnvironmentVariables: [],
+    blockedEnvironmentVariables: [],
+  },
 };
 
 const createMockSerializeTerminalToObjectReturnValue = (
@@ -551,7 +556,13 @@ describe('ShellExecutionService', () => {
         onOutputEventMock,
         new AbortController().signal,
         true,
-        {},
+        {
+          sanitizationConfig: {
+            enableEnvironmentVariableRedaction: true,
+            allowedEnvironmentVariables: [],
+            blockedEnvironmentVariables: [],
+          },
+        },
       );
       const result = await handle.result;
 
@@ -1070,7 +1081,13 @@ describe('ShellExecutionService child_process fallback', () => {
         onOutputEventMock,
         abortController.signal,
         true,
-        {},
+        {
+          sanitizationConfig: {
+            enableEnvironmentVariableRedaction: true,
+            allowedEnvironmentVariables: [],
+            blockedEnvironmentVariables: [],
+          },
+        },
       );
 
       abortController.abort();
@@ -1258,7 +1275,13 @@ describe('ShellExecutionService execution method selection', () => {
       onOutputEventMock,
       abortController.signal,
       false, // shouldUseNodePty
-      {},
+      {
+        sanitizationConfig: {
+          enableEnvironmentVariableRedaction: true,
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+        },
+      },
     );
 
     // Simulate exit to allow promise to resolve
