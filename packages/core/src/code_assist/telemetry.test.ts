@@ -30,7 +30,7 @@ import {
   type AnyToolInvocation,
 } from '../tools/tools.js';
 import type { Config } from '../config/config.js';
-import type { ToolCallResponseInfo } from '../core/turn.js';
+import type { ToolCallResponseInfo } from '../scheduler/types.js';
 
 function createMockResponse(
   candidates: GenerateContentResponse['candidates'] = [],

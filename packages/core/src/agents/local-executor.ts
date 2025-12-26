@@ -17,7 +17,8 @@ import type {
 } from '@google/genai';
 import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { type ToolCallRequestInfo, CompressionStatus } from '../core/turn.js';
+import { CompressionStatus } from '../core/turn.js';
+import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { promptIdContext } from '../utils/promptIdContext.js';

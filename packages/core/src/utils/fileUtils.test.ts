@@ -32,6 +32,7 @@ import {
   readFileWithEncoding,
   fileExists,
   readWasmBinaryFromDisk,
+  saveTruncatedContent,
 } from './fileUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 
@@ -1020,6 +1021,215 @@ describe('fileUtils', () => {
       } finally {
         statSpy.mockRestore();
       }
+    });
+  });
+
+  describe('saveTruncatedContent', () => {
+    const THRESHOLD = 40_000;
+    const TRUNCATE_LINES = 1000;
+
+    it('should return content unchanged if below threshold', async () => {
+      const content = 'Short content';
+      const callId = 'test-call-id';
+
+      const result = await saveTruncatedContent(
+        content,
+        callId,
+        tempRootDir,
+        THRESHOLD,
+        TRUNCATE_LINES,
+      );
+
+      expect(result).toEqual({ content });
+      const outputFile = path.join(tempRootDir, `${callId}.output`);
+      expect(await fileExists(outputFile)).toBe(false);
+    });
+
+    it('should truncate content by lines when content has many lines', async () => {
+      // Create content that exceeds 100,000 character threshold with many lines
+      const lines = Array(2000).fill('x'.repeat(100));
+      const content = lines.join('\n');
+      const callId = 'test-call-id';
+
+      const result = await saveTruncatedContent(
+        content,
+        callId,
+        tempRootDir,
+        THRESHOLD,
+        TRUNCATE_LINES,
+      );
+
+      const expectedOutputFile = path.join(tempRootDir, `${callId}.output`);
+      expect(result.outputFile).toBe(expectedOutputFile);
+
+      const savedContent = await fsPromises.readFile(
+        expectedOutputFile,
+        'utf-8',
+      );
+      expect(savedContent).toBe(content);
+
+      // Should contain the first and last lines with 1/5 head and 4/5 tail
+      const head = Math.floor(TRUNCATE_LINES / 5);
+      const beginning = lines.slice(0, head);
+      const end = lines.slice(-(TRUNCATE_LINES - head));
+      const expectedTruncated =
+        beginning.join('\n') +
+        '\n... [CONTENT TRUNCATED] ...\n' +
+        end.join('\n');
+
+      expect(result.content).toContain(
+        'Tool output was too large and has been truncated',
+      );
+      expect(result.content).toContain('Truncated part of the output:');
+      expect(result.content).toContain(expectedTruncated);
+    });
+
+    it('should wrap and truncate content when content has few but long lines', async () => {
+      const content = 'a'.repeat(200_000); // A single very long line
+      const callId = 'test-call-id';
+      const wrapWidth = 120;
+
+      // Manually wrap the content to generate the expected file content
+      const wrappedLines: string[] = [];
+      for (let i = 0; i < content.length; i += wrapWidth) {
+        wrappedLines.push(content.substring(i, i + wrapWidth));
+      }
+      const expectedFileContent = wrappedLines.join('\n');
+
+      const result = await saveTruncatedContent(
+        content,
+        callId,
+        tempRootDir,
+        THRESHOLD,
+        TRUNCATE_LINES,
+      );
+
+      const expectedOutputFile = path.join(tempRootDir, `${callId}.output`);
+      expect(result.outputFile).toBe(expectedOutputFile);
+
+      const savedContent = await fsPromises.readFile(
+        expectedOutputFile,
+        'utf-8',
+      );
+      expect(savedContent).toBe(expectedFileContent);
+
+      // Should contain the first and last lines with 1/5 head and 4/5 tail of the wrapped content
+      const head = Math.floor(TRUNCATE_LINES / 5);
+      const beginning = wrappedLines.slice(0, head);
+      const end = wrappedLines.slice(-(TRUNCATE_LINES - head));
+      const expectedTruncated =
+        beginning.join('\n') +
+        '\n... [CONTENT TRUNCATED] ...\n' +
+        end.join('\n');
+      expect(result.content).toContain(
+        'Tool output was too large and has been truncated',
+      );
+      expect(result.content).toContain('Truncated part of the output:');
+      expect(result.content).toContain(expectedTruncated);
+    });
+
+    it('should save to correct file path with call ID', async () => {
+      const content = 'a'.repeat(200_000);
+      const callId = 'unique-call-123';
+      const wrapWidth = 120;
+
+      // Manually wrap the content to generate the expected file content
+      const wrappedLines: string[] = [];
+      for (let i = 0; i < content.length; i += wrapWidth) {
+        wrappedLines.push(content.substring(i, i + wrapWidth));
+      }
+      const expectedFileContent = wrappedLines.join('\n');
+
+      const result = await saveTruncatedContent(
+        content,
+        callId,
+        tempRootDir,
+        THRESHOLD,
+        TRUNCATE_LINES,
+      );
+
+      const expectedPath = path.join(tempRootDir, `${callId}.output`);
+      expect(result.outputFile).toBe(expectedPath);
+
+      const savedContent = await fsPromises.readFile(expectedPath, 'utf-8');
+      expect(savedContent).toBe(expectedFileContent);
+    });
+
+    it('should include helpful instructions in truncated message', async () => {
+      const content = 'a'.repeat(200_000);
+      const callId = 'test-call-id';
+
+      const result = await saveTruncatedContent(
+        content,
+        callId,
+        tempRootDir,
+        THRESHOLD,
+        TRUNCATE_LINES,
+      );
+
+      expect(result.content).toContain(
+        'read_file tool with the absolute file path above',
+      );
+      expect(result.content).toContain(
+        'read_file tool with offset=0, limit=100',
+      );
+      expect(result.content).toContain(
+        'read_file tool with offset=N to skip N lines',
+      );
+      expect(result.content).toContain(
+        'read_file tool with limit=M to read only M lines',
+      );
+    });
+
+    it('should sanitize callId to prevent path traversal', async () => {
+      const content = 'a'.repeat(200_000);
+      const callId = '../../../../../etc/passwd';
+      const wrapWidth = 120;
+
+      // Manually wrap the content to generate the expected file content
+      const wrappedLines: string[] = [];
+      for (let i = 0; i < content.length; i += wrapWidth) {
+        wrappedLines.push(content.substring(i, i + wrapWidth));
+      }
+      const expectedFileContent = wrappedLines.join('\n');
+
+      await saveTruncatedContent(
+        content,
+        callId,
+        tempRootDir,
+        THRESHOLD,
+        TRUNCATE_LINES,
+      );
+
+      const expectedPath = path.join(tempRootDir, 'passwd.output');
+
+      const savedContent = await fsPromises.readFile(expectedPath, 'utf-8');
+      expect(savedContent).toBe(expectedFileContent);
+    });
+
+    it('should handle file write errors gracefully', async () => {
+      const content = 'a'.repeat(50_000);
+      const callId = 'test-call-id-fail';
+
+      const writeFileSpy = vi
+        .spyOn(fsPromises, 'writeFile')
+        .mockRejectedValue(new Error('File write failed'));
+
+      const result = await saveTruncatedContent(
+        content,
+        callId,
+        tempRootDir,
+        THRESHOLD,
+        TRUNCATE_LINES,
+      );
+
+      expect(result.outputFile).toBeUndefined();
+      expect(result.content).toContain(
+        '[Note: Could not save full output to file]',
+      );
+      expect(writeFileSpy).toHaveBeenCalled();
+
+      writeFileSpy.mockRestore();
     });
   });
 });
