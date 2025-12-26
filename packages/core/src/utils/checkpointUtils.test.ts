@@ -16,7 +16,7 @@ import {
 } from './checkpointUtils.js';
 import type { GitService } from '../services/gitService.js';
 import type { GeminiClient } from '../core/client.js';
-import type { ToolCallRequestInfo } from '../core/turn.js';
+import type { ToolCallRequestInfo } from '../scheduler/types.js';
 
 describe('checkpoint utils', () => {
   describe('getToolCallDataSchema', () => {
