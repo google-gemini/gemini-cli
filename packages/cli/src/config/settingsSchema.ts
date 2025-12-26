@@ -1385,6 +1385,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Just-In-Time (JIT) context loading.',
         showInDialog: false,
       },
+      enableRealTimeHints: {
+        type: 'boolean',
+        label: 'Enable Real-Time Hints',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Allows providing guidance to the model mid-execution without interrupting the tool chain.',
+        showInDialog: true,
+      },
       codebaseInvestigatorSettings: {
         type: 'object',
         label: 'Codebase Investigator Settings',

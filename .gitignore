@@ -56,3 +56,6 @@ patch_output.log
 
 .genkit
 .gemini-clipboard/
+
+# CodeRhapsody internal files
+cr/

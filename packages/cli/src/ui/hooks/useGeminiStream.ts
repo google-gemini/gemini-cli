@@ -1208,7 +1208,7 @@ export const useGeminiStream = (
 
       // HINTS: Drain any queued messages as hints before sending tool responses
       // Messages typed while the system is busy become hints that influence the current turn
-      if (popAllMessages) {
+      if (config.isRealTimeHintsEnabled() && popAllMessages) {
         const queuedMessages = popAllMessages();
         if (queuedMessages) {
           // SANITIZATION: Only inject hints that are not commands
@@ -1265,6 +1265,7 @@ export const useGeminiStream = (
       addItem,
       popAllMessages,
       onDebugMessage,
+      config,
     ],
   );
 
