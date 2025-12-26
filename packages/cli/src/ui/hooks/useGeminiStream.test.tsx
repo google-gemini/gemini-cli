@@ -97,6 +97,20 @@ vi.mock('./useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
+const mockStdoutWrite = vi.fn(() => true);
+const mockStdout = {
+  write: mockStdoutWrite,
+  isTTY: true,
+} as unknown as NodeJS.WriteStream;
+
+vi.mock('ink', async (importOriginal) => {
+  const actualInk = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actualInk,
+    useStdout: () => ({ stdout: mockStdout }),
+  };
+});
+
 vi.mock('./shellCommandProcessor.js', () => ({
   useShellCommandProcessor: vi.fn().mockReturnValue({
     handleShellCommand: vi.fn(),
@@ -2704,6 +2718,288 @@ describe('useGeminiStream', () => {
       await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
       });
+    });
+  });
+
+  describe('Terminal Bell', () => {
+    beforeEach(() => {
+      mockStdoutWrite.mockClear();
+      // Ensure isTTY is true for these tests
+      (mockStdout as { isTTY: boolean }).isTTY = true;
+    });
+
+    it('should play terminal bell when waiting for tool approval and setting is enabled', () => {
+      const settingsWithBell: LoadedSettings = {
+        ...mockLoadedSettings,
+        merged: { ...mockLoadedSettings.merged, general: { terminalBell: true } },
+      } as LoadedSettings;
+
+      const toolCalls: TrackedToolCall[] = [
+        {
+          request: {
+            callId: 'call1',
+            name: 'replace',
+            args: {},
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'awaiting_approval',
+          responseSubmittedToGemini: false,
+          tool: {
+            name: 'replace',
+            displayName: 'replace',
+            description: 'desc',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+          startTime: Date.now(),
+          confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
+            onConfirm: vi.fn(),
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
+          },
+        } as TrackedWaitingToolCall,
+      ];
+
+      mockUseReactToolScheduler.mockReturnValue([
+        toolCalls,
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+      ]);
+
+      renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          settingsWithBell,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          vi.fn(),
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      expect(mockStdoutWrite).toHaveBeenCalledWith('\x07');
+    });
+
+    it('should not play terminal bell when setting is disabled', () => {
+      const settingsWithoutBell: LoadedSettings = {
+        ...mockLoadedSettings,
+        merged: { ...mockLoadedSettings.merged, general: { terminalBell: false } },
+      } as LoadedSettings;
+
+      const toolCalls: TrackedToolCall[] = [
+        {
+          request: {
+            callId: 'call1',
+            name: 'replace',
+            args: {},
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'awaiting_approval',
+          responseSubmittedToGemini: false,
+          tool: {
+            name: 'replace',
+            displayName: 'replace',
+            description: 'desc',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+          startTime: Date.now(),
+          confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
+            onConfirm: vi.fn(),
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
+          },
+        } as TrackedWaitingToolCall,
+      ];
+
+      mockUseReactToolScheduler.mockReturnValue([
+        toolCalls,
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+      ]);
+
+      renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          settingsWithoutBell,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          vi.fn(),
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      expect(mockStdoutWrite).not.toHaveBeenCalledWith('\x07');
+    });
+
+    it('should not play terminal bell when not in a TTY', () => {
+      (mockStdout as { isTTY: boolean }).isTTY = false;
+
+      const settingsWithBell: LoadedSettings = {
+        ...mockLoadedSettings,
+        merged: { ...mockLoadedSettings.merged, general: { terminalBell: true } },
+      } as LoadedSettings;
+
+      const toolCalls: TrackedToolCall[] = [
+        {
+          request: {
+            callId: 'call1',
+            name: 'replace',
+            args: {},
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'awaiting_approval',
+          responseSubmittedToGemini: false,
+          tool: {
+            name: 'replace',
+            displayName: 'replace',
+            description: 'desc',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+          startTime: Date.now(),
+          confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
+            onConfirm: vi.fn(),
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
+          },
+        } as TrackedWaitingToolCall,
+      ];
+
+      mockUseReactToolScheduler.mockReturnValue([
+        toolCalls,
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+      ]);
+
+      renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          settingsWithBell,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          vi.fn(),
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      expect(mockStdoutWrite).not.toHaveBeenCalledWith('\x07');
+    });
+
+    it('should play terminal bell when response completes and setting is enabled', async () => {
+      const settingsWithBell: LoadedSettings = {
+        ...mockLoadedSettings,
+        merged: { ...mockLoadedSettings.merged, general: { terminalBell: true } },
+      } as LoadedSettings;
+
+      // Mock a stream that yields content and completes
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Test response',
+          };
+        })(),
+      );
+
+      mockUseReactToolScheduler.mockReturnValue([
+        [],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+      ]);
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          settingsWithBell,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          vi.fn(),
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      expect(mockStdoutWrite).toHaveBeenCalledWith('\x07');
     });
   });
 });
