@@ -7,12 +7,14 @@
 import type {
   ToolCallRequestInfo,
   ToolCallResponseInfo,
-  ToolCallConfirmationDetails,
+} from '../core/turn.js';
+import type {
   AnyDeclarativeTool,
   AnyToolInvocation,
-  AnsiOutput,
+  ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
-} from '../index.js';
+} from '../tools/tools.js';
+import type { AnsiOutput } from '../utils/terminalSerializer.js';
 
 export type ValidatingToolCall = {
   status: 'validating';

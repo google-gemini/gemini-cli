@@ -4,29 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
-  ToolCallConfirmationDetails,
-  ToolResult,
-  ToolResultDisplay,
-  EditorType,
-  Config,
-  ToolConfirmationPayload,
-  AnyDeclarativeTool,
-  AnyToolInvocation,
-  AnsiOutput,
-} from '../index.js';
 import {
+  type ToolResult,
+  type ToolResultDisplay,
+  type AnyDeclarativeTool,
+  type AnyToolInvocation,
+  type ToolCallConfirmationDetails,
+  type ToolConfirmationPayload,
   ToolConfirmationOutcome,
-  ApprovalMode,
-  logToolCall,
-  ToolErrorType,
-  ToolCallEvent,
-  logToolOutputTruncated,
-  ToolOutputTruncatedEvent,
-  runInDevTraceSpan,
-} from '../index.js';
+} from '../tools/tools.js';
+import type { ToolCallRequestInfo, ToolCallResponseInfo } from './turn.js';
+import type { EditorType } from '../utils/editor.js';
+import type { Config } from '../config/config.js';
+import type { AnsiOutput } from '../utils/terminalSerializer.js';
+import { ApprovalMode } from '../policy/types.js';
+import { logToolCall, logToolOutputTruncated } from '../telemetry/loggers.js';
+import { ToolErrorType } from '../tools/tool-error.js';
+import { ToolCallEvent, ToolOutputTruncatedEvent } from '../telemetry/types.js';
+import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import type { ModifyContext } from '../tools/modifiable-tool.js';
 import {

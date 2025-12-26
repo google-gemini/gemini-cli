@@ -1206,5 +1206,30 @@ describe('fileUtils', () => {
       const savedContent = await fsPromises.readFile(expectedPath, 'utf-8');
       expect(savedContent).toBe(expectedFileContent);
     });
+
+    it('should handle file write errors gracefully', async () => {
+      const content = 'a'.repeat(50_000);
+      const callId = 'test-call-id-fail';
+
+      const writeFileSpy = vi
+        .spyOn(fsPromises, 'writeFile')
+        .mockRejectedValue(new Error('File write failed'));
+
+      const result = await saveTruncatedContent(
+        content,
+        callId,
+        tempRootDir,
+        THRESHOLD,
+        TRUNCATE_LINES,
+      );
+
+      expect(result.outputFile).toBeUndefined();
+      expect(result.content).toContain(
+        '[Note: Could not save full output to file]',
+      );
+      expect(writeFileSpy).toHaveBeenCalled();
+
+      writeFileSpy.mockRestore();
+    });
   });
 });
