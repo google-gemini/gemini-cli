@@ -98,7 +98,7 @@ export function HookReview({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text bold color={theme.text.primary}>
-          Step 5: Review Configuration
+          Step 4: Review Configuration
         </Text>
       </Box>
 
