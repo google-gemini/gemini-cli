@@ -20,6 +20,19 @@ import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
 import type { ModelPolicy } from '../availability/modelPolicy.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
+import { coreEvents, CoreEvent } from './events.js';
+
+vi.mock('./events.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./events.js')>();
+  return {
+    ...actual,
+    coreEvents: {
+      emit: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+    },
+  };
+});
 
 // Helper to create a mock function that fails a certain number of times
 const createFailingFunction = (
@@ -101,33 +114,33 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
-  it('should default to 3 maxAttempts if no options are provided', async () => {
-    // This function will fail more than 3 times to ensure all retries are used.
-    const mockFn = createFailingFunction(10);
+  it('should default to 10 maxAttempts if no options are provided', async () => {
+    // This function will fail more than 10 times to ensure all retries are used.
+    const mockFn = createFailingFunction(20);
 
     const promise = retryWithBackoff(mockFn);
 
     await Promise.all([
-      expect(promise).rejects.toThrow('Simulated error attempt 3'),
+      expect(promise).rejects.toThrow('Simulated error attempt 10'),
       vi.runAllTimersAsync(),
     ]);
 
-    expect(mockFn).toHaveBeenCalledTimes(3);
+    expect(mockFn).toHaveBeenCalledTimes(10);
   });
 
-  it('should default to 3 maxAttempts if options.maxAttempts is undefined', async () => {
-    // This function will fail more than 3 times to ensure all retries are used.
-    const mockFn = createFailingFunction(10);
+  it('should default to 10 maxAttempts if options.maxAttempts is undefined', async () => {
+    // This function will fail more than 10 times to ensure all retries are used.
+    const mockFn = createFailingFunction(20);
 
     const promise = retryWithBackoff(mockFn, { maxAttempts: undefined });
 
-    // Expect it to fail with the error from the 5th attempt.
+    // Expect it to fail with the error from the 10th attempt.
     await Promise.all([
-      expect(promise).rejects.toThrow('Simulated error attempt 3'),
+      expect(promise).rejects.toThrow('Simulated error attempt 10'),
       vi.runAllTimersAsync(),
     ]);
 
-    expect(mockFn).toHaveBeenCalledTimes(3);
+    expect(mockFn).toHaveBeenCalledTimes(10);
   });
 
   it('should not retry if shouldRetry returns false', async () => {
@@ -305,6 +318,69 @@ describe('retryWithBackoff', () => {
     [...firstDelaySet, ...secondDelaySet].forEach((d) => {
       expect(d).toBeGreaterThanOrEqual(100 * 0.7);
       expect(d).toBeLessThanOrEqual(100 * 1.3);
+    });
+  });
+
+  describe('Retry event emission', () => {
+    it('should emit CoreEvent.Retry and call onRetry on each failed attempt', async () => {
+      const mockFn = createFailingFunction(2);
+      const onRetry = vi.fn();
+      const promise = retryWithBackoff(mockFn, {
+        maxAttempts: 3,
+        initialDelayMs: 10,
+        onRetry,
+      });
+
+      await vi.runAllTimersAsync();
+      await promise;
+
+      expect(onRetry).toHaveBeenCalledTimes(2);
+      expect(onRetry).toHaveBeenCalledWith(1, expect.any(Error), 500);
+      expect(onRetry).toHaveBeenCalledWith(2, expect.any(Error), 500);
+
+      expect(coreEvents.emit).toHaveBeenCalledWith(
+        CoreEvent.Retry,
+        expect.objectContaining({
+          attempt: 1,
+          errorStatus: 500,
+        }),
+      );
+      expect(coreEvents.emit).toHaveBeenCalledWith(
+        CoreEvent.Retry,
+        expect.objectContaining({
+          attempt: 2,
+          errorStatus: 500,
+        }),
+      );
+    });
+
+    it('should emit CoreEvent.Retry for RetryableQuotaError', async () => {
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(
+          new RetryableQuotaError(
+            'Per-minute limit',
+            { code: 429, message: 'quota', details: [] },
+            0.1,
+          ),
+        )
+        .mockResolvedValueOnce('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        maxAttempts: 2,
+        initialDelayMs: 10,
+      });
+
+      await vi.runAllTimersAsync();
+      await promise;
+
+      expect(coreEvents.emit).toHaveBeenCalledWith(
+        CoreEvent.Retry,
+        expect.objectContaining({
+          attempt: 1,
+          errorStatus: 429,
+        }),
+      );
     });
   });
 

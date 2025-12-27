@@ -7,11 +7,20 @@
 const logApiRequest = vi.hoisted(() => vi.fn());
 const logApiResponse = vi.hoisted(() => vi.fn());
 const logApiError = vi.hoisted(() => vi.fn());
+const shouldSimulate429 = vi.hoisted(() => vi.fn());
+const createSimulated429Error = vi.hoisted(() => vi.fn());
+const shouldSimulateSlowServer = vi.hoisted(() => vi.fn());
 
 vi.mock('../telemetry/loggers.js', () => ({
   logApiRequest,
   logApiResponse,
   logApiError,
+}));
+
+vi.mock('../utils/testUtils.js', () => ({
+  shouldSimulate429,
+  createSimulated429Error,
+  shouldSimulateSlowServer,
 }));
 
 const runInDevTraceSpan = vi.hoisted(() =>
@@ -52,6 +61,8 @@ describe('LoggingContentGenerator', () => {
       }),
     } as unknown as Config;
     loggingContentGenerator = new LoggingContentGenerator(wrapped, config);
+    vi.mocked(shouldSimulate429).mockReturnValue(false);
+    vi.mocked(shouldSimulateSlowServer).mockReturnValue(false);
     vi.useFakeTimers();
   });
 
@@ -61,6 +72,46 @@ describe('LoggingContentGenerator', () => {
   });
 
   describe('generateContent', () => {
+    it('should throw 429 error when shouldSimulateSlowServer returns true', async () => {
+      const req = {
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        model: 'gemini-pro',
+      };
+      const userPromptId = 'prompt-123';
+      const error = new Error('Rate limit exceeded (simulated)') as Error & {
+        status: number;
+      };
+      error.status = 429;
+      vi.mocked(shouldSimulateSlowServer).mockReturnValue(true);
+      vi.mocked(createSimulated429Error).mockReturnValue(error);
+
+      await expect(
+        loggingContentGenerator.generateContent(req, userPromptId),
+      ).rejects.toThrow(error);
+
+      expect(wrapped.generateContent).not.toHaveBeenCalled();
+    });
+
+    it('should throw 429 error when shouldSimulate429 returns true', async () => {
+      const req = {
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        model: 'gemini-pro',
+      };
+      const userPromptId = 'prompt-123';
+      const error = new Error('Rate limit exceeded (simulated)') as Error & {
+        status: number;
+      };
+      error.status = 429;
+      vi.mocked(shouldSimulate429).mockReturnValue(true);
+      vi.mocked(createSimulated429Error).mockReturnValue(error);
+
+      await expect(
+        loggingContentGenerator.generateContent(req, userPromptId),
+      ).rejects.toThrow(error);
+
+      expect(wrapped.generateContent).not.toHaveBeenCalled();
+    });
+
     it('should log request and response on success', async () => {
       const req = {
         contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
@@ -132,6 +183,26 @@ describe('LoggingContentGenerator', () => {
   });
 
   describe('generateContentStream', () => {
+    it('should throw 429 error when shouldSimulate429 returns true', async () => {
+      const req = {
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        model: 'gemini-pro',
+      };
+      const userPromptId = 'prompt-123';
+      const error = new Error('Rate limit exceeded (simulated)') as Error & {
+        status: number;
+      };
+      error.status = 429;
+      vi.mocked(shouldSimulate429).mockReturnValue(true);
+      vi.mocked(createSimulated429Error).mockReturnValue(error);
+
+      await expect(
+        loggingContentGenerator.generateContentStream(req, userPromptId),
+      ).rejects.toThrow(error);
+
+      expect(wrapped.generateContentStream).not.toHaveBeenCalled();
+    });
+
     it('should log request and response on success', async () => {
       const req = {
         contents: [{ role: 'user', parts: [{ text: 'hello' }] }],

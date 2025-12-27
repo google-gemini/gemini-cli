@@ -15,6 +15,8 @@ import { delay, createAbortError } from './delay.js';
 import { debugLogger } from './debugLogger.js';
 import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
+import { coreEvents, CoreEvent } from './events.js';
+import { resetSlowServerSimulation } from './testUtils.js';
 
 export type { RetryAvailabilityContext };
 
@@ -28,6 +30,7 @@ export interface RetryOptions {
     authType?: string,
     error?: unknown,
   ) => Promise<string | boolean | null>;
+  onRetry?: (attempt: number, error: unknown, errorStatus?: number) => void;
   authType?: string;
   retryFetchErrors?: boolean;
   signal?: AbortSignal;
@@ -35,7 +38,7 @@ export interface RetryOptions {
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
-  maxAttempts: 3,
+  maxAttempts: 10,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
   shouldRetryOnError: isRetryableError,
@@ -158,11 +161,10 @@ export async function retryWithBackoff<T>(
   let attempt = 0;
   let currentDelay = initialDelayMs;
 
-  while (attempt < maxAttempts) {
+  while (true) {
     if (signal?.aborted) {
       throw createAbortError();
     }
-    attempt++;
     try {
       const result = await fn();
 
@@ -170,8 +172,14 @@ export async function retryWithBackoff<T>(
         shouldRetryOnContent &&
         shouldRetryOnContent(result as GenerateContentResponse)
       ) {
+        attempt++;
+        if (attempt >= maxAttempts) {
+          return result;
+        }
+
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
         const delayWithJitter = Math.max(0, currentDelay + jitter);
+        logRetryAttempt(options, attempt, new Error('Invalid content'), 200);
         await delay(delayWithJitter, signal);
         currentDelay = Math.min(maxDelayMs, currentDelay * 2);
         continue;
@@ -182,6 +190,7 @@ export async function retryWithBackoff<T>(
         successContext.service.markHealthy(successContext.policy.model);
       }
 
+      resetSlowServerSimulation(fn.name);
       return result;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
@@ -189,8 +198,16 @@ export async function retryWithBackoff<T>(
       }
 
       const classifiedError = classifyGoogleError(error);
-
       const errorCode = getErrorStatus(error);
+
+      if (
+        errorCode === 429 ||
+        (error instanceof Error && error.message.includes('429'))
+      ) {
+        debugLogger.debug(`[DEBUG] Caught 429 error, attempt: ${attempt + 1}`);
+      }
+
+      attempt++;
 
       if (
         classifiedError instanceof TerminalQuotaError ||
@@ -232,13 +249,20 @@ export async function retryWithBackoff<T>(
                 continue;
               }
             } catch (fallbackError) {
-              console.warn('Model fallback failed:', fallbackError);
+              debugLogger.warn('Model fallback failed:', fallbackError);
             }
           }
           throw classifiedError instanceof RetryableQuotaError
             ? classifiedError
             : error;
         }
+
+        const currentStatus =
+          errorCode ??
+          (classifiedError instanceof RetryableQuotaError
+            ? classifiedError.cause.code
+            : undefined);
+        logRetryAttempt(options, attempt, error, currentStatus);
 
         if (classifiedError instanceof RetryableQuotaError) {
           console.warn(
@@ -247,9 +271,6 @@ export async function retryWithBackoff<T>(
           await delay(classifiedError.retryDelayMs, signal);
           continue;
         } else {
-          const errorStatus = getErrorStatus(error);
-          logRetryAttempt(attempt, error, errorStatus);
-
           // Exponential backoff with jitter for non-quota errors
           const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
           const delayWithJitter = Math.max(0, currentDelay + jitter);
@@ -267,8 +288,7 @@ export async function retryWithBackoff<T>(
         throw error;
       }
 
-      const errorStatus = getErrorStatus(error);
-      logRetryAttempt(attempt, error, errorStatus);
+      logRetryAttempt(options, attempt, error, errorCode);
 
       // Exponential backoff with jitter for non-quota errors
       const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
@@ -277,21 +297,26 @@ export async function retryWithBackoff<T>(
       currentDelay = Math.min(maxDelayMs, currentDelay * 2);
     }
   }
-
-  throw new Error('Retry attempts exhausted');
 }
 
 /**
  * Logs a message for a retry attempt when using exponential backoff.
+ * @param options Retry options containing potential onRetry callback.
  * @param attempt The current attempt number.
  * @param error The error that caused the retry.
  * @param errorStatus The HTTP status code of the error, if available.
  */
 function logRetryAttempt(
+  options: Partial<RetryOptions> | undefined,
   attempt: number,
   error: unknown,
   errorStatus?: number,
 ): void {
+  coreEvents.emit(CoreEvent.Retry, { attempt, error, errorStatus });
+  if (options?.onRetry) {
+    options.onRetry(attempt, error, errorStatus);
+  }
+
   let message = `Attempt ${attempt} failed. Retrying with backoff...`;
   if (errorStatus) {
     message = `Attempt ${attempt} failed with status ${errorStatus}. Retrying with backoff...`;

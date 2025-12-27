@@ -757,6 +757,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     activePtyId,
     loopDetectionConfirmationRequest,
     lastOutputTime,
+    retryCount,
   } = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
@@ -1528,6 +1529,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerData,
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
+      retryCount,
     }),
     [
       isThemeDialogOpen,
@@ -1620,6 +1622,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerData,
       bannerVisible,
       config,
+      retryCount,
     ],
   );
 

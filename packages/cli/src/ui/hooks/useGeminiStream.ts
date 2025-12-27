@@ -39,6 +39,8 @@ import {
   EDIT_TOOL_NAMES,
   processRestorableToolCalls,
   recordToolCallInteractions,
+  coreEvents,
+  CoreEvent,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -117,10 +119,12 @@ export const useGeminiStream = (
   const activeQueryIdRef = useRef<string | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
+  const [retryCount, setRetryCount] = useState<number>(0);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
+
   const storage = config.storage;
   const logger = useLogger(storage);
   const gitService = useMemo(() => {
@@ -276,6 +280,23 @@ export const useGeminiStream = (
     }
     return StreamingState.Idle;
   }, [isResponding, toolCalls]);
+
+  useEffect(() => {
+    const handleRetry = (payload: { attempt: number }) => {
+      // Only update retry count if we are currently in a state that could be retrying
+      if (
+        activeQueryIdRef.current &&
+        (streamingState === StreamingState.Responding ||
+          streamingState === StreamingState.WaitingForConfirmation)
+      ) {
+        setRetryCount(payload.attempt);
+      }
+    };
+    coreEvents.on(CoreEvent.Retry, handleRetry);
+    return () => {
+      coreEvents.off(CoreEvent.Retry, handleRetry);
+    };
+  }, [streamingState]);
 
   useEffect(() => {
     if (
@@ -804,8 +825,10 @@ export const useGeminiStream = (
         switch (event.type) {
           case ServerGeminiEventType.Thought:
             setThought(event.value);
+            setRetryCount(0);
             break;
           case ServerGeminiEventType.Content:
+            setRetryCount(0);
             geminiMessageBuffer = handleContentEvent(
               event.value,
               geminiMessageBuffer,
@@ -813,6 +836,7 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.ToolCallRequest:
+            setRetryCount(0);
             toolCallRequests.push(event.value);
             break;
           case ServerGeminiEventType.UserCancelled:
@@ -852,8 +876,16 @@ export const useGeminiStream = (
             loopDetectedRef.current = true;
             break;
           case ServerGeminiEventType.Retry:
+            setRetryCount(event.value);
+            break;
           case ServerGeminiEventType.InvalidStream:
-            // Will add the missing logic later
+            addItem(
+              {
+                type: MessageType.INFO,
+                text: '⚠️ Model produced an invalid response. Retrying...',
+              },
+              userMessageTimestamp,
+            );
             break;
           default: {
             // enforces exhaustive switch-case
@@ -878,6 +910,7 @@ export const useGeminiStream = (
       handleContextWindowWillOverflowEvent,
       handleCitationEvent,
       handleChatModelEvent,
+      addItem,
     ],
   );
   const submitQuery = useCallback(
@@ -903,6 +936,7 @@ export const useGeminiStream = (
 
           // Reset quota error flag when starting a new query (not a continuation)
           if (!options?.isContinuation) {
+            setRetryCount(0);
             setModelSwitchedFromQuotaError(false);
             config.setQuotaErrorOccurred(false);
           }
@@ -1311,5 +1345,6 @@ export const useGeminiStream = (
     activePtyId,
     loopDetectionConfirmationRequest,
     lastOutputTime,
+    retryCount,
   };
 };

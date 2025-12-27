@@ -12,9 +12,10 @@ import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
 import { GeminiRespondingSpinner } from './GeminiRespondingSpinner.js';
 import { formatDuration } from '../utils/formatters.js';
-import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
+
+import { useUIState } from '../contexts/UIStateContext.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
@@ -30,19 +31,25 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   thought,
 }) => {
   const streamingState = useStreamingContext();
-  const { columns: terminalWidth } = useTerminalSize();
+  const { terminalWidth, retryCount } = useUIState();
   const isNarrow = isNarrowWidth(terminalWidth);
 
   if (streamingState === StreamingState.Idle) {
     return null;
   }
 
+  const isRetrying = retryCount > 0;
+
   // Prioritize the interactive shell waiting phrase over the thought subject
   // because it conveys an actionable state for the user (waiting for input).
-  const primaryText =
+  let primaryText =
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
       : thought?.subject || currentLoadingPhrase;
+
+  if (isRetrying) {
+    primaryText = `⚠️ Transient error. Retrying... (attempt ${retryCount})`;
+  }
 
   const cancelAndTimerContent =
     streamingState !== StreamingState.WaitingForConfirmation
@@ -60,6 +67,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
         <Box>
           <Box marginRight={1}>
             <GeminiRespondingSpinner
+              color={isRetrying ? theme.status.warning : undefined}
               nonRespondingDisplay={
                 streamingState === StreamingState.WaitingForConfirmation
                   ? '⠏'
@@ -68,7 +76,10 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
             />
           </Box>
           {primaryText && (
-            <Text color={theme.text.accent} wrap="truncate-end">
+            <Text
+              color={isRetrying ? theme.status.warning : theme.text.accent}
+              wrap="truncate-end"
+            >
               {primaryText}
             </Text>
           )}
