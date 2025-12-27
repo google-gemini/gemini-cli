@@ -72,6 +72,7 @@ interface SlashCommandProcessorActions {
   toggleDebugProfiler: () => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
+  setPendingInput: (text: string) => void;
 }
 
 /**
@@ -218,7 +219,12 @@ export const useSlashCommandProcessor = (
           refreshStatic();
           setBannerVisible(false);
         },
-        loadHistory,
+        loadHistory: (history, postLoadInput) => {
+          loadHistory(history);
+          if (postLoadInput !== undefined) {
+            actions.setPendingInput(postLoadInput);
+          }
+        },
         setDebugMessage: actions.setDebugMessage,
         pendingItem,
         setPendingItem,

@@ -58,6 +58,7 @@ const mockSessionStats: SessionStatsState = {
       totalLinesAdded: 0,
       totalLinesRemoved: 0,
     },
+    rewinds: 0,
   },
 };
 

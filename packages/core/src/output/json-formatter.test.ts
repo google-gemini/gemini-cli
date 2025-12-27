@@ -127,6 +127,7 @@ describe('JsonFormatter', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     };
     const formatted = formatter.format(undefined, response, stats);
     const expected = {
@@ -241,6 +242,7 @@ describe('JsonFormatter', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     };
     const error: JsonError = {
       type: 'ApiError',

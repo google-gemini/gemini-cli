@@ -116,6 +116,7 @@ describe('runNonInteractive', () => {
       totalLinesAdded: 0,
       totalLinesRemoved: 0,
     },
+    rewinds: 0,
   };
 
   beforeEach(async () => {
