@@ -172,7 +172,7 @@ export const Composer = () => {
           popAllMessages={uiActions.popAllMessages}
           placeholder={
             vimEnabled
-              ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
+              ? "  Press 'Esc' for NORMAL mode, 'i' to return to INSERT."
               : uiState.shellModeActive
                 ? '  Type your shell command'
                 : '  Type your message or @path/to/file'
