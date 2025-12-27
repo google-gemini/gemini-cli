@@ -14,8 +14,8 @@ import {
 } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
 import { useBanner } from './useBanner.js';
-import { persistentState } from '../../utils/persistentState.js';
 import type { Config } from '@google/gemini-cli-core';
+import { persistentState } from '../../utils/persistentState.js';
 import crypto from 'node:crypto';
 
 vi.mock('../../utils/persistentState.js', () => ({
@@ -46,17 +46,27 @@ interface MockConfigShape {
 
 describe('useBanner', () => {
   let mockConfig: MockConfigShape;
-  const mockedPersistentStateGet = persistentState.get as MockedFunction<
-    typeof persistentState.get
-  >;
-  const mockedPersistentStateSet = persistentState.set as MockedFunction<
-    typeof persistentState.set
-  >;
+  const mockedPersistentState = persistentState as unknown as {
+    get: MockedFunction<typeof persistentState.get>;
+    set: MockedFunction<typeof persistentState.set>;
+  };
 
   const defaultBannerData = {
-    defaultText: 'Standard Banner',
-    warningText: '',
+    bannerText: {
+      title: 'Standard Banner',
+      body: '',
+    },
+    isWarning: false,
   };
+
+  const hashedText = crypto
+    .createHash('sha256')
+    .update(
+      defaultBannerData.bannerText.title +
+        ' \n' +
+        defaultBannerData.bannerText.body,
+    )
+    .digest('hex');
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -65,19 +75,6 @@ describe('useBanner', () => {
     mockConfig = {
       getPreviewFeatures: vi.fn().mockReturnValue(false),
     };
-
-    // Default persistentState behavior: return empty object (no counts)
-    mockedPersistentStateGet.mockReturnValue({});
-  });
-
-  it('should return warning text and warning color if warningText is present', () => {
-    const data = { defaultText: 'Standard', warningText: 'Critical Error' };
-
-    const { result } = renderHook(() =>
-      useBanner(data, mockConfig as unknown as Config),
-    );
-
-    expect(result.current.bannerText).toBe('Critical Error');
   });
 
   it('should NOT show default banner if preview features are enabled in config', () => {
@@ -88,60 +85,57 @@ describe('useBanner', () => {
       useBanner(defaultBannerData, mockConfig as unknown as Config),
     );
 
-    // Should fall back to warningText (which is empty)
-    expect(result.current.bannerText).toBe('');
+    expect(result.current.title).toBe('');
+    expect(result.current.body).toBe('');
   });
 
-  it('should hide banner if show count exceeds max limit (Legacy format)', () => {
-    mockedPersistentStateGet.mockReturnValue({
-      [crypto
-        .createHash('sha256')
-        .update(defaultBannerData.defaultText)
-        .digest('hex')]: 5,
+  it('should increment banner shown count when banner is shown', () => {
+    mockedPersistentState.get.mockReturnValue({});
+
+    renderHook(() =>
+      useBanner(defaultBannerData, mockConfig as unknown as Config),
+    );
+
+    expect(mockedPersistentState.get).toHaveBeenCalledWith(
+      'defaultBannerShownCount',
+    );
+    expect(mockedPersistentState.set).toHaveBeenCalledWith(
+      'defaultBannerShownCount',
+      expect.objectContaining({
+        [hashedText]: 1,
+      }),
+    );
+  });
+
+  it('should NOT show banner if it has been shown max times', () => {
+    // 20 is the DEFAULT_MAX_BANNER_SHOWN_COUNT
+    mockedPersistentState.get.mockReturnValue({
+      [hashedText]: 5,
     });
 
     const { result } = renderHook(() =>
       useBanner(defaultBannerData, mockConfig as unknown as Config),
     );
 
-    expect(result.current.bannerText).toBe('');
+    expect(result.current.title).toBe('');
+    expect(result.current.body).toBe('');
   });
 
-  it('should increment the persistent count when banner is shown', () => {
-    const data = { defaultText: 'Tracker', warningText: '' };
-
-    // Current count is 1
-    mockedPersistentStateGet.mockReturnValue({
-      [crypto.createHash('sha256').update(data.defaultText).digest('hex')]: 1,
+  it('should show banner if it has been shown less than max times', () => {
+    mockedPersistentState.get.mockReturnValue({
+      [hashedText]: 4,
     });
 
-    renderHook(() => useBanner(data, mockConfig as unknown as Config));
-
-    // Expect set to be called with incremented count
-    expect(mockedPersistentStateSet).toHaveBeenCalledWith(
-      'defaultBannerShownCount',
-      {
-        [crypto.createHash('sha256').update(data.defaultText).digest('hex')]: 2,
-      },
-    );
-  });
-
-  it('should NOT increment count if warning text is shown instead', () => {
-    const data = { defaultText: 'Standard', warningText: 'Warning' };
-
-    renderHook(() => useBanner(data, mockConfig as unknown as Config));
-
-    // Since warning text takes precedence, default banner logic (and increment) is skipped
-    expect(mockedPersistentStateSet).not.toHaveBeenCalled();
-  });
-
-  it('should handle newline replacements', () => {
-    const data = { defaultText: 'Line1\\nLine2', warningText: '' };
-
     const { result } = renderHook(() =>
-      useBanner(data, mockConfig as unknown as Config),
+      useBanner(defaultBannerData, mockConfig as unknown as Config),
     );
 
-    expect(result.current.bannerText).toBe('Line1\nLine2');
+    expect(result.current.title).toBe('Standard Banner');
+    expect(mockedPersistentState.set).toHaveBeenCalledWith(
+      'defaultBannerShownCount',
+      expect.objectContaining({
+        [hashedText]: 5,
+      }),
+    );
   });
 });

@@ -1918,8 +1918,8 @@ describe('AppContainer State Management', () => {
         unmount = result.unmount;
       });
       await waitFor(() => {
-        expect(capturedUIState.bannerData.defaultText).toBeDefined();
-        unmount!();
+        expect(capturedUIState.banner.bannerText).toBeDefined();
+        unmount();
       });
     });
   });
@@ -2042,12 +2042,6 @@ describe('AppContainer State Management', () => {
 
   describe('Regression Tests', () => {
     it('does not refresh static on startup if banner text is empty', async () => {
-      // Mock banner text to be empty strings
-      vi.spyOn(mockConfig, 'getBannerTextNoCapacityIssues').mockResolvedValue(
-        '',
-      );
-      vi.spyOn(mockConfig, 'getBannerTextCapacityIssues').mockResolvedValue('');
-
       // Clear previous calls
       mocks.mockStdout.write.mockClear();
 

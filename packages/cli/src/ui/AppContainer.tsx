@@ -124,7 +124,7 @@ import { useSettings } from './contexts/SettingsContext.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { enableBracketedPaste } from './utils/bracketedPaste.js';
-import { useBanner } from './hooks/useBanner.js';
+import { type BannerData } from './hooks/useBanner.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -199,19 +199,14 @@ export const AppContainer = (props: AppContainerProps) => {
     null,
   );
 
-  const [defaultBannerText, setDefaultBannerText] = useState('');
-  const [warningBannerText, setWarningBannerText] = useState('');
+  const [banner, setBanner] = useState<BannerData>({
+    bannerText: {
+      title: '',
+      body: '',
+    },
+    isWarning: false,
+  });
   const [bannerVisible, setBannerVisible] = useState(true);
-
-  const bannerData = useMemo(
-    () => ({
-      defaultText: defaultBannerText,
-      warningText: warningBannerText,
-    }),
-    [defaultBannerText, warningBannerText],
-  );
-
-  const { bannerText } = useBanner(bannerData, config);
 
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
@@ -410,13 +405,14 @@ export const AppContainer = (props: AppContainerProps) => {
     if (
       !(settings.merged.ui?.hideBanner || config.getScreenReader()) &&
       bannerVisible &&
-      bannerText
+      banner.bannerText &&
+      (banner.bannerText.title || banner.bannerText.body)
     ) {
       // The header should show a banner but the Header is rendered in static
       // so we must trigger a static refresh for it to be visible.
       refreshStatic();
     }
-  }, [bannerVisible, bannerText, settings, config, refreshStatic]);
+  }, [bannerVisible, banner.bannerText, settings, config, refreshStatic]);
 
   const {
     isThemeDialogOpen,
@@ -1407,23 +1403,29 @@ Logging in with Google... Restarting Gemini CLI to continue.
     let isMounted = true;
 
     const fetchBannerTexts = async () => {
-      const [defaultBanner, warningBanner] = await Promise.all([
-        config.getBannerTextNoCapacityIssues(),
-        config.getBannerTextCapacityIssues(),
-      ]);
+      const bannerTextUI = await config.getEvent();
 
       if (isMounted) {
-        setDefaultBannerText(defaultBanner);
-        setWarningBannerText(warningBanner);
+        const bannerText = {
+          title: bannerTextUI?.campaignNotification?.title ?? '',
+          body: bannerTextUI?.campaignNotification?.body ?? '',
+        };
+        const isWarning =
+          bannerTextUI?.campaignNotification?.action?.text === 'WARNING';
+        setBanner({ bannerText, isWarning });
         setBannerVisible(true);
         const authType = config.getContentGeneratorConfig()?.authType;
         if (
           authType === AuthType.USE_GEMINI ||
           authType === AuthType.USE_VERTEX_AI
         ) {
-          setDefaultBannerText(
-            'Gemini 3 Flash and Pro are now available. \nEnable "Preview features" in /settings. \nLearn more at https://goo.gle/enable-preview-features',
-          );
+          setBanner({
+            bannerText: {
+              title: 'Gemini 3 Flash and Pro are now available.',
+              body: 'Enable "Preview features" in /settings. \nLearn more at https://goo.gle/enable-preview-features',
+            },
+            isWarning: false,
+          });
         }
       }
     };
@@ -1525,7 +1527,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       customDialog,
       copyModeEnabled,
       warningMessage,
-      bannerData,
+      banner,
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
     }),
@@ -1617,7 +1619,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       authState,
       copyModeEnabled,
       warningMessage,
-      bannerData,
+      banner,
       bannerVisible,
       config,
     ],

@@ -10,19 +10,20 @@ import { describe, it, expect } from 'vitest';
 
 describe('Banner', () => {
   it.each([
-    ['warning mode', true, 'Warning Message'],
-    ['info mode', false, 'Info Message'],
-  ])('renders in %s', (_, isWarning, text) => {
+    ['warning mode', true, 'Warning Title', 'Warning Body'],
+    ['info mode', false, 'Info Title', 'Info Body'],
+  ])('renders in %s', (_, isWarning, title, body) => {
     const { lastFrame } = render(
-      <Banner bannerText={text} isWarning={isWarning} width={80} />,
+      <Banner title={title} body={body} isWarning={isWarning} width={80} />,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('handles newlines in text', () => {
-    const text = 'Line 1\\nLine 2';
+    const title = 'Line 1';
+    const body = 'Line 2\\nLine 3';
     const { lastFrame } = render(
-      <Banner bannerText={text} isWarning={false} width={80} />,
+      <Banner title={title} body={body} isWarning={false} width={80} />,
     );
     expect(lastFrame()).toMatchSnapshot();
   });

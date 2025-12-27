@@ -104,9 +104,12 @@ describe('AlternateBufferQuittingDisplay', () => {
     activePtyId: undefined,
     embeddedShellFocused: false,
     renderMarkdown: false,
-    bannerData: {
-      defaultText: '',
-      warningText: '',
+    banner: {
+      bannerText: {
+        title: '',
+        body: '',
+      },
+      isWarning: false,
     },
   };
 

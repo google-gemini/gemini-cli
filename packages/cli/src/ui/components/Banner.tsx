@@ -10,47 +10,49 @@ import { theme } from '../semantic-colors.js';
 import type { ReactNode } from 'react';
 
 export function getFormattedBannerContent(
-  rawText: string,
+  title: string,
+  body: string,
   isWarning: boolean,
   subsequentLineColor: string,
 ): ReactNode {
+  // Unescape newlines
+  const formattedTitle = title.replace(/\\n/g, '\n');
+  const formattedBody = body.replace(/\\n/g, '\n');
+
   if (isWarning) {
     return (
-      <Text color={theme.status.warning}>{rawText.replace(/\\n/g, '\n')}</Text>
+      <Text color={theme.status.warning}>
+        {formattedTitle}
+        {formattedBody ? '\n' + formattedBody : ''}
+      </Text>
     );
   }
 
-  const text = rawText.replace(/\\n/g, '\n');
-  const lines = text.split('\n');
-
-  return lines.map((line, index) => {
-    if (index === 0) {
-      return (
-        <ThemedGradient key={index}>
-          <Text>{line}</Text>
-        </ThemedGradient>
-      );
-    }
-
-    return (
-      <Text key={index} color={subsequentLineColor}>
-        {line}
-      </Text>
-    );
-  });
+  return (
+    <>
+      <ThemedGradient>
+        <Text>{formattedTitle}</Text>
+      </ThemedGradient>
+      {formattedBody ? (
+        <Text color={subsequentLineColor}>{formattedBody}</Text>
+      ) : null}
+    </>
+  );
 }
 
 interface BannerProps {
-  bannerText: string;
+  title: string;
+  body: string;
   isWarning: boolean;
   width: number;
 }
 
-export const Banner = ({ bannerText, isWarning, width }: BannerProps) => {
+export const Banner = ({ title, body, isWarning, width }: BannerProps) => {
   const subsequentLineColor = theme.text.primary;
 
   const formattedBannerContent = getFormattedBannerContent(
-    bannerText,
+    title,
+    body,
     isWarning,
     subsequentLineColor,
   );

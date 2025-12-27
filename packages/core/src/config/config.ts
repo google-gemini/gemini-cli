@@ -177,6 +177,8 @@ import {
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
+import { getEvents } from '../code_assist/events/events.js';
+import type { Event } from '../code_assist/events/types.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 
 export type { FileFilteringOptions };
@@ -456,7 +458,9 @@ export class Config {
     | undefined;
   private readonly disabledHooks: string[];
   private experiments: Experiments | undefined;
+  private event: Event | undefined;
   private experimentsPromise: Promise<void> | undefined;
+  private eventsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
 
@@ -787,9 +791,19 @@ export class Config {
         .catch((e) => {
           debugLogger.error('Failed to fetch experiments', e);
         });
+
+      this.eventsPromise = getEvents(codeAssistServer)
+        .then((event) => {
+          this.setEvent(event);
+        })
+        .catch((e) => {
+          debugLogger.error('Failed fetch events', e);
+        });
     } else {
       this.experiments = undefined;
       this.experimentsPromise = undefined;
+      this.event = undefined;
+      this.eventsPromise = undefined;
     }
 
     const authType = this.contentGeneratorConfig.authType;
@@ -1437,20 +1451,15 @@ export class Config {
     return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
   }
 
-  async getBannerTextNoCapacityIssues(): Promise<string> {
-    await this.ensureExperimentsLoaded();
-    return (
-      this.experiments?.flags[ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES]
-        ?.stringValue ?? ''
-    );
-  }
-
-  async getBannerTextCapacityIssues(): Promise<string> {
-    await this.ensureExperimentsLoaded();
-    return (
-      this.experiments?.flags[ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES]
-        ?.stringValue ?? ''
-    );
+  private async ensureEventsLoaded(): Promise<void> {
+    if (!this.eventsPromise) {
+      return;
+    }
+    try {
+      await this.eventsPromise;
+    } catch (e) {
+      debugLogger.debug('Failed to fetch events', e);
+    }
   }
 
   private async ensureExperimentsLoaded(): Promise<void> {
@@ -1781,6 +1790,24 @@ export class Config {
       compact: false,
     });
     debugLogger.debug('Experiments loaded', summaryString);
+  }
+
+  /**
+   * Get event based on an event type
+   */
+  async getEvent(): Promise<Event | undefined> {
+    await this.ensureEventsLoaded();
+    if (!this.event) {
+      return;
+    }
+    return this.event;
+  }
+
+  /**
+   * Set event
+   */
+  setEvent(events: Event): void {
+    this.event = events;
   }
 }
 // Export model constants for use in CLI
