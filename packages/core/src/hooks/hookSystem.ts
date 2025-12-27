@@ -74,6 +74,14 @@ export class HookSystem {
   }
 
   /**
+   * Enable or disable all hooks from a specific extension
+   * @returns The number of hooks affected
+   */
+  setExtensionHooksEnabled(extensionName: string, enabled: boolean): number {
+    return this.hookRegistry.setExtensionHooksEnabled(extensionName, enabled);
+  }
+
+  /**
    * Get all registered hooks for display/management
    */
   getAllHooks(): HookRegistryEntry[] {

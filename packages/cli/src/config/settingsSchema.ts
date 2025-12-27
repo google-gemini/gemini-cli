@@ -1528,6 +1528,21 @@ const SETTINGS_SCHEMA = {
         },
         mergeStrategy: MergeStrategy.UNION,
       },
+      extensionHooksDisabled: {
+        type: 'array',
+        label: 'Extensions with Disabled Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [] as string[],
+        description:
+          'List of extension names whose hooks should be disabled. All hooks from these extensions will not execute, but other extension features (tools, MCP servers, context) remain active.',
+        showInDialog: false,
+        items: {
+          type: 'string',
+          description: 'Extension name',
+        },
+        mergeStrategy: MergeStrategy.UNION,
+      },
       BeforeTool: {
         type: 'array',
         label: 'Before Tool Hooks',

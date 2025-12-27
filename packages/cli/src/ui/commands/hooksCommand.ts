@@ -58,7 +58,7 @@ async function panelAction(
 }
 
 /**
- * Enable a hook by name
+ * Enable a hook by name or all hooks from an extension using wildcard syntax
  */
 async function enableAction(
   context: CommandContext,
@@ -82,17 +82,67 @@ async function enableAction(
     };
   }
 
-  const hookName = args.trim();
-  if (!hookName) {
+  const hookArg = args.trim();
+  if (!hookArg) {
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Usage: /hooks enable <hook-name>',
+      content:
+        'Usage: /hooks enable <hook-name> or /hooks enable <extension>/*',
     };
   }
 
-  // Get current disabled hooks from settings
   const settings = context.services.settings;
+
+  // Check for extension wildcard pattern: <extension>/*
+  if (hookArg.endsWith('/*')) {
+    const extensionName = hookArg.slice(0, -2);
+    if (!extensionName) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Invalid syntax. Use: /hooks enable <extension>/*',
+      };
+    }
+
+    try {
+      // Get current disabled extensions from settings
+      const disabledExtensions =
+        settings.merged.hooks?.extensionHooksDisabled || ([] as string[]);
+
+      // Remove from disabled list if present
+      const newDisabledExtensions = disabledExtensions.filter(
+        (name: string) => name !== extensionName,
+      );
+
+      // Update settings (setValue automatically saves)
+      settings.setValue(
+        SettingScope.User,
+        'hooks.extensionHooksDisabled',
+        newDisabledExtensions,
+      );
+
+      // Enable in hook system
+      hookSystem.setExtensionHooksEnabled(extensionName, true);
+
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `All hooks from extension "${extensionName}" enabled successfully.`,
+      };
+    } catch (error) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Failed to enable extension hooks: ${getErrorMessage(error)}`,
+      };
+    }
+  }
+
+  // Single hook enable (existing logic)
+  const hookName = hookArg;
+
+  // Get current disabled hooks from settings
   const disabledHooks = settings.merged.hooks?.disabled || ([] as string[]);
 
   // Remove from disabled list if present
@@ -122,7 +172,7 @@ async function enableAction(
 }
 
 /**
- * Disable a hook by name
+ * Disable a hook by name or all hooks from an extension using wildcard syntax
  */
 async function disableAction(
   context: CommandContext,
@@ -146,17 +196,73 @@ async function disableAction(
     };
   }
 
-  const hookName = args.trim();
-  if (!hookName) {
+  const hookArg = args.trim();
+  if (!hookArg) {
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Usage: /hooks disable <hook-name>',
+      content:
+        'Usage: /hooks disable <hook-name> or /hooks disable <extension>/*',
     };
   }
 
-  // Get current disabled hooks from settings
   const settings = context.services.settings;
+
+  // Check for extension wildcard pattern: <extension>/*
+  if (hookArg.endsWith('/*')) {
+    const extensionName = hookArg.slice(0, -2);
+    if (!extensionName) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Invalid syntax. Use: /hooks disable <extension>/*',
+      };
+    }
+
+    try {
+      // Get current disabled extensions from settings
+      const disabledExtensions =
+        settings.merged.hooks?.extensionHooksDisabled || ([] as string[]);
+
+      // Add to disabled list if not already present
+      if (!disabledExtensions.includes(extensionName)) {
+        const newDisabledExtensions = [...disabledExtensions, extensionName];
+
+        // Update settings (setValue automatically saves)
+        settings.setValue(
+          SettingScope.User,
+          'hooks.extensionHooksDisabled',
+          newDisabledExtensions,
+        );
+
+        // Disable in hook system
+        hookSystem.setExtensionHooksEnabled(extensionName, false);
+
+        return {
+          type: 'message',
+          messageType: 'info',
+          content: `All hooks from extension "${extensionName}" disabled successfully.`,
+        };
+      } else {
+        return {
+          type: 'message',
+          messageType: 'info',
+          content: `All hooks from extension "${extensionName}" are already disabled.`,
+        };
+      }
+    } catch (error) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Failed to disable extension hooks: ${getErrorMessage(error)}`,
+      };
+    }
+  }
+
+  // Single hook disable (existing logic)
+  const hookName = hookArg;
+
+  // Get current disabled hooks from settings
   const disabledHooks = settings.merged.hooks?.disabled || ([] as string[]);
 
   // Add to disabled list if not already present
@@ -192,7 +298,7 @@ async function disableAction(
 }
 
 /**
- * Completion function for hook names
+ * Completion function for hook names and extension wildcards
  */
 function completeHookNames(
   context: CommandContext,
@@ -206,7 +312,24 @@ function completeHookNames(
 
   const allHooks = hookSystem.getAllHooks();
   const hookNames = allHooks.map((hook) => getHookDisplayName(hook));
-  return hookNames.filter((name) => name.startsWith(partialArg));
+
+  // Get unique extension names for wildcard suggestions
+  const extensionNames = new Set<string>();
+  for (const hook of allHooks) {
+    if (hook.extensionName) {
+      extensionNames.add(hook.extensionName);
+    }
+  }
+
+  // Add wildcard patterns for extensions
+  const extensionWildcards = Array.from(extensionNames).map(
+    (name) => `${name}/*`,
+  );
+
+  // Combine hook names and extension wildcards
+  const allCompletions = [...hookNames, ...extensionWildcards];
+
+  return allCompletions.filter((name) => name.startsWith(partialArg));
 }
 
 /**

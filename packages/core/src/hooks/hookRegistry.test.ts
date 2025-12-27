@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import { HookRegistry } from './hookRegistry.js';
 import type { Storage } from '../config/storage.js';
 import { ConfigSource, HookEventName, HookType } from './types.js';
-import type { Config } from '../config/config.js';
+import type { Config, GeminiCLIExtension } from '../config/config.js';
 import type { HookDefinition } from './types.js';
 
 // Mock fs
@@ -67,6 +67,7 @@ describe('HookRegistry', () => {
       getHooks: vi.fn().mockReturnValue({}),
       getProjectHooks: vi.fn().mockReturnValue({}),
       getDisabledHooks: vi.fn().mockReturnValue([]),
+      getExtensionHooksDisabled: vi.fn().mockReturnValue([]),
       isTrustedFolder: vi.fn().mockReturnValue(true),
       getProjectRoot: vi.fn().mockReturnValue('/project'),
     } as unknown as Config;
@@ -728,6 +729,316 @@ describe('HookRegistry', () => {
       await hookRegistry.initialize();
 
       expect(mockTrustedHooksManager.getUntrustedHooks).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('extension hooks support', () => {
+    beforeEach(() => {
+      vi.resetAllMocks();
+
+      mockStorage = {
+        getGeminiDir: vi.fn().mockReturnValue('/project/.gemini'),
+      } as unknown as Storage;
+
+      mockConfig = {
+        storage: mockStorage,
+        getExtensions: vi.fn().mockReturnValue([]),
+        getHooks: vi.fn().mockReturnValue({}),
+        getProjectHooks: vi.fn().mockReturnValue({}),
+        getDisabledHooks: vi.fn().mockReturnValue([]),
+        getExtensionHooksDisabled: vi.fn().mockReturnValue([]),
+        isTrustedFolder: vi.fn().mockReturnValue(true),
+        getProjectRoot: vi.fn().mockReturnValue('/project'),
+      } as unknown as Config;
+
+      hookRegistry = new HookRegistry(mockConfig);
+    });
+
+    it('should track extensionName when loading hooks from extensions', async () => {
+      const extensionHooks = {
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                name: 'extension-hook',
+                type: 'command',
+                command: './hooks/ext-hook.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      const mockExtension = {
+        name: 'my-test-extension',
+        isActive: true,
+        hooks: extensionHooks,
+        version: '1.0.0',
+        path: '/mock/path',
+        contextFiles: [],
+        id: 'my-test-extension',
+      } as unknown as GeminiCLIExtension;
+
+      vi.mocked(mockConfig.getExtensions).mockReturnValue([mockExtension]);
+
+      await hookRegistry.initialize();
+
+      const hooks = hookRegistry.getAllHooks();
+      expect(hooks).toHaveLength(1);
+      expect(hooks[0].extensionName).toBe('my-test-extension');
+      expect(hooks[0].config.name).toBe('extension-hook');
+    });
+
+    it('should not set extensionName for project hooks', async () => {
+      const mockHooksConfig = {
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                name: 'project-hook',
+                type: 'command',
+                command: './hooks/project.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      vi.mocked(mockConfig.getHooks).mockReturnValue(
+        mockHooksConfig as unknown as {
+          [K in HookEventName]?: HookDefinition[];
+        },
+      );
+
+      await hookRegistry.initialize();
+
+      const hooks = hookRegistry.getAllHooks();
+      expect(hooks).toHaveLength(1);
+      expect(hooks[0].extensionName).toBeUndefined();
+    });
+
+    it('should disable all hooks from an extension when setExtensionHooksEnabled is false', async () => {
+      const extensionHooks = {
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                name: 'hook-one',
+                type: 'command',
+                command: './hooks/one.sh',
+              },
+            ],
+          },
+        ],
+        AfterTool: [
+          {
+            hooks: [
+              {
+                name: 'hook-two',
+                type: 'command',
+                command: './hooks/two.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      const mockExtension = {
+        name: 'my-extension',
+        isActive: true,
+        hooks: extensionHooks,
+        version: '1.0.0',
+        path: '/mock/path',
+        contextFiles: [],
+        id: 'my-extension',
+      } as unknown as GeminiCLIExtension;
+
+      vi.mocked(mockConfig.getExtensions).mockReturnValue([mockExtension]);
+
+      await hookRegistry.initialize();
+
+      // Both hooks should initially be enabled
+      expect(
+        hookRegistry.getHooksForEvent(HookEventName.BeforeTool),
+      ).toHaveLength(1);
+      expect(
+        hookRegistry.getHooksForEvent(HookEventName.AfterTool),
+      ).toHaveLength(1);
+
+      // Disable all hooks from the extension
+      hookRegistry.setExtensionHooksEnabled('my-extension', false);
+
+      // Both hooks should now be disabled
+      expect(
+        hookRegistry.getHooksForEvent(HookEventName.BeforeTool),
+      ).toHaveLength(0);
+      expect(
+        hookRegistry.getHooksForEvent(HookEventName.AfterTool),
+      ).toHaveLength(0);
+    });
+
+    it('should re-enable all hooks from an extension when setExtensionHooksEnabled is true', async () => {
+      const extensionHooks = {
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                name: 'hook-one',
+                type: 'command',
+                command: './hooks/one.sh',
+              },
+              {
+                name: 'hook-two',
+                type: 'command',
+                command: './hooks/two.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      const mockExtension = {
+        name: 'my-extension',
+        isActive: true,
+        hooks: extensionHooks,
+        version: '1.0.0',
+        path: '/mock/path',
+        contextFiles: [],
+        id: 'my-extension',
+      } as unknown as GeminiCLIExtension;
+
+      vi.mocked(mockConfig.getExtensions).mockReturnValue([mockExtension]);
+
+      await hookRegistry.initialize();
+
+      // Disable all hooks from the extension
+      hookRegistry.setExtensionHooksEnabled('my-extension', false);
+      expect(
+        hookRegistry.getHooksForEvent(HookEventName.BeforeTool),
+      ).toHaveLength(0);
+
+      // Re-enable all hooks from the extension
+      hookRegistry.setExtensionHooksEnabled('my-extension', true);
+      expect(
+        hookRegistry.getHooksForEvent(HookEventName.BeforeTool),
+      ).toHaveLength(2);
+    });
+
+    it('should warn when no hooks found for extension', async () => {
+      await hookRegistry.initialize();
+
+      hookRegistry.setExtensionHooksEnabled('non-existent-extension', false);
+
+      expect(mockDebugLogger.warn).toHaveBeenCalledWith(
+        'No hooks found from extension "non-existent-extension"',
+      );
+    });
+
+    it('should disable extension hooks from settings on initialize', async () => {
+      const extensionHooks = {
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                name: 'hook-one',
+                type: 'command',
+                command: './hooks/one.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      const mockExtension = {
+        name: 'disabled-extension',
+        isActive: true,
+        hooks: extensionHooks,
+        version: '1.0.0',
+        path: '/mock/path',
+        contextFiles: [],
+        id: 'disabled-extension',
+      } as unknown as GeminiCLIExtension;
+
+      vi.mocked(mockConfig.getExtensions).mockReturnValue([mockExtension]);
+      vi.mocked(mockConfig.getExtensionHooksDisabled).mockReturnValue([
+        'disabled-extension',
+      ]);
+
+      await hookRegistry.initialize();
+
+      // Hook should exist but be disabled
+      const allHooks = hookRegistry.getAllHooks();
+      expect(allHooks).toHaveLength(1);
+      expect(allHooks[0].enabled).toBe(false);
+
+      // getHooksForEvent only returns enabled hooks
+      expect(
+        hookRegistry.getHooksForEvent(HookEventName.BeforeTool),
+      ).toHaveLength(0);
+    });
+
+    it('should not affect project hooks when disabling extension hooks', async () => {
+      const projectHooks = {
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                name: 'project-hook',
+                type: 'command',
+                command: './hooks/project.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      const extensionHooks = {
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                name: 'extension-hook',
+                type: 'command',
+                command: './hooks/extension.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      const mockExtension = {
+        name: 'my-extension',
+        isActive: true,
+        hooks: extensionHooks,
+        version: '1.0.0',
+        path: '/mock/path',
+        contextFiles: [],
+        id: 'my-extension',
+      } as unknown as GeminiCLIExtension;
+
+      vi.mocked(mockConfig.getHooks).mockReturnValue(
+        projectHooks as unknown as {
+          [K in HookEventName]?: HookDefinition[];
+        },
+      );
+      vi.mocked(mockConfig.getExtensions).mockReturnValue([mockExtension]);
+
+      await hookRegistry.initialize();
+
+      // Both hooks should be enabled
+      expect(
+        hookRegistry.getHooksForEvent(HookEventName.BeforeTool),
+      ).toHaveLength(2);
+
+      // Disable extension hooks
+      hookRegistry.setExtensionHooksEnabled('my-extension', false);
+
+      // Only project hook should remain
+      const remainingHooks = hookRegistry.getHooksForEvent(
+        HookEventName.BeforeTool,
+      );
+      expect(remainingHooks).toHaveLength(1);
+      expect(remainingHooks[0].config.name).toBe('project-hook');
     });
   });
 });
