@@ -2241,8 +2241,6 @@ export function useTextBuffer({
       )
         backspace();
       else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
-      else if (key.ctrl && !key.shift && key.name === 'z') undo();
-      else if (key.ctrl && key.shift && key.name === 'z') redo();
       else if (key.insertable) {
         insert(input, { paste: key.paste });
       }
@@ -2255,8 +2253,6 @@ export function useTextBuffer({
       backspace,
       del,
       insert,
-      undo,
-      redo,
       singleLine,
     ],
   );
