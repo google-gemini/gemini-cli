@@ -847,6 +847,15 @@ export class IdeClient {
 }
 
 function getIdeServerHost() {
+  // In a VS Code Dev Container or other remote environment, the IDE companion
+  // is typically running inside the same container.
+  if (
+    process.env['VSCODE_IPC_HOOK_CLI'] ||
+    process.env['VSCODE_TERMINAL_TOKEN']
+  ) {
+    return '127.0.0.1';
+  }
+
   const isInContainer =
     fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
   return isInContainer ? 'host.docker.internal' : '127.0.0.1';
