@@ -49,7 +49,7 @@ import type {
   HistoryItemModel,
 } from '../types.js';
 import { StreamingState, MessageType, ToolCallStatus } from '../types.js';
-import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
+import { isSlashCommand } from '../utils/commandUtils.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
@@ -471,36 +471,38 @@ export const useGeminiStream = (
           return { queryToSend: null, shouldProceed: false };
         }
 
-        // Handle @-commands (which might involve tool calls)
-        if (isAtCommand(trimmedQuery)) {
-          const atCommandResult = await handleAtCommand({
-            query: trimmedQuery,
-            config,
-            addItem,
-            onDebugMessage,
-            messageId: userMessageTimestamp,
-            signal: abortSignal,
-          });
+        // Always process potential @-commands to match non-interactive behavior.
+        // This ensures @file references work correctly regardless of how the
+        // prompt was entered (direct input, external editor, etc.).
+        const atCommandResult = await handleAtCommand({
+          query: trimmedQuery,
+          config,
+          addItem,
+          onDebugMessage,
+          messageId: userMessageTimestamp,
+          signal: abortSignal,
+        });
 
-          // Add user's turn after @ command processing is done.
-          addItem(
-            { type: MessageType.USER, text: trimmedQuery },
-            userMessageTimestamp,
-          );
+        // Add user's turn after @ command processing is done.
+        addItem(
+          { type: MessageType.USER, text: trimmedQuery },
+          userMessageTimestamp,
+        );
 
-          if (atCommandResult.error) {
-            onDebugMessage(atCommandResult.error);
-            return { queryToSend: null, shouldProceed: false };
-          }
-          localQueryToSendToGemini = atCommandResult.processedQuery;
-        } else {
-          // Normal query for Gemini
-          addItem(
-            { type: MessageType.USER, text: trimmedQuery },
-            userMessageTimestamp,
-          );
-          localQueryToSendToGemini = trimmedQuery;
+        if (atCommandResult.error) {
+          onDebugMessage(atCommandResult.error);
+          return { queryToSend: null, shouldProceed: false };
         }
+
+        if (atCommandResult.processedQuery === null) {
+          return { queryToSend: null, shouldProceed: false };
+        }
+
+        if (atCommandResult.shouldProceed === false) {
+          return { queryToSend: null, shouldProceed: false };
+        }
+
+        localQueryToSendToGemini = atCommandResult.processedQuery;
       } else {
         // It's a function response (PartListUnion that isn't a string)
         localQueryToSendToGemini = query;
