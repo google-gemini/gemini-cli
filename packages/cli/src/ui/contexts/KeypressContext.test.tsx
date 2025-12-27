@@ -320,6 +320,111 @@ describe('KeypressContext', () => {
         }),
       );
     });
+
+    it('should parse valid OSC 52 response', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      const base64Data = Buffer.from('Hello OSC 52').toString('base64');
+      const sequence = `\x1b]52;c;${base64Data}\x07`;
+
+      act(() => stdin.write(sequence));
+
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'paste',
+            paste: true,
+            sequence: 'Hello OSC 52',
+          }),
+        );
+      });
+    });
+
+    it('should handle split OSC 52 response', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      const base64Data = Buffer.from('Split Paste').toString('base64');
+      const sequence = `\x1b]52;c;${base64Data}\x07`;
+
+      // Split the sequence
+      const part1 = sequence.slice(0, 5);
+      const part2 = sequence.slice(5);
+
+      act(() => stdin.write(part1));
+      act(() => stdin.write(part2));
+
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'paste',
+            paste: true,
+            sequence: 'Split Paste',
+          }),
+        );
+      });
+    });
+
+    it('should handle OSC 52 response terminated by ESC \\', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      const base64Data = Buffer.from('Terminated by ST').toString('base64');
+      const sequence = `\x1b]52;c;${base64Data}\x1b\\`;
+
+      act(() => stdin.write(sequence));
+
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'paste',
+            paste: true,
+            sequence: 'Terminated by ST',
+          }),
+        );
+      });
+    });
+
+    it('should ignore unknown OSC sequences', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      const sequence = `\x1b]1337;File=name=Zm9vCg==\x07`;
+
+      act(() => stdin.write(sequence));
+
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+      });
+
+      expect(keyHandler).not.toHaveBeenCalled();
+    });
+
+    it('should ignore invalid OSC 52 format', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      const sequence = `\x1b]52;x;notbase64\x07`;
+
+      act(() => stdin.write(sequence));
+
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+      });
+
+      expect(keyHandler).not.toHaveBeenCalled();
+    });
   });
 
   describe('debug keystroke logging', () => {
