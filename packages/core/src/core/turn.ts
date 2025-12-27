@@ -66,6 +66,7 @@ export enum GeminiEventType {
   ContextWindowWillOverflow = 'context_window_will_overflow',
   InvalidStream = 'invalid_stream',
   ModelInfo = 'model_info',
+  RenewSession = 'renew_session',
 }
 
 export type ServerGeminiRetryEvent = {
@@ -187,6 +188,10 @@ export type ServerGeminiCitationEvent = {
   value: string;
 };
 
+export type ServerGeminiRenewSessionEvent = {
+  type: GeminiEventType.RenewSession;
+};
+
 // The original union type, now composed of the individual types
 export type ServerGeminiStreamEvent =
   | ServerGeminiChatCompressedEvent
@@ -204,7 +209,8 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiRetryEvent
   | ServerGeminiContextWindowWillOverflowEvent
   | ServerGeminiInvalidStreamEvent
-  | ServerGeminiModelInfoEvent;
+  | ServerGeminiModelInfoEvent
+  | ServerGeminiRenewSessionEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {

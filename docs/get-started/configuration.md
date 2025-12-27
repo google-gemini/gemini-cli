@@ -295,6 +295,11 @@ their corresponding top-level category object in your `settings.json` file.
     session. -1 means unlimited.
   - **Default:** `-1`
 
+- **`model.renewSessionTurnsThreshold`** (number):
+  - **Description:** Number of conversation turns after which to prompt the user
+    to start a new session or compress. Set to -1 to disable.
+  - **Default:** `-1`
+
 - **`model.summarizeToolOutput`** (object):
   - **Description:** Enables or disables summarization of tool output. Configure
     per-tool token budgets (for example {"run_shell_command": {"tokenBudget":
