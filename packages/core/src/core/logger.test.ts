@@ -45,6 +45,17 @@ const TEST_CHECKPOINT_FILE_PATH = path.join(
   CHECKPOINT_FILE_NAME,
 );
 
+beforeEach(() => {
+  vi.stubEnv('XDG_CONFIG_HOME', '');
+  vi.stubEnv('XDG_CACHE_HOME', '');
+  vi.stubEnv('XDG_DATA_HOME', '');
+  vi.stubEnv('XDG_STATE_HOME', '');
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 async function cleanupLogAndCheckpointFiles() {
   try {
     await fs.rm(TEST_GEMINI_DIR, { recursive: true, force: true });
