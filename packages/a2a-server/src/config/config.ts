@@ -68,8 +68,10 @@ export async function loadConfig(
     // Git-aware file filtering settings
     fileFiltering: {
       respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
+      respectGeminiIgnore: settings.fileFiltering?.respectGeminiIgnore,
       enableRecursiveFileSearch:
         settings.fileFiltering?.enableRecursiveFileSearch,
+      disableFuzzySearch: settings.fileFiltering?.disableFuzzySearch,
     },
     ideMode: false,
     folderTrust: settings.folderTrust === true,
@@ -78,6 +80,7 @@ export async function loadConfig(
       ? process.env['CHECKPOINTING'] === 'true'
       : settings.checkpointing?.enabled,
     previewFeatures: settings.general?.previewFeatures,
+    modelConfigServiceConfig: settings.modelConfigs,
     interactive: true,
   };
 
