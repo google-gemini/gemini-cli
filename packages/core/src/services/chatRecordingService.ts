@@ -86,6 +86,7 @@ export interface ConversationRecord {
   startTime: string;
   lastUpdated: string;
   messages: MessageRecord[];
+  summary?: string;
 }
 
 /**
@@ -435,6 +436,44 @@ export class ChatRecordingService {
     const conversation = this.readConversation();
     updateFn(conversation);
     this.writeConversation(conversation);
+  }
+
+  /**
+   * Saves a summary for the current session.
+   */
+  saveSummary(summary: string): void {
+    if (!this.conversationFile) return;
+
+    try {
+      this.updateConversation((conversation) => {
+        conversation.summary = summary;
+      });
+    } catch (error) {
+      debugLogger.error('Error saving summary to chat history.', error);
+      // Don't throw - we want graceful degradation
+    }
+  }
+
+  /**
+   * Gets the current conversation data (for summary generation).
+   */
+  getConversation(): ConversationRecord | null {
+    if (!this.conversationFile) return null;
+
+    try {
+      return this.readConversation();
+    } catch (error) {
+      debugLogger.error('Error reading conversation for summary.', error);
+      return null;
+    }
+  }
+
+  /**
+   * Gets the path to the current conversation file.
+   * Returns null if the service hasn't been initialized yet.
+   */
+  getConversationFilePath(): string | null {
+    return this.conversationFile;
   }
 
   /**

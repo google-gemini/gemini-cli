@@ -145,7 +145,7 @@ export async function fireToolNotificationHook(
       MessageBusType.HOOK_EXECUTION_RESPONSE,
     );
   } catch (error) {
-    debugLogger.warn(
+    debugLogger.debug(
       `Notification hook failed for ${confirmationDetails.title}:`,
       error,
     );
@@ -185,7 +185,7 @@ export async function fireBeforeToolHook(
       ? createHookOutput('BeforeTool', response.output)
       : undefined;
   } catch (error) {
-    debugLogger.warn(`BeforeTool hook failed for ${toolName}:`, error);
+    debugLogger.debug(`BeforeTool hook failed for ${toolName}:`, error);
     return undefined;
   }
 }
@@ -230,7 +230,7 @@ export async function fireAfterToolHook(
       ? createHookOutput('AfterTool', response.output)
       : undefined;
   } catch (error) {
-    debugLogger.warn(`AfterTool hook failed for ${toolName}:`, error);
+    debugLogger.debug(`AfterTool hook failed for ${toolName}:`, error);
     return undefined;
   }
 }

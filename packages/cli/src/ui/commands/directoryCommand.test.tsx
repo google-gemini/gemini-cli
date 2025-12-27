@@ -72,6 +72,7 @@ describe('directoryCommand', () => {
   describe('show', () => {
     it('should display the list of directories', () => {
       if (!showCommand?.action) throw new Error('No action');
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       showCommand.action(mockContext, '');
       expect(mockWorkspaceContext.getDirectories).toHaveBeenCalled();
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -101,6 +102,7 @@ describe('directoryCommand', () => {
 
     it('should show an error if no path is provided', () => {
       if (!addCommand?.action) throw new Error('No action');
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       addCommand.action(mockContext, '');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({

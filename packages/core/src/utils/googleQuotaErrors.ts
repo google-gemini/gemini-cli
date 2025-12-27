@@ -13,6 +13,8 @@ import type {
 import { parseGoogleApiError } from './googleErrors.js';
 import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 
+const DEFAULT_RETRYABLE_DELAY_SECOND = 5;
+
 /**
  * A non-retryable error indicating a hard quota limit has been reached (e.g., daily limit).
  */
@@ -89,9 +91,15 @@ export function classifyGoogleError(error: unknown): unknown {
     return new ModelNotFoundError(message, status);
   }
 
-  if (!googleApiError || googleApiError.code !== 429) {
+  if (
+    !googleApiError ||
+    googleApiError.code !== 429 ||
+    googleApiError.details.length === 0
+  ) {
     // Fallback: try to parse the error message for a retry delay
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage =
+      googleApiError?.message ||
+      (error instanceof Error ? error.message : String(error));
     const match = errorMessage.match(/Please retry in ([0-9.]+(?:ms|s))/);
     if (match?.[1]) {
       const retryDelaySeconds = parseDurationInSeconds(match[1]);
@@ -106,9 +114,21 @@ export function classifyGoogleError(error: unknown): unknown {
           retryDelaySeconds,
         );
       }
+    } else if (status === 429) {
+      // Fallback: If it is a 429 but doesn't have a specific "retry in" message,
+      // assume it is a temporary rate limit and retry after 5 sec (same as DEFAULT_RETRY_OPTIONS).
+      return new RetryableQuotaError(
+        errorMessage,
+        googleApiError ?? {
+          code: 429,
+          message: errorMessage,
+          details: [],
+        },
+        DEFAULT_RETRYABLE_DELAY_SECOND,
+      );
     }
 
-    return error; // Not a 429 error we can handle.
+    return error; // Not a 429 error we can handle with structured details or a parsable retry message.
   }
 
   const quotaFailure = googleApiError.details.find(
@@ -225,6 +245,22 @@ export function classifyGoogleError(error: unknown): unknown {
         60,
       );
     }
+  }
+
+  // If we reached this point and the status is still 429, we return retryable.
+  if (status === 429) {
+    const errorMessage =
+      googleApiError?.message ||
+      (error instanceof Error ? error.message : String(error));
+    return new RetryableQuotaError(
+      errorMessage,
+      googleApiError ?? {
+        code: 429,
+        message: errorMessage,
+        details: [],
+      },
+      DEFAULT_RETRYABLE_DELAY_SECOND,
+    );
   }
   return error; // Fallback to original error if no specific classification fits.
 }

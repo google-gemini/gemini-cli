@@ -228,6 +228,14 @@ class ThemeManager {
     return this.findThemeByName(themeName);
   }
 
+  /**
+   * Gets all available themes.
+   * @returns A list of all available themes.
+   */
+  getAllThemes(): Theme[] {
+    return [...this.availableThemes, ...Array.from(this.customThemes.values())];
+  }
+
   private isPath(themeName: string): boolean {
     return (
       themeName.endsWith('.json') ||

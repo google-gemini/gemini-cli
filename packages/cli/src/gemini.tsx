@@ -17,11 +17,14 @@ import dns from 'node:dns';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
 import {
+  loadTrustedFolders,
+  type TrustedFoldersError,
+} from './config/trustedFolders.js';
+import {
   loadSettings,
   migrateDeprecatedSettings,
   SettingScope,
 } from './config/settings.js';
-import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -33,7 +36,6 @@ import {
   runExitCleanup,
   registerTelemetryConfig,
 } from './utils/cleanup.js';
-import { getCliVersion } from './utils/version.js';
 import {
   type Config,
   type ResumedSessionData,
@@ -63,6 +65,7 @@ import {
   SessionEndReason,
   fireSessionStartHook,
   fireSessionEndHook,
+  getVersion,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -73,7 +76,6 @@ import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
 import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
-import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
@@ -98,6 +100,7 @@ import { requestConsentNonInteractive } from './config/extensions/consent.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
+import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 
 const SLOW_RENDER_MS = 200;
@@ -196,7 +199,7 @@ export async function startInteractiveUI(
     });
   }
 
-  const version = await getCliVersion();
+  const version = await getVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
   const consolePatcher = new ConsolePatcher({
@@ -300,6 +303,19 @@ export async function main() {
   const settings = loadSettings();
   loadSettingsHandle?.end();
 
+  // Report settings errors once during startup
+  settings.errors.forEach((error) => {
+    coreEvents.emitFeedback('warning', error.message);
+  });
+
+  const trustedFolders = loadTrustedFolders();
+  trustedFolders.errors.forEach((error: TrustedFoldersError) => {
+    coreEvents.emitFeedback(
+      'warning',
+      `Error in ${error.path}: ${error.message}`,
+    );
+  });
+
   const migrateHandle = startupProfiler.start('migrate_settings');
   migrateDeprecatedSettings(
     settings,
@@ -360,19 +376,6 @@ export async function main() {
     }
   }
 
-  // Load custom themes from settings
-  themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
-
-  if (settings.merged.ui?.theme) {
-    if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
-      // If the theme is not found during initial load, log a warning and continue.
-      // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
-      debugLogger.warn(
-        `Warning: Theme "${settings.merged.ui?.theme}" not found.`,
-      );
-    }
-  }
-
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {
     const memoryArgs = settings.merged.advanced?.autoConfigureMemory
@@ -390,6 +393,7 @@ export async function main() {
         settings.merged,
         sessionId,
         argv,
+        { projectHooks: settings.workspace.settings.hooks },
       );
 
       if (
@@ -461,7 +465,9 @@ export async function main() {
   // may have side effects.
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
-    const config = await loadCliConfig(settings.merged, sessionId, argv);
+    const config = await loadCliConfig(settings.merged, sessionId, argv, {
+      projectHooks: settings.workspace.settings.hooks,
+    });
     loadConfigHandle?.end();
 
     // Register config for telemetry shutdown
@@ -498,6 +504,20 @@ export async function main() {
 
     // Handle --list-sessions flag
     if (config.getListSessions()) {
+      // Attempt auth for summary generation (gracefully skips if not configured)
+      const authType = settings.merged.security?.auth?.selectedType;
+      if (authType) {
+        try {
+          await config.refreshAuth(authType);
+        } catch (e) {
+          // Auth failed - continue without summary generation capability
+          debugLogger.debug(
+            'Auth failed for --list-sessions, summaries may not be generated:',
+            e,
+          );
+        }
+      }
+
       await listSessions(config);
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
@@ -536,10 +556,9 @@ export async function main() {
       process.on('SIGINT', () => {
         process.stdin.setRawMode(wasRaw);
       });
-
-      // Detect and enable Kitty keyboard protocol once at startup.
-      await detectAndEnableKittyProtocol();
     }
+
+    await setupTerminalAndTheme(config, settings);
 
     setMaxSizedBoxDebugging(isDebugMode);
     const initAppHandle = startupProfiler.start('initialize_app');

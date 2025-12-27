@@ -222,7 +222,11 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       newContent: correctedContent,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          // No need to publish a policy update as the default policy for
+          // AUTO_EDIT already reflects always approving write-file.
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+        } else {
+          await this.publishPolicyUpdate(outcome);
         }
 
         if (ideConfirmation) {

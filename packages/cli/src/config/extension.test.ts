@@ -749,6 +749,17 @@ describe('extension tests', () => {
           JSON.stringify(hooksConfig),
         );
 
+        const settings = loadSettings(tempWorkspaceDir).merged;
+        if (!settings.tools) settings.tools = {};
+        settings.tools.enableHooks = true;
+
+        extensionManager = new ExtensionManager({
+          workspaceDir: tempWorkspaceDir,
+          requestConsent: mockRequestConsent,
+          requestSetting: mockPromptForSettings,
+          settings,
+        });
+
         const extensions = await extensionManager.loadExtensions();
         expect(extensions).toHaveLength(1);
         const extension = extensions[0];
@@ -758,6 +769,36 @@ describe('extension tests', () => {
         expect(extension.hooks?.BeforeTool?.[0].hooks[0].command).toBe(
           `echo ${extDir}`,
         );
+      });
+
+      it('should not load hooks if enableHooks is false', async () => {
+        const extDir = createExtension({
+          extensionsDir: userExtensionsDir,
+          name: 'hook-extension-disabled',
+          version: '1.0.0',
+        });
+
+        const hooksDir = path.join(extDir, 'hooks');
+        fs.mkdirSync(hooksDir);
+        fs.writeFileSync(
+          path.join(hooksDir, 'hooks.json'),
+          JSON.stringify({ hooks: { BeforeTool: [] } }),
+        );
+
+        const settings = loadSettings(tempWorkspaceDir).merged;
+        if (!settings.tools) settings.tools = {};
+        settings.tools.enableHooks = false;
+
+        extensionManager = new ExtensionManager({
+          workspaceDir: tempWorkspaceDir,
+          requestConsent: mockRequestConsent,
+          requestSetting: mockPromptForSettings,
+          settings,
+        });
+
+        const extensions = await extensionManager.loadExtensions();
+        expect(extensions).toHaveLength(1);
+        expect(extensions[0].hooks).toBeUndefined();
       });
 
       it('should warn about hooks during installation', async () => {
@@ -1383,9 +1424,10 @@ This extension will run the following MCP servers:
         ],
       });
 
-      const previousExtensionConfig = extensionManager.loadExtensionConfig(
-        path.join(userExtensionsDir, 'my-local-extension'),
-      );
+      const previousExtensionConfig =
+        await extensionManager.loadExtensionConfig(
+          path.join(userExtensionsDir, 'my-local-extension'),
+        );
       mockPromptForSettings.mockResolvedValueOnce('new-setting-value');
 
       // 3. Call installOrUpdateExtension to perform the update.
@@ -1440,9 +1482,10 @@ This extension will run the following MCP servers:
         ],
       });
 
-      const previousExtensionConfig = extensionManager.loadExtensionConfig(
-        path.join(userExtensionsDir, 'my-auto-update-ext'),
-      );
+      const previousExtensionConfig =
+        await extensionManager.loadExtensionConfig(
+          path.join(userExtensionsDir, 'my-auto-update-ext'),
+        );
 
       // 3. Attempt to update and assert it fails
       await expect(
@@ -1730,6 +1773,7 @@ This extension will run the following MCP servers:
         } else {
           expect(mockLogExtensionUninstall).toHaveBeenCalled();
           expect(ExtensionUninstallEvent).toHaveBeenCalledWith(
+            'my-local-extension',
             hashValue('my-local-extension'),
             hashValue(userExtensionsDir),
             'success',
@@ -1777,6 +1821,7 @@ This extension will run the following MCP servers:
       expect(fs.existsSync(sourceExtDir)).toBe(false);
       expect(mockLogExtensionUninstall).toHaveBeenCalled();
       expect(ExtensionUninstallEvent).toHaveBeenCalledWith(
+        'gemini-sql-extension',
         hashValue('gemini-sql-extension'),
         hashValue('https://github.com/google/gemini-sql-extension'),
         'success',
@@ -1894,6 +1939,7 @@ This extension will run the following MCP servers:
 
       expect(mockLogExtensionDisable).toHaveBeenCalled();
       expect(ExtensionDisableEvent).toHaveBeenCalledWith(
+        'ext1',
         hashValue('ext1'),
         hashValue(userExtensionsDir),
         SettingScope.Workspace,
@@ -1923,7 +1969,7 @@ This extension will run the following MCP servers:
       expect(activeExtensions).toHaveLength(0);
 
       await extensionManager.enableExtension('ext1', SettingScope.User);
-      activeExtensions = await getActiveExtensions();
+      activeExtensions = getActiveExtensions();
       expect(activeExtensions).toHaveLength(1);
       expect(activeExtensions[0].name).toBe('ext1');
     });
@@ -1940,7 +1986,7 @@ This extension will run the following MCP servers:
       expect(activeExtensions).toHaveLength(0);
 
       await extensionManager.enableExtension('ext1', SettingScope.Workspace);
-      activeExtensions = await getActiveExtensions();
+      activeExtensions = getActiveExtensions();
       expect(activeExtensions).toHaveLength(1);
       expect(activeExtensions[0].name).toBe('ext1');
     });
@@ -1961,6 +2007,7 @@ This extension will run the following MCP servers:
 
       expect(mockLogExtensionEnable).toHaveBeenCalled();
       expect(ExtensionEnableEvent).toHaveBeenCalledWith(
+        'ext1',
         hashValue('ext1'),
         hashValue(userExtensionsDir),
         SettingScope.Workspace,

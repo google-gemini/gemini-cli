@@ -24,7 +24,7 @@
         "slug": "docs/get-started"
       },
       {
-        "label": "Gemini 3 Pro on Gemini CLI",
+        "label": "Gemini 3 on Gemini CLI",
         "slug": "docs/get-started/gemini-3"
       },
       {
@@ -115,6 +115,10 @@
       {
         "label": "Uninstall",
         "slug": "docs/cli/uninstall"
+      },
+      {
+        "label": "System prompt override",
+        "slug": "docs/cli/system-prompt"
       }
     ]
   },
@@ -205,6 +209,10 @@
         "slug": "docs/hooks/writing-hooks"
       },
       {
+        "label": "Hooks reference",
+        "slug": "docs/hooks/reference"
+      },
+      {
         "label": "Best practices",
         "slug": "docs/hooks/best-practices"
       }
@@ -235,16 +243,33 @@
         "slug": "docs/releases"
       },
       {
-        "label": "Changelog",
-        "slug": "docs/changelogs"
-      },
-      {
         "label": "Integration tests",
         "slug": "docs/integration-tests"
       },
       {
         "label": "Issue and PR automation",
         "slug": "docs/issue-and-pr-automation"
+      }
+    ]
+  },
+  {
+    "label": "Releases",
+    "items": [
+      {
+        "label": "Release notes",
+        "slug": "docs/changelogs/"
+      },
+      {
+        "label": "Latest release",
+        "slug": "docs/changelogs/latest"
+      },
+      {
+        "label": "Preview release",
+        "slug": "docs/changelogs/preview"
+      },
+      {
+        "label": "Changelog",
+        "slug": "docs/changelogs/releases"
       }
     ]
   },

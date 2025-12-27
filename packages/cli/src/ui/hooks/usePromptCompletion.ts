@@ -142,8 +142,6 @@ export function usePromptCompletion({
         debugLogger.warn(
           `[WARN] prompt completion failed: : (${error instanceof Error ? error.message : String(error)})`,
         );
-        // Clear the last requested text to allow retry only on real errors
-        lastRequestedTextRef.current = '';
       }
       clearGhostText();
     } finally {
@@ -181,6 +179,7 @@ export function usePromptCompletion({
       lastSelectedTextRef.current = '';
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     generatePromptSuggestions();
   }, [
     buffer.text,

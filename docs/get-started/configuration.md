@@ -367,6 +367,12 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3-pro-preview"
         }
       },
+      "gemini-3-flash-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
+        }
+      },
       "gemini-2.5-pro": {
         "extends": "chat-base-2.5",
         "modelConfig": {
@@ -496,6 +502,11 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3-pro-preview"
         }
       },
+      "chat-compression-3-flash": {
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
+        }
+      },
       "chat-compression-2.5-pro": {
         "modelConfig": {
           "model": "gemini-2.5-pro"
@@ -523,6 +534,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Custom named presets for model configs. These are merged
     with (and override) the built-in aliases.
   - **Default:** `{}`
+
+- **`modelConfigs.customOverrides`** (array):
+  - **Description:** Custom model config overrides. These are merged with (and
+    added to) the built-in overrides.
+  - **Default:** `[]`
 
 - **`modelConfigs.overrides`** (array):
   - **Description:** Apply specific configuration overrides based on matches,
@@ -604,6 +620,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** The maximum time in seconds allowed without output from the
     shell command. Defaults to 5 minutes.
   - **Default:** `300`
+
+- **`tools.shell.enableShellOutputEfficiency`** (boolean):
+  - **Description:** Enable shell output efficiency optimizations for better
+    performance.
+  - **Default:** `true`
 
 - **`tools.autoAccept`** (boolean):
   - **Description:** Automatically accept and execute tool calls that are
@@ -715,6 +736,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`security.enablePermanentToolApproval`** (boolean):
+  - **Description:** Enable the "Allow for all future sessions" option in tool
+    confirmation dialogs.
+  - **Default:** `false`
+
 - **`security.blockGitExtensions`** (boolean):
   - **Description:** Blocks installing and loading extensions from Git.
   - **Default:** `false`
@@ -722,6 +748,22 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`security.folderTrust.enabled`** (boolean):
   - **Description:** Setting to track whether Folder trust is enabled.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`security.environmentVariableRedaction.allowed`** (array):
+  - **Description:** Environment variables to always allow (bypass redaction).
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
+- **`security.environmentVariableRedaction.blocked`** (array):
+  - **Description:** Environment variables to always redact.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
+- **`security.environmentVariableRedaction.enabled`** (boolean):
+  - **Description:** Enable redaction of environment variables that may contain
+    secrets.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -768,7 +810,8 @@ their corresponding top-level category object in your `settings.json` file.
 #### `experimental`
 
 - **`experimental.enableAgents`** (boolean):
-  - **Description:** Enable local and remote subagents.
+  - **Description:** Enable local and remote subagents. Warning: Experimental
+    feature, uses YOLO mode for subagents
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -779,11 +822,6 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.extensionReloading`** (boolean):
   - **Description:** Enables extension loading/unloading within the CLI session.
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
-- **`experimental.isModelAvailabilityServiceEnabled`** (boolean):
-  - **Description:** Enable model routing using new availability service.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -816,7 +854,12 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.codebaseInvestigatorSettings.model`** (string):
   - **Description:** The model to use for the Codebase Investigator agent.
-  - **Default:** `"gemini-2.5-pro"`
+  - **Default:** `"auto"`
+  - **Requires restart:** Yes
+
+- **`experimental.introspectionAgentSettings.enabled`** (boolean):
+  - **Description:** Enable the Introspection Agent.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 #### `hooks`
@@ -1112,6 +1155,18 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GEMINI_SANDBOX`**:
   - Alternative to the `sandbox` setting in `settings.json`.
   - Accepts `true`, `false`, `docker`, `podman`, or a custom command string.
+- **`GEMINI_SYSTEM_MD`**:
+  - Replaces the built‑in system prompt with content from a Markdown file.
+  - `true`/`1`: Use project default path `./.gemini/system.md`.
+  - Any other string: Treat as a path (relative/absolute supported, `~`
+    expands).
+  - `false`/`0` or unset: Use the built‑in prompt. See
+    [System Prompt Override](../cli/system-prompt.md).
+- **`GEMINI_WRITE_SYSTEM_MD`**:
+  - Writes the current built‑in system prompt to a file for review.
+  - `true`/`1`: Write to `./.gemini/system.md`. Otherwise treat the value as a
+    path.
+  - Run the CLI once with this set to generate the file.
 - **`SEATBELT_PROFILE`** (macOS specific):
   - Switches the Seatbelt (`sandbox-exec`) profile on macOS.
   - `permissive-open`: (Default) Restricts writes to the project folder (and a
@@ -1136,6 +1191,52 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`CODE_ASSIST_ENDPOINT`**:
   - Specifies the endpoint for the code assist server.
   - This is useful for development and testing.
+
+### Environment variable redaction
+
+To prevent accidental leakage of sensitive information, Gemini CLI automatically
+redacts potential secrets from environment variables when executing tools (such
+as shell commands). This "best effort" redaction applies to variables inherited
+from the system or loaded from `.env` files.
+
+**Default Redaction Rules:**
+
+- **By Name:** Variables are redacted if their names contain sensitive terms
+  like `TOKEN`, `SECRET`, `PASSWORD`, `KEY`, `AUTH`, `CREDENTIAL`, `PRIVATE`, or
+  `CERT`.
+- **By Value:** Variables are redacted if their values match known secret
+  patterns, such as:
+  - Private keys (RSA, OpenSSH, PGP, etc.)
+  - Certificates
+  - URLs containing credentials
+  - API keys and tokens (GitHub, Google, AWS, Stripe, Slack, etc.)
+- **Specific Blocklist:** Certain variables like `CLIENT_ID`, `DB_URI`,
+  `DATABASE_URL`, and `CONNECTION_STRING` are always redacted by default.
+
+**Allowlist (Never Redacted):**
+
+- Common system variables (e.g., `PATH`, `HOME`, `USER`, `SHELL`, `TERM`,
+  `LANG`).
+- Variables starting with `GEMINI_CLI_`.
+- GitHub Action specific variables.
+
+**Configuration:**
+
+You can customize this behavior in your `settings.json` file:
+
+- **`security.allowedEnvironmentVariables`**: A list of variable names to
+  _never_ redact, even if they match sensitive patterns.
+- **`security.blockedEnvironmentVariables`**: A list of variable names to
+  _always_ redact, even if they don't match sensitive patterns.
+
+```json
+{
+  "security": {
+    "allowedEnvironmentVariables": ["MY_PUBLIC_KEY", "NOT_A_SECRET_TOKEN"],
+    "blockedEnvironmentVariables": ["INTERNAL_IP_ADDRESS"]
+  }
+}
+```
 
 ## Command-line arguments
 

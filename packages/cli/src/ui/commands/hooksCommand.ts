@@ -213,7 +213,7 @@ function completeHookNames(
  * Get a display name for a hook
  */
 function getHookDisplayName(hook: HookRegistryEntry): string {
-  return hook.config.command || 'unknown-hook';
+  return hook.config.name || hook.config.command || 'unknown-hook';
 }
 
 const panelCommand: SlashCommand = {
@@ -228,6 +228,7 @@ const enableCommand: SlashCommand = {
   name: 'enable',
   description: 'Enable a hook by name',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: enableAction,
   completion: completeHookNames,
 };
@@ -236,6 +237,7 @@ const disableCommand: SlashCommand = {
   name: 'disable',
   description: 'Disable a hook by name',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: disableAction,
   completion: completeHookNames,
 };

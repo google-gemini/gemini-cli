@@ -11,7 +11,6 @@ import { PolicyDecision, getHookSource } from '../policy/types.js';
 import {
   MessageBusType,
   type Message,
-  type HookExecutionRequest,
   type HookPolicyDecision,
 } from './types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
@@ -91,7 +90,7 @@ export class MessageBus extends EventEmitter {
         }
       } else if (message.type === MessageBusType.HOOK_EXECUTION_REQUEST) {
         // Handle hook execution requests through policy evaluation
-        const hookRequest = message as HookExecutionRequest;
+        const hookRequest = message;
         const decision = await this.policyEngine.checkHook(hookRequest);
 
         // Map decision to allow/deny for observability (ASK_USER treated as deny for hooks)
@@ -183,6 +182,7 @@ export class MessageBus extends EventEmitter {
       this.subscribe<TResponse>(responseType, responseHandler);
 
       // Publish the request with correlation ID
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       this.publish({ ...request, correlationId } as TRequest);
     });
   }

@@ -30,7 +30,7 @@ import {
   type ChatCompressionInfo,
 } from './turn.js';
 import { getCoreSystemPrompt } from './prompts.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { DEFAULT_GEMINI_MODEL_AUTO } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { tokenLimit } from './tokenLimits.js';
@@ -38,12 +38,15 @@ import { ideContextStore } from '../ide/ideContext.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { createAvailabilityServiceMock } from '../availability/testUtils.js';
+import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import type {
   ModelConfigKey,
   ResolvedModelConfig,
 } from '../services/modelConfigService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { HookSystem } from '../hooks/hookSystem.js';
+import * as policyCatalog from '../availability/policyCatalog.js';
 
 vi.mock('../services/chatCompressionService.js');
 
@@ -145,6 +148,7 @@ describe('Gemini Client (client.ts)', () => {
   let mockConfig: Config;
   let client: GeminiClient;
   let mockGenerateContentFn: Mock;
+  let mockRouterService: { route: Mock };
   beforeEach(async () => {
     vi.resetAllMocks();
     ClearcutLogger.clearInstance();
@@ -165,6 +169,12 @@ describe('Gemini Client (client.ts)', () => {
 
     // Disable 429 simulation for tests
     setSimulate429(false);
+
+    mockRouterService = {
+      route: vi
+        .fn()
+        .mockResolvedValue({ model: 'default-routed-model', reason: 'test' }),
+    };
 
     mockContentGenerator = {
       generateContent: mockGenerateContentFn,
@@ -192,11 +202,15 @@ describe('Gemini Client (client.ts)', () => {
         .mockReturnValue(contentGeneratorConfig),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getModel: vi.fn().mockReturnValue('test-model'),
+      getUserTier: vi.fn().mockReturnValue(undefined),
       getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
       getApiKey: vi.fn().mockReturnValue('test-key'),
       getVertexAI: vi.fn().mockReturnValue(false),
       getUserAgent: vi.fn().mockReturnValue('test-agent'),
       getUserMemory: vi.fn().mockReturnValue(''),
+      getGlobalMemory: vi.fn().mockReturnValue(''),
+      getEnvironmentMemory: vi.fn().mockReturnValue(''),
+      isJitContextEnabled: vi.fn().mockReturnValue(false),
 
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProxy: vi.fn().mockReturnValue(undefined),
@@ -215,13 +229,11 @@ describe('Gemini Client (client.ts)', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getGeminiClient: vi.fn(),
-      getModelRouterService: vi.fn().mockReturnValue({
-        route: vi.fn().mockResolvedValue({ model: 'default-routed-model' }),
-      }),
+      getModelRouterService: vi
+        .fn()
+        .mockReturnValue(mockRouterService as unknown as ModelRouterService),
       getMessageBus: vi.fn().mockReturnValue(undefined),
       getEnableHooks: vi.fn().mockReturnValue(false),
-      isInFallbackMode: vi.fn().mockReturnValue(false),
-      setFallbackMode: vi.fn(),
       getChatCompression: vi.fn().mockReturnValue(undefined),
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
       getUseSmartEdit: vi.fn().mockReturnValue(false),
@@ -251,6 +263,12 @@ describe('Gemini Client (client.ts)', () => {
       },
       isInteractive: vi.fn().mockReturnValue(false),
       getExperiments: () => {},
+      getActiveModel: vi.fn().mockReturnValue('test-model'),
+      setActiveModel: vi.fn(),
+      resetTurn: vi.fn(),
+      getModelAvailabilityService: vi
+        .fn()
+        .mockReturnValue(createAvailabilityServiceMock()),
     } as unknown as Config;
     mockConfig.getHookSystem = vi
       .fn()
@@ -288,12 +306,12 @@ describe('Gemini Client (client.ts)', () => {
     it('should create a new chat session, clearing the old history', async () => {
       // 1. Get the initial chat instance and add some history.
       const initialChat = client.getChat();
-      const initialHistory = await client.getHistory();
+      const initialHistory = client.getHistory();
       await client.addHistory({
         role: 'user',
         parts: [{ text: 'some old message' }],
       });
-      const historyWithOldMessage = await client.getHistory();
+      const historyWithOldMessage = client.getHistory();
       expect(historyWithOldMessage.length).toBeGreaterThan(
         initialHistory.length,
       );
@@ -303,7 +321,7 @@ describe('Gemini Client (client.ts)', () => {
 
       // 3. Get the new chat instance and its history.
       const newChat = client.getChat();
-      const newHistory = await client.getHistory();
+      const newHistory = client.getHistory();
 
       // 4. Assert that the chat instance is new and the history is reset.
       expect(newChat).not.toBe(initialChat);
@@ -1515,68 +1533,39 @@ ${JSON.stringify(
           expect.any(AbortSignal),
         );
       });
+    });
 
-      it('should use the fallback model and bypass routing when in fallback mode', async () => {
-        vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(true);
-        mockRouterService.route.mockResolvedValue({
-          model: DEFAULT_GEMINI_FLASH_MODEL,
-          reason: 'fallback',
-        });
+    it('should use getGlobalMemory for system instruction when JIT is enabled', async () => {
+      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(true);
+      vi.mocked(mockConfig.getGlobalMemory).mockReturnValue(
+        'Global JIT Memory',
+      );
+      vi.mocked(mockConfig.getUserMemory).mockReturnValue('Full JIT Memory');
 
-        const stream = client.sendMessageStream(
-          [{ text: 'Hi' }],
-          new AbortController().signal,
-          'prompt-1',
-        );
-        await fromAsync(stream);
+      const { getCoreSystemPrompt } = await import('./prompts.js');
+      const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
 
-        expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: DEFAULT_GEMINI_FLASH_MODEL },
-          [{ text: 'Hi' }],
-          expect.any(AbortSignal),
-        );
-      });
+      await client.updateSystemInstruction();
 
-      it('should stick to the fallback model for the entire sequence even if fallback mode ends', async () => {
-        // Start the sequence in fallback mode
-        vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(true);
-        mockRouterService.route.mockResolvedValue({
-          model: DEFAULT_GEMINI_FLASH_MODEL,
-          reason: 'fallback',
-        });
-        let stream = client.sendMessageStream(
-          [{ text: 'Hi' }],
-          new AbortController().signal,
-          'prompt-fallback-stickiness',
-        );
-        await fromAsync(stream);
+      expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
+        mockConfig,
+        'Global JIT Memory',
+      );
+    });
 
-        // First call should use fallback model
-        expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: DEFAULT_GEMINI_FLASH_MODEL },
-          [{ text: 'Hi' }],
-          expect.any(AbortSignal),
-        );
+    it('should use getUserMemory for system instruction when JIT is disabled', async () => {
+      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(false);
+      vi.mocked(mockConfig.getUserMemory).mockReturnValue('Legacy Memory');
 
-        // End fallback mode
-        vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(false);
+      const { getCoreSystemPrompt } = await import('./prompts.js');
+      const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
 
-        // Second call in the same sequence
-        stream = client.sendMessageStream(
-          [{ text: 'Continue' }],
-          new AbortController().signal,
-          'prompt-fallback-stickiness',
-        );
-        await fromAsync(stream);
+      await client.updateSystemInstruction();
 
-        // Router should still not be called, and it should stick to the fallback model
-        expect(mockTurnRunFn).toHaveBeenCalledTimes(2); // Ensure it was called again
-        expect(mockTurnRunFn).toHaveBeenLastCalledWith(
-          { model: DEFAULT_GEMINI_FLASH_MODEL }, // Still the fallback model
-          [{ text: 'Continue' }],
-          expect.any(AbortSignal),
-        );
-      });
+      expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
+        mockConfig,
+        'Legacy Memory',
+      );
     });
 
     it('should recursively call sendMessageStream with "Please continue." when InvalidStream event is received', async () => {
@@ -1614,6 +1603,7 @@ ${JSON.stringify(
       expect(events).toEqual([
         { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
         { type: GeminiEventType.InvalidStream },
+        { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
         { type: GeminiEventType.Content, value: 'Continued content' },
       ]);
 
@@ -1701,8 +1691,8 @@ ${JSON.stringify(
       const events = await fromAsync(stream);
 
       // Assert
-      // We expect 3 events (model_info + original + 1 retry)
-      expect(events.length).toBe(3);
+      // We expect 4 events (model_info + original + model_info + 1 retry)
+      expect(events.length).toBe(4);
       expect(
         events
           .filter((e) => e.type !== GeminiEventType.ModelInfo)
@@ -1974,6 +1964,155 @@ ${JSON.stringify(
         );
         expect(contextJson).toHaveProperty('activeFile');
         expect(contextJson.activeFile.path).toBe('/path/to/active/file.ts');
+      });
+    });
+
+    describe('Availability Service Integration', () => {
+      let mockAvailabilityService: ModelAvailabilityService;
+
+      beforeEach(() => {
+        mockAvailabilityService = createAvailabilityServiceMock();
+
+        vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
+          mockAvailabilityService,
+        );
+        vi.mocked(mockConfig.setActiveModel).mockClear();
+        mockRouterService.route.mockResolvedValue({
+          model: 'model-a',
+          reason: 'test',
+        });
+        vi.mocked(mockConfig.getModelRouterService).mockReturnValue(
+          mockRouterService as unknown as ModelRouterService,
+        );
+        vi.spyOn(policyCatalog, 'getModelPolicyChain').mockReturnValue([
+          {
+            model: 'model-a',
+            isLastResort: false,
+            actions: {},
+            stateTransitions: {},
+          },
+          {
+            model: 'model-b',
+            isLastResort: true,
+            actions: {},
+            stateTransitions: {},
+          },
+        ]);
+
+        mockTurnRunFn.mockReturnValue(
+          (async function* () {
+            yield { type: 'content', value: 'Hello' };
+          })(),
+        );
+      });
+
+      it('should select first available model, set active, and not consume sticky attempt (done lower in chain)', async () => {
+        vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue(
+          {
+            selectedModel: 'model-a',
+            attempts: 1,
+            skipped: [],
+          },
+        );
+        vi.mocked(mockConfig.getModel).mockReturnValue(
+          DEFAULT_GEMINI_MODEL_AUTO,
+        );
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-avail',
+        );
+        await fromAsync(stream);
+
+        expect(
+          mockAvailabilityService.selectFirstAvailable,
+        ).toHaveBeenCalledWith(['model-a', 'model-b']);
+        expect(mockConfig.setActiveModel).toHaveBeenCalledWith('model-a');
+        expect(
+          mockAvailabilityService.consumeStickyAttempt,
+        ).not.toHaveBeenCalled();
+        // Ensure turn.run used the selected model
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          expect.objectContaining({ model: 'model-a' }),
+          expect.anything(),
+          expect.anything(),
+        );
+      });
+
+      it('should default to last resort model if selection returns null', async () => {
+        vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue(
+          {
+            selectedModel: null,
+            skipped: [],
+          },
+        );
+        vi.mocked(mockConfig.getModel).mockReturnValue(
+          DEFAULT_GEMINI_MODEL_AUTO,
+        );
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-avail-fallback',
+        );
+        await fromAsync(stream);
+
+        expect(mockConfig.setActiveModel).toHaveBeenCalledWith('model-b'); // Last resort
+        expect(
+          mockAvailabilityService.consumeStickyAttempt,
+        ).not.toHaveBeenCalled();
+      });
+
+      it('should reset turn on new message stream', async () => {
+        vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue(
+          {
+            selectedModel: 'model-a',
+            skipped: [],
+          },
+        );
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-reset',
+        );
+        await fromAsync(stream);
+
+        expect(mockConfig.resetTurn).toHaveBeenCalled();
+      });
+
+      it('should NOT reset turn on invalid stream retry', async () => {
+        vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue(
+          {
+            selectedModel: 'model-a',
+            skipped: [],
+          },
+        );
+        // We simulate a retry by calling sendMessageStream with isInvalidStreamRetry=true
+        // But the public API doesn't expose that argument directly unless we use the private method or simulate the recursion.
+        // We can simulate recursion by mocking turn run to return invalid stream once.
+
+        vi.spyOn(
+          client['config'],
+          'getContinueOnFailedApiCall',
+        ).mockReturnValue(true);
+        const mockStream1 = (async function* () {
+          yield { type: GeminiEventType.InvalidStream };
+        })();
+        const mockStream2 = (async function* () {
+          yield { type: 'content', value: 'ok' };
+        })();
+        mockTurnRunFn
+          .mockReturnValueOnce(mockStream1)
+          .mockReturnValueOnce(mockStream2);
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-retry',
+        );
+        await fromAsync(stream);
+
+        // resetTurn should be called once (for the initial call) but NOT for the recursive call
+        expect(mockConfig.resetTurn).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -2439,14 +2578,14 @@ ${JSON.stringify(
       const abortSignal = new AbortController().signal;
 
       await client.generateContent(
-        { model: DEFAULT_GEMINI_FLASH_MODEL },
+        { model: 'test-model' },
         contents,
         abortSignal,
       );
 
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
         {
-          model: DEFAULT_GEMINI_FLASH_MODEL,
+          model: 'test-model',
           config: {
             abortSignal,
             systemInstruction: getCoreSystemPrompt({} as unknown as Config, ''),
@@ -2460,50 +2599,18 @@ ${JSON.stringify(
     });
 
     it('should use current model from config for content generation', async () => {
-      const initialModel = client['config'].getModel();
+      const initialModel = 'test-model';
       const contents = [{ role: 'user', parts: [{ text: 'test' }] }];
-      const currentModel = initialModel + '-changed';
-
-      vi.spyOn(client['config'], 'getModel').mockReturnValueOnce(currentModel);
 
       await client.generateContent(
-        { model: DEFAULT_GEMINI_FLASH_MODEL },
+        { model: initialModel },
         contents,
         new AbortController().signal,
       );
 
-      expect(mockContentGenerator.generateContent).not.toHaveBeenCalledWith({
-        model: initialModel,
-        config: expect.any(Object),
-        contents,
-      });
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
-        {
-          model: DEFAULT_GEMINI_FLASH_MODEL,
-          config: expect.any(Object),
-          contents,
-        },
-        'test-session-id',
-      );
-    });
-
-    it('should use the Flash model when fallback mode is active', async () => {
-      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
-      const abortSignal = new AbortController().signal;
-      const requestedModel = 'gemini-2.5-pro'; // A non-flash model
-
-      // Mock config to be in fallback mode
-      vi.spyOn(client['config'], 'isInFallbackMode').mockReturnValue(true);
-
-      await client.generateContent(
-        { model: requestedModel },
-        contents,
-        abortSignal,
-      );
-
-      expect(mockGenerateContentFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: DEFAULT_GEMINI_FLASH_MODEL,
+          model: initialModel,
         }),
         'test-session-id',
       );

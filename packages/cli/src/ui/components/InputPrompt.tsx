@@ -27,7 +27,7 @@ import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode } from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
-  buildSegmentsForVisualSlice,
+  parseSegmentsFromTokens,
 } from '../utils/highlight.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import {
@@ -373,6 +373,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   useMouse(
     (event: MouseEvent) => {
       if (event.name === 'right-release') {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleClipboardPaste();
       }
     },
@@ -588,7 +589,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // If the command is a perfect match, pressing enter should execute it.
-      if (completion.isPerfectMatch && keyMatchers[Command.RETURN](key)) {
+      // We prioritize execution unless the user is explicitly selecting a different suggestion.
+      if (
+        completion.isPerfectMatch &&
+        keyMatchers[Command.RETURN](key) &&
+        (!completion.showSuggestions || completion.activeSuggestionIndex <= 0)
+      ) {
         handleSubmit(buffer.text);
         return;
       }
@@ -620,15 +626,40 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               const isEnterKey = key.name === 'return' && !key.ctrl;
 
               if (isEnterKey && buffer.text.startsWith('/')) {
-                const command = completion.getCommandFromSuggestion(suggestion);
+                const { isArgumentCompletion, leafCommand } =
+                  completion.slashCompletionRange;
 
-                if (command && isAutoExecutableCommand(command)) {
+                if (
+                  isArgumentCompletion &&
+                  isAutoExecutableCommand(leafCommand)
+                ) {
+                  // isArgumentCompletion guarantees leafCommand exists
                   const completedText = completion.getCompletedText(suggestion);
-
                   if (completedText) {
                     setExpandedSuggestionIndex(-1);
                     handleSubmit(completedText.trim());
                     return;
+                  }
+                } else if (!isArgumentCompletion) {
+                  // Existing logic for command name completion
+                  const command =
+                    completion.getCommandFromSuggestion(suggestion);
+
+                  // Only auto-execute if the command has no completion function
+                  // (i.e., it doesn't require an argument to be selected)
+                  if (
+                    command &&
+                    isAutoExecutableCommand(command) &&
+                    !command.completion
+                  ) {
+                    const completedText =
+                      completion.getCompletedText(suggestion);
+
+                    if (completedText) {
+                      setExpandedSuggestionIndex(-1);
+                      handleSubmit(completedText.trim());
+                      return;
+                    }
                   }
                 }
               }
@@ -779,12 +810,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // External editor
       if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         buffer.openInExternalEditor();
         return;
       }
 
       // Ctrl+V for clipboard paste
       if (keyMatchers[Command.PASTE_CLIPBOARD](key)) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleClipboardPaste();
         return;
       }
@@ -1068,21 +1101,27 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
                 const renderedLine: React.ReactNode[] = [];
 
-                const [logicalLineIdx, logicalStartCol] = mapEntry;
+                const [logicalLineIdx] = mapEntry;
                 const logicalLine = buffer.lines[logicalLineIdx] || '';
+                const transformations =
+                  buffer.transformationsByLine[logicalLineIdx] ?? [];
                 const tokens = parseInputForHighlighting(
                   logicalLine,
                   logicalLineIdx,
+                  transformations,
+                  ...(focus && buffer.cursor[0] === logicalLineIdx
+                    ? [buffer.cursor[1]]
+                    : []),
                 );
-
-                const visualStart = logicalStartCol;
-                const visualEnd = logicalStartCol + cpLen(lineText);
-                const segments = buildSegmentsForVisualSlice(
+                const startColInTransformed =
+                  buffer.visualToTransformedMap[absoluteVisualIdx] ?? 0;
+                const visualStartCol = startColInTransformed;
+                const visualEndCol = visualStartCol + cpLen(lineText);
+                const segments = parseSegmentsFromTokens(
                   tokens,
-                  visualStart,
-                  visualEnd,
+                  visualStartCol,
+                  visualEndCol,
                 );
-
                 let charCount = 0;
                 segments.forEach((seg, segIdx) => {
                   const segLen = cpLen(seg.text);
@@ -1098,7 +1137,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                       relativeVisualColForHighlight < segEnd
                     ) {
                       const charToHighlight = cpSlice(
-                        seg.text,
+                        display,
                         relativeVisualColForHighlight - segStart,
                         relativeVisualColForHighlight - segStart + 1,
                       );
@@ -1107,17 +1146,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                         : charToHighlight;
                       display =
                         cpSlice(
-                          seg.text,
+                          display,
                           0,
                           relativeVisualColForHighlight - segStart,
                         ) +
                         highlighted +
                         cpSlice(
-                          seg.text,
+                          display,
                           relativeVisualColForHighlight - segStart + 1,
                         );
                     }
                     charCount = segEnd;
+                  } else {
+                    // Advance the running counter even when not on cursor line
+                    charCount += segLen;
                   }
 
                   const color =
