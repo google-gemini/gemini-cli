@@ -953,6 +953,16 @@ const SETTINGS_SCHEMA = {
               'The maximum time in seconds allowed without output from the shell command. Defaults to 5 minutes.',
             showInDialog: false,
           },
+          enableShellOutputEfficiency: {
+            type: 'boolean',
+            label: 'Enable Shell Output Efficiency',
+            category: 'Tools',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Enable shell output efficiency optimizations for better performance.',
+            showInDialog: false,
+          },
         },
       },
       autoAccept: {

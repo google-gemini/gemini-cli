@@ -1043,6 +1043,13 @@
               "markdownDescription": "The maximum time in seconds allowed without output from the shell command. Defaults to 5 minutes.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `300`",
               "default": 300,
               "type": "number"
+            },
+            "enableShellOutputEfficiency": {
+              "title": "Enable Shell Output Efficiency",
+              "description": "Enable shell output efficiency optimizations for better performance.",
+              "markdownDescription": "Enable shell output efficiency optimizations for better performance.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
             }
           },
           "additionalProperties": false

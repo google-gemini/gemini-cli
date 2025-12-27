@@ -11,6 +11,7 @@ import { spawnAsync } from '../utils/shell-utils.js';
 import type { SimpleGit } from 'simple-git';
 import { simpleGit, CheckRepoActions } from 'simple-git';
 import type { Storage } from '../config/storage.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export class GitService {
   private projectRoot: string;
@@ -67,7 +68,16 @@ export class GitService {
     await fs.writeFile(gitConfigPath, gitConfigContent);
 
     const repo = simpleGit(repoDir);
-    const isRepoDefined = await repo.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
+    let isRepoDefined = false;
+    try {
+      isRepoDefined = await repo.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
+    } catch (error) {
+      // If checkIsRepo fails (e.g., on certain Git versions like macOS 2.39.5),
+      // log the error and assume repo is not defined, then proceed with initialization
+      debugLogger.debug(
+        `checkIsRepo failed, will initialize repository: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
 
     if (!isRepoDefined) {
       await repo.init(false, {
