@@ -850,6 +850,11 @@ sandbox image:
 BUILD_SANDBOX=1 gemini -s
 ```
 
+**Note:** Custom sandbox Docker images (`.gemini/sandbox.Dockerfile`) are only
+supported when running Gemini CLI from source. This feature requires a linked
+binary from the gemini-cli repository and will not work with the installed
+version.
+
 ## Usage statistics
 
 To help us improve the Gemini CLI, we collect anonymized usage statistics. This
