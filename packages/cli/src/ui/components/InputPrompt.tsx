@@ -436,7 +436,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Prompt stashing - Ctrl+Shift+S to stash current input
+      // Prompt stashing - Ctrl+Z to stash current input
       if (keyMatchers[Command.STASH_PROMPT](key)) {
         if (buffer.text.trim()) {
           if (promptStash.stash(buffer.text)) {
@@ -447,7 +447,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Pop stash - Ctrl+Shift+R to restore stashed input
+      // Pop stash - Ctrl+Y to restore stashed input
       if (keyMatchers[Command.POP_STASH](key)) {
         const stashed = promptStash.pop();
         if (stashed) {
@@ -457,10 +457,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           if (currentText) {
             // Re-stash the current input so user can swap back
             promptStash.stash(currentText);
-            // Notify user that content was swapped
-            setQueueErrorMessage(
-              '📌 Swapped with stash (press again to swap back)',
-            );
           }
           resetCompletionState();
         }
@@ -915,7 +911,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       activePtyId,
       setEmbeddedShellFocused,
       promptStash,
-      setQueueErrorMessage,
     ],
   );
 
