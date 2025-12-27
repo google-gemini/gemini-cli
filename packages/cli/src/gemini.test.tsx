@@ -114,6 +114,7 @@ vi.mock('./config/settings.js', () => ({
       security: { auth: {} },
       ui: {},
     },
+    workspace: { settings: {} },
     setValue: vi.fn(),
     forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
     errors: [],
@@ -289,6 +290,7 @@ describe('gemini.tsx main function', () => {
         security: { auth: {} },
         ui: {},
       },
+      workspace: { settings: {} },
       setValue: vi.fn(),
       forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
     } as never);
@@ -522,6 +524,7 @@ describe('gemini.tsx main function kitty protocol', () => {
         security: { auth: {} },
         ui: {},
       },
+      workspace: { settings: {} },
       setValue: vi.fn(),
       forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
     } as never);
@@ -583,6 +586,7 @@ describe('gemini.tsx main function kitty protocol', () => {
         security: { auth: {} },
         ui: {},
       },
+      workspace: { settings: {} },
       setValue: vi.fn(),
       forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
       errors: [],
@@ -669,6 +673,7 @@ describe('gemini.tsx main function kitty protocol', () => {
         security: { auth: {} },
         ui: {},
       },
+      workspace: { settings: {} },
       setValue: vi.fn(),
       forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
       errors: [],
@@ -737,6 +742,7 @@ describe('gemini.tsx main function kitty protocol', () => {
         security: { auth: {} },
         ui: { theme: 'non-existent-theme' },
       },
+      workspace: { settings: {} },
       setValue: vi.fn(),
       forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
       errors: [],
@@ -819,6 +825,7 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     vi.mocked(loadSettings).mockReturnValue({
       merged: { advanced: {}, security: { auth: {} }, ui: { theme: 'test' } },
+      workspace: { settings: {} },
       setValue: vi.fn(),
       forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
       errors: [],
@@ -898,6 +905,7 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     vi.mocked(loadSettings).mockReturnValue({
       merged: { advanced: {}, security: { auth: {} }, ui: {} },
+      workspace: { settings: {} },
       setValue: vi.fn(),
       forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
       errors: [],
@@ -971,6 +979,7 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     vi.mocked(loadSettings).mockReturnValue({
       merged: { advanced: {}, security: { auth: {} }, ui: {} },
+      workspace: { settings: {} },
       setValue: vi.fn(),
       forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
       errors: [],
@@ -1118,6 +1127,7 @@ describe('gemini.tsx main function exit codes', () => {
         security: { auth: { selectedType: 'google', useExternal: false } },
         ui: {},
       },
+      workspace: { settings: {} },
       errors: [],
     } as never);
     vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
@@ -1174,6 +1184,7 @@ describe('gemini.tsx main function exit codes', () => {
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue({
       merged: { security: { auth: {} }, ui: {} },
+      workspace: { settings: {} },
       errors: [],
     } as never);
     vi.mocked(parseArguments).mockResolvedValue({
@@ -1237,6 +1248,7 @@ describe('gemini.tsx main function exit codes', () => {
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue({
       merged: { security: { auth: {} }, ui: {} },
+      workspace: { settings: {} },
       errors: [],
     } as never);
     vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);

@@ -6,18 +6,10 @@
 
 import type { Config } from '../config/config.js';
 import type { HookDefinition, HookConfig } from './types.js';
-import { HookEventName } from './types.js';
+import { HookEventName, ConfigSource } from './types.js';
 import { debugLogger } from '../utils/debugLogger.js';
-
-/**
- * Configuration source levels in precedence order (highest to lowest)
- */
-export enum ConfigSource {
-  Project = 'project',
-  User = 'user',
-  System = 'system',
-  Extensions = 'extensions',
-}
+import { TrustedHooksManager } from './trustedHooks.js';
+import { coreEvents } from '../utils/events.js';
 
 /**
  * Hook registry entry with source information
@@ -105,13 +97,56 @@ export class HookRegistry {
   }
 
   /**
+   * Check for untrusted project hooks and warn the user
+   */
+  private checkProjectHooksTrust(): void {
+    const projectHooks = this.config.getProjectHooks();
+    if (!projectHooks) return;
+
+    try {
+      const trustedHooksManager = new TrustedHooksManager();
+      const untrusted = trustedHooksManager.getUntrustedHooks(
+        this.config.getProjectRoot(),
+        projectHooks,
+      );
+
+      if (untrusted.length > 0) {
+        const message = `WARNING: The following project-level hooks have been detected in this workspace:
+${untrusted.map((h) => `  - ${h}`).join('\n')}
+
+These hooks will be executed. If you did not configure these hooks or do not trust this project,
+please review the project settings (.gemini/settings.json) and remove them.`;
+        coreEvents.emitFeedback('warning', message);
+
+        // Trust them so we don't warn again
+        trustedHooksManager.trustHooks(
+          this.config.getProjectRoot(),
+          projectHooks,
+        );
+      }
+    } catch (error) {
+      debugLogger.warn('Failed to check project hooks trust', error);
+    }
+  }
+
+  /**
    * Process hooks from the config that was already loaded by the CLI
    */
   private processHooksFromConfig(): void {
+    if (this.config.isTrustedFolder()) {
+      this.checkProjectHooksTrust();
+    }
+
     // Get hooks from the main config (this comes from the merged settings)
     const configHooks = this.config.getHooks();
     if (configHooks) {
-      this.processHooksConfiguration(configHooks, ConfigSource.Project);
+      if (this.config.isTrustedFolder()) {
+        this.processHooksConfiguration(configHooks, ConfigSource.Project);
+      } else {
+        debugLogger.warn(
+          'Project hooks disabled because the folder is not trusted.',
+        );
+      }
     }
 
     // Get hooks from extensions
@@ -188,6 +223,9 @@ export class HookRegistry {
           config: hookConfig,
         } as HookRegistryEntry);
         const isDisabled = disabledHooks.includes(hookName);
+
+        // Add source to hook config
+        hookConfig.source = source;
 
         this.entries.push({
           config: hookConfig,
