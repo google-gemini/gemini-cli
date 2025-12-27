@@ -13,7 +13,7 @@ import {
 } from './types.js';
 import { MessageType } from '../types.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
-import { formatMemoryUsage } from '../utils/formatters.js';
+import { formatBytes } from '../utils/formatters.js';
 import { IdeClient, sessionId, getVersion } from '@google/gemini-cli-core';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
@@ -37,7 +37,7 @@ export const bugCommand: SlashCommand = {
     }
     const modelVersion = config?.getModel() || 'Unknown';
     const cliVersion = await getVersion();
-    const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
+    const memoryUsage = formatBytes(process.memoryUsage().rss);
     const ideClient = await getIdeClientName(context);
     const terminalName =
       terminalCapabilityManager.getTerminalName() || 'Unknown';
