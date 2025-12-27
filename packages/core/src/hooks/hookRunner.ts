@@ -15,6 +15,7 @@ import type {
   BeforeAgentInput,
   BeforeModelInput,
   BeforeModelOutput,
+  BeforeToolInput,
 } from './types.js';
 import type { LLMRequest } from './hookTranslator.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -186,6 +187,20 @@ export class HookRunner {
                 ...currentRequest,
                 ...partialRequest,
               } as LLMRequest;
+            }
+          }
+          break;
+
+        case HookEventName.BeforeTool:
+          if ('tool_input' in hookOutput.hookSpecificOutput) {
+            const newToolInput = hookOutput.hookSpecificOutput[
+              'tool_input'
+            ] as Record<string, unknown>;
+            if (newToolInput && 'tool_input' in modifiedInput) {
+              (modifiedInput as BeforeToolInput).tool_input = {
+                ...(modifiedInput as BeforeToolInput).tool_input,
+                ...newToolInput,
+              };
             }
           }
           break;

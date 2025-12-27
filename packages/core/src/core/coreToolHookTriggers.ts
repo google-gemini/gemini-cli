@@ -14,6 +14,7 @@ import {
   createHookOutput,
   NotificationType,
   type DefaultHookOutput,
+  BeforeToolHookOutput,
 } from '../hooks/types.js';
 import type {
   ToolCallConfirmationDetails,
@@ -259,6 +260,8 @@ export async function executeToolWithHooks(
   setPidCallback?: (pid: number) => void,
 ): Promise<ToolResult> {
   const toolInput = (invocation.params || {}) as Record<string, unknown>;
+  let inputWasModified = false;
+  let modifiedKeys: string[] = [];
 
   // Fire BeforeTool hook through MessageBus (only if hooks are enabled)
   if (hooksEnabled && messageBus) {
@@ -293,6 +296,19 @@ export async function executeToolWithHooks(
         },
       };
     }
+
+    // Check if hook requested to update tool input
+    if (beforeOutput instanceof BeforeToolHookOutput) {
+      const modifiedInput = beforeOutput.getModifiedToolInput();
+      if (modifiedInput) {
+        // We modify the toolInput object in-place, which should be the same reference as invocation.params
+        // We use Object.assign to update properties
+        Object.assign(toolInput, modifiedInput);
+        debugLogger.debug(`Tool input modified by hook for ${toolName}`);
+        inputWasModified = true;
+        modifiedKeys = Object.keys(modifiedInput);
+      }
+    }
   }
 
   // Execute the actual tool
@@ -310,6 +326,24 @@ export async function executeToolWithHooks(
       liveOutputCallback,
       shellExecutionConfig,
     );
+  }
+
+  // Append notification if parameters were modified
+  if (inputWasModified) {
+    const modificationMsg = `\n\n[System] Tool input parameters (${modifiedKeys.join(
+      ', ',
+    )}) were modified by a hook before execution.`;
+    if (typeof toolResult.llmContent === 'string') {
+      toolResult.llmContent += modificationMsg;
+    } else if (Array.isArray(toolResult.llmContent)) {
+      toolResult.llmContent.push({ text: modificationMsg });
+    } else if (toolResult.llmContent) {
+      // Handle single Part case by converting to an array
+      toolResult.llmContent = [
+        toolResult.llmContent,
+        { text: modificationMsg },
+      ];
+    }
   }
 
   // Fire AfterTool hook through MessageBus (only if hooks are enabled)
