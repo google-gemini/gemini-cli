@@ -497,6 +497,49 @@ This command displays:
 - Hook type (command or plugin)
 - Execution status and recent output
 
+### Add a new hook
+
+You can add a new hook using an interactive wizard that guides you through the
+configuration process:
+
+**In interactive mode:**
+
+```bash
+/hooks add
+```
+
+**As a CLI command:**
+
+```bash
+gemini hooks add
+```
+
+The wizard will guide you through four steps:
+
+1. **Select Hook Event**: Choose when the hook should execute (e.g.,
+   `BeforeTool`, `AfterTool`, `BeforeAgent`). All available events are listed
+   with descriptions.
+
+2. **Configure Matcher** (optional): Specify a pattern to match specific tools
+   or contexts:
+   - **Exact match**: `read_file` matches only the `read_file` tool
+   - **Regex pattern**: `/read_.*/` matches tools starting with `read_`
+   - **Wildcard**: `*` or leave empty to match all tools
+
+3. **Enter Hook Details**:
+   - **Command** (required): Path to your script or executable command
+   - **Name** (optional): Unique identifier for enable/disable commands
+   - **Description** (optional): Human-readable description
+   - **Timeout** (optional): Maximum execution time in milliseconds (default:
+     60000ms, max: 300000ms)
+
+4. **Review and Save**: Review your configuration and save it to
+   `.gemini/settings.json`, or go back to edit any step.
+
+The wizard includes validation for all inputs and provides clear error messages
+if any field is invalid. You can navigate between steps using keyboard shortcuts
+(Tab, Enter, Esc) and cancel at any time.
+
 ### Enable and disable hooks
 
 You can temporarily enable or disable individual hooks using commands:
