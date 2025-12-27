@@ -458,6 +458,16 @@ const SETTINGS_SCHEMA = {
             description: 'Hides the context window remaining percentage.',
             showInDialog: true,
           },
+          showModelUsage: {
+            type: 'boolean',
+            label: 'Show Model Usage',
+            category: 'UI',
+            requiresRestart: false,
+            default: false,
+            description:
+              'Show model usage percentage in the footer (e.g. "95% model usage left").',
+            showInDialog: true,
+          },
         },
       },
       hideFooter: {
