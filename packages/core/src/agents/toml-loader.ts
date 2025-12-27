@@ -16,28 +16,6 @@ import {
 } from '../tools/tool-names.js';
 
 /**
- * DTO for TOML parsing - represents the raw structure of the TOML file.
- */
-interface TomlAgentDefinition {
-  name: string;
-  description: string;
-  display_name?: string;
-  tools?: string[];
-  prompts: {
-    system_prompt: string;
-    query?: string;
-  };
-  model?: {
-    model?: string;
-    temperature?: number;
-  };
-  run?: {
-    max_turns?: number;
-    timeout_mins?: number;
-  };
-}
-
-/**
  * Error thrown when an agent definition is invalid or cannot be loaded.
  */
 export class AgentLoadError extends Error {
@@ -58,34 +36,78 @@ export interface AgentLoadResult {
   errors: AgentLoadError[];
 }
 
-const tomlSchema = z.object({
-  name: z.string().regex(/^[a-z0-9-_]+$/, 'Name must be a valid slug'),
-  description: z.string().min(1),
-  display_name: z.string().optional(),
-  tools: z
-    .array(
-      z.string().refine((val) => isValidToolName(val), {
-        message: 'Invalid tool name',
-      }),
-    )
-    .optional(),
-  prompts: z.object({
-    system_prompt: z.string().min(1),
-    query: z.string().optional(),
-  }),
-  model: z
-    .object({
-      model: z.string().optional(),
-      temperature: z.number().optional(),
-    })
-    .optional(),
-  run: z
-    .object({
-      max_turns: z.number().int().positive().optional(),
-      timeout_mins: z.number().int().positive().optional(),
-    })
-    .optional(),
-});
+const tomlSchema = z
+  .object({
+    name: z.string().regex(/^[a-z0-9-_]+$/, 'Name must be a valid slug'),
+    description: z.string().min(1),
+    display_name: z.string().optional(),
+    kind: z.enum(['local', 'remote']).default('local'),
+    agent_card_url: z.string().url().optional(),
+    tools: z
+      .array(
+        z.string().refine((val) => isValidToolName(val), {
+          message: 'Invalid tool name',
+        }),
+      )
+      .optional(),
+    prompts: z
+      .object({
+        system_prompt: z.string().min(1),
+        query: z.string().optional(),
+      })
+      .optional(),
+    model: z
+      .object({
+        model: z.string().optional(),
+        temperature: z.number().optional(),
+      })
+      .optional(),
+    run: z
+      .object({
+        max_turns: z.number().int().positive().optional(),
+        timeout_mins: z.number().int().positive().optional(),
+      })
+      .optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.kind === 'remote' && !data.agent_card_url) {
+        return false;
+      }
+      if (data.kind === 'local' && !data.prompts) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message:
+        'Remote agents require agent_card_url; local agents require prompts',
+    },
+  );
+
+/**
+ * DTO for TOML parsing - represents the raw structure of the TOML file.
+ */
+export interface TomlAgentDefinition {
+  name: string;
+  description: string;
+  display_name?: string;
+  kind?: 'local' | 'remote';
+  agent_card_url?: string;
+  tools?: string[];
+  prompts?: {
+    system_prompt: string;
+    query?: string;
+  };
+  model?: {
+    model?: string;
+    temperature?: number;
+  };
+  run?: {
+    max_turns?: number;
+    timeout_mins?: number;
+  };
+}
 
 /**
  * Parses and validates an agent TOML file.
@@ -147,6 +169,25 @@ export async function parseAgentToml(
 export function tomlToAgentDefinition(
   toml: TomlAgentDefinition,
 ): AgentDefinition {
+  if (toml.kind === 'remote') {
+    return {
+      kind: 'remote',
+      name: toml.name,
+      description: toml.description,
+      displayName: toml.display_name,
+      agentCardUrl: toml.agent_card_url!,
+      inputConfig: {
+        inputs: {
+          query: {
+            type: 'string',
+            description: 'The task for the agent.',
+            required: false,
+          },
+        },
+      },
+    };
+  }
+
   // If a model is specified, use it. Otherwise, inherit
   const modelName = toml.model?.model || 'inherit';
 
@@ -156,8 +197,8 @@ export function tomlToAgentDefinition(
     description: toml.description,
     displayName: toml.display_name,
     promptConfig: {
-      systemPrompt: toml.prompts.system_prompt,
-      query: toml.prompts.query,
+      systemPrompt: toml.prompts!.system_prompt,
+      query: toml.prompts?.query,
     },
     modelConfig: {
       model: modelName,
