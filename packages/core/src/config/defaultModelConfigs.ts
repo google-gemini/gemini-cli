@@ -222,6 +222,18 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
   },
   overrides: [
     {
+      match: { overrideScope: 'prompt-completion' },
+      modelConfig: {
+        generateContentConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 16000,
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
+        },
+      },
+    },
+    {
       match: { model: 'chat-base', isRetry: true },
       modelConfig: {
         generateContentConfig: {
