@@ -59,14 +59,20 @@ export async function reportError(
     stringifiedReportContent = JSON.stringify(reportContent, null, 2);
   } catch (stringifyError) {
     // This can happen if context contains something like BigInt
+    const stringifyErrorMessage =
+      stringifyError instanceof Error
+        ? stringifyError.message
+        : String(stringifyError);
     console.error(
-      `${baseMessage} Could not stringify report content (likely due to context):`,
-      stringifyError,
+      `${baseMessage} Failed to serialize error report content to JSON (likely due to non-serializable values in context, e.g., BigInt). Stringify error: ${stringifyErrorMessage}`,
     );
-    console.error('Original error that triggered report generation:', error);
+    console.error(
+      `Original error that triggered report generation:`,
+      error instanceof Error ? error.message : String(error),
+    );
     if (context) {
       console.error(
-        'Original context could not be stringified or included in report.',
+        `Original context (type: ${Array.isArray(context) ? 'array' : typeof context}) could not be stringified or included in report.`,
       );
     }
     // Fallback: try to report only the error if context was the issue
@@ -79,9 +85,16 @@ export async function reportError(
         `${baseMessage} Partial report (excluding context) available at: ${reportPath}`,
       );
     } catch (minimalWriteError) {
+      const writeErrorMessage =
+        minimalWriteError instanceof Error
+          ? minimalWriteError.message
+          : String(minimalWriteError);
       console.error(
-        `${baseMessage} Failed to write even a minimal error report:`,
-        minimalWriteError,
+        `${baseMessage} Failed to write minimal error report to ${reportPath}. Write error: ${writeErrorMessage}`,
+      );
+      console.error(
+        `Original error that triggered report generation:`,
+        error instanceof Error ? error.message : String(error),
       );
     }
     return;
@@ -91,12 +104,16 @@ export async function reportError(
     await fs.writeFile(reportPath, stringifiedReportContent);
     console.error(`${baseMessage} Full report available at: ${reportPath}`);
   } catch (writeError) {
+    const writeErrorMessage =
+      writeError instanceof Error ? writeError.message : String(writeError);
     console.error(
-      `${baseMessage} Additionally, failed to write detailed error report:`,
-      writeError,
+      `${baseMessage} Failed to write detailed error report to ${reportPath}. Write error: ${writeErrorMessage}`,
     );
     // Log the original error as a fallback if report writing fails
-    console.error('Original error that triggered report generation:', error);
+    console.error(
+      `Original error that triggered report generation:`,
+      error instanceof Error ? error.message : String(error),
+    );
     if (context) {
       // Context was stringifiable, but writing the file failed.
       // We already have stringifiedReportContent, but it might be too large for console.
@@ -109,8 +126,14 @@ export async function reportError(
             'Original context (stringified, truncated):',
             JSON.stringify(context).substring(0, 1000),
           );
-        } catch {
-          console.error('Original context could not be logged or stringified.');
+        } catch (finalError) {
+          const finalErrorMessage =
+            finalError instanceof Error
+              ? finalError.message
+              : String(finalError);
+          console.error(
+            `Original context could not be logged or stringified. Final error: ${finalErrorMessage}`,
+          );
         }
       }
     }
