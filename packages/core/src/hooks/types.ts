@@ -18,6 +18,16 @@ import type {
 import { defaultHookTranslator } from './hookTranslator.js';
 
 /**
+ * Configuration source levels in precedence order (highest to lowest)
+ */
+export enum ConfigSource {
+  Project = 'project',
+  User = 'user',
+  System = 'system',
+  Extensions = 'extensions',
+}
+
+/**
  * Event names for the hook system
  */
 export enum HookEventName {
@@ -40,7 +50,10 @@ export enum HookEventName {
 export interface CommandHookConfig {
   type: HookType.Command;
   command: string;
+  name?: string;
+  description?: string;
   timeout?: number;
+  source?: ConfigSource;
 }
 
 export type HookConfig = CommandHookConfig;
@@ -59,6 +72,15 @@ export interface HookDefinition {
  */
 export enum HookType {
   Command = 'command',
+}
+
+/**
+ * Generate a unique key for a hook configuration
+ */
+export function getHookKey(hook: HookConfig): string {
+  const name = hook.name || '';
+  const command = hook.command || '';
+  return `${name}:${command}`;
 }
 
 /**
@@ -212,45 +234,9 @@ export class DefaultHookOutput implements HookOutput {
 }
 
 /**
- * Specific hook output class for BeforeTool events with compatibility support
+ * Specific hook output class for BeforeTool events.
  */
-export class BeforeToolHookOutput extends DefaultHookOutput {
-  /**
-   * Get the effective blocking reason, considering compatibility fields
-   */
-  override getEffectiveReason(): string {
-    // Check for compatibility fields first
-    if (this.hookSpecificOutput) {
-      if ('permissionDecisionReason' in this.hookSpecificOutput) {
-        const compatReason =
-          this.hookSpecificOutput['permissionDecisionReason'];
-        if (typeof compatReason === 'string') {
-          return compatReason;
-        }
-      }
-    }
-
-    return super.getEffectiveReason();
-  }
-
-  /**
-   * Check if this output represents a blocking decision, considering compatibility fields
-   */
-  override isBlockingDecision(): boolean {
-    // Check compatibility field first
-    if (
-      this.hookSpecificOutput &&
-      'permissionDecision' in this.hookSpecificOutput
-    ) {
-      const compatDecision = this.hookSpecificOutput['permissionDecision'];
-      if (compatDecision === 'block' || compatDecision === 'deny') {
-        return true;
-      }
-    }
-
-    return super.isBlockingDecision();
-  }
-}
+export class BeforeToolHookOutput extends DefaultHookOutput {}
 
 /**
  * Specific hook output class for BeforeModel events
@@ -382,8 +368,6 @@ export interface BeforeToolInput extends HookInput {
 export interface BeforeToolOutput extends HookOutput {
   hookSpecificOutput?: {
     hookEventName: 'BeforeTool';
-    permissionDecision?: HookDecision;
-    permissionDecisionReason?: string;
   };
 }
 

@@ -18,7 +18,7 @@ vi.mock('node:os', async (importOriginal) => {
 });
 
 import { PolicyEngine } from './policy-engine.js';
-import { PolicyDecision } from './types.js';
+import { PolicyDecision, ApprovalMode } from './types.js';
 import type { FunctionCall } from '@google/genai';
 import { buildArgsPatterns } from './toml-loader.js';
 
@@ -42,6 +42,7 @@ describe('Shell Safety Policy', () => {
         },
       ],
       defaultDecision: PolicyDecision.ASK_USER,
+      approvalMode: ApprovalMode.DEFAULT,
     });
   }
 

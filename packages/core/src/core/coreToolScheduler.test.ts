@@ -4,18 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { Mock } from 'vitest';
-import {
-  CoreToolScheduler,
-  convertToFunctionResponse,
-  truncateAndSaveToFile,
-} from './coreToolScheduler.js';
+import { CoreToolScheduler } from './coreToolScheduler.js';
 import type {
   ToolCall,
   WaitingToolCall,
   ErroredToolCall,
-} from './coreToolScheduler.js';
+} from '../scheduler/types.js';
 import type {
   ToolCallConfirmationDetails,
   ToolConfirmationPayload,
@@ -36,20 +32,14 @@ import {
   HookSystem,
 } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
-import type { Part, PartListUnion } from '@google/genai';
 import {
   MockModifiableTool,
   MockTool,
   MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
 } from '../test-utils/mock-tool.js';
 import * as modifiableToolModule from '../tools/modifiable-tool.js';
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
 import { isShellInvocationAllowlisted } from '../utils/shell-permissions.js';
-import {
-  DEFAULT_GEMINI_MODEL,
-  PREVIEW_GEMINI_MODEL,
-} from '../config/models.js';
+import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
@@ -251,6 +241,11 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getShellExecutionConfig: () => ({
       terminalWidth: 90,
       terminalHeight: 30,
+      sanitizationConfig: {
+        enableEnvironmentVariableRedaction: true,
+        allowedEnvironmentVariables: [],
+        blockedEnvironmentVariables: [],
+      },
     }),
     storage: {
       getProjectTempDir: () => '/tmp',
@@ -650,42 +645,6 @@ describe('CoreToolScheduler', () => {
       'Tool execution for "mockTool" requires user confirmation, which is not supported in non-interactive mode.',
     );
   });
-
-  describe('getToolSuggestion', () => {
-    it('should suggest the top N closest tool names for a typo', () => {
-      // Create mocked tool registry
-      const mockToolRegistry = {
-        getAllToolNames: () => ['list_files', 'read_file', 'write_file'],
-      } as unknown as ToolRegistry;
-      const mockConfig = createMockConfig({
-        getToolRegistry: () => mockToolRegistry,
-        isInteractive: () => false,
-      });
-
-      // Create scheduler
-      const scheduler = new CoreToolScheduler({
-        config: mockConfig,
-        getPreferredEditor: () => 'vscode',
-      });
-
-      // Test that the right tool is selected, with only 1 result, for typos
-      // @ts-expect-error accessing private method
-      const misspelledTool = scheduler.getToolSuggestion('list_fils', 1);
-      expect(misspelledTool).toBe(' Did you mean "list_files"?');
-
-      // Test that the right tool is selected, with only 1 result, for prefixes
-      // @ts-expect-error accessing private method
-      const prefixedTool = scheduler.getToolSuggestion('github.list_files', 1);
-      expect(prefixedTool).toBe(' Did you mean "list_files"?');
-
-      // Test that the right tool is first
-      // @ts-expect-error accessing private method
-      const suggestionMultiple = scheduler.getToolSuggestion('list_fils');
-      expect(suggestionMultiple).toBe(
-        ' Did you mean one of: "list_files", "read_file", "write_file"?',
-      );
-    });
-  });
 });
 
 describe('CoreToolScheduler with payload', () => {
@@ -763,310 +722,6 @@ describe('CoreToolScheduler with payload', () => {
     expect(mockTool.executeFn).toHaveBeenCalledWith({
       newContent: 'final version',
     });
-  });
-});
-
-describe('convertToFunctionResponse', () => {
-  const toolName = 'testTool';
-  const callId = 'call1';
-
-  it('should handle simple string llmContent', () => {
-    const llmContent = 'Simple text output';
-    const result = convertToFunctionResponse(
-      toolName,
-      callId,
-      llmContent,
-      DEFAULT_GEMINI_MODEL,
-    );
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Simple text output' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as a single Part with text', () => {
-    const llmContent: Part = { text: 'Text from Part object' };
-    const result = convertToFunctionResponse(
-      toolName,
-      callId,
-      llmContent,
-      DEFAULT_GEMINI_MODEL,
-    );
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Text from Part object' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as a PartListUnion array with a single text Part', () => {
-    const llmContent: PartListUnion = [{ text: 'Text from array' }];
-    const result = convertToFunctionResponse(
-      toolName,
-      callId,
-      llmContent,
-      DEFAULT_GEMINI_MODEL,
-    );
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Text from array' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as a PartListUnion array with multiple Parts', () => {
-    const llmContent: PartListUnion = [{ text: 'part1' }, { text: 'part2' }];
-    const result = convertToFunctionResponse(
-      toolName,
-      callId,
-      llmContent,
-      DEFAULT_GEMINI_MODEL,
-    );
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'part1\npart2' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent with fileData for Gemini 3 model (should be siblings)', () => {
-    const llmContent: Part = {
-      fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
-    };
-    const result = convertToFunctionResponse(
-      toolName,
-      callId,
-      llmContent,
-      PREVIEW_GEMINI_MODEL,
-    );
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Binary content provided (1 item(s)).' },
-        },
-      },
-      llmContent,
-    ]);
-  });
-
-  it('should handle llmContent with inlineData for Gemini 3 model (should be nested)', () => {
-    const llmContent: Part = {
-      inlineData: { mimeType: 'image/png', data: 'base64...' },
-    };
-    const result = convertToFunctionResponse(
-      toolName,
-      callId,
-      llmContent,
-      PREVIEW_GEMINI_MODEL,
-    );
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Binary content provided (1 item(s)).' },
-          parts: [llmContent],
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent with fileData for non-Gemini 3 models', () => {
-    const llmContent: Part = {
-      fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
-    };
-    const result = convertToFunctionResponse(
-      toolName,
-      callId,
-      llmContent,
-      DEFAULT_GEMINI_MODEL,
-    );
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Binary content provided (1 item(s)).' },
-        },
-      },
-      llmContent,
-    ]);
-  });
-
-  it('should preserve existing functionResponse metadata', () => {
-    const innerId = 'inner-call-id';
-    const innerName = 'inner-tool-name';
-    const responseMetadata = {
-      flags: ['flag1'],
-      isError: false,
-      customData: { key: 'value' },
-    };
-    const input: Part = {
-      functionResponse: {
-        id: innerId,
-        name: innerName,
-        response: responseMetadata,
-      },
-    };
-
-    const result = convertToFunctionResponse(
-      toolName,
-      callId,
-      input,
-      DEFAULT_GEMINI_MODEL,
-    );
-
-    expect(result).toHaveLength(1);
-    expect(result[0].functionResponse).toEqual({
-      id: callId,
-      name: toolName,
-      response: responseMetadata,
-    });
-  });
-
-  it('should handle llmContent as an array of multiple Parts (text and inlineData)', () => {
-    const llmContent: PartListUnion = [
-      { text: 'Some textual description' },
-      { inlineData: { mimeType: 'image/jpeg', data: 'base64data...' } },
-      { text: 'Another text part' },
-    ];
-    const result = convertToFunctionResponse(
-      toolName,
-      callId,
-      llmContent,
-      PREVIEW_GEMINI_MODEL,
-    );
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: {
-            output: 'Some textual description\nAnother text part',
-          },
-          parts: [
-            { inlineData: { mimeType: 'image/jpeg', data: 'base64data...' } },
-          ],
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as an array with a single inlineData Part', () => {
-    const llmContent: PartListUnion = [
-      { inlineData: { mimeType: 'image/gif', data: 'gifdata...' } },
-    ];
-    const result = convertToFunctionResponse(
-      toolName,
-      callId,
-      llmContent,
-      PREVIEW_GEMINI_MODEL,
-    );
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Binary content provided (1 item(s)).' },
-          parts: llmContent,
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as a generic Part (not text, inlineData, or fileData)', () => {
-    const llmContent: Part = { functionCall: { name: 'test', args: {} } };
-    const result = convertToFunctionResponse(
-      toolName,
-      callId,
-      llmContent,
-      PREVIEW_GEMINI_MODEL,
-    );
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: {},
-        },
-      },
-    ]);
-  });
-
-  it('should handle empty string llmContent', () => {
-    const llmContent = '';
-    const result = convertToFunctionResponse(
-      toolName,
-      callId,
-      llmContent,
-      PREVIEW_GEMINI_MODEL,
-    );
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: '' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as an empty array', () => {
-    const llmContent: PartListUnion = [];
-    const result = convertToFunctionResponse(
-      toolName,
-      callId,
-      llmContent,
-      PREVIEW_GEMINI_MODEL,
-    );
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: {},
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as a Part with undefined inlineData/fileData/text', () => {
-    const llmContent: Part = {}; // An empty part object
-    const result = convertToFunctionResponse(
-      toolName,
-      callId,
-      llmContent,
-      PREVIEW_GEMINI_MODEL,
-    );
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: {},
-        },
-      },
-    ]);
   });
 });
 
@@ -1444,6 +1099,11 @@ describe('CoreToolScheduler request queueing', () => {
       getShellExecutionConfig: () => ({
         terminalWidth: 80,
         terminalHeight: 24,
+        sanitizationConfig: {
+          enableEnvironmentVariableRedaction: true,
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+        },
       }),
       isInteractive: () => false,
     });
@@ -1556,6 +1216,11 @@ describe('CoreToolScheduler request queueing', () => {
       getShellExecutionConfig: () => ({
         terminalWidth: 80,
         terminalHeight: 24,
+        sanitizationConfig: {
+          enableEnvironmentVariableRedaction: true,
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+        },
       }),
       getToolRegistry: () => toolRegistry,
       getHookSystem: () => undefined,
@@ -2113,226 +1778,5 @@ describe('CoreToolScheduler Sequential Execution', () => {
     });
 
     modifyWithEditorSpy.mockRestore();
-  });
-});
-
-describe('truncateAndSaveToFile', () => {
-  const mockWriteFile = vi.mocked(fs.writeFile);
-  const THRESHOLD = 40_000;
-  const TRUNCATE_LINES = 1000;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should return content unchanged if below threshold', async () => {
-    const content = 'Short content';
-    const callId = 'test-call-id';
-    const projectTempDir = '/tmp';
-
-    const result = await truncateAndSaveToFile(
-      content,
-      callId,
-      projectTempDir,
-      THRESHOLD,
-      TRUNCATE_LINES,
-    );
-
-    expect(result).toEqual({ content });
-    expect(mockWriteFile).not.toHaveBeenCalled();
-  });
-
-  it('should truncate content by lines when content has many lines', async () => {
-    // Create content that exceeds 100,000 character threshold with many lines
-    const lines = Array(2000).fill('x'.repeat(100)); // 100 chars per line * 2000 lines = 200,000 chars
-    const content = lines.join('\n');
-    const callId = 'test-call-id';
-    const projectTempDir = '/tmp';
-
-    mockWriteFile.mockResolvedValue(undefined);
-
-    const result = await truncateAndSaveToFile(
-      content,
-      callId,
-      projectTempDir,
-      THRESHOLD,
-      TRUNCATE_LINES,
-    );
-
-    expect(result.outputFile).toBe(
-      path.join(projectTempDir, `${callId}.output`),
-    );
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      path.join(projectTempDir, `${callId}.output`),
-      content,
-    );
-
-    // Should contain the first and last lines with 1/5 head and 4/5 tail
-    const head = Math.floor(TRUNCATE_LINES / 5);
-    const beginning = lines.slice(0, head);
-    const end = lines.slice(-(TRUNCATE_LINES - head));
-    const expectedTruncated =
-      beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
-
-    expect(result.content).toContain(
-      'Tool output was too large and has been truncated',
-    );
-    expect(result.content).toContain('Truncated part of the output:');
-    expect(result.content).toContain(expectedTruncated);
-  });
-
-  it('should wrap and truncate content when content has few but long lines', async () => {
-    const content = 'a'.repeat(200_000); // A single very long line
-    const callId = 'test-call-id';
-    const projectTempDir = '/tmp';
-    const wrapWidth = 120;
-
-    mockWriteFile.mockResolvedValue(undefined);
-
-    // Manually wrap the content to generate the expected file content
-    const wrappedLines: string[] = [];
-    for (let i = 0; i < content.length; i += wrapWidth) {
-      wrappedLines.push(content.substring(i, i + wrapWidth));
-    }
-    const expectedFileContent = wrappedLines.join('\n');
-
-    const result = await truncateAndSaveToFile(
-      content,
-      callId,
-      projectTempDir,
-      THRESHOLD,
-      TRUNCATE_LINES,
-    );
-
-    expect(result.outputFile).toBe(
-      path.join(projectTempDir, `${callId}.output`),
-    );
-    // Check that the file was written with the wrapped content
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      path.join(projectTempDir, `${callId}.output`),
-      expectedFileContent,
-    );
-
-    // Should contain the first and last lines with 1/5 head and 4/5 tail of the wrapped content
-    const head = Math.floor(TRUNCATE_LINES / 5);
-    const beginning = wrappedLines.slice(0, head);
-    const end = wrappedLines.slice(-(TRUNCATE_LINES - head));
-    const expectedTruncated =
-      beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
-    expect(result.content).toContain(
-      'Tool output was too large and has been truncated',
-    );
-    expect(result.content).toContain('Truncated part of the output:');
-    expect(result.content).toContain(expectedTruncated);
-  });
-
-  it('should handle file write errors gracefully', async () => {
-    const content = 'a'.repeat(2_000_000);
-    const callId = 'test-call-id';
-    const projectTempDir = '/tmp';
-
-    mockWriteFile.mockRejectedValue(new Error('File write failed'));
-
-    const result = await truncateAndSaveToFile(
-      content,
-      callId,
-      projectTempDir,
-      THRESHOLD,
-      TRUNCATE_LINES,
-    );
-
-    expect(result.outputFile).toBeUndefined();
-    expect(result.content).toContain(
-      '[Note: Could not save full output to file]',
-    );
-    expect(mockWriteFile).toHaveBeenCalled();
-  });
-
-  it('should save to correct file path with call ID', async () => {
-    const content = 'a'.repeat(200_000);
-    const callId = 'unique-call-123';
-    const projectTempDir = '/custom/temp/dir';
-    const wrapWidth = 120;
-
-    mockWriteFile.mockResolvedValue(undefined);
-
-    // Manually wrap the content to generate the expected file content
-    const wrappedLines: string[] = [];
-    for (let i = 0; i < content.length; i += wrapWidth) {
-      wrappedLines.push(content.substring(i, i + wrapWidth));
-    }
-    const expectedFileContent = wrappedLines.join('\n');
-
-    const result = await truncateAndSaveToFile(
-      content,
-      callId,
-      projectTempDir,
-      THRESHOLD,
-      TRUNCATE_LINES,
-    );
-
-    const expectedPath = path.join(projectTempDir, `${callId}.output`);
-    expect(result.outputFile).toBe(expectedPath);
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expectedPath,
-      expectedFileContent,
-    );
-  });
-
-  it('should include helpful instructions in truncated message', async () => {
-    const content = 'a'.repeat(2_000_000);
-    const callId = 'test-call-id';
-    const projectTempDir = '/tmp';
-
-    mockWriteFile.mockResolvedValue(undefined);
-
-    const result = await truncateAndSaveToFile(
-      content,
-      callId,
-      projectTempDir,
-      THRESHOLD,
-      TRUNCATE_LINES,
-    );
-
-    expect(result.content).toContain(
-      'read_file tool with the absolute file path above',
-    );
-    expect(result.content).toContain('read_file tool with offset=0, limit=100');
-    expect(result.content).toContain(
-      'read_file tool with offset=N to skip N lines',
-    );
-    expect(result.content).toContain(
-      'read_file tool with limit=M to read only M lines',
-    );
-  });
-
-  it('should sanitize callId to prevent path traversal', async () => {
-    const content = 'a'.repeat(200_000);
-    const callId = '../../../../../etc/passwd';
-    const projectTempDir = '/tmp/safe_dir';
-    const wrapWidth = 120;
-
-    mockWriteFile.mockResolvedValue(undefined);
-
-    // Manually wrap the content to generate the expected file content
-    const wrappedLines: string[] = [];
-    for (let i = 0; i < content.length; i += wrapWidth) {
-      wrappedLines.push(content.substring(i, i + wrapWidth));
-    }
-    const expectedFileContent = wrappedLines.join('\n');
-
-    await truncateAndSaveToFile(
-      content,
-      callId,
-      projectTempDir,
-      THRESHOLD,
-      TRUNCATE_LINES,
-    );
-
-    const expectedPath = path.join(projectTempDir, 'passwd.output');
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expectedPath,
-      expectedFileContent,
-    );
   });
 });
