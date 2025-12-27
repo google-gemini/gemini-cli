@@ -517,59 +517,65 @@ export class LoadedSettings {
   }
 }
 
-function findEnvFile(startDir: string): string | null {
+function findEnvFiles(startDir: string): string[] {
+  const envFiles = new Set<string>();
   let currentDir = path.resolve(startDir);
   while (true) {
     // prefer gemini-specific .env under GEMINI_DIR
     const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
     if (fs.existsSync(geminiEnvPath)) {
-      return geminiEnvPath;
+      envFiles.add(geminiEnvPath);
     }
     const envPath = path.join(currentDir, '.env');
     if (fs.existsSync(envPath)) {
-      return envPath;
+      envFiles.add(envPath);
     }
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
       // check .env under home as fallback, again preferring gemini-specific .env
       const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
       if (fs.existsSync(homeGeminiEnvPath)) {
-        return homeGeminiEnvPath;
+        envFiles.add(homeGeminiEnvPath);
       }
       const homeEnvPath = path.join(homedir(), '.env');
       if (fs.existsSync(homeEnvPath)) {
-        return homeEnvPath;
+        envFiles.add(homeEnvPath);
       }
-      return null;
+      return [...envFiles];
     }
     currentDir = parentDir;
   }
 }
 
-export function setUpCloudShellEnvironment(envFilePath: string | null): void {
+export function setUpCloudShellEnvironment(envFiles: string[]): void {
   // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
   // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
   // set by the user using "gcloud config set project" we do not want to
   // use its value. So, unless the user overrides GOOGLE_CLOUD_PROJECT in
   // one of the .env files, we set the Cloud Shell-specific default here.
-  if (envFilePath && fs.existsSync(envFilePath)) {
-    const envFileContent = fs.readFileSync(envFilePath);
-    const parsedEnv = dotenv.parse(envFileContent);
-    if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
-      // .env file takes precedence in Cloud Shell
-      process.env['GOOGLE_CLOUD_PROJECT'] = parsedEnv['GOOGLE_CLOUD_PROJECT'];
-    } else {
-      // If not in .env, set to default and override global
-      process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
+  for (const envFilePath of envFiles) {
+    try {
+      if (fs.existsSync(envFilePath)) {
+        const envFileContent = fs.readFileSync(envFilePath);
+        const parsedEnv = dotenv.parse(envFileContent);
+        if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
+          // .env file takes precedence in Cloud Shell
+          process.env['GOOGLE_CLOUD_PROJECT'] =
+            parsedEnv['GOOGLE_CLOUD_PROJECT'];
+          return;
+        }
+      }
+    } catch (_e) {
+      // Ignore errors reading individual files
     }
-  } else {
-    // If no .env file, set to default and override global
-    process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
   }
+
+  // If no .env file defines it, set to default and override global
+  process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
 }
 
 export function loadEnvironment(settings: Settings): void {
-  const envFilePath = findEnvFile(process.cwd());
+  const envFiles = findEnvFiles(process.cwd());
 
   if (!isWorkspaceTrusted(settings).isTrusted) {
     return;
@@ -577,10 +583,10 @@ export function loadEnvironment(settings: Settings): void {
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
-    setUpCloudShellEnvironment(envFilePath);
+    setUpCloudShellEnvironment(envFiles);
   }
 
-  if (envFilePath) {
+  for (const envFilePath of envFiles) {
     // Manually parse and load environment variables to handle exclusions correctly.
     // This avoids modifying environment variables that were already set from the shell.
     try {
