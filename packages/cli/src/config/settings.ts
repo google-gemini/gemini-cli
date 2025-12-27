@@ -101,7 +101,7 @@ const MIGRATION_MAP: Record<string, string> = {
   hideWindowTitle: 'ui.hideWindowTitle',
   showStatusInTitle: 'ui.showStatusInTitle',
   hideTips: 'ui.hideTips',
-  hideBanner: 'ui.hideBanner',
+  showBanner: 'ui.showBanner',
   hideFooter: 'ui.hideFooter',
   hideCWD: 'ui.footer.hideCWD',
   hideSandboxStatus: 'ui.footer.hideSandboxStatus',

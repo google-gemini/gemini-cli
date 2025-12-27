@@ -385,7 +385,7 @@ describe('AppContainer State Management', () => {
     // Mock LoadedSettings
     mockSettings = {
       merged: {
-        hideBanner: false,
+        showBanner: true,
         hideFooter: false,
         hideTips: false,
         showMemoryUsage: false,
@@ -511,7 +511,7 @@ describe('AppContainer State Management', () => {
     it('handles settings with all display options disabled', async () => {
       const settingsAllHidden = {
         merged: {
-          hideBanner: true,
+          showBanner: false,
           hideFooter: true,
           hideTips: true,
           showMemoryUsage: false,
@@ -530,7 +530,7 @@ describe('AppContainer State Management', () => {
     it('handles settings with memory usage enabled', async () => {
       const settingsWithMemory = {
         merged: {
-          hideBanner: false,
+          showBanner: true,
           hideFooter: false,
           hideTips: false,
           showMemoryUsage: true,
