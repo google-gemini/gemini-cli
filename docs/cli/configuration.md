@@ -535,7 +535,8 @@ the `excludedProjectEnvVars` setting in your `settings.json` file.
   - This is useful for development and testing.
 - **`GEMINI_SYSTEM_MD`**:
   - Overrides the base system prompt with the contents of a Markdown file.
-  - If set to `1` or `true`, it uses the file at `.gemini/system.md`.
+  - If set to `1` or `true`, it uses the file at `.gemini/system.md`. If that
+    file is missing, it falls back to `~/.gemini/system.md`.
   - If set to a file path, it uses that file. The path can be absolute or
     relative. `~` is supported for the home directory.
   - The specified file must exist.

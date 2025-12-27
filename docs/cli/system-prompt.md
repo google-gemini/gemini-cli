@@ -27,7 +27,7 @@ via a `.gemini/.env` file. See
 - Use the project default path (`.gemini/system.md`):
   - `GEMINI_SYSTEM_MD=true` or `GEMINI_SYSTEM_MD=1`
   - The CLI reads `./.gemini/system.md` (relative to your current project
-    directory).
+    directory). If it does not exist, it falls back to `~/.gemini/system.md`.
 
 - Use a custom file path:
   - `GEMINI_SYSTEM_MD=/absolute/path/to/my-system.md`
@@ -85,7 +85,8 @@ GEMINI.md focused on high‑level guidance and project specifics.
 
 - Error: `missing system prompt file '…'`
   - Ensure the referenced path exists and is readable.
-  - For `GEMINI_SYSTEM_MD=1|true`, create `./.gemini/system.md` in your project.
+  - For `GEMINI_SYSTEM_MD=1|true`, create `./.gemini/system.md` in your project
+    or `~/.gemini/system.md` in your home directory.
 - Override not taking effect
   - Confirm the variable is loaded (use `.gemini/.env` or export in your shell).
   - Paths are resolved from the current working directory; try an absolute path.
