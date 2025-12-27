@@ -11,7 +11,7 @@ import {
   type ToolResult,
 } from '../tools/tools.js';
 import type { Config } from '../config/config.js';
-import type { AgentDefinition, AgentInputs } from './types.js';
+import { type AgentDefinition, type AgentInputs } from './types.js';
 import { convertInputConfigToJsonSchema } from './schema-utils.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { RemoteAgentInvocation } from './remote-invocation.js';

@@ -22,8 +22,10 @@ interface TomlAgentDefinition {
   name: string;
   description: string;
   display_name?: string;
+  kind?: 'local' | 'remote';
+  agent_card_url?: string;
   tools?: string[];
-  prompts: {
+  prompts?: {
     system_prompt: string;
     query?: string;
   };
@@ -62,6 +64,8 @@ const tomlSchema = z.object({
   name: z.string().regex(/^[a-z0-9-_]+$/, 'Name must be a valid slug'),
   description: z.string().min(1),
   display_name: z.string().optional(),
+  kind: z.enum(['local', 'remote']).optional(),
+  agent_card_url: z.string().url().optional(),
   tools: z
     .array(
       z.string().refine((val) => isValidToolName(val), {
@@ -70,9 +74,9 @@ const tomlSchema = z.object({
     )
     .optional(),
   prompts: z.object({
-    system_prompt: z.string().min(1),
+    system_prompt: z.string().min(1).optional(), // Optional for remote
     query: z.string().optional(),
-  }),
+  }).optional(),
   model: z
     .object({
       model: z.string().optional(),
@@ -127,6 +131,14 @@ export async function parseAgentToml(
 
   const definition = result.data as TomlAgentDefinition;
 
+  // Validate local agent requirements
+  if (!definition.agent_card_url && !definition.prompts?.system_prompt) {
+    throw new AgentLoadError(
+      filePath,
+      `Validation failed: Local agents must specify a 'prompts.system_prompt'.`,
+    );
+  }
+
   // Prevent sub-agents from delegating to other agents (to prevent recursion/complexity)
   if (definition.tools?.includes(DELEGATE_TO_AGENT_TOOL_NAME)) {
     throw new AgentLoadError(
@@ -147,7 +159,28 @@ export async function parseAgentToml(
 export function tomlToAgentDefinition(
   toml: TomlAgentDefinition,
 ): AgentDefinition {
-  // If a model is specified, use it. Otherwise, inherit
+  if (toml.agent_card_url) {
+    return {
+      kind: 'remote',
+      name: toml.name,
+      displayName: toml.display_name,
+      description: toml.description,
+      agentCardUrl: toml.agent_card_url,
+      inputConfig: {
+        inputs: {
+          query: {
+            type: 'string',
+            description: 'The task for the agent.',
+            required: false,
+          },
+        },
+      },
+      // Remote agents might not have outputConfig defined in TOML yet,
+      // usually they return what they return.
+    };
+  }
+
+  // Local Agent
   const modelName = toml.model?.model || 'inherit';
 
   return {
@@ -156,8 +189,8 @@ export function tomlToAgentDefinition(
     description: toml.description,
     displayName: toml.display_name,
     promptConfig: {
-      systemPrompt: toml.prompts.system_prompt,
-      query: toml.prompts.query,
+      systemPrompt: toml.prompts?.system_prompt,
+      query: toml.prompts?.query,
     },
     modelConfig: {
       model: modelName,
