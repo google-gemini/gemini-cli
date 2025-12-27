@@ -709,11 +709,18 @@ export class Config {
       this.eventEmitter,
     );
     const initMcpHandle = startupProfiler.start('initialize_mcp_clients');
-    await Promise.all([
-      await this.mcpClientManager.startConfiguredMcpServers(),
-      await this.getExtensionLoader().start(this),
-    ]);
-    initMcpHandle?.end();
+    // We do not await this promise so that the CLI can start up even if
+    // MCP servers are slow to connect.
+    Promise.all([
+      this.mcpClientManager.startConfiguredMcpServers(),
+      this.getExtensionLoader().start(this),
+    ])
+      .catch((error) => {
+        debugLogger.error('Error initializing MCP clients:', error);
+      })
+      .finally(() => {
+        initMcpHandle?.end();
+      });
 
     // Initialize hook system if enabled
     if (this.enableHooks) {
