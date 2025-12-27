@@ -75,6 +75,10 @@ export enum Command {
   // Suggestion expansion
   EXPAND_SUGGESTION = 'expandSuggestion',
   COLLAPSE_SUGGESTION = 'collapseSuggestion',
+
+  // Prompt stashing
+  STASH_PROMPT = 'stashPrompt',
+  POP_STASH = 'popStash',
 }
 
 /**
@@ -217,6 +221,10 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Suggestion expansion
   [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
   [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
+
+  // Prompt stashing
+  [Command.STASH_PROMPT]: [{ key: 'z', ctrl: true }],
+  [Command.POP_STASH]: [{ key: 'y', ctrl: true }],
 };
 
 interface CommandCategory {
@@ -243,6 +251,8 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.KILL_LINE_LEFT,
       Command.CLEAR_INPUT,
       Command.DELETE_WORD_BACKWARD,
+      Command.STASH_PROMPT,
+      Command.POP_STASH,
     ],
   },
   {
@@ -366,4 +376,6 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Toggle focus between the shell and Gemini input.',
   [Command.EXPAND_SUGGESTION]: 'Expand an inline suggestion.',
   [Command.COLLAPSE_SUGGESTION]: 'Collapse an inline suggestion.',
+  [Command.STASH_PROMPT]: 'Stash the current input to restore later.',
+  [Command.POP_STASH]: 'Restore the previously stashed input.',
 };

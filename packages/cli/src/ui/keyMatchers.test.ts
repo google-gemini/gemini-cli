@@ -79,6 +79,8 @@ describe('keyMatchers', () => {
       key.ctrl && key.name === 'f',
     [Command.EXPAND_SUGGESTION]: (key: Key) => key.name === 'right',
     [Command.COLLAPSE_SUGGESTION]: (key: Key) => key.name === 'left',
+    [Command.STASH_PROMPT]: (key: Key) => key.ctrl && key.name === 'z',
+    [Command.POP_STASH]: (key: Key) => key.ctrl && key.name === 'y',
   };
 
   // Test data for each command with positive and negative test cases
@@ -335,6 +337,18 @@ describe('keyMatchers', () => {
       command: Command.TOGGLE_SHELL_INPUT_FOCUS,
       positive: [createKey('f', { ctrl: true })],
       negative: [createKey('f')],
+    },
+
+    // Prompt stashing
+    {
+      command: Command.STASH_PROMPT,
+      positive: [createKey('z', { ctrl: true })],
+      negative: [createKey('z'), createKey('s', { ctrl: true })],
+    },
+    {
+      command: Command.POP_STASH,
+      positive: [createKey('y', { ctrl: true })],
+      negative: [createKey('y'), createKey('z', { ctrl: true })],
     },
   ];
 
