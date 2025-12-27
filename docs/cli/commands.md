@@ -49,7 +49,7 @@ Slash commands provide meta-level control over the CLI itself.
         project. Because chat history is project-scoped, chats saved in other
         project directories will not be displayed.
     - **`delete`**
-      - **Description:** Deletes a saved conversation checkpoint.
+      - **Description:** Deletes a saved conversation checkpoint. You will be prompted for confirmation before deletion.
       - **Usage:** `/chat delete <tag>`
     - **`share`**
       - **Description** Writes the current conversation to a provided Markdown
