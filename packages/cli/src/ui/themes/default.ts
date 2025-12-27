@@ -18,20 +18,7 @@ export const DefaultDark: Theme = new Theme(
       color: darkTheme.Foreground,
     },
     'hljs-keyword': {
-      color: darkTheme.AccentBlue,
-    },
-    'hljs-literal': {
-      color: darkTheme.AccentBlue,
-    },
-    'hljs-symbol': {
-      color: darkTheme.AccentBlue,
-    },
-    'hljs-name': {
-      color: darkTheme.AccentBlue,
-    },
-    'hljs-link': {
-      color: darkTheme.AccentBlue,
-      textDecoration: 'underline',
+      color: darkTheme.AccentPurple,
     },
     'hljs-built_in': {
       color: darkTheme.AccentCyan,
@@ -39,38 +26,56 @@ export const DefaultDark: Theme = new Theme(
     'hljs-type': {
       color: darkTheme.AccentCyan,
     },
-    'hljs-number': {
-      color: darkTheme.AccentGreen,
+    'hljs-literal': {
+      color: darkTheme.AccentBlue,
     },
-    'hljs-class': {
+    'hljs-number': {
       color: darkTheme.AccentGreen,
     },
     'hljs-string': {
       color: darkTheme.AccentYellow,
     },
-    'hljs-meta-string': {
-      color: darkTheme.AccentYellow,
-    },
     'hljs-regexp': {
       color: darkTheme.AccentRed,
     },
-    'hljs-template-tag': {
-      color: darkTheme.AccentRed,
+    'hljs-variable': {
+      color: darkTheme.LightBlue,
     },
-    'hljs-subst': {
-      color: darkTheme.Foreground,
+    'hljs-template-variable': {
+      color: darkTheme.LightBlue,
+    },
+    'hljs-attr': {
+      color: darkTheme.LightBlue,
+    },
+    'hljs-attribute': {
+      color: darkTheme.LightBlue,
+    },
+    'hljs-property': {
+      color: darkTheme.LightBlue,
+    },
+    'hljs-meta': {
+      color: darkTheme.AccentBlue,
+    },
+    'hljs-meta-keyword': {
+      color: darkTheme.AccentBlue,
+    },
+    'hljs-tag': {
+      color: darkTheme.AccentBlue,
+    },
+    'hljs-name': {
+      color: darkTheme.AccentBlue,
+    },
+    'hljs-selector-tag': {
+      color: darkTheme.AccentBlue,
     },
     'hljs-function': {
-      color: darkTheme.Foreground,
+      color: darkTheme.AccentGreen,
     },
     'hljs-title': {
-      color: darkTheme.Foreground,
+      color: darkTheme.AccentGreen,
     },
-    'hljs-params': {
-      color: darkTheme.Foreground,
-    },
-    'hljs-formula': {
-      color: darkTheme.Foreground,
+    'hljs-class': {
+      color: darkTheme.AccentGreen,
     },
     'hljs-comment': {
       color: darkTheme.Comment,
@@ -83,29 +88,18 @@ export const DefaultDark: Theme = new Theme(
     'hljs-doctag': {
       color: darkTheme.Comment,
     },
-    'hljs-meta': {
-      color: darkTheme.Gray,
+    'hljs-link': {
+      color: darkTheme.AccentBlue,
+      textDecoration: 'underline',
     },
-    'hljs-meta-keyword': {
-      color: darkTheme.Gray,
+    'hljs-subst': {
+      color: darkTheme.Foreground,
     },
-    'hljs-tag': {
-      color: darkTheme.Gray,
+    'hljs-params': {
+      color: darkTheme.Foreground,
     },
-    'hljs-variable': {
-      color: darkTheme.AccentPurple,
-    },
-    'hljs-template-variable': {
-      color: darkTheme.AccentPurple,
-    },
-    'hljs-attr': {
-      color: darkTheme.LightBlue,
-    },
-    'hljs-attribute': {
-      color: darkTheme.LightBlue,
-    },
-    'hljs-builtin-name': {
-      color: darkTheme.LightBlue,
+    'hljs-formula': {
+      color: darkTheme.Foreground,
     },
     'hljs-section': {
       color: darkTheme.AccentYellow,
@@ -119,11 +113,8 @@ export const DefaultDark: Theme = new Theme(
     'hljs-bullet': {
       color: darkTheme.AccentYellow,
     },
-    'hljs-selector-tag': {
-      color: darkTheme.AccentYellow,
-    },
     'hljs-selector-id': {
-      color: darkTheme.AccentYellow,
+      color: darkTheme.AccentRed,
     },
     'hljs-selector-class': {
       color: darkTheme.AccentYellow,
@@ -134,13 +125,16 @@ export const DefaultDark: Theme = new Theme(
     'hljs-selector-pseudo': {
       color: darkTheme.AccentYellow,
     },
+    'hljs-template-tag': {
+      color: darkTheme.AccentBlue,
+    },
     'hljs-addition': {
-      backgroundColor: '#144212',
+      color: darkTheme.AccentGreen,
       display: 'inline-block',
       width: '100%',
     },
     'hljs-deletion': {
-      backgroundColor: '#600',
+      color: darkTheme.AccentRed,
       display: 'inline-block',
       width: '100%',
     },
