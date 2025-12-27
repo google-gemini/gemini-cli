@@ -5,9 +5,33 @@
  */
 
 import { expect, describe, it } from 'vitest';
-import { doesToolInvocationMatch } from './tool-utils.js';
+import { doesToolInvocationMatch, getToolSuggestion } from './tool-utils.js';
 import type { AnyToolInvocation, Config } from '../index.js';
 import { ReadFileTool } from '../tools/read-file.js';
+
+describe('getToolSuggestion', () => {
+  it('should suggest the top N closest tool names for a typo', () => {
+    const allToolNames = ['list_files', 'read_file', 'write_file'];
+
+    // Test that the right tool is selected, with only 1 result, for typos
+    const misspelledTool = getToolSuggestion('list_fils', allToolNames, 1);
+    expect(misspelledTool).toBe(' Did you mean "list_files"?');
+
+    // Test that the right tool is selected, with only 1 result, for prefixes
+    const prefixedTool = getToolSuggestion(
+      'github.list_files',
+      allToolNames,
+      1,
+    );
+    expect(prefixedTool).toBe(' Did you mean "list_files"?');
+
+    // Test that the right tool is first
+    const suggestionMultiple = getToolSuggestion('list_fils', allToolNames);
+    expect(suggestionMultiple).toBe(
+      ' Did you mean one of: "list_files", "read_file", "write_file"?',
+    );
+  });
+});
 
 describe('doesToolInvocationMatch', () => {
   it('should not match a partial command prefix', () => {
