@@ -357,6 +357,15 @@ describe('SettingsSchema', () => {
       );
     });
 
+    it('should have hooks.notifications setting in schema', () => {
+      const setting = getSettingsSchema().hooks.properties.notifications;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Advanced');
+      expect(setting.default).toBe(true);
+      expect(setting.showInDialog).toBe(true);
+    });
+
     it('should have name and description in hook definitions', () => {
       const hookDef = SETTINGS_SCHEMA_DEFINITIONS['HookDefinitionArray'];
       expect(hookDef).toBeDefined();

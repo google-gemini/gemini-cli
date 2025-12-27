@@ -143,6 +143,7 @@ vi.mock('./contexts/SessionContext.js');
 vi.mock('./components/shared/text-buffer.js');
 vi.mock('./hooks/useLogger.js');
 vi.mock('./hooks/useInputHistoryStore.js');
+vi.mock('./hooks/useHookDisplayState.js');
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -171,6 +172,7 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
+import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
@@ -243,6 +245,7 @@ describe('AppContainer State Management', () => {
   const mockedUseLoadingIndicator = useLoadingIndicator as Mock;
   const mockedUseKeypress = useKeypress as Mock;
   const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
+  const mockedUseHookDisplayState = useHookDisplayState as Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -363,6 +366,7 @@ describe('AppContainer State Management', () => {
       elapsedTime: '0.0s',
       currentLoadingPhrase: '',
     });
+    mockedUseHookDisplayState.mockReturnValue([]);
 
     // Mock Config
     mockConfig = makeFakeConfig();
@@ -1872,6 +1876,21 @@ describe('AppContainer State Management', () => {
 
       // Assert: Verify model is updated
       expect(capturedUIState.currentModel).toBe('new-model');
+      unmount!();
+    });
+
+    it('provides activeHooks from useHookDisplayState', async () => {
+      const mockHooks = [{ name: 'hook1', eventName: 'event1' }];
+      mockedUseHookDisplayState.mockReturnValue(mockHooks);
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      expect(capturedUIState.activeHooks).toEqual(mockHooks);
       unmount!();
     });
   });

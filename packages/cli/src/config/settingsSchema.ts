@@ -1538,6 +1538,15 @@ const SETTINGS_SCHEMA = {
         },
         mergeStrategy: MergeStrategy.UNION,
       },
+      notifications: {
+        type: 'boolean',
+        label: 'Hook Notifications',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: true,
+        description: 'Show visual indicators when hooks are executing.',
+        showInDialog: true,
+      },
       BeforeTool: {
         type: 'array',
         label: 'Before Tool Hooks',
