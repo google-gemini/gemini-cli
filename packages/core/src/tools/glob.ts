@@ -17,6 +17,7 @@ import { ToolErrorType } from './tool-error.js';
 import { GLOB_TOOL_NAME } from './tool-names.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { LocalFileDeclarativeTool } from './local-file-tool.js';
 
 // Subset of 'Path' interface provided by 'glob' that we can implement for testing
 export interface GlobPath {
@@ -258,8 +259,12 @@ class GlobToolInvocation extends BaseToolInvocation<
 /**
  * Implementation of the Glob tool logic
  */
-export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
+export class GlobTool
+  extends BaseDeclarativeTool<GlobToolParams, ToolResult>
+  implements LocalFileDeclarativeTool<GlobToolParams>
+{
   static readonly Name = GLOB_TOOL_NAME;
+  readonly accessesLocalFiles = true;
   constructor(
     private config: Config,
     messageBus?: MessageBus,

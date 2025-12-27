@@ -42,6 +42,7 @@ import { IdeClient } from '../ide/ide-client.js';
 import { safeLiteralReplace } from '../utils/textUtils.js';
 import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { LocalFileDeclarativeTool } from './local-file-tool.js';
 
 export function applyReplacement(
   currentContent: string | null,
@@ -486,9 +487,12 @@ class EditToolInvocation
  */
 export class EditTool
   extends BaseDeclarativeTool<EditToolParams, ToolResult>
-  implements ModifiableDeclarativeTool<EditToolParams>
+  implements
+    ModifiableDeclarativeTool<EditToolParams>,
+    LocalFileDeclarativeTool<EditToolParams>
 {
   static readonly Name = EDIT_TOOL_NAME;
+  readonly accessesLocalFiles = true;
 
   constructor(
     private readonly config: Config,
