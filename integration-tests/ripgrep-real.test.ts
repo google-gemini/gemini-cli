@@ -28,6 +28,10 @@ class MockConfig {
     return true;
   }
 
+  getFileFilteringRespectGitIgnore() {
+    return true;
+  }
+
   getFileFilteringRespectGeminiIgnore() {
     return true;
   }
