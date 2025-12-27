@@ -746,6 +746,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
   }, [pendingRestorePrompt, inputHistory, historyManager.history]);
 
+  // Store popAllMessages in a ref so useGeminiStream can access it
+  const popAllMessagesRef = useRef<() => string | undefined>(undefined);
+
   const {
     streamingState,
     submitQuery,
@@ -776,6 +779,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     terminalWidth,
     terminalHeight,
     embeddedShellFocused,
+    () => popAllMessagesRef.current?.(), // Pass via ref to avoid dependency cycle
   );
 
   // Auto-accept indicator
@@ -796,6 +800,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
     streamingState,
     submitQuery,
   });
+
+  useEffect(() => {
+    popAllMessagesRef.current = popAllMessages;
+  }, [popAllMessages]);
 
   cancelHandlerRef.current = useCallback(
     (shouldRestorePrompt: boolean = true) => {
@@ -833,6 +841,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
+      // All messages go to the message queue
+      // - If idle: auto-submits immediately as new turn
+      // - If busy: queued and drained as hints before tool responses
       addMessage(submittedValue);
       addInput(submittedValue); // Track input for up-arrow history
     },
