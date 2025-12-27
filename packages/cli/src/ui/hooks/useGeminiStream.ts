@@ -39,6 +39,7 @@ import {
   EDIT_TOOL_NAMES,
   processRestorableToolCalls,
   recordToolCallInteractions,
+  MAX_TURNS,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -412,6 +413,7 @@ export const useGeminiStream = (
     ): Promise<{
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
+      modelOverride?: string;
     }> => {
       if (turnCancelledRef.current) {
         return { queryToSend: null, shouldProceed: false };
@@ -421,6 +423,7 @@ export const useGeminiStream = (
       }
 
       let localQueryToSendToGemini: PartListUnion | null = null;
+      let modelOverride: string | undefined;
 
       if (typeof query === 'string') {
         const trimmedQuery = query.trim();
@@ -448,10 +451,12 @@ export const useGeminiStream = (
               }
               case 'submit_prompt': {
                 localQueryToSendToGemini = slashCommandResult.content;
+                modelOverride = slashCommandResult.model;
 
                 return {
                   queryToSend: localQueryToSendToGemini,
                   shouldProceed: true,
+                  modelOverride,
                 };
               }
               case 'handled': {
@@ -512,7 +517,11 @@ export const useGeminiStream = (
         );
         return { queryToSend: null, shouldProceed: false };
       }
-      return { queryToSend: localQueryToSendToGemini, shouldProceed: true };
+      return {
+        queryToSend: localQueryToSendToGemini,
+        shouldProceed: true,
+        modelOverride,
+      };
     },
     [
       config,
@@ -915,12 +924,13 @@ export const useGeminiStream = (
             prompt_id = config.getSessionId() + '########' + getPromptCount();
           }
           return promptIdContext.run(prompt_id, async () => {
-            const { queryToSend, shouldProceed } = await prepareQueryForGemini(
-              query,
-              userMessageTimestamp,
-              abortSignal,
-              prompt_id!,
-            );
+            const { queryToSend, shouldProceed, modelOverride } =
+              await prepareQueryForGemini(
+                query,
+                userMessageTimestamp,
+                abortSignal,
+                prompt_id!,
+              );
 
             if (!shouldProceed || queryToSend === null) {
               return;
@@ -956,6 +966,9 @@ export const useGeminiStream = (
                 queryToSend,
                 abortSignal,
                 prompt_id!,
+                MAX_TURNS,
+                false,
+                modelOverride,
               );
               const processingStatus = await processGeminiStreamEvents(
                 stream,
