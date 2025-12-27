@@ -135,6 +135,10 @@ export class Storage {
     return path.join(this.getProjectTempDir(), 'checkpoints');
   }
 
+  getProjectClipboardDir(): string {
+    return path.join(this.getProjectTempDir(), 'clipboard');
+  }
+
   getExtensionsDir(): string {
     return path.join(this.getGeminiDir(), 'extensions');
   }

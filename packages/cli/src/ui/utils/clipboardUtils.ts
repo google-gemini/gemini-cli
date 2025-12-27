@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import type { Storage } from '@google/gemini-cli-core';
 import {
   debugLogger,
   spawnAsync,
@@ -70,17 +71,16 @@ export async function clipboardHasImage(): Promise<boolean> {
  * @returns The path to the saved image file, or null if no image or error
  */
 export async function saveClipboardImage(
-  targetDir?: string,
+  storage: Storage,
 ): Promise<string | null> {
   if (process.platform !== 'darwin' && process.platform !== 'win32') {
     return null;
   }
 
   try {
-    // Create a temporary directory for clipboard images within the target directory
-    // This avoids security restrictions on paths outside the target directory
-    const baseDir = targetDir || process.cwd();
-    const tempDir = path.join(baseDir, '.gemini-clipboard');
+    // Use the project-specific temporary directory for clipboard images.
+    // This ensures physical relocation and full compatibility with the WorkspaceContext.
+    const tempDir = storage.getProjectClipboardDir();
     await fs.mkdir(tempDir, { recursive: true });
 
     // Generate a unique filename with timestamp
@@ -187,11 +187,10 @@ export async function saveClipboardImage(
  * @param targetDir The target directory where temp files are stored
  */
 export async function cleanupOldClipboardImages(
-  targetDir?: string,
+  storage: Storage,
 ): Promise<void> {
   try {
-    const baseDir = targetDir || process.cwd();
-    const tempDir = path.join(baseDir, '.gemini-clipboard');
+    const tempDir = storage.getProjectClipboardDir();
     const files = await fs.readdir(tempDir);
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
 

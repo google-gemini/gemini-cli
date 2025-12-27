@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Storage } from '@google/gemini-cli-core';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import { saveClipboardImage } from './clipboardUtils.js';
@@ -48,7 +49,10 @@ describe('saveClipboardImage Windows Path Escaping', () => {
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     const targetDir = "C:\\User's Files";
-    await saveClipboardImage(targetDir);
+    const mockStorage = {
+      getProjectClipboardDir: vi.fn().mockReturnValue(targetDir),
+    } as unknown as Storage;
+    await saveClipboardImage(mockStorage);
 
     expect(spawnAsync).toHaveBeenCalled();
     const args = vi.mocked(spawnAsync).mock.calls[0][1];

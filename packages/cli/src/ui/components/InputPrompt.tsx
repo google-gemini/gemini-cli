@@ -24,7 +24,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode, escapePath } from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
   parseSegmentsFromTokens,
@@ -39,7 +39,6 @@ import {
   isAutoExecutableCommand,
   isSlashCommand,
 } from '../utils/commandUtils.js';
-import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -316,18 +315,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const handleClipboardPaste = useCallback(async () => {
     try {
       if (await clipboardHasImage()) {
-        const imagePath = await saveClipboardImage(config.getTargetDir());
+        const imagePath = await saveClipboardImage(config.storage);
         if (imagePath) {
           // Clean up old images
-          cleanupOldClipboardImages(config.getTargetDir()).catch(() => {
+          cleanupOldClipboardImages(config.storage).catch(() => {
             // Ignore cleanup errors
           });
 
-          // Get relative path from current directory
-          const relativePath = path.relative(config.getTargetDir(), imagePath);
-
           // Insert @path reference at cursor position
-          const insertText = `@${relativePath}`;
+          const insertText = `@${escapePath(imagePath)}`;
           const currentText = buffer.text;
           const offset = buffer.getOffset();
 

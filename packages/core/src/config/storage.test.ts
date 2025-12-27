@@ -68,4 +68,12 @@ describe('Storage – additional helpers', () => {
     const expected = path.join(os.homedir(), GEMINI_DIR, 'tmp', 'bin');
     expect(Storage.getGlobalBinDir()).toBe(expected);
   });
+
+  it('getProjectClipboardDir returns project-specific temp clipboard path', () => {
+    const tempDir = path.join(os.homedir(), GEMINI_DIR, 'tmp');
+    // The hash is derived from projectRoot
+    const hash = storage['getFilePathHash'](projectRoot);
+    const expected = path.join(tempDir, hash, 'clipboard');
+    expect(storage.getProjectClipboardDir()).toBe(expected);
+  });
 });

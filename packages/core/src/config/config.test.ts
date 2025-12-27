@@ -563,9 +563,10 @@ describe('Server Config (config.ts)', () => {
     const workspaceContext = config.getWorkspaceContext();
     const directories = workspaceContext.getDirectories();
 
-    // Should include only the target directory initially
-    expect(directories).toHaveLength(1);
+    // Should include both the target directory and the clipboard directory initially
+    expect(directories).toHaveLength(2);
     expect(directories).toContain(path.resolve(baseParams.targetDir));
+    expect(directories).toContain(config.storage.getProjectClipboardDir());
 
     // The other directories should be in the pending list
     expect(config.getPendingIncludeDirectories()).toEqual(includeDirectories);

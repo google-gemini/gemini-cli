@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { inspect } from 'node:util';
 import process from 'node:process';
@@ -474,7 +475,14 @@ export class Config {
     this.sandbox = params.sandbox;
     this.targetDir = path.resolve(params.targetDir);
     this.folderTrust = params.folderTrust ?? false;
-    this.workspaceContext = new WorkspaceContext(this.targetDir, []);
+    this.storage = new Storage(this.targetDir);
+    // Guarantee the clipboard directory exists so WorkspaceContext includes it.
+    // This is necessary because WorkspaceContext skips directories that don't exist,
+    // which would cause the directory to not be mounted in macOS sandbox on first run.
+    fs.mkdirSync(this.storage.getProjectClipboardDir(), { recursive: true });
+    this.workspaceContext = new WorkspaceContext(this.targetDir, [
+      this.storage.getProjectClipboardDir(),
+    ]);
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
     this.question = params.question;
@@ -606,7 +614,6 @@ export class Config {
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
-    this.storage = new Storage(this.targetDir);
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;

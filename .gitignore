@@ -55,4 +55,3 @@ gha-creds-*.json
 patch_output.log
 
 .genkit
-.gemini-clipboard/
