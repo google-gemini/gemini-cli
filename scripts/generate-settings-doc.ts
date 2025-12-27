@@ -30,6 +30,8 @@ const MANUAL_TOP_LEVEL = new Set(['mcpServers', 'telemetry', 'extensions']);
 interface DocEntry {
   path: string;
   type: string;
+  label: string;
+  category: string;
   description: string;
   defaultValue: string;
   requiresRestart: boolean;
@@ -46,40 +48,61 @@ export async function main(argv = process.argv.slice(2)) {
     '..',
   );
   const docPath = path.join(repoRoot, 'docs/get-started/configuration.md');
+  const cliSettingsDocPath = path.join(repoRoot, 'docs/cli/settings.md');
 
   const { getSettingsSchema } = await loadSettingsSchemaModule();
   const schema = getSettingsSchema();
-  const sections = collectEntries(schema);
-  const generatedBlock = renderSections(sections);
+  const allSettingsSections = collectEntries(schema, { includeAll: true });
+  const filteredSettingsSections = collectEntries(schema, {
+    includeAll: false,
+  });
 
-  const doc = await readFile(docPath, 'utf8');
+  const generatedBlock = renderSections(allSettingsSections);
+  const generatedTableBlock = renderTableSections(filteredSettingsSections);
+
+  await updateFile(docPath, generatedBlock, checkOnly);
+  await updateFile(cliSettingsDocPath, generatedTableBlock, checkOnly);
+}
+
+async function updateFile(
+  filePath: string,
+  newContent: string,
+  checkOnly: boolean,
+) {
+  const doc = await readFile(filePath, 'utf8');
   const injectedDoc = injectBetweenMarkers({
     document: doc,
     startMarker: START_MARKER,
     endMarker: END_MARKER,
-    newContent: generatedBlock,
+    newContent: newContent,
     paddingBefore: '\n',
     paddingAfter: '\n',
   });
-  const formattedDoc = await formatWithPrettier(injectedDoc, docPath);
+  const formattedDoc = await formatWithPrettier(injectedDoc, filePath);
 
   if (normalizeForCompare(doc) === normalizeForCompare(formattedDoc)) {
     if (!checkOnly) {
-      console.log('Settings documentation already up to date.');
+      console.log(
+        `Settings documentation (${path.basename(filePath)}) already up to date.`,
+      );
     }
     return;
   }
 
   if (checkOnly) {
     console.error(
-      'Settings documentation is out of date. Run `npm run docs:settings` to regenerate.',
+      'Settings documentation (' +
+        path.basename(filePath) +
+        ') is out of date. Run `npm run docs:settings` to regenerate.',
     );
     process.exitCode = 1;
     return;
   }
 
-  await writeFile(docPath, formattedDoc);
-  console.log('Settings documentation regenerated.');
+  await writeFile(filePath, formattedDoc);
+  console.log(
+    `Settings documentation (${path.basename(filePath)}) regenerated.`,
+  );
 }
 
 async function loadSettingsSchemaModule() {
@@ -87,7 +110,10 @@ async function loadSettingsSchemaModule() {
   return import(modulePath);
 }
 
-function collectEntries(schema: SettingsSchemaType) {
+function collectEntries(
+  schema: SettingsSchemaType,
+  options: { includeAll?: boolean } = {},
+) {
   const sections = new Map<string, DocEntry[]>();
 
   const visit = (
@@ -107,7 +133,7 @@ function collectEntries(schema: SettingsSchemaType) {
         definition.properties &&
         Object.keys(definition.properties).length > 0;
 
-      if (!hasChildren) {
+      if (!hasChildren && (options.includeAll || definition.showInDialog)) {
         if (!sections.has(sectionKey)) {
           sections.set(sectionKey, []);
         }
@@ -115,6 +141,8 @@ function collectEntries(schema: SettingsSchemaType) {
         sections.get(sectionKey)!.push({
           path: newPathSegments.join('.'),
           type: formatType(definition),
+          label: definition.label,
+          category: definition.category,
           description: formatDescription(definition),
           defaultValue: formatDefaultValue(definition.default, {
             quoteStrings: true,
@@ -162,12 +190,12 @@ function renderSections(sections: Map<string, DocEntry[]>) {
       continue;
     }
 
-    lines.push(`#### \`${section}\``);
+    lines.push('#### `' + section + '`');
     lines.push('');
 
     for (const entry of entries) {
-      lines.push(`- **\`${entry.path}\`** (${entry.type}):`);
-      lines.push(`  - **Description:** ${entry.description}`);
+      lines.push('- **`' + entry.path + '`** (' + entry.type + '):');
+      lines.push('  - **Description:** ' + entry.description);
 
       if (entry.defaultValue.includes('\n')) {
         lines.push('  - **Default:**');
@@ -176,21 +204,21 @@ function renderSections(sections: Map<string, DocEntry[]>) {
         lines.push(
           entry.defaultValue
             .split('\n')
-            .map((line) => `    ${line}`)
+            .map((line) => '    ' + line)
             .join('\n'),
         );
         lines.push('    ```');
       } else {
         lines.push(
-          `  - **Default:** \`${escapeBackticks(entry.defaultValue)}\``,
+          '  - **Default:** `' + escapeBackticks(entry.defaultValue) + '`',
         );
       }
 
       if (entry.enumValues && entry.enumValues.length > 0) {
         const values = entry.enumValues
-          .map((value) => `\`${escapeBackticks(value)}\``)
+          .map((value) => '`' + escapeBackticks(value) + '`')
           .join(', ');
-        lines.push(`  - **Values:** ${values}`);
+        lines.push('  - **Values:** ' + values);
       }
 
       if (entry.requiresRestart) {
@@ -199,6 +227,47 @@ function renderSections(sections: Map<string, DocEntry[]>) {
 
       lines.push('');
     }
+  }
+
+  return lines.join('\n').trimEnd();
+}
+
+function renderTableSections(sections: Map<string, DocEntry[]>) {
+  const lines: string[] = [];
+
+  for (const [section, entries] of sections) {
+    if (entries.length === 0) {
+      continue;
+    }
+
+    let title = section.charAt(0).toUpperCase() + section.slice(1);
+    if (title === 'Ui') {
+      title = 'UI';
+    } else if (title === 'Ide') {
+      title = 'IDE';
+    }
+    lines.push(`### ${title}`);
+    lines.push('');
+    lines.push('| UI Label | Setting | Description | Default |');
+    lines.push('| --- | --- | --- | --- |');
+
+    for (const entry of entries) {
+      const val = entry.defaultValue.replace(/\n/g, ' ');
+      const defaultVal = '`' + escapeBackticks(val) + '`';
+      lines.push(
+        '| ' +
+          entry.label +
+          ' | `' +
+          entry.path +
+          '` | ' +
+          entry.description +
+          ' | ' +
+          defaultVal +
+          ' |',
+      );
+    }
+
+    lines.push('');
   }
 
   return lines.join('\n').trimEnd();

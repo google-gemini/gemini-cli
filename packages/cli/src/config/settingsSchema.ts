@@ -323,7 +323,7 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: 'text',
-        description: 'The format of the CLI output.',
+        description: 'The format of the CLI output. Can be `text` or `json`.',
         showInDialog: true,
         options: [
           { value: 'text', label: 'Text' },
@@ -595,7 +595,7 @@ const SETTINGS_SCHEMA = {
         category: 'IDE',
         requiresRestart: true,
         default: false,
-        description: 'Enable IDE integration mode',
+        description: 'Enable IDE integration mode.',
         showInDialog: true,
       },
       hasSeenNudge: {
@@ -844,7 +844,7 @@ const SETTINGS_SCHEMA = {
             category: 'Context',
             requiresRestart: true,
             default: true,
-            description: 'Respect .gitignore files when searching',
+            description: 'Respect .gitignore files when searching.',
             showInDialog: true,
           },
           respectGeminiIgnore: {
@@ -853,7 +853,7 @@ const SETTINGS_SCHEMA = {
             category: 'Context',
             requiresRestart: true,
             default: true,
-            description: 'Respect .geminiignore files when searching',
+            description: 'Respect .geminiignore files when searching.',
             showInDialog: true,
           },
           enableRecursiveFileSearch: {
