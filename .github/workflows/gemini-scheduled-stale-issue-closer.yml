@@ -21,6 +21,7 @@ defaults:
 
 jobs:
   close-stale-issues:
+    if: 'github.repository == ''google-gemini/gemini-cli'''
     runs-on: 'ubuntu-latest'
     permissions:
       issues: 'write'
