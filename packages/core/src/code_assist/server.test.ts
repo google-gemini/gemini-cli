@@ -102,7 +102,10 @@ describe('CodeAssistServer', () => {
             index: 0,
             content: {
               role: 'model',
-              parts: [{ text: 'response' }],
+              parts: [
+                { text: 'response' },
+                { functionCall: { name: 'test', args: {} } },
+              ],
             },
             finishReason: FinishReason.SAFETY,
             safetyRatings: [],
@@ -142,7 +145,10 @@ describe('CodeAssistServer', () => {
             index: 0,
             content: {
               role: 'model',
-              parts: [{ text: 'response' }],
+              parts: [
+                { text: 'response' },
+                { functionCall: { name: 'test', args: {} } },
+              ],
             },
             finishReason: FinishReason.STOP,
             safetyRatings: [],
@@ -178,6 +184,9 @@ describe('CodeAssistServer', () => {
                 firstMessageLatency: expect.stringMatching(/\d+s/),
               }),
             }),
+            timestamp: expect.stringMatching(
+              /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/,
+            ),
           }),
         ]),
       }),
@@ -204,7 +213,16 @@ describe('CodeAssistServer', () => {
     const mockResponseData = {
       traceId: 'stream-trace-id',
       response: {
-        candidates: [{ content: { parts: [{ text: 'chunk' }] } }],
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: 'chunk' },
+                { functionCall: { name: 'test', args: {} } },
+              ],
+            },
+          },
+        ],
         sdkHttpResponse: {
           responseInternal: {
             ok: true,
@@ -229,6 +247,9 @@ describe('CodeAssistServer', () => {
             conversationOffered: expect.objectContaining({
               traceId: 'stream-trace-id',
             }),
+            timestamp: expect.stringMatching(
+              /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/,
+            ),
           }),
         ]),
       }),
@@ -251,6 +272,9 @@ describe('CodeAssistServer', () => {
         metrics: expect.arrayContaining([
           expect.objectContaining({
             conversationInteraction: interaction,
+            timestamp: expect.stringMatching(
+              /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/,
+            ),
           }),
         ]),
       }),

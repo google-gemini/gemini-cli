@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { stat } from 'node:fs/promises';
 import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import { type Settings, SettingScope } from './settings.js';
@@ -198,7 +199,9 @@ export class ExtensionManager extends ExtensionLoader {
               installMetadata.type === 'git') ||
             // Otherwise ask the user if they would like to try a git clone.
             (await this.requestConsent(
-              `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.\n\nWould you like to attempt to install via "git clone" instead?`,
+              `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.
+
+Would you like to attempt to install via "git clone" instead?`,
             ))
           ) {
             await cloneFromGit(installMetadata, tempDir);
@@ -794,6 +797,45 @@ function validateName(name: string) {
     throw new Error(
       `Invalid extension name: "${name}". Only letters (a-z, A-Z), numbers (0-9), and dashes (-) are allowed.`,
     );
+  }
+}
+
+export async function inferInstallMetadata(
+  source: string,
+  args: {
+    ref?: string;
+    autoUpdate?: boolean;
+    allowPreRelease?: boolean;
+  } = {},
+): Promise<ExtensionInstallMetadata> {
+  if (
+    source.startsWith('http://') ||
+    source.startsWith('https://') ||
+    source.startsWith('git@') ||
+    source.startsWith('sso://')
+  ) {
+    return {
+      source,
+      type: 'git',
+      ref: args.ref,
+      autoUpdate: args.autoUpdate,
+      allowPreRelease: args.allowPreRelease,
+    };
+  } else {
+    if (args.ref || args.autoUpdate) {
+      throw new Error(
+        '--ref and --auto-update are not applicable for local extensions.',
+      );
+    }
+    try {
+      await stat(source);
+      return {
+        source,
+        type: 'local',
+      };
+    } catch {
+      throw new Error('Install source not found.');
+    }
   }
 }
 
