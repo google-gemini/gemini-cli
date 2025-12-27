@@ -28,8 +28,8 @@ available combinations.
 | Delete from the cursor to the start of the line. | `Ctrl + U`                                |
 | Clear all text in the input field.               | `Ctrl + C`                                |
 | Delete the previous word.                        | `Ctrl + Backspace`<br />`Cmd + Backspace` |
-| Stash the current input to restore later.        | `Ctrl + Shift + S`                        |
-| Restore the previously stashed input.            | `Ctrl + Shift + R`                        |
+| Stash the current input to restore later.        | `Ctrl + Z`                                |
+| Restore the previously stashed input.            | `Ctrl + Y`                                |
 
 #### Screen Control
 

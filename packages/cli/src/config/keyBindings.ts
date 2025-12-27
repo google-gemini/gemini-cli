@@ -223,8 +223,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
 
   // Prompt stashing
-  [Command.STASH_PROMPT]: [{ key: 's', ctrl: true, shift: true }],
-  [Command.POP_STASH]: [{ key: 'r', ctrl: true, shift: true }],
+  [Command.STASH_PROMPT]: [{ key: 'z', ctrl: true }],
+  [Command.POP_STASH]: [{ key: 'y', ctrl: true }],
 };
 
 interface CommandCategory {

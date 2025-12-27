@@ -79,10 +79,8 @@ describe('keyMatchers', () => {
       key.ctrl && key.name === 'f',
     [Command.EXPAND_SUGGESTION]: (key: Key) => key.name === 'right',
     [Command.COLLAPSE_SUGGESTION]: (key: Key) => key.name === 'left',
-    [Command.STASH_PROMPT]: (key: Key) =>
-      key.ctrl && key.shift && key.name === 's',
-    [Command.POP_STASH]: (key: Key) =>
-      key.ctrl && key.shift && key.name === 'r',
+    [Command.STASH_PROMPT]: (key: Key) => key.ctrl && key.name === 'z',
+    [Command.POP_STASH]: (key: Key) => key.ctrl && key.name === 'y',
   };
 
   // Test data for each command with positive and negative test cases
@@ -344,21 +342,13 @@ describe('keyMatchers', () => {
     // Prompt stashing
     {
       command: Command.STASH_PROMPT,
-      positive: [createKey('s', { ctrl: true, shift: true })],
-      negative: [
-        createKey('s'),
-        createKey('s', { ctrl: true }),
-        createKey('z', { ctrl: true }),
-      ],
+      positive: [createKey('z', { ctrl: true })],
+      negative: [createKey('z'), createKey('s', { ctrl: true })],
     },
     {
       command: Command.POP_STASH,
-      positive: [createKey('r', { ctrl: true, shift: true })],
-      negative: [
-        createKey('r'),
-        createKey('r', { ctrl: true }),
-        createKey('y', { ctrl: true }),
-      ],
+      positive: [createKey('y', { ctrl: true })],
+      negative: [createKey('y'), createKey('z', { ctrl: true })],
     },
   ];
 
