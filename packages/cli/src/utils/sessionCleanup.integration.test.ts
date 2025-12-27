@@ -9,6 +9,29 @@ import { cleanupExpiredSessions } from './sessionCleanup.js';
 import type { Settings } from '../config/settings.js';
 import { SESSION_FILE_PREFIX, type Config } from '@google/gemini-cli-core';
 
+const createJsonlSession = (options: {
+  sessionId: string;
+  startTime: string;
+  lastUpdated: string;
+  messages: Array<{
+    id: string;
+    type: 'user' | 'gemini' | 'info' | 'error' | 'warning';
+    content: string;
+    timestamp: string;
+  }>;
+}) =>
+  `${[
+    {
+      type: 'session_metadata',
+      sessionId: options.sessionId,
+      startTime: options.startTime,
+      lastUpdated: options.lastUpdated,
+    },
+    ...options.messages,
+  ]
+    .map((entry) => JSON.stringify(entry))
+    .join('\n')}\n`;
+
 // Create a mock config for integration testing
 function createTestConfig(): Config {
   return {
@@ -76,15 +99,15 @@ describe('Session Cleanup Integration', () => {
     const oldDate = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000); // 60 days ago
     const sessionFile = path.join(
       chatsDir,
-      `${SESSION_FILE_PREFIX}2024-01-01T10-00-00-test123.json`,
+      `${SESSION_FILE_PREFIX}2024-01-01T10-00-00-test123.jsonl`,
     );
     await fs.writeFile(
       sessionFile,
-      JSON.stringify({
+      createJsonlSession({
         sessionId: 'test123',
-        messages: [],
         startTime: oldDate.toISOString(),
         lastUpdated: oldDate.toISOString(),
+        messages: [],
       }),
     );
 
@@ -104,7 +127,7 @@ describe('Session Cleanup Integration', () => {
     // Verify the session file still exists (was not deleted)
     const filesAfter = await fs.readdir(chatsDir);
     expect(filesAfter).toContain(
-      `${SESSION_FILE_PREFIX}2024-01-01T10-00-00-test123.json`,
+      `${SESSION_FILE_PREFIX}2024-01-01T10-00-00-test123.jsonl`,
     );
 
     // Cleanup
@@ -160,45 +183,66 @@ describe('Session Cleanup Integration', () => {
     // Create an old session file that should be deleted
     const oldSessionFile = path.join(
       chatsDir,
-      `${SESSION_FILE_PREFIX}2024-12-01T10-00-00-old12345.json`,
+      `${SESSION_FILE_PREFIX}2024-12-01T10-00-00-old12345.jsonl`,
     );
     await fs.writeFile(
       oldSessionFile,
-      JSON.stringify({
+      createJsonlSession({
         sessionId: 'old12345',
-        messages: [{ type: 'user', content: 'test message' }],
         startTime: oldDate.toISOString(),
         lastUpdated: oldDate.toISOString(),
+        messages: [
+          {
+            id: 'msg-old',
+            type: 'user',
+            content: 'test message',
+            timestamp: oldDate.toISOString(),
+          },
+        ],
       }),
     );
 
     // Create a recent session file that should be kept
     const recentSessionFile = path.join(
       chatsDir,
-      `${SESSION_FILE_PREFIX}2025-01-15T10-00-00-recent789.json`,
+      `${SESSION_FILE_PREFIX}2025-01-15T10-00-00-recent789.jsonl`,
     );
     await fs.writeFile(
       recentSessionFile,
-      JSON.stringify({
+      createJsonlSession({
         sessionId: 'recent789',
-        messages: [{ type: 'user', content: 'test message' }],
         startTime: recentDate.toISOString(),
         lastUpdated: recentDate.toISOString(),
+        messages: [
+          {
+            id: 'msg-recent',
+            type: 'user',
+            content: 'test message',
+            timestamp: recentDate.toISOString(),
+          },
+        ],
       }),
     );
 
     // Create a current session file that should always be kept
     const currentSessionFile = path.join(
       chatsDir,
-      `${SESSION_FILE_PREFIX}2025-01-20T10-00-00-current123.json`,
+      `${SESSION_FILE_PREFIX}2025-01-20T10-00-00-current123.jsonl`,
     );
     await fs.writeFile(
       currentSessionFile,
-      JSON.stringify({
+      createJsonlSession({
         sessionId: 'current123',
-        messages: [{ type: 'user', content: 'test message' }],
         startTime: now.toISOString(),
         lastUpdated: now.toISOString(),
+        messages: [
+          {
+            id: 'msg-current',
+            type: 'user',
+            content: 'test message',
+            timestamp: now.toISOString(),
+          },
+        ],
       }),
     );
 
@@ -235,13 +279,13 @@ describe('Session Cleanup Integration', () => {
       const remainingFiles = await fs.readdir(chatsDir);
       expect(remainingFiles).toHaveLength(2); // Only 2 files should remain
       expect(remainingFiles).toContain(
-        `${SESSION_FILE_PREFIX}2025-01-15T10-00-00-recent789.json`,
+        `${SESSION_FILE_PREFIX}2025-01-15T10-00-00-recent789.jsonl`,
       );
       expect(remainingFiles).toContain(
-        `${SESSION_FILE_PREFIX}2025-01-20T10-00-00-current123.json`,
+        `${SESSION_FILE_PREFIX}2025-01-20T10-00-00-current123.jsonl`,
       );
       expect(remainingFiles).not.toContain(
-        `${SESSION_FILE_PREFIX}2024-12-01T10-00-00-old12345.json`,
+        `${SESSION_FILE_PREFIX}2024-12-01T10-00-00-old12345.jsonl`,
       );
     } finally {
       // Clean up test directory

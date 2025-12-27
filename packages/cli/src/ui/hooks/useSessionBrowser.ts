@@ -14,7 +14,7 @@ import type {
   ResumedSessionData,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
-import { partListUnionToString } from '@google/gemini-cli-core';
+import { partListUnionToString, parseJsonl } from '@google/gemini-cli-core';
 import type { SessionInfo } from '../../utils/sessionUtils.js';
 import { MessageType, ToolCallStatus } from '../types.js';
 
@@ -55,9 +55,13 @@ export const useSessionBrowser = (
           const originalFilePath = path.join(chatsDir, fileName);
 
           // Load up the conversation.
-          const conversation: ConversationRecord = JSON.parse(
-            await fs.readFile(originalFilePath, 'utf8'),
-          );
+          const rawContent = await fs.readFile(originalFilePath, 'utf8');
+          let conversation: ConversationRecord;
+          if (fileName.endsWith('.jsonl')) {
+            conversation = parseJsonl(rawContent, session.id, '');
+          } else {
+            conversation = JSON.parse(rawContent);
+          }
 
           // Use the old session's ID to continue it.
           const existingSessionId = conversation.sessionId;
@@ -90,17 +94,15 @@ export const useSessionBrowser = (
      * Deletes a session by ID using the ChatRecordingService.
      */
     handleDeleteSession: useCallback(
-      (session: SessionInfo) => {
-        // Note: Chat sessions are stored on disk using a filename derived from
-        // the session, e.g. "session-<timestamp>-<sessionIdPrefix>.json".
-        // The ChatRecordingService.deleteSession API expects this file basename
-        // (without the ".json" extension), not the full session UUID.
+      async (session: SessionInfo) => {
+        // Note: use the canonical session id so deleteSession can remove all
+        // related files across formats.
         try {
           const chatRecordingService = config
             .getGeminiClient()
             ?.getChatRecordingService();
           if (chatRecordingService) {
-            chatRecordingService.deleteSession(session.file);
+            await chatRecordingService.deleteSession(session.id);
           }
         } catch (error) {
           console.error('Error deleting session:', error);

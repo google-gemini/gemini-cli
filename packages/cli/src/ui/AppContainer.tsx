@@ -473,7 +473,7 @@ export const AppContainer = (props: AppContainerProps) => {
   // Wrap handleDeleteSession to return a Promise for UIActions interface
   const handleDeleteSession = useCallback(
     async (session: SessionInfo): Promise<void> => {
-      handleDeleteSessionSync(session);
+      await handleDeleteSessionSync(session);
     },
     [handleDeleteSessionSync],
   );

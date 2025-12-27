@@ -66,7 +66,7 @@ describe('HookEventHandler', () => {
         getChatRecordingService: vi.fn().mockReturnValue({
           getConversationFilePath: vi
             .fn()
-            .mockReturnValue('/test/project/.gemini/tmp/chats/session.json'),
+            .mockReturnValue('/test/project/.gemini/tmp/chats/session.jsonl'),
         }),
       }),
     } as unknown as Config;
@@ -584,7 +584,7 @@ describe('HookEventHandler', () => {
         HookEventName.BeforeTool,
         expect.objectContaining({
           session_id: 'test-session',
-          transcript_path: '/test/project/.gemini/tmp/chats/session.json',
+          transcript_path: '/test/project/.gemini/tmp/chats/session.jsonl',
           cwd: '/test/project',
           hook_event_name: 'BeforeTool',
           timestamp: expect.any(String),

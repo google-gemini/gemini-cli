@@ -48,7 +48,7 @@ export const clearCommand: SlashCommand = {
     if (config && chatRecordingService) {
       const newSessionId = randomUUID();
       config.setSessionId(newSessionId);
-      chatRecordingService.initialize();
+      await chatRecordingService.initialize();
     }
 
     // Fire SessionStart hook after clearing

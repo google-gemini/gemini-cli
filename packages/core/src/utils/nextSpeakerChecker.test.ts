@@ -66,7 +66,7 @@ describe('checkNextSpeaker', () => {
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getModel: () => 'test-model',
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/test-temp'),
       },
       modelConfigService: {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),

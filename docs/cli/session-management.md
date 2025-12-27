@@ -16,6 +16,9 @@ This happens in the background without any manual intervention.
   - Token usage statistics (input/output/cached, etc.).
   - Assistant thoughts/reasoning summaries (when available).
 - **Location:** Sessions are stored in `~/.gemini/tmp/<project_hash>/chats/`.
+- **Format:** New sessions are stored as newline-delimited JSON (`.jsonl`) using
+  append-only writes. Legacy `.json` sessions are still readable and will be
+  included in listing, resuming, and cleanup.
 - **Scope:** Sessions are project-specific. Switching directories to a different
   project will switch to that project's session history.
 

@@ -49,7 +49,7 @@ function createTestSessions(): SessionInfo[] {
     {
       id: 'current123',
       file: `${SESSION_FILE_PREFIX}2025-01-20T10-30-00-current12`,
-      fileName: `${SESSION_FILE_PREFIX}2025-01-20T10-30-00-current12.json`,
+      fileName: `${SESSION_FILE_PREFIX}2025-01-20T10-30-00-current12.jsonl`,
       startTime: now.toISOString(),
       lastUpdated: now.toISOString(),
       messageCount: 5,
@@ -61,7 +61,7 @@ function createTestSessions(): SessionInfo[] {
     {
       id: 'recent456',
       file: `${SESSION_FILE_PREFIX}2025-01-18T15-45-00-recent45`,
-      fileName: `${SESSION_FILE_PREFIX}2025-01-18T15-45-00-recent45.json`,
+      fileName: `${SESSION_FILE_PREFIX}2025-01-18T15-45-00-recent45.jsonl`,
       startTime: oneWeekAgo.toISOString(),
       lastUpdated: oneWeekAgo.toISOString(),
       messageCount: 10,
@@ -73,7 +73,7 @@ function createTestSessions(): SessionInfo[] {
     {
       id: 'old789abc',
       file: `${SESSION_FILE_PREFIX}2025-01-10T09-15-00-old789ab`,
-      fileName: `${SESSION_FILE_PREFIX}2025-01-10T09-15-00-old789ab.json`,
+      fileName: `${SESSION_FILE_PREFIX}2025-01-10T09-15-00-old789ab.jsonl`,
       startTime: twoWeeksAgo.toISOString(),
       lastUpdated: twoWeeksAgo.toISOString(),
       messageCount: 3,
@@ -85,7 +85,7 @@ function createTestSessions(): SessionInfo[] {
     {
       id: 'ancient12',
       file: `${SESSION_FILE_PREFIX}2024-12-25T12-00-00-ancient1`,
-      fileName: `${SESSION_FILE_PREFIX}2024-12-25T12-00-00-ancient1.json`,
+      fileName: `${SESSION_FILE_PREFIX}2024-12-25T12-00-00-ancient1.jsonl`,
       startTime: oneMonthAgo.toISOString(),
       lastUpdated: oneMonthAgo.toISOString(),
       messageCount: 15,
@@ -236,7 +236,7 @@ describe('Session Cleanup', () => {
       const currentSessionPath = path.join(
         '/tmp/test-project',
         'chats',
-        `${SESSION_FILE_PREFIX}2025-01-20T10-30-00-current12.json`,
+        `${SESSION_FILE_PREFIX}2025-01-20T10-30-00-current12.jsonl`,
       );
       expect(
         unlinkCalls.find((call) => call[0] === currentSessionPath),
@@ -440,7 +440,7 @@ describe('Session Cleanup', () => {
         {
           id: 'current',
           file: `${SESSION_FILE_PREFIX}current`,
-          fileName: `${SESSION_FILE_PREFIX}current.json`,
+          fileName: `${SESSION_FILE_PREFIX}current.jsonl`,
           startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
           messageCount: 1,
@@ -452,7 +452,7 @@ describe('Session Cleanup', () => {
         {
           id: 'session5d',
           file: `${SESSION_FILE_PREFIX}5d`,
-          fileName: `${SESSION_FILE_PREFIX}5d.json`,
+          fileName: `${SESSION_FILE_PREFIX}5d.jsonl`,
           startTime: fiveDaysAgo.toISOString(),
           lastUpdated: fiveDaysAgo.toISOString(),
           messageCount: 1,
@@ -464,7 +464,7 @@ describe('Session Cleanup', () => {
         {
           id: 'session8d',
           file: `${SESSION_FILE_PREFIX}8d`,
-          fileName: `${SESSION_FILE_PREFIX}8d.json`,
+          fileName: `${SESSION_FILE_PREFIX}8d.jsonl`,
           startTime: eightDaysAgo.toISOString(),
           lastUpdated: eightDaysAgo.toISOString(),
           messageCount: 1,
@@ -476,7 +476,7 @@ describe('Session Cleanup', () => {
         {
           id: 'session15d',
           file: `${SESSION_FILE_PREFIX}15d`,
-          fileName: `${SESSION_FILE_PREFIX}15d.json`,
+          fileName: `${SESSION_FILE_PREFIX}15d.jsonl`,
           startTime: fifteenDaysAgo.toISOString(),
           lastUpdated: fifteenDaysAgo.toISOString(),
           messageCount: 1,
@@ -520,21 +520,21 @@ describe('Session Cleanup', () => {
         path.join(
           '/tmp/test-project',
           'chats',
-          `${SESSION_FILE_PREFIX}8d.json`,
+          `${SESSION_FILE_PREFIX}8d.jsonl`,
         ),
       );
       expect(unlinkCalls).toContain(
         path.join(
           '/tmp/test-project',
           'chats',
-          `${SESSION_FILE_PREFIX}15d.json`,
+          `${SESSION_FILE_PREFIX}15d.jsonl`,
         ),
       );
       expect(unlinkCalls).not.toContain(
         path.join(
           '/tmp/test-project',
           'chats',
-          `${SESSION_FILE_PREFIX}5d.json`,
+          `${SESSION_FILE_PREFIX}5d.jsonl`,
         ),
       );
     });
@@ -562,7 +562,7 @@ describe('Session Cleanup', () => {
         {
           id: 'current',
           file: `${SESSION_FILE_PREFIX}current`,
-          fileName: `${SESSION_FILE_PREFIX}current.json`,
+          fileName: `${SESSION_FILE_PREFIX}current.jsonl`,
           startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
           messageCount: 1,
@@ -574,7 +574,7 @@ describe('Session Cleanup', () => {
         {
           id: 'session1d',
           file: `${SESSION_FILE_PREFIX}1d`,
-          fileName: `${SESSION_FILE_PREFIX}1d.json`,
+          fileName: `${SESSION_FILE_PREFIX}1d.jsonl`,
           startTime: oneDayAgo.toISOString(),
           lastUpdated: oneDayAgo.toISOString(),
           messageCount: 1,
@@ -586,7 +586,7 @@ describe('Session Cleanup', () => {
         {
           id: 'session7d',
           file: `${SESSION_FILE_PREFIX}7d`,
-          fileName: `${SESSION_FILE_PREFIX}7d.json`,
+          fileName: `${SESSION_FILE_PREFIX}7d.jsonl`,
           startTime: sevenDaysAgo.toISOString(),
           lastUpdated: sevenDaysAgo.toISOString(),
           messageCount: 1,
@@ -598,7 +598,7 @@ describe('Session Cleanup', () => {
         {
           id: 'session13d',
           file: `${SESSION_FILE_PREFIX}13d`,
-          fileName: `${SESSION_FILE_PREFIX}13d.json`,
+          fileName: `${SESSION_FILE_PREFIX}13d.jsonl`,
           startTime: thirteenDaysAgo.toISOString(),
           lastUpdated: thirteenDaysAgo.toISOString(),
           messageCount: 1,
@@ -658,7 +658,7 @@ describe('Session Cleanup', () => {
         {
           id: 'current',
           file: `${SESSION_FILE_PREFIX}current`,
-          fileName: `${SESSION_FILE_PREFIX}current.json`,
+          fileName: `${SESSION_FILE_PREFIX}current.jsonl`,
           startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
           messageCount: 1,
@@ -675,7 +675,7 @@ describe('Session Cleanup', () => {
         sessions.push({
           id: `session${i}`,
           file: `${SESSION_FILE_PREFIX}${i}d`,
-          fileName: `${SESSION_FILE_PREFIX}${i}d.json`,
+          fileName: `${SESSION_FILE_PREFIX}${i}d.jsonl`,
           startTime: daysAgo.toISOString(),
           lastUpdated: daysAgo.toISOString(),
           messageCount: 1,
@@ -719,21 +719,21 @@ describe('Session Cleanup', () => {
         path.join(
           '/tmp/test-project',
           'chats',
-          `${SESSION_FILE_PREFIX}3d.json`,
+          `${SESSION_FILE_PREFIX}3d.jsonl`,
         ),
       );
       expect(unlinkCalls).toContain(
         path.join(
           '/tmp/test-project',
           'chats',
-          `${SESSION_FILE_PREFIX}4d.json`,
+          `${SESSION_FILE_PREFIX}4d.jsonl`,
         ),
       );
       expect(unlinkCalls).toContain(
         path.join(
           '/tmp/test-project',
           'chats',
-          `${SESSION_FILE_PREFIX}5d.json`,
+          `${SESSION_FILE_PREFIX}5d.jsonl`,
         ),
       );
 
@@ -742,21 +742,21 @@ describe('Session Cleanup', () => {
         path.join(
           '/tmp/test-project',
           'chats',
-          `${SESSION_FILE_PREFIX}current.json`,
+          `${SESSION_FILE_PREFIX}current.jsonl`,
         ),
       );
       expect(unlinkCalls).not.toContain(
         path.join(
           '/tmp/test-project',
           'chats',
-          `${SESSION_FILE_PREFIX}1d.json`,
+          `${SESSION_FILE_PREFIX}1d.jsonl`,
         ),
       );
       expect(unlinkCalls).not.toContain(
         path.join(
           '/tmp/test-project',
           'chats',
-          `${SESSION_FILE_PREFIX}2d.json`,
+          `${SESSION_FILE_PREFIX}2d.jsonl`,
         ),
       );
     });
@@ -784,7 +784,7 @@ describe('Session Cleanup', () => {
         {
           id: 'current',
           file: `${SESSION_FILE_PREFIX}current`,
-          fileName: `${SESSION_FILE_PREFIX}current.json`,
+          fileName: `${SESSION_FILE_PREFIX}current.jsonl`,
           startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
           messageCount: 1,
@@ -796,7 +796,7 @@ describe('Session Cleanup', () => {
         {
           id: 'session3d',
           file: `${SESSION_FILE_PREFIX}3d`,
-          fileName: `${SESSION_FILE_PREFIX}3d.json`,
+          fileName: `${SESSION_FILE_PREFIX}3d.jsonl`,
           startTime: threeDaysAgo.toISOString(),
           lastUpdated: threeDaysAgo.toISOString(),
           messageCount: 1,
@@ -808,7 +808,7 @@ describe('Session Cleanup', () => {
         {
           id: 'session5d',
           file: `${SESSION_FILE_PREFIX}5d`,
-          fileName: `${SESSION_FILE_PREFIX}5d.json`,
+          fileName: `${SESSION_FILE_PREFIX}5d.jsonl`,
           startTime: fiveDaysAgo.toISOString(),
           lastUpdated: fiveDaysAgo.toISOString(),
           messageCount: 1,
@@ -820,7 +820,7 @@ describe('Session Cleanup', () => {
         {
           id: 'session7d',
           file: `${SESSION_FILE_PREFIX}7d`,
-          fileName: `${SESSION_FILE_PREFIX}7d.json`,
+          fileName: `${SESSION_FILE_PREFIX}7d.jsonl`,
           startTime: sevenDaysAgo.toISOString(),
           lastUpdated: sevenDaysAgo.toISOString(),
           messageCount: 1,
@@ -832,7 +832,7 @@ describe('Session Cleanup', () => {
         {
           id: 'session12d',
           file: `${SESSION_FILE_PREFIX}12d`,
-          fileName: `${SESSION_FILE_PREFIX}12d.json`,
+          fileName: `${SESSION_FILE_PREFIX}12d.jsonl`,
           startTime: twelveDaysAgo.toISOString(),
           lastUpdated: twelveDaysAgo.toISOString(),
           messageCount: 1,
@@ -878,21 +878,21 @@ describe('Session Cleanup', () => {
         path.join(
           '/tmp/test-project',
           'chats',
-          `${SESSION_FILE_PREFIX}5d.json`,
+          `${SESSION_FILE_PREFIX}5d.jsonl`,
         ),
       );
       expect(unlinkCalls).toContain(
         path.join(
           '/tmp/test-project',
           'chats',
-          `${SESSION_FILE_PREFIX}7d.json`,
+          `${SESSION_FILE_PREFIX}7d.jsonl`,
         ),
       );
       expect(unlinkCalls).toContain(
         path.join(
           '/tmp/test-project',
           'chats',
-          `${SESSION_FILE_PREFIX}12d.json`,
+          `${SESSION_FILE_PREFIX}12d.jsonl`,
         ),
       );
 
@@ -901,14 +901,14 @@ describe('Session Cleanup', () => {
         path.join(
           '/tmp/test-project',
           'chats',
-          `${SESSION_FILE_PREFIX}current.json`,
+          `${SESSION_FILE_PREFIX}current.jsonl`,
         ),
       );
       expect(unlinkCalls).not.toContain(
         path.join(
           '/tmp/test-project',
           'chats',
-          `${SESSION_FILE_PREFIX}3d.json`,
+          `${SESSION_FILE_PREFIX}3d.jsonl`,
         ),
       );
     });
@@ -1699,11 +1699,11 @@ describe('Session Cleanup', () => {
       mockGetAllSessionFiles.mockResolvedValue([
         { fileName: validSession.fileName, sessionInfo: validSession },
         {
-          fileName: `${SESSION_FILE_PREFIX}2025-01-02T10-00-00-corrupt1.json`,
+          fileName: `${SESSION_FILE_PREFIX}2025-01-02T10-00-00-corrupt1.jsonl`,
           sessionInfo: null,
         },
         {
-          fileName: `${SESSION_FILE_PREFIX}2025-01-03T10-00-00-corrupt2.json`,
+          fileName: `${SESSION_FILE_PREFIX}2025-01-03T10-00-00-corrupt2.jsonl`,
           sessionInfo: null,
         },
       ]);
@@ -1719,10 +1719,10 @@ describe('Session Cleanup', () => {
 
       // Verify corrupted files were deleted
       expect(mockFs.unlink).toHaveBeenCalledWith(
-        expect.stringContaining('corrupt1.json'),
+        expect.stringContaining('corrupt1.jsonl'),
       );
       expect(mockFs.unlink).toHaveBeenCalledWith(
-        expect.stringContaining('corrupt2.json'),
+        expect.stringContaining('corrupt2.jsonl'),
       );
     });
 

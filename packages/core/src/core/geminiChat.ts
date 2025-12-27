@@ -209,6 +209,7 @@ export class GeminiChat {
   // model.
   private sendPromise: Promise<void> = Promise.resolve();
   private readonly chatRecordingService: ChatRecordingService;
+  private readonly initPromise: Promise<void>;
   private lastPromptTokenCount: number;
 
   constructor(
@@ -220,7 +221,7 @@ export class GeminiChat {
   ) {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(config);
-    this.chatRecordingService.initialize(resumedSessionData);
+    this.initPromise = this.chatRecordingService.initialize(resumedSessionData);
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.history.flatMap((c) => c.parts || []),
     );
@@ -262,6 +263,7 @@ export class GeminiChat {
     signal: AbortSignal,
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
+    await this.initPromise;
 
     let streamDoneResolver: () => void;
     const streamDonePromise = new Promise<void>((resolve) => {
@@ -278,11 +280,13 @@ export class GeminiChat {
     if (!isFunctionResponse(userContent)) {
       const userMessage = Array.isArray(message) ? message : [message];
       const userMessageContent = partListUnionToString(toParts(userMessage));
-      this.chatRecordingService.recordMessage({
-        model,
-        type: 'user',
-        content: userMessageContent,
-      });
+      void this.chatRecordingService
+        .recordMessage({
+          model,
+          type: 'user',
+          content: userMessageContent,
+        })
+        .catch(() => undefined);
     }
 
     // Add user content to history ONCE before any attempts.
@@ -733,7 +737,9 @@ export class GeminiChat {
 
       // Record token usage if this chunk has usageMetadata
       if (chunk.usageMetadata) {
-        this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
+        void this.chatRecordingService
+          .recordMessageTokens(chunk.usageMetadata)
+          .catch(() => undefined);
         if (chunk.usageMetadata.promptTokenCount !== undefined) {
           this.lastPromptTokenCount = chunk.usageMetadata.promptTokenCount;
         }
@@ -777,11 +783,13 @@ export class GeminiChat {
 
     // Record model response text from the collected parts
     if (responseText) {
-      this.chatRecordingService.recordMessage({
-        model,
-        type: 'gemini',
-        content: responseText,
-      });
+      void this.chatRecordingService
+        .recordMessage({
+          model,
+          type: 'gemini',
+          content: responseText,
+        })
+        .catch(() => undefined);
     }
 
     // Stream validation logic: A stream is considered successful if:
@@ -851,7 +859,9 @@ export class GeminiChat {
       };
     });
 
-    this.chatRecordingService.recordToolCalls(model, toolCallRecords);
+    void this.chatRecordingService
+      .recordToolCalls(model, toolCallRecords)
+      .catch(() => undefined);
   }
 
   /**
