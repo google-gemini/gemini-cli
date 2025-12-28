@@ -342,6 +342,7 @@ describe('keyMatchers', () => {
       negative: [createKey('tab')],
     },
 
+
     // Prompt stashing - Ctrl+Q toggles (same key for stash/pop)
     {
       command: Command.STASH_PROMPT,
