@@ -94,6 +94,7 @@ describe('handleAtCommand', () => {
       getMcpClientManager: () => ({
         getClient: () => undefined,
       }),
+      getAllowedTools: vi.fn(),
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig);

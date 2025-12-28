@@ -191,11 +191,20 @@ export class ToolRegistry {
   // This includes tools which are currently not active, use `getActiveTools`
   // and `isActive` to get only the active tools.
   private allKnownTools: Map<string, AnyDeclarativeTool> = new Map();
+  private allowedTools: Set<string> | undefined;
   private config: Config;
   private messageBus?: MessageBus;
 
   constructor(config: Config) {
     this.config = config;
+    this.setAllowedTools(config.getAllowedTools());
+  }
+
+  setAllowedTools(allowedTools: string[] | undefined): void {
+    this.allowedTools =
+      allowedTools && allowedTools.length > 0
+        ? new Set(allowedTools)
+        : undefined;
   }
 
   setMessageBus(messageBus: MessageBus): void {
@@ -457,6 +466,20 @@ export class ToolRegistry {
         possibleNames.push(`${tool.getFullyQualifiedPrefix()}${tool.name}`);
       }
     }
+
+    if (this.allowedTools) {
+      const isAllowed = possibleNames.some(
+        (name) =>
+          this.allowedTools!.has(name) ||
+          Array.from(this.allowedTools!).some((allowed) =>
+            allowed.startsWith(name + '('),
+          ),
+      );
+      if (!isAllowed) {
+        return false;
+      }
+    }
+
     return !possibleNames.some((name) => excludeTools.has(name));
   }
 

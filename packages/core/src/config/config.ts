@@ -361,7 +361,7 @@ export class Config {
   private readonly question: string | undefined;
 
   private readonly coreTools: string[] | undefined;
-  private readonly allowedTools: string[] | undefined;
+  private allowedTools: string[] | undefined;
   private readonly excludeTools: string[] | undefined;
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
@@ -1036,6 +1036,18 @@ export class Config {
     return this.allowedTools;
   }
 
+  async setAllowedTools(allowedTools: string[] | undefined): Promise<void> {
+    await this._setAllowedTools(allowedTools);
+  }
+
+  /** @internal */
+  async _setAllowedTools(allowedTools: string[] | undefined): Promise<void> {
+    this.allowedTools = allowedTools;
+    // Update the tool registry's internal whitelist
+    this.getToolRegistry()?.setAllowedTools(allowedTools);
+    await this.updateSystemInstructionIfInitialized();
+  }
+
   /**
    * All the excluded tools from static configuration, loaded extensions, or
    * other sources.
@@ -1225,13 +1237,16 @@ export class Config {
   }
 
   /**
-   * Updates the system instruction with the latest user memory.
-   * Whenever the user memory (GEMINI.md files) is updated.
+   * Updates the system instruction with the latest user memory and refreshes the tool list.
+   * Whenever the user memory (GEMINI.md files) or the tool whitelist is updated.
    */
   async updateSystemInstructionIfInitialized(): Promise<void> {
     const geminiClient = this.getGeminiClient();
     if (geminiClient?.isInitialized()) {
-      await geminiClient.updateSystemInstruction();
+      await Promise.all([
+        geminiClient.updateSystemInstruction(),
+        geminiClient.setTools(),
+      ]);
     }
   }
 
