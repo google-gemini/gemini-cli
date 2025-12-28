@@ -1036,6 +1036,21 @@ export class Config {
     return this.allowedTools;
   }
 
+  setAllowedTools(allowedTools: string[] | undefined): void {
+    this._setAllowedTools(allowedTools);
+  }
+
+  /** @internal */
+  _setAllowedTools(allowedTools: string[] | undefined): void {
+    // @ts-expect-error - overriding a readonly property for runtime updates
+    this.allowedTools = allowedTools;
+    // Update the tool registry's internal whitelist
+    this.getToolRegistry()?.setAllowedTools(allowedTools);
+    // Update the system instruction and tools to reflect changes in available tools
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    this.updateSystemInstructionIfInitialized();
+  }
+
   /**
    * All the excluded tools from static configuration, loaded extensions, or
    * other sources.
@@ -1225,13 +1240,16 @@ export class Config {
   }
 
   /**
-   * Updates the system instruction with the latest user memory.
-   * Whenever the user memory (GEMINI.md files) is updated.
+   * Updates the system instruction with the latest user memory and refreshes the tool list.
+   * Whenever the user memory (GEMINI.md files) or the tool whitelist is updated.
    */
   async updateSystemInstructionIfInitialized(): Promise<void> {
     const geminiClient = this.getGeminiClient();
     if (geminiClient?.isInitialized()) {
-      await geminiClient.updateSystemInstruction();
+      await Promise.all([
+        geminiClient.updateSystemInstruction(),
+        geminiClient.setTools(),
+      ]);
     }
   }
 
