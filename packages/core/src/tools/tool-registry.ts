@@ -197,6 +197,7 @@ export class ToolRegistry {
 
   constructor(config: Config) {
     this.config = config;
+    this.setAllowedTools(config.getAllowedTools());
   }
 
   setAllowedTools(allowedTools: string[] | undefined): void {
