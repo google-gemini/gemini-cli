@@ -204,10 +204,6 @@ export class ToolRegistry {
     this.allowedTools = allowedTools ? new Set(allowedTools) : undefined;
   }
 
-  setAllowedTools(allowedTools: string[] | undefined): void {
-    this.allowedTools = allowedTools ? new Set(allowedTools) : undefined;
-  }
-
   setMessageBus(messageBus: MessageBus): void {
     this.messageBus = messageBus;
   }
