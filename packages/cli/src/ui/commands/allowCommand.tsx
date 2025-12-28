@@ -35,24 +35,37 @@ const addAction = async (
   args: string,
 ): Promise<SlashCommandActionReturn> => {
   // Parse arguments to find scope flag
-  // Split by whitespace and filter out empty strings to handle multiple spaces safely
   const argsList = args.trim().split(/\s+/).filter(Boolean);
+
+  // Normalize --scope=value to --scope value
+  for (let i = 0; i < argsList.length; i++) {
+    if (argsList[i].startsWith('--scope=')) {
+      const [flag, value] = argsList[i].split('=');
+      argsList.splice(i, 1, flag, value);
+    }
+  }
+
   let scope = SettingScope.Workspace;
   const toolArgs: string[] = [];
 
   for (let i = 0; i < argsList.length; i++) {
     const arg = argsList[i];
     if (arg === '-s' || arg === '--scope') {
-      const next = argsList[i + 1];
-      if (next === 'user') {
-        scope = SettingScope.User;
-        i++; // skip next
-      } else if (next === 'project' || next === 'workspace') {
-        scope = SettingScope.Workspace;
-        i++; // skip next
-      } else {
-        // likely an invalid scope name, consume it to avoid confusion if it's not a flag
-        if (next && !next.startsWith('-')) i++;
+      const value = argsList[i + 1]?.toLowerCase();
+      switch (value) {
+        case 'user':
+          scope = SettingScope.User;
+          i++;
+          break;
+        case 'project':
+        case 'workspace':
+          scope = SettingScope.Workspace;
+          i++;
+          break;
+        default:
+          // If the next token isn't a valid scope, we treat it as part of the tool name
+          // and keep the default scope.
+          break;
       }
     } else {
       toolArgs.push(arg);
@@ -112,21 +125,34 @@ const removeAction = async (
 ): Promise<SlashCommandActionReturn> => {
   // Parse arguments to find scope flag
   const argsList = args.trim().split(/\s+/).filter(Boolean);
+
+  // Normalize --scope=value to --scope value
+  for (let i = 0; i < argsList.length; i++) {
+    if (argsList[i].startsWith('--scope=')) {
+      const [flag, value] = argsList[i].split('=');
+      argsList.splice(i, 1, flag, value);
+    }
+  }
+
   let scope = SettingScope.Workspace;
   const toolArgs: string[] = [];
 
   for (let i = 0; i < argsList.length; i++) {
     const arg = argsList[i];
     if (arg === '-s' || arg === '--scope') {
-      const next = argsList[i + 1];
-      if (next === 'user') {
-        scope = SettingScope.User;
-        i++;
-      } else if (next === 'project' || next === 'workspace') {
-        scope = SettingScope.Workspace;
-        i++;
-      } else {
-        if (next && !next.startsWith('-')) i++;
+      const value = argsList[i + 1]?.toLowerCase();
+      switch (value) {
+        case 'user':
+          scope = SettingScope.User;
+          i++;
+          break;
+        case 'project':
+        case 'workspace':
+          scope = SettingScope.Workspace;
+          i++;
+          break;
+        default:
+          break;
       }
     } else {
       toolArgs.push(arg);
