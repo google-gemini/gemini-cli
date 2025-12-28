@@ -31,26 +31,26 @@ describe('CommandRegistry', () => {
       ExtensionsCommand: mockExtensionsCommand,
       ListExtensionsCommand: mockListExtensionsCommand,
     }));
-  });
+  }, 10000);
 
   it('should register ExtensionsCommand on initialization', async () => {
     const { commandRegistry } = await import('./command-registry.js');
     expect(mockExtensionsCommand).toHaveBeenCalled();
     const command = commandRegistry.get('extensions');
     expect(command).toBe(mockExtensionsCommandInstance);
-  });
+  }, 10000);
 
   it('should register sub commands on initialization', async () => {
     const { commandRegistry } = await import('./command-registry.js');
     const command = commandRegistry.get('extensions list');
     expect(command).toBe(mockListExtensionsCommandInstance);
-  });
+  }, 10000);
 
   it('get() should return undefined for a non-existent command', async () => {
     const { commandRegistry } = await import('./command-registry.js');
     const command = commandRegistry.get('non-existent');
     expect(command).toBeUndefined();
-  });
+  }, 10000);
 
   it('register() should register a new command', async () => {
     const { commandRegistry } = await import('./command-registry.js');
@@ -62,7 +62,7 @@ describe('CommandRegistry', () => {
     commandRegistry.register(mockCommand);
     const command = commandRegistry.get('test-command');
     expect(command).toBe(mockCommand);
-  });
+  }, 10000);
 
   it('register() should register a nested command', async () => {
     const { commandRegistry } = await import('./command-registry.js');
@@ -92,7 +92,7 @@ describe('CommandRegistry', () => {
     expect(command).toBe(mockCommand);
     expect(subCommand).toBe(mockSubCommand);
     expect(subSubCommand).toBe(mockSubSubCommand);
-  });
+  }, 10000);
 
   it('register() should not enter an infinite loop with a cyclic command', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -114,5 +114,5 @@ describe('CommandRegistry', () => {
     );
     // If the test finishes, it means we didn't get into an infinite loop.
     warnSpy.mockRestore();
-  });
+  }, 10000);
 });

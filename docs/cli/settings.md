@@ -90,6 +90,7 @@ they appear in the UI.
 | Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                      | `true`  |
 | Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                     | `false` |
 | Auto Accept                      | `tools.autoAccept`                   | Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).              | `false` |
+| Allowed Tools                    | `tools.allowed`                      | A list of tools that are allowed to run without manual confirmation.                                            | `[]`    |
 | Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance. | `true`  |
 | Enable Tool Output Truncation    | `tools.enableToolOutputTruncation`   | Enable truncation of large tool outputs.                                                                        | `true`  |
 | Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Truncate tool output if it is larger than this many characters. Set to -1 to disable.                           | `10000` |

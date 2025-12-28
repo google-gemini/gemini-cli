@@ -213,6 +213,20 @@ Slash commands provide meta-level control over the CLI itself.
   - **Description:** Show version info. Please share this information when
     filing issues.
 
+- **`/allow`**
+  - **Description:** Manage allowed tools (whitelist). This command allows you
+    to add, remove, and list tools that are permitted to run without manual
+    confirmation.
+  - **Sub-commands:**
+    - **`add`**
+      - **Description:** Adds a tool to the allowed list.
+      - **Usage:** `/allow add <tool> [--scope user|project]`
+    - **`remove`**
+      - **Description:** Removes a tool from the allowed list.
+      - **Usage:** `/allow remove <tool> [--scope user|project]`
+    - **`list`**
+      - **Description:** Lists all tools currently in the allowed list.
+
 - [**`/tools`**](../tools/index.md)
   - **Description:** Display a list of tools that are currently available within
     Gemini CLI.
