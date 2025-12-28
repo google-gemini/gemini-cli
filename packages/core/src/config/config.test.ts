@@ -105,6 +105,8 @@ vi.mock('../core/client.js', () => ({
   GeminiClient: vi.fn().mockImplementation(() => ({
     initialize: vi.fn().mockResolvedValue(undefined),
     stripThoughtsFromHistory: vi.fn(),
+    isInitialized: vi.fn().mockReturnValue(true),
+    updateSystemInstruction: vi.fn().mockResolvedValue(undefined),
   })),
 }));
 

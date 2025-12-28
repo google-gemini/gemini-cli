@@ -1045,7 +1045,6 @@ export class Config {
     this.allowedTools = allowedTools;
     // Update the tool registry's internal whitelist
     this.getToolRegistry()?.setAllowedTools(allowedTools);
-    // Update the system instruction and tools to reflect changes in available tools
     await this.updateSystemInstructionIfInitialized();
   }
 

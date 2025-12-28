@@ -109,7 +109,7 @@ const addAction = async (
   if (context.services.config) {
     const reloadedSettings = loadSettings(process.cwd());
     const mergedAllowed = reloadedSettings.merged.tools?.allowed || [];
-    context.services.config.setAllowedTools(mergedAllowed);
+    await context.services.config.setAllowedTools(mergedAllowed);
   }
 
   return {
@@ -189,7 +189,7 @@ const removeAction = async (
   if (context.services.config) {
     const reloadedSettings = loadSettings(process.cwd());
     const mergedAllowed = reloadedSettings.merged.tools?.allowed || [];
-    context.services.config.setAllowedTools(mergedAllowed);
+    await context.services.config.setAllowedTools(mergedAllowed);
   }
 
   return {

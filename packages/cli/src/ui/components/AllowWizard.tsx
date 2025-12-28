@@ -70,7 +70,7 @@ export function AllowWizard({ context, scope, onClose }: AllowWizardProps) {
   }, []);
 
   const handleInputSubmit = useCallback(
-    (input: string) => {
+    async (input: string) => {
       const tools = input
         .split(',')
         .map((t) => t.trim())
@@ -112,7 +112,7 @@ export function AllowWizard({ context, scope, onClose }: AllowWizardProps) {
         if (context.services.config) {
           const reloadedSettings = loadSettings(process.cwd());
           const mergedAllowed = reloadedSettings.merged.tools?.allowed || [];
-          context.services.config.setAllowedTools(mergedAllowed);
+          await context.services.config.setAllowedTools(mergedAllowed);
         }
 
         context.ui.addItem(
