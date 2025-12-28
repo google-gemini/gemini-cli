@@ -18,6 +18,7 @@ import type {
   Config,
   ConversationRecord,
   MessageRecord,
+  GeminiClient,
 } from '@google/gemini-cli-core';
 
 // Mock modules
@@ -34,6 +35,7 @@ describe('useSessionBrowser', () => {
   const mockedFs = vi.mocked(fs);
   const mockedPath = vi.mocked(path);
   const mockedGetSessionFiles = vi.mocked(getSessionFiles);
+  const mockDeleteSession = vi.fn();
 
   const mockConfig = {
     storage: {
@@ -43,15 +45,20 @@ describe('useSessionBrowser', () => {
     getSessionId: vi.fn(),
     getGeminiClient: vi.fn().mockReturnValue({
       getChatRecordingService: vi.fn().mockReturnValue({
-        deleteSession: vi.fn(),
+        deleteSession: mockDeleteSession,
       }),
-    }),
+    } as unknown as GeminiClient),
   } as unknown as Config;
 
   const mockOnLoadHistory = vi.fn();
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(mockConfig.getGeminiClient).mockReturnValue({
+      getChatRecordingService: vi.fn().mockReturnValue({
+        deleteSession: mockDeleteSession,
+      }),
+    } as unknown as GeminiClient);
     mockedPath.join.mockImplementation((...args) => args.join('/'));
     vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue(
       MOCKED_PROJECT_TEMP_DIR,
@@ -139,6 +146,66 @@ describe('useSessionBrowser', () => {
     expect(consoleErrorSpy).toHaveBeenCalled();
     expect(result.current.isSessionBrowserOpen).toBe(false);
     consoleErrorSpy.mockRestore();
+  });
+
+  it('should resume a JSONL session by parsing JSONL content', async () => {
+    const MOCKED_FILENAME = 'session-2025-01-01-test-session-123.jsonl';
+    const metadata = {
+      type: 'session_metadata',
+      sessionId: 'existing-session-789',
+      projectHash: 'test-project-hash',
+      startTime: '2025-01-01T00:00:00.000Z',
+      lastUpdated: '2025-01-01T00:00:00.000Z',
+    };
+    const message = {
+      id: 'msg-1',
+      type: 'user',
+      content: 'Hello',
+      timestamp: '2025-01-01T00:00:01.000Z',
+    };
+    const jsonlContent = `${JSON.stringify(metadata)}\n${JSON.stringify(message)}\n`;
+
+    const mockSession = {
+      id: MOCKED_SESSION_ID,
+      fileName: MOCKED_FILENAME,
+    } as SessionInfo;
+    mockedGetSessionFiles.mockResolvedValue([mockSession]);
+    mockedFs.readFile.mockResolvedValue(jsonlContent);
+
+    const { result } = renderHook(() =>
+      useSessionBrowser(mockConfig, mockOnLoadHistory),
+    );
+
+    await act(async () => {
+      await result.current.handleResumeSession(mockSession);
+    });
+
+    expect(mockedFs.readFile).toHaveBeenCalledWith(
+      `${MOCKED_CHATS_DIR}/${MOCKED_FILENAME}`,
+      'utf8',
+    );
+    expect(mockConfig.setSessionId).toHaveBeenCalledWith(
+      'existing-session-789',
+    );
+    expect(result.current.isSessionBrowserOpen).toBe(false);
+    expect(mockOnLoadHistory).toHaveBeenCalled();
+  });
+
+  it('should delete a session by id', async () => {
+    const mockSession = {
+      id: MOCKED_SESSION_ID,
+      fileName: 'session-2025-01-01-test-session-123.json',
+    } as SessionInfo;
+
+    const { result } = renderHook(() =>
+      useSessionBrowser(mockConfig, mockOnLoadHistory),
+    );
+
+    await act(async () => {
+      await result.current.handleDeleteSession(mockSession);
+    });
+
+    expect(mockDeleteSession).toHaveBeenCalledWith(MOCKED_SESSION_ID);
   });
 });
 

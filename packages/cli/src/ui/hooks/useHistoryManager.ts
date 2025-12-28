@@ -83,25 +83,31 @@ export function useHistory({
         switch (itemData.type) {
           case 'compression':
           case 'info':
-            chatRecordingService?.recordMessage({
-              model: undefined,
-              type: 'info',
-              content: itemData.text ?? '',
-            });
+            void chatRecordingService
+              ?.recordMessage({
+                model: undefined,
+                type: 'info',
+                content: itemData.text ?? '',
+              })
+              .catch(() => undefined);
             break;
           case 'warning':
-            chatRecordingService?.recordMessage({
-              model: undefined,
-              type: 'warning',
-              content: itemData.text ?? '',
-            });
+            void chatRecordingService
+              ?.recordMessage({
+                model: undefined,
+                type: 'warning',
+                content: itemData.text ?? '',
+              })
+              .catch(() => undefined);
             break;
           case 'error':
-            chatRecordingService?.recordMessage({
-              model: undefined,
-              type: 'error',
-              content: itemData.text ?? '',
-            });
+            void chatRecordingService
+              ?.recordMessage({
+                model: undefined,
+                type: 'error',
+                content: itemData.text ?? '',
+              })
+              .catch(() => undefined);
             break;
           case 'user':
           case 'gemini':

@@ -9,7 +9,7 @@ import { type Status } from '../core/coreToolScheduler.js';
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
 import path from 'node:path';
-import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import type {
   PartListUnion,
@@ -98,6 +98,155 @@ export interface ResumedSessionData {
 }
 
 /**
+ * Parses a JSONL string into a ConversationRecord.
+ */
+export function parseJsonl(
+  content: string,
+  sessionId: string,
+  projectHash: string,
+): ConversationRecord {
+  const lines = content.split('\n');
+  let lastUpdatedMs: number | null = null;
+  let lastUpdatedValue: string | null = null;
+  let earliestTimestamp: string | null = null;
+  let hasStartTime = false;
+  let parseErrors = 0;
+  const conversation: ConversationRecord = {
+    sessionId,
+    projectHash,
+    startTime: new Date().toISOString(),
+    lastUpdated: new Date().toISOString(),
+    messages: [],
+  };
+
+  // Queue for message_update records that arrive before their target message
+  const pendingUpdates = new Map<
+    string,
+    Array<Partial<MessageRecord> & { id: string }>
+  >();
+  const messageIndex = new Map<string, MessageRecord>();
+
+  const updateLastUpdated = (timestamp?: string) => {
+    if (!timestamp) return;
+    const ms = Date.parse(timestamp);
+    if (Number.isNaN(ms)) return;
+    if (lastUpdatedMs === null || ms > lastUpdatedMs) {
+      lastUpdatedMs = ms;
+      lastUpdatedValue = timestamp;
+    }
+    if (!earliestTimestamp || timestamp < earliestTimestamp) {
+      earliestTimestamp = timestamp;
+    }
+  };
+
+  // Helper to apply an update to a message
+  const applyUpdate = (
+    msg: MessageRecord,
+    update: Partial<MessageRecord> & { id: string },
+  ) => {
+    // Exclude the type field from the update merge to avoid overwriting the message type
+    const { type: _type, ...updateData } = update;
+    Object.assign(msg, updateData);
+  };
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    try {
+      const record = JSON.parse(line);
+      // Handle session metadata
+      if (record.type === 'session_metadata') {
+        if (typeof record.sessionId === 'string') {
+          conversation.sessionId = record.sessionId;
+        }
+        if (typeof record.projectHash === 'string') {
+          conversation.projectHash = record.projectHash;
+        }
+        if (typeof record.startTime === 'string') {
+          conversation.startTime = record.startTime;
+        }
+        if (typeof record.lastUpdated === 'string') {
+          conversation.lastUpdated = record.lastUpdated;
+        }
+        if (typeof record.summary === 'string') {
+          conversation.summary = record.summary;
+        }
+        if (typeof record.startTime === 'string') {
+          const startMs = Date.parse(record.startTime);
+          if (!Number.isNaN(startMs)) {
+            hasStartTime = true;
+            updateLastUpdated(record.startTime);
+          }
+        }
+        if (typeof record.lastUpdated === 'string') {
+          updateLastUpdated(record.lastUpdated);
+        }
+        continue;
+      }
+
+      // Handle message updates
+      if (record.type === 'message_update') {
+        const update = record as Partial<MessageRecord> & { id: string };
+        const existingMsg = messageIndex.get(update.id);
+        if (existingMsg) {
+          applyUpdate(existingMsg, update);
+        } else {
+          // Queue the update for when the message arrives
+          const queue = pendingUpdates.get(update.id) ?? [];
+          queue.push(update);
+          pendingUpdates.set(update.id, queue);
+        }
+        updateLastUpdated(record.timestamp);
+        continue;
+      }
+
+      // Handle standard messages (user, gemini, info, error, warning)
+      // We assume anything else with an 'id' is a message record
+      if (record.id && record.type) {
+        const msg = record as MessageRecord;
+        const existingMsg = messageIndex.get(msg.id);
+        let targetMsg: MessageRecord;
+        if (existingMsg) {
+          Object.assign(existingMsg, msg);
+          targetMsg = existingMsg;
+        } else {
+          conversation.messages.push(msg);
+          messageIndex.set(msg.id, msg);
+          targetMsg = msg;
+        }
+
+        // Apply any pending updates for this message
+        const pending = pendingUpdates.get(targetMsg.id);
+        if (pending) {
+          for (const update of pending) {
+            applyUpdate(targetMsg, update);
+          }
+          pendingUpdates.delete(targetMsg.id);
+        }
+
+        updateLastUpdated(targetMsg.timestamp);
+      }
+    } catch (e) {
+      debugLogger.error('Error parsing JSONL line', e);
+      parseErrors += 1;
+    }
+  }
+  if (!hasStartTime && earliestTimestamp) {
+    conversation.startTime = earliestTimestamp;
+  }
+  if (lastUpdatedValue) {
+    conversation.lastUpdated = lastUpdatedValue;
+  } else if (earliestTimestamp) {
+    conversation.lastUpdated = earliestTimestamp;
+  }
+  if (parseErrors > 0) {
+    debugLogger.warn(
+      `[SessionRecording] Failed to parse ${parseErrors} JSONL line(s) for session ${sessionId || 'unknown'}. Some messages may be missing.`,
+    );
+  }
+  return conversation;
+}
+
+/**
  * Service for automatically recording chat conversations to disk.
  *
  * This service provides comprehensive conversation recording that captures:
@@ -110,12 +259,16 @@ export interface ResumedSessionData {
  */
 export class ChatRecordingService {
   private conversationFile: string | null = null;
-  private cachedLastConvData: string | null = null;
+  private conversation: ConversationRecord | null = null;
   private sessionId: string;
   private projectHash: string;
   private queuedThoughts: Array<ThoughtSummary & { timestamp: string }> = [];
   private queuedTokens: TokensSummary | null = null;
   private config: Config;
+  /** Tracks whether session_metadata has been written to the file */
+  private fileInitialized: boolean = false;
+  /** Promise gate to prevent concurrent metadata writes */
+  private metadataWritePromise: Promise<void> | null = null;
 
   constructor(config: Config) {
     this.config = config;
@@ -127,50 +280,66 @@ export class ChatRecordingService {
    * Initializes the chat recording service: creates a new conversation file and associates it with
    * this service instance, or resumes from an existing session if resumedSessionData is provided.
    */
-  initialize(resumedSessionData?: ResumedSessionData): void {
+  async initialize(resumedSessionData?: ResumedSessionData): Promise<void> {
     try {
       if (resumedSessionData) {
         // Resume from existing session
         this.conversationFile = resumedSessionData.filePath;
-        this.sessionId = resumedSessionData.conversation.sessionId;
+        this.conversation = resumedSessionData.conversation;
+        if (!this.conversation.messages) {
+          this.conversation.messages = [];
+        }
+        this.sessionId = this.conversation.sessionId;
+        // Resumed sessions already have metadata written
+        this.fileInitialized = true;
 
-        // Update the session ID in the existing file
-        this.updateConversation((conversation) => {
-          conversation.sessionId = this.sessionId;
-        });
-
-        // Clear any cached data to force fresh reads
-        this.cachedLastConvData = null;
+        // If it's an old .json file, we'll keep using it as JSON for now to avoid complexity,
+        // or we could convert it. But let's check the extension.
+        if (this.conversationFile.endsWith('.json')) {
+          // Force an update to the session ID in the existing file
+          await this.updateConversation((conversation) => {
+            conversation.sessionId = this.sessionId;
+          });
+        } else {
+          // For .jsonl, keep the existing metadata; don't update lastUpdated on resume
+          this.conversation.sessionId = this.sessionId;
+        }
       } else {
         // Create new session
         const chatsDir = path.join(
           this.config.storage.getProjectTempDir(),
           'chats',
         );
-        fs.mkdirSync(chatsDir, { recursive: true });
+        await fsPromises.mkdir(chatsDir, { recursive: true });
 
         const timestamp = new Date()
           .toISOString()
           .slice(0, 16)
           .replace(/:/g, '-');
+        // Use .jsonl for new sessions
         const filename = `${SESSION_FILE_PREFIX}${timestamp}-${this.sessionId.slice(
           0,
           8,
-        )}.json`;
+        )}.jsonl`;
         this.conversationFile = path.join(chatsDir, filename);
 
-        this.writeConversation({
+        this.conversation = {
           sessionId: this.sessionId,
           projectHash: this.projectHash,
           startTime: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
           messages: [],
-        });
+        };
+        // New sessions haven't written metadata yet
+        this.fileInitialized = false;
+        // We don't write anything yet until there's at least one message,
+        // similar to previous implementation.
       }
 
-      // Clear any queued data since this is a fresh start
+      // Clear any queued data and reset promise gate since this is a fresh start
       this.queuedThoughts = [];
       this.queuedTokens = null;
+      this.metadataWritePromise = null;
     } catch (error) {
       debugLogger.error('Error initializing chat recording service:', error);
       throw error;
@@ -198,31 +367,38 @@ export class ChatRecordingService {
   /**
    * Records a message in the conversation.
    */
-  recordMessage(message: {
+  async recordMessage(message: {
     model: string | undefined;
     type: ConversationRecordExtra['type'];
     content: PartListUnion;
-  }): void {
+  }): Promise<void> {
     if (!this.conversationFile) return;
 
     try {
-      this.updateConversation((conversation) => {
+      let msgToWrite: MessageRecord | null = null;
+      await this.updateConversation((conversation) => {
         const msg = this.newMessage(message.type, message.content);
         if (msg.type === 'gemini') {
           // If it's a new Gemini message then incorporate any queued thoughts.
-          conversation.messages.push({
+          const fullMsg: MessageRecord = {
             ...msg,
             thoughts: this.queuedThoughts,
             tokens: this.queuedTokens,
             model: message.model,
-          });
+          };
+          conversation.messages.push(fullMsg);
           this.queuedThoughts = [];
           this.queuedTokens = null;
+          msgToWrite = fullMsg;
         } else {
           // Or else just add it.
           conversation.messages.push(msg);
+          msgToWrite = msg;
         }
       });
+      if (msgToWrite) {
+        await this.writeMessageRecord(msgToWrite);
+      }
     } catch (error) {
       debugLogger.error('Error saving message to chat history.', error);
       throw error;
@@ -249,9 +425,9 @@ export class ChatRecordingService {
   /**
    * Updates the tokens for the last message in the conversation (which should be by Gemini).
    */
-  recordMessageTokens(
+  async recordMessageTokens(
     respUsageMetadata: GenerateContentResponseUsageMetadata,
-  ): void {
+  ): Promise<void> {
     if (!this.conversationFile) return;
 
     try {
@@ -263,17 +439,29 @@ export class ChatRecordingService {
         tool: respUsageMetadata.toolUsePromptTokenCount ?? 0,
         total: respUsageMetadata.totalTokenCount ?? 0,
       };
-      this.updateConversation((conversation) => {
+      let updateData: { id: string; tokens: typeof tokens } | null = null;
+      let msgToWrite: MessageRecord | null = null;
+      await this.updateConversation((conversation) => {
         const lastMsg = this.getLastMessage(conversation);
         // If the last message already has token info, it's because this new token info is for a
         // new message that hasn't been recorded yet.
         if (lastMsg && lastMsg.type === 'gemini' && !lastMsg.tokens) {
           lastMsg.tokens = tokens;
           this.queuedTokens = null;
+          if (this.conversationFile?.endsWith('.jsonl')) {
+            updateData = { id: lastMsg.id, tokens };
+          } else {
+            msgToWrite = lastMsg;
+          }
         } else {
           this.queuedTokens = tokens;
         }
       });
+      if (updateData) {
+        await this.writeMessageUpdate(updateData);
+      } else if (msgToWrite) {
+        await this.writeMessageRecord(msgToWrite);
+      }
     } catch (error) {
       debugLogger.error(
         'Error updating message tokens in chat history.',
@@ -287,7 +475,10 @@ export class ChatRecordingService {
    * Adds tool calls to the last message in the conversation (which should be by Gemini).
    * This method enriches tool calls with metadata from the ToolRegistry.
    */
-  recordToolCalls(model: string, toolCalls: ToolCallRecord[]): void {
+  async recordToolCalls(
+    model: string,
+    toolCalls: ToolCallRecord[],
+  ): Promise<void> {
     if (!this.conversationFile) return;
 
     // Enrich tool calls with metadata from the ToolRegistry
@@ -303,7 +494,12 @@ export class ChatRecordingService {
     });
 
     try {
-      this.updateConversation((conversation) => {
+      let msgToWrite: MessageRecord | null = null;
+      let updateData: {
+        id: string;
+        toolCalls: ToolCallRecord[];
+      } | null = null;
+      await this.updateConversation((conversation) => {
         const lastMsg = this.getLastMessage(conversation);
         // If a tool call was made, but the last message isn't from Gemini, it's because Gemini is
         // calling tools without starting the message with text.  So the user submits a prompt, and
@@ -339,6 +535,7 @@ export class ChatRecordingService {
             this.queuedTokens = null;
           }
           conversation.messages.push(newMsg);
+          msgToWrite = newMsg;
         } else {
           // The last message is an existing Gemini message that we need to update.
 
@@ -369,8 +566,21 @@ export class ChatRecordingService {
               lastMsg.toolCalls.push(toolCall);
             }
           }
+          if (this.conversationFile?.endsWith('.jsonl')) {
+            updateData = {
+              id: lastMsg.id,
+              toolCalls: lastMsg.toolCalls,
+            };
+          } else {
+            msgToWrite = lastMsg;
+          }
         }
       });
+      if (msgToWrite) {
+        await this.writeMessageRecord(msgToWrite);
+      } else if (updateData) {
+        await this.writeMessageUpdate(updateData);
+      }
     } catch (error) {
       debugLogger.error(
         'Error adding tool call to message in chat history.',
@@ -383,10 +593,17 @@ export class ChatRecordingService {
   /**
    * Loads up the conversation record from disk.
    */
-  private readConversation(): ConversationRecord {
+  private async readConversation(): Promise<ConversationRecord> {
+    if (!this.conversationFile) {
+      throw new Error('Conversation file not set');
+    }
+
     try {
-      this.cachedLastConvData = fs.readFileSync(this.conversationFile!, 'utf8');
-      return JSON.parse(this.cachedLastConvData);
+      const content = await fsPromises.readFile(this.conversationFile, 'utf8');
+      const result = this.conversationFile.endsWith('.jsonl')
+        ? parseJsonl(content, this.sessionId, this.projectHash)
+        : JSON.parse(content);
+      return result;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         debugLogger.error('Error reading conversation file.', error);
@@ -405,21 +622,30 @@ export class ChatRecordingService {
   }
 
   /**
-   * Saves the conversation record; overwrites the file.
+   * Saves the conversation record; overwrites the file for .json, appends for .jsonl.
    */
-  private writeConversation(conversation: ConversationRecord): void {
+  private async writeConversation(
+    conversation: ConversationRecord,
+  ): Promise<void> {
     try {
       if (!this.conversationFile) return;
       // Don't write the file yet until there's at least one message.
-      if (conversation.messages.length === 0) return;
+      if (!conversation.messages || conversation.messages.length === 0) return;
 
-      // Only write the file if this change would change the file.
-      if (this.cachedLastConvData !== JSON.stringify(conversation, null, 2)) {
+      if (this.conversationFile.endsWith('.jsonl')) {
+        // In JSONL mode, we should have already written the individual records
+        // via writeMessageRecord or writeMetadataUpdate.
+        // We just update the lastUpdated timestamp in memory.
         conversation.lastUpdated = new Date().toISOString();
-        const newContent = JSON.stringify(conversation, null, 2);
-        this.cachedLastConvData = newContent;
-        fs.writeFileSync(this.conversationFile, newContent);
+        return;
       }
+
+      // Legacy .json support (overwrites file)
+      conversation.lastUpdated = new Date().toISOString();
+      const newContent = JSON.stringify(conversation, null, 2);
+      const tmpPath = `${this.conversationFile}.tmp`;
+      await fsPromises.writeFile(tmpPath, newContent);
+      await fsPromises.rename(tmpPath, this.conversationFile);
     } catch (error) {
       debugLogger.error('Error writing conversation file.', error);
       throw error;
@@ -427,27 +653,131 @@ export class ChatRecordingService {
   }
 
   /**
+   * Ensures session_metadata is written to the file exactly once.
+   * Uses a promise gate to prevent concurrent writes from racing.
+   */
+  private async ensureMetadataWritten(): Promise<void> {
+    if (this.fileInitialized) return;
+    if (!this.conversationFile || !this.conversationFile.endsWith('.jsonl'))
+      return;
+
+    // If another call is already writing metadata, wait for it
+    if (this.metadataWritePromise) {
+      await this.metadataWritePromise;
+      return;
+    }
+
+    // Create promise gate for concurrent callers
+    this.metadataWritePromise = (async () => {
+      try {
+        const metadata = {
+          type: 'session_metadata',
+          sessionId: this.conversation?.sessionId,
+          projectHash: this.conversation?.projectHash,
+          startTime: this.conversation?.startTime,
+          lastUpdated: new Date().toISOString(),
+        };
+        await fsPromises.appendFile(
+          this.conversationFile!,
+          JSON.stringify(metadata) + '\n',
+        );
+        this.fileInitialized = true;
+      } finally {
+        this.metadataWritePromise = null;
+      }
+    })();
+
+    await this.metadataWritePromise;
+  }
+
+  private async writeMessageRecord(message: MessageRecord): Promise<void> {
+    if (!this.conversationFile || !this.conversationFile.endsWith('.jsonl'))
+      return;
+
+    try {
+      await this.ensureMetadataWritten();
+      await fsPromises.appendFile(
+        this.conversationFile,
+        JSON.stringify(message) + '\n',
+      );
+    } catch (error) {
+      debugLogger.error('Error appending message to JSONL', error);
+    }
+  }
+
+  private async writeMessageUpdate(
+    update: Partial<MessageRecord> & { id: string },
+  ): Promise<void> {
+    if (!this.conversationFile || !this.conversationFile.endsWith('.jsonl'))
+      return;
+
+    try {
+      // Ensure metadata is written first to prevent race conditions
+      await this.ensureMetadataWritten();
+      const record = {
+        type: 'message_update',
+        ...update,
+        timestamp: new Date().toISOString(),
+      };
+      await fsPromises.appendFile(
+        this.conversationFile,
+        JSON.stringify(record) + '\n',
+      );
+    } catch (error) {
+      debugLogger.error('Error appending message update to JSONL', error);
+    }
+  }
+
+  private async writeMetadataUpdate(
+    data: Partial<ConversationRecord>,
+  ): Promise<void> {
+    if (!this.conversationFile || !this.conversationFile.endsWith('.jsonl'))
+      return;
+
+    try {
+      // Ensure metadata is written first to prevent race conditions
+      await this.ensureMetadataWritten();
+      const record = {
+        type: 'session_metadata',
+        ...data,
+        lastUpdated: new Date().toISOString(),
+      };
+      await fsPromises.appendFile(
+        this.conversationFile,
+        JSON.stringify(record) + '\n',
+      );
+    } catch (error) {
+      debugLogger.error('Error appending metadata update to JSONL', error);
+    }
+  }
+
+  /**
    * Convenient helper for updating the conversation without file reading and writing and time
    * updating boilerplate.
    */
-  private updateConversation(
+  private async updateConversation(
     updateFn: (conversation: ConversationRecord) => void,
-  ) {
-    const conversation = this.readConversation();
-    updateFn(conversation);
-    this.writeConversation(conversation);
+  ): Promise<void> {
+    if (!this.conversation) {
+      this.conversation = await this.readConversation();
+    }
+    updateFn(this.conversation);
+    await this.writeConversation(this.conversation);
   }
 
   /**
    * Saves a summary for the current session.
    */
-  saveSummary(summary: string): void {
+  async saveSummary(summary: string): Promise<void> {
     if (!this.conversationFile) return;
 
     try {
-      this.updateConversation((conversation) => {
+      await this.updateConversation((conversation) => {
         conversation.summary = summary;
       });
+      if (this.conversationFile.endsWith('.jsonl')) {
+        await this.writeMetadataUpdate({ summary });
+      }
     } catch (error) {
       debugLogger.error('Error saving summary to chat history.', error);
       // Don't throw - we want graceful degradation
@@ -457,11 +787,14 @@ export class ChatRecordingService {
   /**
    * Gets the current conversation data (for summary generation).
    */
-  getConversation(): ConversationRecord | null {
+  async getConversation(): Promise<ConversationRecord | null> {
     if (!this.conversationFile) return null;
 
     try {
-      return this.readConversation();
+      if (!this.conversation) {
+        this.conversation = await this.readConversation();
+      }
+      return this.conversation;
     } catch (error) {
       debugLogger.error('Error reading conversation for summary.', error);
       return null;
@@ -478,15 +811,168 @@ export class ChatRecordingService {
 
   /**
    * Deletes a session file by session ID.
+   * Session files are named: session-{timestamp}-{sessionId.slice(0,8)}.jsonl
    */
-  deleteSession(sessionId: string): void {
+  async deleteSession(sessionId: string): Promise<void> {
     try {
       const chatsDir = path.join(
         this.config.storage.getProjectTempDir(),
         'chats',
       );
-      const sessionPath = path.join(chatsDir, `${sessionId}.json`);
-      fs.unlinkSync(sessionPath);
+
+      // Helper to check if a file exists
+      const fileExists = async (filePath: string): Promise<boolean> => {
+        try {
+          await fsPromises.access(filePath);
+          return true;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return false;
+          }
+          throw error;
+        }
+      };
+
+      // If sessionId looks like a full filename with path, try that first
+      if (sessionId.includes('/') || sessionId.includes('\\')) {
+        const resolvedPath = path.resolve(sessionId);
+        const resolvedChatsDir = `${path.resolve(chatsDir)}${path.sep}`;
+        if (!resolvedPath.startsWith(resolvedChatsDir)) {
+          throw new Error('Session path is outside of the chats directory.');
+        }
+        const baseName = path.basename(resolvedPath);
+        if (
+          !baseName.startsWith(SESSION_FILE_PREFIX) ||
+          (!baseName.endsWith('.json') && !baseName.endsWith('.jsonl'))
+        ) {
+          throw new Error('Session path is not a valid session file.');
+        }
+        if (await fileExists(resolvedPath)) {
+          await fsPromises.unlink(resolvedPath);
+          return;
+        }
+      }
+
+      // If sessionId is a full filename (with extension), try it directly
+      if (sessionId.endsWith('.json') || sessionId.endsWith('.jsonl')) {
+        const directPath = path.join(chatsDir, sessionId);
+        if (await fileExists(directPath)) {
+          await fsPromises.unlink(directPath);
+          return;
+        }
+      }
+
+      // If sessionId already looks like a session filename without extension,
+      // delete it directly and return. Do NOT fall through to shortId scan,
+      // as shortId would be "session-" which could match all session files.
+      if (sessionId.startsWith(SESSION_FILE_PREFIX)) {
+        const jsonlPath = path.join(chatsDir, `${sessionId}.jsonl`);
+        const jsonPath = path.join(chatsDir, `${sessionId}.json`);
+        if (await fileExists(jsonlPath)) {
+          await fsPromises.unlink(jsonlPath);
+        }
+        if (await fileExists(jsonPath)) {
+          await fsPromises.unlink(jsonPath);
+        }
+        // Always return here to prevent fall-through to shortId scan
+        return;
+      }
+
+      // Session files use the first 8 chars of the UUID in the filename
+      // Pattern: session-{timestamp}-{sessionId.slice(0,8)}.jsonl
+      const shortId = sessionId.slice(0, 8);
+      const isShortId = /^[0-9a-fA-F]{8}$/.test(sessionId);
+      const isUuid =
+        /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+          sessionId,
+        );
+      const shortIdIsHex = isUuid || isShortId;
+      const readSessionId = async (
+        filePath: string,
+      ): Promise<string | undefined> => {
+        try {
+          const content = await fsPromises.readFile(filePath, 'utf8');
+          if (filePath.endsWith('.jsonl')) {
+            const parsed = parseJsonl(content, '', '');
+            return parsed.sessionId ?? undefined;
+          }
+          const parsed = JSON.parse(content) as ConversationRecord;
+          return parsed.sessionId ?? undefined;
+        } catch (error) {
+          debugLogger.warn(
+            `[SessionRecording] Failed to verify sessionId for ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          return undefined;
+        }
+      };
+
+      // Scan chats directory for matching files
+      if (await fileExists(chatsDir)) {
+        const files = await fsPromises.readdir(chatsDir);
+        let deleted = false;
+        const jsonlSuffix = `-${shortId}.jsonl`;
+        const jsonSuffix = `-${shortId}.json`;
+        const candidates = shortIdIsHex
+          ? files.filter(
+              (file) =>
+                file.startsWith(SESSION_FILE_PREFIX) &&
+                (file.endsWith(jsonlSuffix) || file.endsWith(jsonSuffix)),
+            )
+          : files.filter(
+              (file) =>
+                file.startsWith(SESSION_FILE_PREFIX) &&
+                (file.endsWith('.jsonl') || file.endsWith('.json')),
+            );
+        const matchedSessions = new Map<string, string[]>();
+        for (const file of candidates) {
+          const filePath = path.join(chatsDir, file);
+          const parsedSessionId = await readSessionId(filePath);
+          if (!parsedSessionId) {
+            continue;
+          }
+          const matches = isShortId
+            ? parsedSessionId.startsWith(sessionId)
+            : parsedSessionId === sessionId;
+          if (matches) {
+            const entry = matchedSessions.get(parsedSessionId) ?? [];
+            entry.push(filePath);
+            matchedSessions.set(parsedSessionId, entry);
+          }
+        }
+
+        if (isShortId && matchedSessions.size > 1) {
+          throw new Error(
+            `Multiple sessions found for identifier "${sessionId}". Please use a more specific ID to delete a session.`,
+          );
+        }
+
+        for (const filePaths of matchedSessions.values()) {
+          for (const filePath of filePaths) {
+            await fsPromises.unlink(filePath);
+            deleted = true;
+          }
+        }
+        if (deleted) {
+          return;
+        }
+      }
+
+      // Fallback: try direct paths with sessionId as filename
+      const jsonlPath = path.join(chatsDir, `${sessionId}.jsonl`);
+      const jsonPath = path.join(chatsDir, `${sessionId}.json`);
+
+      if (await fileExists(jsonlPath)) {
+        const parsedSessionId = await readSessionId(jsonlPath);
+        if (parsedSessionId === sessionId) {
+          await fsPromises.unlink(jsonlPath);
+        }
+      }
+      if (await fileExists(jsonPath)) {
+        const parsedSessionId = await readSessionId(jsonPath);
+        if (parsedSessionId === sessionId) {
+          await fsPromises.unlink(jsonPath);
+        }
+      }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
       throw error;

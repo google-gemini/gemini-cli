@@ -18,6 +18,32 @@ import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+const createJsonlSession = (session: {
+  sessionId: string;
+  projectHash: string;
+  startTime: string;
+  lastUpdated: string;
+  messages: Array<{
+    type: string;
+    content: string;
+    id: string;
+    timestamp: string;
+  }>;
+  summary?: string;
+}) => {
+  const metadata = {
+    type: 'session_metadata',
+    sessionId: session.sessionId,
+    projectHash: session.projectHash,
+    startTime: session.startTime,
+    lastUpdated: session.lastUpdated,
+    summary: session.summary,
+  };
+  return `${[metadata, ...session.messages]
+    .map((entry) => JSON.stringify(entry))
+    .join('\n')}\n`;
+};
+
 describe('SessionSelector', () => {
   let tmpDir: string;
   let config: Config;
@@ -86,17 +112,17 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.jsonl`,
       ),
-      JSON.stringify(session1, null, 2),
+      createJsonlSession(session1),
     );
 
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId2.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId2.slice(0, 8)}.jsonl`,
       ),
-      JSON.stringify(session2, null, 2),
+      createJsonlSession(session2),
     );
 
     const sessionSelector = new SessionSelector(config);
@@ -152,17 +178,17 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.jsonl`,
       ),
-      JSON.stringify(session1, null, 2),
+      createJsonlSession(session1),
     );
 
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId2.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId2.slice(0, 8)}.jsonl`,
       ),
-      JSON.stringify(session2, null, 2),
+      createJsonlSession(session2),
     );
 
     const sessionSelector = new SessionSelector(config);
@@ -216,17 +242,17 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.jsonl`,
       ),
-      JSON.stringify(session1, null, 2),
+      createJsonlSession(session1),
     );
 
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId2.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId2.slice(0, 8)}.jsonl`,
       ),
-      JSON.stringify(session2, null, 2),
+      createJsonlSession(session2),
     );
 
     const sessionSelector = new SessionSelector(config);
@@ -273,7 +299,7 @@ describe('SessionSelector', () => {
       ],
     };
 
-    // File 1
+    // File 1 (legacy JSON)
     await fs.writeFile(
       path.join(
         chatsDir,
@@ -282,13 +308,13 @@ describe('SessionSelector', () => {
       JSON.stringify(sessionOriginal, null, 2),
     );
 
-    // File 2 (Simulate a copy or newer version with same ID)
+    // File 2 (JSONL with same ID but newer)
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId.slice(0, 8)}.jsonl`,
       ),
-      JSON.stringify(sessionDuplicate, null, 2),
+      createJsonlSession(sessionDuplicate),
     );
 
     const sessionSelector = new SessionSelector(config);
@@ -298,6 +324,49 @@ describe('SessionSelector', () => {
     expect(sessions[0].id).toBe(sessionId);
     // Should keep the one with later lastUpdated
     expect(sessions[0].lastUpdated).toBe('2024-01-01T11:00:00.000Z');
+  });
+
+  it('should derive timestamps when JSONL metadata omits startTime/lastUpdated', async () => {
+    const sessionId = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const jsonlContent = [
+      JSON.stringify({
+        type: 'session_metadata',
+        sessionId,
+        projectHash: 'test-hash',
+      }),
+      JSON.stringify({
+        type: 'user',
+        content: 'First message',
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      }),
+      JSON.stringify({
+        type: 'gemini',
+        content: 'Second message',
+        id: 'msg2',
+        timestamp: '2024-01-01T10:05:00.000Z',
+      }),
+    ].join('\n');
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.jsonl`,
+      ),
+      `${jsonlContent}\n`,
+    );
+
+    const sessionSelector = new SessionSelector(config);
+    const sessions = await sessionSelector.listSessions();
+
+    expect(sessions.length).toBe(1);
+    expect(sessions[0].startTime).toBe('2024-01-01T10:00:00.000Z');
+    expect(sessions[0].lastUpdated).toBe('2024-01-01T10:05:00.000Z');
   });
 
   it('should throw error for invalid session identifier', async () => {
@@ -325,9 +394,9 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.jsonl`,
       ),
-      JSON.stringify(session1, null, 2),
+      createJsonlSession(session1),
     );
 
     const sessionSelector = new SessionSelector(config);
@@ -390,17 +459,17 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionIdWithUser.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionIdWithUser.slice(0, 8)}.jsonl`,
       ),
-      JSON.stringify(sessionWithUser, null, 2),
+      createJsonlSession(sessionWithUser),
     );
 
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionIdSystemOnly.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionIdSystemOnly.slice(0, 8)}.jsonl`,
       ),
-      JSON.stringify(sessionSystemOnly, null, 2),
+      createJsonlSession(sessionSystemOnly),
     );
 
     const sessionSelector = new SessionSelector(config);
@@ -437,9 +506,9 @@ describe('SessionSelector', () => {
     await fs.writeFile(
       path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionIdGeminiOnly.slice(0, 8)}.json`,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionIdGeminiOnly.slice(0, 8)}.jsonl`,
       ),
-      JSON.stringify(sessionGeminiOnly, null, 2),
+      createJsonlSession(sessionGeminiOnly),
     );
 
     const sessionSelector = new SessionSelector(config);

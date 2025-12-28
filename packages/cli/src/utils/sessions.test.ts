@@ -345,7 +345,7 @@ describe('deleteSession', () => {
 
     // Create mock methods
     mockListSessions = vi.fn();
-    mockDeleteSession = vi.fn();
+    mockDeleteSession = vi.fn().mockResolvedValue(undefined);
 
     // Mock SessionSelector constructor
     vi.mocked(SessionSelector).mockImplementation(
@@ -408,14 +408,12 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {});
-
     // Act
     await deleteSession(mockConfig, 'session-uuid-123');
 
     // Assert
     expect(mockListSessions).toHaveBeenCalledOnce();
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-123');
+    expect(mockDeleteSession).toHaveBeenCalledWith('session-uuid-123');
     expect(consoleLogSpy).toHaveBeenCalledWith(
       'Deleted session 1: Test session (some time ago)',
     );
@@ -455,14 +453,12 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {});
-
     // Act
     await deleteSession(mockConfig, '2');
 
     // Assert
     expect(mockListSessions).toHaveBeenCalledOnce();
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-2');
+    expect(mockDeleteSession).toHaveBeenCalledWith('session-2');
     expect(consoleLogSpy).toHaveBeenCalledWith(
       'Deleted session 2: Second session (some time ago)',
     );
@@ -637,15 +633,13 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {
-      throw new Error('File deletion failed');
-    });
+    mockDeleteSession.mockRejectedValue(new Error('File deletion failed'));
 
     // Act
     await deleteSession(mockConfig, '1');
 
     // Assert
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-1');
+    expect(mockDeleteSession).toHaveBeenCalledWith('session-1');
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       'Failed to delete session: File deletion failed',
     );
@@ -670,10 +664,7 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {
-      // eslint-disable-next-line no-restricted-syntax
-      throw 'Unknown error type';
-    });
+    mockDeleteSession.mockRejectedValue('Unknown error type');
 
     // Act
     await deleteSession(mockConfig, '1');
@@ -730,13 +721,11 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {});
-
     // Act - delete index 1 (should be oldest session after sorting)
     await deleteSession(mockConfig, '1');
 
     // Assert
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-1');
+    expect(mockDeleteSession).toHaveBeenCalledWith('session-1');
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.stringContaining('Oldest session'),
     );
