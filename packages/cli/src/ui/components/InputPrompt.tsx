@@ -227,6 +227,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       onSubmit(submittedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
+
+      // Auto-restore stashed prompt after submit (like Claude Code)
+      if (promptStash.hasStash) {
+        const stashed = promptStash.pop();
+        if (stashed) {
+          // Use setTimeout to restore after the submit is processed
+          setTimeout(() => {
+            buffer.setText(stashed);
+          }, 0);
+        }
+      }
     },
     [
       onSubmit,
@@ -235,6 +246,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellModeActive,
       shellHistory,
       resetReverseSearchCompletionState,
+      promptStash,
     ],
   );
 
@@ -426,29 +438,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Prompt stashing - Ctrl+Z to stash current input
+      // Prompt stashing - Ctrl+Q toggles (Q = Queue for later)
+      // With text: stash it and clear. Empty: pop the stash.
       if (keyMatchers[Command.STASH_PROMPT](key)) {
         if (buffer.text.trim()) {
+          // Has text → Stash it
           if (promptStash.stash(buffer.text)) {
             buffer.setText('');
             resetCompletionState();
+            setQueueErrorMessage('(Stashed - auto-restores after submit)');
           }
-        }
-        return;
-      }
-
-      // Pop stash - Ctrl+Y to restore stashed input
-      if (keyMatchers[Command.POP_STASH](key)) {
-        const stashed = promptStash.pop();
-        if (stashed) {
-          // If there's current input, swap it with the stash
-          const currentText = buffer.text.trim();
-          buffer.setText(stashed);
-          if (currentText) {
-            // Re-stash the current input so user can swap back
-            promptStash.stash(currentText);
+        } else if (promptStash.hasStash) {
+          // Empty → Pop stash
+          const stashed = promptStash.pop();
+          if (stashed) {
+            buffer.setText(stashed);
+            resetCompletionState();
           }
-          resetCompletionState();
         }
         return;
       }
@@ -894,6 +900,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       tryLoadQueuedMessages,
       setBannerVisible,
       promptStash,
+      setQueueErrorMessage,
     ],
   );
 
