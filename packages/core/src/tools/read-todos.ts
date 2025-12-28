@@ -108,8 +108,9 @@ class ReadTodosToolInvocation extends BaseToolInvocation<
     let statsString = `\n\nStatistics: ${stats.completed}/${activeCount} completed (${progressPercent}%)`;
     if (stats.inProgress > 0) {
       const inProgressTask = todos.find((t) => t.status === 'in_progress');
-      statsString += `\nCurrently working on: Task ${todos.indexOf(inProgressTask!) + 1}`;
-    }
+      if (inProgressTask) {
+        statsString += `\nCurrently working on: Task ${todos.indexOf(inProgressTask) + 1}`;
+      }
     if (stats.cancelled > 0) {
       statsString += `\n${stats.cancelled} task(s) cancelled`;
     }
