@@ -14,7 +14,7 @@ async function addAllowedTool(
   options: {
     scope: string;
   },
-) {
+): Promise<boolean> {
   const { scope } = options;
 
   const settings = loadSettings(process.cwd());
@@ -24,7 +24,7 @@ async function addAllowedTool(
     debugLogger.error(
       'Error: Please use --scope user to edit settings in the home directory.',
     );
-    process.exit(1);
+    return false;
   }
 
   const settingsScope =
@@ -36,7 +36,7 @@ async function addAllowedTool(
 
   if (allowed.includes(tool)) {
     debugLogger.log(`Tool "${tool}" is already allowed in ${scope} settings.`);
-    return;
+    return true;
   }
 
   const newAllowed = [...allowed, tool];
@@ -44,6 +44,7 @@ async function addAllowedTool(
   settings.setValue(settingsScope, 'tools.allowed', newAllowed);
 
   debugLogger.log(`Tool "${tool}" added to allowed list in ${scope} settings.`);
+  return true;
 }
 
 export const addCommand: CommandModule = {
@@ -65,9 +66,9 @@ export const addCommand: CommandModule = {
         choices: ['user', 'project'],
       }),
   handler: async (argv) => {
-    await addAllowedTool(argv['tool'] as string, {
+    const success = await addAllowedTool(argv['tool'] as string, {
       scope: argv['scope'] as string,
     });
-    await exitCli();
+    await exitCli(success ? 0 : 1);
   },
 };

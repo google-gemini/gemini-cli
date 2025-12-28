@@ -112,20 +112,14 @@ describe('allow remove command', () => {
       user: { path: '/home/user' },
     });
 
-    const mockProcessExit = vi
-      .spyOn(process, 'exit')
-      .mockImplementation((() => {
-        throw new Error('process.exit called');
-      }) as (code?: number | string | null) => never);
+    const { exitCli } = await import('../utils.js');
 
-    await expect(parser.parseAsync('remove my_tool')).rejects.toThrow(
-      'process.exit called',
-    );
+    await parser.parseAsync('remove my_tool');
 
     expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       'Error: Please use --scope user to edit settings in the home directory.',
     );
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    expect(exitCli).toHaveBeenCalledWith(1);
     expect(mockSetValue).not.toHaveBeenCalled();
   });
 });

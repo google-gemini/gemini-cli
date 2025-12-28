@@ -14,7 +14,7 @@ async function removeAllowedTool(
   options: {
     scope: string;
   },
-) {
+): Promise<boolean> {
   const { scope } = options;
 
   const settings = loadSettings(process.cwd());
@@ -24,7 +24,7 @@ async function removeAllowedTool(
     debugLogger.error(
       'Error: Please use --scope user to edit settings in the home directory.',
     );
-    process.exit(1);
+    return false;
   }
 
   const settingsScope =
@@ -36,7 +36,7 @@ async function removeAllowedTool(
 
   if (!allowed.includes(tool)) {
     debugLogger.warn(`Tool "${tool}" is not found in ${scope} allowed list.`);
-    return;
+    return true;
   }
 
   const newAllowed = allowed.filter((t) => t !== tool);
@@ -46,6 +46,7 @@ async function removeAllowedTool(
   debugLogger.log(
     `Tool "${tool}" removed from allowed list in ${scope} settings.`,
   );
+  return true;
 }
 
 export const removeCommand: CommandModule = {
@@ -67,9 +68,9 @@ export const removeCommand: CommandModule = {
         choices: ['user', 'project'],
       }),
   handler: async (argv) => {
-    await removeAllowedTool(argv['tool'] as string, {
+    const success = await removeAllowedTool(argv['tool'] as string, {
       scope: argv['scope'] as string,
     });
-    await exitCli();
+    await exitCli(success ? 0 : 1);
   },
 };
