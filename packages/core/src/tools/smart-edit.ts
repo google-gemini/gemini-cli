@@ -44,6 +44,7 @@ import { logSmartEditCorrectionEvent } from '../telemetry/loggers.js';
 import { correctPath } from '../utils/pathCorrector.js';
 import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { LocalFileDeclarativeTool } from './local-file-tool.js';
 interface ReplacementContext {
   params: EditToolParams;
   currentContent: string;
@@ -847,9 +848,12 @@ class EditToolInvocation
  */
 export class SmartEditTool
   extends BaseDeclarativeTool<EditToolParams, ToolResult>
-  implements ModifiableDeclarativeTool<EditToolParams>
+  implements
+    ModifiableDeclarativeTool<EditToolParams>,
+    LocalFileDeclarativeTool<EditToolParams>
 {
   static readonly Name = EDIT_TOOL_NAME;
+  readonly accessesLocalFiles = true;
 
   constructor(
     private readonly config: Config,

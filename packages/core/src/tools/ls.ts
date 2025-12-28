@@ -15,6 +15,7 @@ import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
 import { LS_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { LocalFileDeclarativeTool } from './local-file-tool.js';
 
 /**
  * Parameters for the LS tool
@@ -254,8 +255,12 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
 /**
  * Implementation of the LS tool logic
  */
-export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
+export class LSTool
+  extends BaseDeclarativeTool<LSToolParams, ToolResult>
+  implements LocalFileDeclarativeTool<LSToolParams>
+{
   static readonly Name = LS_TOOL_NAME;
+  readonly accessesLocalFiles = true;
 
   constructor(
     private config: Config,

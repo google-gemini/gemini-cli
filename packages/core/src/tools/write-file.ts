@@ -44,6 +44,7 @@ import { FileOperation } from '../telemetry/metrics.js';
 import { getSpecificMimeType } from '../utils/fileUtils.js';
 import { getLanguageFromFilePath } from '../utils/language-detection.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { LocalFileDeclarativeTool } from './local-file-tool.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -402,9 +403,12 @@ class WriteFileToolInvocation extends BaseToolInvocation<
  */
 export class WriteFileTool
   extends BaseDeclarativeTool<WriteFileToolParams, ToolResult>
-  implements ModifiableDeclarativeTool<WriteFileToolParams>
+  implements
+    ModifiableDeclarativeTool<WriteFileToolParams>,
+    LocalFileDeclarativeTool<WriteFileToolParams>
 {
   static readonly Name = WRITE_FILE_TOOL_NAME;
+  readonly accessesLocalFiles = true;
 
   constructor(
     private readonly config: Config,

@@ -29,6 +29,7 @@ import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { ToolErrorType } from './tool-error.js';
 import { READ_MANY_FILES_TOOL_NAME } from './tool-names.js';
+import type { LocalFileDeclarativeTool } from './local-file-tool.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -439,11 +440,12 @@ ${finalExclusionPatternsForDescription
  * within a specified target directory. The content is concatenated.
  * It is intended to run in an environment with access to the local file system (e.g., a Node.js backend).
  */
-export class ReadManyFilesTool extends BaseDeclarativeTool<
-  ReadManyFilesParams,
-  ToolResult
-> {
+export class ReadManyFilesTool
+  extends BaseDeclarativeTool<ReadManyFilesParams, ToolResult>
+  implements LocalFileDeclarativeTool<ReadManyFilesParams>
+{
   static readonly Name = READ_MANY_FILES_TOOL_NAME;
+  readonly accessesLocalFiles = true;
 
   constructor(
     private config: Config,
