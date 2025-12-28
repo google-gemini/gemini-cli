@@ -34,6 +34,8 @@ interface TomlAgentDefinition {
   run?: {
     max_turns?: number;
     timeout_mins?: number;
+    enable_loop_detection?: boolean;
+    loop_threshold?: number;
   };
 }
 
@@ -83,6 +85,8 @@ const tomlSchema = z.object({
     .object({
       max_turns: z.number().int().positive().optional(),
       timeout_mins: z.number().int().positive().optional(),
+      enable_loop_detection: z.boolean().optional(),
+      loop_threshold: z.number().int().positive().optional(),
     })
     .optional(),
 });
@@ -167,6 +171,8 @@ export function tomlToAgentDefinition(
     runConfig: {
       max_turns: toml.run?.max_turns,
       max_time_minutes: toml.run?.timeout_mins || 5,
+      enableLoopDetection: toml.run?.enable_loop_detection ?? true,
+      loopDetectionThreshold: toml.run?.loop_threshold ?? 5,
     },
     toolConfig: toml.tools
       ? {

@@ -22,6 +22,7 @@ export enum AgentTerminateMode {
   MAX_TURNS = 'MAX_TURNS',
   ABORTED = 'ABORTED',
   ERROR_NO_COMPLETE_TASK_CALL = 'ERROR_NO_COMPLETE_TASK_CALL',
+  CYCLE_DETECTED = 'CYCLE_DETECTED',
 }
 
 /**
@@ -30,6 +31,8 @@ export enum AgentTerminateMode {
 export interface OutputObject {
   result: string;
   terminate_reason: AgentTerminateMode;
+  turn_count?: number;
+  tool_calls_count?: number;
 }
 
 /**
@@ -190,4 +193,8 @@ export interface RunConfig {
   max_time_minutes: number;
   /** The maximum number of conversational turns. */
   max_turns?: number;
+  /** Enable loop detection for this agent. Defaults to true. */
+  enableLoopDetection?: boolean;
+  /** Threshold for tool call repetition before loop is detected. Defaults to 5. */
+  loopDetectionThreshold?: number;
 }

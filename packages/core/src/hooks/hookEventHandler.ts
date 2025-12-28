@@ -17,6 +17,7 @@ import type {
   BeforeAgentInput,
   NotificationInput,
   AfterAgentInput,
+  SubagentStopInput,
   SessionStartInput,
   SessionEndInput,
   PreCompressInput,
@@ -273,6 +274,65 @@ function validatePreCompressInput(input: Record<string, unknown>): {
 }
 
 /**
+ * Validates SubagentStop input fields
+ */
+function validateSubagentStopInput(input: Record<string, unknown>): {
+  agentName: string;
+  agentResult: string;
+  terminateReason: string;
+  executionTimeMs: number;
+  turnCount: number;
+  toolCallsCount: number;
+} {
+  const agentName = input['agent_name'];
+  const agentResult = input['agent_result'];
+  const terminateReason = input['terminate_reason'];
+  const executionTimeMs = input['execution_time_ms'];
+  const turnCount = input['turn_count'];
+  const toolCallsCount = input['tool_calls_count'];
+
+  if (typeof agentName !== 'string') {
+    throw new Error(
+      'Invalid input for SubagentStop hook event: agent_name must be a string',
+    );
+  }
+  if (typeof agentResult !== 'string') {
+    throw new Error(
+      'Invalid input for SubagentStop hook event: agent_result must be a string',
+    );
+  }
+  if (typeof terminateReason !== 'string') {
+    throw new Error(
+      'Invalid input for SubagentStop hook event: terminate_reason must be a string',
+    );
+  }
+  if (typeof executionTimeMs !== 'number') {
+    throw new Error(
+      'Invalid input for SubagentStop hook event: execution_time_ms must be a number',
+    );
+  }
+  if (typeof turnCount !== 'number') {
+    throw new Error(
+      'Invalid input for SubagentStop hook event: turn_count must be a number',
+    );
+  }
+  if (typeof toolCallsCount !== 'number') {
+    throw new Error(
+      'Invalid input for SubagentStop hook event: tool_calls_count must be a number',
+    );
+  }
+
+  return {
+    agentName,
+    agentResult,
+    terminateReason,
+    executionTimeMs,
+    turnCount,
+    toolCallsCount,
+  };
+}
+
+/**
  * Hook event bus that coordinates hook execution across the system
  */
 export class HookEventHandler {
@@ -483,6 +543,31 @@ export class HookEventHandler {
     };
 
     return this.executeHooks(HookEventName.BeforeToolSelection, input);
+  }
+
+  /**
+   * Fire a SubagentStop event
+   * Called when a subagent completes execution via delegate_to_agent
+   */
+  async fireSubagentStopEvent(
+    agentName: string,
+    agentResult: string,
+    terminateReason: string,
+    executionTimeMs: number,
+    turnCount: number,
+    toolCallsCount: number,
+  ): Promise<AggregatedHookResult> {
+    const input: SubagentStopInput = {
+      ...this.createBaseInput(HookEventName.SubagentStop),
+      agent_name: agentName,
+      agent_result: agentResult,
+      terminate_reason: terminateReason,
+      execution_time_ms: executionTimeMs,
+      turn_count: turnCount,
+      tool_calls_count: toolCallsCount,
+    };
+
+    return this.executeHooks(HookEventName.SubagentStop, input);
   }
 
   /**
@@ -723,6 +808,25 @@ export class HookEventHandler {
             prompt,
             promptResponse,
             stopHookActive,
+          );
+          break;
+        }
+        case HookEventName.SubagentStop: {
+          const {
+            agentName,
+            agentResult,
+            terminateReason,
+            executionTimeMs,
+            turnCount,
+            toolCallsCount,
+          } = validateSubagentStopInput(enrichedInput);
+          result = await this.fireSubagentStopEvent(
+            agentName,
+            agentResult,
+            terminateReason,
+            executionTimeMs,
+            turnCount,
+            toolCallsCount,
           );
           break;
         }

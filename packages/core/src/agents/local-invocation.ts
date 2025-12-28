@@ -13,6 +13,7 @@ import type {
   LocalAgentDefinition,
   AgentInputs,
   SubagentActivityEvent,
+  OutputObject,
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
@@ -76,6 +77,11 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: string | AnsiOutput) => void,
   ): Promise<ToolResult> {
+    const executionStartTime = Date.now();
+    let output: OutputObject | null = null;
+    let turnCount = 0;
+    let toolCallsCount = 0;
+
     try {
       if (updateOutput) {
         updateOutput('Subagent starting...\n');
@@ -92,6 +98,11 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         ) {
           updateOutput(`🤖💭 ${activity.data['text']}`);
         }
+
+        // Track tool calls for metrics
+        if (activity.type === 'TOOL_CALL_START') {
+          toolCallsCount++;
+        }
       };
 
       const executor = await LocalAgentExecutor.create(
@@ -100,7 +111,12 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         onActivity,
       );
 
-      const output = await executor.run(this.params, signal);
+      output = await executor.run(this.params, signal);
+
+      // Use actual counts from executor output (with fallback to tracked counts)
+      turnCount =
+        output.turn_count ?? Math.max(1, Math.floor(toolCallsCount / 2));
+      toolCallsCount = output.tool_calls_count ?? toolCallsCount;
 
       const resultContent = `Subagent '${this.definition.name}' finished.
 Termination Reason: ${output.terminate_reason}
@@ -132,6 +148,27 @@ ${output.result}
           type: ToolErrorType.EXECUTION_FAILED,
         },
       };
+    } finally {
+      // Fire SubagentStop hook regardless of success or failure
+      if (output) {
+        const hookSystem = this.config.getHookSystem();
+        if (hookSystem) {
+          const hookHandler = hookSystem.getEventHandler();
+          try {
+            await hookHandler.fireSubagentStopEvent(
+              this.definition.name,
+              output.result || '',
+              output.terminate_reason || 'UNKNOWN',
+              Date.now() - executionStartTime,
+              turnCount,
+              toolCallsCount,
+            );
+          } catch (hookError) {
+            // Log hook error but don't fail the agent execution
+            console.warn(`SubagentStop hook error: ${hookError}`);
+          }
+        }
+      }
     }
   }
 }

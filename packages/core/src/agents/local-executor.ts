@@ -41,6 +41,7 @@ import type {
 import { AgentTerminateMode } from './types.js';
 import { templateString } from './utils.js';
 import { parseThought } from '../utils/thoughtUtils.js';
+import { LocalAgentLoopDetector } from './loop-detection-utils.js';
 import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -52,18 +53,20 @@ import { ApprovalMode } from '../policy/types.js';
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
 
 const TASK_COMPLETE_TOOL_NAME = 'complete_task';
-const GRACE_PERIOD_MS = 60 * 1000; // 1 min
+const GRACE_PERIOD_MS = 60 * 1000; // 60 seconds for recovery attempt
 
 /** The possible outcomes of a single agent turn. */
 type AgentTurnResult =
   | {
       status: 'continue';
       nextMessage: Content;
+      toolCallsInTurn: number;
     }
   | {
       status: 'stop';
       terminateReason: AgentTerminateMode;
       finalResult: string | null;
+      toolCallsInTurn: number;
     };
 
 /**
@@ -80,7 +83,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly runtimeContext: Config;
   private readonly onActivity?: ActivityCallback;
   private readonly compressionService: ChatCompressionService;
+  private readonly loopDetector: LocalAgentLoopDetector;
   private hasFailedCompressionAttempt = false;
+  private timeoutWarningEmitted = false;
 
   /**
    * Creates and validates a new `AgentExecutor` instance.
@@ -155,6 +160,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.toolRegistry = toolRegistry;
     this.onActivity = onActivity;
     this.compressionService = new ChatCompressionService();
+    this.loopDetector = new LocalAgentLoopDetector({
+      toolThreshold: definition.runConfig.loopDetectionThreshold ?? 5,
+    });
 
     const randomIdPart = Math.random().toString(36).slice(2, 8);
     // parentPromptId will be undefined if this agent is invoked directly
@@ -185,6 +193,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.callModel(chat, currentMessage, combinedSignal, promptId),
     );
 
+    const toolCallsInTurn = functionCalls.length;
+
     if (combinedSignal.aborted) {
       const terminateReason = timeoutSignal.aborted
         ? AgentTerminateMode.TIMEOUT
@@ -193,6 +203,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         status: 'stop',
         terminateReason,
         finalResult: null, // 'run' method will set the final timeout string
+        toolCallsInTurn,
       };
     }
 
@@ -206,17 +217,39 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         status: 'stop',
         terminateReason: AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
         finalResult: null,
+        toolCallsInTurn,
       };
     }
 
-    const { nextMessage, submittedOutput, taskCompleted } =
-      await this.processFunctionCalls(functionCalls, combinedSignal, promptId);
+    const {
+      nextMessage,
+      submittedOutput,
+      taskCompleted,
+      cycleDetected,
+      cycleDetails,
+    } = await this.processFunctionCalls(
+      functionCalls,
+      combinedSignal,
+      promptId,
+    );
+
+    // Check for cycle detection
+    if (cycleDetected) {
+      return {
+        status: 'stop',
+        terminateReason: AgentTerminateMode.CYCLE_DETECTED,
+        finalResult: cycleDetails ?? 'Cycle detected in agent execution',
+        toolCallsInTurn,
+      };
+    }
+
     if (taskCompleted) {
       const finalResult = submittedOutput ?? 'Task completed successfully.';
       return {
         status: 'stop',
         terminateReason: AgentTerminateMode.GOAL,
         finalResult,
+        toolCallsInTurn,
       };
     }
 
@@ -224,6 +257,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     return {
       status: 'continue',
       nextMessage,
+      toolCallsInTurn,
     };
   }
 
@@ -267,15 +301,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       | AgentTerminateMode.MAX_TURNS
       | AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
     externalSignal: AbortSignal, // The original signal passed to run()
+    gracePeriodMs: number, // Calculated grace period from caller
   ): Promise<string | null> {
     this.emitActivity('THOUGHT_CHUNK', {
-      text: `Execution limit reached (${reason}). Attempting one final recovery turn with a grace period.`,
+      text: `Execution limit reached (${reason}). Attempting one final recovery turn with ${Math.round(gracePeriodMs / 1000)}s grace period.`,
     });
 
     const recoveryStartTime = Date.now();
     let success = false;
 
-    const gracePeriodMs = GRACE_PERIOD_MS;
     const graceTimeoutController = new AbortController();
     const graceTimeoutId = setTimeout(
       () => graceTimeoutController.abort(new Error('Grace period timed out.')),
@@ -352,11 +386,17 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    */
   async run(inputs: AgentInputs, signal: AbortSignal): Promise<OutputObject> {
     const startTime = Date.now();
+    const { max_time_minutes } = this.definition.runConfig;
+    const deadline = startTime + max_time_minutes * 60 * 1000;
+
     let turnCounter = 0;
+    let totalToolCalls = 0;
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
     let finalResult: string | null = null;
 
-    const { max_time_minutes } = this.definition.runConfig;
+    // Reset loop detection for this agent execution
+    this.loopDetector.reset();
+
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(
       () => timeoutController.abort(new Error('Agent timed out.')),
@@ -414,6 +454,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           timeoutController.signal,
         );
 
+        // Track tool calls from this turn
+        totalToolCalls += turnResult.toolCallsInTurn;
+
         if (turnResult.status === 'stop') {
           terminateReason = turnResult.terminateReason;
           // Only set finalResult if the turn provided one (e.g., error or goal).
@@ -425,52 +468,78 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
         // If status is 'continue', update message for the next loop
         currentMessage = turnResult.nextMessage;
+
+        // Check if agent has used 80% of allocated time
+        const elapsedTime = Date.now() - startTime;
+        const totalTimeout = max_time_minutes * 60 * 1000;
+        if (elapsedTime > totalTimeout * 0.8 && !this.timeoutWarningEmitted) {
+          const remainingSeconds = Math.round((deadline - Date.now()) / 1000);
+          this.emitActivity('THOUGHT_CHUNK', {
+            text: `⏰ Warning: Agent has used 80% of allocated time (${Math.round(elapsedTime / 1000)}s / ${Math.round(totalTimeout / 1000)}s, ${remainingSeconds}s remaining)`,
+          });
+          this.timeoutWarningEmitted = true;
+        }
       }
 
       // === UNIFIED RECOVERY BLOCK ===
       // Only attempt recovery if it's a known recoverable reason.
-      // We don't recover from GOAL (already done) or ABORTED (user cancelled).
+      // We don't recover from GOAL (already done), ABORTED (user cancelled), ERROR, or CYCLE_DETECTED (stuck in loop).
       if (
         terminateReason !== AgentTerminateMode.ERROR &&
         terminateReason !== AgentTerminateMode.ABORTED &&
-        terminateReason !== AgentTerminateMode.GOAL
+        terminateReason !== AgentTerminateMode.GOAL &&
+        terminateReason !== AgentTerminateMode.CYCLE_DETECTED
       ) {
-        const recoveryResult = await this.executeFinalWarningTurn(
-          chat,
-          turnCounter, // Use current turnCounter for the recovery attempt
-          terminateReason,
-          signal, // Pass the external signal
-        );
+        // Calculate remaining time and grace period
+        const remainingTime = deadline - Date.now();
 
-        if (recoveryResult !== null) {
-          // Recovery Succeeded
-          terminateReason = AgentTerminateMode.GOAL;
-          finalResult = recoveryResult;
+        // Skip recovery if insufficient time (need at least 5s for meaningful recovery)
+        if (remainingTime < 5000) {
+          finalResult =
+            finalResult ||
+            'Agent stopped without completing task (insufficient time for recovery).';
         } else {
-          // Recovery Failed. Set the final error message based on the *original* reason.
-          if (terminateReason === AgentTerminateMode.TIMEOUT) {
-            finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
-            this.emitActivity('ERROR', {
-              error: finalResult,
-              context: 'timeout',
-            });
-          } else if (terminateReason === AgentTerminateMode.MAX_TURNS) {
-            finalResult = `Agent reached max turns limit (${this.definition.runConfig.max_turns}).`;
-            this.emitActivity('ERROR', {
-              error: finalResult,
-              context: 'max_turns',
-            });
-          } else if (
-            terminateReason === AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL
-          ) {
-            // The finalResult was already set by executeTurn, but we re-emit just in case.
-            finalResult =
-              finalResult ||
-              `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}'.`;
-            this.emitActivity('ERROR', {
-              error: finalResult,
-              context: 'protocol_violation',
-            });
+          // Calculate actual grace period (min of 60s or remaining time)
+          const gracePeriodMs = Math.min(GRACE_PERIOD_MS, remainingTime);
+
+          const recoveryResult = await this.executeFinalWarningTurn(
+            chat,
+            turnCounter, // Use current turnCounter for the recovery attempt
+            terminateReason,
+            signal, // Pass the external signal
+            gracePeriodMs,
+          );
+
+          if (recoveryResult !== null) {
+            // Recovery Succeeded
+            terminateReason = AgentTerminateMode.GOAL;
+            finalResult = recoveryResult;
+          } else {
+            // Recovery Failed. Set the final error message based on the *original* reason.
+            if (terminateReason === AgentTerminateMode.TIMEOUT) {
+              finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+              this.emitActivity('ERROR', {
+                error: finalResult,
+                context: 'timeout',
+              });
+            } else if (terminateReason === AgentTerminateMode.MAX_TURNS) {
+              finalResult = `Agent reached max turns limit (${this.definition.runConfig.max_turns}).`;
+              this.emitActivity('ERROR', {
+                error: finalResult,
+                context: 'max_turns',
+              });
+            } else if (
+              terminateReason === AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL
+            ) {
+              // The finalResult was already set by executeTurn, but we re-emit just in case.
+              finalResult =
+                finalResult ||
+                `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}'.`;
+              this.emitActivity('ERROR', {
+                error: finalResult,
+                context: 'protocol_violation',
+              });
+            }
           }
         }
       }
@@ -480,6 +549,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return {
           result: finalResult || 'Task completed.',
           terminate_reason: terminateReason,
+          turn_count: turnCounter,
+          tool_calls_count: totalToolCalls,
         };
       }
 
@@ -487,6 +558,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         result:
           finalResult || 'Agent execution was terminated before completion.',
         terminate_reason: terminateReason,
+        turn_count: turnCounter,
+        tool_calls_count: totalToolCalls,
       };
     } catch (error) {
       // Check if the error is an AbortError caused by our internal timeout.
@@ -500,11 +573,18 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
         // Also use the unified recovery logic here
         if (chat && tools) {
+          const remainingTime = deadline - Date.now();
+          const gracePeriodMs = Math.min(
+            GRACE_PERIOD_MS,
+            Math.max(5000, remainingTime),
+          );
+
           const recoveryResult = await this.executeFinalWarningTurn(
             chat,
             turnCounter, // Use current turnCounter
             AgentTerminateMode.TIMEOUT,
             signal,
+            gracePeriodMs,
           );
 
           if (recoveryResult !== null) {
@@ -514,6 +594,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             return {
               result: finalResult,
               terminate_reason: terminateReason,
+              turn_count: turnCounter,
+              tool_calls_count: totalToolCalls,
             };
           }
         }
@@ -527,6 +609,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return {
           result: finalResult,
           terminate_reason: terminateReason,
+          turn_count: turnCounter,
+          tool_calls_count: totalToolCalls,
         };
       }
 
@@ -628,6 +712,19 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
         if (text) {
           textResponse += text;
+
+          // Check for content loops (if enabled)
+          if (this.definition.runConfig.enableLoopDetection !== false) {
+            const contentCheck = this.loopDetector.checkContentLoop(text);
+            if (contentCheck.detected) {
+              this.emitActivity('ERROR', {
+                context: 'loop_detection',
+                error: contentCheck.details || 'Content loop detected',
+              });
+              // Break stream immediately to stop wasteful generation
+              break;
+            }
+          }
         }
       }
     }
@@ -690,6 +787,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     nextMessage: Content;
     submittedOutput: string | null;
     taskCompleted: boolean;
+    cycleDetected?: boolean;
+    cycleDetails?: string;
   }> {
     const allowedToolNames = new Set(this.toolRegistry.getAllToolNames());
     // Always allow the completion tool
@@ -711,6 +810,47 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         name: functionCall.name,
         args,
       });
+
+      // Check for tool call loops (if enabled)
+      if (
+        this.definition.runConfig.enableLoopDetection !== false &&
+        functionCall.name &&
+        functionCall.name !== TASK_COMPLETE_TOOL_NAME
+      ) {
+        const loopCheck = this.loopDetector.checkToolCallLoop({
+          name: functionCall.name,
+          args,
+        });
+
+        if (loopCheck.detected) {
+          this.emitActivity('ERROR', {
+            context: 'loop_detection',
+            error: loopCheck.details || 'Tool call loop detected',
+          });
+
+          // Return early with cycle detection flag
+          return {
+            nextMessage: {
+              role: 'model',
+              parts: [
+                {
+                  functionResponse: {
+                    name: functionCall.name,
+                    response: {
+                      error: `Loop detected: ${loopCheck.details}`,
+                    },
+                    id: callId,
+                  },
+                },
+              ],
+            },
+            submittedOutput: null,
+            taskCompleted: false,
+            cycleDetected: true,
+            cycleDetails: loopCheck.details,
+          };
+        }
+      }
 
       if (functionCall.name === TASK_COMPLETE_TOOL_NAME) {
         if (taskCompleted) {
@@ -930,6 +1070,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       nextMessage: { role: 'user', parts: toolResponseParts },
       submittedOutput,
       taskCompleted,
+      cycleDetected: false,
     };
   }
 

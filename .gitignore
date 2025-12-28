@@ -56,3 +56,10 @@ patch_output.log
 
 .genkit
 .gemini-clipboard/
+
+# AGI Research (Claude Code analysis docs)
+__research__/
+
+# Claude Capsule Kit (generated at runtime)
+.claude/**
+CLAUDE.md

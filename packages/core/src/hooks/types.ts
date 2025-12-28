@@ -36,6 +36,7 @@ export enum HookEventName {
   BeforeAgent = 'BeforeAgent',
   Notification = 'Notification',
   AfterAgent = 'AfterAgent',
+  SubagentStop = 'SubagentStop',
   SessionStart = 'SessionStart',
   SessionEnd = 'SessionEnd',
   PreCompress = 'PreCompress',
@@ -133,6 +134,8 @@ export function createHookOutput(
       return new AfterModelHookOutput(data);
     case 'BeforeToolSelection':
       return new BeforeToolSelectionHookOutput(data);
+    case 'SubagentStop':
+      return new DefaultHookOutput(data);
     default:
       return new DefaultHookOutput(data);
   }
@@ -438,6 +441,28 @@ export interface AfterAgentInput extends HookInput {
   prompt: string;
   prompt_response: string;
   stop_hook_active: boolean;
+}
+
+/**
+ * SubagentStop hook input
+ */
+export interface SubagentStopInput extends HookInput {
+  agent_name: string;
+  agent_result: string;
+  terminate_reason: string;
+  execution_time_ms: number;
+  turn_count: number;
+  tool_calls_count: number;
+}
+
+/**
+ * SubagentStop hook output
+ */
+export interface SubagentStopOutput extends HookOutput {
+  hookSpecificOutput?: {
+    hookEventName: 'SubagentStop';
+    additionalContext?: string;
+  };
 }
 
 /**
