@@ -135,7 +135,10 @@ export class GeminiClient {
   async setTools(): Promise<void> {
     const toolRegistry = this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
-    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    const tools: Tool[] =
+      toolDeclarations.length > 0
+        ? [{ functionDeclarations: toolDeclarations }]
+        : [];
     this.getChat().setTools(tools);
   }
 
@@ -195,7 +198,10 @@ export class GeminiClient {
 
     const toolRegistry = this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
-    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    const tools: Tool[] =
+      toolDeclarations.length > 0
+        ? [{ functionDeclarations: toolDeclarations }]
+        : [];
 
     const history = await getInitialChatHistory(this.config, extraHistory);
 

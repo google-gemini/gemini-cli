@@ -107,6 +107,7 @@ vi.mock('../core/client.js', () => ({
     stripThoughtsFromHistory: vi.fn(),
     isInitialized: vi.fn().mockReturnValue(true),
     updateSystemInstruction: vi.fn().mockResolvedValue(undefined),
+    setTools: vi.fn().mockResolvedValue(undefined),
   })),
 }));
 

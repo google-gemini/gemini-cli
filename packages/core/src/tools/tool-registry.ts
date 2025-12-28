@@ -201,11 +201,10 @@ export class ToolRegistry {
   }
 
   setAllowedTools(allowedTools: string[] | undefined): void {
-    this.allowedTools = allowedTools ? new Set(allowedTools) : undefined;
-  }
-
-  setAllowedTools(allowedTools: string[] | undefined): void {
-    this.allowedTools = allowedTools ? new Set(allowedTools) : undefined;
+    this.allowedTools =
+      allowedTools && allowedTools.length > 0
+        ? new Set(allowedTools)
+        : undefined;
   }
 
   setMessageBus(messageBus: MessageBus): void {
@@ -469,7 +468,14 @@ export class ToolRegistry {
     }
 
     if (this.allowedTools) {
-      if (!possibleNames.some((name) => this.allowedTools!.has(name))) {
+      const isAllowed = possibleNames.some(
+        (name) =>
+          this.allowedTools!.has(name) ||
+          Array.from(this.allowedTools!).some((allowed) =>
+            allowed.startsWith(name + '('),
+          ),
+      );
+      if (!isAllowed) {
         return false;
       }
     }
