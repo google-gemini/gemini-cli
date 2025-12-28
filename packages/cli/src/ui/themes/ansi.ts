@@ -10,7 +10,7 @@ import { darkSemanticColors } from './semantic-tokens.js';
 const ansiColors: ColorsTheme = {
   type: 'dark',
   Background: 'black',
-  Foreground: 'white',
+  Foreground: '',
   LightBlue: 'bluebright',
   AccentBlue: 'blue',
   AccentPurple: 'magenta',
@@ -22,6 +22,7 @@ const ansiColors: ColorsTheme = {
   DiffRemoved: '#4D0000',
   Comment: 'gray',
   Gray: 'gray',
+  DarkGray: 'gray',
   GradientColors: ['cyan', 'green'],
 };
 

@@ -10,8 +10,8 @@
  * external dependencies, making it compatible with Docker sandbox mode.
  */
 
-import { describe, it, beforeAll, expect } from 'vitest';
-import { TestRig, validateModelOutput } from './test-helper.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { TestRig, poll, validateModelOutput } from './test-helper.js';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 
@@ -165,9 +165,15 @@ rpc.send({
 `;
 
 describe('simple-mcp-server', () => {
-  const rig = new TestRig();
+  let rig: TestRig;
 
-  beforeAll(async () => {
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
+  it('should add two numbers', async () => {
     // Setup test directory with MCP server configuration
     await rig.setup('simple-mcp-server', {
       settings: {
@@ -177,6 +183,7 @@ describe('simple-mcp-server', () => {
             args: ['mcp-server.cjs'],
           },
         },
+        tools: { core: [] },
       },
     });
 
@@ -192,7 +199,7 @@ describe('simple-mcp-server', () => {
 
     // Poll for script for up to 5s
     const { accessSync, constants } = await import('node:fs');
-    const isReady = await rig.poll(
+    const isReady = await poll(
       () => {
         try {
           accessSync(testServerPath, constants.F_OK);
@@ -208,12 +215,12 @@ describe('simple-mcp-server', () => {
     if (!isReady) {
       throw new Error('MCP server script was not ready in time.');
     }
-  });
 
-  it('should add two numbers', async () => {
     // Test directory is already set up in before hook
     // Just run the command - MCP server config is in settings.json
-    const output = await rig.run('add 5 and 10');
+    const output = await rig.run({
+      args: 'Use the `add` tool to calculate 5+10 and output only the resulting number.',
+    });
 
     const foundToolCall = await rig.waitForToolCall('add');
 

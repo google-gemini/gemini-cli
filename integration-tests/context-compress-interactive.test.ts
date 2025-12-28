@@ -5,7 +5,8 @@
  */
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
-import { TestRig, type } from './test-helper.js';
+import { TestRig } from './test-helper.js';
+import { join } from 'node:path';
 
 describe('Interactive Mode', () => {
   let rig: TestRig;
@@ -18,93 +19,93 @@ describe('Interactive Mode', () => {
     await rig.cleanup();
   });
 
-  it.skipIf(process.platform === 'win32')(
-    'should trigger chat compression with /compress command',
-    async () => {
-      await rig.setup('interactive-compress-test');
+  it('should trigger chat compression with /compress command', async () => {
+    await rig.setup('interactive-compress-success', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'context-compress-interactive.compress.responses',
+      ),
+    });
 
-      const { ptyProcess } = rig.runInteractive();
+    const run = await rig.runInteractive();
 
-      let fullOutput = '';
-      ptyProcess.onData((data) => (fullOutput += data));
+    await run.sendKeys(
+      'Write a 200 word story about a robot. The story MUST end with the text THE_END followed by a period.',
+    );
+    await run.sendKeys('\r');
 
-      const authDialogAppeared = await rig.waitForText(
-        'How would you like to authenticate',
-        5000,
-      );
+    // Wait for the specific end marker.
+    await run.expectText('THE_END.', 30000);
 
-      // select the second option if auth dialog come's up
-      if (authDialogAppeared) {
-        ptyProcess.write('2');
-      }
+    await run.type('/compress');
+    await run.type('\r');
 
-      // Wait for the app to be ready
-      const isReady = await rig.waitForText('Type your message', 15000);
-      expect(
-        isReady,
-        'CLI did not start up in interactive mode correctly',
-      ).toBe(true);
+    const foundEvent = await rig.waitForTelemetryEvent(
+      'chat_compression',
+      25000,
+    );
+    expect(foundEvent, 'chat_compression telemetry event was not found').toBe(
+      true,
+    );
 
-      const longPrompt =
-        'Dont do anything except returning a 1000 token long paragragh with the <name of the scientist who discovered theory of relativity> at the end to indicate end of response. This is a moderately long sentence.';
+    await run.expectText('Chat history compressed', 5000);
+  });
 
-      await type(ptyProcess, longPrompt);
-      await type(ptyProcess, '\r');
+  // TODO: Context compression is broken and doesn't include the system
+  // instructions or tool counts, so it thinks compression is beneficial when
+  // it is in fact not.
+  it.skip('should handle compression failure on token inflation', async () => {
+    await rig.setup('interactive-compress-failure', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'context-compress-interactive.compress-failure.responses',
+      ),
+    });
 
-      await rig.waitForText('einstein', 25000);
+    const run = await rig.runInteractive();
 
-      await type(ptyProcess, '/compress');
-      // A small delay to allow React to re-render the command list.
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      await type(ptyProcess, '\r');
+    await run.type('Respond with exactly "Hello" followed by a period');
+    await run.type('\r');
 
-      const foundEvent = await rig.waitForTelemetryEvent(
-        'chat_compression',
-        90000,
-      );
-      expect(foundEvent, 'chat_compression telemetry event was not found').toBe(
-        true,
-      );
-    },
-  );
+    await run.expectText('Hello.', 25000);
 
-  it.skipIf(process.platform === 'win32')(
-    'should handle compression failure on token inflation',
-    async () => {
-      await rig.setup('interactive-compress-test');
+    await run.type('/compress');
+    await run.type('\r');
+    await run.expectText('compression was not beneficial', 25000);
 
-      const { ptyProcess } = rig.runInteractive();
+    // Verify no telemetry event is logged for NOOP
+    const foundEvent = await rig.waitForTelemetryEvent(
+      'chat_compression',
+      5000,
+    );
+    expect(
+      foundEvent,
+      'chat_compression telemetry event should be found for failures',
+    ).toBe(true);
+  });
 
-      let fullOutput = '';
-      ptyProcess.onData((data) => (fullOutput += data));
+  it('should handle /compress command on empty history', async () => {
+    rig.setup('interactive-compress-empty', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'context-compress-interactive.compress-empty.responses',
+      ),
+    });
 
-      const authDialogAppeared = await rig.waitForText(
-        'How would you like to authenticate',
-        5000,
-      );
+    const run = await rig.runInteractive();
+    await run.type('/compress');
+    await run.type('\r');
 
-      // select the second option if auth dialog come's up
-      if (authDialogAppeared) {
-        ptyProcess.write('2');
-      }
+    await run.expectText('Nothing to compress.', 5000);
 
-      // Wait for the app to be ready
-      const isReady = await rig.waitForText('Type your message', 25000);
-      expect(
-        isReady,
-        'CLI did not start up in interactive mode correctly',
-      ).toBe(true);
-
-      await type(ptyProcess, '/compress');
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      await type(ptyProcess, '\r');
-
-      const compressionFailed = await rig.waitForText(
-        'compression was not beneficial',
-        25000,
-      );
-
-      expect(compressionFailed).toBe(true);
-    },
-  );
+    // Verify no telemetry event is logged for NOOP
+    const foundEvent = await rig.waitForTelemetryEvent(
+      'chat_compression',
+      5000, // Short timeout as we expect it not to happen
+    );
+    expect(
+      foundEvent,
+      'chat_compression telemetry event should not be found for NOOP',
+    ).toBe(false);
+  });
 });

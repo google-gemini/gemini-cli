@@ -22,4 +22,6 @@
     (literal "/dev/stdout")
     (literal "/dev/stderr")
     (literal "/dev/null")
+    (literal "/dev/ptmx")
+    (regex #"^/dev/ttys[0-9]*$")
 )

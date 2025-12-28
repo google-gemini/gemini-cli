@@ -210,6 +210,60 @@ describe('OAuthUtils', () => {
     });
   });
 
+  describe('discoverOAuthConfig', () => {
+    const mockResourceMetadata: OAuthProtectedResourceMetadata = {
+      resource: 'https://example.com/mcp',
+      authorization_servers: ['https://auth.example.com'],
+      bearer_methods_supported: ['header'],
+    };
+
+    const mockAuthServerMetadata: OAuthAuthorizationServerMetadata = {
+      issuer: 'https://auth.example.com',
+      authorization_endpoint: 'https://auth.example.com/authorize',
+      token_endpoint: 'https://auth.example.com/token',
+      scopes_supported: ['read', 'write'],
+    };
+
+    it('should succeed when resource metadata matches server URL', async () => {
+      mockFetch
+        // fetchProtectedResourceMetadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResourceMetadata),
+        })
+        // discoverAuthorizationServerMetadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      const config = await OAuthUtils.discoverOAuthConfig(
+        'https://example.com/mcp',
+      );
+
+      expect(config).toEqual({
+        authorizationUrl: 'https://auth.example.com/authorize',
+        tokenUrl: 'https://auth.example.com/token',
+        scopes: ['read', 'write'],
+      });
+    });
+
+    it('should throw error when resource metadata does not match server URL', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            ...mockResourceMetadata,
+            resource: 'https://malicious.com/mcp',
+          }),
+      });
+
+      await expect(
+        OAuthUtils.discoverOAuthConfig('https://example.com/mcp'),
+      ).rejects.toThrow(/does not match expected/);
+    });
+  });
+
   describe('metadataToOAuthConfig', () => {
     it('should convert metadata to OAuth config', () => {
       const metadata: OAuthAuthorizationServerMetadata = {
@@ -297,14 +351,69 @@ describe('OAuthUtils', () => {
       const result = OAuthUtils.buildResourceParameter(
         'https://example.com/oauth/token',
       );
-      expect(result).toBe('https://example.com');
+      expect(result).toBe('https://example.com/oauth/token');
     });
 
     it('should handle URLs with ports', () => {
       const result = OAuthUtils.buildResourceParameter(
         'https://example.com:8080/oauth/token',
       );
-      expect(result).toBe('https://example.com:8080');
+      expect(result).toBe('https://example.com:8080/oauth/token');
+    });
+
+    it('should strip query parameters from the URL', () => {
+      const result = OAuthUtils.buildResourceParameter(
+        'https://example.com/api/v1/data?user=123&scope=read',
+      );
+      expect(result).toBe('https://example.com/api/v1/data');
+    });
+
+    it('should strip URL fragments from the URL', () => {
+      const result = OAuthUtils.buildResourceParameter(
+        'https://example.com/api/v1/data#section-one',
+      );
+      expect(result).toBe('https://example.com/api/v1/data');
+    });
+
+    it('should throw an error for invalid URLs', () => {
+      expect(() => OAuthUtils.buildResourceParameter('not-a-url')).toThrow();
+    });
+  });
+
+  describe('parseTokenExpiry', () => {
+    it('should return the expiry time in milliseconds for a valid token', () => {
+      // Corresponds to a date of 2100-01-01T00:00:00Z
+      const expiry = 4102444800;
+      const payload = { exp: expiry };
+      const token = `header.${Buffer.from(JSON.stringify(payload)).toString('base64')}.signature`;
+      const result = OAuthUtils.parseTokenExpiry(token);
+      expect(result).toBe(expiry * 1000);
+    });
+
+    it('should return undefined for a token without an expiry time', () => {
+      const payload = { iat: 1678886400 };
+      const token = `header.${Buffer.from(JSON.stringify(payload)).toString('base64')}.signature`;
+      const result = OAuthUtils.parseTokenExpiry(token);
+      expect(result).toBeUndefined();
+    });
+
+    it('should return undefined for a token with an invalid expiry time', () => {
+      const payload = { exp: 'not-a-number' };
+      const token = `header.${Buffer.from(JSON.stringify(payload)).toString('base64')}.signature`;
+      const result = OAuthUtils.parseTokenExpiry(token);
+      expect(result).toBeUndefined();
+    });
+
+    it('should return undefined for a malformed token', () => {
+      const token = 'not-a-valid-token';
+      const result = OAuthUtils.parseTokenExpiry(token);
+      expect(result).toBeUndefined();
+    });
+
+    it('should return undefined for a token with invalid JSON in payload', () => {
+      const token = `header.${Buffer.from('{ not valid json').toString('base64')}.signature`;
+      const result = OAuthUtils.parseTokenExpiry(token);
+      expect(result).toBeUndefined();
     });
   });
 });

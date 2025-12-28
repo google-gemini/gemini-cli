@@ -29,7 +29,6 @@ export default tseslint.config(
     // Global ignores
     ignores: [
       'node_modules/*',
-      '.integration-tests/**',
       'eslint.config.js',
       'packages/**/dist/**',
       'bundle/**',
@@ -81,6 +80,11 @@ export default tseslint.config(
       },
     },
     languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: projectRoot,
+      },
       globals: {
         ...globals.node,
         ...globals.es2021,
@@ -118,6 +122,8 @@ export default tseslint.config(
           caughtErrorsIgnorePattern: '^_',
         },
       ],
+      // Prevent async errors from bypassing catch handlers
+      '@typescript-eslint/return-await': ['error', 'in-try-catch'],
       'import/no-internal-modules': [
         'error',
         {
@@ -159,6 +165,34 @@ export default tseslint.config(
       'prefer-const': ['error', { destructuring: 'all' }],
       radix: 'error',
       'default-case': 'error',
+      '@typescript-eslint/await-thenable': ['error'],
+      '@typescript-eslint/no-floating-promises': ['error'],
+      '@typescript-eslint/no-unnecessary-type-assertion': ['error'],
+    },
+  },
+  {
+    // Prevent self-imports in packages
+    files: ['packages/core/src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          name: '@google/gemini-cli-core',
+          message: 'Please use relative imports within the @google/gemini-cli-core package.',
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/cli/src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          name: '@google/gemini-cli',
+          message: 'Please use relative imports within the @google/gemini-cli package.',
+        },
+      ],
     },
   },
   {

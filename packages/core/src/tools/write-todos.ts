@@ -9,10 +9,20 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  type Todo,
   type ToolResult,
 } from './tools.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { WRITE_TODOS_TOOL_NAME } from './tool-names.js';
 
-// Insprired by langchain/deepagents.
+const TODO_STATUSES = [
+  'pending',
+  'in_progress',
+  'completed',
+  'cancelled',
+] as const;
+
+// Inspired by langchain/deepagents.
 export const WRITE_TODOS_DESCRIPTION = `This tool can help you list out the current subtasks that are required to be completed for a given user request. The list of subtasks helps you keep track of the current task, organize complex queries and help ensure that you don't miss any steps. With this list, the user can also see the current progress you are making in executing a given task.
 
 Depending on the task complexity, you should first divide a given task into subtasks and then use this tool to list out the subtasks that are required to be completed for a given user request.
@@ -26,12 +36,12 @@ DO NOT use this tool for simple tasks that can be completed in less than 2 steps
 
 - pending: Work has not begun on a given subtask.
 - in_progress: Marked just prior to beginning work on a given subtask. You should only have one subtask as in_progress at a time.
-- completed: Subtask was succesfully completed with no errors or issues. If the subtask required more steps to complete, update the todo list with the subtasks. All steps should be identified as completed only when they are completed.
+- completed: Subtask was successfully completed with no errors or issues. If the subtask required more steps to complete, update the todo list with the subtasks. All steps should be identified as completed only when they are completed.
 - cancelled: As you update the todo list, some tasks are not required anymore due to the dynamic nature of the task. In this case, mark the subtasks as cancelled.
 
 
 ## Methodology for using this tool
-1. Use this todo list list as soon as you receive a user request based on the complexity of the task.
+1. Use this todo list as soon as you receive a user request based on the complexity of the task.
 2. Keep track of every subtask that you update the list with.
 3. Mark a subtask as in_progress before you begin working on it. You should only have one subtask as in_progress at a time.
 4. Update the subtask list as you proceed in executing the task. The subtask list is not static and should reflect your progress and current plans, which may evolve as you acquire new information.
@@ -78,13 +88,6 @@ The agent did not use the todo list because this task could be completed by a ti
 </example>
 `;
 
-export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
-
-export interface Todo {
-  description: string;
-  status: TodoStatus;
-}
-
 export interface WriteTodosToolParams {
   /**
    * The full list of todos. This will overwrite any existing list.
@@ -96,6 +99,15 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
   WriteTodosToolParams,
   ToolResult
 > {
+  constructor(
+    params: WriteTodosToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ) {
+    super(params, messageBus, _toolName, _toolDisplayName);
+  }
+
   getDescription(): string {
     const count = this.params.todos?.length ?? 0;
     if (count === 0) {
@@ -122,7 +134,7 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
 
     return {
       llmContent,
-      returnDisplay: llmContent,
+      returnDisplay: { todos },
     };
   }
 }
@@ -131,12 +143,12 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   WriteTodosToolParams,
   ToolResult
 > {
-  static readonly Name: string = 'write_todos_list';
+  static readonly Name = WRITE_TODOS_TOOL_NAME;
 
   constructor() {
     super(
       WriteTodosTool.Name,
-      'Write Todos',
+      'WriteTodos',
       WRITE_TODOS_DESCRIPTION,
       Kind.Other,
       {
@@ -157,16 +169,50 @@ export class WriteTodosTool extends BaseDeclarativeTool<
                 status: {
                   type: 'string',
                   description: 'The current status of the task.',
-                  enum: ['pending', 'in_progress', 'completed'],
+                  enum: TODO_STATUSES,
                 },
               },
               required: ['description', 'status'],
+              additionalProperties: false,
             },
           },
         },
         required: ['todos'],
+        additionalProperties: false,
       },
     );
+  }
+
+  override get schema() {
+    return {
+      name: this.name,
+      description: this.description,
+      parametersJsonSchema: this.parameterSchema,
+      responseJsonSchema: {
+        type: 'object',
+        properties: {
+          todos: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                description: {
+                  type: 'string',
+                },
+                status: {
+                  type: 'string',
+                  enum: TODO_STATUSES,
+                },
+              },
+              required: ['description', 'status'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['todos'],
+        additionalProperties: false,
+      },
+    };
   }
 
   protected override validateToolParamValues(
@@ -184,8 +230,8 @@ export class WriteTodosTool extends BaseDeclarativeTool<
       if (typeof todo.description !== 'string' || !todo.description.trim()) {
         return 'Each todo must have a non-empty description string';
       }
-      if (!['pending', 'in_progress', 'completed'].includes(todo.status)) {
-        return 'Each todo must have a valid status (pending, in_progress, or completed)';
+      if (!TODO_STATUSES.includes(todo.status)) {
+        return `Each todo must have a valid status (${TODO_STATUSES.join(', ')})`;
       }
     }
 
@@ -202,7 +248,15 @@ export class WriteTodosTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: WriteTodosToolParams,
+    _messageBus?: MessageBus,
+    _toolName?: string,
+    _displayName?: string,
   ): ToolInvocation<WriteTodosToolParams, ToolResult> {
-    return new WriteTodosToolInvocation(params);
+    return new WriteTodosToolInvocation(
+      params,
+      _messageBus,
+      _toolName,
+      _displayName,
+    );
   }
 }

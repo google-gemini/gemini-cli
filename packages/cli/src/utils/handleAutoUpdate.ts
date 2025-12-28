@@ -23,6 +23,13 @@ export function handleAutoUpdate(
     return;
   }
 
+  if (settings.merged.tools?.sandbox || process.env['GEMINI_SANDBOX']) {
+    updateEventEmitter.emit('update-info', {
+      message: `${info.message}\nAutomatic update is not available in sandbox mode.`,
+    });
+    return;
+  }
+
   if (settings.merged.general?.disableUpdateNag) {
     return;
   }
@@ -61,11 +68,13 @@ export function handleAutoUpdate(
     '@latest',
     isNightly ? '@nightly' : `@${info.update.latest}`,
   );
-  const updateProcess = spawnFn(updateCommand, { stdio: 'pipe', shell: true });
-  let errorOutput = '';
-  updateProcess.stderr.on('data', (data) => {
-    errorOutput += data.toString();
+  const updateProcess = spawnFn(updateCommand, {
+    stdio: 'ignore',
+    shell: true,
+    detached: true,
   });
+  // Un-reference the child process to allow the parent to exit independently.
+  updateProcess.unref();
 
   updateProcess.on('close', (code) => {
     if (code === 0) {
@@ -75,7 +84,7 @@ export function handleAutoUpdate(
       });
     } else {
       updateEventEmitter.emit('update-failed', {
-        message: `Automatic update failed. Please try updating manually. (command: ${updateCommand}, stderr: ${errorOutput.trim()})`,
+        message: `Automatic update failed. Please try updating manually. (command: ${updateCommand})`,
       });
     }
   });
@@ -93,7 +102,7 @@ export function setUpdateHandler(
   setUpdateInfo: (info: UpdateObject | null) => void,
 ) {
   let successfullyInstalled = false;
-  const handleUpdateRecieved = (info: UpdateObject) => {
+  const handleUpdateReceived = (info: UpdateObject) => {
     setUpdateInfo(info);
     const savedMessage = info.message;
     setTimeout(() => {
@@ -143,13 +152,13 @@ export function setUpdateHandler(
     );
   };
 
-  updateEventEmitter.on('update-received', handleUpdateRecieved);
+  updateEventEmitter.on('update-received', handleUpdateReceived);
   updateEventEmitter.on('update-failed', handleUpdateFailed);
   updateEventEmitter.on('update-success', handleUpdateSuccess);
   updateEventEmitter.on('update-info', handleUpdateInfo);
 
   return () => {
-    updateEventEmitter.off('update-received', handleUpdateRecieved);
+    updateEventEmitter.off('update-received', handleUpdateReceived);
     updateEventEmitter.off('update-failed', handleUpdateFailed);
     updateEventEmitter.off('update-success', handleUpdateSuccess);
     updateEventEmitter.off('update-info', handleUpdateInfo);

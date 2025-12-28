@@ -47,7 +47,7 @@ export function CompressionMessage({
       case CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR:
         return 'Could not compress chat history due to a token counting error.';
       case CompressionStatus.NOOP:
-        return 'Chat history is already compressed.';
+        return 'Nothing to compress.';
       default:
         return '';
     }

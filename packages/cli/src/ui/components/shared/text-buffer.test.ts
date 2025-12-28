@@ -6,12 +6,15 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import stripAnsi from 'strip-ansi';
-import { renderHook, act } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../../test-utils/render.js';
 import type {
   Viewport,
   TextBuffer,
   TextBufferState,
   TextBufferAction,
+  VisualLayout,
+  TextBufferOptions,
 } from './text-buffer.js';
 import {
   useTextBuffer,
@@ -21,8 +24,20 @@ import {
   findWordEndInLine,
   findNextWordStartInLine,
   isWordCharStrict,
+  calculateTransformationsForLine,
+  calculateTransformedLine,
+  getTransformUnderCursor,
+  getTransformedImagePath,
 } from './text-buffer.js';
 import { cpLen } from '../../utils/textUtils.js';
+
+const defaultVisualLayout: VisualLayout = {
+  visualLines: [''],
+  logicalToVisualMap: [[[0, 0]]],
+  visualToLogicalMap: [[0, 0]],
+  transformedToLogicalMaps: [[]],
+  visualToTransformedMap: [],
+};
 
 const initialState: TextBufferState = {
   lines: [''],
@@ -33,6 +48,10 @@ const initialState: TextBufferState = {
   redoStack: [],
   clipboard: null,
   selectionAnchor: null,
+  viewportWidth: 80,
+  viewportHeight: 24,
+  transformationsByLine: [[]],
+  visualLayout: defaultVisualLayout,
 };
 
 describe('textBufferReducer', () => {
@@ -87,6 +106,43 @@ describe('textBufferReducer', () => {
       expect(state.lines).toEqual(['', 'hello']);
       expect(state.cursorRow).toBe(1);
       expect(state.cursorCol).toBe(0);
+    });
+  });
+
+  describe('insert action with options', () => {
+    it('should filter input using inputFilter option', () => {
+      const action: TextBufferAction = { type: 'insert', payload: 'a1b2c3' };
+      const options: TextBufferOptions = {
+        inputFilter: (text) => text.replace(/[0-9]/g, ''),
+      };
+      const state = textBufferReducer(initialState, action, options);
+      expect(state.lines).toEqual(['abc']);
+      expect(state.cursorCol).toBe(3);
+    });
+
+    it('should strip newlines when singleLine option is true', () => {
+      const action: TextBufferAction = {
+        type: 'insert',
+        payload: 'hello\nworld',
+      };
+      const options: TextBufferOptions = { singleLine: true };
+      const state = textBufferReducer(initialState, action, options);
+      expect(state.lines).toEqual(['helloworld']);
+      expect(state.cursorCol).toBe(10);
+    });
+
+    it('should apply both inputFilter and singleLine options', () => {
+      const action: TextBufferAction = {
+        type: 'insert',
+        payload: 'h\ne\nl\nl\no\n1\n2\n3',
+      };
+      const options: TextBufferOptions = {
+        singleLine: true,
+        inputFilter: (text) => text.replace(/[0-9]/g, ''),
+      };
+      const state = textBufferReducer(initialState, action, options);
+      expect(state.lines).toEqual(['hello']);
+      expect(state.cursorCol).toBe(5);
     });
   });
 
@@ -174,44 +230,49 @@ describe('textBufferReducer', () => {
   });
 
   describe('delete_word_left action', () => {
-    it('should delete a simple word', () => {
-      const stateWithText: TextBufferState = {
-        ...initialState,
-        lines: ['hello world'],
-        cursorRow: 0,
+    const createSingleLineState = (
+      text: string,
+      col: number,
+    ): TextBufferState => ({
+      ...initialState,
+      lines: [text],
+      cursorRow: 0,
+      cursorCol: col,
+    });
+
+    it.each([
+      {
+        input: 'hello world',
         cursorCol: 11,
-      };
-      const action: TextBufferAction = { type: 'delete_word_left' };
-      const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['hello ']);
-      expect(state.cursorCol).toBe(6);
-    });
-
-    it('should delete a path segment', () => {
-      const stateWithText: TextBufferState = {
-        ...initialState,
-        lines: ['path/to/file'],
-        cursorRow: 0,
+        expectedLines: ['hello '],
+        expectedCol: 6,
+        desc: 'simple word',
+      },
+      {
+        input: 'path/to/file',
         cursorCol: 12,
-      };
-      const action: TextBufferAction = { type: 'delete_word_left' };
-      const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['path/to/']);
-      expect(state.cursorCol).toBe(8);
-    });
-
-    it('should delete variable_name parts', () => {
-      const stateWithText: TextBufferState = {
-        ...initialState,
-        lines: ['variable_name'],
-        cursorRow: 0,
+        expectedLines: ['path/to/'],
+        expectedCol: 8,
+        desc: 'path segment',
+      },
+      {
+        input: 'variable_name',
         cursorCol: 13,
-      };
-      const action: TextBufferAction = { type: 'delete_word_left' };
-      const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['variable_']);
-      expect(state.cursorCol).toBe(9);
-    });
+        expectedLines: ['variable_'],
+        expectedCol: 9,
+        desc: 'variable_name parts',
+      },
+    ])(
+      'should delete $desc',
+      ({ input, cursorCol, expectedLines, expectedCol }) => {
+        const state = textBufferReducer(
+          createSingleLineState(input, cursorCol),
+          { type: 'delete_word_left' },
+        );
+        expect(state.lines).toEqual(expectedLines);
+        expect(state.cursorCol).toBe(expectedCol);
+      },
+    );
 
     it('should act like backspace at the beginning of a line', () => {
       const stateWithText: TextBufferState = {
@@ -220,8 +281,9 @@ describe('textBufferReducer', () => {
         cursorRow: 1,
         cursorCol: 0,
       };
-      const action: TextBufferAction = { type: 'delete_word_left' };
-      const state = textBufferReducer(stateWithText, action);
+      const state = textBufferReducer(stateWithText, {
+        type: 'delete_word_left',
+      });
       expect(state.lines).toEqual(['helloworld']);
       expect(state.cursorRow).toBe(0);
       expect(state.cursorCol).toBe(5);
@@ -229,44 +291,56 @@ describe('textBufferReducer', () => {
   });
 
   describe('delete_word_right action', () => {
-    it('should delete a simple word', () => {
-      const stateWithText: TextBufferState = {
-        ...initialState,
-        lines: ['hello world'],
-        cursorRow: 0,
-        cursorCol: 0,
-      };
-      const action: TextBufferAction = { type: 'delete_word_right' };
-      const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['world']);
-      expect(state.cursorCol).toBe(0);
+    const createSingleLineState = (
+      text: string,
+      col: number,
+    ): TextBufferState => ({
+      ...initialState,
+      lines: [text],
+      cursorRow: 0,
+      cursorCol: col,
     });
 
-    it('should delete a path segment', () => {
+    it.each([
+      {
+        input: 'hello world',
+        cursorCol: 0,
+        expectedLines: ['world'],
+        expectedCol: 0,
+        desc: 'simple word',
+      },
+      {
+        input: 'variable_name',
+        cursorCol: 0,
+        expectedLines: ['_name'],
+        expectedCol: 0,
+        desc: 'variable_name parts',
+      },
+    ])(
+      'should delete $desc',
+      ({ input, cursorCol, expectedLines, expectedCol }) => {
+        const state = textBufferReducer(
+          createSingleLineState(input, cursorCol),
+          { type: 'delete_word_right' },
+        );
+        expect(state.lines).toEqual(expectedLines);
+        expect(state.cursorCol).toBe(expectedCol);
+      },
+    );
+
+    it('should delete path segments progressively', () => {
       const stateWithText: TextBufferState = {
         ...initialState,
         lines: ['path/to/file'],
         cursorRow: 0,
         cursorCol: 0,
       };
-      const action: TextBufferAction = { type: 'delete_word_right' };
-      let state = textBufferReducer(stateWithText, action);
+      let state = textBufferReducer(stateWithText, {
+        type: 'delete_word_right',
+      });
       expect(state.lines).toEqual(['/to/file']);
-      state = textBufferReducer(state, action);
+      state = textBufferReducer(state, { type: 'delete_word_right' });
       expect(state.lines).toEqual(['to/file']);
-    });
-
-    it('should delete variable_name parts', () => {
-      const stateWithText: TextBufferState = {
-        ...initialState,
-        lines: ['variable_name'],
-        cursorRow: 0,
-        cursorCol: 0,
-      };
-      const action: TextBufferAction = { type: 'delete_word_right' };
-      const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['_name']);
-      expect(state.cursorCol).toBe(0);
     });
 
     it('should act like delete at the end of a line', () => {
@@ -276,8 +350,9 @@ describe('textBufferReducer', () => {
         cursorRow: 0,
         cursorCol: 5,
       };
-      const action: TextBufferAction = { type: 'delete_word_right' };
-      const state = textBufferReducer(stateWithText, action);
+      const state = textBufferReducer(stateWithText, {
+        type: 'delete_word_right',
+      });
       expect(state.lines).toEqual(['helloworld']);
       expect(state.cursorRow).toBe(0);
       expect(state.cursorCol).toBe(5);
@@ -285,7 +360,6 @@ describe('textBufferReducer', () => {
   });
 });
 
-// Helper to get the state from the hook
 const getBufferState = (result: { current: TextBuffer }) => {
   expect(result.current).toHaveOnlyValidCharacters();
   return {
@@ -569,6 +643,46 @@ describe('useTextBuffer', () => {
       const shortText = 'ab';
       act(() => result.current.insert(shortText, { paste: true }));
       expect(getBufferState(result).text).toBe(shortText);
+    });
+
+    it('should prepend @ to multiple valid file paths on insert', () => {
+      // Use Set to model reality: individual paths exist, combined string doesn't
+      const validPaths = new Set(['/path/to/file1.txt', '/path/to/file2.txt']);
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: (p) => validPaths.has(p) }),
+      );
+      const filePaths = '/path/to/file1.txt /path/to/file2.txt';
+      act(() => result.current.insert(filePaths, { paste: true }));
+      expect(getBufferState(result).text).toBe(
+        '@/path/to/file1.txt @/path/to/file2.txt ',
+      );
+    });
+
+    it('should handle multiple paths with escaped spaces', () => {
+      // Use Set to model reality: individual paths exist, combined string doesn't
+      const validPaths = new Set(['/path/to/my file.txt', '/other/path.txt']);
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: (p) => validPaths.has(p) }),
+      );
+      const filePaths = '/path/to/my\\ file.txt /other/path.txt';
+      act(() => result.current.insert(filePaths, { paste: true }));
+      expect(getBufferState(result).text).toBe(
+        '@/path/to/my\\ file.txt @/other/path.txt ',
+      );
+    });
+
+    it('should only prepend @ to valid paths in multi-path paste', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: (p) => p.endsWith('.txt'),
+        }),
+      );
+      const filePaths = '/valid/file.txt /invalid/file.jpg';
+      act(() => result.current.insert(filePaths, { paste: true }));
+      expect(getBufferState(result).text).toBe(
+        '@/valid/file.txt /invalid/file.jpg ',
+      );
     });
   });
 
@@ -896,6 +1010,34 @@ describe('useTextBuffer', () => {
       expect(state.cursor).toEqual([0, 1]);
       expect(state.visualCursor).toEqual([0, 1]);
     });
+
+    it('moveToVisualPosition: should correctly handle wide characters (Chinese)', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: '你好', // 2 chars, width 4
+          viewport: { width: 10, height: 1 },
+          isValidPath: () => false,
+        }),
+      );
+
+      // '你' (width 2): visual 0-1. '好' (width 2): visual 2-3.
+
+      // Click on '你' (first half, x=0) -> index 0
+      act(() => result.current.moveToVisualPosition(0, 0));
+      expect(getBufferState(result).cursor).toEqual([0, 0]);
+
+      // Click on '你' (second half, x=1) -> index 1 (after first char)
+      act(() => result.current.moveToVisualPosition(0, 1));
+      expect(getBufferState(result).cursor).toEqual([0, 1]);
+
+      // Click on '好' (first half, x=2) -> index 1 (before second char)
+      act(() => result.current.moveToVisualPosition(0, 2));
+      expect(getBufferState(result).cursor).toEqual([0, 1]);
+
+      // Click on '好' (second half, x=3) -> index 2 (after second char)
+      act(() => result.current.moveToVisualPosition(0, 3));
+      expect(getBufferState(result).cursor).toEqual([0, 2]);
+    });
   });
 
   describe('handleInput', () => {
@@ -910,6 +1052,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: 'h',
         }),
       );
@@ -920,6 +1063,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: 'i',
         }),
       );
@@ -937,10 +1081,47 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: '\r',
         }),
       );
       expect(getBufferState(result).lines).toEqual(['', '']);
+    });
+
+    it('should do nothing for a tab key press', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      act(() =>
+        result.current.handleInput({
+          name: 'tab',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          insertable: false,
+          sequence: '\t',
+        }),
+      );
+      expect(getBufferState(result).text).toBe('');
+    });
+
+    it('should do nothing for a shift tab key press', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      act(() =>
+        result.current.handleInput({
+          name: 'tab',
+          ctrl: false,
+          meta: false,
+          shift: true,
+          paste: false,
+          insertable: false,
+          sequence: '\u001b[9;2u',
+        }),
+      );
+      expect(getBufferState(result).text).toBe('');
     });
 
     it('should handle "Backspace" key', () => {
@@ -959,6 +1140,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: false,
           sequence: '\x7f',
         }),
       );
@@ -983,6 +1165,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: false,
           sequence: '\x7f',
         });
         result.current.handleInput({
@@ -991,6 +1174,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: false,
           sequence: '\x7f',
         });
         result.current.handleInput({
@@ -999,6 +1183,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: false,
           sequence: '\x7f',
         });
       });
@@ -1058,6 +1243,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: false,
           sequence: '\x1b[D',
         }),
       ); // cursor [0,1]
@@ -1069,6 +1255,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: false,
           sequence: '\x1b[C',
         }),
       ); // cursor [0,2]
@@ -1088,6 +1275,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: textWithAnsi,
         }),
       );
@@ -1105,6 +1293,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: true,
           paste: false,
+          insertable: true,
           sequence: '\r',
         }),
       ); // Simulates Shift+Enter in VSCode terminal
@@ -1303,58 +1492,43 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
   });
 
   describe('Input Sanitization', () => {
-    it('should strip ANSI escape codes from input', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
-      const textWithAnsi = '\x1B[31mHello\x1B[0m \x1B[32mWorld\x1B[0m';
-      act(() =>
-        result.current.handleInput({
-          name: '',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: false,
-          sequence: textWithAnsi,
-        }),
-      );
-      expect(getBufferState(result).text).toBe('Hello World');
+    const createInput = (sequence: string) => ({
+      name: '',
+      ctrl: false,
+      meta: false,
+      shift: false,
+      paste: false,
+      insertable: true,
+      sequence,
     });
 
-    it('should strip control characters from input', () => {
+    it.each([
+      {
+        input: '\x1B[31mHello\x1B[0m \x1B[32mWorld\x1B[0m',
+        expected: 'Hello World',
+        desc: 'ANSI escape codes',
+      },
+      {
+        input: 'H\x07e\x08l\x0Bl\x0Co',
+        expected: 'Hello',
+        desc: 'control characters',
+      },
+      {
+        input: '\u001B[4mH\u001B[0mello',
+        expected: 'Hello',
+        desc: 'mixed ANSI and control characters',
+      },
+      {
+        input: '\u001B[4mPasted\u001B[4m Text',
+        expected: 'Pasted Text',
+        desc: 'pasted text with ANSI',
+      },
+    ])('should strip $desc from input', ({ input, expected }) => {
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
-      const textWithControlChars = 'H\x07e\x08l\x0Bl\x0Co'; // BELL, BACKSPACE, VT, FF
-      act(() =>
-        result.current.handleInput({
-          name: '',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: false,
-          sequence: textWithControlChars,
-        }),
-      );
-      expect(getBufferState(result).text).toBe('Hello');
-    });
-
-    it('should strip mixed ANSI and control characters from input', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
-      const textWithMixed = '\u001B[4mH\u001B[0mello';
-      act(() =>
-        result.current.handleInput({
-          name: '',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: false,
-          sequence: textWithMixed,
-        }),
-      );
-      expect(getBufferState(result).text).toBe('Hello');
+      act(() => result.current.handleInput(createInput(input)));
+      expect(getBufferState(result).text).toBe(expected);
     });
 
     it('should not strip standard characters or newlines', () => {
@@ -1362,35 +1536,8 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       const validText = 'Hello World\nThis is a test.';
-      act(() =>
-        result.current.handleInput({
-          name: '',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: false,
-          sequence: validText,
-        }),
-      );
+      act(() => result.current.handleInput(createInput(validText)));
       expect(getBufferState(result).text).toBe(validText);
-    });
-
-    it('should sanitize pasted text via handleInput', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
-      const pastedText = '\u001B[4mPasted\u001B[4m Text';
-      act(() =>
-        result.current.handleInput({
-          name: '',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: false,
-          sequence: pastedText,
-        }),
-      );
-      expect(getBufferState(result).text).toBe('Pasted Text');
     });
 
     it('should sanitize large text (>5000 chars) and strip unsafe characters', () => {
@@ -1410,6 +1557,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: largeTextWithUnsafe,
         }),
       );
@@ -1444,6 +1592,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: largeTextWithAnsi,
         }),
       );
@@ -1468,10 +1617,80 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: emojis,
         }),
       );
       expect(getBufferState(result).text).toBe(emojis);
+    });
+  });
+
+  describe('inputFilter', () => {
+    it('should filter input based on the provided filter function', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: () => false,
+          inputFilter: (text) => text.replace(/[^0-9]/g, ''),
+        }),
+      );
+
+      act(() => result.current.insert('a1b2c3'));
+      expect(getBufferState(result).text).toBe('123');
+    });
+
+    it('should handle empty result from filter', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: () => false,
+          inputFilter: (text) => text.replace(/[^0-9]/g, ''),
+        }),
+      );
+
+      act(() => result.current.insert('abc'));
+      expect(getBufferState(result).text).toBe('');
+    });
+
+    it('should filter pasted text', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: () => false,
+          inputFilter: (text) => text.toUpperCase(),
+        }),
+      );
+
+      act(() => result.current.insert('hello', { paste: true }));
+      expect(getBufferState(result).text).toBe('HELLO');
+    });
+
+    it('should not filter newlines if they are allowed by the filter', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: () => false,
+          inputFilter: (text) => text, // Allow everything including newlines
+        }),
+      );
+
+      act(() => result.current.insert('a\nb'));
+      // The insert function splits by newline and inserts separately if it detects them.
+      // If the filter allows them, they should be handled correctly by the subsequent logic in insert.
+      expect(getBufferState(result).text).toBe('a\nb');
+    });
+
+    it('should filter before newline check in insert', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: () => false,
+          inputFilter: (text) => text.replace(/\n/g, ''), // Filter out newlines
+        }),
+      );
+
+      act(() => result.current.insert('a\nb'));
+      expect(getBufferState(result).text).toBe('ab');
     });
   });
 
@@ -1542,101 +1761,255 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(getBufferState(result).text).toBe('hello world');
     });
   });
+
+  describe('singleLine mode', () => {
+    it('should not insert a newline character when singleLine is true', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: () => false,
+          singleLine: true,
+        }),
+      );
+      act(() => result.current.insert('\n'));
+      const state = getBufferState(result);
+      expect(state.text).toBe('');
+      expect(state.lines).toEqual(['']);
+    });
+
+    it('should not create a new line when newline() is called and singleLine is true', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'ab',
+          viewport,
+          isValidPath: () => false,
+          singleLine: true,
+        }),
+      );
+      act(() => result.current.move('end')); // cursor at [0,2]
+      act(() => result.current.newline());
+      const state = getBufferState(result);
+      expect(state.text).toBe('ab');
+      expect(state.lines).toEqual(['ab']);
+      expect(state.cursor).toEqual([0, 2]);
+    });
+
+    it('should not handle "Enter" key as newline when singleLine is true', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: () => false,
+          singleLine: true,
+        }),
+      );
+      act(() =>
+        result.current.handleInput({
+          name: 'return',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          insertable: true,
+          sequence: '\r',
+        }),
+      );
+      expect(getBufferState(result).lines).toEqual(['']);
+    });
+
+    it('should not print anything for function keys when singleLine is true', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: () => false,
+          singleLine: true,
+        }),
+      );
+      act(() =>
+        result.current.handleInput({
+          name: 'f1',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          insertable: false,
+          sequence: '\u001bOP',
+        }),
+      );
+      expect(getBufferState(result).lines).toEqual(['']);
+    });
+
+    it('should strip newlines from pasted text when singleLine is true', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: () => false,
+          singleLine: true,
+        }),
+      );
+      act(() => result.current.insert('hello\nworld', { paste: true }));
+      const state = getBufferState(result);
+      expect(state.text).toBe('helloworld');
+      expect(state.lines).toEqual(['helloworld']);
+    });
+  });
 });
 
 describe('offsetToLogicalPos', () => {
-  it('should return [0,0] for offset 0', () => {
-    expect(offsetToLogicalPos('any text', 0)).toEqual([0, 0]);
+  it.each([
+    { text: 'any text', offset: 0, expected: [0, 0], desc: 'offset 0' },
+    { text: 'hello', offset: 0, expected: [0, 0], desc: 'single line start' },
+    { text: 'hello', offset: 2, expected: [0, 2], desc: 'single line middle' },
+    { text: 'hello', offset: 5, expected: [0, 5], desc: 'single line end' },
+    { text: 'hello', offset: 10, expected: [0, 5], desc: 'beyond end clamps' },
+    {
+      text: 'a\n\nc',
+      offset: 0,
+      expected: [0, 0],
+      desc: 'empty lines - first char',
+    },
+    {
+      text: 'a\n\nc',
+      offset: 1,
+      expected: [0, 1],
+      desc: 'empty lines - end of first',
+    },
+    {
+      text: 'a\n\nc',
+      offset: 2,
+      expected: [1, 0],
+      desc: 'empty lines - empty line',
+    },
+    {
+      text: 'a\n\nc',
+      offset: 3,
+      expected: [2, 0],
+      desc: 'empty lines - last line start',
+    },
+    {
+      text: 'a\n\nc',
+      offset: 4,
+      expected: [2, 1],
+      desc: 'empty lines - last line end',
+    },
+    {
+      text: 'hello\n',
+      offset: 5,
+      expected: [0, 5],
+      desc: 'newline end - before newline',
+    },
+    {
+      text: 'hello\n',
+      offset: 6,
+      expected: [1, 0],
+      desc: 'newline end - after newline',
+    },
+    {
+      text: 'hello\n',
+      offset: 7,
+      expected: [1, 0],
+      desc: 'newline end - beyond',
+    },
+    {
+      text: '\nhello',
+      offset: 0,
+      expected: [0, 0],
+      desc: 'newline start - first line',
+    },
+    {
+      text: '\nhello',
+      offset: 1,
+      expected: [1, 0],
+      desc: 'newline start - second line',
+    },
+    {
+      text: '\nhello',
+      offset: 3,
+      expected: [1, 2],
+      desc: 'newline start - middle of second',
+    },
+    { text: '', offset: 0, expected: [0, 0], desc: 'empty string at 0' },
+    { text: '', offset: 5, expected: [0, 0], desc: 'empty string beyond' },
+    {
+      text: '你好\n世界',
+      offset: 0,
+      expected: [0, 0],
+      desc: 'unicode - start',
+    },
+    {
+      text: '你好\n世界',
+      offset: 1,
+      expected: [0, 1],
+      desc: 'unicode - after first char',
+    },
+    {
+      text: '你好\n世界',
+      offset: 2,
+      expected: [0, 2],
+      desc: 'unicode - end first line',
+    },
+    {
+      text: '你好\n世界',
+      offset: 3,
+      expected: [1, 0],
+      desc: 'unicode - second line start',
+    },
+    {
+      text: '你好\n世界',
+      offset: 4,
+      expected: [1, 1],
+      desc: 'unicode - second line middle',
+    },
+    {
+      text: '你好\n世界',
+      offset: 5,
+      expected: [1, 2],
+      desc: 'unicode - second line end',
+    },
+    {
+      text: '你好\n世界',
+      offset: 6,
+      expected: [1, 2],
+      desc: 'unicode - beyond',
+    },
+    {
+      text: 'abc\ndef',
+      offset: 3,
+      expected: [0, 3],
+      desc: 'at newline - end of line',
+    },
+    {
+      text: 'abc\ndef',
+      offset: 4,
+      expected: [1, 0],
+      desc: 'at newline - after newline',
+    },
+    { text: '🐶🐱', offset: 0, expected: [0, 0], desc: 'emoji - start' },
+    { text: '🐶🐱', offset: 1, expected: [0, 1], desc: 'emoji - middle' },
+    { text: '🐶🐱', offset: 2, expected: [0, 2], desc: 'emoji - end' },
+  ])('should handle $desc', ({ text, offset, expected }) => {
+    expect(offsetToLogicalPos(text, offset)).toEqual(expected);
   });
 
-  it('should handle single line text', () => {
-    const text = 'hello';
-    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // Start
-    expect(offsetToLogicalPos(text, 2)).toEqual([0, 2]); // Middle 'l'
-    expect(offsetToLogicalPos(text, 5)).toEqual([0, 5]); // End
-    expect(offsetToLogicalPos(text, 10)).toEqual([0, 5]); // Beyond end
-  });
-
-  it('should handle multi-line text', () => {
+  describe('multi-line text', () => {
     const text = 'hello\nworld\n123';
-    // "hello" (5) + \n (1) + "world" (5) + \n (1) + "123" (3)
-    // h e l l o \n w o r l d \n 1 2 3
-    // 0 1 2 3 4  5  6 7 8 9 0  1  2 3 4
-    // Line 0: "hello" (length 5)
-    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // Start of 'hello'
-    expect(offsetToLogicalPos(text, 3)).toEqual([0, 3]); // 'l' in 'hello'
-    expect(offsetToLogicalPos(text, 5)).toEqual([0, 5]); // End of 'hello' (before \n)
 
-    // Line 1: "world" (length 5)
-    expect(offsetToLogicalPos(text, 6)).toEqual([1, 0]); // Start of 'world' (after \n)
-    expect(offsetToLogicalPos(text, 8)).toEqual([1, 2]); // 'r' in 'world'
-    expect(offsetToLogicalPos(text, 11)).toEqual([1, 5]); // End of 'world' (before \n)
-
-    // Line 2: "123" (length 3)
-    expect(offsetToLogicalPos(text, 12)).toEqual([2, 0]); // Start of '123' (after \n)
-    expect(offsetToLogicalPos(text, 13)).toEqual([2, 1]); // '2' in '123'
-    expect(offsetToLogicalPos(text, 15)).toEqual([2, 3]); // End of '123'
-    expect(offsetToLogicalPos(text, 20)).toEqual([2, 3]); // Beyond end of text
-  });
-
-  it('should handle empty lines', () => {
-    const text = 'a\n\nc'; // "a" (1) + \n (1) + "" (0) + \n (1) + "c" (1)
-    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // 'a'
-    expect(offsetToLogicalPos(text, 1)).toEqual([0, 1]); // End of 'a'
-    expect(offsetToLogicalPos(text, 2)).toEqual([1, 0]); // Start of empty line
-    expect(offsetToLogicalPos(text, 3)).toEqual([2, 0]); // Start of 'c'
-    expect(offsetToLogicalPos(text, 4)).toEqual([2, 1]); // End of 'c'
-  });
-
-  it('should handle text ending with a newline', () => {
-    const text = 'hello\n'; // "hello" (5) + \n (1)
-    expect(offsetToLogicalPos(text, 5)).toEqual([0, 5]); // End of 'hello'
-    expect(offsetToLogicalPos(text, 6)).toEqual([1, 0]); // Position on the new empty line after
-
-    expect(offsetToLogicalPos(text, 7)).toEqual([1, 0]); // Still on the new empty line
-  });
-
-  it('should handle text starting with a newline', () => {
-    const text = '\nhello'; // "" (0) + \n (1) + "hello" (5)
-    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // Start of first empty line
-    expect(offsetToLogicalPos(text, 1)).toEqual([1, 0]); // Start of 'hello'
-    expect(offsetToLogicalPos(text, 3)).toEqual([1, 2]); // 'l' in 'hello'
-  });
-
-  it('should handle empty string input', () => {
-    expect(offsetToLogicalPos('', 0)).toEqual([0, 0]);
-    expect(offsetToLogicalPos('', 5)).toEqual([0, 0]);
-  });
-
-  it('should handle multi-byte unicode characters correctly', () => {
-    const text = '你好\n世界'; // "你好" (2 chars) + \n (1) + "世界" (2 chars)
-    // Total "code points" for offset calculation: 2 + 1 + 2 = 5
-    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // Start of '你好'
-    expect(offsetToLogicalPos(text, 1)).toEqual([0, 1]); // After '你', before '好'
-    expect(offsetToLogicalPos(text, 2)).toEqual([0, 2]); // End of '你好'
-    expect(offsetToLogicalPos(text, 3)).toEqual([1, 0]); // Start of '世界'
-    expect(offsetToLogicalPos(text, 4)).toEqual([1, 1]); // After '世', before '界'
-    expect(offsetToLogicalPos(text, 5)).toEqual([1, 2]); // End of '世界'
-    expect(offsetToLogicalPos(text, 6)).toEqual([1, 2]); // Beyond end
-  });
-
-  it('should handle offset exactly at newline character', () => {
-    const text = 'abc\ndef';
-    // a b c \n d e f
-    // 0 1 2  3  4 5 6
-    expect(offsetToLogicalPos(text, 3)).toEqual([0, 3]); // End of 'abc'
-    // The next character is the newline, so an offset of 4 means the start of the next line.
-    expect(offsetToLogicalPos(text, 4)).toEqual([1, 0]); // Start of 'def'
-  });
-
-  it('should handle offset in the middle of a multi-byte character (should place at start of that char)', () => {
-    // This scenario is tricky as "offset" is usually character-based.
-    // Assuming cpLen and related logic handles this by treating multi-byte as one unit.
-    // The current implementation of offsetToLogicalPos uses cpLen, so it should be code-point aware.
-    const text = '🐶🐱'; // 2 code points
-    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]);
-    expect(offsetToLogicalPos(text, 1)).toEqual([0, 1]); // After 🐶
-    expect(offsetToLogicalPos(text, 2)).toEqual([0, 2]); // After 🐱
+    it.each([
+      { offset: 0, expected: [0, 0], desc: 'start of first line' },
+      { offset: 3, expected: [0, 3], desc: 'middle of first line' },
+      { offset: 5, expected: [0, 5], desc: 'end of first line' },
+      { offset: 6, expected: [1, 0], desc: 'start of second line' },
+      { offset: 8, expected: [1, 2], desc: 'middle of second line' },
+      { offset: 11, expected: [1, 5], desc: 'end of second line' },
+      { offset: 12, expected: [2, 0], desc: 'start of third line' },
+      { offset: 13, expected: [2, 1], desc: 'middle of third line' },
+      { offset: 15, expected: [2, 3], desc: 'end of third line' },
+      { offset: 20, expected: [2, 3], desc: 'beyond end' },
+    ])(
+      'should return $expected for $desc (offset $offset)',
+      ({ offset, expected }) => {
+        expect(offsetToLogicalPos(text, offset)).toEqual(expected);
+      },
+    );
   });
 });
 
@@ -1700,28 +2073,39 @@ describe('logicalPosToOffset', () => {
   });
 });
 
+const createTestState = (
+  lines: string[],
+  cursorRow: number,
+  cursorCol: number,
+  viewportWidth = 80,
+): TextBufferState => {
+  const text = lines.join('\n');
+  let state = textBufferReducer(initialState, {
+    type: 'set_text',
+    payload: text,
+  });
+  state = textBufferReducer(state, {
+    type: 'set_cursor',
+    payload: { cursorRow, cursorCol, preferredCol: null },
+  });
+  state = textBufferReducer(state, {
+    type: 'set_viewport',
+    payload: { width: viewportWidth, height: 24 },
+  });
+  return state;
+};
+
 describe('textBufferReducer vim operations', () => {
   describe('vim_delete_line', () => {
     it('should delete a single line including newline in multi-line text', () => {
-      const initialState: TextBufferState = {
-        lines: ['line1', 'line2', 'line3'],
-        cursorRow: 1,
-        cursorCol: 2,
-        preferredCol: null,
-        visualLines: [['line1'], ['line2'], ['line3']],
-        visualScrollRow: 0,
-        visualCursor: { row: 1, col: 2 },
-        viewport: { width: 10, height: 5 },
-        undoStack: [],
-        redoStack: [],
-      };
+      const state = createTestState(['line1', 'line2', 'line3'], 1, 2);
 
       const action: TextBufferAction = {
         type: 'vim_delete_line',
         payload: { count: 1 },
       };
 
-      const result = textBufferReducer(initialState, action);
+      const result = textBufferReducer(state, action);
       expect(result).toHaveOnlyValidCharacters();
 
       // After deleting line2, we should have line1 and line3, with cursor on line3 (now at index 1)
@@ -1731,25 +2115,14 @@ describe('textBufferReducer vim operations', () => {
     });
 
     it('should delete multiple lines when count > 1', () => {
-      const initialState: TextBufferState = {
-        lines: ['line1', 'line2', 'line3', 'line4'],
-        cursorRow: 1,
-        cursorCol: 0,
-        preferredCol: null,
-        visualLines: [['line1'], ['line2'], ['line3'], ['line4']],
-        visualScrollRow: 0,
-        visualCursor: { row: 1, col: 0 },
-        viewport: { width: 10, height: 5 },
-        undoStack: [],
-        redoStack: [],
-      };
+      const state = createTestState(['line1', 'line2', 'line3', 'line4'], 1, 0);
 
       const action: TextBufferAction = {
         type: 'vim_delete_line',
         payload: { count: 2 },
       };
 
-      const result = textBufferReducer(initialState, action);
+      const result = textBufferReducer(state, action);
       expect(result).toHaveOnlyValidCharacters();
 
       // Should delete line2 and line3, leaving line1 and line4
@@ -1759,25 +2132,14 @@ describe('textBufferReducer vim operations', () => {
     });
 
     it('should clear single line content when only one line exists', () => {
-      const initialState: TextBufferState = {
-        lines: ['only line'],
-        cursorRow: 0,
-        cursorCol: 5,
-        preferredCol: null,
-        visualLines: [['only line']],
-        visualScrollRow: 0,
-        visualCursor: { row: 0, col: 5 },
-        viewport: { width: 10, height: 5 },
-        undoStack: [],
-        redoStack: [],
-      };
+      const state = createTestState(['only line'], 0, 5);
 
       const action: TextBufferAction = {
         type: 'vim_delete_line',
         payload: { count: 1 },
       };
 
-      const result = textBufferReducer(initialState, action);
+      const result = textBufferReducer(state, action);
       expect(result).toHaveOnlyValidCharacters();
 
       // Should clear the line content but keep the line
@@ -1787,25 +2149,14 @@ describe('textBufferReducer vim operations', () => {
     });
 
     it('should handle deleting the last line properly', () => {
-      const initialState: TextBufferState = {
-        lines: ['line1', 'line2'],
-        cursorRow: 1,
-        cursorCol: 0,
-        preferredCol: null,
-        visualLines: [['line1'], ['line2']],
-        visualScrollRow: 0,
-        visualCursor: { row: 1, col: 0 },
-        viewport: { width: 10, height: 5 },
-        undoStack: [],
-        redoStack: [],
-      };
+      const state = createTestState(['line1', 'line2'], 1, 0);
 
       const action: TextBufferAction = {
         type: 'vim_delete_line',
         payload: { count: 1 },
       };
 
-      const result = textBufferReducer(initialState, action);
+      const result = textBufferReducer(state, action);
       expect(result).toHaveOnlyValidCharacters();
 
       // Should delete the last line completely, not leave empty line
@@ -1815,18 +2166,7 @@ describe('textBufferReducer vim operations', () => {
     });
 
     it('should handle deleting all lines and maintain valid state for subsequent paste', () => {
-      const initialState: TextBufferState = {
-        lines: ['line1', 'line2', 'line3', 'line4'],
-        cursorRow: 0,
-        cursorCol: 0,
-        preferredCol: null,
-        visualLines: [['line1'], ['line2'], ['line3'], ['line4']],
-        visualScrollRow: 0,
-        visualCursor: { row: 0, col: 0 },
-        viewport: { width: 10, height: 5 },
-        undoStack: [],
-        redoStack: [],
-      };
+      const state = createTestState(['line1', 'line2', 'line3', 'line4'], 0, 0);
 
       // Delete all 4 lines with 4dd
       const deleteAction: TextBufferAction = {
@@ -1834,7 +2174,7 @@ describe('textBufferReducer vim operations', () => {
         payload: { count: 4 },
       };
 
-      const afterDelete = textBufferReducer(initialState, deleteAction);
+      const afterDelete = textBufferReducer(state, deleteAction);
       expect(afterDelete).toHaveOnlyValidCharacters();
 
       // After deleting all lines, should have one empty line
@@ -1946,6 +2286,284 @@ describe('Unicode helper functions', () => {
     it('should handle Chinese and Arabic text', () => {
       expect(cpLen('hello 你好 world')).toBe(14); // 5 + 1 + 2 + 1 + 5 = 14
       expect(cpLen('hello مرحبا world')).toBe(17);
+    });
+  });
+
+  describe('useTextBuffer CJK Navigation', () => {
+    const viewport = { width: 80, height: 24 };
+
+    it('should navigate by word in Chinese', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: '你好世界',
+          initialCursorOffset: 4, // End of string
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      // Initial state: cursor at end (index 2 in code points if 4 is length? wait. length is 2 code points? No. '你好世界' length is 4.)
+      // '你好世界' length is 4. Code points length is 4.
+
+      // Move word left
+      act(() => {
+        result.current.move('wordLeft');
+      });
+
+      // Should be at start of "世界" (index 2)
+      // "你好世界" -> "你好" | "世界"
+      expect(result.current.cursor[1]).toBe(2);
+
+      // Move word left again
+      act(() => {
+        result.current.move('wordLeft');
+      });
+
+      // Should be at start of "你好" (index 0)
+      expect(result.current.cursor[1]).toBe(0);
+
+      // Move word left again (should stay at 0)
+      act(() => {
+        result.current.move('wordLeft');
+      });
+      expect(result.current.cursor[1]).toBe(0);
+
+      // Move word right
+      act(() => {
+        result.current.move('wordRight');
+      });
+
+      // Should be at end of "你好" (index 2)
+      expect(result.current.cursor[1]).toBe(2);
+
+      // Move word right again
+      act(() => {
+        result.current.move('wordRight');
+      });
+
+      // Should be at end of "世界" (index 4)
+      expect(result.current.cursor[1]).toBe(4);
+
+      // Move word right again (should stay at end)
+      act(() => {
+        result.current.move('wordRight');
+      });
+      expect(result.current.cursor[1]).toBe(4);
+    });
+
+    it('should navigate mixed English and Chinese', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'Hello你好World',
+          initialCursorOffset: 10, // End
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      // Hello (5) + 你好 (2) + World (5) = 12 chars.
+      // initialCursorOffset 10? 'Hello你好World'.length is 12.
+      // Let's set it to end.
+
+      act(() => {
+        result.current.move('end');
+      });
+      expect(result.current.cursor[1]).toBe(12);
+
+      // wordLeft -> start of "World" (index 7)
+      act(() => result.current.move('wordLeft'));
+      expect(result.current.cursor[1]).toBe(7);
+
+      // wordLeft -> start of "你好" (index 5)
+      act(() => result.current.move('wordLeft'));
+      expect(result.current.cursor[1]).toBe(5);
+
+      // wordLeft -> start of "Hello" (index 0)
+      act(() => result.current.move('wordLeft'));
+      expect(result.current.cursor[1]).toBe(0);
+
+      // wordLeft -> start of line (should stay at 0)
+      act(() => result.current.move('wordLeft'));
+      expect(result.current.cursor[1]).toBe(0);
+    });
+  });
+});
+
+describe('Transformation Utilities', () => {
+  describe('getTransformedImagePath', () => {
+    it('should transform a simple image path', () => {
+      expect(getTransformedImagePath('@test.png')).toBe('[Image test.png]');
+    });
+
+    it('should handle paths with directories', () => {
+      expect(getTransformedImagePath('@path/to/image.jpg')).toBe(
+        '[Image image.jpg]',
+      );
+    });
+
+    it('should truncate long filenames', () => {
+      expect(getTransformedImagePath('@verylongfilename1234567890.png')).toBe(
+        '[Image ...1234567890.png]',
+      );
+    });
+
+    it('should handle different image extensions', () => {
+      expect(getTransformedImagePath('@test.jpg')).toBe('[Image test.jpg]');
+      expect(getTransformedImagePath('@test.jpeg')).toBe('[Image test.jpeg]');
+      expect(getTransformedImagePath('@test.gif')).toBe('[Image test.gif]');
+      expect(getTransformedImagePath('@test.webp')).toBe('[Image test.webp]');
+      expect(getTransformedImagePath('@test.svg')).toBe('[Image test.svg]');
+      expect(getTransformedImagePath('@test.bmp')).toBe('[Image test.bmp]');
+    });
+
+    it('should handle POSIX-style forward-slash paths on any platform', () => {
+      const input = '@C:/Users/foo/screenshots/image2x.png';
+      expect(getTransformedImagePath(input)).toBe('[Image image2x.png]');
+    });
+
+    it('should handle Windows-style backslash paths on any platform', () => {
+      const input = '@C:\\Users\\foo\\screenshots\\image2x.png';
+      expect(getTransformedImagePath(input)).toBe('[Image image2x.png]');
+    });
+
+    it('should handle escaped spaces in paths', () => {
+      const input = '@path/to/my\\ file.png';
+      expect(getTransformedImagePath(input)).toBe('[Image my file.png]');
+    });
+  });
+
+  describe('getTransformationsForLine', () => {
+    it('should find transformations in a line', () => {
+      const line = 'Check out @test.png and @another.jpg';
+      const result = calculateTransformationsForLine(line);
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({
+        logicalText: '@test.png',
+        collapsedText: '[Image test.png]',
+      });
+      expect(result[1]).toMatchObject({
+        logicalText: '@another.jpg',
+        collapsedText: '[Image another.jpg]',
+      });
+    });
+
+    it('should handle no transformations', () => {
+      const line = 'Just some regular text';
+      const result = calculateTransformationsForLine(line);
+      expect(result).toEqual([]);
+    });
+
+    it('should handle empty line', () => {
+      const result = calculateTransformationsForLine('');
+      expect(result).toEqual([]);
+    });
+
+    it('should keep adjacent image paths as separate transformations', () => {
+      const line = '@a.png@b.png@c.png';
+      const result = calculateTransformationsForLine(line);
+      expect(result).toHaveLength(3);
+      expect(result[0].logicalText).toBe('@a.png');
+      expect(result[1].logicalText).toBe('@b.png');
+      expect(result[2].logicalText).toBe('@c.png');
+    });
+
+    it('should handle multiple transformations in a row', () => {
+      const line = '@a.png @b.png @c.png';
+      const result = calculateTransformationsForLine(line);
+      expect(result).toHaveLength(3);
+    });
+  });
+
+  describe('getTransformUnderCursor', () => {
+    const transformations = [
+      {
+        logStart: 5,
+        logEnd: 14,
+        logicalText: '@test.png',
+        collapsedText: '[Image @test.png]',
+      },
+      {
+        logStart: 20,
+        logEnd: 31,
+        logicalText: '@another.jpg',
+        collapsedText: '[Image @another.jpg]',
+      },
+    ];
+
+    it('should find transformation when cursor is inside it', () => {
+      const result = getTransformUnderCursor(0, 7, [transformations]);
+      expect(result).toEqual(transformations[0]);
+    });
+
+    it('should find transformation when cursor is at start', () => {
+      const result = getTransformUnderCursor(0, 5, [transformations]);
+      expect(result).toEqual(transformations[0]);
+    });
+
+    it('should find transformation when cursor is at end', () => {
+      const result = getTransformUnderCursor(0, 14, [transformations]);
+      expect(result).toEqual(transformations[0]);
+    });
+
+    it('should return null when cursor is not on a transformation', () => {
+      const result = getTransformUnderCursor(0, 2, [transformations]);
+      expect(result).toBeNull();
+    });
+
+    it('should handle empty transformations array', () => {
+      const result = getTransformUnderCursor(0, 5, []);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('calculateTransformedLine', () => {
+    it('should transform a line with one transformation', () => {
+      const line = 'Check out @test.png';
+      const transformations = calculateTransformationsForLine(line);
+      const result = calculateTransformedLine(line, 0, [0, 0], transformations);
+
+      expect(result.transformedLine).toBe('Check out [Image test.png]');
+      expect(result.transformedToLogMap).toHaveLength(27); // Length includes all characters in the transformed line
+
+      // Test that we have proper mappings
+      expect(result.transformedToLogMap[0]).toBe(0); // 'C'
+      expect(result.transformedToLogMap[9]).toBe(9); // ' ' before transformation
+    });
+
+    it('should handle cursor inside transformation', () => {
+      const line = 'Check out @test.png';
+      const transformations = calculateTransformationsForLine(line);
+      // Cursor at '@' (position 10 in the line)
+      const result = calculateTransformedLine(
+        line,
+        0,
+        [0, 10],
+        transformations,
+      );
+
+      // Should show full path when cursor is on it
+      expect(result.transformedLine).toBe('Check out @test.png');
+      // When expanded, each character maps to itself
+      expect(result.transformedToLogMap[10]).toBe(10); // '@'
+    });
+
+    it('should handle line with no transformations', () => {
+      const line = 'Just some text';
+      const result = calculateTransformedLine(line, 0, [0, 0], []);
+
+      expect(result.transformedLine).toBe(line);
+      // Each visual position should map directly to logical position + trailing
+      expect(result.transformedToLogMap).toHaveLength(15); // 14 chars + 1 trailing
+      expect(result.transformedToLogMap[0]).toBe(0);
+      expect(result.transformedToLogMap[13]).toBe(13);
+      expect(result.transformedToLogMap[14]).toBe(14); // Trailing position
+    });
+
+    it('should handle empty line', () => {
+      const result = calculateTransformedLine('', 0, [0, 0], []);
+      expect(result.transformedLine).toBe('');
+      expect(result.transformedToLogMap).toEqual([0]); // Just the trailing position
     });
   });
 });

@@ -10,9 +10,16 @@ import { isGitRepository } from '../utils/gitUtils.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
 import type { Config } from '../config/config.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
+import { GEMINI_DIR } from '../utils/paths.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import {
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_MODEL,
+} from '../config/models.js';
 
 // Mock tool names if they are dynamically generated or complex
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
@@ -36,6 +43,12 @@ vi.mock('../utils/gitUtils', () => ({
   isGitRepository: vi.fn(),
 }));
 vi.mock('node:fs');
+vi.mock('../config/models.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as object),
+  };
+});
 
 describe('Core System Prompt (prompts.ts)', () => {
   let mockConfig: Config;
@@ -47,31 +60,47 @@ describe('Core System Prompt (prompts.ts)', () => {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
       }),
+      getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+      },
+      isInteractive: vi.fn().mockReturnValue(true),
+      isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
+      getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
+      getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getAgentRegistry: vi.fn().mockReturnValue({
+        getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
+      }),
     } as unknown as Config;
   });
 
-  it('should return the base prompt when no userMemory is provided', () => {
+  it('should use chatty system prompt for preview model', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
+    expect(prompt).not.toContain('No Chitchat:');
+    expect(prompt).toMatchSnapshot();
+  });
+
+  it('should use chatty system prompt for preview flash model', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+      PREVIEW_GEMINI_FLASH_MODEL,
+    );
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain('Do not call tools in silence');
+  });
+
+  it.each([
+    ['empty string', ''],
+    ['whitespace only', '   \n  \t '],
+  ])('should return the base prompt when userMemory is %s', (_, userMemory) => {
     vi.stubEnv('SANDBOX', undefined);
-    const prompt = getCoreSystemPrompt(mockConfig, '');
+    const prompt = getCoreSystemPrompt(mockConfig, userMemory);
     expect(prompt).not.toContain('---\n\n'); // Separator should not be present
     expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
+    expect(prompt).toContain('No Chitchat:');
     expect(prompt).toMatchSnapshot(); // Use snapshot for base prompt structure
-  });
-
-  it('should return the base prompt when userMemory is empty string', () => {
-    vi.stubEnv('SANDBOX', undefined);
-    const prompt = getCoreSystemPrompt(mockConfig, '');
-    expect(prompt).not.toContain('---\n\n');
-    expect(prompt).toContain('You are an interactive CLI agent');
-    expect(prompt).toMatchSnapshot();
-  });
-
-  it('should return the base prompt when userMemory is whitespace only', () => {
-    vi.stubEnv('SANDBOX', undefined);
-    const prompt = getCoreSystemPrompt(mockConfig, '   \n  \t ');
-    expect(prompt).not.toContain('---\n\n');
-    expect(prompt).toContain('You are an interactive CLI agent');
-    expect(prompt).toMatchSnapshot();
   });
 
   it('should append userMemory with separator when provided', () => {
@@ -85,133 +114,99 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot(); // Snapshot the combined prompt
   });
 
-  it('should include sandbox-specific instructions when SANDBOX env var is set', () => {
-    vi.stubEnv('SANDBOX', 'true'); // Generic sandbox value
-    const prompt = getCoreSystemPrompt(mockConfig);
-    expect(prompt).toContain('# Sandbox');
-    expect(prompt).not.toContain('# macOS Seatbelt');
-    expect(prompt).not.toContain('# Outside of Sandbox');
-    expect(prompt).toMatchSnapshot();
-  });
+  it.each([
+    ['true', '# Sandbox', ['# macOS Seatbelt', '# Outside of Sandbox']],
+    ['sandbox-exec', '# macOS Seatbelt', ['# Sandbox', '# Outside of Sandbox']],
+    [undefined, '# Outside of Sandbox', ['# Sandbox', '# macOS Seatbelt']],
+  ])(
+    'should include correct sandbox instructions for SANDBOX=%s',
+    (sandboxValue, expectedContains, expectedNotContains) => {
+      vi.stubEnv('SANDBOX', sandboxValue);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain(expectedContains);
+      expectedNotContains.forEach((text) => expect(prompt).not.toContain(text));
+      expect(prompt).toMatchSnapshot();
+    },
+  );
 
-  it('should include seatbelt-specific instructions when SANDBOX env var is "sandbox-exec"', () => {
-    vi.stubEnv('SANDBOX', 'sandbox-exec');
-    const prompt = getCoreSystemPrompt(mockConfig);
-    expect(prompt).toContain('# macOS Seatbelt');
-    expect(prompt).not.toContain('# Sandbox');
-    expect(prompt).not.toContain('# Outside of Sandbox');
-    expect(prompt).toMatchSnapshot();
-  });
+  it.each([
+    [true, true],
+    [false, false],
+  ])(
+    'should handle git instructions when isGitRepository=%s',
+    (isGitRepo, shouldContainGit) => {
+      vi.stubEnv('SANDBOX', undefined);
+      vi.mocked(isGitRepository).mockReturnValue(isGitRepo);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      shouldContainGit
+        ? expect(prompt).toContain('# Git Repository')
+        : expect(prompt).not.toContain('# Git Repository');
+      expect(prompt).toMatchSnapshot();
+    },
+  );
 
-  it('should include non-sandbox instructions when SANDBOX env var is not set', () => {
-    vi.stubEnv('SANDBOX', undefined); // Ensure it\'s not set
-    const prompt = getCoreSystemPrompt(mockConfig);
-    expect(prompt).toContain('# Outside of Sandbox');
-    expect(prompt).not.toContain('# Sandbox');
-    expect(prompt).not.toContain('# macOS Seatbelt');
-    expect(prompt).toMatchSnapshot();
-  });
-
-  it('should include git instructions when in a git repo', () => {
+  it('should return the interactive avoidance prompt when in non-interactive mode', () => {
     vi.stubEnv('SANDBOX', undefined);
-    vi.mocked(isGitRepository).mockReturnValue(true);
-    const prompt = getCoreSystemPrompt(mockConfig);
-    expect(prompt).toContain('# Git Repository');
-    expect(prompt).toMatchSnapshot();
+    mockConfig.isInteractive = vi.fn().mockReturnValue(false);
+    const prompt = getCoreSystemPrompt(mockConfig, '');
+    expect(prompt).toContain('**Interactive Commands:**'); // Check for interactive prompt
+    expect(prompt).toMatchSnapshot(); // Use snapshot for base prompt structure
   });
 
-  it('should not include git instructions when not in a git repo', () => {
-    vi.stubEnv('SANDBOX', undefined);
-    vi.mocked(isGitRepository).mockReturnValue(false);
-    const prompt = getCoreSystemPrompt(mockConfig);
-    expect(prompt).not.toContain('# Git Repository');
-    expect(prompt).toMatchSnapshot();
-  });
-
-  describe('with CodebaseInvestigator enabled', () => {
-    beforeEach(() => {
-      mockConfig = {
+  it.each([
+    [[CodebaseInvestigatorAgent.name], true],
+    [[], false],
+  ])(
+    'should handle CodebaseInvestigator with tools=%s',
+    (toolNames, expectCodebaseInvestigator) => {
+      const testConfig = {
         getToolRegistry: vi.fn().mockReturnValue({
-          getAllToolNames: vi
-            .fn()
-            .mockReturnValue([CodebaseInvestigatorAgent.name]),
+          getAllToolNames: vi.fn().mockReturnValue(toolNames),
+        }),
+        getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+        },
+        isInteractive: vi.fn().mockReturnValue(false),
+        isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
+        getModel: vi.fn().mockReturnValue('auto'),
+        getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
+        getPreviewFeatures: vi.fn().mockReturnValue(false),
+        getAgentRegistry: vi.fn().mockReturnValue({
+          getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
         }),
       } as unknown as Config;
-    });
 
-    it('should include CodebaseInvestigator instructions in the prompt', () => {
-      const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).toContain(
-        `your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'`,
-      );
-      expect(prompt).toContain(
-        `Do not ignore the output of '${CodebaseInvestigatorAgent.name}'`,
-      );
-      expect(prompt).not.toContain(
-        "Use 'search_file_content' and 'glob' search tools extensively",
-      );
-    });
-
-    it('should include CodebaseInvestigator examples in the prompt', () => {
-      const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).toContain(
-        "First, I'll use the Codebase Investigator to understand the current implementation",
-      );
-      expect(prompt).toContain(
-        `[tool_call: ${CodebaseInvestigatorAgent.name} for query 'Analyze the authentication logic`,
-      );
-      expect(prompt).toContain(
-        "I'll use the Codebase Investigator to find the relevant code and APIs.",
-      );
-      expect(prompt).toContain(
-        `[tool_call: ${CodebaseInvestigatorAgent.name} for query 'Find the code responsible for updating user profile information`,
-      );
-    });
-  });
-
-  describe('with CodebaseInvestigator disabled', () => {
-    // No beforeEach needed, will use the default from the parent describe
-    it('should include standard tool instructions in the prompt', () => {
-      const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).not.toContain(
-        `your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'`,
-      );
-      expect(prompt).toContain(
-        "Use 'search_file_content' and 'glob' search tools extensively",
-      );
-    });
-
-    it('should include standard tool examples in the prompt', () => {
-      const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).not.toContain(
-        "First, I'll use the Codebase Investigator to understand the current implementation",
-      );
-      expect(prompt).not.toContain(
-        `[tool_call: ${CodebaseInvestigatorAgent.name} for query 'Analyze the authentication logic`,
-      );
-      expect(prompt).toContain(
-        "First, I'll analyze the code and check for a test safety net before planning any changes.",
-      );
-      expect(prompt).toContain(
-        "I'm not immediately sure how user profile information is updated. I'll search the codebase for terms like 'UserProfile'",
-      );
-    });
-  });
+      const prompt = getCoreSystemPrompt(testConfig);
+      if (expectCodebaseInvestigator) {
+        expect(prompt).toContain(
+          `your **first and primary action** must be to delegate to the '${CodebaseInvestigatorAgent.name}' agent`,
+        );
+        expect(prompt).toContain(`do not ignore the output of the agent`);
+        expect(prompt).not.toContain(
+          "Use 'search_file_content' and 'glob' search tools extensively",
+        );
+      } else {
+        expect(prompt).not.toContain(
+          `your **first and primary action** must be to delegate to the '${CodebaseInvestigatorAgent.name}' agent`,
+        );
+        expect(prompt).toContain(
+          "Use 'search_file_content' and 'glob' search tools extensively",
+        );
+      }
+    },
+  );
 
   describe('GEMINI_SYSTEM_MD environment variable', () => {
-    it('should use default prompt when GEMINI_SYSTEM_MD is "false"', () => {
-      vi.stubEnv('GEMINI_SYSTEM_MD', 'false');
-      const prompt = getCoreSystemPrompt(mockConfig);
-      expect(fs.readFileSync).not.toHaveBeenCalled();
-      expect(prompt).not.toContain('custom system prompt');
-    });
-
-    it('should use default prompt when GEMINI_SYSTEM_MD is "0"', () => {
-      vi.stubEnv('GEMINI_SYSTEM_MD', '0');
-      const prompt = getCoreSystemPrompt(mockConfig);
-      expect(fs.readFileSync).not.toHaveBeenCalled();
-      expect(prompt).not.toContain('custom system prompt');
-    });
+    it.each(['false', '0'])(
+      'should use default prompt when GEMINI_SYSTEM_MD is "%s"',
+      (value) => {
+        vi.stubEnv('GEMINI_SYSTEM_MD', value);
+        const prompt = getCoreSystemPrompt(mockConfig);
+        expect(fs.readFileSync).not.toHaveBeenCalled();
+        expect(prompt).not.toContain('custom system prompt');
+      },
+    );
 
     it('should throw error if GEMINI_SYSTEM_MD points to a non-existent file', () => {
       const customPath = '/non/existent/path/system.md';
@@ -222,31 +217,19 @@ describe('Core System Prompt (prompts.ts)', () => {
       );
     });
 
-    it('should read from default path when GEMINI_SYSTEM_MD is "true"', () => {
-      const defaultPath = path.resolve(
-        path.join(GEMINI_CONFIG_DIR, 'system.md'),
-      );
-      vi.stubEnv('GEMINI_SYSTEM_MD', 'true');
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('custom system prompt');
+    it.each(['true', '1'])(
+      'should read from default path when GEMINI_SYSTEM_MD is "%s"',
+      (value) => {
+        const defaultPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
+        vi.stubEnv('GEMINI_SYSTEM_MD', value);
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        vi.mocked(fs.readFileSync).mockReturnValue('custom system prompt');
 
-      const prompt = getCoreSystemPrompt(mockConfig);
-      expect(fs.readFileSync).toHaveBeenCalledWith(defaultPath, 'utf8');
-      expect(prompt).toBe('custom system prompt');
-    });
-
-    it('should read from default path when GEMINI_SYSTEM_MD is "1"', () => {
-      const defaultPath = path.resolve(
-        path.join(GEMINI_CONFIG_DIR, 'system.md'),
-      );
-      vi.stubEnv('GEMINI_SYSTEM_MD', '1');
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('custom system prompt');
-
-      const prompt = getCoreSystemPrompt(mockConfig);
-      expect(fs.readFileSync).toHaveBeenCalledWith(defaultPath, 'utf8');
-      expect(prompt).toBe('custom system prompt');
-    });
+        const prompt = getCoreSystemPrompt(mockConfig);
+        expect(fs.readFileSync).toHaveBeenCalledWith(defaultPath, 'utf8');
+        expect(prompt).toBe('custom system prompt');
+      },
+    );
 
     it('should read from custom path when GEMINI_SYSTEM_MD provides one, preserving case', () => {
       const customPath = path.resolve('/custom/path/SyStEm.Md');
@@ -278,41 +261,27 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   describe('GEMINI_WRITE_SYSTEM_MD environment variable', () => {
-    it('should not write to file when GEMINI_WRITE_SYSTEM_MD is "false"', () => {
-      vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', 'false');
-      getCoreSystemPrompt(mockConfig);
-      expect(fs.writeFileSync).not.toHaveBeenCalled();
-    });
+    it.each(['false', '0'])(
+      'should not write to file when GEMINI_WRITE_SYSTEM_MD is "%s"',
+      (value) => {
+        vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', value);
+        getCoreSystemPrompt(mockConfig);
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+      },
+    );
 
-    it('should not write to file when GEMINI_WRITE_SYSTEM_MD is "0"', () => {
-      vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', '0');
-      getCoreSystemPrompt(mockConfig);
-      expect(fs.writeFileSync).not.toHaveBeenCalled();
-    });
-
-    it('should write to default path when GEMINI_WRITE_SYSTEM_MD is "true"', () => {
-      const defaultPath = path.resolve(
-        path.join(GEMINI_CONFIG_DIR, 'system.md'),
-      );
-      vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', 'true');
-      getCoreSystemPrompt(mockConfig);
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
-        defaultPath,
-        expect.any(String),
-      );
-    });
-
-    it('should write to default path when GEMINI_WRITE_SYSTEM_MD is "1"', () => {
-      const defaultPath = path.resolve(
-        path.join(GEMINI_CONFIG_DIR, 'system.md'),
-      );
-      vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', '1');
-      getCoreSystemPrompt(mockConfig);
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
-        defaultPath,
-        expect.any(String),
-      );
-    });
+    it.each(['true', '1'])(
+      'should write to default path when GEMINI_WRITE_SYSTEM_MD is "%s"',
+      (value) => {
+        const defaultPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
+        vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', value);
+        getCoreSystemPrompt(mockConfig);
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+          defaultPath,
+          expect.any(String),
+        );
+      },
+    );
 
     it('should write to custom path when GEMINI_WRITE_SYSTEM_MD provides one', () => {
       const customPath = path.resolve('/custom/path/system.md');
@@ -324,31 +293,25 @@ describe('Core System Prompt (prompts.ts)', () => {
       );
     });
 
-    it('should expand tilde in custom path when GEMINI_WRITE_SYSTEM_MD is set', () => {
-      const homeDir = '/Users/test';
-      vi.spyOn(os, 'homedir').mockReturnValue(homeDir);
-      const customPath = '~/custom/system.md';
-      const expectedPath = path.join(homeDir, 'custom/system.md');
-      vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', customPath);
-      getCoreSystemPrompt(mockConfig);
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
-        path.resolve(expectedPath),
-        expect.any(String),
-      );
-    });
-
-    it('should expand tilde in custom path when GEMINI_WRITE_SYSTEM_MD is just ~', () => {
-      const homeDir = '/Users/test';
-      vi.spyOn(os, 'homedir').mockReturnValue(homeDir);
-      const customPath = '~';
-      const expectedPath = homeDir;
-      vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', customPath);
-      getCoreSystemPrompt(mockConfig);
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
-        path.resolve(expectedPath),
-        expect.any(String),
-      );
-    });
+    it.each([
+      ['~/custom/system.md', 'custom/system.md'],
+      ['~', ''],
+    ])(
+      'should expand tilde in custom path when GEMINI_WRITE_SYSTEM_MD is "%s"',
+      (customPath, relativePath) => {
+        const homeDir = '/Users/test';
+        vi.spyOn(os, 'homedir').mockReturnValue(homeDir);
+        const expectedPath = relativePath
+          ? path.join(homeDir, relativePath)
+          : homeDir;
+        vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', customPath);
+        getCoreSystemPrompt(mockConfig);
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+          path.resolve(expectedPath),
+          expect.any(String),
+        );
+      },
+    );
   });
 });
 
@@ -358,26 +321,12 @@ describe('resolvePathFromEnv helper function', () => {
   });
 
   describe('when envVar is undefined, empty, or whitespace', () => {
-    it('should return null for undefined', () => {
-      const result = resolvePathFromEnv(undefined);
-      expect(result).toEqual({
-        isSwitch: false,
-        value: null,
-        isDisabled: false,
-      });
-    });
-
-    it('should return null for empty string', () => {
-      const result = resolvePathFromEnv('');
-      expect(result).toEqual({
-        isSwitch: false,
-        value: null,
-        isDisabled: false,
-      });
-    });
-
-    it('should return null for whitespace only', () => {
-      const result = resolvePathFromEnv('   \n\t  ');
+    it.each([
+      ['undefined', undefined],
+      ['empty string', ''],
+      ['whitespace only', '   \n\t  '],
+    ])('should return null for %s', (_, input) => {
+      const result = resolvePathFromEnv(input);
       expect(result).toEqual({
         isSwitch: false,
         value: null,
@@ -387,95 +336,48 @@ describe('resolvePathFromEnv helper function', () => {
   });
 
   describe('when envVar is a boolean-like string', () => {
-    it('should handle "0" as disabled switch', () => {
-      const result = resolvePathFromEnv('0');
+    it.each([
+      ['"0" as disabled switch', '0', '0', true],
+      ['"false" as disabled switch', 'false', 'false', true],
+      ['"1" as enabled switch', '1', '1', false],
+      ['"true" as enabled switch', 'true', 'true', false],
+      ['"FALSE" (case-insensitive)', 'FALSE', 'false', true],
+      ['"TRUE" (case-insensitive)', 'TRUE', 'true', false],
+    ])('should handle %s', (_, input, expectedValue, isDisabled) => {
+      const result = resolvePathFromEnv(input);
       expect(result).toEqual({
         isSwitch: true,
-        value: '0',
-        isDisabled: true,
-      });
-    });
-
-    it('should handle "false" as disabled switch', () => {
-      const result = resolvePathFromEnv('false');
-      expect(result).toEqual({
-        isSwitch: true,
-        value: 'false',
-        isDisabled: true,
-      });
-    });
-
-    it('should handle "1" as enabled switch', () => {
-      const result = resolvePathFromEnv('1');
-      expect(result).toEqual({
-        isSwitch: true,
-        value: '1',
-        isDisabled: false,
-      });
-    });
-
-    it('should handle "true" as enabled switch', () => {
-      const result = resolvePathFromEnv('true');
-      expect(result).toEqual({
-        isSwitch: true,
-        value: 'true',
-        isDisabled: false,
-      });
-    });
-
-    it('should be case-insensitive for boolean values', () => {
-      expect(resolvePathFromEnv('FALSE')).toEqual({
-        isSwitch: true,
-        value: 'false',
-        isDisabled: true,
-      });
-      expect(resolvePathFromEnv('TRUE')).toEqual({
-        isSwitch: true,
-        value: 'true',
-        isDisabled: false,
+        value: expectedValue,
+        isDisabled,
       });
     });
   });
 
   describe('when envVar is a file path', () => {
-    it('should resolve absolute paths', () => {
-      const result = resolvePathFromEnv('/absolute/path/file.txt');
-      expect(result).toEqual({
-        isSwitch: false,
-        value: path.resolve('/absolute/path/file.txt'),
-        isDisabled: false,
-      });
-    });
+    it.each([['/absolute/path/file.txt'], ['relative/path/file.txt']])(
+      'should resolve path: %s',
+      (input) => {
+        const result = resolvePathFromEnv(input);
+        expect(result).toEqual({
+          isSwitch: false,
+          value: path.resolve(input),
+          isDisabled: false,
+        });
+      },
+    );
 
-    it('should resolve relative paths', () => {
-      const result = resolvePathFromEnv('relative/path/file.txt');
-      expect(result).toEqual({
-        isSwitch: false,
-        value: path.resolve('relative/path/file.txt'),
-        isDisabled: false,
-      });
-    });
-
-    it('should expand tilde to home directory', () => {
+    it.each([
+      ['~/documents/file.txt', 'documents/file.txt'],
+      ['~', ''],
+    ])('should expand tilde path: %s', (input, homeRelativePath) => {
       const homeDir = '/Users/test';
       vi.spyOn(os, 'homedir').mockReturnValue(homeDir);
-
-      const result = resolvePathFromEnv('~/documents/file.txt');
+      const result = resolvePathFromEnv(input);
       expect(result).toEqual({
         isSwitch: false,
-        value: path.resolve(path.join(homeDir, 'documents/file.txt')),
-        isDisabled: false,
-      });
-    });
-
-    it('should handle standalone tilde', () => {
-      const homeDir = '/Users/test';
-      vi.spyOn(os, 'homedir').mockReturnValue(homeDir);
-
-      const result = resolvePathFromEnv('~');
-      expect(result).toEqual({
-        isSwitch: false,
-        value: path.resolve(homeDir),
+        value: path.resolve(
+          homeRelativePath ? path.join(homeDir, homeRelativePath) : homeDir,
+        ),
         isDisabled: false,
       });
     });
@@ -484,7 +386,9 @@ describe('resolvePathFromEnv helper function', () => {
       vi.spyOn(os, 'homedir').mockImplementation(() => {
         throw new Error('Cannot resolve home directory');
       });
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
 
       const result = resolvePathFromEnv('~/documents/file.txt');
       expect(result).toEqual({

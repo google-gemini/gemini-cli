@@ -20,9 +20,10 @@ on:
 
 jobs:
   smoke-test:
-    runs-on: 'self-hosted'
+    runs-on: 'ubuntu-latest'
     permissions:
-      contents: 'read'
+      contents: 'write'
+      packages: 'write'
       issues: 'write'
     steps:
       - name: 'Checkout'
@@ -46,4 +47,4 @@ jobs:
           gh issue create \
             --title 'Smoke test failed on ${REF} @ $(date +'%Y-%m-%d')' \
             --body 'Smoke test build failed. See the full run for details: ${DETAILS_URL}' \
-            --label 'kind/bug,priority/p0'
+            --label 'priority/p0'

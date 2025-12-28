@@ -5,66 +5,66 @@
  */
 
 import type { CommandModule } from 'yargs';
-import {
-  installExtension,
-  requestConsentNonInteractive,
-} from '../../config/extension.js';
-import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
+import { debugLogger } from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
-import { stat } from 'node:fs/promises';
+import {
+  INSTALL_WARNING_MESSAGE,
+  requestConsentNonInteractive,
+} from '../../config/extensions/consent.js';
+import {
+  ExtensionManager,
+  inferInstallMetadata,
+} from '../../config/extension-manager.js';
+import { loadSettings } from '../../config/settings.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 interface InstallArgs {
   source: string;
   ref?: string;
   autoUpdate?: boolean;
+  allowPreRelease?: boolean;
+  consent?: boolean;
 }
 
 export async function handleInstall(args: InstallArgs) {
   try {
-    let installMetadata: ExtensionInstallMetadata;
     const { source } = args;
-    if (
-      source.startsWith('http://') ||
-      source.startsWith('https://') ||
-      source.startsWith('git@') ||
-      source.startsWith('sso://')
-    ) {
-      installMetadata = {
-        source,
-        type: 'git',
-        ref: args.ref,
-        autoUpdate: args.autoUpdate,
-      };
-    } else {
-      if (args.ref || args.autoUpdate) {
-        throw new Error(
-          '--ref and --auto-update are not applicable for local extensions.',
-        );
-      }
-      try {
-        await stat(source);
-        installMetadata = {
-          source,
-          type: 'local',
-        };
-      } catch {
-        throw new Error('Install source not found.');
-      }
+    const installMetadata = await inferInstallMetadata(source, {
+      ref: args.ref,
+      autoUpdate: args.autoUpdate,
+      allowPreRelease: args.allowPreRelease,
+    });
+
+    const requestConsent = args.consent
+      ? () => Promise.resolve(true)
+      : requestConsentNonInteractive;
+    if (args.consent) {
+      debugLogger.log('You have consented to the following:');
+      debugLogger.log(INSTALL_WARNING_MESSAGE);
     }
 
-    const name = await installExtension(
-      installMetadata,
-      requestConsentNonInteractive,
+    const workspaceDir = process.cwd();
+    const extensionManager = new ExtensionManager({
+      workspaceDir,
+      requestConsent,
+      requestSetting: promptForSetting,
+      settings: loadSettings(workspaceDir).merged,
+    });
+    await extensionManager.loadExtensions();
+    const extension =
+      await extensionManager.installOrUpdateExtension(installMetadata);
+    debugLogger.log(
+      `Extension "${extension.name}" installed successfully and enabled.`,
     );
-    console.log(`Extension "${name}" installed successfully and enabled.`);
   } catch (error) {
-    console.error(getErrorMessage(error));
+    debugLogger.error(getErrorMessage(error));
     process.exit(1);
   }
 }
 
 export const installCommand: CommandModule = {
-  command: 'install <source>',
+  command: 'install <source> [--auto-update] [--pre-release]',
   describe: 'Installs an extension from a git repository URL or a local path.',
   builder: (yargs) =>
     yargs
@@ -81,6 +81,16 @@ export const installCommand: CommandModule = {
         describe: 'Enable auto-update for this extension.',
         type: 'boolean',
       })
+      .option('pre-release', {
+        describe: 'Enable pre-release versions for this extension.',
+        type: 'boolean',
+      })
+      .option('consent', {
+        describe:
+          'Acknowledge the security risks of installing an extension and skip the confirmation prompt.',
+        type: 'boolean',
+        default: false,
+      })
       .check((argv) => {
         if (!argv.source) {
           throw new Error('The source argument must be provided.');
@@ -92,6 +102,9 @@ export const installCommand: CommandModule = {
       source: argv['source'] as string,
       ref: argv['ref'] as string | undefined,
       autoUpdate: argv['auto-update'] as boolean | undefined,
+      allowPreRelease: argv['pre-release'] as boolean | undefined,
+      consent: argv['consent'] as boolean | undefined,
     });
+    await exitCli();
   },
 };

@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AgentDefinition } from './types.js';
-import { LSTool } from '../tools/ls.js';
-import { ReadFileTool } from '../tools/read-file.js';
-import { GLOB_TOOL_NAME } from '../tools/tool-names.js';
-import { GrepTool } from '../tools/grep.js';
+import type { LocalAgentDefinition } from './types.js';
+import {
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+} from '../tools/tool-names.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { z } from 'zod';
 
@@ -39,19 +41,19 @@ const CodebaseInvestigationReportSchema = z.object({
  * A Proof-of-Concept subagent specialized in analyzing codebase structure,
  * dependencies, and technologies.
  */
-export const CodebaseInvestigatorAgent: AgentDefinition<
+export const CodebaseInvestigatorAgent: LocalAgentDefinition<
   typeof CodebaseInvestigationReportSchema
 > = {
   name: 'codebase_investigator',
+  kind: 'local',
   displayName: 'Codebase Investigator Agent',
-  description: `Your primary tool for multifile search tasks and codebase exploration. 
-    Invoke this tool to delegate search tasks to an autonomous subagent. 
-    Use this to find features, understand context, or locate specific files, functions, or symbols. 
-    Returns a structured Json report with key file paths, symbols, architectural map and insights to solve a task or answer questions`,
+  description: `The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies.
+    Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation or to answer questions about the codebase that require investigation.
+    It returns a structured report with key file paths, symbols, and actionable architectural insights.`,
   inputConfig: {
     inputs: {
       objective: {
-        description: `A comprehensive and detailed description of the user's ultimate goal. 
+        description: `A comprehensive and detailed description of the user's ultimate goal.
           You must include original user's objective as well as questions and any extra context and questions you may have.`,
         type: 'string',
         required: true,
@@ -81,7 +83,7 @@ export const CodebaseInvestigatorAgent: AgentDefinition<
 
   toolConfig: {
     // Grant access only to read-only tools.
-    tools: [LSTool.Name, ReadFileTool.Name, GLOB_TOOL_NAME, GrepTool.Name],
+    tools: [LS_TOOL_NAME, READ_FILE_TOOL_NAME, GLOB_TOOL_NAME, GREP_TOOL_NAME],
   },
 
   promptConfig: {
@@ -95,7 +97,7 @@ You are a sub-agent in a larger system. Your only responsibility is to provide d
 - **DO:** Find the key modules, classes, and functions that are part of the problem and its solution.
 - **DO:** Understand *why* the code is written the way it is. Question everything.
 - **DO:** Foresee the ripple effects of a change. If \`function A\` is modified, you must check its callers. If a data structure is altered, you must identify where its type definitions need to be updated.
-- **DO:** provide a conclusion and insights to the main agent that invoked you. If the agent is trying to solve a bug, you should provide the root cause of the bug, its impacts, how to fix it etc. If it's a new feature, you should provide insights on where to implement it, what chagnes are necessary etc. 
+- **DO:** provide a conclusion and insights to the main agent that invoked you. If the agent is trying to solve a bug, you should provide the root cause of the bug, its impacts, how to fix it etc. If it's a new feature, you should provide insights on where to implement it, what changes are necessary etc.
 - **DO NOT:** Write the final implementation code yourself.
 - **DO NOT:** Stop at the first relevant file. Your goal is a comprehensive understanding of the entire relevant subsystem.
 You operate in a non-interactive loop and must reason based on the information provided and the output of your tools.

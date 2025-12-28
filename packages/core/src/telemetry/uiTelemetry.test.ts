@@ -13,7 +13,7 @@ import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
-} from './constants.js';
+} from './types.js';
 import type {
   CompletedToolCall,
   ErroredToolCall,
@@ -129,12 +129,14 @@ describe('UiTelemetryService', () => {
       'event.name': EVENT_API_RESPONSE,
       model: 'gemini-2.5-pro',
       duration_ms: 500,
-      input_token_count: 10,
-      output_token_count: 20,
-      total_token_count: 30,
-      cached_content_token_count: 5,
-      thoughts_token_count: 2,
-      tool_token_count: 3,
+      usage: {
+        input_token_count: 10,
+        output_token_count: 20,
+        total_token_count: 30,
+        cached_content_token_count: 5,
+        thoughts_token_count: 2,
+        tool_token_count: 3,
+      },
     } as ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE };
 
     service.addEvent(event);
@@ -151,12 +153,14 @@ describe('UiTelemetryService', () => {
         'event.name': EVENT_API_RESPONSE,
         model: 'gemini-2.5-pro',
         duration_ms: 500,
-        input_token_count: 10,
-        output_token_count: 20,
-        total_token_count: 30,
-        cached_content_token_count: 5,
-        thoughts_token_count: 2,
-        tool_token_count: 3,
+        usage: {
+          input_token_count: 10,
+          output_token_count: 20,
+          total_token_count: 30,
+          cached_content_token_count: 5,
+          thoughts_token_count: 2,
+          tool_token_count: 3,
+        },
       } as ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE };
 
       service.addEvent(event);
@@ -169,6 +173,7 @@ describe('UiTelemetryService', () => {
           totalLatencyMs: 500,
         },
         tokens: {
+          input: 5,
           prompt: 10,
           candidates: 20,
           total: 30,
@@ -185,12 +190,14 @@ describe('UiTelemetryService', () => {
         'event.name': EVENT_API_RESPONSE,
         model: 'gemini-2.5-pro',
         duration_ms: 500,
-        input_token_count: 10,
-        output_token_count: 20,
-        total_token_count: 30,
-        cached_content_token_count: 5,
-        thoughts_token_count: 2,
-        tool_token_count: 3,
+        usage: {
+          input_token_count: 10,
+          output_token_count: 20,
+          total_token_count: 30,
+          cached_content_token_count: 5,
+          thoughts_token_count: 2,
+          tool_token_count: 3,
+        },
       } as ApiResponseEvent & {
         'event.name': typeof EVENT_API_RESPONSE;
       };
@@ -198,12 +205,14 @@ describe('UiTelemetryService', () => {
         'event.name': EVENT_API_RESPONSE,
         model: 'gemini-2.5-pro',
         duration_ms: 600,
-        input_token_count: 15,
-        output_token_count: 25,
-        total_token_count: 40,
-        cached_content_token_count: 10,
-        thoughts_token_count: 4,
-        tool_token_count: 6,
+        usage: {
+          input_token_count: 15,
+          output_token_count: 25,
+          total_token_count: 40,
+          cached_content_token_count: 10,
+          thoughts_token_count: 4,
+          tool_token_count: 6,
+        },
       } as ApiResponseEvent & {
         'event.name': typeof EVENT_API_RESPONSE;
       };
@@ -219,6 +228,7 @@ describe('UiTelemetryService', () => {
           totalLatencyMs: 1100,
         },
         tokens: {
+          input: 10,
           prompt: 25,
           candidates: 45,
           total: 70,
@@ -235,12 +245,14 @@ describe('UiTelemetryService', () => {
         'event.name': EVENT_API_RESPONSE,
         model: 'gemini-2.5-pro',
         duration_ms: 500,
-        input_token_count: 10,
-        output_token_count: 20,
-        total_token_count: 30,
-        cached_content_token_count: 5,
-        thoughts_token_count: 2,
-        tool_token_count: 3,
+        usage: {
+          input_token_count: 10,
+          output_token_count: 20,
+          total_token_count: 30,
+          cached_content_token_count: 5,
+          thoughts_token_count: 2,
+          tool_token_count: 3,
+        },
       } as ApiResponseEvent & {
         'event.name': typeof EVENT_API_RESPONSE;
       };
@@ -248,12 +260,14 @@ describe('UiTelemetryService', () => {
         'event.name': EVENT_API_RESPONSE,
         model: 'gemini-2.5-flash',
         duration_ms: 1000,
-        input_token_count: 100,
-        output_token_count: 200,
-        total_token_count: 300,
-        cached_content_token_count: 50,
-        thoughts_token_count: 20,
-        tool_token_count: 30,
+        usage: {
+          input_token_count: 100,
+          output_token_count: 200,
+          total_token_count: 300,
+          cached_content_token_count: 50,
+          thoughts_token_count: 20,
+          tool_token_count: 30,
+        },
       } as ApiResponseEvent & {
         'event.name': typeof EVENT_API_RESPONSE;
       };
@@ -289,6 +303,7 @@ describe('UiTelemetryService', () => {
           totalLatencyMs: 300,
         },
         tokens: {
+          input: 0,
           prompt: 0,
           candidates: 0,
           total: 0,
@@ -304,12 +319,14 @@ describe('UiTelemetryService', () => {
         'event.name': EVENT_API_RESPONSE,
         model: 'gemini-2.5-pro',
         duration_ms: 500,
-        input_token_count: 10,
-        output_token_count: 20,
-        total_token_count: 30,
-        cached_content_token_count: 5,
-        thoughts_token_count: 2,
-        tool_token_count: 3,
+        usage: {
+          input_token_count: 10,
+          output_token_count: 20,
+          total_token_count: 30,
+          cached_content_token_count: 5,
+          thoughts_token_count: 2,
+          tool_token_count: 3,
+        },
       } as ApiResponseEvent & {
         'event.name': typeof EVENT_API_RESPONSE;
       };
@@ -331,6 +348,7 @@ describe('UiTelemetryService', () => {
           totalLatencyMs: 800,
         },
         tokens: {
+          input: 5,
           prompt: 10,
           candidates: 20,
           total: 30,
@@ -534,12 +552,14 @@ describe('UiTelemetryService', () => {
         'event.name': EVENT_API_RESPONSE,
         model: 'gemini-2.5-pro',
         duration_ms: 500,
-        input_token_count: 100,
-        output_token_count: 200,
-        total_token_count: 300,
-        cached_content_token_count: 50,
-        thoughts_token_count: 20,
-        tool_token_count: 30,
+        usage: {
+          input_token_count: 100,
+          output_token_count: 200,
+          total_token_count: 300,
+          cached_content_token_count: 50,
+          thoughts_token_count: 20,
+          tool_token_count: 30,
+        },
       } as ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE };
 
       service.addEvent(event);
@@ -559,12 +579,14 @@ describe('UiTelemetryService', () => {
         'event.name': EVENT_API_RESPONSE,
         model: 'gemini-2.5-pro',
         duration_ms: 500,
-        input_token_count: 100,
-        output_token_count: 200,
-        total_token_count: 300,
-        cached_content_token_count: 50,
-        thoughts_token_count: 20,
-        tool_token_count: 30,
+        usage: {
+          input_token_count: 100,
+          output_token_count: 200,
+          total_token_count: 300,
+          cached_content_token_count: 50,
+          thoughts_token_count: 20,
+          tool_token_count: 30,
+        },
       } as ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE };
 
       service.addEvent(event);
@@ -584,12 +606,14 @@ describe('UiTelemetryService', () => {
         'event.name': EVENT_API_RESPONSE,
         model: 'gemini-2.5-pro',
         duration_ms: 500,
-        input_token_count: 100,
-        output_token_count: 200,
-        total_token_count: 300,
-        cached_content_token_count: 50,
-        thoughts_token_count: 20,
-        tool_token_count: 30,
+        usage: {
+          input_token_count: 100,
+          output_token_count: 200,
+          total_token_count: 300,
+          cached_content_token_count: 50,
+          thoughts_token_count: 20,
+          tool_token_count: 30,
+        },
       } as ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE };
 
       service.addEvent(event);
@@ -616,12 +640,14 @@ describe('UiTelemetryService', () => {
         'event.name': EVENT_API_RESPONSE,
         model: 'gemini-2.5-pro',
         duration_ms: 500,
-        input_token_count: 100,
-        output_token_count: 200,
-        total_token_count: 300,
-        cached_content_token_count: 50,
-        thoughts_token_count: 20,
-        tool_token_count: 30,
+        usage: {
+          input_token_count: 100,
+          output_token_count: 200,
+          total_token_count: 300,
+          cached_content_token_count: 50,
+          thoughts_token_count: 20,
+          tool_token_count: 30,
+        },
       } as ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE };
 
       service.addEvent(event);

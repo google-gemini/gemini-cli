@@ -7,17 +7,25 @@
         "slug": "docs"
       },
       {
-        "label": "Architecture Overview",
+        "label": "Architecture overview",
         "slug": "docs/architecture"
+      },
+      {
+        "label": "Contribution guide",
+        "slug": "docs/contributing"
       }
     ]
   },
   {
-    "label": "Get Started",
+    "label": "Get started",
     "items": [
       {
-        "label": "Gemini CLI Quickstart",
+        "label": "Gemini CLI quickstart",
         "slug": "docs/get-started"
+      },
+      {
+        "label": "Gemini 3 on Gemini CLI",
+        "slug": "docs/get-started/gemini-3"
       },
       {
         "label": "Authentication",
@@ -28,8 +36,8 @@
         "slug": "docs/get-started/configuration"
       },
       {
-        "label": "Deployment",
-        "slug": "docs/get-started/deployment"
+        "label": "Installation",
+        "slug": "docs/get-started/installation"
       },
       {
         "label": "Examples",
@@ -53,7 +61,7 @@
         "slug": "docs/cli/checkpointing"
       },
       {
-        "label": "Custom Commands",
+        "label": "Custom commands",
         "slug": "docs/cli/custom-commands"
       },
       {
@@ -61,16 +69,28 @@
         "slug": "docs/cli/enterprise"
       },
       {
-        "label": "Headless Mode",
+        "label": "Headless mode",
         "slug": "docs/cli/headless"
       },
       {
-        "label": "Keyboard Shortcuts",
+        "label": "Keyboard shortcuts",
         "slug": "docs/cli/keyboard-shortcuts"
+      },
+      {
+        "label": "Model selection",
+        "slug": "docs/cli/model"
       },
       {
         "label": "Sandbox",
         "slug": "docs/cli/sandbox"
+      },
+      {
+        "label": "Session Management",
+        "slug": "docs/cli/session-management"
+      },
+      {
+        "label": "Settings",
+        "slug": "docs/cli/settings"
       },
       {
         "label": "Telemetry",
@@ -81,7 +101,7 @@
         "slug": "docs/cli/themes"
       },
       {
-        "label": "Token Caching",
+        "label": "Token caching",
         "slug": "docs/cli/token-caching"
       },
       {
@@ -95,6 +115,10 @@
       {
         "label": "Uninstall",
         "slug": "docs/cli/uninstall"
+      },
+      {
+        "label": "System prompt override",
+        "slug": "docs/cli/system-prompt"
       }
     ]
   },
@@ -112,6 +136,10 @@
       {
         "label": "Memory Import Processor",
         "slug": "docs/core/memport"
+      },
+      {
+        "label": "Policy Engine",
+        "slug": "docs/core/policy-engine"
       }
     ]
   },
@@ -123,23 +151,19 @@
         "slug": "docs/tools"
       },
       {
-        "label": "File System",
+        "label": "File system",
         "slug": "docs/tools/file-system"
-      },
-      {
-        "label": "Multi-File Read",
-        "slug": "docs/tools/multi-file"
       },
       {
         "label": "Shell",
         "slug": "docs/tools/shell"
       },
       {
-        "label": "Web Fetch",
+        "label": "Web fetch",
         "slug": "docs/tools/web-fetch"
       },
       {
-        "label": "Web Search",
+        "label": "Web search",
         "slug": "docs/tools/web-search"
       },
       {
@@ -147,7 +171,11 @@
         "slug": "docs/tools/memory"
       },
       {
-        "label": "MCP Servers",
+        "label": "Todos",
+        "slug": "docs/tools/todos"
+      },
+      {
+        "label": "MCP servers",
         "slug": "docs/tools/mcp-server"
       }
     ]
@@ -160,20 +188,45 @@
         "slug": "docs/extensions"
       },
       {
-        "label": "Extension Releasing",
+        "label": "Get started with extensions",
+        "slug": "docs/extensions/getting-started-extensions"
+      },
+      {
+        "label": "Extension releasing",
         "slug": "docs/extensions/extension-releasing"
       }
     ]
   },
   {
-    "label": "IDE Integration",
+    "label": "Hooks",
+    "items": [
+      {
+        "label": "Introduction",
+        "slug": "docs/hooks"
+      },
+      {
+        "label": "Writing hooks",
+        "slug": "docs/hooks/writing-hooks"
+      },
+      {
+        "label": "Hooks reference",
+        "slug": "docs/hooks/reference"
+      },
+      {
+        "label": "Best practices",
+        "slug": "docs/hooks/best-practices"
+      }
+    ]
+  },
+  {
+    "label": "IDE integration",
     "items": [
       {
         "label": "Introduction",
         "slug": "docs/ide-integration"
       },
       {
-        "label": "IDE Companion Spec",
+        "label": "IDE companion spec",
         "slug": "docs/ide-integration/ide-companion-spec"
       }
     ]
@@ -190,12 +243,33 @@
         "slug": "docs/releases"
       },
       {
-        "label": "Integration Tests",
+        "label": "Integration tests",
         "slug": "docs/integration-tests"
       },
       {
-        "label": "Issue and PR Automation",
+        "label": "Issue and PR automation",
         "slug": "docs/issue-and-pr-automation"
+      }
+    ]
+  },
+  {
+    "label": "Releases",
+    "items": [
+      {
+        "label": "Release notes",
+        "slug": "docs/changelogs/"
+      },
+      {
+        "label": "Latest release",
+        "slug": "docs/changelogs/latest"
+      },
+      {
+        "label": "Preview release",
+        "slug": "docs/changelogs/preview"
+      },
+      {
+        "label": "Changelog",
+        "slug": "docs/changelogs/releases"
       }
     ]
   },
@@ -211,11 +285,11 @@
         "slug": "docs/troubleshooting"
       },
       {
-        "label": "Quota and Pricing",
+        "label": "Quota and pricing",
         "slug": "docs/quota-and-pricing"
       },
       {
-        "label": "Terms of Service",
+        "label": "Terms of service",
         "slug": "docs/tos-privacy"
       }
     ]

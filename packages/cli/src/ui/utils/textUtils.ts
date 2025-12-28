@@ -89,6 +89,7 @@ export function cpSlice(str: string, start: number, end?: number): string {
  * - All printable Unicode including emojis
  * - DEL (0x7F) - handled functionally by applyOperations, not a display issue
  * - CR/LF (0x0D/0x0A) - needed for line breaks
+ * - TAB (0x09) - preserve tabs
  */
 export function stripUnsafeCharacters(str: string): string {
   const strippedAnsi = stripAnsi(str);
@@ -99,8 +100,8 @@ export function stripUnsafeCharacters(str: string): string {
       const code = char.codePointAt(0);
       if (code === undefined) return false;
 
-      // Preserve CR/LF for line handling
-      if (code === 0x0a || code === 0x0d) return true;
+      // Preserve CR/LF/TAB for line handling
+      if (code === 0x0a || code === 0x0d || code === 0x09) return true;
 
       // Remove C0 control chars (except CR/LF) that can break display
       // Examples: BELL(0x07) makes noise, BS(0x08) moves cursor, VT(0x0B), FF(0x0C)

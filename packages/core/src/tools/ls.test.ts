@@ -12,7 +12,7 @@ import { LSTool } from './ls.js';
 import type { Config } from '../config/config.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { ToolErrorType } from './tool-error.js';
-import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 
 describe('LSTool', () => {
   let lsTool: LSTool;
@@ -22,18 +22,16 @@ describe('LSTool', () => {
   const abortSignal = new AbortController().signal;
 
   beforeEach(async () => {
-    tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ls-tool-root-'));
+    const realTmp = await fs.realpath(os.tmpdir());
+    tempRootDir = await fs.mkdtemp(path.join(realTmp, 'ls-tool-root-'));
     tempSecondaryDir = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'ls-tool-secondary-'),
+      path.join(realTmp, 'ls-tool-secondary-'),
     );
-
-    const mockWorkspaceContext = createMockWorkspaceContext(tempRootDir, [
-      tempSecondaryDir,
-    ]);
 
     mockConfig = {
       getTargetDir: () => tempRootDir,
-      getWorkspaceContext: () => mockWorkspaceContext,
+      getWorkspaceContext: () =>
+        new WorkspaceContext(tempRootDir, [tempSecondaryDir]),
       getFileService: () => new FileDiscoveryService(tempRootDir),
       getFileFilteringOptions: () => ({
         respectGitIgnore: true,
@@ -54,19 +52,23 @@ describe('LSTool', () => {
       const testPath = path.join(tempRootDir, 'src');
       await fs.mkdir(testPath);
 
-      const invocation = lsTool.build({ path: testPath });
+      const invocation = lsTool.build({ dir_path: testPath });
 
       expect(invocation).toBeDefined();
     });
 
-    it('should reject relative paths', () => {
-      expect(() => lsTool.build({ path: './src' })).toThrow(
-        'Path must be absolute: ./src',
-      );
+    it('should accept relative paths', async () => {
+      const testPath = path.join(tempRootDir, 'src');
+      await fs.mkdir(testPath);
+
+      const relativePath = path.relative(tempRootDir, testPath);
+      const invocation = lsTool.build({ dir_path: relativePath });
+
+      expect(invocation).toBeDefined();
     });
 
     it('should reject paths outside workspace with clear error message', () => {
-      expect(() => lsTool.build({ path: '/etc/passwd' })).toThrow(
+      expect(() => lsTool.build({ dir_path: '/etc/passwd' })).toThrow(
         `Path must be within one of the workspace directories: ${tempRootDir}, ${tempSecondaryDir}`,
       );
     });
@@ -75,7 +77,7 @@ describe('LSTool', () => {
       const testPath = path.join(tempSecondaryDir, 'lib');
       await fs.mkdir(testPath);
 
-      const invocation = lsTool.build({ path: testPath });
+      const invocation = lsTool.build({ dir_path: testPath });
 
       expect(invocation).toBeDefined();
     });
@@ -90,7 +92,7 @@ describe('LSTool', () => {
         'secondary',
       );
 
-      const invocation = lsTool.build({ path: tempRootDir });
+      const invocation = lsTool.build({ dir_path: tempRootDir });
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('[DIR] subdir');
@@ -106,7 +108,7 @@ describe('LSTool', () => {
         'secondary',
       );
 
-      const invocation = lsTool.build({ path: tempSecondaryDir });
+      const invocation = lsTool.build({ dir_path: tempSecondaryDir });
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('secondary-file.txt');
@@ -116,7 +118,7 @@ describe('LSTool', () => {
     it('should handle empty directories', async () => {
       const emptyDir = path.join(tempRootDir, 'empty');
       await fs.mkdir(emptyDir);
-      const invocation = lsTool.build({ path: emptyDir });
+      const invocation = lsTool.build({ dir_path: emptyDir });
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toBe(`Directory ${emptyDir} is empty.`);
@@ -128,7 +130,7 @@ describe('LSTool', () => {
       await fs.writeFile(path.join(tempRootDir, 'file2.log'), 'content1');
 
       const invocation = lsTool.build({
-        path: tempRootDir,
+        dir_path: tempRootDir,
         ignore: ['*.log'],
       });
       const result = await invocation.execute(abortSignal);
@@ -143,32 +145,32 @@ describe('LSTool', () => {
       await fs.writeFile(path.join(tempRootDir, 'file2.log'), 'content1');
       await fs.writeFile(path.join(tempRootDir, '.git'), '');
       await fs.writeFile(path.join(tempRootDir, '.gitignore'), '*.log');
-      const invocation = lsTool.build({ path: tempRootDir });
+      const invocation = lsTool.build({ dir_path: tempRootDir });
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('file2.log');
       // .git is always ignored by default.
-      expect(result.returnDisplay).toBe('Listed 2 item(s). (2 git-ignored)');
+      expect(result.returnDisplay).toBe('Listed 2 item(s). (2 ignored)');
     });
 
     it('should respect geminiignore patterns', async () => {
       await fs.writeFile(path.join(tempRootDir, 'file1.txt'), 'content1');
       await fs.writeFile(path.join(tempRootDir, 'file2.log'), 'content1');
       await fs.writeFile(path.join(tempRootDir, '.geminiignore'), '*.log');
-      const invocation = lsTool.build({ path: tempRootDir });
+      const invocation = lsTool.build({ dir_path: tempRootDir });
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('file2.log');
-      expect(result.returnDisplay).toBe('Listed 2 item(s). (1 gemini-ignored)');
+      expect(result.returnDisplay).toBe('Listed 2 item(s). (1 ignored)');
     });
 
     it('should handle non-directory paths', async () => {
       const testPath = path.join(tempRootDir, 'file1.txt');
       await fs.writeFile(testPath, 'content1');
 
-      const invocation = lsTool.build({ path: testPath });
+      const invocation = lsTool.build({ dir_path: testPath });
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('Path is not a directory');
@@ -178,7 +180,7 @@ describe('LSTool', () => {
 
     it('should handle non-existent paths', async () => {
       const testPath = path.join(tempRootDir, 'does-not-exist');
-      const invocation = lsTool.build({ path: testPath });
+      const invocation = lsTool.build({ dir_path: testPath });
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('Error listing directory');
@@ -192,7 +194,7 @@ describe('LSTool', () => {
       await fs.mkdir(path.join(tempRootDir, 'x-dir'));
       await fs.mkdir(path.join(tempRootDir, 'y-dir'));
 
-      const invocation = lsTool.build({ path: tempRootDir });
+      const invocation = lsTool.build({ dir_path: tempRootDir });
       const result = await invocation.execute(abortSignal);
 
       const lines = (
@@ -217,19 +219,13 @@ describe('LSTool', () => {
       const error = new Error('EACCES: permission denied');
       vi.spyOn(fs, 'readdir').mockRejectedValueOnce(error);
 
-      const invocation = lsTool.build({ path: restrictedDir });
+      const invocation = lsTool.build({ dir_path: restrictedDir });
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('Error listing directory');
       expect(result.llmContent).toContain('permission denied');
       expect(result.returnDisplay).toBe('Error: Failed to list directory.');
       expect(result.error?.type).toBe(ToolErrorType.LS_EXECUTION_ERROR);
-    });
-
-    it('should throw for invalid params at build time', () => {
-      expect(() => lsTool.build({ path: '../outside' })).toThrow(
-        'Path must be absolute: ../outside',
-      );
     });
 
     it('should handle errors accessing individual files during listing', async () => {
@@ -248,12 +244,7 @@ describe('LSTool', () => {
         return originalStat(p);
       });
 
-      // Spy on console.error to verify it's called
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
-      const invocation = lsTool.build({ path: tempRootDir });
+      const invocation = lsTool.build({ dir_path: tempRootDir });
       const result = await invocation.execute(abortSignal);
 
       // Should still list the other files
@@ -261,13 +252,7 @@ describe('LSTool', () => {
       expect(result.llmContent).not.toContain('problematic.txt');
       expect(result.returnDisplay).toBe('Listed 1 item(s).');
 
-      // Verify error was logged
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/Error accessing.*problematic\.txt/s),
-      );
-
       statSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -275,7 +260,7 @@ describe('LSTool', () => {
     it('should return shortened relative path', () => {
       const deeplyNestedDir = path.join(tempRootDir, 'deeply', 'nested');
       const params = {
-        path: path.join(deeplyNestedDir, 'directory'),
+        dir_path: path.join(deeplyNestedDir, 'directory'),
       };
       const invocation = lsTool.build(params);
       const description = invocation.getDescription();
@@ -284,11 +269,11 @@ describe('LSTool', () => {
 
     it('should handle paths in secondary workspace', () => {
       const params = {
-        path: path.join(tempSecondaryDir, 'lib'),
+        dir_path: path.join(tempSecondaryDir, 'lib'),
       };
       const invocation = lsTool.build(params);
       const description = invocation.getDescription();
-      const expected = path.relative(tempRootDir, params.path);
+      const expected = path.relative(tempRootDir, params.dir_path);
       expect(description).toBe(expected);
     });
   });
@@ -297,19 +282,19 @@ describe('LSTool', () => {
     it('should accept paths in primary workspace directory', async () => {
       const testPath = path.join(tempRootDir, 'src');
       await fs.mkdir(testPath);
-      const params = { path: testPath };
+      const params = { dir_path: testPath };
       expect(lsTool.build(params)).toBeDefined();
     });
 
     it('should accept paths in secondary workspace directory', async () => {
       const testPath = path.join(tempSecondaryDir, 'lib');
       await fs.mkdir(testPath);
-      const params = { path: testPath };
+      const params = { dir_path: testPath };
       expect(lsTool.build(params)).toBeDefined();
     });
 
     it('should reject paths outside all workspace directories', () => {
-      const params = { path: '/etc/passwd' };
+      const params = { dir_path: '/etc/passwd' };
       expect(() => lsTool.build(params)).toThrow(
         'Path must be within one of the workspace directories',
       );
@@ -321,7 +306,7 @@ describe('LSTool', () => {
         'secondary',
       );
 
-      const invocation = lsTool.build({ path: tempSecondaryDir });
+      const invocation = lsTool.build({ dir_path: tempSecondaryDir });
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('secondary-file.txt');

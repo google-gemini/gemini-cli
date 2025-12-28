@@ -11,11 +11,14 @@ import { theme } from '../semantic-colors.js';
 import type {
   CommandContext,
   SlashCommand,
-  MessageActionReturn,
   SlashCommandActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
-import { decodeTagName } from '@google/gemini-cli-core';
+import {
+  decodeTagName,
+  type MessageActionReturn,
+  INITIAL_HISTORY_LENGTH,
+} from '@google/gemini-cli-core';
 import path from 'node:path';
 import type {
   HistoryItemWithoutId,
@@ -68,6 +71,7 @@ const listCommand: SlashCommand = {
   name: 'list',
   description: 'List saved conversation checkpoints',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async (context): Promise<void> => {
     const chatDetails = await getSavedChatTags(context, false);
 
@@ -85,6 +89,7 @@ const saveCommand: SlashCommand = {
   description:
     'Save the current conversation as a checkpoint. Usage: /chat save <tag>',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: async (context, args): Promise<SlashCommandActionReturn | void> => {
     const tag = args.trim();
     if (!tag) {
@@ -117,7 +122,7 @@ const saveCommand: SlashCommand = {
       }
     }
 
-    const chat = await config?.getGeminiClient()?.getChat();
+    const chat = config?.getGeminiClient()?.getChat();
     if (!chat) {
       return {
         type: 'message',
@@ -127,12 +132,15 @@ const saveCommand: SlashCommand = {
     }
 
     const history = chat.getHistory();
-    if (history.length > 2) {
-      await logger.saveCheckpoint(history, tag);
+    if (history.length > INITIAL_HISTORY_LENGTH) {
+      const authType = config?.getContentGeneratorConfig()?.authType;
+      await logger.saveCheckpoint({ history, authType }, tag);
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint saved with tag: ${decodeTagName(tag)}.`,
+        content: `Conversation checkpoint saved with tag: ${decodeTagName(
+          tag,
+        )}.`,
       };
     } else {
       return {
@@ -150,6 +158,7 @@ const resumeCommand: SlashCommand = {
   description:
     'Resume a conversation from a checkpoint. Usage: /chat resume <tag>',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async (context, args) => {
     const tag = args.trim();
     if (!tag) {
@@ -160,9 +169,10 @@ const resumeCommand: SlashCommand = {
       };
     }
 
-    const { logger } = context.services;
+    const { logger, config } = context.services;
     await logger.initialize();
-    const conversation = await logger.loadCheckpoint(tag);
+    const checkpoint = await logger.loadCheckpoint(tag);
+    const conversation = checkpoint.history;
 
     if (conversation.length === 0) {
       return {
@@ -172,17 +182,27 @@ const resumeCommand: SlashCommand = {
       };
     }
 
+    const currentAuthType = config?.getContentGeneratorConfig()?.authType;
+    if (
+      checkpoint.authType &&
+      currentAuthType &&
+      checkpoint.authType !== currentAuthType
+    ) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Cannot resume chat. It was saved with a different authentication method (${checkpoint.authType}) than the current one (${currentAuthType}).`,
+      };
+    }
+
     const rolemap: { [key: string]: MessageType } = {
       user: MessageType.USER,
       model: MessageType.GEMINI,
     };
 
     const uiHistory: HistoryItemWithoutId[] = [];
-    let hasSystemPrompt = false;
-    let i = 0;
 
-    for (const item of conversation) {
-      i += 1;
+    for (const item of conversation.slice(INITIAL_HISTORY_LENGTH)) {
       const text =
         item.parts
           ?.filter((m) => !!m.text)
@@ -191,15 +211,11 @@ const resumeCommand: SlashCommand = {
       if (!text) {
         continue;
       }
-      if (i === 1 && text.match(/context for our chat/)) {
-        hasSystemPrompt = true;
-      }
-      if (i > 2 || !hasSystemPrompt) {
-        uiHistory.push({
-          type: (item.role && rolemap[item.role]) || MessageType.GEMINI,
-          text,
-        } as HistoryItemWithoutId);
-      }
+
+      uiHistory.push({
+        type: (item.role && rolemap[item.role]) || MessageType.GEMINI,
+        text,
+      } as HistoryItemWithoutId);
     }
     return {
       type: 'load_history',
@@ -219,6 +235,7 @@ const deleteCommand: SlashCommand = {
   name: 'delete',
   description: 'Delete a conversation checkpoint. Usage: /chat delete <tag>',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async (context, args): Promise<MessageActionReturn> => {
     const tag = args.trim();
     if (!tag) {
@@ -282,7 +299,7 @@ export function serializeHistoryToMarkdown(history: Content[]): string {
           })
           .join('') || '';
       const roleIcon = item.role === 'user' ? '🧑‍💻' : '✨';
-      return `${roleIcon} ## ${(item.role || 'model').toUpperCase()}\n\n${text}`;
+      return `## ${(item.role || 'model').toUpperCase()} ${roleIcon}\n\n${text}`;
     })
     .join('\n\n---\n\n');
 }
@@ -292,6 +309,7 @@ const shareCommand: SlashCommand = {
   description:
     'Share the current conversation to a markdown or json file. Usage: /chat share <file>',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: async (context, args): Promise<MessageActionReturn> => {
     let filePathArg = args.trim();
     if (!filePathArg) {
@@ -308,7 +326,7 @@ const shareCommand: SlashCommand = {
       };
     }
 
-    const chat = await context.services.config?.getGeminiClient()?.getChat();
+    const chat = context.services.config?.getGeminiClient()?.getChat();
     if (!chat) {
       return {
         type: 'message',
@@ -319,10 +337,10 @@ const shareCommand: SlashCommand = {
 
     const history = chat.getHistory();
 
-    // An empty conversation has two hidden messages that setup the context for
+    // An empty conversation has a hidden message that sets up the context for
     // the chat. Thus, to check whether a conversation has been started, we
     // can't check for length 0.
-    if (history.length <= 2) {
+    if (history.length <= INITIAL_HISTORY_LENGTH) {
       return {
         type: 'message',
         messageType: 'info',
@@ -357,8 +375,9 @@ const shareCommand: SlashCommand = {
 
 export const chatCommand: SlashCommand = {
   name: 'chat',
-  description: 'Manage conversation history.',
+  description: 'Manage conversation history',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   subCommands: [
     listCommand,
     saveCommand,

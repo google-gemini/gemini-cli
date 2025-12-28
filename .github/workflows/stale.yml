@@ -13,7 +13,6 @@ jobs:
       matrix:
         runner:
           - 'ubuntu-latest' # GitHub-hosted
-          - 'self-hosted' # GHA on GCP runners
     runs-on: '${{ matrix.runner }}'
     if: |-
       ${{ github.repository == 'google-gemini/gemini-cli' }}

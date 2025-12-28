@@ -9,6 +9,7 @@ import type { Config, FileSearch } from '@google/gemini-cli-core';
 import { FileSearchFactory, escapePath } from '@google/gemini-cli-core';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
+import { AsyncFzf } from 'fzf';
 
 export enum AtCompletionStatus {
   IDLE = 'idle',
@@ -97,6 +98,61 @@ export interface UseAtCompletionProps {
   setIsLoadingSuggestions: (isLoading: boolean) => void;
 }
 
+interface ResourceSuggestionCandidate {
+  searchKey: string;
+  suggestion: Suggestion;
+}
+
+function buildResourceCandidates(
+  config?: Config,
+): ResourceSuggestionCandidate[] {
+  const registry = config?.getResourceRegistry?.();
+  if (!registry) {
+    return [];
+  }
+
+  const resources = registry.getAllResources().map((resource) => {
+    // Use serverName:uri format to disambiguate resources from different MCP servers
+    const prefixedUri = `${resource.serverName}:${resource.uri}`;
+    return {
+      // Include prefixedUri in searchKey so users can search by the displayed format
+      searchKey: `${prefixedUri} ${resource.name ?? ''}`.toLowerCase(),
+      suggestion: {
+        label: prefixedUri,
+        value: prefixedUri,
+      },
+    } satisfies ResourceSuggestionCandidate;
+  });
+
+  return resources;
+}
+
+async function searchResourceCandidates(
+  pattern: string,
+  candidates: ResourceSuggestionCandidate[],
+): Promise<Suggestion[]> {
+  if (candidates.length === 0) {
+    return [];
+  }
+
+  const normalizedPattern = pattern.toLowerCase();
+  if (!normalizedPattern) {
+    return candidates
+      .slice(0, MAX_SUGGESTIONS_TO_SHOW)
+      .map((candidate) => candidate.suggestion);
+  }
+
+  const fzf = new AsyncFzf(candidates, {
+    selector: (candidate: ResourceSuggestionCandidate) => candidate.searchKey,
+  });
+  const results = await fzf.find(normalizedPattern, {
+    limit: MAX_SUGGESTIONS_TO_SHOW * 3,
+  });
+  return results.map(
+    (result: { item: ResourceSuggestionCandidate }) => result.item.suggestion,
+  );
+}
+
 export function useAtCompletion(props: UseAtCompletionProps): void {
   const {
     enabled,
@@ -145,9 +201,9 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     } else if (
       (state.status === AtCompletionStatus.READY ||
         state.status === AtCompletionStatus.SEARCHING) &&
-      pattern !== state.pattern // Only search if the pattern has changed
+      pattern.toLowerCase() !== state.pattern // Only search if the pattern has changed
     ) {
-      dispatch({ type: 'SEARCH', payload: pattern });
+      dispatch({ type: 'SEARCH', payload: pattern.toLowerCase() });
     }
   }, [enabled, pattern, state.status, state.pattern]);
 
@@ -210,11 +266,28 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
           return;
         }
 
-        const suggestions = results.map((p) => ({
+        const fileSuggestions = results.map((p) => ({
           label: p,
           value: escapePath(p),
         }));
-        dispatch({ type: 'SEARCH_SUCCESS', payload: suggestions });
+
+        const resourceCandidates = buildResourceCandidates(config);
+        const resourceSuggestions = (
+          await searchResourceCandidates(
+            state.pattern ?? '',
+            resourceCandidates,
+          )
+        ).map((suggestion) => ({
+          ...suggestion,
+          label: suggestion.label.replace(/^@/, ''),
+          value: suggestion.value.replace(/^@/, ''),
+        }));
+
+        const combinedSuggestions = [
+          ...fileSuggestions,
+          ...resourceSuggestions,
+        ];
+        dispatch({ type: 'SEARCH_SUCCESS', payload: combinedSuggestions });
       } catch (error) {
         if (!(error instanceof Error && error.name === 'AbortError')) {
           dispatch({ type: 'ERROR' });
@@ -223,8 +296,10 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     };
 
     if (state.status === AtCompletionStatus.INITIALIZING) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       initialize();
     } else if (state.status === AtCompletionStatus.SEARCHING) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       search();
     }
 

@@ -17,6 +17,7 @@ describe('keyMatchers', () => {
     meta: false,
     shift: false,
     paste: false,
+    insertable: false,
     sequence: name,
     ...mods,
   });
@@ -32,10 +33,20 @@ describe('keyMatchers', () => {
     [Command.DELETE_WORD_BACKWARD]: (key: Key) =>
       (key.ctrl || key.meta) && key.name === 'backspace',
     [Command.CLEAR_SCREEN]: (key: Key) => key.ctrl && key.name === 'l',
+    [Command.SCROLL_UP]: (key: Key) => key.name === 'up' && !!key.shift,
+    [Command.SCROLL_DOWN]: (key: Key) => key.name === 'down' && !!key.shift,
+    [Command.SCROLL_HOME]: (key: Key) => key.name === 'home',
+    [Command.SCROLL_END]: (key: Key) => key.name === 'end',
+    [Command.PAGE_UP]: (key: Key) => key.name === 'pageup',
+    [Command.PAGE_DOWN]: (key: Key) => key.name === 'pagedown',
     [Command.HISTORY_UP]: (key: Key) => key.ctrl && key.name === 'p',
     [Command.HISTORY_DOWN]: (key: Key) => key.ctrl && key.name === 'n',
     [Command.NAVIGATION_UP]: (key: Key) => key.name === 'up',
     [Command.NAVIGATION_DOWN]: (key: Key) => key.name === 'down',
+    [Command.DIALOG_NAVIGATION_UP]: (key: Key) =>
+      !key.shift && (key.name === 'up' || key.name === 'k'),
+    [Command.DIALOG_NAVIGATION_DOWN]: (key: Key) =>
+      !key.shift && (key.name === 'down' || key.name === 'j'),
     [Command.ACCEPT_SUGGESTION]: (key: Key) =>
       key.name === 'tab' || (key.name === 'return' && !key.ctrl),
     [Command.COMPLETION_UP]: (key: Key) =>
@@ -49,12 +60,13 @@ describe('keyMatchers', () => {
       key.name === 'return' && (key.ctrl || key.meta || key.paste),
     [Command.OPEN_EXTERNAL_EDITOR]: (key: Key) =>
       key.ctrl && (key.name === 'x' || key.sequence === '\x18'),
-    [Command.PASTE_CLIPBOARD_IMAGE]: (key: Key) => key.ctrl && key.name === 'v',
-    [Command.SHOW_ERROR_DETAILS]: (key: Key) => key.ctrl && key.name === 'o',
-    [Command.TOGGLE_TOOL_DESCRIPTIONS]: (key: Key) =>
-      key.ctrl && key.name === 't',
+    [Command.PASTE_CLIPBOARD]: (key: Key) => key.ctrl && key.name === 'v',
+    [Command.SHOW_ERROR_DETAILS]: (key: Key) => key.name === 'f12',
+    [Command.SHOW_FULL_TODOS]: (key: Key) => key.ctrl && key.name === 't',
     [Command.TOGGLE_IDE_CONTEXT_DETAIL]: (key: Key) =>
       key.ctrl && key.name === 'g',
+    [Command.TOGGLE_MARKDOWN]: (key: Key) => key.meta && key.name === 'm',
+    [Command.TOGGLE_COPY_MODE]: (key: Key) => key.ctrl && key.name === 's',
     [Command.QUIT]: (key: Key) => key.ctrl && key.name === 'c',
     [Command.EXIT]: (key: Key) => key.ctrl && key.name === 'd',
     [Command.SHOW_MORE_LINES]: (key: Key) => key.ctrl && key.name === 's',
@@ -135,6 +147,38 @@ describe('keyMatchers', () => {
       negative: [createKey('l'), createKey('k', { ctrl: true })],
     },
 
+    // Scrolling
+    {
+      command: Command.SCROLL_UP,
+      positive: [createKey('up', { shift: true })],
+      negative: [createKey('up'), createKey('up', { ctrl: true })],
+    },
+    {
+      command: Command.SCROLL_DOWN,
+      positive: [createKey('down', { shift: true })],
+      negative: [createKey('down'), createKey('down', { ctrl: true })],
+    },
+    {
+      command: Command.SCROLL_HOME,
+      positive: [createKey('home')],
+      negative: [createKey('end')],
+    },
+    {
+      command: Command.SCROLL_END,
+      positive: [createKey('end')],
+      negative: [createKey('home')],
+    },
+    {
+      command: Command.PAGE_UP,
+      positive: [createKey('pageup'), createKey('pageup', { shift: true })],
+      negative: [createKey('pagedown'), createKey('up')],
+    },
+    {
+      command: Command.PAGE_DOWN,
+      positive: [createKey('pagedown'), createKey('pagedown', { ctrl: true })],
+      negative: [createKey('pageup'), createKey('down')],
+    },
+
     // History navigation
     {
       command: Command.HISTORY_UP,
@@ -155,6 +199,26 @@ describe('keyMatchers', () => {
       command: Command.NAVIGATION_DOWN,
       positive: [createKey('down'), createKey('down', { ctrl: true })],
       negative: [createKey('n'), createKey('d')],
+    },
+
+    // Dialog navigation
+    {
+      command: Command.DIALOG_NAVIGATION_UP,
+      positive: [createKey('up'), createKey('k')],
+      negative: [
+        createKey('up', { shift: true }),
+        createKey('k', { shift: true }),
+        createKey('p'),
+      ],
+    },
+    {
+      command: Command.DIALOG_NAVIGATION_DOWN,
+      positive: [createKey('down'), createKey('j')],
+      negative: [
+        createKey('down', { shift: true }),
+        createKey('j', { shift: true }),
+        createKey('n'),
+      ],
     },
 
     // Auto-completion
@@ -204,7 +268,7 @@ describe('keyMatchers', () => {
       negative: [createKey('x'), createKey('c', { ctrl: true })],
     },
     {
-      command: Command.PASTE_CLIPBOARD_IMAGE,
+      command: Command.PASTE_CLIPBOARD,
       positive: [createKey('v', { ctrl: true })],
       negative: [createKey('v'), createKey('c', { ctrl: true })],
     },
@@ -212,18 +276,28 @@ describe('keyMatchers', () => {
     // App level bindings
     {
       command: Command.SHOW_ERROR_DETAILS,
-      positive: [createKey('o', { ctrl: true })],
-      negative: [createKey('o'), createKey('e', { ctrl: true })],
+      positive: [createKey('f12')],
+      negative: [createKey('o', { ctrl: true }), createKey('f11')],
     },
     {
-      command: Command.TOGGLE_TOOL_DESCRIPTIONS,
+      command: Command.SHOW_FULL_TODOS,
       positive: [createKey('t', { ctrl: true })],
-      negative: [createKey('t'), createKey('s', { ctrl: true })],
+      negative: [createKey('t'), createKey('e', { ctrl: true })],
     },
     {
       command: Command.TOGGLE_IDE_CONTEXT_DETAIL,
       positive: [createKey('g', { ctrl: true })],
       negative: [createKey('g'), createKey('t', { ctrl: true })],
+    },
+    {
+      command: Command.TOGGLE_MARKDOWN,
+      positive: [createKey('m', { meta: true })],
+      negative: [createKey('m'), createKey('m', { shift: true })],
+    },
+    {
+      command: Command.TOGGLE_COPY_MODE,
+      positive: [createKey('s', { ctrl: true })],
+      negative: [createKey('s'), createKey('s', { meta: true })],
     },
     {
       command: Command.QUIT,

@@ -94,7 +94,12 @@ describe('parseGoogleApiError', () => {
         },
       },
     };
-    expect(parseGoogleApiError(mockError)).toBeNull();
+
+    expect(parseGoogleApiError(mockError)).toEqual({
+      code: 400,
+      message: 'Bad Request',
+      details: [],
+    });
   });
 
   it('should return null if there are no valid details', () => {
@@ -115,7 +120,11 @@ describe('parseGoogleApiError', () => {
         },
       },
     };
-    expect(parseGoogleApiError(mockError)).toBeNull();
+    expect(parseGoogleApiError(mockError)).toEqual({
+      code: 400,
+      message: 'Bad Request',
+      details: [],
+    });
   });
 
   it('should parse a doubly nested error in the message', () => {
@@ -232,6 +241,112 @@ describe('parseGoogleApiError', () => {
       '{"error":{"message":"{\\n  \\"error\\": {\\n    \\"code\\": 429,\\n    \\"message\\": \\"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.\\\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_paid_tier_input_token_count, limit: 10000\\\\nPlease retry in 40.025771073s.\\",\\n    \\"status\\": \\"RESOURCE_EXHAUSTED\\",\\n    \\"details\\": [\\n      {\\n        \\"@type\\": \\"type.googleapis.com/google.rpc.DebugInfo\\",\\n        \\"detail\\": \\"[ORIGINAL ERROR] generic::resource_exhausted: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.\\\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_paid_tier_input_token_count, limit: 10000\\\\nPlease retry in 40.025771073s. [google.rpc.error_details_ext] { message: \\\\\\"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.\\\\\\\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_paid_tier_input_token_count, limit: 10000\\\\\\\\nPlease retry in 40.025771073s.\\\\\\" }\\"\\n      },\\n      {\\n        \\"@type\\": \\"type.googleapis.com/google.rpc.QuotaFailure\\",\\n        \\"violations\\": [\\n          {\\n            \\"quotaMetric\\": \\"generativelanguage.googleapis.com/generate_content_paid_tier_input_token_count\\",\\n            \\"quotaId\\": \\"GenerateContentPaidTierInputTokensPerModelPerMinute\\",\\n            \\"quotaDimensions\\": {\\n              \\"location\\": \\"global\\",\\n              \\"model\\": \\"gemini-2.5-pro\\"\\n            },\\n            \\"quotaValue\\": \\"10000\\"\\n          }\\n        ]\\n      },\\n      {\\n        \\"@type\\": \\"type.googleapis.com/google.rpc.Help\\",\\n        \\"links\\": [\\n          {\\n            \\"description\\": \\"Learn more about Gemini API quotas\\",\\n            \\"url\\": \\"https://ai.google.dev/gemini-api/docs/rate-limits\\"\\n          }\\n        ]\\n      },\\n      {\\n        \\"@type\\": \\"type.googleapis.com/google.rpc.RetryInfo\\",\\n        \\"retryDelay\\": \\"40s\\"\\n      }\\n    ]\\n  }\\n}\\n","code":429,"status":"Too Many Requests"}}';
 
     const parsed = parseGoogleApiError(userErrorString);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.code).toBe(429);
+    expect(parsed?.message).toContain('You exceeded your current quota');
+    expect(parsed?.details).toHaveLength(4);
+    expect(
+      parsed?.details.some(
+        (d) => d['@type'] === 'type.googleapis.com/google.rpc.QuotaFailure',
+      ),
+    ).toBe(true);
+    expect(
+      parsed?.details.some(
+        (d) => d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo',
+      ),
+    ).toBe(true);
+  });
+
+  it('should parse an error that is an array', () => {
+    const mockError = [
+      {
+        error: {
+          code: 429,
+          message: 'Quota exceeded',
+          details: [
+            {
+              '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+              violations: [{ subject: 'user', description: 'daily limit' }],
+            },
+          ],
+        },
+      },
+    ];
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.code).toBe(429);
+    expect(parsed?.message).toBe('Quota exceeded');
+  });
+
+  it('should parse a gaxios error where data is an array', () => {
+    const mockError = {
+      response: {
+        status: 429,
+        data: [
+          {
+            error: {
+              code: 429,
+              message: 'Quota exceeded',
+              details: [
+                {
+                  '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+                  violations: [{ subject: 'user', description: 'daily limit' }],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    };
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.code).toBe(429);
+    expect(parsed?.message).toBe('Quota exceeded');
+  });
+
+  it('should parse a gaxios error where data is a stringified array', () => {
+    const mockError = {
+      response: {
+        status: 429,
+        data: JSON.stringify([
+          {
+            error: {
+              code: 429,
+              message: 'Quota exceeded',
+              details: [
+                {
+                  '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+                  violations: [{ subject: 'user', description: 'daily limit' }],
+                },
+              ],
+            },
+          },
+        ]),
+      },
+    };
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.code).toBe(429);
+    expect(parsed?.message).toBe('Quota exceeded');
+  });
+
+  it('should parse an error with a malformed @type key (returned by Gemini API)', () => {
+    const malformedError = {
+      name: 'API Error',
+      message: {
+        error: {
+          message:
+            '{\n  "error": {\n    "code": 429,\n    "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 2\nPlease retry in 54.887755558s.",\n    "status": "RESOURCE_EXHAUSTED",\n    "details": [\n      {\n        " @type": "type.googleapis.com/google.rpc.DebugInfo",\n        "detail": "[ORIGINAL ERROR] generic::resource_exhausted: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 2\\nPlease retry in 54.887755558s. [google.rpc.error_details_ext] { message: \\"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.\\\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 2\\\\nPlease retry in 54.887755558s.\\" }"\n      },\n      {\n" @type": "type.googleapis.com/google.rpc.QuotaFailure",\n        "violations": [\n          {\n            "quotaMetric": "generativelanguage.googleapis.com/generate_content_free_tier_requests",\n            "quotaId": "GenerateRequestsPerMinutePerProjectPerModel-FreeTier",\n            "quotaDimensions": {\n              "location": "global",\n"model": "gemini-2.5-pro"\n            },\n            "quotaValue": "2"\n          }\n        ]\n      },\n      {\n" @type": "type.googleapis.com/google.rpc.Help",\n        "links": [\n          {\n            "description": "Learn more about Gemini API quotas",\n            "url": "https://ai.google.dev/gemini-api/docs/rate-limits"\n          }\n        ]\n      },\n      {\n" @type": "type.googleapis.com/google.rpc.RetryInfo",\n        "retryDelay": "54s"\n      }\n    ]\n  }\n}\n',
+          code: 429,
+          status: 'Too Many Requests',
+        },
+      },
+    };
+
+    const parsed = parseGoogleApiError(malformedError);
     expect(parsed).not.toBeNull();
     expect(parsed?.code).toBe(429);
     expect(parsed?.message).toContain('You exceeded your current quota');

@@ -6,33 +6,97 @@
 
 import * as path from 'node:path';
 import fs from 'node:fs';
-import os from 'node:os';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExtensionEnablementManager, Override } from './extensionEnablement.js';
-import type { Extension } from '../extension.js';
+
+import { ExtensionStorage } from './storage.js';
+
+vi.mock('./storage.js');
+
+import {
+  coreEvents,
+  GEMINI_DIR,
+  type GeminiCLIExtension,
+} from '@google/gemini-cli-core';
+
+vi.mock('node:os', () => ({
+  homedir: vi.fn().mockReturnValue('/virtual-home'),
+  tmpdir: vi.fn().mockReturnValue('/virtual-tmp'),
+}));
+
+const inMemoryFs: { [key: string]: string } = {};
 
 // Helper to create a temporary directory for testing
 function createTestDir() {
-  const dirPath = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-test-'));
+  const dirPath = `/virtual-tmp/gemini-test-${Math.random().toString(36).substring(2, 15)}`;
+  inMemoryFs[dirPath] = ''; // Simulate directory existence
   return {
     path: dirPath,
-    cleanup: () => fs.rmSync(dirPath, { recursive: true, force: true }),
+    cleanup: () => {
+      for (const key in inMemoryFs) {
+        if (key.startsWith(dirPath)) {
+          delete inMemoryFs[key];
+        }
+      }
+    },
   };
 }
 
 let testDir: { path: string; cleanup: () => void };
-let configDir: string;
 let manager: ExtensionEnablementManager;
 
 describe('ExtensionEnablementManager', () => {
   beforeEach(() => {
+    // Clear the in-memory file system before each test
+    for (const key in inMemoryFs) {
+      delete inMemoryFs[key];
+    }
+    expect(Object.keys(inMemoryFs).length).toBe(0); // Add this assertion
+
+    // Mock fs functions
+    vi.spyOn(fs, 'readFileSync').mockImplementation(
+      (path: fs.PathOrFileDescriptor) => {
+        const content = inMemoryFs[path.toString()];
+        if (content === undefined) {
+          const error = new Error(
+            `ENOENT: no such file or directory, open '${path}'`,
+          );
+          (error as NodeJS.ErrnoException).code = 'ENOENT';
+          throw error;
+        }
+        return content;
+      },
+    );
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(
+      (
+        path: fs.PathOrFileDescriptor,
+        data: string | ArrayBufferView<ArrayBufferLike>,
+      ) => {
+        inMemoryFs[path.toString()] = data.toString(); // Convert ArrayBufferView to string for inMemoryFs
+      },
+    );
+    vi.spyOn(fs, 'mkdirSync').mockImplementation(
+      (
+        _path: fs.PathLike,
+        _options?: fs.MakeDirectoryOptions | fs.Mode | null,
+      ) => undefined,
+    );
+    vi.spyOn(fs, 'mkdtempSync').mockImplementation((prefix: string) => {
+      const virtualPath = `/virtual-tmp/${prefix.replace(/[^a-zA-Z0-9]/g, '')}`;
+      return virtualPath;
+    });
+    vi.spyOn(fs, 'rmSync').mockImplementation(() => {});
+
     testDir = createTestDir();
-    configDir = path.join(testDir.path, '.gemini');
-    manager = new ExtensionEnablementManager(configDir);
+    vi.mocked(ExtensionStorage.getUserExtensionsDir).mockReturnValue(
+      path.join(testDir.path, GEMINI_DIR),
+    );
+    manager = new ExtensionEnablementManager();
   });
 
   afterEach(() => {
-    testDir.cleanup();
+    vi.restoreAllMocks();
     // Reset the singleton instance for test isolation
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ExtensionEnablementManager as any).instance = undefined;
@@ -80,7 +144,7 @@ describe('ExtensionEnablementManager', () => {
       );
     });
 
-    it('should handle', () => {
+    it('should handle overlapping rules correctly', () => {
       manager.enable('ext-test', true, '/home/user/projects');
       manager.disable('ext-test', false, '/home/user/projects/my-app');
       expect(manager.isEnabled('ext-test', '/home/user/projects/my-app')).toBe(
@@ -89,6 +153,46 @@ describe('ExtensionEnablementManager', () => {
       expect(
         manager.isEnabled('ext-test', '/home/user/projects/something-else'),
       ).toBe(true);
+    });
+  });
+
+  describe('remove', () => {
+    it('should remove an extension from the config', () => {
+      manager.enable('ext-test', true, '/path/to/dir');
+      const config = manager.readConfig();
+      expect(config['ext-test']).toBeDefined();
+
+      manager.remove('ext-test');
+      const newConfig = manager.readConfig();
+      expect(newConfig['ext-test']).toBeUndefined();
+    });
+
+    it('should not throw when removing a non-existent extension', () => {
+      const config = manager.readConfig();
+      expect(config['ext-test']).toBeUndefined();
+      expect(() => manager.remove('ext-test')).not.toThrow();
+    });
+  });
+
+  describe('readConfig', () => {
+    it('should return an empty object if the config file is corrupted', () => {
+      const configPath = path.join(
+        testDir.path,
+        GEMINI_DIR,
+        'extension-enablement.json',
+      );
+      fs.mkdirSync(path.dirname(configPath), { recursive: true });
+      fs.writeFileSync(configPath, 'not a json');
+      const config = manager.readConfig();
+      expect(config).toEqual({});
+    });
+
+    it('should return an empty object on generic read error', () => {
+      vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+        throw new Error('Read error');
+      });
+      const config = manager.readConfig();
+      expect(config).toEqual({});
     });
   });
 
@@ -211,7 +315,7 @@ describe('ExtensionEnablementManager', () => {
     });
   });
 
-  it('should enable a path based on an enable override', () => {
+  it('should correctly prioritize more specific enable rules', () => {
     manager.disable('ext-test', true, '/Users/chrstn');
     manager.enable('ext-test', true, '/Users/chrstn/gemini-cli');
 
@@ -220,7 +324,7 @@ describe('ExtensionEnablementManager', () => {
     );
   });
 
-  it('should ignore subdirs', () => {
+  it('should not disable subdirectories if includeSubdirs is false', () => {
     manager.disable('ext-test', false, '/Users/chrstn');
     expect(manager.isEnabled('ext-test', '/Users/chrstn/gemini-cli')).toBe(
       true,
@@ -229,7 +333,7 @@ describe('ExtensionEnablementManager', () => {
 
   describe('extension overrides (-e <name>)', () => {
     beforeEach(() => {
-      manager = new ExtensionEnablementManager(configDir, ['ext-test']);
+      manager = new ExtensionEnablementManager(['ext-test']);
     });
 
     it('can enable extensions, case-insensitive', () => {
@@ -237,86 +341,85 @@ describe('ExtensionEnablementManager', () => {
       expect(manager.isEnabled('ext-test', '/')).toBe(true);
       expect(manager.isEnabled('Ext-Test', '/')).toBe(true);
       // Double check that it would have been disabled otherwise
-      expect(
-        new ExtensionEnablementManager(configDir).isEnabled('ext-test', '/'),
-      ).toBe(false);
+      expect(new ExtensionEnablementManager().isEnabled('ext-test', '/')).toBe(
+        false,
+      );
     });
 
     it('disable all other extensions', () => {
-      manager = new ExtensionEnablementManager(configDir, ['ext-test']);
+      manager = new ExtensionEnablementManager(['ext-test']);
       manager.enable('ext-test-2', true, '/');
       expect(manager.isEnabled('ext-test-2', '/')).toBe(false);
       // Double check that it would have been enabled otherwise
       expect(
-        new ExtensionEnablementManager(configDir).isEnabled('ext-test-2', '/'),
+        new ExtensionEnablementManager().isEnabled('ext-test-2', '/'),
       ).toBe(true);
     });
 
     it('none disables all extensions', () => {
-      manager = new ExtensionEnablementManager(configDir, ['none']);
+      manager = new ExtensionEnablementManager(['none']);
       manager.enable('ext-test', true, '/');
       expect(manager.isEnabled('ext-test', '/path/to/dir')).toBe(false);
       // Double check that it would have been enabled otherwise
-      expect(
-        new ExtensionEnablementManager(configDir).isEnabled('ext-test', '/'),
-      ).toBe(true);
+      expect(new ExtensionEnablementManager().isEnabled('ext-test', '/')).toBe(
+        true,
+      );
     });
   });
 
   describe('validateExtensionOverrides', () => {
-    let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+    let coreEventsEmitSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      coreEventsEmitSpy = vi.spyOn(coreEvents, 'emitFeedback');
     });
 
     afterEach(() => {
-      consoleErrorSpy.mockRestore();
+      coreEventsEmitSpy.mockRestore();
     });
 
     it('should not log an error if enabledExtensionNamesOverride is empty', () => {
-      const manager = new ExtensionEnablementManager(configDir, []);
+      const manager = new ExtensionEnablementManager([]);
       manager.validateExtensionOverrides([]);
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(coreEventsEmitSpy).not.toHaveBeenCalled();
     });
 
     it('should not log an error if all enabledExtensionNamesOverride are valid', () => {
-      const manager = new ExtensionEnablementManager(configDir, [
-        'ext-one',
-        'ext-two',
-      ]);
+      const manager = new ExtensionEnablementManager(['ext-one', 'ext-two']);
       const extensions = [
-        { config: { name: 'ext-one' } },
-        { config: { name: 'ext-two' } },
-      ] as Extension[];
+        { name: 'ext-one' },
+        { name: 'ext-two' },
+      ] as GeminiCLIExtension[];
       manager.validateExtensionOverrides(extensions);
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(coreEventsEmitSpy).not.toHaveBeenCalled();
     });
 
     it('should log an error for each invalid extension name in enabledExtensionNamesOverride', () => {
-      const manager = new ExtensionEnablementManager(configDir, [
+      const manager = new ExtensionEnablementManager([
         'ext-one',
         'ext-invalid',
         'ext-another-invalid',
       ]);
       const extensions = [
-        { config: { name: 'ext-one' } },
-        { config: { name: 'ext-two' } },
-      ] as Extension[];
+        { name: 'ext-one' },
+        { name: 'ext-two' },
+      ] as GeminiCLIExtension[];
       manager.validateExtensionOverrides(extensions);
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(coreEventsEmitSpy).toHaveBeenCalledTimes(2);
+      expect(coreEventsEmitSpy).toHaveBeenCalledWith(
+        'error',
         'Extension not found: ext-invalid',
       );
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(coreEventsEmitSpy).toHaveBeenCalledWith(
+        'error',
         'Extension not found: ext-another-invalid',
       );
     });
 
     it('should not log an error if "none" is in enabledExtensionNamesOverride', () => {
-      const manager = new ExtensionEnablementManager(configDir, ['none']);
+      const manager = new ExtensionEnablementManager(['none']);
       manager.validateExtensionOverrides([]);
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(coreEventsEmitSpy).not.toHaveBeenCalled();
     });
   });
 });
@@ -337,6 +440,13 @@ describe('Override', () => {
   });
 
   it('should create an override from a file rule', () => {
+    const override = Override.fromFileRule('/path/to/dir/');
+    expect(override.baseRule).toBe('/path/to/dir/');
+    expect(override.isDisable).toBe(false);
+    expect(override.includeSubdirs).toBe(false);
+  });
+
+  it('should create an override from a file rule without a trailing slash', () => {
     const override = Override.fromFileRule('/path/to/dir');
     expect(override.baseRule).toBe('/path/to/dir');
     expect(override.isDisable).toBe(false);

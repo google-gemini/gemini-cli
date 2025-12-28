@@ -4,9 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import yargs from 'yargs';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  type Mock,
+  type MockInstance,
+} from 'vitest';
+import yargs, { type Argv } from 'yargs';
 import { addCommand } from './add.js';
 import { loadSettings, SettingScope } from '../../config/settings.js';
+import { debugLogger } from '@google/gemini-cli-core';
+
+vi.mock('../utils.js', () => ({
+  exitCli: vi.fn(),
+}));
 
 vi.mock('fs/promises', () => ({
   readFile: vi.fn(),
@@ -31,12 +45,13 @@ vi.mock('../../config/settings.js', async () => {
   };
 });
 
-const mockedLoadSettings = loadSettings as vi.Mock;
+const mockedLoadSettings = loadSettings as Mock;
 
 describe('mcp add command', () => {
-  let parser: yargs.Argv;
-  let mockSetValue: vi.Mock;
-  let mockConsoleError: vi.Mock;
+  let parser: Argv;
+  let mockSetValue: Mock;
+  let mockConsoleError: Mock;
+  let debugLoggerErrorSpy: MockInstance;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -44,6 +59,9 @@ describe('mcp add command', () => {
     parser = yargsInstance;
     mockSetValue = vi.fn();
     mockConsoleError = vi.fn();
+    debugLoggerErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(mockConsoleError);
     mockedLoadSettings.mockReturnValue({
       forScope: () => ({ settings: {} }),
@@ -55,7 +73,7 @@ describe('mcp add command', () => {
 
   it('should add a stdio server to project settings', async () => {
     await parser.parseAsync(
-      'add my-server /path/to/server arg1 arg2 -e FOO=bar',
+      'add -e FOO=bar my-server /path/to/server arg1 arg2',
     );
 
     expect(mockSetValue).toHaveBeenCalledWith(
@@ -71,14 +89,33 @@ describe('mcp add command', () => {
     );
   });
 
+  it('should handle multiple env vars before positional args', async () => {
+    await parser.parseAsync(
+      'add -e FOO=bar -e BAZ=qux my-server /path/to/server',
+    );
+
+    expect(mockSetValue).toHaveBeenCalledWith(
+      SettingScope.Workspace,
+      'mcpServers',
+      {
+        'my-server': {
+          command: '/path/to/server',
+          args: [],
+          env: { FOO: 'bar', BAZ: 'qux' },
+        },
+      },
+    );
+  });
+
   it('should add an sse server to user settings', async () => {
     await parser.parseAsync(
-      'add --transport sse sse-server https://example.com/sse-endpoint --scope user -H "X-API-Key: your-key"',
+      'add --transport sse --scope user -H "X-API-Key: your-key" sse-server https://example.com/sse-endpoint',
     );
 
     expect(mockSetValue).toHaveBeenCalledWith(SettingScope.User, 'mcpServers', {
       'sse-server': {
         url: 'https://example.com/sse-endpoint',
+        type: 'sse',
         headers: { 'X-API-Key': 'your-key' },
       },
     });
@@ -86,7 +123,7 @@ describe('mcp add command', () => {
 
   it('should add an http server to project settings', async () => {
     await parser.parseAsync(
-      'add --transport http http-server https://example.com/mcp -H "Authorization: Bearer your-token"',
+      'add --transport http -H "Authorization: Bearer your-token" http-server https://example.com/mcp',
     );
 
     expect(mockSetValue).toHaveBeenCalledWith(
@@ -94,7 +131,40 @@ describe('mcp add command', () => {
       'mcpServers',
       {
         'http-server': {
-          httpUrl: 'https://example.com/mcp',
+          url: 'https://example.com/mcp',
+          type: 'http',
+          headers: { Authorization: 'Bearer your-token' },
+        },
+      },
+    );
+  });
+
+  it('should add an sse server using --type alias', async () => {
+    await parser.parseAsync(
+      'add --type sse --scope user -H "X-API-Key: your-key" sse-server https://example.com/sse',
+    );
+
+    expect(mockSetValue).toHaveBeenCalledWith(SettingScope.User, 'mcpServers', {
+      'sse-server': {
+        url: 'https://example.com/sse',
+        type: 'sse',
+        headers: { 'X-API-Key': 'your-key' },
+      },
+    });
+  });
+
+  it('should add an http server using --type alias', async () => {
+    await parser.parseAsync(
+      'add --type http -H "Authorization: Bearer your-token" http-server https://example.com/mcp',
+    );
+
+    expect(mockSetValue).toHaveBeenCalledWith(
+      SettingScope.Workspace,
+      'mcpServers',
+      {
+        'http-server': {
+          url: 'https://example.com/mcp',
+          type: 'http',
           headers: { Authorization: 'Bearer your-token' },
         },
       },
@@ -207,13 +277,13 @@ describe('mcp add command', () => {
           .spyOn(process, 'exit')
           .mockImplementation((() => {
             throw new Error('process.exit called');
-          }) as (code?: number) => never);
+          }) as (code?: number | string | null) => never);
 
         await expect(
           parser.parseAsync(`add ${serverName} ${command}`),
         ).rejects.toThrow('process.exit called');
 
-        expect(mockConsoleError).toHaveBeenCalledWith(
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
           'Error: Please use --scope user to edit settings in the home directory.',
         );
         expect(mockProcessExit).toHaveBeenCalledWith(1);
@@ -225,13 +295,13 @@ describe('mcp add command', () => {
           .spyOn(process, 'exit')
           .mockImplementation((() => {
             throw new Error('process.exit called');
-          }) as (code?: number) => never);
+          }) as (code?: number | string | null) => never);
 
         await expect(
           parser.parseAsync(`add --scope project ${serverName} ${command}`),
         ).rejects.toThrow('process.exit called');
 
-        expect(mockConsoleError).toHaveBeenCalledWith(
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
           'Error: Please use --scope user to edit settings in the home directory.',
         );
         expect(mockProcessExit).toHaveBeenCalledWith(1);
@@ -245,7 +315,7 @@ describe('mcp add command', () => {
           'mcpServers',
           expect.any(Object),
         );
-        expect(mockConsoleError).not.toHaveBeenCalled();
+        expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
       });
     });
 

@@ -46,7 +46,9 @@ try {
 // if debugging is enabled and sandboxing is disabled, use --inspect-brk flag
 // note with sandboxing this flag is passed to the binary inside the sandbox
 // inside sandbox SANDBOX should be set and sandbox_command.js should fail
-if (process.env.DEBUG && !sandboxCommand) {
+const isInDebugMode = process.env.DEBUG === '1' || process.env.DEBUG === 'true';
+
+if (isInDebugMode && !sandboxCommand) {
   if (process.env.SANDBOX) {
     const port = process.env.DEBUG_PORT || '9229';
     nodeArgs.push(`--inspect-brk=0.0.0.0:${port}`);
@@ -64,7 +66,7 @@ const env = {
   DEV: 'true',
 };
 
-if (process.env.DEBUG) {
+if (isInDebugMode) {
   // If this is not set, the debugger will pause on the outer process rather
   // than the relaunched process making it harder to debug.
   env.GEMINI_CLI_NO_RELAUNCH = 'true';

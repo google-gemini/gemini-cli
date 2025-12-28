@@ -81,6 +81,11 @@ async function main() {
       type: 'boolean',
       default: false,
     })
+    .option('environment', {
+      choices: ['prod', 'dev'],
+      type: 'string',
+      default: process.env.ENVIRONMENT || 'prod',
+    })
     .example(
       '$0 --head-ref "hotfix/v0.5.3/preview/cherry-pick-abc1234" --test',
       'Test channel detection logic',
@@ -105,6 +110,7 @@ async function main() {
 
   // Get inputs from CLI args or environment
   const headRef = argv.headRef || process.env.HEAD_REF;
+  const environment = argv.environment;
   const body = argv.prBody || process.env.PR_BODY || '';
   const isDryRun = argv.dryRun || body.includes('[DRY RUN]');
   const forceSkipTests =
@@ -226,6 +232,8 @@ async function main() {
         '--field',
         `release_ref=${releaseRef}`,
         '--field',
+        `environment=${environment}`,
+        '--field',
         originalPr ? `original_pr=${originalPr.toString()}` : 'original_pr=',
       ];
 
@@ -259,6 +267,7 @@ async function main() {
     const commentBody = `🚀 **Patch Release Started!**
 
 **📋 Release Details:**
+- **Environment**: \`${environment}\`
 - **Channel**: \`${channel}\` → publishing to npm tag \`${npmTag}\`
 - **Version**: \`${version}\`
 - **Hotfix PR**: Merged ✅
