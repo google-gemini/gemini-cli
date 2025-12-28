@@ -1366,11 +1366,13 @@ describe('loadCliConfig folderTrust', () => {
 });
 
 describe('loadCliConfig with includeDirectories', () => {
+  const originalIsTTY = process.stdin.isTTY;
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue(
       path.resolve(path.sep, 'mock', 'home', 'user'),
     );
+    process.stdin.isTTY = false;
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     vi.spyOn(process, 'cwd').mockReturnValue(
       path.resolve(path.sep, 'home', 'user', 'project'),
@@ -1379,6 +1381,7 @@ describe('loadCliConfig with includeDirectories', () => {
   });
 
   afterEach(() => {
+    process.stdin.isTTY = originalIsTTY;
     vi.restoreAllMocks();
   });
 
@@ -1417,6 +1420,24 @@ describe('loadCliConfig with includeDirectories', () => {
     expect(config.getPendingIncludeDirectories()).toHaveLength(
       expected.length - 1,
     );
+  });
+
+  it('should include directories as pending in non-interactive mode', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--include-directories',
+      path.resolve(path.sep, 'cli', 'path1'),
+      '-p', // Prompt flag for non-interactive
+      'test prompt',
+    ];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getPendingIncludeDirectories()).toContain(
+      path.resolve(path.sep, 'cli', 'path1'),
+    );
+    expect(config.getPendingIncludeDirectories()).toHaveLength(1);
   });
 });
 
