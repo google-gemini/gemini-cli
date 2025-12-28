@@ -20,5 +20,8 @@ export default defineConfig({
         maxThreads: 16,
       },
     },
+    sequence: {
+      concurrent: true,
+    },
   },
 });
