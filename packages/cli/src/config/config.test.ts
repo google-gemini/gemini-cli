@@ -1434,10 +1434,9 @@ describe('loadCliConfig with includeDirectories', () => {
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getPendingIncludeDirectories()).toContain(
+    expect(config.getPendingIncludeDirectories()).toEqual([
       path.resolve(path.sep, 'cli', 'path1'),
-    );
-    expect(config.getPendingIncludeDirectories()).toHaveLength(1);
+    ]);
   });
 });
 
