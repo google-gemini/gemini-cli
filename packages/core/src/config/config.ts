@@ -361,7 +361,7 @@ export class Config {
   private readonly question: string | undefined;
 
   private readonly coreTools: string[] | undefined;
-  private readonly allowedTools: string[] | undefined;
+  private allowedTools: string[] | undefined;
   private readonly excludeTools: string[] | undefined;
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
@@ -1036,19 +1036,17 @@ export class Config {
     return this.allowedTools;
   }
 
-  setAllowedTools(allowedTools: string[] | undefined): void {
-    this._setAllowedTools(allowedTools);
+  async setAllowedTools(allowedTools: string[] | undefined): Promise<void> {
+    await this._setAllowedTools(allowedTools);
   }
 
   /** @internal */
-  _setAllowedTools(allowedTools: string[] | undefined): void {
-    // @ts-expect-error - overriding a readonly property for runtime updates
+  async _setAllowedTools(allowedTools: string[] | undefined): Promise<void> {
     this.allowedTools = allowedTools;
     // Update the tool registry's internal whitelist
     this.getToolRegistry()?.setAllowedTools(allowedTools);
     // Update the system instruction and tools to reflect changes in available tools
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    this.updateSystemInstructionIfInitialized();
+    await this.updateSystemInstructionIfInitialized();
   }
 
   /**

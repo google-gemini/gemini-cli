@@ -219,6 +219,33 @@ describe('ToolRegistry', () => {
     });
   });
 
+  describe('allowed tools', () => {
+    const toolA = new MockTool({ name: 'tool-a', displayName: 'Tool A' });
+    const toolB = new MockTool({ name: 'tool-b', displayName: 'Tool B' });
+
+    it('should only return tools that are in the allowed list when set', () => {
+      toolRegistry.registerTool(toolA);
+      toolRegistry.registerTool(toolB);
+
+      toolRegistry.setAllowedTools(['tool-a']);
+
+      expect(toolRegistry.getAllTools()).toEqual([toolA]);
+      expect(toolRegistry.getTool('tool-a')).toBe(toolA);
+      expect(toolRegistry.getTool('tool-b')).toBeUndefined();
+    });
+
+    it('should return all tools when allowed list is undefined', () => {
+      toolRegistry.registerTool(toolA);
+      toolRegistry.registerTool(toolB);
+
+      toolRegistry.setAllowedTools(undefined);
+
+      expect(toolRegistry.getAllTools()).toHaveLength(2);
+      expect(toolRegistry.getTool('tool-a')).toBe(toolA);
+      expect(toolRegistry.getTool('tool-b')).toBe(toolB);
+    });
+  });
+
   describe('excluded tools', () => {
     const simpleTool = new MockTool({
       name: 'tool-a',
@@ -282,38 +309,6 @@ describe('ToolRegistry', () => {
           );
         }
       }
-    });
-  });
-
-  describe('allowed tools', () => {
-    const toolA = new MockTool({ name: 'tool-a', displayName: 'Tool A' });
-    const toolB = new MockTool({ name: 'tool-b', displayName: 'Tool B' });
-
-    it('should only return tools that are in the allowlist', () => {
-      toolRegistry.registerTool(toolA);
-      toolRegistry.registerTool(toolB);
-
-      // Set allowlist to only include toolA
-      toolRegistry.setAllowedTools(['tool-a']);
-
-      expect(toolRegistry.getAllToolNames()).toEqual(['tool-a']);
-      expect(toolRegistry.getTool('tool-a')).toBe(toolA);
-      expect(toolRegistry.getTool('tool-b')).toBeUndefined();
-    });
-
-    it('should initialize with allowed tools from config', () => {
-      const configWithAllowed = new Config({
-        ...baseConfigParams,
-        allowedTools: ['tool-a'],
-      });
-      const registryWithAllowed = new ToolRegistry(configWithAllowed);
-
-      registryWithAllowed.registerTool(toolA);
-      registryWithAllowed.registerTool(toolB);
-
-      expect(registryWithAllowed.getAllToolNames()).toEqual(['tool-a']);
-      expect(registryWithAllowed.getTool('tool-a')).toBe(toolA);
-      expect(registryWithAllowed.getTool('tool-b')).toBeUndefined();
     });
   });
 

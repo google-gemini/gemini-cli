@@ -61,6 +61,7 @@ vi.mock('../tools/tool-registry', () => {
   ToolRegistryMock.prototype.sortTools = vi.fn();
   ToolRegistryMock.prototype.getAllTools = vi.fn(() => []); // Mock methods if needed
   ToolRegistryMock.prototype.getTool = vi.fn();
+  ToolRegistryMock.prototype.setAllowedTools = vi.fn();
   ToolRegistryMock.prototype.getFunctionDeclarations = vi.fn(() => []);
   return { ToolRegistry: ToolRegistryMock };
 });
@@ -1652,6 +1653,21 @@ describe('Config getHooks', () => {
       config.setModel(DEFAULT_GEMINI_MODEL, true);
 
       expect(onModelChange).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('setAllowedTools', () => {
+    it('should update allowedTools and notify ToolRegistry', async () => {
+      const config = new Config(baseParams);
+      await config.initialize();
+      const registry = config.getToolRegistry();
+      const spy = vi.spyOn(registry, 'setAllowedTools');
+
+      const allowedTools = ['tool1', 'tool2'];
+      await config.setAllowedTools(allowedTools);
+
+      expect(config.getAllowedTools()).toEqual(allowedTools);
+      expect(spy).toHaveBeenCalledWith(allowedTools);
     });
   });
 });
