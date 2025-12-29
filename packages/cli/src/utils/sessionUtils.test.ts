@@ -10,6 +10,7 @@ import {
   extractFirstUserMessage,
   formatRelativeTime,
   hasUserOrAssistantMessage,
+  SessionError,
 } from './sessionUtils.js';
 import type { Config, MessageRecord } from '@google/gemini-cli-core';
 import { SESSION_FILE_PREFIX } from '@google/gemini-cli-core';
@@ -493,12 +494,10 @@ describe('SessionSelector', () => {
 
     await expect(
       sessionSelector.resolveSession('invalid-uuid'),
-    ).rejects.toThrow(
-      'Invalid session identifier "invalid-uuid". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, --resume "{name or summary}" or --resume latest.',
-    );
+    ).rejects.toThrow(SessionError);
 
     await expect(sessionSelector.resolveSession('999')).rejects.toThrow(
-      'Invalid session identifier "999". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, --resume "{name or summary}" or --resume latest.',
+      SessionError,
     );
   });
 

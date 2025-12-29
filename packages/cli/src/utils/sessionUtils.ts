@@ -24,6 +24,47 @@ import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
 export const RESUME_LATEST = 'latest';
 
 /**
+ * Error codes for session-related errors.
+ */
+export type SessionErrorCode =
+  | 'NO_SESSIONS_FOUND'
+  | 'INVALID_SESSION_IDENTIFIER';
+
+/**
+ * Error thrown for session-related failures.
+ * Uses a code field to differentiate between error types.
+ */
+export class SessionError extends Error {
+  constructor(
+    readonly code: SessionErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'SessionError';
+  }
+
+  /**
+   * Creates an error for when no sessions exist for the current project.
+   */
+  static noSessionsFound(): SessionError {
+    return new SessionError(
+      'NO_SESSIONS_FOUND',
+      'No previous sessions found for this project.',
+    );
+  }
+
+  /**
+   * Creates an error for when a session identifier is invalid.
+   */
+  static invalidSessionIdentifier(identifier: string): SessionError {
+    return new SessionError(
+      'INVALID_SESSION_IDENTIFIER',
+      `Invalid session identifier "${identifier}".\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, --resume "{name or summary}" or --resume latest.`,
+    );
+  }
+}
+
+/**
  * Represents a text match found during search with surrounding context.
  */
 export interface TextMatch {
@@ -369,7 +410,7 @@ export class SessionSelector {
     const sessions = await this.listSessions();
 
     if (sessions.length === 0) {
-      throw new Error('No previous sessions found for this project.');
+      throw SessionError.noSessionsFound();
     }
 
     // Sort by startTime (oldest first, so newest sessions get highest numbers)
@@ -413,9 +454,7 @@ export class SessionSelector {
       return sessionsByName[0];
     }
 
-    throw new Error(
-      `Invalid session identifier "${identifier}". Use --list-sessions to see available sessions.`,
-    );
+    throw SessionError.invalidSessionIdentifier(identifier);
   }
 
   /**
@@ -445,9 +484,13 @@ export class SessionSelector {
       try {
         selectedSession = await this.findSession(resumeArg);
       } catch (error) {
-        // Re-throw with more detailed message for resume command
+        // SessionError already has detailed messages - just rethrow
+        if (error instanceof SessionError) {
+          throw error;
+        }
+        // Wrap unexpected errors with context
         throw new Error(
-          `Invalid session identifier "${resumeArg}". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, --resume "{name or summary}" or --resume latest.  Error: ${error}`,
+          `Failed to find session "${resumeArg}": ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
