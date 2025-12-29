@@ -44,6 +44,12 @@ export interface RadioButtonSelectProps<T> {
   maxItemsToShow?: number;
   /** Whether to show numbers next to items. */
   showNumbers?: boolean;
+  /** Whether an input field within the active item is currently active. */
+  isInputActive?: boolean;
+  /** Whether the active input is at its top boundary (relevant for arrow key navigation). */
+  isAtTop?: boolean;
+  /** Whether the active input is at its bottom boundary (relevant for arrow key navigation). */
+  isAtBottom?: boolean;
   /** Optional custom renderer for items. */
   renderItem?: (
     item: RadioSelectItem<T>,
@@ -66,6 +72,9 @@ export function RadioButtonSelect<T>({
   showScrollArrows = false,
   maxItemsToShow = 10,
   showNumbers = true,
+  isInputActive = false,
+  isAtTop = false,
+  isAtBottom = false,
   renderItem,
 }: RadioButtonSelectProps<T>): React.JSX.Element {
   return (
@@ -78,6 +87,9 @@ export function RadioButtonSelect<T>({
       showNumbers={showNumbers}
       showScrollArrows={showScrollArrows}
       maxItemsToShow={maxItemsToShow}
+      isInputActive={isInputActive}
+      isAtTop={isAtTop}
+      isAtBottom={isAtBottom}
       renderItem={
         renderItem ||
         ((item, { titleColor }) => {

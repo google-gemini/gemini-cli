@@ -30,6 +30,9 @@ export interface BaseSelectionListProps<
   showNumbers?: boolean;
   showScrollArrows?: boolean;
   maxItemsToShow?: number;
+  isInputActive?: boolean;
+  isAtTop?: boolean;
+  isAtBottom?: boolean;
   renderItem: (item: TItem, context: RenderItemContext) => React.ReactNode;
 }
 
@@ -59,6 +62,9 @@ export function BaseSelectionList<
   showNumbers = true,
   showScrollArrows = false,
   maxItemsToShow = 10,
+  isInputActive = false,
+  isAtTop = false,
+  isAtBottom = false,
   renderItem,
 }: BaseSelectionListProps<T, TItem>): React.JSX.Element {
   const { activeIndex } = useSelectionList({
@@ -68,6 +74,9 @@ export function BaseSelectionList<
     onHighlight,
     isFocused,
     showNumbers,
+    isInputActive,
+    isAtTop,
+    isAtBottom,
   });
 
   const [scrollOffset, setScrollOffset] = useState(0);

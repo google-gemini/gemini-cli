@@ -53,13 +53,16 @@ export const ToolConfirmationMessage: React.FC<
   const allowPermanentApproval =
     settings.merged.security?.enablePermanentToolApproval ?? false;
 
+  const HEIGHT_SEPARATOR = 1;
+  const HEIGHT_HINT = 2;
+
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
   const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
-  const [isFeedbackMode, setIsFeedbackMode] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   const feedbackBuffer = useTextBuffer({
-    viewport: { width: terminalWidth, height: 1 }, // Height grows dynamically in TextInput but buffer needs a viewport
-    singleLine: true,
+    viewport: { width: terminalWidth - 10, height: 5 }, // Allow up to 5 lines, indented from bullet/number
+    singleLine: false,
     isValidPath: () => false,
   });
 
@@ -108,20 +111,19 @@ export const ToolConfirmationMessage: React.FC<
     (key) => {
       if (!isFocused) return;
 
-      if (isFeedbackMode) {
-        // TextInput handles its own keys, but we need to catch Escape to cancel feedback mode
-        // Handled by onCancel prop of TextInput
-        return;
-      }
-
       if (keyMatchers[Command.ESCAPE](key) || keyMatchers[Command.QUIT](key)) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleConfirm(ToolConfirmationOutcome.Cancel);
       }
 
       if (keyMatchers[Command.TOGGLE_FEEDBACK](key)) {
-        feedbackBuffer.setText('');
-        setIsFeedbackMode(true);
+        const feedbackIndex = options.findIndex(
+          (o) => o.value === ToolConfirmationOutcome.Feedback,
+        );
+        if (feedbackIndex !== -1 && selectedIndex !== feedbackIndex) {
+          feedbackBuffer.setText('');
+          setSelectedIndex(feedbackIndex);
+        }
       }
     },
     { isActive: isFocused },
@@ -129,25 +131,18 @@ export const ToolConfirmationMessage: React.FC<
 
   const handleSelect = (item: ToolConfirmationOutcome) => {
     if (item === ToolConfirmationOutcome.Feedback) {
-      feedbackBuffer.setText('');
-      setIsFeedbackMode(true);
-    } else {
-      handleConfirm(item).catch((e) => {
-        debugLogger.error('Failed to handle confirmation selection', e);
-      });
+      // No-op: Feedback is submitted via TextInput's onSubmit to allow the user to type first.
+      return;
     }
-  };
-
-  const handleFeedbackSubmit = (value: string) => {
-    setIsFeedbackMode(false);
-    handleConfirm(ToolConfirmationOutcome.Feedback, value).catch((e) => {
-      debugLogger.error('Failed to submit feedback', e);
+    handleConfirm(item).catch((e) => {
+      debugLogger.error('Failed to handle confirmation selection', e);
     });
   };
 
-  const handleFeedbackCancel = () => {
-    setIsFeedbackMode(false);
-    feedbackBuffer.setText('');
+  const handleFeedbackSubmit = (value: string) => {
+    handleConfirm(ToolConfirmationOutcome.Feedback, value).catch((e) => {
+      debugLogger.error('Failed to submit feedback', e);
+    });
   };
 
   const { question, bodyContent, options } = useMemo(() => {
@@ -157,14 +152,9 @@ export const ToolConfirmationMessage: React.FC<
 
     const addCommonOptions = () => {
       options.push({
-        label: 'Give feedback (f)',
+        label: 'Provide feedback (f)',
         value: ToolConfirmationOutcome.Feedback,
-        key: 'Give feedback (f)',
-      });
-      options.push({
-        label: 'No, suggest changes (esc)',
-        value: ToolConfirmationOutcome.Cancel,
-        key: 'No, suggest changes (esc)',
+        key: 'Provide feedback (f)',
       });
     };
 
@@ -291,7 +281,16 @@ export const ToolConfirmationMessage: React.FC<
       const MARGIN_BODY_BOTTOM = 1; // margin on the body container.
       const HEIGHT_QUESTION = 1; // The question text is one line.
       const MARGIN_QUESTION_BOTTOM = 1; // Margin on the question container.
-      const HEIGHT_OPTIONS = options.length; // Each option in the radio select takes one line.
+      const isFeedbackSelected =
+        options[selectedIndex]?.value === ToolConfirmationOutcome.Feedback;
+      const extraFeedbackLines = isFeedbackSelected
+        ? Math.max(0, feedbackBuffer.viewportVisualLines.length - 1)
+        : 0;
+      const HEIGHT_OPTIONS =
+        options.length +
+        extraFeedbackLines +
+        (isFeedbackSelected ? HEIGHT_SEPARATOR : 0) +
+        HEIGHT_HINT; // options + extra feedback lines + underline + bottom hint line
 
       const surroundingElementsHeight =
         PADDING_OUTER_Y +
@@ -387,6 +386,8 @@ export const ToolConfirmationMessage: React.FC<
     terminalWidth,
     isAlternateBuffer,
     allowPermanentApproval,
+    selectedIndex,
+    feedbackBuffer.viewportVisualLines.length,
   ]);
 
   if (confirmationDetails.type === 'edit') {
@@ -411,7 +412,7 @@ export const ToolConfirmationMessage: React.FC<
   }
 
   return (
-    <Box flexDirection="column" paddingTop={0} paddingBottom={1}>
+    <Box flexDirection="column" paddingTop={0} paddingBottom={0}>
       {/* Body Content (Diff Renderer or Command Info) */}
       {/* No separate context display here anymore for edits */}
       <Box flexGrow={1} flexShrink={1} overflow="hidden" marginBottom={1}>
@@ -423,33 +424,72 @@ export const ToolConfirmationMessage: React.FC<
         <Text color={theme.text.primary}>{question}</Text>
       </Box>
 
-      {/* Select Input for Options or Feedback Input */}
+      {/* Select Input for Options */}
       <Box flexShrink={0}>
-        {isFeedbackMode ? (
-          <Box flexDirection="column">
-            <Text color={theme.text.primary}>
-              Provide feedback to the agent:
-            </Text>
-            <Box borderStyle="round" borderColor={theme.border.default}>
-              <TextInput
-                buffer={feedbackBuffer}
-                onSubmit={handleFeedbackSubmit}
-                onCancel={handleFeedbackCancel}
-                focus={isFocused}
-                placeholder="Type your instructions here..."
-              />
-            </Box>
-            <Text color={theme.text.secondary}>
-              (Enter to submit, Esc to cancel)
-            </Text>
-          </Box>
-        ) : (
-          <RadioButtonSelect
-            items={options}
-            onSelect={handleSelect}
-            isFocused={isFocused}
-          />
-        )}
+        <RadioButtonSelect
+          items={options}
+          onSelect={handleSelect}
+          onHighlight={(val) => {
+            const index = options.findIndex((o) => o.value === val);
+            if (index !== -1) {
+              setSelectedIndex(index);
+            }
+          }}
+          initialIndex={selectedIndex}
+          isFocused={isFocused}
+          isInputActive={
+            options[selectedIndex]?.value === ToolConfirmationOutcome.Feedback
+          }
+          isAtTop={feedbackBuffer.visualCursor[0] === 0}
+          isAtBottom={
+            feedbackBuffer.visualCursor[0] ===
+            feedbackBuffer.allVisualLines.length - 1
+          }
+          renderItem={(item, { isSelected }) => {
+            if (item.value === ToolConfirmationOutcome.Feedback && isSelected) {
+              return (
+                <Box flexDirection="column">
+                  <Box>
+                    <TextInput
+                      buffer={feedbackBuffer}
+                      onSubmit={handleFeedbackSubmit}
+                      onCancel={() => {
+                        handleConfirm(ToolConfirmationOutcome.Cancel).catch(
+                          (e) => {
+                            debugLogger.error('Failed to cancel tool call', e);
+                          },
+                        );
+                      }}
+                      focus={isFocused}
+                      placeholder={`${item.label} ...`}
+                      placeholderColor={theme.text.primary}
+                    />
+                  </Box>
+                  <Text
+                    color={
+                      isFocused ? theme.status.success : theme.text.secondary
+                    }
+                  >
+                    {'─'.repeat(Math.max(0, terminalWidth - 10))}
+                  </Text>
+                </Box>
+              );
+            }
+            return (
+              <Text
+                color={isSelected ? theme.status.success : theme.text.primary}
+              >
+                {item.label}
+              </Text>
+            );
+          }}
+        />
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={theme.text.secondary} dimColor>
+          (esc to cancel)
+        </Text>
       </Box>
     </Box>
   );

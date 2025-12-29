@@ -26,6 +26,12 @@ export interface UseSelectionListOptions<T> {
   onHighlight?: (value: T) => void;
   isFocused?: boolean;
   showNumbers?: boolean;
+  /** Whether an input field within the active item is currently active. */
+  isInputActive?: boolean;
+  /** Whether the active input is at its top boundary (relevant for arrow key navigation). */
+  isAtTop?: boolean;
+  /** Whether the active input is at its bottom boundary (relevant for arrow key navigation). */
+  isAtBottom?: boolean;
 }
 
 export interface UseSelectionListResult {
@@ -244,6 +250,9 @@ export function useSelectionList<T>({
   onHighlight,
   isFocused = true,
   showNumbers = false,
+  isInputActive = false,
+  isAtTop = false,
+  isAtBottom = false,
 }: UseSelectionListOptions<T>): UseSelectionListResult {
   const baseItems = toBaseItems(items);
 
@@ -319,8 +328,32 @@ export function useSelectionList<T>({
   const itemsLength = items.length;
   const handleKeypress = useCallback(
     (key: Key) => {
-      const { sequence } = key;
+      const { sequence, name } = key;
       const isNumeric = showNumbers && /^[0-9]$/.test(sequence);
+
+      // If an input is active within the selection, we swallow all keys that would otherwise trigger navigation or selection.
+      // However, we allow arrow keys to "leak" out of the input if it's at its visual boundaries.
+      if (isInputActive) {
+        if (name === 'up' && isAtTop) {
+          dispatch({ type: 'MOVE_UP' });
+          return;
+        }
+        if (name === 'down' && isAtBottom) {
+          dispatch({ type: 'MOVE_DOWN' });
+          return;
+        }
+
+        if (
+          isNumeric ||
+          name === 'up' ||
+          name === 'down' ||
+          keyMatchers[Command.DIALOG_NAVIGATION_UP](key) ||
+          keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key) ||
+          keyMatchers[Command.RETURN](key)
+        ) {
+          return;
+        }
+      }
 
       // Clear number input buffer on non-numeric key press
       if (!isNumeric && numberInputTimer.current) {
@@ -390,7 +423,7 @@ export function useSelectionList<T>({
         }
       }
     },
-    [dispatch, itemsLength, showNumbers],
+    [dispatch, itemsLength, showNumbers, isInputActive, isAtTop, isAtBottom],
   );
 
   useKeypress(handleKeypress, { isActive: !!(isFocused && itemsLength > 0) });

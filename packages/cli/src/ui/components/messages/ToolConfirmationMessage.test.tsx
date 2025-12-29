@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import type {
   ToolCallConfirmationDetails,
@@ -23,6 +23,10 @@ describe('ToolConfirmationMessage', () => {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
   } as unknown as Config;
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('should allow providing feedback', async () => {
     const onConfirm = vi.fn();
@@ -44,32 +48,257 @@ describe('ToolConfirmationMessage', () => {
     );
 
     // Initial state check
-    expect(lastFrame()).toContain('Give feedback (f)');
+    expect(lastFrame()).toContain('Provide feedback (f)');
 
-    // Enter feedback mode
+    // Focus feedback item
     await act(async () => {
       stdin.write('f');
     });
-    await waitFor(() => {
-      expect(lastFrame()).toContain('Provide feedback to the agent:');
-    });
 
-    // Type feedback
     await act(async () => {
       stdin.write('Use lower case');
     });
     await waitFor(() => {
-      expect(lastFrame()).toContain('Use lower case');
+      // Placeholder disappears, only input visible
+      expect(lastFrame()).toContain('● 3. Use lower case');
     });
     await act(async () => {
       stdin.write('\r'); // Enter
     });
 
-    // Expect callback
     await waitFor(() => {
       expect(onConfirm).toHaveBeenCalledWith(ToolConfirmationOutcome.Feedback, {
         feedback: 'Use lower case',
       });
+    });
+  });
+
+  it('should expand feedback box height when input is multi-line', async () => {
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Execution',
+      command: 'echo "hello"',
+      rootCommand: 'echo',
+      onConfirm: vi.fn(),
+    };
+
+    const { lastFrame, stdin } = renderWithProviders(
+      <ToolConfirmationMessage
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={40} // Narrow width to force wrapping
+      />,
+    );
+
+    // Focus feedback item
+    await act(async () => {
+      stdin.write('f');
+    });
+
+    // Type long feedback that will wrap
+    const longFeedback =
+      'This is a very long feedback message that should definitely wrap into multiple lines given the narrow width of the terminal.';
+    await act(async () => {
+      stdin.write(longFeedback);
+    });
+
+    await waitFor(() => {
+      const frame = lastFrame();
+      expect(frame).toContain('This is a very long feedback');
+      expect(frame).toContain('message that should');
+      expect(frame).toContain('definitely wrap into multiple');
+    });
+  });
+
+  it('should clear feedback buffer when pressing f', async () => {
+    const onConfirm = vi.fn();
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Execution',
+      command: 'echo "hello"',
+      rootCommand: 'echo',
+      onConfirm,
+    };
+
+    const { lastFrame, stdin } = renderWithProviders(
+      <ToolConfirmationMessage
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={100}
+      />,
+    );
+
+    await act(async () => {
+      stdin.write('f');
+    });
+    await waitFor(() => {
+      expect(lastFrame()).toContain('● 3. Provide feedback (f)');
+    });
+
+    await act(async () => {
+      stdin.write('clearme');
+    });
+    await waitFor(() => {
+      expect(lastFrame()).toContain('clearme');
+    });
+
+    // Move away
+    await act(async () => {
+      stdin.write('\u001B[A'); // Up arrow
+    });
+    await waitFor(() => {
+      expect(lastFrame()).toContain('● 2. Allow for this session');
+    });
+
+    // Come back with 'f'
+    await act(async () => {
+      stdin.write('f');
+    });
+
+    // Should be cleared and focused
+    await waitFor(() => {
+      expect(lastFrame()).toContain('● 3. Provide feedback (f)');
+      expect(lastFrame()).not.toContain('clearme');
+    });
+  });
+
+  it('should not auto-submit when selecting the feedback option', async () => {
+    vi.useFakeTimers();
+    const onConfirm = vi.fn();
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Execution',
+      command: 'echo "hello"',
+      rootCommand: 'echo',
+      onConfirm,
+    };
+
+    const { stdin } = renderWithProviders(
+      <ToolConfirmationMessage
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={100}
+      />,
+    );
+
+    // Press 'f' to focus feedback
+    await act(async () => {
+      stdin.write('f');
+    });
+
+    // Advance timers and ensure no async calls happen
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    // Press '3' (the number for feedback in this untrusted config)
+    // Wait, in mockConfig isTrustedFolder returns true, so feedback is at index 2 (number 3).
+    await act(async () => {
+      stdin.write('3');
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    await waitFor(() => {
+      expect(onConfirm).not.toHaveBeenCalled();
+    });
+  });
+
+  it('should restrict navigation when feedback input is focused', async () => {
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Execution',
+      command: 'echo "hello"',
+      rootCommand: 'echo',
+      onConfirm: vi.fn(),
+    };
+
+    const { lastFrame, stdin } = renderWithProviders(
+      <ToolConfirmationMessage
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={100}
+      />,
+    );
+
+    // Focus feedback item
+    await act(async () => {
+      stdin.write('f');
+    });
+    await waitFor(() => {
+      expect(lastFrame()).toContain('● 3. Provide feedback (f)');
+    });
+
+    // Try numeric navigation (should be ignored and typed instead)
+    await act(async () => {
+      stdin.write('1');
+    });
+    await waitFor(() => {
+      // Placeholder should disappear, only input '1' remains
+      expect(lastFrame()).toContain('● 3. 1');
+    });
+
+    // Try 'j'/'k' navigation (should be ignored)
+    await act(async () => {
+      stdin.write('k');
+    });
+    await waitFor(() => {
+      expect(lastFrame()).toContain('● 3. 1');
+    });
+
+    // Try up arrow (should work)
+    await act(async () => {
+      stdin.write('\u001B[A'); // Up arrow
+    });
+    await waitFor(() => {
+      expect(lastFrame()).toContain('● 2. Allow for this session');
+    });
+  });
+
+  it('should not reset feedback buffer when pressing f while already focused', async () => {
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Execution',
+      command: 'echo "hello"',
+      rootCommand: 'echo',
+      onConfirm: vi.fn(),
+    };
+
+    const { lastFrame, stdin } = renderWithProviders(
+      <ToolConfirmationMessage
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={100}
+      />,
+    );
+
+    // Focus and type something containing 'f'
+    await act(async () => {
+      stdin.write('f');
+    });
+    await act(async () => {
+      stdin.write('fix');
+    });
+    await waitFor(() => {
+      expect(lastFrame()).toContain('fix');
+    });
+
+    // Press 'f' again
+    await act(async () => {
+      stdin.write('f');
+    });
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('fixf');
     });
   });
 

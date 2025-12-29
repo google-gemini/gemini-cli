@@ -45,6 +45,8 @@ import { randomUUID } from 'node:crypto';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
 
+import { checkExhaustive } from '../utils/checks.js';
+
 export async function runZedIntegration(
   config: Config,
   settings: LoadedSettings,
@@ -486,10 +488,9 @@ export class Session {
             return errorResponse(
               new Error('Tool execution rejected with feedback.'),
             );
-          default: {
-            const resultOutcome: never = outcome;
-            throw new Error(`Unexpected: ${resultOutcome}`);
-          }
+          default:
+            checkExhaustive(outcome);
+            throw new Error(`Unexpected: ${outcome}`);
         }
       } else {
         await this.sendUpdate({
