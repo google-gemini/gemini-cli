@@ -1,3 +1,5 @@
+<div align="center">
+  
 # Gemini CLI
 
 [![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
@@ -13,6 +15,8 @@ into your terminal. It provides lightweight access to Gemini, giving you the
 most direct path from your prompt to our model.
 
 Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
+
+</div>
 
 ## 🚀 Why Gemini CLI?
 
