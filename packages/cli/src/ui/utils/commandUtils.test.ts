@@ -354,6 +354,39 @@ describe('commandUtils', () => {
       expect(tty.write).not.toHaveBeenCalled();
       expect(tty.end).not.toHaveBeenCalled();
     });
+
+    it('skips /dev/tty on Windows and uses stderr fallback for OSC-52', async () => {
+      // Simulate Windows environment
+      mockProcess.platform = 'win32';
+      const stderrStream = makeWritable({ isTTY: true });
+      Object.defineProperty(process, 'stderr', {
+        value: stderrStream,
+        configurable: true,
+      });
+
+      // Set SSH environment to trigger OSC-52 path
+      process.env['SSH_CONNECTION'] = '1';
+
+      await copyToClipboard('windows-ssh-test');
+
+      // Should NOT attempt to open /dev/tty on Windows
+      expect(mockFs.createWriteStream).not.toHaveBeenCalled();
+      // Should use stderr as TTY fallback and write OSC-52
+      expect(stderrStream.write).toHaveBeenCalled();
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('uses clipboardy on native Windows without SSH/WSL', async () => {
+      mockProcess.platform = 'win32';
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      await copyToClipboard('windows-native-test');
+
+      // Not in SSH/tmux/screen/WSL, so should use clipboardy
+      expect(mockClipboardyWrite).toHaveBeenCalledWith('windows-native-test');
+      // Should NOT attempt /dev/tty
+      expect(mockFs.createWriteStream).not.toHaveBeenCalled();
+    });
   });
 
   describe('getUrlOpenCommand', () => {
