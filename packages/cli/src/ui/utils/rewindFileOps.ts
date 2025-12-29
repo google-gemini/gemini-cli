@@ -11,6 +11,7 @@ import type {
 } from '@google/gemini-cli-core';
 import fs from 'node:fs/promises';
 import * as Diff from 'diff';
+import { coreEvents } from '@google/gemini-cli-core';
 
 export interface FileChangeStats {
   addedLines: number;
@@ -101,7 +102,7 @@ export async function revertFileChanges(
               currentContent = await fs.readFile(filePath, 'utf8');
             } catch (e) {
               // File might not exist
-              console.log(e);
+              coreEvents.emitFeedback('error', `File does not exist ${e}`);
             }
 
             // 1. Exact Match: Safe to revert directly
@@ -141,14 +142,24 @@ export async function revertFileChanges(
                 }
               } else {
                 // Patch failed
-                console.warn(`Failed to revert changes for ${result.fileName}`);
+                coreEvents.emitFeedback(
+                  'warning',
+                  `Failed to revert changes for ${result.fileName}: user has modified lines that model has modified`,
+                );
               }
             } else {
               // File deleted by user, but we expected content.
-              console.warn(`File ${result.fileName} missing, cannot revert.`);
+              coreEvents.emitFeedback(
+                'warning',
+                `File ${result.fileName} missing, cannot revert.`,
+              );
             }
           } catch (e) {
-            console.error(`Error reverting ${result.fileName}:`, e);
+            coreEvents.emitFeedback(
+              'error',
+              `Error reverting ${result.fileName}:`,
+              e,
+            );
           }
         }
       }
