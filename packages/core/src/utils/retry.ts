@@ -220,6 +220,11 @@ export async function retryWithBackoff<T>(
 
       if (classifiedError instanceof RetryableQuotaError || is500) {
         if (attempt >= maxAttempts) {
+          const errorMessage =
+            classifiedError instanceof Error ? classifiedError.message : '';
+          debugLogger.warn(
+            `Attempt ${attempt} failed${errorMessage ? `: ${errorMessage}` : ''}. Max attempts reached`,
+          );
           if (onPersistent429) {
             try {
               const fallbackModel = await onPersistent429(
@@ -240,8 +245,16 @@ export async function retryWithBackoff<T>(
             : error;
         }
 
+<<<<<<< HEAD
         if (classifiedError instanceof RetryableQuotaError) {
           console.warn(
+=======
+        if (
+          classifiedError instanceof RetryableQuotaError &&
+          classifiedError.retryDelayMs !== undefined
+        ) {
+          debugLogger.warn(
+>>>>>>> 07e597de4 (Exponential back-off retries for retryable error without a specified … (#15684))
             `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${classifiedError.retryDelayMs}ms...`,
           );
           await delay(classifiedError.retryDelayMs, signal);
