@@ -32,6 +32,7 @@ describe('<AppHeader />', () => {
   it('should render the banner with default text', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: 'This is the default banner',
         warningText: '',
@@ -52,6 +53,7 @@ describe('<AppHeader />', () => {
   it('should render the banner with warning text', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: 'This is the default banner',
         warningText: 'There are capacity issues',
@@ -72,6 +74,7 @@ describe('<AppHeader />', () => {
   it('should not render the banner when no flags are set', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: '',
         warningText: '',
@@ -91,6 +94,7 @@ describe('<AppHeader />', () => {
   it('should render the banner when previewFeatures is disabled', () => {
     const mockConfig = makeFakeConfig({ previewFeatures: false });
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: 'This is the default banner',
         warningText: '',
@@ -111,6 +115,7 @@ describe('<AppHeader />', () => {
   it('should not render the banner when previewFeatures is enabled', () => {
     const mockConfig = makeFakeConfig({ previewFeatures: true });
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: 'This is the default banner',
         warningText: '',
@@ -131,6 +136,7 @@ describe('<AppHeader />', () => {
     persistentStateMock.get.mockReturnValue(5);
     const mockConfig = makeFakeConfig();
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: 'This is the default banner',
         warningText: '',
@@ -151,6 +157,7 @@ describe('<AppHeader />', () => {
     persistentStateMock.get.mockReturnValue({});
     const mockConfig = makeFakeConfig();
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: 'This is the default banner',
         warningText: '',
@@ -177,6 +184,7 @@ describe('<AppHeader />', () => {
   it('should render banner text with unescaped newlines', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: 'First line\\nSecond line',
         warningText: '',
