@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { loadSettings, USER_SETTINGS_PATH } from './settings.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 const mocks = vi.hoisted(() => {
   const suffix = Math.random().toString(36).slice(2);
@@ -75,7 +76,7 @@ describe('loadSettings', () => {
         fs.rmSync(mockWorkspaceDir, { recursive: true, force: true });
       }
     } catch (e) {
-      console.error('Failed to cleanup temp dirs', e);
+      debugLogger.error('Failed to cleanup temp dirs', e);
     }
     vi.restoreAllMocks();
   });

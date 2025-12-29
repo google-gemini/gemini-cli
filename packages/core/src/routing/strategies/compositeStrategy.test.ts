@@ -14,6 +14,14 @@ import type {
 } from '../routingStrategy.js';
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
+import { debugLogger } from '../../utils/debugLogger.js';
+import { coreEvents } from '../../utils/events.js';
+
+vi.mock('../../utils/debugLogger.js', () => ({
+  debugLogger: {
+    warn: vi.fn(),
+  },
+}));
 
 describe('CompositeStrategy', () => {
   let mockContext: RoutingContext;
@@ -22,6 +30,7 @@ describe('CompositeStrategy', () => {
   let mockStrategy1: RoutingStrategy;
   let mockStrategy2: RoutingStrategy;
   let mockTerminalStrategy: TerminalStrategy;
+  let emitFeedbackSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -29,6 +38,8 @@ describe('CompositeStrategy', () => {
     mockContext = {} as RoutingContext;
     mockConfig = {} as Config;
     mockBaseLlmClient = {} as BaseLlmClient;
+
+    emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
     mockStrategy1 = {
       name: 'strategy1',
@@ -112,9 +123,6 @@ describe('CompositeStrategy', () => {
   });
 
   it('should handle errors in non-terminal strategies and continue', async () => {
-    const consoleErrorSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
     vi.spyOn(mockStrategy1, 'route').mockRejectedValue(
       new Error('Strategy 1 failed'),
     );
@@ -130,18 +138,14 @@ describe('CompositeStrategy', () => {
       mockBaseLlmClient,
     );
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLogger.warn).toHaveBeenCalledWith(
       "[Routing] Strategy 'strategy1' failed. Continuing to next strategy. Error:",
       expect.any(Error),
     );
     expect(result.model).toBe('terminal-model');
-    consoleErrorSpy.mockRestore();
   });
 
   it('should re-throw an error from the terminal strategy', async () => {
-    const consoleErrorSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
     const terminalError = new Error('Terminal strategy failed');
     vi.spyOn(mockTerminalStrategy, 'route').mockRejectedValue(terminalError);
 
@@ -151,11 +155,11 @@ describe('CompositeStrategy', () => {
       composite.route(mockContext, mockConfig, mockBaseLlmClient),
     ).rejects.toThrow(terminalError);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
       "[Routing] Critical Error: Terminal strategy 'terminal' failed. Routing cannot proceed. Error:",
       terminalError,
     );
-    consoleErrorSpy.mockRestore();
   });
 
   it('should correctly finalize the decision metadata', async () => {
