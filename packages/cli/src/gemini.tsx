@@ -400,18 +400,28 @@ export async function main() {
         settings.merged.security?.auth?.selectedType &&
         !settings.merged.security?.auth?.useExternal
       ) {
-        // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
         try {
-          const err = validateAuthMethod(
-            settings.merged.security.auth.selectedType,
-          );
-          if (err) {
-            throw new Error(err);
-          }
+          if (partialConfig.isInteractive()) {
+            // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
+            const err = validateAuthMethod(
+              settings.merged.security.auth.selectedType,
+            );
+            if (err) {
+              throw new Error(err);
+            }
 
-          await partialConfig.refreshAuth(
-            settings.merged.security.auth.selectedType,
-          );
+            await partialConfig.refreshAuth(
+              settings.merged.security.auth.selectedType,
+            );
+          } else {
+            const authType = await validateNonInteractiveAuth(
+              settings.merged.security?.auth?.selectedType,
+              settings.merged.security?.auth?.useExternal,
+              partialConfig,
+              settings,
+            );
+            await partialConfig.refreshAuth(authType);
+          }
         } catch (err) {
           debugLogger.error('Error authenticating:', err);
           await runExitCleanup();
@@ -665,12 +675,13 @@ export async function main() {
       ),
     );
 
-    const nonInteractiveConfig = await validateNonInteractiveAuth(
+    const authType = await validateNonInteractiveAuth(
       settings.merged.security?.auth?.selectedType,
       settings.merged.security?.auth?.useExternal,
       config,
       settings,
     );
+    await config.refreshAuth(authType);
 
     if (config.getDebugMode()) {
       debugLogger.log('Session ID: %s', sessionId);
@@ -682,7 +693,7 @@ export async function main() {
     initializeOutputListenersAndFlush();
 
     await runNonInteractive({
-      config: nonInteractiveConfig,
+      config,
       settings,
       input,
       prompt_id,
