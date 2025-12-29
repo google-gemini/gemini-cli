@@ -36,8 +36,7 @@ describe('validateNonInterActiveAuth', () => {
   let originalEnvGeminiApiKey: string | undefined;
   let originalEnvVertexAi: string | undefined;
   let originalEnvGcp: string | undefined;
-  let consoleErrorSpy: MockInstance;
-  let debugLoggerErrorSpy: MockInstance;
+  let debugLoggerErrorSpy: ReturnType<typeof vi.spyOn>;
   let coreEventsEmitFeedbackSpy: MockInstance;
   let processExitSpy: MockInstance;
   let mockSettings: LoadedSettings;
@@ -138,7 +137,7 @@ describe('validateNonInterActiveAuth', () => {
       nonInteractiveConfig,
       mockSettings,
     );
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(processExitSpy).not.toHaveBeenCalled();
     expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
   });
 
@@ -151,7 +150,7 @@ describe('validateNonInterActiveAuth', () => {
       nonInteractiveConfig,
       mockSettings,
     );
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(processExitSpy).not.toHaveBeenCalled();
     expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
   });
 
@@ -166,7 +165,7 @@ describe('validateNonInterActiveAuth', () => {
       nonInteractiveConfig,
       mockSettings,
     );
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(processExitSpy).not.toHaveBeenCalled();
     expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
   });
 
@@ -180,7 +179,7 @@ describe('validateNonInterActiveAuth', () => {
       nonInteractiveConfig,
       mockSettings,
     );
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(processExitSpy).not.toHaveBeenCalled();
     expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
   });
 
@@ -197,7 +196,7 @@ describe('validateNonInterActiveAuth', () => {
       nonInteractiveConfig,
       mockSettings,
     );
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(processExitSpy).not.toHaveBeenCalled();
     expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
   });
 
@@ -213,7 +212,7 @@ describe('validateNonInterActiveAuth', () => {
       nonInteractiveConfig,
       mockSettings,
     );
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(processExitSpy).not.toHaveBeenCalled();
     expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
   });
 
@@ -229,7 +228,7 @@ describe('validateNonInterActiveAuth', () => {
       nonInteractiveConfig,
       mockSettings,
     );
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(processExitSpy).not.toHaveBeenCalled();
     expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
   });
 
@@ -242,7 +241,7 @@ describe('validateNonInterActiveAuth', () => {
       nonInteractiveConfig,
       mockSettings,
     );
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(processExitSpy).not.toHaveBeenCalled();
     expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
   });
 
@@ -305,7 +304,7 @@ describe('validateNonInterActiveAuth', () => {
       nonInteractiveConfig,
       mockSettings,
     );
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(processExitSpy).not.toHaveBeenCalled();
     expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
   });
 
