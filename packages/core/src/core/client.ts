@@ -31,6 +31,7 @@ import type {
   ResumedSessionData,
 } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
+import { resolveModel } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { ideContextStore } from '../ide/ideContext.js';
@@ -59,7 +60,7 @@ import {
 } from '../availability/policyHelpers.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 
-const MAX_TURNS = 100;
+export const MAX_TURNS = 100;
 
 export class GeminiClient {
   private chat?: GeminiChat;
@@ -400,12 +401,30 @@ export class GeminiClient {
     return this.config.getActiveModel();
   }
 
+  private _resolveModelOverride(modelOverride: string): string | undefined {
+    const trimmedModel = modelOverride.trim();
+    if (!trimmedModel) {
+      return undefined;
+    }
+
+    const resolvedModelAlias = resolveModel(
+      trimmedModel,
+      this.config.getPreviewFeatures(),
+    );
+    const resolvedConfig = this.config.modelConfigService.getResolvedConfig({
+      model: resolvedModelAlias,
+    });
+
+    return resolvedConfig.model;
+  }
+
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
     prompt_id: string,
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
+    modelOverride?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
@@ -531,10 +550,21 @@ export class GeminiClient {
       signal,
     };
 
+    if (modelOverride) {
+      debugLogger.log(
+        `[GeminiClient] Sending message with model override: "${modelOverride}"`,
+      );
+    }
+
     let modelToUse: string;
+    const resolvedOverrideModel = modelOverride
+      ? this._resolveModelOverride(modelOverride)
+      : undefined;
 
     // Determine Model (Stickiness vs. Routing)
-    if (this.currentSequenceModel) {
+    if (resolvedOverrideModel) {
+      modelToUse = resolvedOverrideModel;
+    } else if (this.currentSequenceModel) {
       modelToUse = this.currentSequenceModel;
     } else {
       const router = this.config.getModelRouterService();
@@ -551,7 +581,9 @@ export class GeminiClient {
     );
     modelToUse = finalModel;
 
-    this.currentSequenceModel = modelToUse;
+    if (!resolvedOverrideModel) {
+      this.currentSequenceModel = modelToUse;
+    }
     yield { type: GeminiEventType.ModelInfo, value: modelToUse };
 
     const resultStream = turn.run(modelConfigKey, request, linkedSignal);

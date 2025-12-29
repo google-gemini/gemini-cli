@@ -39,6 +39,7 @@ import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
+import type { ModelConfigService } from '../services/modelConfigService.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import type {
   ModelConfigKey,
@@ -47,6 +48,7 @@ import type {
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { HookSystem } from '../hooks/hookSystem.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
+import { MAX_TURNS } from './client.js'; // Corrected import
 
 vi.mock('../services/chatCompressionService.js');
 
@@ -251,16 +253,17 @@ describe('Gemini Client (client.ts)', () => {
         }),
       }),
       modelConfigService: {
-        getResolvedConfig(modelConfigKey: ModelConfigKey) {
-          return {
-            model: modelConfigKey.model,
-            generateContentConfig: {
-              temperature: 0,
-              topP: 1,
-            } as unknown as ResolvedModelConfig,
-          };
-        },
-      },
+        getResolvedConfig: vi.fn(
+          (modelConfigKey: ModelConfigKey) =>
+            ({
+              model: modelConfigKey.model,
+              generateContentConfig: {
+                temperature: 0,
+                topP: 1,
+              },
+            }) as unknown as ResolvedModelConfig,
+        ),
+      } as unknown as ModelConfigService,
       isInteractive: vi.fn().mockReturnValue(false),
       getExperiments: () => {},
       getActiveModel: vi.fn().mockReturnValue('test-model'),
@@ -1462,6 +1465,66 @@ ${JSON.stringify(
         );
       });
 
+      it('should use modelOverride when provided, bypassing the router', async () => {
+        const validOverrideModel = 'gemini-2.5-flash';
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-1',
+          MAX_TURNS,
+          false,
+          validOverrideModel,
+        );
+        await fromAsync(stream); // consume stream
+
+        expect(mockConfig.getModelRouterService).not.toHaveBeenCalled();
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          { model: validOverrideModel },
+          [{ text: 'Hi' }],
+          expect.any(AbortSignal),
+        );
+      });
+
+      it('should NOT stick to modelOverride for subsequent turns', async () => {
+        const overrideModel = 'gemini-2.5-flash';
+        const routedModel = 'routed-model';
+
+        // Turn 1: With Override
+        const stream1 = client.sendMessageStream(
+          [{ text: 'Hi with override' }],
+          new AbortController().signal,
+          'prompt-sticky-test',
+          MAX_TURNS,
+          false,
+          overrideModel,
+        );
+        await fromAsync(stream1);
+
+        expect(mockTurnRunFn).toHaveBeenLastCalledWith(
+          { model: overrideModel },
+          expect.anything(),
+          expect.anything(),
+        );
+
+        // Turn 2: Without Override (should revert to default/routed)
+        const stream2 = client.sendMessageStream(
+          [{ text: 'Hi again' }],
+          new AbortController().signal,
+          'prompt-sticky-test', // Same prompt ID to test session stickiness
+          MAX_TURNS,
+          false,
+          undefined,
+        );
+        await fromAsync(stream2);
+
+        // Should use the routed model, NOT the override from previous turn
+        expect(mockTurnRunFn).toHaveBeenLastCalledWith(
+          { model: routedModel },
+          expect.anything(),
+          expect.anything(),
+        );
+      });
+
       it('should use the same model for subsequent turns in the same prompt (stickiness)', async () => {
         // First turn
         let stream = client.sendMessageStream(
@@ -2569,6 +2632,49 @@ ${JSON.stringify(
       // Assert
       expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
       expect(capturedSignal!.aborted).toBe(true);
+    });
+
+    it('should fall back to current model and log a warning if modelOverride is invalid', async () => {
+      const invalidModel = 'non-existent-model';
+      // modelConfigService returns the model name if it can't resolve it as an alias
+      // It does NOT throw by default for unknown models (unless they are aliases that fail resolution)
+      (
+        mockConfig.modelConfigService.getResolvedConfig as Mock
+      ).mockImplementation(
+        (context) =>
+          ({
+            model: context.model, // Returns the input model (invalidModel)
+            generateContentConfig: {},
+          }) as ResolvedModelConfig,
+      );
+
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })(),
+      );
+
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-invalid-model',
+        MAX_TURNS,
+        false,
+        invalidModel, // Invalid model override
+      );
+      await fromAsync(stream); // consume stream
+
+      // Assert
+      expect(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).toHaveBeenNthCalledWith(1, { model: invalidModel });
+
+      // Will use the invalid model, which will fail when sending message instead of silently using a default model
+      expect(mockTurnRunFn).toHaveBeenCalledWith(
+        { model: invalidModel },
+        [{ text: 'Hi' }],
+        expect.any(AbortSignal),
+      );
     });
   });
 
