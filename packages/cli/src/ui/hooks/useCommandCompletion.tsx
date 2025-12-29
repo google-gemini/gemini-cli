@@ -92,14 +92,6 @@ export function useCommandCompletion(
   const { completionMode, query, completionStart, completionEnd } =
     useMemo(() => {
       const currentLine = buffer.lines[cursorRow] || '';
-      if (cursorRow === 0 && isSlashCommand(currentLine.trim())) {
-        return {
-          completionMode: CompletionMode.SLASH,
-          query: currentLine,
-          completionStart: 0,
-          completionEnd: currentLine.length,
-        };
-      }
 
       const codePoints = toCodePoints(currentLine);
       for (let i = cursorCol - 1; i >= 0; i--) {
@@ -114,6 +106,25 @@ export function useCommandCompletion(
             break;
           }
         } else if (char === '@') {
+          // Check if this is the start of a token (start of line or preceded by space)
+          let isTokenStart = i === 0;
+          if (!isTokenStart) {
+            const prevChar = codePoints[i - 1];
+            if (prevChar === ' ') {
+              let backslashCount = 0;
+              for (let j = i - 2; j >= 0 && codePoints[j] === '\\'; j--) {
+                backslashCount++;
+              }
+              if (backslashCount % 2 === 0) {
+                isTokenStart = true;
+              }
+            }
+          }
+
+          if (!isTokenStart) {
+            continue;
+          }
+
           let end = codePoints.length;
           for (let i = cursorCol; i < codePoints.length; i++) {
             if (codePoints[i] === ' ') {
@@ -137,6 +148,15 @@ export function useCommandCompletion(
             completionEnd: end,
           };
         }
+      }
+
+      if (cursorRow === 0 && isSlashCommand(currentLine.trim())) {
+        return {
+          completionMode: CompletionMode.SLASH,
+          query: currentLine,
+          completionStart: 0,
+          completionEnd: currentLine.length,
+        };
       }
 
       // Check for prompt completion - only if enabled
