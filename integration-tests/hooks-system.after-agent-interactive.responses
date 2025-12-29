@@ -1,2 +1,0 @@
-{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"Response 1"}],"role":"model"},"finishReason":"STOP","index":0}]}]}
-{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"Response 2"}],"role":"model"},"finishReason":"STOP","index":0}]}]}
