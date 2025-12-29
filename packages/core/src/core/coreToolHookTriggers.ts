@@ -303,7 +303,7 @@ export async function executeToolWithHooks(
       if (modifiedInput) {
         // We modify the toolInput object in-place, which should be the same reference as invocation.params
         // We use Object.assign to update properties
-        Object.assign(toolInput, modifiedInput);
+        Object.assign(invocation.params, modifiedInput);
         debugLogger.debug(`Tool input modified by hook for ${toolName}`);
         inputWasModified = true;
         modifiedKeys = Object.keys(modifiedInput);
