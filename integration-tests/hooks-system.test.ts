@@ -450,6 +450,150 @@ echo '{
     });
   });
 
+  describe('AfterAgent Hooks - Response Handling', () => {
+    it('should provide the final model response to AfterAgent hooks', async () => {
+      // Create a hook script that reads the response and echoes it back
+      // We use jq to safely parse the input and construct the output JSON
+      const hookScript = `#!/bin/bash
+jq -c '{decision: "allow", systemMessage: ("Hook received response: " + (.prompt_response // ""))}'`;
+
+      const scriptName = 'after_agent_hook.sh';
+
+      await rig.setup(
+        'should provide the final model response to AfterAgent hooks',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.before-agent.responses', // Reusing an existing response set
+          ),
+          settings: {
+            tools: {
+              enableHooks: true,
+            },
+            hooks: {
+              AfterAgent: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `./${scriptName}`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      );
+
+      const scriptPath = join(rig.testDir!, scriptName);
+      writeFileSync(scriptPath, hookScript);
+      const { execSync } = await import('node:child_process');
+      execSync(`chmod +x "${scriptPath}"`);
+
+      const result = await rig.run({ args: 'Hello' });
+
+      // Wait for hook telemetry to be flushed
+      await rig.waitForTelemetryEvent('hook_call');
+
+      // The hook should have executed and printed the system message
+      expect(result).toContain('Hook received response:');
+
+      // Verify the hook executed via telemetry
+      const hookLogs = rig.readHookLogs();
+      const afterAgentLog = hookLogs.find(
+        (log) => log.hookCall.hook_event_name === 'AfterAgent',
+      );
+
+      expect(afterAgentLog).toBeDefined();
+      expect(afterAgentLog?.hookCall.hook_name).toBe(`./${scriptName}`);
+      expect(afterAgentLog?.hookCall.exit_code).toBe(0);
+
+      // Verify the input contained prompt_response
+      const hookInput =
+        typeof afterAgentLog!.hookCall.hook_input === 'string'
+          ? JSON.parse(afterAgentLog!.hookCall.hook_input)
+          : afterAgentLog!.hookCall.hook_input;
+
+      expect(hookInput).toHaveProperty('prompt_response');
+      expect(typeof hookInput.prompt_response).toBe('string');
+      expect(hookInput.prompt_response.length).toBeGreaterThan(0);
+    });
+
+    it('should provide the final model response to AfterAgent hooks in interactive mode', async () => {
+      // Create a hook script that reads the response and echoes it back
+      const scriptName = 'after_agent_hook_interactive.sh';
+      const hookScript = `#!/bin/bash
+jq -c '{decision: "allow", systemMessage: ("Interactive hook received response: " + (.prompt_response // ""))}'`;
+
+      await rig.setup(
+        'should provide the final model response to AfterAgent hooks in interactive mode',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.before-agent.responses', // Reusing an existing response set
+          ),
+          settings: {
+            tools: {
+              enableHooks: true,
+            },
+            hooks: {
+              AfterAgent: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `./${scriptName}`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      );
+
+      const scriptPath = join(rig.testDir!, scriptName);
+      writeFileSync(scriptPath, hookScript);
+      const { execSync } = await import('node:child_process');
+      execSync(`chmod +x "${scriptPath}"`);
+
+      const run = await rig.runInteractive();
+
+      // Send a prompt
+      await run.type('Hello');
+      await run.type('\r');
+
+      // Wait for response
+      await run.expectText('Hello', 10000);
+
+      // Wait for hook telemetry
+      await rig.waitForTelemetryEvent('hook_call');
+
+      // Verify the hook executed via telemetry
+      const hookLogs = rig.readHookLogs();
+      const afterAgentLog = hookLogs.find(
+        (log) => log.hookCall.hook_event_name === 'AfterAgent',
+      );
+
+      expect(afterAgentLog).toBeDefined();
+      expect(afterAgentLog?.hookCall.hook_name).toBe(`./${scriptName}`);
+      expect(afterAgentLog?.hookCall.exit_code).toBe(0);
+
+      // Verify the input contained prompt_response
+      const hookInput =
+        typeof afterAgentLog!.hookCall.hook_input === 'string'
+          ? JSON.parse(afterAgentLog!.hookCall.hook_input)
+          : afterAgentLog!.hookCall.hook_input;
+
+      expect(hookInput).toHaveProperty('prompt_response');
+      expect(typeof hookInput.prompt_response).toBe('string');
+      expect(hookInput.prompt_response.length).toBeGreaterThan(0);
+    });
+  });
+
   describe('Notification Hooks - Permission Handling', () => {
     it('should handle notification hooks for tool permissions', async () => {
       // Create inline hook command (works on both Unix and Windows)
