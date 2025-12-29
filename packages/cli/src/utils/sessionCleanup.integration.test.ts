@@ -7,7 +7,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { cleanupExpiredSessions } from './sessionCleanup.js';
 import type { Settings } from '../config/settings.js';
-import { SESSION_FILE_PREFIX, type Config } from '@google/gemini-cli-core';
+import {
+  SESSION_FILE_PREFIX,
+  type Config,
+  debugLogger,
+} from '@google/gemini-cli-core';
 
 // Create a mock config for integration testing
 function createTestConfig(): Config {
@@ -112,7 +116,7 @@ describe('Session Cleanup Integration', () => {
   });
 
   it('should validate configuration and fail gracefully', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
     const config = createTestConfig();
 
     const settings: Settings = {

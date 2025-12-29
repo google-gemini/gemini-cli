@@ -277,9 +277,6 @@ class MemoryToolInvocation extends BaseToolInvocation<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.warn(
-        `[MemoryTool] Error executing save_memory for fact "${fact}": ${errorMessage}`,
-      );
       return {
         llmContent: JSON.stringify({
           success: false,
@@ -367,10 +364,6 @@ export class MemoryTool
 
       await fsAdapter.writeFile(memoryFilePath, newContent, 'utf-8');
     } catch (error) {
-      console.error(
-        `[MemoryTool] Error adding memory entry to ${memoryFilePath}:`,
-        error,
-      );
       throw new Error(
         `[MemoryTool] Failed to add memory entry: ${error instanceof Error ? error.message : String(error)}`,
       );

@@ -12,6 +12,7 @@ import type { LoadedSettings } from '../../config/settings.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { act } from 'react';
 import { waitFor } from '../../test-utils/async.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -101,7 +102,7 @@ describe('EditorSettingsDialog', () => {
     await waitFor(() => {
       const frame = lastFrame() || '';
       if (!frame.includes('> Apply To')) {
-        console.log(
+        debugLogger.debug(
           'Waiting for scope focus. Current frame:',
           JSON.stringify(frame),
         );
@@ -166,7 +167,7 @@ describe('EditorSettingsDialog', () => {
 
     const frame = lastFrame() || '';
     if (!frame.includes('(Also modified')) {
-      console.log(
+      debugLogger.debug(
         'Modified message test failure. Frame:',
         JSON.stringify(frame),
       );

@@ -729,7 +729,7 @@ describe('SmartEditTool', () => {
             result.returnDisplay.diffStat?.model_removed_lines,
           );
         } else if (result.error) {
-          console.error(`Edit failed for ${file.path}:`, result.error);
+          throw result.error;
         }
       }
 

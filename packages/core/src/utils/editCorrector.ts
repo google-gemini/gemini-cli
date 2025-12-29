@@ -22,6 +22,7 @@ import {
 } from '../utils/messageInspectors.js';
 import * as fs from 'node:fs';
 import { promptIdContext } from './promptIdContext.js';
+import { debugLogger } from './debugLogger.js';
 
 const CODE_CORRECTION_SYSTEM_PROMPT = `
 You are an expert code-editing assistant. Your task is to analyze a failed edit attempt and provide a corrected version of the text snippets.
@@ -434,7 +435,7 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
       throw error;
     }
 
-    console.error(
+    debugLogger.warn(
       'Error during LLM call for old string snippet correction:',
       error,
     );
@@ -523,7 +524,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       throw error;
     }
 
-    console.error('Error during LLM call for new_string correction:', error);
+    debugLogger.warn('Error during LLM call for new_string correction:', error);
     return originalNewString;
   }
 }
@@ -593,7 +594,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       throw error;
     }
 
-    console.error(
+    debugLogger.warn(
       'Error during LLM call for new_string escaping correction:',
       error,
     );
@@ -660,7 +661,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       throw error;
     }
 
-    console.error(
+    debugLogger.warn(
       'Error during LLM call for string escaping correction:',
       error,
     );
