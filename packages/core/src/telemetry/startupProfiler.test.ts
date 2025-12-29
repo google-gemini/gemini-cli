@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StartupProfiler } from './startupProfiler.js';
 import type { Config } from '../config/config.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // Mock the metrics module
 vi.mock('./metrics.js', () => ({
@@ -254,6 +255,19 @@ describe('StartupProfiler', () => {
           }),
         }),
       );
+    });
+
+    it('should use debug logging instead of standard logging', () => {
+      const logSpy = vi.spyOn(debugLogger, 'log');
+      const debugSpy = vi.spyOn(debugLogger, 'debug');
+
+      const handle = profiler.start('test_phase');
+      handle?.end();
+
+      profiler.flush(mockConfig);
+
+      expect(logSpy).not.toHaveBeenCalled();
+      expect(debugSpy).toHaveBeenCalled();
     });
   });
 

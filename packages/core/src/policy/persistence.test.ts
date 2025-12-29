@@ -20,6 +20,7 @@ import { PolicyEngine } from './policy-engine.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import { Storage } from '../config/storage.js';
+import { ApprovalMode } from './types.js';
 
 vi.mock('node:fs/promises');
 vi.mock('../config/storage.js');
@@ -29,7 +30,11 @@ describe('createPolicyUpdater', () => {
   let messageBus: MessageBus;
 
   beforeEach(() => {
-    policyEngine = new PolicyEngine({ rules: [], checkers: [] });
+    policyEngine = new PolicyEngine({
+      rules: [],
+      checkers: [],
+      approvalMode: ApprovalMode.DEFAULT,
+    });
     messageBus = new MessageBus(policyEngine);
     vi.clearAllMocks();
   });
@@ -121,7 +126,9 @@ describe('createPolicyUpdater', () => {
     const addedRule = rules.find((r) => r.toolName === toolName);
     expect(addedRule).toBeDefined();
     expect(addedRule?.priority).toBe(2.95);
-    expect(addedRule?.argsPattern).toEqual(new RegExp(`"command":"git status`));
+    expect(addedRule?.argsPattern).toEqual(
+      new RegExp(`"command":"git status(?:[\\s"]|$)`),
+    );
 
     // Verify file written
     expect(fs.writeFile).toHaveBeenCalledWith(
