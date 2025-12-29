@@ -9,20 +9,23 @@ import { render } from '../../test-utils/render.js';
 import { Text } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StreamingContext } from '../contexts/StreamingContext.js';
+import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 import { StreamingState } from '../types.js';
 import { vi } from 'vitest';
-import * as useTerminalSize from '../hooks/useTerminalSize.js';
 
 // Mock GeminiRespondingSpinner
 vi.mock('./GeminiRespondingSpinner.js', () => ({
   GeminiRespondingSpinner: ({
     nonRespondingDisplay,
+    color,
   }: {
     nonRespondingDisplay?: string;
+    color?: string;
   }) => {
     const streamingState = React.useContext(StreamingContext)!;
+    const colorPart = color ? `[${color}]` : '';
     if (streamingState === StreamingState.Responding) {
-      return <Text>MockRespondingSpinner</Text>;
+      return <Text>MockRespondingSpinner{colorPart}</Text>;
     } else if (nonRespondingDisplay) {
       return <Text>{nonRespondingDisplay}</Text>;
     }
@@ -30,23 +33,24 @@ vi.mock('./GeminiRespondingSpinner.js', () => ({
   },
 }));
 
-vi.mock('../hooks/useTerminalSize.js', () => ({
-  useTerminalSize: vi.fn(),
-}));
-
-const useTerminalSizeMock = vi.mocked(useTerminalSize.useTerminalSize);
-
 const renderWithContext = (
   ui: React.ReactElement,
   streamingStateValue: StreamingState,
   width = 120,
+  retryCount = 0,
 ) => {
-  useTerminalSizeMock.mockReturnValue({ columns: width, rows: 24 });
   const contextValue: StreamingState = streamingStateValue;
+  const uiState = {
+    terminalWidth: width,
+    retryCount,
+  } as UIState;
+
   return render(
-    <StreamingContext.Provider value={contextValue}>
-      {ui}
-    </StreamingContext.Provider>,
+    <UIStateContext.Provider value={uiState}>
+      <StreamingContext.Provider value={contextValue}>
+        {ui}
+      </StreamingContext.Provider>
+    </UIStateContext.Provider>,
     width,
   );
 };
@@ -148,14 +152,21 @@ describe('<LoadingIndicator />', () => {
     );
     expect(lastFrame()).toBe(''); // Initial: Idle
 
+    const uiState = {
+      terminalWidth: 120,
+      retryCount: 0,
+    } as UIState;
+
     // Transition to Responding
     rerender(
-      <StreamingContext.Provider value={StreamingState.Responding}>
-        <LoadingIndicator
-          currentLoadingPhrase="Now Responding"
-          elapsedTime={2}
-        />
-      </StreamingContext.Provider>,
+      <UIStateContext.Provider value={uiState}>
+        <StreamingContext.Provider value={StreamingState.Responding}>
+          <LoadingIndicator
+            currentLoadingPhrase="Now Responding"
+            elapsedTime={2}
+          />
+        </StreamingContext.Provider>
+      </UIStateContext.Provider>,
     );
     let output = lastFrame();
     expect(output).toContain('MockRespondingSpinner');
@@ -164,12 +175,16 @@ describe('<LoadingIndicator />', () => {
 
     // Transition to WaitingForConfirmation
     rerender(
-      <StreamingContext.Provider value={StreamingState.WaitingForConfirmation}>
-        <LoadingIndicator
-          currentLoadingPhrase="Please Confirm"
-          elapsedTime={15}
-        />
-      </StreamingContext.Provider>,
+      <UIStateContext.Provider value={uiState}>
+        <StreamingContext.Provider
+          value={StreamingState.WaitingForConfirmation}
+        >
+          <LoadingIndicator
+            currentLoadingPhrase="Please Confirm"
+            elapsedTime={15}
+          />
+        </StreamingContext.Provider>
+      </UIStateContext.Provider>,
     );
     output = lastFrame();
     expect(output).toContain('⠏');
@@ -179,9 +194,11 @@ describe('<LoadingIndicator />', () => {
 
     // Transition back to Idle
     rerender(
-      <StreamingContext.Provider value={StreamingState.Idle}>
-        <LoadingIndicator {...defaultProps} />
-      </StreamingContext.Provider>,
+      <UIStateContext.Provider value={uiState}>
+        <StreamingContext.Provider value={StreamingState.Idle}>
+          <LoadingIndicator {...defaultProps} />
+        </StreamingContext.Provider>
+      </UIStateContext.Provider>,
     );
     expect(lastFrame()).toBe('');
     unmount();
@@ -321,5 +338,19 @@ describe('<LoadingIndicator />', () => {
       expect(lastFrame()?.includes('\n')).toBe(true);
       unmount();
     });
+  });
+
+  it('should display retry status and change color when retryCount > 0', () => {
+    const { lastFrame, unmount } = renderWithContext(
+      <LoadingIndicator {...defaultProps} />,
+      StreamingState.Responding,
+      120,
+      2, // retryCount
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('⚠️ Transient error. Retrying... (attempt 2)');
+    expect(output).toContain('[#F9E2AF]'); // Warning color in default theme
+    unmount();
   });
 });

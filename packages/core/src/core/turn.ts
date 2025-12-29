@@ -70,6 +70,7 @@ export enum GeminiEventType {
 
 export type ServerGeminiRetryEvent = {
   type: GeminiEventType.Retry;
+  value: number;
 };
 
 export type ServerGeminiContextWindowWillOverflowEvent = {
@@ -242,7 +243,7 @@ export class Turn {
 
         // Handle the new RETRY event
         if (streamEvent.type === 'retry') {
-          yield { type: GeminiEventType.Retry };
+          yield { type: GeminiEventType.Retry, value: streamEvent.attempt };
           continue; // Skip to the next event in the stream
         }
 

@@ -51,6 +51,10 @@ import {
   recordConversationOffered,
 } from './telemetry.js';
 import { getClientMetadata } from './experiments/client_metadata.js';
+import {
+  shouldSimulate429,
+  createSimulated429Error,
+} from '../utils/testUtils.js';
 
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
@@ -74,6 +78,9 @@ export class CodeAssistServer implements ContentGenerator {
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    if (shouldSimulate429()) {
+      throw createSimulated429Error();
+    }
     const responses =
       await this.requestStreamingPost<CaGenerateContentResponse>(
         'streamGenerateContent',
@@ -124,6 +131,9 @@ export class CodeAssistServer implements ContentGenerator {
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<GenerateContentResponse> {
+    if (shouldSimulate429()) {
+      throw createSimulated429Error();
+    }
     const start = Date.now();
     const response = await this.requestPost<CaGenerateContentResponse>(
       'generateContent',
@@ -195,6 +205,9 @@ export class CodeAssistServer implements ContentGenerator {
   }
 
   async countTokens(req: CountTokensParameters): Promise<CountTokensResponse> {
+    if (shouldSimulate429()) {
+      throw createSimulated429Error();
+    }
     const resp = await this.requestPost<CaCountTokenResponse>(
       'countTokens',
       toCountTokenRequest(req),
