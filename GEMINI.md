@@ -391,6 +391,15 @@ When working in the `/docs` directory, follow the guidelines in this section:
 Only write high-value comments if at all. Avoid talking to the user through
 comments.
 
+## Logging and Error Handling
+
+- **Avoid Console Statements:** Do not use `console.log`, `console.error`, or
+  similar methods directly.
+- **Non-User-Facing Logs:** For developer-facing debug messages, use
+  `debugLogger` (from `@google/gemini-cli-core`).
+- **User-Facing Feedback:** To surface errors or warnings to the user, use
+  `coreEvents.emitFeedback` (from `@google/gemini-cli-core`).
+
 ## General requirements
 
 - If there is something you do not understand or is ambiguous, seek confirmation

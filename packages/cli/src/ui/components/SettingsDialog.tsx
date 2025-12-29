@@ -42,7 +42,7 @@ import {
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -254,7 +254,11 @@ export function SettingsDialog({
             if (key === 'general.vimMode' && newValue !== vimEnabled) {
               // Call toggleVimEnabled to sync the VimModeContext local state
               toggleVimEnabled().catch((error) => {
-                console.error('Failed to toggle vim mode:', error);
+                coreEvents.emitFeedback(
+                  'error',
+                  'Failed to toggle vim mode:',
+                  error,
+                );
               });
             }
 

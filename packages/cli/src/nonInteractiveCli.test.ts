@@ -44,6 +44,7 @@ const mockCoreEvents = vi.hoisted(() => ({
   off: vi.fn(),
   drainBacklogs: vi.fn(),
   emit: vi.fn(),
+  emitFeedback: vi.fn(),
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -785,11 +786,6 @@ describe('runNonInteractive', () => {
       throw testError;
     });
 
-    // Mock console.error to capture JSON error output
-    const consoleErrorJsonSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
-
     let thrownError: Error | null = null;
     try {
       await runNonInteractive({
@@ -807,7 +803,8 @@ describe('runNonInteractive', () => {
     // Should throw because of mocked process.exit
     expect(thrownError?.message).toBe('process.exit(1) called');
 
-    expect(consoleErrorJsonSpy).toHaveBeenCalledWith(
+    expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+      'error',
       JSON.stringify(
         {
           session_id: 'test-session-id',
@@ -831,11 +828,6 @@ describe('runNonInteractive', () => {
       throw fatalError;
     });
 
-    // Mock console.error to capture JSON error output
-    const consoleErrorJsonSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
-
     let thrownError: Error | null = null;
     try {
       await runNonInteractive({
@@ -853,7 +845,8 @@ describe('runNonInteractive', () => {
     // Should throw because of mocked process.exit with custom exit code
     expect(thrownError?.message).toBe('process.exit(42) called');
 
-    expect(consoleErrorJsonSpy).toHaveBeenCalledWith(
+    expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+      'error',
       JSON.stringify(
         {
           session_id: 'test-session-id',
