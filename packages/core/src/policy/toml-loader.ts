@@ -7,7 +7,7 @@
 import {
   type PolicyRule,
   PolicyDecision,
-  type ApprovalMode,
+  ApprovalMode,
   type SafetyCheckerConfig,
   type SafetyCheckerRule,
   InProcessCheckerType,
@@ -43,7 +43,7 @@ const PolicyRuleSchema = z.object({
       message:
         'priority must be <= 999 to prevent tier overflow. Priorities >= 1000 would jump to the next tier.',
     }),
-  modes: z.array(z.string()).optional(),
+  modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
 });
 
 /**
@@ -56,7 +56,7 @@ const SafetyCheckerRuleSchema = z.object({
   commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
   commandRegex: z.string().optional(),
   priority: z.number().int().default(0),
-  modes: z.array(z.string()).optional(),
+  modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
   checker: z.discriminatedUnion('type', [
     z.object({
       type: z.literal('in-process'),
@@ -193,6 +193,15 @@ function validateShellCommandSyntax(
 }
 
 /**
+ * Escapes characters with special meaning in regular expressions.
+ * @param str The string to escape.
+ * @returns The escaped string.
+ */
+export function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
+
+/**
  * Transforms a priority number based on the policy tier.
  * Formula: tier + priority/1000
  *
@@ -228,6 +237,7 @@ function processPolicyItems<
     commandPrefix: string | undefined,
     argsPattern: RegExp | undefined,
     commandPattern: RegExp | undefined,
+    modes: ApprovalMode[] | undefined,
   ) => TOutput,
 ): TOutput[] {
   const invalidIndices = new Set<number>();
@@ -249,6 +259,26 @@ function processPolicyItems<
         details: validationError,
       });
     }
+
+    // Check for restricted modes property in Tier 2/3
+    if (
+      (context.tier === 2 || context.tier === 3) &&
+      item.modes !== undefined &&
+      item.modes.length > 0
+    ) {
+      errors.push({
+        filePath: context.filePath,
+        fileName: context.fileName,
+        tier: context.tierName,
+        ruleIndex: i,
+        errorType: 'rule_validation',
+        message: `Restricted property "modes" cannot be used in ${context.tierName} tier policies`,
+        details:
+          `${itemType} #${i + 1}: The "modes" property is only allowed in default tier (Tier 1) policies.\n` +
+          `  Found: modes = ${JSON.stringify(item.modes)}\n` +
+          `  Fix: Remove the "modes" property or move this rule to a default tier policy file`,
+      });
+    }
   }
 
   return items
@@ -256,10 +286,7 @@ function processPolicyItems<
       if (invalidIndices.has(index)) {
         return false;
       }
-      if (!item.modes || item.modes.length === 0) {
-        return true;
-      }
-      return item.modes.includes(approvalMode);
+      return true;
     })
     .flatMap((item) => {
       let commandPattern: RegExp | undefined;
@@ -338,12 +365,17 @@ function processPolicyItems<
             effectiveToolName = toolName;
           }
 
+          // For Tier 2/3, modes property is restricted and should be undefined
+          const effectiveModes =
+            context.tier === 2 || context.tier === 3 ? undefined : item.modes;
+
           return createOutput(
             item,
             effectiveToolName,
             prefix,
             argsPattern,
             commandPattern,
+            effectiveModes,
           );
         });
       });
@@ -358,18 +390,17 @@ function processPolicyItems<
  * 1. Scans directories for .toml files
  * 2. Parses and validates each file
  * 3. Transforms rules (commandPrefix, arrays, mcpName, priorities)
- * 4. Filters rules by approval mode
- * 5. Collects detailed error information for any failures
+ * 4. Collects detailed error information for any failures
  *
- * @param approvalMode The current approval mode (for filtering rules by mode)
  * @param policyDirs Array of directory paths to scan for policy files
  * @param getPolicyTier Function to determine tier (1-3) for a directory
+ * @param approvalMode The approval mode to use for filtering rules
  * @returns Object containing successfully parsed rules and any errors encountered
  */
 export async function loadPoliciesFromToml(
-  approvalMode: ApprovalMode,
   policyDirs: string[],
   getPolicyTier: (dir: string) => number,
+  approvalMode: ApprovalMode,
 ): Promise<PolicyLoadResult> {
   const rules: PolicyRule[] = [];
   const checkers: SafetyCheckerRule[] = [];
@@ -459,6 +490,7 @@ export async function loadPoliciesFromToml(
             commandPrefix,
             argsPattern,
             commandPattern,
+            modes,
           ): PolicyRule => ({
             toolName,
             decision: item.decision,
@@ -466,6 +498,7 @@ export async function loadPoliciesFromToml(
             commandPrefix,
             argsPattern,
             commandPattern,
+            modes,
           }),
         );
         rules.push(...parsedRules);
@@ -482,6 +515,7 @@ export async function loadPoliciesFromToml(
             commandPrefix,
             argsPattern,
             commandPattern,
+            modes,
           ): SafetyCheckerRule => ({
             toolName,
             priority: item.priority,
@@ -489,6 +523,7 @@ export async function loadPoliciesFromToml(
             commandPrefix,
             argsPattern,
             commandPattern,
+            modes,
           }),
         );
         checkers.push(...parsedCheckers);

@@ -218,7 +218,7 @@ export class GeminiAgent {
 
     const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };
 
-    const config = await loadCliConfig(settings, sessionId, this.argv, cwd);
+    const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
 
     await config.initialize();
     startupProfiler.flush(config);
