@@ -11,6 +11,7 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import type { FileChangeStats } from '../utils/rewindFileOps.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { formatTimeAgo } from '../utils/formatters.js';
 
 export enum RewindOutcome {
   RewindAndRevert = 'rewind_and_revert',
@@ -23,12 +24,14 @@ interface RewindConfirmationProps {
   stats: FileChangeStats | null;
   onConfirm: (outcome: RewindOutcome) => void;
   terminalWidth: number;
+  timestamp?: string;
 }
 
 export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
   stats,
   onConfirm,
   terminalWidth,
+  timestamp,
 }) => {
   useKeypress(
     (key) => {
@@ -98,10 +101,17 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
             <Text color={theme.status.error}>
               Lines removed: {stats.removedLines}
             </Text>
+            {timestamp && (
+              <Text color={theme.text.secondary}>
+                {' '}
+                ({formatTimeAgo(timestamp)})
+              </Text>
+            )}
           </Box>
           <Box marginTop={1}>
             <Text color={theme.status.warning}>
-              ℹ Rewinding does not affect files edited manually or via bash.
+              ℹ Rewinding does not affect files edited manually or by the shell
+              tool.
             </Text>
           </Box>
         </Box>
@@ -110,6 +120,12 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
       {!stats && (
         <Box marginBottom={1}>
           <Text color={theme.text.secondary}>No code changes to revert.</Text>
+          {timestamp && (
+            <Text color={theme.text.secondary}>
+              {' '}
+              ({formatTimeAgo(timestamp)})
+            </Text>
+          )}
         </Box>
       )}
 

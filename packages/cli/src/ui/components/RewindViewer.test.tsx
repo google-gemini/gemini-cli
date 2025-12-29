@@ -166,18 +166,20 @@ describe('RewindViewer', () => {
       />,
     );
 
-    // Initial state: Item 1 selected (expanded), Item 2 unselected (truncated)
-    expect(lastFrame()).toContain('Line G'); // Item 1 fully shown
+    // Initial state: Item 2 (newest) is at top and selected (expanded)
+    // Item 1 (oldest) is below and unselected (truncated)
 
-    // Check for Item 2 being truncated.
-    expect(lastFrame()).not.toContain('Line 7');
+    expect(lastFrame()).toContain('Line 7'); // Item 2 fully shown
 
-    // Move down to select Item 2
+    // Check for Item 1 being truncated.
+    expect(lastFrame()).not.toContain('Line G');
+
+    // Move down to select Item 1 (older message)
     triggerKey({ name: 'down' });
 
-    // New state: Item 1 unselected (truncated), Item 2 selected (expanded)
-    expect(lastFrame()).not.toContain('Line G');
-    expect(lastFrame()).toContain('Line 7');
+    // New state: Item 2 unselected (truncated), Item 1 selected (expanded)
+    expect(lastFrame()).not.toContain('Line 7');
+    expect(lastFrame()).toContain('Line G');
   });
 
   it('handles scrolling and header updates', () => {
@@ -342,7 +344,7 @@ describe('RewindViewer', () => {
   });
 
   describe('Content Filtering', () => {
-    it('filters out referenced file content from display', () => {
+    it('preserves content but removes markers from display', () => {
       const userPrompt =
         'some command @file\n--- Content from referenced files ---\nContent from file:\nblah blah\n--- End of content ---';
 
@@ -391,6 +393,32 @@ describe('RewindViewer', () => {
         '1',
         'some command @file', // Should be stripped
         RewindOutcome.RewindAndRevert,
+      );
+    });
+
+    it('strips expanded MCP resource content', () => {
+      const userPrompt =
+        'read @server3:mcp://demo-resource hello\n' +
+        '--- Content from referenced files ---\n' +
+        '\nContent from @server3:mcp://demo-resource:\n' +
+        'This is the content of the demo resource.\n' +
+        '--- End of content ---';
+
+      const conversation = createConversation([
+        { type: 'user', content: userPrompt, id: '1', timestamp: '1' },
+      ]);
+      const onRewind = vi.fn();
+      const { lastFrame } = render(
+        <RewindViewer
+          conversation={conversation}
+          onExit={vi.fn()}
+          onRewind={onRewind}
+        />,
+      );
+
+      expect(lastFrame()).toContain('read @server3:mcp://demo-resource hello');
+      expect(lastFrame()).not.toContain(
+        'This is the content of the demo resource',
       );
     });
   });

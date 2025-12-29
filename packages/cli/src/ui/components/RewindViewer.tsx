@@ -77,11 +77,13 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     return text;
   };
 
-  const items = interactions.map((msg, idx) => ({
-    key: `${msg.id || 'msg'}-${idx}`,
-    value: msg,
-    index: idx,
-  }));
+  const items = interactions
+    .map((msg, idx) => ({
+      key: `${msg.id || 'msg'}-${idx}`,
+      value: msg,
+      index: idx,
+    }))
+    .reverse();
 
   useKeypress(
     (key) => {
@@ -107,10 +109,14 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   const maxItemsToShow = Math.max(1, Math.floor(listHeight / 4));
 
   if (selectedMessageId) {
+    const selectedMessage = interactions.find(
+      (m) => m.id === selectedMessageId,
+    );
     return (
       <RewindConfirmation
         stats={confirmationStats}
         terminalWidth={terminalWidth}
+        timestamp={selectedMessage?.timestamp}
         onConfirm={(outcome) => {
           if (outcome === RewindOutcome.Cancel) {
             clearSelection();

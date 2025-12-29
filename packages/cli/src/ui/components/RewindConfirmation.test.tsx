@@ -98,4 +98,19 @@ describe('RewindConfirmation', () => {
     triggerKey({ name: 'escape' });
     expect(onConfirm).toHaveBeenCalledWith(RewindOutcome.Cancel);
   });
+
+  it('renders timestamp when provided', () => {
+    const onConfirm = vi.fn();
+    const timestamp = new Date().toISOString();
+    const { lastFrame } = render(
+      <RewindConfirmation
+        stats={null}
+        onConfirm={onConfirm}
+        terminalWidth={80}
+        timestamp={timestamp}
+      />,
+    );
+
+    expect(lastFrame()).toContain('just now');
+  });
 });
