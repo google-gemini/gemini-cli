@@ -13,8 +13,6 @@ import type {
 import { parseGoogleApiError } from './googleErrors.js';
 import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 
-const DEFAULT_RETRYABLE_DELAY_SECOND = 5;
-
 /**
  * A non-retryable error indicating a hard quota limit has been reached (e.g., daily limit).
  */
@@ -24,11 +22,13 @@ export class TerminalQuotaError extends Error {
   constructor(
     message: string,
     override readonly cause: GoogleApiError,
-    retryDelayMs?: number,
+    retryDelaySeconds?: number,
   ) {
     super(message);
     this.name = 'TerminalQuotaError';
-    this.retryDelayMs = retryDelayMs ? retryDelayMs * 1000 : undefined;
+    this.retryDelayMs = retryDelaySeconds
+      ? retryDelaySeconds * 1000
+      : undefined;
   }
 }
 
@@ -36,16 +36,18 @@ export class TerminalQuotaError extends Error {
  * A retryable error indicating a temporary quota issue (e.g., per-minute limit).
  */
 export class RetryableQuotaError extends Error {
-  retryDelayMs: number;
+  retryDelayMs?: number;
 
   constructor(
     message: string,
     override readonly cause: GoogleApiError,
-    retryDelaySeconds: number,
+    retryDelaySeconds?: number,
   ) {
     super(message);
     this.name = 'RetryableQuotaError';
-    this.retryDelayMs = retryDelaySeconds * 1000;
+    this.retryDelayMs = retryDelaySeconds
+      ? retryDelaySeconds * 1000
+      : undefined;
   }
 }
 
@@ -124,7 +126,6 @@ export function classifyGoogleError(error: unknown): unknown {
           message: errorMessage,
           details: [],
         },
-        DEFAULT_RETRYABLE_DELAY_SECOND,
       );
     }
 
@@ -259,7 +260,6 @@ export function classifyGoogleError(error: unknown): unknown {
         message: errorMessage,
         details: [],
       },
-      DEFAULT_RETRYABLE_DELAY_SECOND,
     );
   }
   return error; // Fallback to original error if no specific classification fits.
