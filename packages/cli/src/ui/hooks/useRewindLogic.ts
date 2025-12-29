@@ -10,7 +10,8 @@ import type {
   MessageRecord,
 } from '@google/gemini-cli-core';
 import {
-  calculateRewindStats,
+  calculateTurnStats,
+  calculateRewindImpact,
   type FileChangeStats,
 } from '../utils/rewindFileOps.js';
 
@@ -33,13 +34,13 @@ export function useRewindLogic(conversation: ConversationRecord) {
   }, [conversation.messages]);
 
   const getStats = (userMessage: MessageRecord) =>
-    calculateRewindStats(conversation, userMessage);
+    calculateTurnStats(conversation, userMessage);
 
   const selectMessage = (messageId: string) => {
     const msg = conversation.messages.find((m) => m.id === messageId);
     if (msg) {
       setSelectedMessageId(messageId);
-      setConfirmationStats(getStats(msg));
+      setConfirmationStats(calculateRewindImpact(conversation, msg));
     }
   };
 

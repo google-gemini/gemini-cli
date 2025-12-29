@@ -12,15 +12,20 @@ import type {
 import fs from 'node:fs/promises';
 import * as Diff from 'diff';
 import { coreEvents } from '@google/gemini-cli-core';
+export interface FileChangeDetail {
+  fileName: string;
+  diff: string;
+}
 
 export interface FileChangeStats {
   addedLines: number;
   removedLines: number;
   fileCount: number;
   firstFileName: string;
+  details?: FileChangeDetail[];
 }
 
-export function calculateRewindStats(
+export function calculateTurnStats(
   conversation: ConversationRecord,
   userMessage: MessageRecord,
 ): FileChangeStats | null {
@@ -32,7 +37,7 @@ export function calculateRewindStats(
   const files = new Set<string>();
   let hasEdits = false;
 
-  // Look ahead until the next user message or end of conversation
+  // Look ahead until the next user message (single turn)
   for (let i = msgIndex + 1; i < conversation.messages.length; i++) {
     const msg = conversation.messages[i];
     if (msg.type === 'user') break; // Stop at next user message
@@ -65,6 +70,62 @@ export function calculateRewindStats(
     removedLines,
     fileCount: files.size,
     firstFileName: files.values().next().value as string,
+  };
+}
+
+export function calculateRewindImpact(
+  conversation: ConversationRecord,
+  userMessage: MessageRecord,
+): FileChangeStats | null {
+  const msgIndex = conversation.messages.indexOf(userMessage);
+  if (msgIndex === -1) return null;
+
+  let addedLines = 0;
+  let removedLines = 0;
+  const files = new Set<string>();
+  const details: FileChangeDetail[] = [];
+  let hasEdits = false;
+
+  // Look ahead to the end of conversation (cumulative)
+  for (let i = msgIndex + 1; i < conversation.messages.length; i++) {
+    const msg = conversation.messages[i];
+    // Do NOT break on user message - we want total impact
+
+    if (msg.type === 'gemini' && msg.toolCalls) {
+      for (const toolCall of msg.toolCalls) {
+        const result = toolCall.resultDisplay;
+        if (
+          result &&
+          typeof result === 'object' &&
+          'diffStat' in result &&
+          result.diffStat
+        ) {
+          hasEdits = true;
+          const stats = result.diffStat;
+          addedLines += stats.model_added_lines + stats.user_added_lines;
+          removedLines += stats.model_removed_lines + stats.user_removed_lines;
+          if ('fileName' in result && typeof result.fileName === 'string') {
+            files.add(result.fileName);
+            if ('fileDiff' in result && typeof result.fileDiff === 'string') {
+              details.push({
+                fileName: result.fileName,
+                diff: result.fileDiff,
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (!hasEdits) return null;
+
+  return {
+    addedLines,
+    removedLines,
+    fileCount: files.size,
+    firstFileName: files.values().next().value as string,
+    details,
   };
 }
 
