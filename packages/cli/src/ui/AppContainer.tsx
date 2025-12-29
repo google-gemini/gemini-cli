@@ -185,7 +185,6 @@ export const AppContainer = (props: AppContainerProps) => {
   );
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
   const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
-  const [pendingInput, setPendingInput] = useState<string | null>(null);
 
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -370,13 +369,6 @@ export const AppContainer = (props: AppContainerProps) => {
     isValidPath,
     shellModeActive,
   });
-
-  useEffect(() => {
-    if (pendingInput !== null) {
-      buffer.setText(pendingInput);
-      setPendingInput(null);
-    }
-  }, [pendingInput, buffer]);
 
   // Initialize input history from logger (past sessions)
   useEffect(() => {
@@ -632,7 +624,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
-      setPendingInput: (text: string) => setPendingInput(text),
+      setText: (text: string) => buffer.setText(text),
     }),
     [
       setAuthState,
@@ -649,6 +641,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openPermissionsDialog,
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
+      buffer,
     ],
   );
 

@@ -87,8 +87,13 @@ export const rewindCommand: SlashCommand = {
               }
 
               uiTelemetryService.recordRewind();
-              // Proceed with Rewind (for RewindOnly and RewindAndRevert)
-              const updatedConversation = recordingService.rewindTo(messageId);
+              let updatedConversation = conversation;
+              if (
+                outcome === RewindOutcome.RewindOnly ||
+                outcome === RewindOutcome.RewindAndRevert
+              ) {
+                updatedConversation = recordingService.rewindTo(messageId);
+              }
               // Convert to UI and Client formats
               const { uiHistory, clientHistory } =
                 convertSessionToHistoryFormats(updatedConversation.messages);
