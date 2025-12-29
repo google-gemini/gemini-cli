@@ -87,6 +87,7 @@ export interface ConversationRecord {
   lastUpdated: string;
   messages: MessageRecord[];
   summary?: string;
+  displayName?: string;
 }
 
 /**
@@ -125,14 +126,14 @@ export class ChatRecordingService {
 
   /**
    * Initializes the chat recording service: creates a new conversation file and associates it with
-   * this service instance, or resumes from an existing session if resumedSessionData is provided.
+   * this service instance, or resumes from an existing session if existingSession is provided.
    */
-  initialize(resumedSessionData?: ResumedSessionData): void {
+  initialize(existingSession?: { sessionId: string; filePath: string }): void {
     try {
-      if (resumedSessionData) {
+      if (existingSession) {
         // Resume from existing session
-        this.conversationFile = resumedSessionData.filePath;
-        this.sessionId = resumedSessionData.conversation.sessionId;
+        this.conversationFile = existingSession.filePath;
+        this.sessionId = existingSession.sessionId;
 
         // Update the session ID in the existing file
         this.updateConversation((conversation) => {
@@ -450,6 +451,22 @@ export class ChatRecordingService {
       });
     } catch (error) {
       debugLogger.error('Error saving summary to chat history.', error);
+      // Don't throw - we want graceful degradation
+    }
+  }
+
+  /**
+   * Sets the display name for the current session.
+   */
+  setDisplayName(displayName: string): void {
+    if (!this.conversationFile) return;
+
+    try {
+      this.updateConversation((conversation) => {
+        conversation.displayName = displayName;
+      });
+    } catch (error) {
+      debugLogger.error('Error saving display name to chat history.', error);
       // Don't throw - we want graceful degradation
     }
   }

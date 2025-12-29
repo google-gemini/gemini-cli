@@ -11,6 +11,7 @@ import type {
   ConfirmationRequest,
 } from '../types.js';
 import type {
+  ChatRecordingService,
   Config,
   GitService,
   Logger,
@@ -42,6 +43,7 @@ export interface CommandContext {
     settings: LoadedSettings;
     git: GitService | undefined;
     logger: Logger;
+    chatRecordingService: ChatRecordingService | undefined;
   };
   // UI state and history management
   ui: {

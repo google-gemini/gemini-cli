@@ -44,6 +44,7 @@ export const createMockCommandContext = (
         loadCheckpoint: vi.fn().mockResolvedValue([]),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any, // Cast because Logger is a class.
+      chatRecordingService: undefined,
     },
     ui: {
       addItem: vi.fn(),

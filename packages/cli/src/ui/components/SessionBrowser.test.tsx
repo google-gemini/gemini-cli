@@ -130,7 +130,6 @@ const createSession = (overrides: Partial<SessionInfo>): SessionInfo => ({
   lastUpdated: new Date().toISOString(),
   messageCount: 1,
   displayName: 'Test Session',
-  firstUserMessage: 'Test Session',
   isCurrentSession: false,
   index: 0,
   ...overrides,
@@ -205,12 +204,39 @@ describe('SessionBrowser component', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
+  it('displays fallback displayName', () => {
+    const session = createSession({
+      id: 'no-display-name',
+      file: 'no-display-name',
+      displayName: 'Fallback Message',
+      lastUpdated: '2025-01-01T10:05:00Z',
+      messageCount: 2,
+      index: 0,
+    });
+
+    const config = createMockConfig();
+    const onResumeSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
+    const onExit = vi.fn();
+
+    const { lastFrame } = render(
+      <TestSessionBrowser
+        config={config}
+        onResumeSession={onResumeSession}
+        onDeleteSession={onDeleteSession}
+        onExit={onExit}
+        testSessions={[session]}
+      />,
+    );
+
+    expect(lastFrame()).toContain('Fallback Message');
+  });
+
   it('enters search mode, filters sessions, and renders match snippets', async () => {
     const searchSession = createSession({
       id: 'search1',
       file: 'search1',
       displayName: 'Query is here and another query.',
-      firstUserMessage: 'Query is here and another query.',
       fullContent: 'Query is here and another query.',
       messages: [
         {
@@ -226,7 +252,6 @@ describe('SessionBrowser component', () => {
       id: 'other',
       file: 'other',
       displayName: 'Nothing interesting here.',
-      firstUserMessage: 'Nothing interesting here.',
       fullContent: 'Nothing interesting here.',
       messages: [
         {

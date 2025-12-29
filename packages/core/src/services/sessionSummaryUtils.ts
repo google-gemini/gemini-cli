@@ -36,6 +36,14 @@ async function generateAndSaveSummary(
     return;
   }
 
+  // Skip if display name is already set
+  if (conversation.displayName) {
+    debugLogger.debug(
+      `[SessionSummary] Display name exists for ${sessionPath}, skipping summary generation`,
+    );
+    return;
+  }
+
   // Skip if no messages
   if (conversation.messages.length === 0) {
     debugLogger.debug(
@@ -132,6 +140,13 @@ export async function getPreviousSession(
       if (conversation.summary) {
         debugLogger.debug(
           '[SessionSummary] Most recent session already has summary',
+        );
+        return null;
+      }
+
+      if (conversation.displayName) {
+        debugLogger.debug(
+          '[SessionSummary] Most recent session already has display name',
         );
         return null;
       }
