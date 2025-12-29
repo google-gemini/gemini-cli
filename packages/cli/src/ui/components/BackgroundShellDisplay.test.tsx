@@ -197,39 +197,6 @@ describe('<BackgroundShellDisplay />', () => {
     expect(lastFrame()).toContain('   2: tail -f log.txt (PID: 1002)');
   });
 
-  it('auto-opens to process view if only one shell exists on mount', () => {
-    const singleShellMap = new Map();
-    singleShellMap.set(shell1.pid, shell1);
-
-    render(
-      <BackgroundShellDisplay
-        shells={singleShellMap}
-        activePid={shell1.pid}
-        width={80}
-        height={24}
-        isFocused={true}
-        isListOpenProp={false} // Should be overridden by useEffect
-      />,
-    );
-
-    expect(mockSetIsBackgroundShellListOpen).toHaveBeenCalledWith(false);
-  });
-
-  it('auto-opens to list view if multiple shells exist on mount', () => {
-    render(
-      <BackgroundShellDisplay
-        shells={mockShells}
-        activePid={shell1.pid}
-        width={80}
-        height={24}
-        isFocused={true}
-        isListOpenProp={false} // Should be overridden by useEffect
-      />,
-    );
-
-    expect(mockSetIsBackgroundShellListOpen).toHaveBeenCalledWith(true);
-  });
-
   it('selects the current process and closes the list when Ctrl+O is pressed in list view', () => {
     const useKeypressMock = vi.mocked(useKeypress);
     let keypressHandler: KeypressHandler | undefined;

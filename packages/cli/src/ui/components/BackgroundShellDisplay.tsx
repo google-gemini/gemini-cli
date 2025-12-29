@@ -31,7 +31,6 @@ const RIGHT_TEXT = 'Ctrl+B Hide | Ctrl+K Kill';
 const BORDER_WIDTH = 2; // Left and Right border
 const HEADER_HEIGHT = 3; // 2 for border, 1 for header
 const TAB_PADDING = 2; // Spaces around tab text
-const PID_TEXT_ESTIMATE = 25; // " (PID: 123456) (Focused)"
 const TAB_DISPLAY_HORIZONTAL_PADDING = 4;
 
 export const BackgroundShellDisplay = ({
@@ -48,11 +47,13 @@ export const BackgroundShellDisplay = ({
     setIsBackgroundShellListOpen,
   } = useUIActions();
   const activeShell = shells.get(activePid);
-  const [output, setOutput] = useState<string | AnsiOutput>('');
+  const [output, setOutput] = useState<string | AnsiOutput>(
+    activeShell?.output || '',
+  );
   const [listSelectionIndex, setListSelectionIndex] = useState(0);
 
   useEffect(() => {
-    if (!shells.has(activePid)) return;
+    if (!activePid) return;
 
     const ptyWidth = Math.max(
       1,
@@ -60,13 +61,31 @@ export const BackgroundShellDisplay = ({
     );
     const ptyHeight = Math.max(1, height - HEADER_HEIGHT);
     ShellExecutionService.resizePty(activePid, ptyWidth, ptyHeight);
-  }, [activePid, width, height, shells]);
+  }, [activePid, width, height]);
 
   useEffect(() => {
-    if (activeShell) {
-      setOutput(activeShell.output);
+    if (!activePid) {
+      setOutput('');
+      return;
     }
-  }, [activeShell]);
+
+    // Set initial output from the shell object
+    const shell = shells.get(activePid);
+    if (shell) {
+      setOutput(shell.output);
+    }
+
+    // Subscribe to live updates for the active shell
+    const unsubscribe = ShellExecutionService.subscribe(activePid, (event) => {
+      if (event.type === 'data') {
+        setOutput(event.chunk);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [activePid, shells]);
 
   useEffect(() => {
     if (isListOpenProp && activeShell) {
@@ -77,15 +96,6 @@ export const BackgroundShellDisplay = ({
       }
     }
   }, [isListOpenProp, activeShell, shells]);
-
-  useEffect(() => {
-    if (shells.size === 1) {
-      setIsBackgroundShellListOpen(false);
-    } else if (shells.size > 1) {
-      setIsBackgroundShellListOpen(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useKeypress(
     (key) => {
@@ -157,11 +167,11 @@ export const BackgroundShellDisplay = ({
       (s) => s.status === 'running',
     );
 
+    const pidInfoWidth = ` (PID: ${activePid}) ${isFocused ? '(Focused)' : ''}`
+      .length;
+
     const availableWidth =
-      width -
-      TAB_DISPLAY_HORIZONTAL_PADDING -
-      RIGHT_TEXT.length -
-      PID_TEXT_ESTIMATE;
+      width - TAB_DISPLAY_HORIZONTAL_PADDING - RIGHT_TEXT.length - pidInfoWidth;
 
     let currentWidth = 0;
     const tabs = [];

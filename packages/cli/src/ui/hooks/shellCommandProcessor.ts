@@ -187,7 +187,6 @@ export const useShellCommandProcessor = (
           shell.isBinary = true;
           shell.binaryBytesReceived = event.bytesReceived;
         }
-        setTick((t) => t + 1);
       });
 
       setBackgroundShellCount(countRunningShells());
@@ -303,6 +302,8 @@ export const useShellCommandProcessor = (
                   executionPid &&
                   backgroundShellsRef.current.has(executionPid)
                 ) {
+                  // If already backgrounded, let the background shell subscription handle it.
+                  // We update the map so that switches show the latest output immediately.
                   const existingShell =
                     backgroundShellsRef.current.get(executionPid)!;
                   backgroundShellsRef.current.set(executionPid, {
@@ -311,7 +312,6 @@ export const useShellCommandProcessor = (
                     isBinary: isBinaryStream,
                     binaryBytesReceived,
                   });
-                  setTick((t) => t + 1);
                   return;
                 }
 
@@ -367,28 +367,8 @@ export const useShellCommandProcessor = (
           setPendingHistoryItem(null);
 
           if (result.backgrounded && result.pid) {
-            backgroundShellsRef.current.set(result.pid, {
-              pid: result.pid,
-              command: rawQuery,
-              output: cumulativeStdout,
-              isBinary: isBinaryStream,
-              binaryBytesReceived,
-              status: 'running',
-            });
-            setBackgroundShellCount(countRunningShells());
+            registerBackgroundShell(result.pid, rawQuery, cumulativeStdout);
             setActiveShellPtyId(null);
-
-            ShellExecutionService.onExit(result.pid, (code) => {
-              if (backgroundShellsRef.current.has(result.pid!)) {
-                const shell = backgroundShellsRef.current.get(result.pid!);
-                if (shell) {
-                  shell.status = 'exited';
-                  shell.exitCode = code;
-                }
-                setBackgroundShellCount(countRunningShells());
-                setTick((t) => t + 1);
-              }
-            });
           }
 
           let mainContent: string;
@@ -479,7 +459,7 @@ export const useShellCommandProcessor = (
       setShellInputFocused,
       terminalHeight,
       terminalWidth,
-      countRunningShells,
+      registerBackgroundShell,
     ],
   );
 

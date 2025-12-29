@@ -87,6 +87,7 @@ import { computeWindowTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
+import { type BackgroundShell } from './hooks/shellCommandProcessor.js';
 import { useVim } from './hooks/vim.js';
 import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
@@ -185,6 +186,13 @@ export const AppContainer = (props: AppContainerProps) => {
   const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
   const toggleBackgroundShellRef = useRef<() => void>(() => {});
   const isBackgroundShellVisibleRef = useRef<boolean>(false);
+  const backgroundShellsRef = useRef<Map<number, BackgroundShell>>(new Map());
+
+  const [isBackgroundShellListOpen, setIsBackgroundShellListOpen] =
+    useState(false);
+  const [activeBackgroundShellPid, setActiveBackgroundShellPid] = useState<
+    number | null
+  >(null);
 
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -669,6 +677,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
         toggleBackgroundShellRef.current();
         if (!isBackgroundShellVisibleRef.current) {
           setEmbeddedShellFocused(true);
+          if (backgroundShellsRef.current.size > 1) {
+            setIsBackgroundShellListOpen(true);
+          } else {
+            setIsBackgroundShellListOpen(false);
+          }
         }
       },
     }),
@@ -687,6 +700,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openPermissionsDialog,
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
+      setIsBackgroundShellListOpen,
     ],
   );
 
@@ -839,6 +853,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isBackgroundShellVisibleRef.current = isBackgroundShellVisible;
   }, [isBackgroundShellVisible]);
 
+  useEffect(() => {
+    backgroundShellsRef.current = backgroundShells;
+  }, [backgroundShells]);
+
   // Auto-accept indicator
   const showAutoAcceptIndicator = useAutoAcceptIndicator({
     config,
@@ -870,12 +888,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     streamingState,
     submitQuery,
   });
-
-  const [activeBackgroundShellPid, setActiveBackgroundShellPid] = useState<
-    number | null
-  >(null);
-  const [isBackgroundShellListOpen, setIsBackgroundShellListOpen] =
-    useState(false);
 
   useEffect(() => {
     if (backgroundShells.size === 0) {
