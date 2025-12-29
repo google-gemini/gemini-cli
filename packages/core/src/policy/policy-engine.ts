@@ -24,6 +24,7 @@ import {
   SHELL_TOOL_NAMES,
   initializeShellParsers,
   splitCommands,
+  hasRedirection,
 } from '../utils/shell-utils.js';
 
 function ruleMatches(
@@ -141,6 +142,86 @@ export class PolicyEngine {
   }
 
   /**
+   * Check if a shell command is allowed.
+   */
+  private async checkShellCommand(
+    toolName: string,
+    command: string | undefined,
+    ruleDecision: PolicyDecision,
+    serverName: string | undefined,
+    allowRedirection?: boolean,
+  ): Promise<PolicyDecision> {
+    if (!command) {
+      return this.applyNonInteractiveMode(ruleDecision);
+    }
+
+    await initializeShellParsers();
+    const subCommands = splitCommands(command);
+
+    if (subCommands.length === 0) {
+      debugLogger.debug(
+        `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to safe decision.`,
+      );
+      return this.applyNonInteractiveMode(PolicyDecision.ASK_USER);
+    }
+
+    if (subCommands.length > 1) {
+      debugLogger.debug(
+        `[PolicyEngine.check] Compound command detected: ${subCommands.length} parts`,
+      );
+      let aggregateDecision = PolicyDecision.ALLOW;
+
+      for (const subCmd of subCommands) {
+        // Prevent infinite recursion for the root command
+        if (subCmd === command) {
+          if (!allowRedirection && hasRedirection(subCmd)) {
+            debugLogger.debug(
+              `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${subCmd}`,
+            );
+            aggregateDecision = PolicyDecision.ASK_USER;
+          }
+          continue;
+        }
+
+        const subResult = await this.check(
+          { name: toolName, args: { command: subCmd } },
+          serverName,
+        );
+
+        if (subResult.decision === PolicyDecision.DENY) {
+          return PolicyDecision.DENY;
+        }
+        if (subResult.decision === PolicyDecision.ASK_USER) {
+          aggregateDecision = PolicyDecision.ASK_USER;
+        }
+
+        // Check for redirection in allowed sub-commands (unless already downgraded)
+        if (
+          subResult.decision === PolicyDecision.ALLOW &&
+          !allowRedirection &&
+          hasRedirection(subCmd)
+        ) {
+          debugLogger.debug(
+            `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${subCmd}`,
+          );
+          aggregateDecision = PolicyDecision.ASK_USER;
+        }
+      }
+      return aggregateDecision;
+    }
+
+    // Base case: Single command
+    if (!allowRedirection && hasRedirection(command)) {
+      debugLogger.debug(
+        `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${command}`,
+      );
+      return this.applyNonInteractiveMode(PolicyDecision.ASK_USER);
+    }
+
+    return this.applyNonInteractiveMode(ruleDecision);
+  }
+
+  /**
    * Check if a tool call is allowed based on the configured policies.
    * Returns the decision and the matching rule (if any).
    */
@@ -183,62 +264,18 @@ export class PolicyEngine {
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
 
-        // Special handling for shell commands: check sub-commands if present
         if (
           toolCall.name &&
           SHELL_TOOL_NAMES.includes(toolCall.name) &&
           rule.decision === PolicyDecision.ALLOW
         ) {
-          const command = (toolCall.args as { command?: string })?.command;
-          if (command) {
-            await initializeShellParsers();
-            const subCommands = splitCommands(command);
-
-            // If there are multiple sub-commands, we must verify EACH of them matches an ALLOW rule.
-            // If any sub-command results in DENY -> the whole thing is DENY.
-            // If any sub-command results in ASK_USER -> the whole thing is ASK_USER (unless one is DENY).
-            // Only if ALL sub-commands are ALLOW do we proceed with ALLOW.
-            if (subCommands.length === 0) {
-              // This case occurs if the command is non-empty but parsing fails.
-              // An ALLOW rule for a prefix might have matched, but since the rest of
-              // the command is un-parseable, it's unsafe to proceed.
-              // Fall back to a safe decision.
-              debugLogger.debug(
-                `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to safe decision because implicit ALLOW is unsafe.`,
-              );
-              decision = this.applyNonInteractiveMode(PolicyDecision.ASK_USER);
-            } else if (subCommands.length > 1) {
-              debugLogger.debug(
-                `[PolicyEngine.check] Compound command detected: ${subCommands.length} parts`,
-              );
-              let aggregateDecision = PolicyDecision.ALLOW;
-
-              for (const subCmd of subCommands) {
-                // Recursively check each sub-command
-                const subCall = {
-                  name: toolCall.name,
-                  args: { command: subCmd },
-                };
-                const subResult = await this.check(subCall, serverName);
-
-                if (subResult.decision === PolicyDecision.DENY) {
-                  aggregateDecision = PolicyDecision.DENY;
-                  break; // Fail fast
-                } else if (subResult.decision === PolicyDecision.ASK_USER) {
-                  aggregateDecision = PolicyDecision.ASK_USER;
-                  // efficient: we can only strictly downgrade from ALLOW to ASK_USER,
-                  // but we must continue looking for DENY.
-                }
-              }
-
-              decision = aggregateDecision;
-            } else {
-              // Single command, rule match is valid
-              decision = this.applyNonInteractiveMode(rule.decision);
-            }
-          } else {
-            decision = this.applyNonInteractiveMode(rule.decision);
-          }
+          decision = await this.checkShellCommand(
+            toolCall.name,
+            (toolCall.args as { command?: string })?.command,
+            rule.decision,
+            serverName,
+            rule.allowRedirection,
+          );
         } else {
           decision = this.applyNonInteractiveMode(rule.decision);
         }
