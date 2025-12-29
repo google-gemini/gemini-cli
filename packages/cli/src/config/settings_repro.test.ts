@@ -150,7 +150,7 @@ describe('Settings Repro', () => {
           showColor: true,
           enableInteractiveShell: true,
         },
-        enableMessageBusIntegration: true,
+        truncateToolOutputLines: 100,
       },
       experimental: {
         useModelRouter: false,

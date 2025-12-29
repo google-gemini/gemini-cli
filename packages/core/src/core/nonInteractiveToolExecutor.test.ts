@@ -65,7 +65,6 @@ describe('executeToolCall', () => {
       getActiveModel: () => PREVIEW_GEMINI_MODEL,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
       getMessageBus: () => null,
       getPolicyEngine: () => null,
       isInteractive: () => false,
