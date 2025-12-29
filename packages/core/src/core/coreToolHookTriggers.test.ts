@@ -6,7 +6,11 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeToolWithHooks } from './coreToolHookTriggers.js';
-import { BaseToolInvocation, type ToolResult } from '../tools/tools.js';
+import {
+  BaseToolInvocation,
+  type ToolResult,
+  type AnyDeclarativeTool,
+} from '../tools/tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   MessageBusType,
@@ -30,11 +34,15 @@ class MockInvocation extends BaseToolInvocation<{ key: string }, ToolResult> {
 
 describe('executeToolWithHooks', () => {
   let messageBus: MessageBus;
+  let mockTool: AnyDeclarativeTool;
 
   beforeEach(() => {
     messageBus = {
       request: vi.fn(),
     } as unknown as MessageBus;
+    mockTool = {
+      build: vi.fn().mockImplementation((params) => new MockInvocation(params)),
+    } as unknown as AnyDeclarativeTool;
   });
 
   it('should apply modified tool input from BeforeTool hook', async () => {
@@ -75,6 +83,7 @@ describe('executeToolWithHooks', () => {
       abortSignal,
       messageBus,
       true, // hooksEnabled
+      mockTool,
     );
 
     // Verify result reflects modified input
@@ -85,6 +94,7 @@ describe('executeToolWithHooks', () => {
     expect(invocation.params.key).toBe('modified');
 
     expect(requestSpy).toHaveBeenCalled();
+    expect(mockTool.build).toHaveBeenCalledWith({ key: 'modified' });
   });
 
   it('should not modify input if hook does not provide tool_input', async () => {
@@ -111,9 +121,11 @@ describe('executeToolWithHooks', () => {
       abortSignal,
       messageBus,
       true, // hooksEnabled
+      mockTool,
     );
 
     expect(result.llmContent).toBe('key: original');
     expect(invocation.params.key).toBe('original');
+    expect(mockTool.build).not.toHaveBeenCalled();
   });
 });

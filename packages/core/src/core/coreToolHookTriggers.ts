@@ -19,6 +19,7 @@ import {
 import type {
   ToolCallConfirmationDetails,
   ToolResult,
+  AnyDeclarativeTool,
 } from '../tools/tools.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -255,6 +256,7 @@ export async function executeToolWithHooks(
   signal: AbortSignal,
   messageBus: MessageBus | undefined,
   hooksEnabled: boolean,
+  tool: AnyDeclarativeTool,
   liveOutputCallback?: (outputChunk: string | AnsiOutput) => void,
   shellExecutionConfig?: ShellExecutionConfig,
   setPidCallback?: (pid: number) => void,
@@ -307,6 +309,25 @@ export async function executeToolWithHooks(
         debugLogger.debug(`Tool input modified by hook for ${toolName}`);
         inputWasModified = true;
         modifiedKeys = Object.keys(modifiedInput);
+
+        // Recreate the invocation with the new parameters
+        // to ensure any derived state (like resolvedPath in ReadFileTool) is updated.
+        try {
+          // We use the tool's build method to validate and create the invocation
+          // This ensures consistent behavior with the initial creation
+          invocation = tool.build(invocation.params);
+        } catch (error) {
+          return {
+            llmContent: `Tool parameter modification by hook failed validation: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+            returnDisplay: `Tool parameter modification by hook failed validation.`,
+            error: {
+              type: ToolErrorType.INVALID_TOOL_PARAMS,
+              message: String(error),
+            },
+          };
+        }
       }
     }
   }

@@ -46,6 +46,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   ReadFileToolParams,
   ToolResult
 > {
+  private readonly resolvedPath: string;
   constructor(
     private config: Config,
     params: ReadFileToolParams,
@@ -54,10 +55,10 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     _toolDisplayName?: string,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
-  }
-
-  private get resolvedPath(): string {
-    return path.resolve(this.config.getTargetDir(), this.params.file_path);
+    this.resolvedPath = path.resolve(
+      this.config.getTargetDir(),
+      this.params.file_path,
+    );
   }
 
   getDescription(): string {

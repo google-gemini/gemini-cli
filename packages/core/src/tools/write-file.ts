@@ -143,6 +143,8 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   WriteFileToolParams,
   ToolResult
 > {
+  private readonly resolvedPath: string;
+
   constructor(
     private readonly config: Config,
     params: WriteFileToolParams,
@@ -151,10 +153,10 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     displayName?: string,
   ) {
     super(params, messageBus, toolName, displayName);
-  }
-
-  private get resolvedPath(): string {
-    return path.resolve(this.config.getTargetDir(), this.params.file_path);
+    this.resolvedPath = path.resolve(
+      this.config.getTargetDir(),
+      this.params.file_path,
+    );
   }
 
   override toolLocations(): ToolLocation[] {
