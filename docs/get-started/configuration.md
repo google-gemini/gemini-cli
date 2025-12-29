@@ -621,6 +621,11 @@ their corresponding top-level category object in your `settings.json` file.
     shell command. Defaults to 5 minutes.
   - **Default:** `300`
 
+- **`tools.shell.enableShellOutputEfficiency`** (boolean):
+  - **Description:** Enable shell output efficiency optimizations for better
+    performance.
+  - **Default:** `true`
+
 - **`tools.autoAccept`** (boolean):
   - **Description:** Automatically accept and execute tool calls that are
     considered safe (e.g., read-only operations).

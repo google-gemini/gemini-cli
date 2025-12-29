@@ -678,6 +678,9 @@ export class IdeClient {
       noProxy: [existingNoProxy, '127.0.0.1'].filter(Boolean).join(','),
     });
     const undiciPromise = import('undici');
+    // Suppress unhandled rejection if the promise is not awaited immediately.
+    // If the import fails, the error will be thrown when awaiting undiciPromise below.
+    undiciPromise.catch(() => {});
     return async (url: string | URL, init?: RequestInit): Promise<Response> => {
       const { fetch: fetchFn } = await undiciPromise;
       const fetchOptions: RequestInit & { dispatcher?: unknown } = {
