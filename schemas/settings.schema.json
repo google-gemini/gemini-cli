@@ -1128,13 +1128,6 @@
           "default": 1000,
           "type": "number"
         },
-        "enableMessageBusIntegration": {
-          "title": "Enable Message Bus Integration",
-          "description": "Enable policy-based tool confirmation via message bus integration. When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.",
-          "markdownDescription": "Enable policy-based tool confirmation via message bus integration. When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
-        },
         "enableHooks": {
           "title": "Enable Hooks System",
           "description": "Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.",

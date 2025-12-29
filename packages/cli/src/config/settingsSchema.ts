@@ -1073,18 +1073,6 @@ const SETTINGS_SCHEMA = {
         description: 'The number of lines to keep when truncating tool output.',
         showInDialog: true,
       },
-      enableMessageBusIntegration: {
-        type: 'boolean',
-        label: 'Enable Message Bus Integration',
-        category: 'Tools',
-        requiresRestart: true,
-        default: true,
-        description: oneLine`
-          Enable policy-based tool confirmation via message bus integration.
-          When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.
-        `,
-        showInDialog: true,
-      },
       enableHooks: {
         type: 'boolean',
         label: 'Enable Hooks System',
