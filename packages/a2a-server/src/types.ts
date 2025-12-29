@@ -47,6 +47,7 @@ export interface AgentSettings {
   kind: CoderAgentEvent.StateAgentSettingsEvent;
   workspacePath: string;
   autoExecute?: boolean;
+  isBackground?: boolean;
 }
 
 export interface ToolCallConfirmation {

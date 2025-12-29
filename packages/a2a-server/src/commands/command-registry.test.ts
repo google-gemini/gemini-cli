@@ -25,11 +25,57 @@ describe('CommandRegistry', () => {
   };
   const mockExtensionsCommand = vi.fn(() => mockExtensionsCommandInstance);
 
+  // Mock spawn-worker commands to prevent interference
+  const mockSpawnWorkerCommandInstance: Command = {
+    name: 'spawn-worker',
+    description: 'Mock spawn worker',
+    execute: vi.fn(),
+  };
+  const mockListWorkersCommandInstance: Command = {
+    name: 'list-workers',
+    description: 'Mock list workers',
+    execute: vi.fn(),
+  };
+  const mockGetWorkerCommandInstance: Command = {
+    name: 'get-worker',
+    description: 'Mock get worker',
+    execute: vi.fn(),
+  };
+  const mockCancelWorkerCommandInstance: Command = {
+    name: 'cancel-worker',
+    description: 'Mock cancel worker',
+    execute: vi.fn(),
+  };
+
+  // Mock init and restore commands
+  const mockInitCommandInstance: Command = {
+    name: 'init',
+    description: 'Mock init',
+    execute: vi.fn(),
+  };
+  const mockRestoreCommandInstance: Command = {
+    name: 'restore',
+    description: 'Mock restore',
+    execute: vi.fn(),
+  };
+
   beforeEach(async () => {
     vi.resetModules();
     vi.doMock('./extensions.js', () => ({
       ExtensionsCommand: mockExtensionsCommand,
       ListExtensionsCommand: mockListExtensionsCommand,
+    }));
+    vi.doMock('./init.js', () => ({
+      InitCommand: vi.fn(() => mockInitCommandInstance),
+    }));
+    vi.doMock('./restore.js', () => ({
+      RestoreCommand: vi.fn(() => mockRestoreCommandInstance),
+    }));
+    vi.doMock('./spawn-worker.js', () => ({
+      SpawnWorkerCommand: vi.fn(() => mockSpawnWorkerCommandInstance),
+      ListWorkersCommand: vi.fn(() => mockListWorkersCommandInstance),
+      GetWorkerCommand: vi.fn(() => mockGetWorkerCommandInstance),
+      CancelWorkerCommand: vi.fn(() => mockCancelWorkerCommandInstance),
     }));
   });
 
