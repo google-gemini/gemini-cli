@@ -209,7 +209,7 @@ describe('useGeminiStream', () => {
       getGeminiClient: mockGetGeminiClient,
       getApprovalMode: () => ApprovalMode.DEFAULT,
       getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
+      getDebugMode: false,
       addHistory: vi.fn(),
       getSessionId() {
         return 'test-session-id';
@@ -220,8 +220,8 @@ describe('useGeminiStream', () => {
       getContentGeneratorConfig: vi
         .fn()
         .mockReturnValue(contentGeneratorConfig),
-      getUseSmartEdit: () => false,
-      isInteractive: () => false,
+      getUseSmartEdit: false,
+      isInteractive: false,
       getExperiments: () => {},
       isRealTimeHintsEnabled: vi.fn(() => true),
     } as unknown as Config;
@@ -2760,7 +2760,7 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
-          () => false,
+          false,
           mockPopAllMessages,
         ),
       );
@@ -2841,7 +2841,7 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
-          () => false,
+          false,
           mockPopAllMessages,
         ),
       );
@@ -2913,7 +2913,7 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
-          () => false,
+          false,
           mockPopAllMessages,
         ),
       );
@@ -2990,7 +2990,7 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
-          () => false,
+          false,
           mockPopAllMessages,
         ),
       );
