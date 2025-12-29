@@ -10,7 +10,12 @@ import os from 'node:os';
 import pathMod from 'node:path';
 import * as path from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
-import { coreEvents, CoreEvent, debugLogger, unescapePath } from '@google/gemini-cli-core';
+import {
+  coreEvents,
+  CoreEvent,
+  debugLogger,
+  unescapePath,
+} from '@google/gemini-cli-core';
 import {
   toCodePoints,
   cpLen,
