@@ -309,9 +309,15 @@ export async function runNonInteractive({
                 content: event.value,
                 delta: true,
               });
-            } else if (config.getOutputFormat() === OutputFormat.JSON) {
-              responseText += event.value;
-            } else {
+            }
+
+            // Always accumulate response text for hooks
+            responseText += event.value;
+
+            if (
+              config.getOutputFormat() !== OutputFormat.JSON &&
+              config.getOutputFormat() !== OutputFormat.STREAM_JSON
+            ) {
               if (event.value) {
                 textOutput.write(event.value);
               }
@@ -418,6 +424,18 @@ export async function runNonInteractive({
 
           currentMessages = [{ role: 'user', parts: toolResponseParts }];
         } else {
+          // Fire AfterAgent hook if enabled
+          if (config.getEnableHooks()) {
+            try {
+              await config
+                .getHookSystem()
+                ?.getEventHandler()
+                .fireAfterAgentEvent(input, responseText);
+            } catch (error) {
+              debugLogger.error(`Error firing AfterAgent hook: ${error}`);
+            }
+          }
+
           // Emit final result event for streaming JSON
           if (streamFormatter) {
             const metrics = uiTelemetryService.getMetrics();

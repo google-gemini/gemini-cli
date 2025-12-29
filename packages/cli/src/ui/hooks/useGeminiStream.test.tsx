@@ -53,6 +53,7 @@ const MockedGeminiClientClass = vi.hoisted(() =>
     this.startChat = mockStartChat;
     this.sendMessageStream = mockSendMessageStream;
     this.addHistory = vi.fn();
+    this.getCurrentSequenceModel = vi.fn().mockReturnValue('test-model');
     this.getChat = vi.fn().mockReturnValue({
       recordCompletedToolCalls: vi.fn(),
     });
@@ -222,6 +223,12 @@ describe('useGeminiStream', () => {
         .mockReturnValue(contentGeneratorConfig),
       getUseSmartEdit: () => false,
       isInteractive: () => false,
+      getEnableHooks: () => false,
+      getHookSystem: () => ({
+        getEventHandler: () => ({
+          fireAfterAgentEvent: vi.fn().mockResolvedValue(undefined),
+        }),
+      }),
       getExperiments: () => {},
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();

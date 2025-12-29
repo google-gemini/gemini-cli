@@ -792,13 +792,20 @@ export const useGeminiStream = (
     [addItem, pendingHistoryItemRef, setPendingHistoryItem, settings],
   );
 
+  const activeUserPromptRef = useRef<string>('');
+
   const processGeminiStreamEvents = useCallback(
     async (
       stream: AsyncIterable<GeminiEvent>,
       userMessageTimestamp: number,
       signal: AbortSignal,
-    ): Promise<StreamProcessingStatus> => {
+    ): Promise<{
+      status: StreamProcessingStatus;
+      text: string;
+      hasToolCalls: boolean;
+    }> => {
       let geminiMessageBuffer = '';
+      let hookTextBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
       for await (const event of stream) {
         switch (event.type) {
@@ -806,6 +813,9 @@ export const useGeminiStream = (
             setThought(event.value);
             break;
           case ServerGeminiEventType.Content:
+            // Accumulate content for hooks
+            hookTextBuffer += event.value;
+
             geminiMessageBuffer = handleContentEvent(
               event.value,
               geminiMessageBuffer,
@@ -817,10 +827,18 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.UserCancelled:
             handleUserCancelledEvent(userMessageTimestamp);
-            break;
+            return {
+              status: StreamProcessingStatus.UserCancelled,
+              text: hookTextBuffer,
+              hasToolCalls: false,
+            };
           case ServerGeminiEventType.Error:
             handleErrorEvent(event.value, userMessageTimestamp);
-            break;
+            return {
+              status: StreamProcessingStatus.Error,
+              text: hookTextBuffer,
+              hasToolCalls: false,
+            };
           case ServerGeminiEventType.ChatCompressed:
             handleChatCompressionEvent(event.value, userMessageTimestamp);
             break;
@@ -858,14 +876,23 @@ export const useGeminiStream = (
           default: {
             // enforces exhaustive switch-case
             const unreachable: never = event;
-            return unreachable;
+            debugLogger.warn(`Unhandled event type: ${unreachable}`);
+            return {
+              status: StreamProcessingStatus.Error,
+              text: hookTextBuffer,
+              hasToolCalls: false,
+            };
           }
         }
       }
       if (toolCallRequests.length > 0) {
         scheduleToolCalls(toolCallRequests, signal);
       }
-      return StreamProcessingStatus.Completed;
+      return {
+        status: StreamProcessingStatus.Completed,
+        text: hookTextBuffer,
+        hasToolCalls: toolCallRequests.length > 0,
+      };
     },
     [
       handleContentEvent,
@@ -905,6 +932,12 @@ export const useGeminiStream = (
           if (!options?.isContinuation) {
             setModelSwitchedFromQuotaError(false);
             config.setQuotaErrorOccurred(false);
+            // Store original prompt for AfterAgent hook
+            if (typeof query === 'string') {
+              activeUserPromptRef.current = query;
+            } else {
+              activeUserPromptRef.current = '';
+            }
           }
 
           abortControllerRef.current = new AbortController();
@@ -957,14 +990,31 @@ export const useGeminiStream = (
                 abortSignal,
                 prompt_id!,
               );
-              const processingStatus = await processGeminiStreamEvents(
-                stream,
-                userMessageTimestamp,
-                abortSignal,
-              );
+              const { status, text, hasToolCalls } =
+                await processGeminiStreamEvents(
+                  stream,
+                  userMessageTimestamp,
+                  abortSignal,
+                );
 
-              if (processingStatus === StreamProcessingStatus.UserCancelled) {
+              if (status === StreamProcessingStatus.UserCancelled) {
                 return;
+              }
+
+              // Fire AfterAgent hook if this was the final response (no tool calls)
+              if (
+                status === StreamProcessingStatus.Completed &&
+                !hasToolCalls &&
+                config.getEnableHooks()
+              ) {
+                try {
+                  await config
+                    .getHookSystem()
+                    ?.getEventHandler()
+                    .fireAfterAgentEvent(activeUserPromptRef.current, text);
+                } catch (error) {
+                  debugLogger.error(`Error firing AfterAgent hook: ${error}`);
+                }
               }
 
               if (pendingHistoryItemRef.current) {
