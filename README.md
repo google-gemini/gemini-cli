@@ -1,4 +1,6 @@
-# Gemini CLI
+<div align="center">
+
+<h1>Gemini CLI</h1>
 
 [![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
 [![Gemini CLI E2E (Chained)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml)
@@ -6,7 +8,11 @@
 [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
 [![View Code Wiki](https://www.gstatic.com/_/boq-sdlc-agents-ui/_/r/YUi5dj2UWvE.svg)](https://codewiki.google/github.com/google-gemini/gemini-cli)
 
+<br/>
+
 ![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
+
+</div>
 
 Gemini CLI is an open-source AI agent that brings the power of Gemini directly
 into your terminal. It provides lightweight access to Gemini, giving you the
