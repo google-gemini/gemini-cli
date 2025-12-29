@@ -13,6 +13,7 @@ import {
   type ToolResult,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
+import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   MessageBusType,
@@ -90,9 +91,7 @@ const AskUserQuestionParamsSchema = z.object({
     .describe('1-4 questions to ask the user'),
 });
 
-export type AskUserQuestionParams = z.infer<
-  typeof AskUserQuestionParamsSchema
->;
+export type AskUserQuestionParams = z.infer<typeof AskUserQuestionParamsSchema>;
 export type Question = z.infer<typeof QuestionSchema>;
 export type QuestionOption = z.infer<typeof QuestionOptionSchema>;
 
@@ -104,7 +103,7 @@ export class AskUserQuestionTool extends BaseDeclarativeTool<
   AskUserQuestionParams,
   ToolResult
 > {
-  constructor(messageBus?: MessageBus) {
+  constructor(_config: Config, messageBus?: MessageBus) {
     super(
       ASK_USER_QUESTION_TOOL_NAME,
       'Ask User Question',
@@ -132,10 +131,7 @@ class AskUserQuestionInvocation extends BaseToolInvocation<
   AskUserQuestionParams,
   ToolResult
 > {
-  constructor(
-    params: AskUserQuestionParams,
-    messageBus?: MessageBus,
-  ) {
+  constructor(params: AskUserQuestionParams, messageBus?: MessageBus) {
     super(params, messageBus, ASK_USER_QUESTION_TOOL_NAME);
   }
 
@@ -160,7 +156,10 @@ class AskUserQuestionInvocation extends BaseToolInvocation<
     }
 
     try {
-      const answers = await this.requestUserInput(this.params.questions, signal);
+      const answers = await this.requestUserInput(
+        this.params.questions,
+        signal,
+      );
 
       // Format for LLM
       const llmContent = this.formatAnswersForLLM(answers);
@@ -241,11 +240,7 @@ class AskUserQuestionInvocation extends BaseToolInvocation<
   private formatAnswersForLLM(
     answers: Record<string, string | string[]>,
   ): string {
-    return JSON.stringify(
-      { answers },
-      null,
-      2,
-    );
+    return JSON.stringify({ answers }, null, 2);
   }
 
   /**
@@ -257,7 +252,8 @@ class AskUserQuestionInvocation extends BaseToolInvocation<
     const lines = ['User Responses:'];
 
     for (const [questionId, answer] of Object.entries(answers)) {
-      const questionIndex = parseInt(questionId.replace('question_', ''), 10) - 1;
+      const questionIndex =
+        parseInt(questionId.replace('question_', ''), 10) - 1;
       const question = this.params.questions[questionIndex];
 
       if (Array.isArray(answer)) {
