@@ -15,6 +15,7 @@ export * from './policy/types.js';
 export * from './policy/policy-engine.js';
 export * from './policy/toml-loader.js';
 export * from './policy/config.js';
+export { MessageBusType, type Question, type QuestionOption, type AskUserQuestionRequest, type AskUserQuestionResponse } from './confirmation-bus/types.js';
 export * from './confirmation-bus/types.js';
 export * from './confirmation-bus/message-bus.js';
 

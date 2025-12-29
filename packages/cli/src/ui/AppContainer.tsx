@@ -30,6 +30,8 @@ import {
 import { MessageType, StreamingState } from './types.js';
 import {
   type EditorType,
+  type AskUserQuestionRequest,
+  MessageBusType,
   type Config,
   type IdeInfo,
   type IdeContext,
@@ -233,6 +235,8 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const [isPermissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
+  const [askUserQuestionRequest, setAskUserQuestionRequest] =
+    useState<AskUserQuestionRequest | null>(null);
   const [permissionsDialogProps, setPermissionsDialogProps] = useState<{
     targetDirectory?: string;
   } | null>(null);
@@ -541,6 +545,43 @@ Logging in with Google... Restarting Gemini CLI to continue.
     // Go back to auth method selection
     setAuthState(AuthState.Updating);
   }, [setAuthState]);
+
+  const handleAskUserQuestionComplete = useCallback(
+    (answers: Record<string, string | string[]>) => {
+      const messageBus = config.getMessageBus();
+      if (!messageBus || !askUserQuestionRequest) {
+        return;
+      }
+
+      messageBus.publish({
+        type: MessageBusType.ASK_USER_QUESTION_RESPONSE,
+        correlationId: askUserQuestionRequest.correlationId,
+        answers,
+      });
+
+      setAskUserQuestionRequest(null);
+    },
+    [config, askUserQuestionRequest],
+  );
+
+  // Subscribe to ASK_USER_QUESTION requests from Core
+  useEffect(() => {
+    const messageBus = config.getMessageBus();
+    if (!messageBus) return;
+
+    const handler = (request: AskUserQuestionRequest) => {
+      setAskUserQuestionRequest(request);
+    };
+
+    messageBus.subscribe<AskUserQuestionRequest>(
+      MessageBusType.ASK_USER_QUESTION_REQUEST,
+      handler,
+    );
+
+    return () => {
+      messageBus.unsubscribe(MessageBusType.ASK_USER_QUESTION_REQUEST, handler);
+    };
+  }, [config]);
 
   // Sync user tier from config when authentication changes
   useEffect(() => {
@@ -1452,6 +1493,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showPrivacyNotice,
       corgiMode,
       debugMessage,
+      askUserQuestionRequest,
       quittingMessages,
       isSettingsDialogOpen,
       isSessionBrowserOpen,
@@ -1650,6 +1692,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setConstrainHeight,
       onEscapePromptChange: handleEscapePromptChange,
       refreshStatic,
+      handleAskUserQuestionComplete,
       handleFinalSubmit,
       handleClearScreen,
       handleProQuotaChoice,
@@ -1696,6 +1739,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       popAllMessages,
       handleApiKeySubmit,
       handleApiKeyCancel,
+      handleAskUserQuestionComplete,
+      askUserQuestionRequest,
       setBannerVisible,
       setEmbeddedShellFocused,
     ],

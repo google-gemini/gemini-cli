@@ -31,6 +31,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
+import { AskUserQuestionDialog } from './AskUserQuestionDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -91,6 +92,15 @@ export const DialogManager = ({
     return (
       <LoopDetectionConfirmation
         onComplete={uiState.loopDetectionConfirmationRequest.onComplete}
+      />
+    );
+  }
+  if (uiState.askUserQuestionRequest) {
+    return (
+      <AskUserQuestionDialog
+        questions={uiState.askUserQuestionRequest.questions}
+        onComplete={uiActions.handleAskUserQuestionComplete}
+        isFocused={true}
       />
     );
   }

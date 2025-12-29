@@ -23,6 +23,7 @@ import type {
   UserTierId,
   IdeInfo,
   FallbackIntent,
+  AskUserQuestionRequest,
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
@@ -71,6 +72,7 @@ export interface UIState {
   confirmationRequest: ConfirmationRequest | null;
   confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
+  askUserQuestionRequest: AskUserQuestionRequest | null;
   geminiMdFileCount: number;
   streamingState: StreamingState;
   initError: string | null;
