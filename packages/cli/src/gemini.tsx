@@ -41,6 +41,7 @@ import {
   type ResumedSessionData,
   type OutputPayload,
   type ConsoleLogPayload,
+  type UserFeedbackPayload,
   sessionId,
   logUserPrompt,
   AuthType,
@@ -607,7 +608,8 @@ export async function main() {
         // Use the existing session ID to continue recording to the same session
         config.setSessionId(resumedSessionData.conversation.sessionId);
       } catch (error) {
-        console.error(
+        coreEvents.emitFeedback(
+          'error',
           `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
         await runExitCleanup();
@@ -730,13 +732,25 @@ export function initializeOutputListenersAndFlush() {
       }
     });
 
-    coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
-      if (payload.type === 'error' || payload.type === 'warn') {
-        writeToStderr(payload.content);
-      } else {
-        writeToStdout(payload.content);
-      }
-    });
+    if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
+      coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
+        if (payload.type === 'error' || payload.type === 'warn') {
+          writeToStderr(payload.content);
+        } else {
+          writeToStdout(payload.content);
+        }
+      });
+    }
+
+    if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
+      coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
+        if (payload.severity === 'error' || payload.severity === 'warning') {
+          writeToStderr(payload.message);
+        } else {
+          writeToStdout(payload.message);
+        }
+      });
+    }
   }
   coreEvents.drainBacklogs();
 }
