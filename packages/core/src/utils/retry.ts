@@ -240,7 +240,10 @@ export async function retryWithBackoff<T>(
             : error;
         }
 
-        if (classifiedError instanceof RetryableQuotaError) {
+        if (
+          classifiedError instanceof RetryableQuotaError &&
+          classifiedError.retryDelayMs
+        ) {
           console.warn(
             `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${classifiedError.retryDelayMs}ms...`,
           );
