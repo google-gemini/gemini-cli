@@ -342,7 +342,7 @@ describe('classifyGoogleError', () => {
     const result = classifyGoogleError(originalError);
     expect(result).toBeInstanceOf(RetryableQuotaError);
     if (result instanceof RetryableQuotaError) {
-      expect(result.retryDelayMs).toBe(5000);
+      expect(result.retryDelayMs).toBeUndefined();
     }
   });
 
@@ -393,7 +393,7 @@ describe('classifyGoogleError', () => {
     }
   });
 
-  it('should return RetryableQuotaError with 5s fallback for generic 429 without specific message', () => {
+  it('should return RetryableQuotaError without delay time for generic 429 without specific message', () => {
     const generic429 = {
       status: 429,
       message: 'Resource exhausted. No specific retry info.',
@@ -403,11 +403,11 @@ describe('classifyGoogleError', () => {
 
     expect(result).toBeInstanceOf(RetryableQuotaError);
     if (result instanceof RetryableQuotaError) {
-      expect(result.retryDelayMs).toBe(5000);
+      expect(result.retryDelayMs).toBeUndefined();
     }
   });
 
-  it('should return RetryableQuotaError with 5s fallback for 429 with empty details and no regex match', () => {
+  it('should return RetryableQuotaError without delay time for 429 with empty details and no regex match', () => {
     const errorWithEmptyDetails = {
       error: {
         code: 429,
@@ -420,11 +420,11 @@ describe('classifyGoogleError', () => {
 
     expect(result).toBeInstanceOf(RetryableQuotaError);
     if (result instanceof RetryableQuotaError) {
-      expect(result.retryDelayMs).toBe(5000);
+      expect(result.retryDelayMs).toBeUndefined();
     }
   });
 
-  it('should return RetryableQuotaError with 5s fallback for 429 with some detail', () => {
+  it('should return RetryableQuotaError without delay time for 429 with some detail', () => {
     const errorWithEmptyDetails = {
       error: {
         code: 429,
@@ -446,7 +446,7 @@ describe('classifyGoogleError', () => {
 
     expect(result).toBeInstanceOf(RetryableQuotaError);
     if (result instanceof RetryableQuotaError) {
-      expect(result.retryDelayMs).toBe(5000);
+      expect(result.retryDelayMs).toBeUndefined();
     }
   });
 });
