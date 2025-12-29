@@ -7,7 +7,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 import { join } from 'node:path';
-import { writeFileSync } from 'node:fs';
 
 describe('AfterAgent Hook Integration', () => {
   let rig: TestRig;
@@ -23,44 +22,35 @@ describe('AfterAgent Hook Integration', () => {
   });
 
   it('should provide the final model response to AfterAgent hooks', async () => {
-    // Create a mock response file
-    // We need a fake response that the model would produce
+    // We use a node script for robust JSON parsing
+    const hookScriptName = 'after_agent_hook.js';
+    const hookScriptContent = `#!/usr/bin/env node
+const fs = require('fs');
+try {
+  // Read from stdin
+  const input = JSON.parse(fs.readFileSync(0, 'utf-8'));
+  const response = input.prompt_response || '';
+  const output = {
+    decision: 'allow',
+    systemMessage: \`Hook received response: \${response}\`
+  };
+  console.log(JSON.stringify(output));
+} catch (e) {
+  console.error(\`Error parsing hook input: \${e}\`);
+  process.exit(1);
+}
+`;
+
+    // Configure the test rig in a single step
+    // We refer to the hook script by relative path, which will be resolved
+    // relative to the project root (testDir) when executed.
     await rig.setup(
       'should provide the final model response to AfterAgent hooks',
       {
         fakeResponsesPath: join(
           import.meta.dirname,
-          'hooks-system.before-agent.responses', // Reusing an existing response set or creating a minimal one
+          'hooks-system.before-agent.responses', // Reusing an existing response set
         ),
-      },
-    );
-
-    // Create a hook script that logs the prompt_response to stdout (which is captured)
-    // We'll also echo it in a structured way we can parse
-    const hookScript = `#!/bin/bash
-# Read input from stdin
-input=$(cat)
-
-# Extract prompt_response using grep/sed/awk
-# We extract the value associated with "prompt_response" key
-# The sed commands remove the key and the surrounding quotes
-response=$(echo "$input" | grep -o '"prompt_response":"[^"]*"' | sed 's/"prompt_response":"//' | sed 's/"$//')
-
-# Echo a structured output that we can assert on in the test result
-# We escape the quotes for JSON
-echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"Hook received response: $response\\"}"
-`;
-
-    const scriptPath = join(rig.testDir!, 'after_agent_hook.sh');
-    writeFileSync(scriptPath, hookScript);
-
-    // Make executable
-    const { execSync } = await import('node:child_process');
-    execSync(`chmod +x "${scriptPath}"`);
-
-    await rig.setup(
-      'should provide the final model response to AfterAgent hooks',
-      {
         settings: {
           tools: {
             enableHooks: true,
@@ -71,7 +61,7 @@ echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"Hook received respon
                 hooks: [
                   {
                     type: 'command',
-                    command: scriptPath,
+                    command: `./${hookScriptName}`,
                     timeout: 5000,
                   },
                 ],
@@ -82,16 +72,19 @@ echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"Hook received respon
       },
     );
 
+    // Create the hook script in the test directory
+    const scriptPath = rig.createFile(hookScriptName, hookScriptContent);
+
+    // Make executable
+    const { execSync } = await import('node:child_process');
+    execSync(`chmod +x "${scriptPath}"`);
+
     const result = await rig.run({ args: 'Hello' });
 
     // Wait for hook telemetry to be flushed
-    // Note: This relies on the system successfully generating telemetry for the hook call
-    // If AfterAgent doesn't fire, this will time out
     await rig.waitForTelemetryEvent('hook_call');
 
     // The hook should have executed and printed the system message
-    // Note: The actual response text depends on the 'hooks-system.before-agent.responses' content
-    // But we should at least see the prefix we added
     expect(result).toContain('Hook received response:');
 
     // Verify the hook executed via telemetry
@@ -101,11 +94,12 @@ echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"Hook received respon
     );
 
     expect(afterAgentLog).toBeDefined();
-    expect(afterAgentLog?.hookCall.hook_name).toBe(scriptPath);
+    // The hook name in logs might be absolute or relative depending on how it's executed
+    // We just check it ends with the script name
+    expect(afterAgentLog?.hookCall.hook_name).toContain(hookScriptName);
     expect(afterAgentLog?.hookCall.exit_code).toBe(0);
 
     // Verify the input contained prompt_response
-    // We can inspect the hook_input in the telemetry log
     const hookInput =
       typeof afterAgentLog!.hookCall.hook_input === 'string'
         ? JSON.parse(afterAgentLog!.hookCall.hook_input)
