@@ -30,7 +30,7 @@ exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border when too
 
 exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation with permanent approval disabled 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ?  confirm-tool A tool for testing                                         ← │
+│ ?  confirm-tool A tool for testing                                         ￩ │
 │                                                                              │
 │ Test result                                                                  │
 │ Do you want to proceed?                                                      │
@@ -46,7 +46,7 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation wit
 
 exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation with permanent approval enabled 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ?  confirm-tool A tool for testing                                         ← │
+│ ?  confirm-tool A tool for testing                                         ￩ │
 │                                                                              │
 │ Test result                                                                  │
 │ Do you want to proceed?                                                      │
@@ -63,7 +63,7 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation wit
 
 exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialog for first confirming tool only 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ?  first-confirm A tool for testing                                        ← │
+│ ?  first-confirm A tool for testing                                        ￩ │
 │                                                                              │
 │ Test result                                                                  │
 │ Confirm first tool                                                           │
@@ -146,7 +146,7 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders single successful too
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call awaiting confirmation 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ?  confirmation-tool This tool needs confirmation                          ← │
+│ ?  confirmation-tool This tool needs confirmation                          ￩ │
 │                                                                              │
 │ Test result                                                                  │
 │ Are you sure you want to proceed?                                            │

@@ -293,21 +293,21 @@ two advanced features:
 ### Architecture
 
 ```
-SessionStart → Initialize memory & index tools
-     ↓
-BeforeAgent → Inject relevant memories
-     ↓
-BeforeModel → Add system instructions
-     ↓
-BeforeToolSelection → Filter tools via RAG
-     ↓
-BeforeTool → Validate security
-     ↓
-AfterTool → Run auto-tests
-     ↓
-AfterModel → Record interaction
-     ↓
-SessionEnd → Extract and store memories
+SessionStart ￫ Initialize memory & index tools
+     ￬
+BeforeAgent ￫ Inject relevant memories
+     ￬
+BeforeModel ￫ Add system instructions
+     ￬
+BeforeToolSelection ￫ Filter tools via RAG
+     ￬
+BeforeTool ￫ Validate security
+     ￬
+AfterTool ￫ Run auto-tests
+     ￬
+AfterModel ￫ Record interaction
+     ￬
+SessionEnd ￫ Extract and store memories
 ```
 
 ### Installation
@@ -621,7 +621,7 @@ async function main() {
           },
         },
       },
-      systemMessage: `🎯 Filtered ${candidateTools.length} → ${Math.min(filtered.length, 20)} tools`,
+      systemMessage: `🎯 Filtered ${candidateTools.length} ￫ ${Math.min(filtered.length, 20)} tools`,
     }),
   );
 }
@@ -939,7 +939,7 @@ readStdin().then(main).catch(console.error);
   - [convention] Use middleware pattern for auth
   - [gotcha] Remember to update token types
 
-🎯 Filtered 127 → 15 tools
+🎯 Filtered 127 ￫ 15 tools
 
 [Agent reads login.ts and proposes fix]
 
@@ -954,7 +954,7 @@ readStdin().then(main).catch(console.error);
   - [pattern] Centralized error handling in middleware
   - [decision] Log errors to CloudWatch
 
-🎯 Filtered 127 → 18 tools
+🎯 Filtered 127 ￫ 18 tools
 
 [Agent implements error logging]
 

@@ -90,7 +90,7 @@ describe('checkForUpdates', () => {
     latestVersion.mockResolvedValue('1.1.0');
 
     const result = await checkForUpdates(mockSettings);
-    expect(result?.message).toContain('1.0.0 → 1.1.0');
+    expect(result?.message).toContain('1.0.0 ￫ 1.1.0');
     expect(result?.update.current).toEqual('1.0.0');
     expect(result?.update.latest).toEqual('1.1.0');
     expect(result?.update.name).toEqual('test-package');
@@ -148,7 +148,7 @@ describe('checkForUpdates', () => {
       });
 
       const result = await checkForUpdates(mockSettings);
-      expect(result?.message).toContain('1.2.3-nightly.1 → 1.2.3-nightly.2');
+      expect(result?.message).toContain('1.2.3-nightly.1 ￫ 1.2.3-nightly.2');
       expect(result?.update.latest).toBe('1.2.3-nightly.2');
     });
   });

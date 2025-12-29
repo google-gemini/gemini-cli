@@ -539,8 +539,8 @@ gemini hooks migrate --from-claude
 This command:
 
 - Reads `.claude/settings.json`
-- Converts event names (`PreToolUse` → `BeforeTool`, etc.)
-- Translates tool names (`Bash` → `run_shell_command`, `replace` → `replace`)
+- Converts event names (`PreToolUse` ￫ `BeforeTool`, etc.)
+- Translates tool names (`Bash` ￫ `run_shell_command`, `replace` ￫ `replace`)
 - Updates matcher patterns
 - Writes to `.gemini/settings.json`
 

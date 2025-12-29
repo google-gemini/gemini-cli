@@ -308,7 +308,7 @@ const SessionListHeader = ({
 const NavigationHelp = (): React.JSX.Element => (
   <Box flexDirection="column">
     <Text color={Colors.Gray}>
-      <Kbd name="Navigate" shortcut="↑/↓" />
+      <Kbd name="Navigate" shortcut="￪/￬" />
       {'   '}
       <Kbd name="Resume" shortcut="Enter" />
       {'   '}

@@ -12,7 +12,7 @@ exports[`SessionBrowser component > enters search mode, filters sessions, and re
 
 exports[`SessionBrowser component > renders a list of sessions and marks current session as disabled 1`] = `
 " Chat Sessions (2 total)                                                        sorted by date desc
- Navigate: ↑/↓   Resume: Enter   Search: /   Delete: x   Quit: q
+ Navigate: ￪/￬   Resume: Enter   Search: /   Delete: x   Quit: q
  Sort: s         Reverse: r      First/Last: g/G
 
    Index │ Msgs │ Age  │ Name

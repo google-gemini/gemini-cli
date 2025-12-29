@@ -2288,14 +2288,14 @@ describe('InputPrompt', () => {
         stdin.write('\x12');
       });
       await waitFor(() => {
-        expect(clean(stdout.lastFrame())).toContain('→');
+        expect(clean(stdout.lastFrame())).toContain('￫');
       });
 
       await act(async () => {
         stdin.write('\u001B[C');
       });
       await waitFor(() => {
-        expect(clean(stdout.lastFrame())).toContain('←');
+        expect(clean(stdout.lastFrame())).toContain('￩');
       });
       expect(stdout.lastFrame()).toMatchSnapshot(
         'command-search-render-expanded-match',
@@ -2305,7 +2305,7 @@ describe('InputPrompt', () => {
         stdin.write('\u001B[D');
       });
       await waitFor(() => {
-        expect(clean(stdout.lastFrame())).toContain('→');
+        expect(clean(stdout.lastFrame())).toContain('￫');
       });
       expect(stdout.lastFrame()).toMatchSnapshot(
         'command-search-render-collapsed-match',
@@ -2378,8 +2378,8 @@ describe('InputPrompt', () => {
         const frame = clean(stdout.lastFrame());
         // Ensure it rendered the search mode
         expect(frame).toContain('(r:)');
-        expect(frame).not.toContain('→');
-        expect(frame).not.toContain('←');
+        expect(frame).not.toContain('￫');
+        expect(frame).not.toContain('￩');
       });
       unmount();
     });

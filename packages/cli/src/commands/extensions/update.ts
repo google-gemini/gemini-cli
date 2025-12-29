@@ -27,7 +27,7 @@ interface UpdateArgs {
 }
 
 const updateOutput = (info: ExtensionUpdateInfo) =>
-  `Extension "${info.name}" successfully updated: ${info.originalVersion} → ${info.updatedVersion}.`;
+  `Extension "${info.name}" successfully updated: ${info.originalVersion} ￫ ${info.updatedVersion}.`;
 
 export async function handleUpdate(args: UpdateArgs) {
   const workspaceDir = process.cwd();
@@ -76,7 +76,7 @@ export async function handleUpdate(args: UpdateArgs) {
         updatedExtensionInfo.updatedVersion
       ) {
         debugLogger.log(
-          `Extension "${args.name}" successfully updated: ${updatedExtensionInfo.originalVersion} → ${updatedExtensionInfo.updatedVersion}.`,
+          `Extension "${args.name}" successfully updated: ${updatedExtensionInfo.originalVersion} ￫ ${updatedExtensionInfo.updatedVersion}.`,
         );
       } else {
         debugLogger.log(`Extension "${args.name}" is already up to date.`);
