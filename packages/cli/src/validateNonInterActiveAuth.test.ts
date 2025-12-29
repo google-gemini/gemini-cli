@@ -35,8 +35,8 @@ describe('validateNonInterActiveAuth', () => {
   let originalEnvGeminiApiKey: string | undefined;
   let originalEnvVertexAi: string | undefined;
   let originalEnvGcp: string | undefined;
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-  let debugLoggerErrorSpy: ReturnType<typeof vi.spyOn>;
+  let consoleErrorSpy: MockInstance;
+  let debugLoggerErrorSpy: MockInstance;
   let processExitSpy: MockInstance;
   let mockSettings: LoadedSettings;
 
