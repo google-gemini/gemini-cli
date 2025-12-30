@@ -621,6 +621,11 @@ their corresponding top-level category object in your `settings.json` file.
     shell command. Defaults to 5 minutes.
   - **Default:** `300`
 
+- **`tools.shell.enableShellOutputEfficiency`** (boolean):
+  - **Description:** Enable shell output efficiency optimizations for better
+    performance.
+  - **Default:** `true`
+
 - **`tools.autoAccept`** (boolean):
   - **Description:** Automatically accept and execute tool calls that are
     considered safe (e.g., read-only operations).
@@ -677,14 +682,6 @@ their corresponding top-level category object in your `settings.json` file.
 - **`tools.truncateToolOutputLines`** (number):
   - **Description:** The number of lines to keep when truncating tool output.
   - **Default:** `1000`
-  - **Requires restart:** Yes
-
-- **`tools.enableMessageBusIntegration`** (boolean):
-  - **Description:** Enable policy-based tool confirmation via message bus
-    integration. When enabled, tools automatically respect policy engine
-    decisions (ALLOW/DENY/ASK_USER) without requiring individual tool
-    implementations.
-  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`tools.enableHooks`** (boolean):
