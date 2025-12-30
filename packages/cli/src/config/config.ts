@@ -542,9 +542,6 @@ export async function loadCliConfig(
     approvalMode,
   );
 
-  const enableMessageBusIntegration =
-    settings.tools?.enableMessageBusIntegration ?? true;
-
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
 
@@ -682,6 +679,8 @@ export async function loadCliConfig(
     enableInteractiveShell:
       settings.tools?.shell?.enableInteractiveShell ?? true,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
+    enableShellOutputEfficiency:
+      settings.tools?.shell?.enableShellOutputEfficiency ?? true,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
@@ -693,7 +692,6 @@ export async function loadCliConfig(
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
-    enableMessageBusIntegration,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
     introspectionAgentSettings:

@@ -14,6 +14,7 @@ import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { type Config } from '../config/config.js';
 import { getResponseText } from '../utils/partUtils.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -167,7 +168,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
       const errorMessage = `Error during web search for query "${
         this.params.query
       }": ${getErrorMessage(error)}`;
-      console.error(errorMessage, error);
+      debugLogger.warn(errorMessage, error);
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error performing web search.`,
