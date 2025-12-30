@@ -28,7 +28,6 @@ import {
   type Config,
   type ResumedSessionData,
   debugLogger,
-  coreEvents,
 } from '@google/gemini-cli-core';
 import { act } from 'react';
 import { type InitializationResult } from './core/initializer.js';

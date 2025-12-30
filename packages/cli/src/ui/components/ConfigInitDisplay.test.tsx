@@ -5,10 +5,19 @@
  */
 
 import { act } from 'react';
+import type { EventEmitter } from 'node:events';
 import { render } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { ConfigInitDisplay } from './ConfigInitDisplay.js';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+} from 'vitest';
 import {
   CoreEvent,
   MCPServerStatus,
@@ -23,10 +32,10 @@ vi.mock('./GeminiRespondingSpinner.js', () => ({
 }));
 
 describe('ConfigInitDisplay', () => {
-  let onSpy: ReturnType<typeof vi.spyOn>;
+  let onSpy: MockInstance<EventEmitter['on']>;
 
   beforeEach(() => {
-    onSpy = vi.spyOn(coreEvents, 'on');
+    onSpy = vi.spyOn(coreEvents as EventEmitter, 'on');
   });
 
   afterEach(() => {

@@ -1835,8 +1835,8 @@ describe('AppContainer State Management', () => {
         message: 'Test error message',
       };
       act(() => {
-        handlers.forEach((handler: (payload: UserFeedbackPayload) => void) => {
-          handler(payload);
+        handlers.forEach((handler) => {
+          (handler as (payload: UserFeedbackPayload) => void)(payload);
         });
       });
 

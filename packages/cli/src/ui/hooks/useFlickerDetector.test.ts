@@ -5,6 +5,7 @@
  */
 
 import { renderHook } from '../../test-utils/render.js';
+import type { EventEmitter } from 'node:events';
 import {
   vi,
   type Mock,
@@ -13,6 +14,7 @@ import {
   expect,
   beforeEach,
   afterEach,
+  type MockInstance,
 } from 'vitest';
 import { useFlickerDetector } from './useFlickerDetector.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -55,10 +57,10 @@ const mockMeasureElement = measureElement as Mock;
 describe('useFlickerDetector', () => {
   const mockConfig = {} as Config;
   let mockRef: React.RefObject<DOMElement | null>;
-  let emitSpy: ReturnType<typeof vi.spyOn>;
+  let emitSpy: MockInstance<EventEmitter['emit']>;
 
   beforeEach(() => {
-    emitSpy = vi.spyOn(coreEvents, 'emit');
+    emitSpy = vi.spyOn(coreEvents as EventEmitter, 'emit');
 
     mockUseConfig.mockReturnValue(mockConfig);
     mockRef = { current: { yogaNode: {} } as DOMElement };
