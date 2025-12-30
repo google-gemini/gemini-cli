@@ -71,6 +71,9 @@ export enum ToolErrorType {
 
   // WebSearch-specific Errors
   WEB_SEARCH_FAILED = 'web_search_failed',
+
+  // User Feedback
+  USER_FEEDBACK = 'user_feedback',
 }
 
 /**

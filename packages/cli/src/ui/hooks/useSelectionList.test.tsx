@@ -80,6 +80,9 @@ describe('useSelectionList', () => {
     initialIndex?: number;
     isFocused?: boolean;
     showNumbers?: boolean;
+    isInputActive?: boolean;
+    isAtTop?: boolean;
+    isAtBottom?: boolean;
   }) => {
     let hookResult: ReturnType<typeof useSelectionList>;
     function TestComponent(props: typeof initialProps) {
@@ -961,6 +964,84 @@ describe('useSelectionList', () => {
 
       await rerender({ items: newItems });
       expect(renderCount).toBe(2);
+    });
+  });
+
+  describe('Navigation Restriction (isInputActive=true)', () => {
+    it('should ignore j/k navigation when isInputActive is true', async () => {
+      const { result } = await renderSelectionListHook({
+        items,
+        onSelect: mockOnSelect,
+        isInputActive: true,
+      });
+      expect(result.current.activeIndex).toBe(0);
+
+      pressKey('j');
+      expect(result.current.activeIndex).toBe(0);
+
+      pressKey('k');
+      expect(result.current.activeIndex).toBe(0);
+    });
+
+    it('should ignore numeric shortcuts when isInputActive is true', async () => {
+      const { result } = await renderSelectionListHook({
+        items,
+        onSelect: mockOnSelect,
+        showNumbers: true,
+        isInputActive: true,
+      });
+      expect(result.current.activeIndex).toBe(0);
+
+      pressKey('3', '3');
+      expect(result.current.activeIndex).toBe(0);
+      expect(mockOnSelect).not.toHaveBeenCalled();
+    });
+
+    it('should ignore return key when isInputActive is true', async () => {
+      await renderSelectionListHook({
+        items,
+        onSelect: mockOnSelect,
+        isInputActive: true,
+      });
+
+      pressKey('return');
+      expect(mockOnSelect).not.toHaveBeenCalled();
+    });
+
+    it('should allow arrow key navigation when isInputActive is true but at boundaries', async () => {
+      const { result } = await renderSelectionListHook({
+        items,
+        onSelect: mockOnSelect,
+        isInputActive: true,
+        isAtTop: true,
+        isAtBottom: true,
+      });
+      expect(result.current.activeIndex).toBe(0);
+
+      // Down should leak because isAtBottom is true
+      pressKey('down');
+      expect(result.current.activeIndex).toBe(2);
+
+      // Up should leak because isAtTop is true
+      pressKey('up');
+      expect(result.current.activeIndex).toBe(0);
+    });
+
+    it('should ignore arrow key navigation when isInputActive is true and NOT at boundaries', async () => {
+      const { result } = await renderSelectionListHook({
+        items,
+        onSelect: mockOnSelect,
+        isInputActive: true,
+        isAtTop: false,
+        isAtBottom: false,
+      });
+      expect(result.current.activeIndex).toBe(0);
+
+      pressKey('down');
+      expect(result.current.activeIndex).toBe(0);
+
+      pressKey('up');
+      expect(result.current.activeIndex).toBe(0);
     });
   });
 

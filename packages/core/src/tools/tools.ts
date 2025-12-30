@@ -683,13 +683,17 @@ export interface ToolEditConfirmationDetails {
 export interface ToolConfirmationPayload {
   // used to override `modifiedProposedContent` for modifiable tools in the
   // inline modify flow
-  newContent: string;
+  newContent?: string;
+  feedback?: string;
 }
 
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';
   title: string;
-  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
   command: string;
   rootCommand: string;
 }
@@ -700,13 +704,19 @@ export interface ToolMcpConfirmationDetails {
   serverName: string;
   toolName: string;
   toolDisplayName: string;
-  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
 }
 
 export interface ToolInfoConfirmationDetails {
   type: 'info';
   title: string;
-  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
   prompt: string;
   urls?: string[];
 }
@@ -725,6 +735,7 @@ export enum ToolConfirmationOutcome {
   ProceedAlwaysTool = 'proceed_always_tool',
   ModifyWithEditor = 'modify_with_editor',
   Cancel = 'cancel',
+  Feedback = 'feedback',
 }
 
 export enum Kind {

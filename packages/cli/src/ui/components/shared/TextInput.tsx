@@ -17,6 +17,8 @@ import { cpSlice } from '../../utils/textUtils.js';
 export interface TextInputProps {
   buffer: TextBuffer;
   placeholder?: string;
+  placeholderColor?: string;
+  placeholderFocusedColor?: string;
   onSubmit?: (value: string) => void;
   onCancel?: () => void;
   focus?: boolean;
@@ -25,6 +27,8 @@ export interface TextInputProps {
 export function TextInput({
   buffer,
   placeholder = '',
+  placeholderColor = theme.text.secondary,
+  placeholderFocusedColor = theme.text.secondary,
   onSubmit,
   onCancel,
   focus = true,
@@ -65,10 +69,10 @@ export function TextInput({
         {focus ? (
           <Text>
             {chalk.inverse(placeholder[0] || ' ')}
-            <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
+            <Text color={placeholderFocusedColor}>{placeholder.slice(1)}</Text>
           </Text>
         ) : (
-          <Text color={theme.text.secondary}>{placeholder}</Text>
+          <Text color={placeholderColor}>{placeholder}</Text>
         )}
       </Box>
     );

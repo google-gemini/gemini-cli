@@ -77,6 +77,8 @@ describe('keyMatchers', () => {
       key.name === 'tab',
     [Command.TOGGLE_SHELL_INPUT_FOCUS]: (key: Key) =>
       key.ctrl && key.name === 'f',
+    [Command.TOGGLE_FEEDBACK]: (key: Key) =>
+      key.name === 'f' && !key.ctrl && !key.meta,
     [Command.EXPAND_SUGGESTION]: (key: Key) => key.name === 'right',
     [Command.COLLAPSE_SUGGESTION]: (key: Key) => key.name === 'left',
   };
@@ -335,6 +337,11 @@ describe('keyMatchers', () => {
       command: Command.TOGGLE_SHELL_INPUT_FOCUS,
       positive: [createKey('f', { ctrl: true })],
       negative: [createKey('f')],
+    },
+    {
+      command: Command.TOGGLE_FEEDBACK,
+      positive: [createKey('f')],
+      negative: [createKey('f', { ctrl: true })],
     },
   ];
 
