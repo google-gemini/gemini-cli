@@ -214,11 +214,7 @@ export class LoggingContentGenerator implements ContentGenerator {
             response.candidates,
             response.usageMetadata,
             JSON.stringify({
-              candidates: response.candidates,
-              usageMetadata: response.usageMetadata,
-              responseId: response.responseId,
               promptFeedback: response.promptFeedback,
-              modelVersion: response.modelVersion,
             }),
             req.config,
             serverDetails,
@@ -327,11 +323,7 @@ export class LoggingContentGenerator implements ContentGenerator {
         lastUsageMetadata,
         JSON.stringify(
           responses.map((r) => ({
-            candidates: r.candidates,
-            usageMetadata: r.usageMetadata,
-            responseId: r.responseId,
             promptFeedback: r.promptFeedback,
-            modelVersion: r.modelVersion,
           })),
         ),
         req.config,
