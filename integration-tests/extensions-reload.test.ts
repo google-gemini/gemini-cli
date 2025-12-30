@@ -39,7 +39,9 @@ describe('extension reloading', () => {
     async () => {
       const serverA = new TestMcpServer();
       const portA = await serverA.start({
-        hello: () => ({ content: [{ type: 'text', text: 'world' }] }),
+        tools: {
+          hello: () => ({ content: [{ type: 'text', text: 'world' }] }),
+        },
       });
       const extension = {
         name: 'test-extension',
@@ -74,7 +76,9 @@ describe('extension reloading', () => {
       // Now create the update, but its not installed yet
       const serverB = new TestMcpServer();
       const portB = await serverB.start({
-        goodbye: () => ({ content: [{ type: 'text', text: 'world' }] }),
+        tools: {
+          goodbye: () => ({ content: [{ type: 'text', text: 'world' }] }),
+        },
       });
       extension.version = '0.0.2';
       extension.mcpServers['test-server'].httpUrl =

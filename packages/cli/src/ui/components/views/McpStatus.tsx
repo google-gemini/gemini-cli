@@ -87,6 +87,9 @@ export const McpStatus: React.FC<McpStatusProps> = ({
         const serverPrompts = prompts.filter(
           (prompt) => prompt.serverName === serverName,
         );
+
+        //Todo: handle MCP servers with many resources
+        //https://github.com/google-gemini/gemini-cli/issues/15061
         const serverResources = resources.filter(
           (resource) => resource.serverName === serverName,
         );
