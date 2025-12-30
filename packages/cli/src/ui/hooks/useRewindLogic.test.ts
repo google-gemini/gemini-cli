@@ -26,23 +26,22 @@ describe('useRewindLogic', () => {
     id: 'msg-1',
     type: 'user',
     content: 'Hello',
-    timestamp: 1000,
+    timestamp: new Date(1000).toISOString(),
   };
 
   const mockModelMessage: MessageRecord = {
     id: 'msg-2',
-    type: 'model',
+    type: 'gemini',
     content: 'Hi there',
-    timestamp: 1001,
+    timestamp: new Date(1001).toISOString(),
   };
 
   const mockConversation: ConversationRecord = {
-    id: 'conv-1',
-    title: 'Test Conversation',
+    sessionId: 'conv-1',
+    projectHash: 'hash-1',
+    startTime: new Date(1000).toISOString(),
+    lastUpdated: new Date(1001).toISOString(),
     messages: [mockUserMessage, mockModelMessage],
-    created: 1000,
-    updated: 1001,
-    metadata: {},
   };
 
   beforeEach(() => {
