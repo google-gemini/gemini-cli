@@ -155,7 +155,7 @@ describe('rewindCommand', () => {
     await onRewind('msg-id-123', 'New Prompt', RewindOutcome.RewindAndRevert);
 
     expect(mockRevertFileChanges).toHaveBeenCalledWith(
-      expect.anything(),
+      mockGetConversation(),
       'msg-id-123',
     );
     expect(mockRewindTo).toHaveBeenCalledWith('msg-id-123');
@@ -177,7 +177,7 @@ describe('rewindCommand', () => {
     await onRewind('msg-id-123', 'New Prompt', RewindOutcome.RevertOnly);
 
     expect(mockRevertFileChanges).toHaveBeenCalledWith(
-      expect.anything(),
+      mockGetConversation(),
       'msg-id-123',
     );
     expect(mockRewindTo).not.toHaveBeenCalled();
