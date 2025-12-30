@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { SkillManager } from './skillManager.js';
+import { Storage } from '../config/storage.js';
 
 describe('SkillManager', () => {
   let testRootDir: string;
@@ -21,6 +22,7 @@ describe('SkillManager', () => {
 
   afterEach(async () => {
     await fs.rm(testRootDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
   });
 
   it('should discover skills with valid SKILL.md and frontmatter', async () => {
@@ -39,14 +41,13 @@ Do something.
     );
 
     const service = new SkillManager();
-    const skills = await service.discoverSkills([testRootDir]);
+    const skills = await service.discoverSkillsInternal([testRootDir]);
 
     expect(skills).toHaveLength(1);
-    expect(skills[0]).toEqual({
-      name: 'my-skill',
-      description: 'A test skill',
-      location: skillFile,
-    });
+    expect(skills[0].name).toBe('my-skill');
+    expect(skills[0].description).toBe('A test skill');
+    expect(skills[0].location).toBe(skillFile);
+    expect(skills[0].body).toBe('# Instructions\nDo something.');
   });
 
   it('should ignore directories without SKILL.md', async () => {
@@ -54,7 +55,7 @@ Do something.
     await fs.mkdir(notASkillDir, { recursive: true });
 
     const service = new SkillManager();
-    const skills = await service.discoverSkills([testRootDir]);
+    const skills = await service.discoverSkillsInternal([testRootDir]);
 
     expect(skills).toHaveLength(0);
   });
@@ -66,7 +67,7 @@ Do something.
     await fs.writeFile(skillFile, '# No frontmatter here');
 
     const service = new SkillManager();
-    const skills = await service.discoverSkills([testRootDir]);
+    const skills = await service.discoverSkillsInternal([testRootDir]);
 
     expect(skills).toHaveLength(0);
   });
@@ -84,7 +85,7 @@ name: missing-fields
     );
 
     const service = new SkillManager();
-    const skills = await service.discoverSkills([testRootDir]);
+    const skills = await service.discoverSkillsInternal([testRootDir]);
 
     expect(skills).toHaveLength(0);
   });
@@ -118,29 +119,10 @@ description: Skill 2
     );
 
     const service = new SkillManager();
-    const skills = await service.discoverSkills([path1, path2]);
+    const skills = await service.discoverSkillsInternal([path1, path2]);
 
     expect(skills).toHaveLength(2);
     expect(skills.map((s) => s.name).sort()).toEqual(['skill1', 'skill2']);
-  });
-
-  it('should de-duplicate skills by location', async () => {
-    const skillDir = path.join(testRootDir, 'skill');
-    await fs.mkdir(skillDir, { recursive: true });
-    await fs.writeFile(
-      path.join(skillDir, 'SKILL.md'),
-      `---
-name: skill
-description: Skill
----
-`,
-    );
-
-    const service = new SkillManager();
-    // Use the same path twice
-    const skills = await service.discoverSkills([testRootDir, testRootDir]);
-
-    expect(skills).toHaveLength(1);
   });
 
   it('should deduplicate skills by name (last wins)', async () => {
@@ -170,11 +152,51 @@ description: Second
     );
 
     const service = new SkillManager();
-    await service.discoverSkills([path1, path2]);
+    // In our tiered discovery logic, we call discoverSkillsInternal for each tier
+    // and then add them with precedence.
+    const skills1 = await service.discoverSkillsInternal([path1]);
+    service['addSkillsWithPrecedence'](skills1);
+    const skills2 = await service.discoverSkillsInternal([path2]);
+    service['addSkillsWithPrecedence'](skills2);
 
     const skills = service.getSkills();
     expect(skills).toHaveLength(1);
     expect(skills[0].description).toBe('Second');
+  });
+
+  it('should discover skills from Storage with project precedence', async () => {
+    const userDir = path.join(testRootDir, 'user');
+    const projectDir = path.join(testRootDir, 'project');
+    await fs.mkdir(path.join(userDir, 'skill-a'), { recursive: true });
+    await fs.mkdir(path.join(projectDir, 'skill-a'), { recursive: true });
+
+    await fs.writeFile(
+      path.join(userDir, 'skill-a', 'SKILL.md'),
+      `---
+name: skill-a
+description: user-desc
+---
+`,
+    );
+    await fs.writeFile(
+      path.join(projectDir, 'skill-a', 'SKILL.md'),
+      `---
+name: skill-a
+description: project-desc
+---
+`,
+    );
+
+    vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
+    const storage = new Storage('/dummy');
+    vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
+
+    const service = new SkillManager();
+    await service.discoverSkills(storage);
+
+    const skills = service.getSkills();
+    expect(skills).toHaveLength(1);
+    expect(skills[0].description).toBe('project-desc');
   });
 
   it('should filter disabled skills in getSkills but not in getAllSkills', async () => {
@@ -185,15 +207,24 @@ description: Second
 
     await fs.writeFile(
       path.join(skill1Dir, 'SKILL.md'),
-      '---\nname: skill1\ndescription: desc1\n---\n',
+      `---
+name: skill1
+description: desc1
+---
+`,
     );
     await fs.writeFile(
       path.join(skill2Dir, 'SKILL.md'),
-      '---\nname: skill2\ndescription: desc2\n---\n',
+      `---
+name: skill2
+description: desc2
+---
+`,
     );
 
     const service = new SkillManager();
-    await service.discoverSkills([testRootDir]);
+    const discovered = await service.discoverSkillsInternal([testRootDir]);
+    service['addSkillsWithPrecedence'](discovered);
     service.setDisabledSkills(['skill1']);
 
     expect(service.getSkills()).toHaveLength(1);

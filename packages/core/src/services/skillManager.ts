@@ -9,17 +9,17 @@ import * as path from 'node:path';
 import { glob } from 'glob';
 import yaml from 'js-yaml';
 import { debugLogger } from '../utils/debugLogger.js';
+import { Storage } from '../config/storage.js';
 
 export interface SkillMetadata {
   name: string;
   description: string;
   location: string;
+  body: string;
   disabled?: boolean;
 }
 
-export interface SkillContent extends SkillMetadata {
-  body: string; // The Markdown content after the frontmatter
-}
+const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)/;
 
 export class SkillManager {
   private skills: SkillMetadata[] = [];
@@ -33,10 +33,36 @@ export class SkillManager {
   }
 
   /**
-   * Discovered skills in the provided paths and adds them to the manager.
-   * A skill is a directory containing a SKILL.md file at its root.
+   * Discovers skills from standard user and project locations.
+   * Project skills take precedence over user skills.
    */
-  async discoverSkills(paths: string[]): Promise<SkillMetadata[]> {
+  async discoverSkills(storage: Storage): Promise<void> {
+    this.clearSkills();
+
+    // User skills first
+    const userPaths = [Storage.getUserSkillsDir()];
+    const userSkills = await this.discoverSkillsInternal(userPaths);
+    this.addSkillsWithPrecedence(userSkills);
+
+    // Project skills second (overwrites user skills with same name)
+    const projectPaths = [storage.getProjectSkillsDir()];
+    const projectSkills = await this.discoverSkillsInternal(projectPaths);
+    this.addSkillsWithPrecedence(projectSkills);
+  }
+
+  private addSkillsWithPrecedence(newSkills: SkillMetadata[]): void {
+    const skillMap = new Map<string, SkillMetadata>();
+    for (const skill of [...this.skills, ...newSkills]) {
+      skillMap.set(skill.name, skill);
+    }
+    this.skills = Array.from(skillMap.values());
+  }
+
+  /**
+   * Discovered skills in the provided paths and adds them to the manager.
+   * Internal helper for tiered discovery.
+   */
+  async discoverSkillsInternal(paths: string[]): Promise<SkillMetadata[]> {
     const discoveredSkills: SkillMetadata[] = [];
     const seenLocations = new Set(this.skills.map((s) => s.location));
 
@@ -45,7 +71,6 @@ export class SkillManager {
         const absoluteSearchPath = path.resolve(searchPath);
         debugLogger.debug(`Discovering skills in: ${absoluteSearchPath}`);
 
-        // Check if the search path itself is a directory
         const stats = await fs.stat(absoluteSearchPath).catch(() => null);
         if (!stats || !stats.isDirectory()) {
           debugLogger.debug(
@@ -54,8 +79,6 @@ export class SkillManager {
           continue;
         }
 
-        // Search for SKILL.md files in immediate subdirectories
-        // We use a depth of 2 to find <searchPath>/<skill-name>/SKILL.md
         const skillFiles = await glob('*/SKILL.md', {
           cwd: absoluteSearchPath,
           absolute: true,
@@ -81,17 +104,9 @@ export class SkillManager {
           }
         }
       } catch (error) {
-        // Silently ignore errors for individual search paths
-        debugLogger.error(`Error discovering skills in ${searchPath}:`, error);
+        debugLogger.log(`Error discovering skills in ${searchPath}:`, error);
       }
     }
-
-    // Deduplicate by name, last one wins
-    const skillMap = new Map<string, SkillMetadata>();
-    for (const skill of [...this.skills, ...discoveredSkills]) {
-      skillMap.set(skill.name, skill);
-    }
-    this.skills = Array.from(skillMap.values());
 
     return discoveredSkills;
   }
@@ -129,44 +144,8 @@ export class SkillManager {
   /**
    * Reads the full content (metadata + body) of a skill by name.
    */
-  async getSkillContent(name: string): Promise<SkillContent | null> {
-    const skill = this.skills.find((s) => s.name === name);
-    if (!skill) {
-      return null;
-    }
-    const filePath = skill.location;
-    try {
-      const content = await fs.readFile(filePath, 'utf-8');
-
-      // Extract YAML frontmatter
-      const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)/);
-      if (!match) {
-        return null;
-      }
-
-      const frontmatter = yaml.load(match[1]);
-      if (!frontmatter || typeof frontmatter !== 'object') {
-        return null;
-      }
-
-      const { name: skillName, description } = frontmatter as Record<
-        string,
-        unknown
-      >;
-      if (typeof skillName !== 'string' || typeof description !== 'string') {
-        return null;
-      }
-
-      return {
-        name: skillName,
-        description,
-        location: filePath,
-        body: match[2].trim(),
-      };
-    } catch (error) {
-      debugLogger.error(`Error reading skill content from ${filePath}:`, error);
-      return null;
-    }
+  getSkillContent(name: string): SkillMetadata | null {
+    return this.skills.find((s) => s.name === name) ?? null;
   }
 
   /**
@@ -188,13 +167,12 @@ export class SkillManager {
   ): Promise<SkillMetadata | null> {
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-
-      // Extract YAML frontmatter
-      const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
+      const match = content.match(FRONTMATTER_REGEX);
       if (!match) {
         return null;
       }
 
+      // Use yaml.load() which is safe in js-yaml v4.
       const frontmatter = yaml.load(match[1]);
       if (!frontmatter || typeof frontmatter !== 'object') {
         return null;
@@ -209,9 +187,10 @@ export class SkillManager {
         name,
         description,
         location: filePath,
+        body: match[2].trim(),
       };
     } catch (error) {
-      debugLogger.error(`Error parsing skill file ${filePath}:`, error);
+      debugLogger.log(`Error parsing skill file ${filePath}:`, error);
       return null;
     }
   }

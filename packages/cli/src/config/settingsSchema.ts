@@ -1390,7 +1390,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable Agent Skills (experimental).',
-        showInDialog: true,
+        showInDialog: false,
       },
       codebaseInvestigatorSettings: {
         type: 'object',
@@ -1526,7 +1526,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: [] as string[],
         description: 'List of disabled skills.',
-        showInDialog: true,
+        showInDialog: false,
         items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },

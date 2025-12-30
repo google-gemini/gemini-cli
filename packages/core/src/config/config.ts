@@ -716,12 +716,7 @@ export class Config {
 
     // Discover skills if enabled
     if (this.skillsSupport) {
-      const skillPaths = [
-        Storage.getUserSkillsDir(),
-        this.storage.getProjectSkillsDir(),
-      ];
-
-      await this.getSkillManager().discoverSkills(skillPaths);
+      await this.getSkillManager().discoverSkills(this.storage);
       this.getSkillManager().setDisabledSkills(this.disabledSkills);
     }
 
