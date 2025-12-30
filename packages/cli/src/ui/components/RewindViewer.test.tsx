@@ -41,10 +41,26 @@ vi.mock('../contexts/SessionContext.js', () => ({
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
+
+  const partToStringRecursive = (part: unknown): string => {
+    if (!part) {
+      return '';
+    }
+    if (typeof part === 'string') {
+      return part;
+    }
+    if (Array.isArray(part)) {
+      return part.map(partToStringRecursive).join('');
+    }
+    if (typeof part === 'object' && part !== null && 'text' in part) {
+      return (part as { text: string }).text ?? '';
+    }
+    return '';
+  };
+
   return {
     ...original,
-    partToString: (part: string | JSON) =>
-      typeof part === 'string' ? part : JSON.stringify(part),
+    partToString: (part: string | JSON) => partToStringRecursive(part),
   };
 });
 
@@ -153,8 +169,8 @@ describe('RewindViewer', () => {
     const conversation = createConversation([
       { type: 'user', content: longText1, id: '1', timestamp: '1' },
       { type: 'gemini', content: 'Response 1', id: '1', timestamp: '1' },
-      { type: 'user', content: longText2, id: '1', timestamp: '1' },
-      { type: 'gemini', content: 'Response 2', id: '1', timestamp: '1' },
+      { type: 'user', content: longText2, id: '2', timestamp: '1' },
+      { type: 'gemini', content: 'Response 2', id: '2', timestamp: '1' },
     ]);
     const onExit = vi.fn();
     const onRewind = vi.fn();
