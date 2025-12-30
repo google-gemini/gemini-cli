@@ -245,16 +245,11 @@ export async function retryWithBackoff<T>(
             : error;
         }
 
-<<<<<<< HEAD
-        if (classifiedError instanceof RetryableQuotaError) {
-          console.warn(
-=======
         if (
           classifiedError instanceof RetryableQuotaError &&
           classifiedError.retryDelayMs !== undefined
         ) {
           debugLogger.warn(
->>>>>>> 07e597de4 (Exponential back-off retries for retryable error without a specified … (#15684))
             `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${classifiedError.retryDelayMs}ms...`,
           );
           await delay(classifiedError.retryDelayMs, signal);
