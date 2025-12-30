@@ -842,16 +842,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const handleClearScreen = useCallback(() => {
     historyManager.clearItems();
     clearConsoleMessagesState();
-    if (!isAlternateBuffer) {
-      console.clear();
-    }
     refreshStatic();
-  }, [
-    historyManager,
-    clearConsoleMessagesState,
-    refreshStatic,
-    isAlternateBuffer,
-  ]);
+  }, [historyManager, clearConsoleMessagesState, refreshStatic]);
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
@@ -899,6 +891,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ),
     pager: settings.merged.tools?.shell?.pager,
     showColor: settings.merged.tools?.shell?.showColor,
+    sanitizationConfig: config.sanitizationConfig,
   });
 
   const isFocused = useFocus();

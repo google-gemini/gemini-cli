@@ -69,6 +69,7 @@ describe('useQuotaAndFallback', () => {
 
     setFallbackHandlerSpy = vi.spyOn(mockConfig, 'setFallbackModelHandler');
     vi.spyOn(mockConfig, 'setQuotaErrorOccurred');
+    vi.spyOn(mockConfig, 'setModel');
   });
 
   afterEach(() => {
@@ -162,6 +163,9 @@ describe('useQuotaAndFallback', () => {
         // The original promise from the handler should now resolve
         const intent = await promise!;
         expect(intent).toBe('retry_always');
+
+        // Verify setModel was called with isFallbackModel=true
+        expect(mockConfig.setModel).toHaveBeenCalledWith('gemini-flash', true);
 
         // The pending request should be cleared from the state
         expect(result.current.proQuotaRequest).toBeNull();
@@ -274,6 +278,9 @@ describe('useQuotaAndFallback', () => {
           const intent = await promise!;
           expect(intent).toBe('retry_always');
 
+          // Verify setModel was called with isFallbackModel=true
+          expect(mockConfig.setModel).toHaveBeenCalledWith('model-B', true);
+
           // The pending request should be cleared from the state
           expect(result.current.proQuotaRequest).toBeNull();
           expect(mockConfig.setQuotaErrorOccurred).toHaveBeenCalledWith(true);
@@ -328,6 +335,13 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
 
         const intent = await promise!;
         expect(intent).toBe('retry_always');
+
+        // Verify setModel was called with isFallbackModel=true
+        expect(mockConfig.setModel).toHaveBeenCalledWith(
+          'gemini-2.5-pro',
+          true,
+        );
+
         expect(result.current.proQuotaRequest).toBeNull();
       });
     });
@@ -410,6 +424,9 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
       const intent = await promise!;
       expect(intent).toBe('retry_always');
       expect(result.current.proQuotaRequest).toBeNull();
+
+      // Verify setModel was called with isFallbackModel=true
+      expect(mockConfig.setModel).toHaveBeenCalledWith('gemini-flash', true);
 
       // Check for the "Switched to fallback model" message
       expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);

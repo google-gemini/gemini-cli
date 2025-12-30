@@ -25,3 +25,6 @@ export const TOOL_STATUS = {
   CANCELED: '-',
   ERROR: 'x',
 } as const;
+
+// Maximum number of MCP resources to display per server before truncating
+export const MAX_MCP_RESOURCES_TO_SHOW = 10;

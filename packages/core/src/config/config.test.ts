@@ -61,6 +61,7 @@ vi.mock('../tools/tool-registry', () => {
   ToolRegistryMock.prototype.sortTools = vi.fn();
   ToolRegistryMock.prototype.getAllTools = vi.fn(() => []); // Mock methods if needed
   ToolRegistryMock.prototype.getTool = vi.fn();
+  ToolRegistryMock.prototype.setMessageBus = vi.fn();
   ToolRegistryMock.prototype.getFunctionDeclarations = vi.fn(() => []);
   return { ToolRegistry: ToolRegistryMock };
 });
@@ -923,7 +924,7 @@ describe('Server Config (config.ts)', () => {
       expect(DelegateToAgentToolMock).toHaveBeenCalledWith(
         expect.anything(), // AgentRegistry
         config,
-        undefined,
+        expect.anything(), // MessageBus
       );
 
       const calls = registerToolMock.mock.calls;
@@ -1628,6 +1629,30 @@ describe('Config getHooks', () => {
 
       expect(config.getModel()).toBe(originalModel);
       expect(config.getActiveModel()).toBe(originalModel);
+    });
+
+    it('should call onModelChange when a new model is set', () => {
+      const onModelChange = vi.fn();
+      const config = new Config({
+        ...baseParams,
+        onModelChange,
+      });
+
+      config.setModel(DEFAULT_GEMINI_MODEL);
+
+      expect(onModelChange).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+    });
+
+    it('should NOT call onModelChange when a new model is set as a fallback', () => {
+      const onModelChange = vi.fn();
+      const config = new Config({
+        ...baseParams,
+        onModelChange,
+      });
+
+      config.setModel(DEFAULT_GEMINI_MODEL, true);
+
+      expect(onModelChange).not.toHaveBeenCalled();
     });
   });
 });

@@ -5,7 +5,15 @@
  */
 
 import * as fs from 'node:fs';
-import { describe, it, expect, vi, type MockInstance } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+} from 'vitest';
 import { handleValidate, validateCommand } from './validate.js';
 import yargs from 'yargs';
 import { createExtension } from '../../test-utils/createExtension.js';
