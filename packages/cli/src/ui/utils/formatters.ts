@@ -63,8 +63,12 @@ export const formatDuration = (milliseconds: number): string => {
 };
 
 export const formatTimeAgo = (date: string | number | Date): string => {
-  const now = new Date();
   const past = new Date(date);
+  if (isNaN(past.getTime())) {
+    return 'invalid date';
+  }
+
+  const now = new Date();
   const diffMs = now.getTime() - past.getTime();
   const diffSeconds = Math.floor(diffMs / 1000);
   const diffMinutes = Math.floor(diffSeconds / 60);
