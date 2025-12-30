@@ -290,6 +290,7 @@ export class CoreToolScheduler {
                 originalContent:
                   waitingCall.confirmationDetails.originalContent,
                 newContent: waitingCall.confirmationDetails.newContent,
+                filePath: waitingCall.confirmationDetails.filePath,
               };
             }
           }

@@ -417,9 +417,11 @@ class EditToolInvocation
       const displayResult = {
         fileDiff,
         fileName,
+        filePath: this.resolvedPath,
         originalContent: editData.currentContent,
         newContent: editData.newContent,
         diffStat,
+        isNewFile: editData.isNewFile,
       };
 
       // Log file operation for telemetry (without diff_stat to avoid double-counting)
