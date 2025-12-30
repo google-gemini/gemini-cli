@@ -900,6 +900,7 @@ export class CoreToolScheduler {
                 signal,
                 messageBus,
                 hooksEnabled,
+                this.config,
                 liveOutputCallback,
                 shellExecutionConfig,
                 setPidCallback,
@@ -911,6 +912,7 @@ export class CoreToolScheduler {
                 signal,
                 messageBus,
                 hooksEnabled,
+                this.config,
                 liveOutputCallback,
                 shellExecutionConfig,
               );
