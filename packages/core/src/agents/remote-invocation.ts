@@ -9,7 +9,11 @@ import {
   type ToolResult,
   type ToolCallConfirmationDetails,
 } from '../tools/tools.js';
-import type { AgentInputs, RemoteAgentDefinition } from './types.js';
+import type {
+  RemoteAgentInputs,
+  RemoteAgentDefinition,
+  AgentInputs,
+} from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import {
@@ -36,10 +40,14 @@ export class ADCHandler implements AuthenticationHandler {
       if (token.token) {
         return { Authorization: `Bearer ${token.token}` };
       }
+      throw new Error('Failed to retrieve ADC access token.');
     } catch (e) {
-      debugLogger.log('ERROR', 'Failed to get ADC token:', e);
+      const errorMessage = `Failed to get ADC token: ${
+        e instanceof Error ? e.message : String(e)
+      }`;
+      debugLogger.log('ERROR', errorMessage);
+      throw new Error(errorMessage);
     }
-    return {};
   }
 
   async shouldRetryWithHeaders(
@@ -57,9 +65,14 @@ export class ADCHandler implements AuthenticationHandler {
  * invokes the configured A2A tool.
  */
 export class RemoteAgentInvocation extends BaseToolInvocation<
-  AgentInputs,
+  RemoteAgentInputs,
   ToolResult
 > {
+  // Persist state across ephemeral invocation instances.
+  private static readonly sessionState = new Map<
+    string,
+    { contextId?: string; taskId?: string }
+  >();
   // State for the ongoing conversation with the remote agent
   private contextId: string | undefined;
   private taskId: string | undefined;
@@ -73,7 +86,14 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     params: AgentInputs,
     messageBus?: MessageBus,
   ) {
-    super(params, messageBus, definition.name, definition.displayName);
+    const query = params['query'];
+    if (typeof query !== 'string') {
+      throw new Error(
+        `Remote agent '${definition.name}' requires a string 'query' input.`,
+      );
+    }
+    // Safe to pass strict object to super
+    super({ query }, messageBus, definition.name, definition.displayName);
   }
 
   getDescription(): string {
@@ -97,6 +117,14 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     // We assume the user has provided an access token via some mechanism (TODO),
     // or we rely on ADC.
     try {
+      const priorState = RemoteAgentInvocation.sessionState.get(
+        this.definition.name,
+      );
+      if (priorState) {
+        this.contextId = priorState.contextId;
+        this.taskId = priorState.taskId;
+      }
+
       if (!this.clientManager.getClient(this.definition.name)) {
         await this.clientManager.loadAgent(
           this.definition.name,
@@ -105,47 +133,8 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         );
       }
 
-      // 2. Construct the message from params.
-      // We aim to extract a single string message from the structured AgentInputs.
-      // Priority:
-      // 1. Explicit 'query', 'prompt', or 'message' field.
-      // 2. Single string input.
-      // 3. Simple key-value formatting.
-      // 4. JSON fallback.
-      let message = '';
+      const message = this.params.query;
 
-      const paramKeys = Object.keys(this.params);
-      const primaryKey = paramKeys.find((k) =>
-        ['query', 'prompt', 'message'].includes(k.toLowerCase()),
-      );
-
-      if (primaryKey && typeof this.params[primaryKey] === 'string') {
-        message = this.params[primaryKey];
-      } else if (
-        paramKeys.length === 1 &&
-        typeof this.params[paramKeys[0]] === 'string'
-      ) {
-        // Single string input, use it directly (e.g. { topic: "foo" } -> "foo")
-        message = this.params[paramKeys[0]] as string;
-      } else {
-        // Multiple inputs or non-string inputs.
-        // Try to format nicely if they are all primitives
-        const allPrimitives = Object.values(this.params).every(
-          (v) =>
-            typeof v === 'string' ||
-            typeof v === 'number' ||
-            typeof v === 'boolean',
-        );
-
-        if (allPrimitives && paramKeys.length > 0) {
-          message = paramKeys.map((k) => `${k}: ${this.params[k]}`).join('\n');
-        } else {
-          message = JSON.stringify(this.params);
-        }
-      }
-
-      // 3. Send the message, passing in our state
-      // The sendMessage method now unwraps the response and returns Message | Task directly.
       const response = await this.clientManager.sendMessage(
         this.definition.name,
         message,
@@ -155,23 +144,18 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         },
       );
 
-      // 4. Update our state
+      // Extracts IDs, taskID will be undefined if the task is completed/failed/canceled.
       const { contextId, taskId } = extractIdsFromResponse(response);
 
-      if (contextId) {
-        this.contextId = contextId;
-      }
+      this.contextId = contextId ?? this.contextId;
+      this.taskId = taskId;
 
-      // Update taskId based on response kind
-      if (response.kind === 'task') {
-        // For task responses, taskId is authoritative (either new ID or undefined if complete)
-        this.taskId = taskId;
-      } else if (response.kind === 'message' && taskId) {
-        // For message responses, update if present (continuation)
-        this.taskId = taskId;
-      }
+      RemoteAgentInvocation.sessionState.set(this.definition.name, {
+        contextId: this.contextId,
+        taskId: this.taskId,
+      });
 
-      // 5. Extract the output text
+      // Extract the output text
       const resultData = response;
       let outputText = '';
 

@@ -14,14 +14,6 @@ import type {
 } from '@a2a-js/sdk';
 
 /**
- * Metadata keys used in A2A parts for rich content.
- */
-export const A2A_METADATA_KEYS = {
-  TYPE: 'type', // or specific ADK keys if known, but 'type' is common
-  // Add others as discovered from ADK
-};
-
-/**
  * Extracts a human-readable text representation from a Message object.
  * Handles Text, Data (JSON), and File parts.
  */

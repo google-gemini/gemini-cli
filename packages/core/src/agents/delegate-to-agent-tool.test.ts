@@ -25,11 +25,9 @@ vi.mock('./local-invocation.js', () => ({
 
 vi.mock('./remote-invocation.js', () => ({
   RemoteAgentInvocation: vi.fn().mockImplementation(() => ({
-    execute: vi
-      .fn()
-      .mockResolvedValue({
-        content: [{ type: 'text', text: 'Remote Success' }],
-      }),
+    execute: vi.fn().mockResolvedValue({
+      content: [{ type: 'text', text: 'Remote Success' }],
+    }),
     shouldConfirmExecute: vi.fn().mockResolvedValue(true),
   })),
 }));

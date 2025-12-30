@@ -305,9 +305,12 @@ describe('LocalAgentExecutor', () => {
 
     it('should allow any tool for experimentation (formerly SECURITY check)', async () => {
       const definition = createTestDefinition([MOCK_TOOL_NOT_ALLOWED.name]);
-      await expect(
-        LocalAgentExecutor.create(definition, mockConfig, onActivity),
-      ).rejects.toThrow(/not on the allow-list for non-interactive execution/);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      expect(executor).toBeInstanceOf(LocalAgentExecutor);
     });
 
     it('should create an isolated ToolRegistry for the agent', async () => {

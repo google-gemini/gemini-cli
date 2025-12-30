@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { RemoteAgentInvocation } from './remote-invocation.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import type { RemoteAgentDefinition } from './types.js';
@@ -38,182 +46,222 @@ describe('RemoteAgentInvocation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (A2AClientManager.getInstance as Mock).mockReturnValue(mockClientManager);
+    (
+      RemoteAgentInvocation as unknown as {
+        sessionState?: Map<string, { contextId?: string; taskId?: string }>;
+      }
+    ).sessionState?.clear();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('should lazy load the agent if not present', async () => {
-    mockClientManager.getClient.mockReturnValue(undefined);
-    mockClientManager.sendMessage.mockResolvedValue({
-      result: { kind: 'message', parts: [{ kind: 'text', text: 'Hello' }] },
+  describe('Constructor Validation', () => {
+    it('accepts valid input with string query', () => {
+      expect(() => {
+        new RemoteAgentInvocation(mockDefinition, { query: 'valid' });
+      }).not.toThrow();
     });
 
-    const invocation = new RemoteAgentInvocation(mockDefinition, { query: 'hi' });
-    await invocation.execute(new AbortController().signal);
-
-    expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
-      'test-agent',
-      'http://test-agent/card',
-    );
-  });
-
-  it('should not load the agent if already present', async () => {
-    mockClientManager.getClient.mockReturnValue({});
-    mockClientManager.sendMessage.mockResolvedValue({
-      result: { kind: 'message', parts: [{ kind: 'text', text: 'Hello' }] },
+    it('throws if query is missing', () => {
+      expect(() => {
+        new RemoteAgentInvocation(mockDefinition, {});
+      }).toThrow("requires a string 'query' input");
     });
 
-    const invocation = new RemoteAgentInvocation(mockDefinition, { query: 'hi' });
-    await invocation.execute(new AbortController().signal);
-
-    expect(mockClientManager.loadAgent).not.toHaveBeenCalled();
-  });
-
-  it('should maintain contextId and taskId across calls', async () => {
-    mockClientManager.getClient.mockReturnValue({});
-
-    // First call return values
-    mockClientManager.sendMessage.mockResolvedValueOnce({
-      result: { kind: 'message', parts: [{ kind: 'text', text: 'Response 1' }] },
-      contextId: 'ctx-1',
-      taskId: 'task-1',
+    it('throws if query is not a string', () => {
+      expect(() => {
+        new RemoteAgentInvocation(mockDefinition, { query: 123 });
+      }).toThrow("requires a string 'query' input");
     });
-
-    const invocation = new RemoteAgentInvocation(mockDefinition, { query: 'first' });
-
-    // Execute first time
-    const result1 = await invocation.execute(new AbortController().signal);
-    expect(result1.returnDisplay).toBe('Response 1');
-    expect(mockClientManager.sendMessage).toHaveBeenLastCalledWith(
-      'test-agent',
-      'first',
-      { contextId: undefined, taskId: undefined },
-    );
-
-    // Prepare for second call with simulated state persistence
-    mockClientManager.sendMessage.mockResolvedValueOnce({
-      result: { kind: 'message', parts: [{ kind: 'text', text: 'Response 2' }] },
-      contextId: 'ctx-1',
-      taskId: 'task-2',
-    });
-
-    const result2 = await invocation.execute(new AbortController().signal);
-    expect(result2.returnDisplay).toBe('Response 2');
-
-    expect(mockClientManager.sendMessage).toHaveBeenLastCalledWith(
-      'test-agent',
-      'first', // Params same
-      { contextId: 'ctx-1', taskId: 'task-1' }, // Used state from first call
-    );
   });
 
-  it('should handle errors gracefully', async () => {
-    mockClientManager.getClient.mockReturnValue({});
-    mockClientManager.sendMessage.mockRejectedValue(new Error('Network error'));
-
-    const invocation = new RemoteAgentInvocation(mockDefinition, { query: 'hi' });
-    const result = await invocation.execute(new AbortController().signal);
-
-    expect(result.error).toBeDefined();
-    expect(result.error?.message).toContain('Network error');
-  });
-
-  it('should use a2a helpers for extracting text', async () => {
-     mockClientManager.getClient.mockReturnValue({});
-     // Mock a complex message part that needs extraction
-     mockClientManager.sendMessage.mockResolvedValue({
-      result: {
+  describe('Execution Logic', () => {
+    it('should lazy load the agent with ADCHandler if not present', async () => {
+      mockClientManager.getClient.mockReturnValue(undefined);
+      mockClientManager.sendMessage.mockResolvedValue({
         kind: 'message',
-        parts: [
-            { kind: 'text', text: 'Extracted text' },
-            { kind: 'data', data: { foo: 'bar' } }
-        ]
-      },
+        messageId: 'msg-1',
+        role: 'agent',
+        parts: [{ kind: 'text', text: 'Hello' }],
+      });
+
+      const invocation = new RemoteAgentInvocation(mockDefinition, {
+        query: 'hi',
+      });
+      await invocation.execute(new AbortController().signal);
+
+      expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
+        'test-agent',
+        'http://test-agent/card',
+        expect.objectContaining({
+          headers: expect.any(Function),
+          shouldRetryWithHeaders: expect.any(Function),
+        }),
+      );
     });
 
-    const invocation = new RemoteAgentInvocation(mockDefinition, { query: 'hi' });
-    const result = await invocation.execute(new AbortController().signal);
+    it('should not load the agent if already present', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.sendMessage.mockResolvedValue({
+        kind: 'message',
+        messageId: 'msg-1',
+        role: 'agent',
+        parts: [{ kind: 'text', text: 'Hello' }],
+      });
 
-    // Just check that text is present, exact formatting depends on helper
-    expect(result.returnDisplay).toContain('Extracted text');
+      const invocation = new RemoteAgentInvocation(mockDefinition, {
+        query: 'hi',
+      });
+      await invocation.execute(new AbortController().signal);
+
+      expect(mockClientManager.loadAgent).not.toHaveBeenCalled();
+    });
+
+    it('should persist contextId and taskId across invocations', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+
+      // First call return values
+      mockClientManager.sendMessage.mockResolvedValueOnce({
+        kind: 'message',
+        messageId: 'msg-1',
+        role: 'agent',
+        parts: [{ kind: 'text', text: 'Response 1' }],
+        contextId: 'ctx-1',
+        taskId: 'task-1',
+      });
+
+      const invocation1 = new RemoteAgentInvocation(mockDefinition, {
+        query: 'first',
+      });
+
+      // Execute first time
+      const result1 = await invocation1.execute(new AbortController().signal);
+      expect(result1.returnDisplay).toBe('Response 1');
+      expect(mockClientManager.sendMessage).toHaveBeenLastCalledWith(
+        'test-agent',
+        'first',
+        { contextId: undefined, taskId: undefined },
+      );
+
+      // Prepare for second call with simulated state persistence
+      mockClientManager.sendMessage.mockResolvedValueOnce({
+        kind: 'message',
+        messageId: 'msg-2',
+        role: 'agent',
+        parts: [{ kind: 'text', text: 'Response 2' }],
+        contextId: 'ctx-1',
+        taskId: 'task-2',
+      });
+
+      const invocation2 = new RemoteAgentInvocation(mockDefinition, {
+        query: 'second',
+      });
+      const result2 = await invocation2.execute(new AbortController().signal);
+      expect(result2.returnDisplay).toBe('Response 2');
+
+      expect(mockClientManager.sendMessage).toHaveBeenLastCalledWith(
+        'test-agent',
+        'second',
+        { contextId: 'ctx-1', taskId: 'task-1' }, // Used state from first call
+      );
+
+      // Third call: Task completes
+      mockClientManager.sendMessage.mockResolvedValueOnce({
+        kind: 'task',
+        id: 'task-2',
+        contextId: 'ctx-1',
+        status: { state: 'completed', message: undefined },
+        artifacts: [],
+        history: [],
+      });
+
+      const invocation3 = new RemoteAgentInvocation(mockDefinition, {
+        query: 'third',
+      });
+      await invocation3.execute(new AbortController().signal);
+
+      // Fourth call: Should start new task (taskId undefined)
+      mockClientManager.sendMessage.mockResolvedValueOnce({
+        kind: 'message',
+        messageId: 'msg-3',
+        role: 'agent',
+        parts: [{ kind: 'text', text: 'New Task' }],
+      });
+
+      const invocation4 = new RemoteAgentInvocation(mockDefinition, {
+        query: 'fourth',
+      });
+      await invocation4.execute(new AbortController().signal);
+
+      expect(mockClientManager.sendMessage).toHaveBeenLastCalledWith(
+        'test-agent',
+        'fourth',
+        { contextId: 'ctx-1', taskId: undefined }, // taskId cleared!
+      );
+    });
+
+    it('should handle errors gracefully', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.sendMessage.mockRejectedValue(
+        new Error('Network error'),
+      );
+
+      const invocation = new RemoteAgentInvocation(mockDefinition, {
+        query: 'hi',
+      });
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.message).toContain('Network error');
+      expect(result.returnDisplay).toContain('Network error');
+    });
+
+    it('should use a2a helpers for extracting text', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+      // Mock a complex message part that needs extraction
+      mockClientManager.sendMessage.mockResolvedValue({
+        kind: 'message',
+        messageId: 'msg-1',
+        role: 'agent',
+        parts: [
+          { kind: 'text', text: 'Extracted text' },
+          { kind: 'data', data: { foo: 'bar' } },
+        ],
+      });
+
+      const invocation = new RemoteAgentInvocation(mockDefinition, {
+        query: 'hi',
+      });
+      const result = await invocation.execute(new AbortController().signal);
+
+      // Just check that text is present, exact formatting depends on helper
+      expect(result.returnDisplay).toContain('Extracted text');
+    });
   });
 
-  describe('input mapping', () => {
-    it('should use "query" param if present', async () => {
-      mockClientManager.getClient.mockReturnValue({});
-      mockClientManager.sendMessage.mockResolvedValue({
-        result: { kind: 'message', parts: [{ kind: 'text', text: 'OK' }] },
-      });
-
+  describe('Confirmations', () => {
+    it('should return info confirmation details', async () => {
       const invocation = new RemoteAgentInvocation(mockDefinition, {
-        query: 'my query',
-        other: 'ignored',
+        query: 'hi',
       });
-      await invocation.execute(new AbortController().signal);
-
-      expect(mockClientManager.sendMessage).toHaveBeenCalledWith(
-        'test-agent',
-        'my query',
-        expect.any(Object),
+      // @ts-expect-error - getConfirmationDetails is protected
+      const confirmation = await invocation.getConfirmationDetails(
+        new AbortController().signal,
       );
-    });
 
-    it('should use single string param if present', async () => {
-      mockClientManager.getClient.mockReturnValue({});
-      mockClientManager.sendMessage.mockResolvedValue({
-        result: { kind: 'message', parts: [{ kind: 'text', text: 'OK' }] },
-      });
-
-      const invocation = new RemoteAgentInvocation(mockDefinition, {
-        single: 'single value',
-      });
-      await invocation.execute(new AbortController().signal);
-
-      expect(mockClientManager.sendMessage).toHaveBeenCalledWith(
-        'test-agent',
-        'single value',
-        expect.any(Object),
-      );
-    });
-
-    it('should format multiple params as key-value pairs', async () => {
-      mockClientManager.getClient.mockReturnValue({});
-      mockClientManager.sendMessage.mockResolvedValue({
-        result: { kind: 'message', parts: [{ kind: 'text', text: 'OK' }] },
-      });
-
-      const invocation = new RemoteAgentInvocation(mockDefinition, {
-        topic: 'foo',
-        count: 5,
-      });
-      await invocation.execute(new AbortController().signal);
-
-      expect(mockClientManager.sendMessage).toHaveBeenCalledWith(
-        'test-agent',
-        'topic: foo\ncount: 5',
-        expect.any(Object),
-      );
-    });
-
-    it('should fallback to JSON for complex params', async () => {
-      mockClientManager.getClient.mockReturnValue({});
-      mockClientManager.sendMessage.mockResolvedValue({
-        result: { kind: 'message', parts: [{ kind: 'text', text: 'OK' }] },
-      });
-
-      const complexParam = { nested: { key: 'value' } };
-      const invocation = new RemoteAgentInvocation(mockDefinition, {
-        complex: complexParam,
-      });
-      await invocation.execute(new AbortController().signal);
-
-      expect(mockClientManager.sendMessage).toHaveBeenCalledWith(
-        'test-agent',
-        JSON.stringify({ complex: complexParam }),
-        expect.any(Object),
-      );
+      expect(confirmation).not.toBe(false);
+      if (
+        confirmation &&
+        typeof confirmation === 'object' &&
+        confirmation.type === 'info'
+      ) {
+        expect(confirmation.title).toContain('Test Agent');
+        expect(confirmation.prompt).toContain('http://test-agent/card');
+      } else {
+        throw new Error('Expected confirmation to be of type info');
+      }
     });
   });
 });
