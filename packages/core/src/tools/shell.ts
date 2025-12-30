@@ -275,7 +275,29 @@ export class ShellToolInvocation extends BaseToolInvocation<
         setPidCallback(pid);
       }
 
+      const isInteractive = this.config.isInteractive();
+      const wasRaw = process.stdin.isRaw;
+      const stdinListener = (data: Buffer) => {
+        if (data.length === 1 && data[0] === 0x02) {
+          // CTRL+b
+          if (pid) {
+            ShellExecutionService.detach(pid);
+          }
+        }
+      };
+
+      if (isInteractive) {
+        process.stdin.setRawMode(true);
+        process.stdin.resume();
+        process.stdin.on('data', stdinListener);
+      }
+
       const result = await resultPromise;
+
+      if (isInteractive) {
+        process.stdin.removeListener('data', stdinListener);
+        process.stdin.setRawMode(wasRaw);
+      }
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
@@ -305,7 +327,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (result.backgrounded) {
         llmContent = `Command backgrounded by user. The process (PID: ${result.pid}) is still running.`;
         if (result.output.trim()) {
-          llmContent += `\nOutput so far:\n${result.output}`;
+          llmContent += `\nOutput so far:\n\`\`\`\n${result.output}\n\`\`\``;
         }
       } else if (result.aborted) {
         if (timeoutController.signal.aborted) {
@@ -318,7 +340,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             'Command was cancelled by user before it could complete.';
         }
         if (result.output.trim()) {
-          llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
+          llmContent += ` Below is the output before it was cancelled:\n\`\`\`\n${result.output}\n\`\`\``;
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
@@ -332,7 +354,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         llmContent = [
           `Command: ${this.params.command}`,
           `Directory: ${this.params.dir_path || '(root)'}`,
-          `Output: ${result.output || '(empty)'}`,
+          `Output: \n\`\`\`\n${result.output || '(empty)'}\n\`\`\``,
           `Error: ${finalError}`, // Use the cleaned error string.
           `Exit Code: ${result.exitCode ?? '(none)'}`,
           `Signal: ${result.signal ?? '(none)'}`,

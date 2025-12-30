@@ -657,14 +657,16 @@ export class ShellExecutionService {
           );
         };
 
-        ptyProcess.onData((data: string) => {
+        const onDataDisposable = ptyProcess.onData((data: string) => {
           const bufferData = Buffer.from(data, 'utf-8');
           handleOutput(bufferData);
         });
 
-        ptyProcess.onExit(
+        const onExitDisposable = ptyProcess.onExit(
           ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
             exited = true;
+            onDataDisposable.dispose();
+            onExitDisposable.dispose();
             abortSignal.removeEventListener('abort', abortHandler);
             this.activePtys.delete(ptyProcess.pid);
 
@@ -737,6 +739,9 @@ export class ShellExecutionService {
         if (activePty) {
           activePty.detach = () => {
             exited = true;
+            onDataDisposable.dispose();
+            onExitDisposable.dispose();
+            headlessTerminal.dispose();
             abortSignal.removeEventListener('abort', abortHandler);
             this.activePtys.delete(ptyProcess.pid);
 
