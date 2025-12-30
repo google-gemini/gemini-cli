@@ -28,6 +28,7 @@ import {
   CoreEvent,
   createWorkingStdio,
   recordToolCallInteractions,
+  ToolErrorType,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -414,6 +415,43 @@ export async function runNonInteractive({
             debugLogger.error(
               `Error recording completed tool call information: ${error}`,
             );
+          }
+
+          // Check if any tool requested to stop execution immediately
+          const stopExecutionTool = completedToolCalls.find(
+            (tc) => tc.response.errorType === ToolErrorType.STOP_EXECUTION,
+          );
+
+          if (stopExecutionTool && stopExecutionTool.response.error) {
+            const stopMessage = `Agent execution stopped: ${stopExecutionTool.response.error.message}`;
+
+            if (config.getOutputFormat() === OutputFormat.TEXT) {
+              process.stderr.write(`${stopMessage}\n`);
+            }
+
+            // Emit final result event for streaming JSON
+            if (streamFormatter) {
+              const metrics = uiTelemetryService.getMetrics();
+              const durationMs = Date.now() - startTime;
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.RESULT,
+                timestamp: new Date().toISOString(),
+                status: 'success',
+                stats: streamFormatter.convertToStreamStats(
+                  metrics,
+                  durationMs,
+                ),
+              });
+            } else if (config.getOutputFormat() === OutputFormat.JSON) {
+              const formatter = new JsonFormatter();
+              const stats = uiTelemetryService.getMetrics();
+              textOutput.write(
+                formatter.format(config.getSessionId(), responseText, stats),
+              );
+            } else {
+              textOutput.ensureTrailingNewline(); // Ensure a final newline
+            }
+            return;
           }
 
           currentMessages = [{ role: 'user', parts: toolResponseParts }];
