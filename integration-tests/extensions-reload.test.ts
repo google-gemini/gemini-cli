@@ -21,7 +21,7 @@ import stripAnsi from 'strip-ansi';
 
 const itIf = (condition: boolean) => (condition ? it : it.skip);
 
-describe.concurrent('extension reloading', () => {
+describe('extension reloading', () => {
   beforeEach<LocalTestContext>(setupTestRig);
   afterEach<LocalTestContext>(cleanupTestRig);
 
@@ -55,7 +55,9 @@ describe.concurrent('extension reloading', () => {
           experimental: { extensionReloading: true },
         },
       });
-      const testServerPath = join(rig.testDir!, 'gemini-extension.json');
+      const extensionSourceDir = join(rig.testDir!, 'extension-source');
+      rig.mkdir('extension-source');
+      const testServerPath = join(extensionSourceDir, 'gemini-extension.json');
       writeFileSync(testServerPath, safeJsonStringify(extension, 2));
       // defensive cleanup from previous tests.
       try {
@@ -65,7 +67,7 @@ describe.concurrent('extension reloading', () => {
       }
 
       const result = await rig.runCommand(
-        ['extensions', 'install', `${rig.testDir!}`],
+        ['extensions', 'install', extensionSourceDir],
         { stdin: 'y\n' },
       );
       expect(result).toContain('test-extension');

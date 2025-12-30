@@ -52,7 +52,7 @@ const utf32BE = (s: string) => {
   return Buffer.concat([bom, payload]);
 };
 
-describe.concurrent('BOM end-to-end integraion', () => {
+describe('BOM end-to-end integraion', () => {
   beforeEach<LocalTestContext>(async (context) => {
     await setupTestRig(context);
     await context.rig.setup('bom-integration', {

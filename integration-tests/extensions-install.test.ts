@@ -23,7 +23,7 @@ const extensionUpdate = `{
   "version": "0.0.2"
 }`;
 
-describe.concurrent('extension install', () => {
+describe('extension install', () => {
   beforeEach<LocalTestContext>(setupTestRig);
   afterEach<LocalTestContext>(cleanupTestRig);
 
@@ -31,11 +31,13 @@ describe.concurrent('extension install', () => {
     rig,
   }) => {
     rig.setup('extension install test');
-    const testServerPath = join(rig.testDir!, 'gemini-extension.json');
+    const extensionSourceDir = join(rig.testDir!, 'extension-source');
+    rig.mkdir('extension-source');
+    const testServerPath = join(extensionSourceDir, 'gemini-extension.json');
     writeFileSync(testServerPath, extension);
     try {
       const result = await rig.runCommand(
-        ['extensions', 'install', `${rig.testDir!}`],
+        ['extensions', 'install', extensionSourceDir],
         { stdin: 'y\n' },
       );
       expect(result).toContain('test-extension-install');

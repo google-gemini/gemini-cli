@@ -18,7 +18,7 @@ describe.concurrent('Hooks System Integration', () => {
   beforeEach<LocalTestContext>(setupTestRig);
   afterEach<LocalTestContext>(cleanupTestRig);
 
-  describe('Command Hooks - Blocking Behavior', () => {
+  describe.concurrent('Command Hooks - Blocking Behavior', () => {
     it<LocalTestContext>('should block tool execution when hook returns block decision', async ({
       rig,
     }) => {
@@ -126,7 +126,7 @@ describe.concurrent('Hooks System Integration', () => {
     });
   });
 
-  describe('Command Hooks - Additional Context', () => {
+  describe.concurrent('Command Hooks - Additional Context', () => {
     it<LocalTestContext>('should add additional context from AfterTool hooks', async ({
       rig,
     }) => {
@@ -182,7 +182,7 @@ describe.concurrent('Hooks System Integration', () => {
     });
   });
 
-  describe('BeforeModel Hooks - LLM Request Modification', () => {
+  describe.concurrent('BeforeModel Hooks - LLM Request Modification', () => {
     it<LocalTestContext>('should modify LLM requests with BeforeModel hooks', async ({
       rig,
     }) => {
@@ -263,7 +263,7 @@ echo '{
     });
   });
 
-  describe('AfterModel Hooks - LLM Response Modification', () => {
+  describe.concurrent('AfterModel Hooks - LLM Response Modification', () => {
     it.skipIf(process.platform === 'win32')<LocalTestContext>(
       'should modify LLM responses with AfterModel hooks',
       async ({ rig }) => {
@@ -334,7 +334,7 @@ echo '{
     );
   });
 
-  describe('BeforeToolSelection Hooks - Tool Configuration', () => {
+  describe.concurrent('BeforeToolSelection Hooks - Tool Configuration', () => {
     it<LocalTestContext>('should modify tool selection with BeforeToolSelection hooks', async ({
       rig,
     }) => {
@@ -401,7 +401,7 @@ echo '{
     });
   });
 
-  describe('BeforeAgent Hooks - Prompt Augmentation', () => {
+  describe.concurrent('BeforeAgent Hooks - Prompt Augmentation', () => {
     it<LocalTestContext>('should augment prompts with BeforeAgent hooks', async ({
       rig,
     }) => {
@@ -458,7 +458,7 @@ echo '{
     });
   });
 
-  describe('Notification Hooks - Permission Handling', () => {
+  describe.concurrent('Notification Hooks - Permission Handling', () => {
     it<LocalTestContext>('should handle notification hooks for tool permissions', async ({
       rig,
     }) => {
@@ -554,7 +554,7 @@ echo '{
     });
   });
 
-  describe('Sequential Hook Execution', () => {
+  describe.concurrent('Sequential Hook Execution', () => {
     it<LocalTestContext>('should execute hooks sequentially when configured', async ({
       rig,
     }) => {
@@ -624,7 +624,7 @@ echo '{
     });
   });
 
-  describe('Hook Input/Output Validation', () => {
+  describe.concurrent('Hook Input/Output Validation', () => {
     it<LocalTestContext>('should provide correct input format to hooks', async ({
       rig,
     }) => {
@@ -692,7 +692,7 @@ fi`;
     });
   });
 
-  describe('Multiple Event Types', () => {
+  describe.concurrent('Multiple Event Types', () => {
     it<LocalTestContext>('should handle hooks for all major event types', async ({
       rig,
     }) => {
@@ -807,7 +807,7 @@ fi`;
     });
   });
 
-  describe('Hook Error Handling', () => {
+  describe.concurrent('Hook Error Handling', () => {
     it<LocalTestContext>('should handle hook failures gracefully', async ({
       rig,
     }) => {
@@ -869,7 +869,7 @@ fi`;
     });
   });
 
-  describe('Hook Telemetry and Observability', () => {
+  describe.concurrent('Hook Telemetry and Observability', () => {
     it<LocalTestContext>('should generate telemetry events for hook executions', async ({
       rig,
     }) => {
@@ -914,7 +914,7 @@ fi`;
     });
   });
 
-  describe('Session Lifecycle Hooks', () => {
+  describe.concurrent('Session Lifecycle Hooks', () => {
     it<LocalTestContext>('should fire SessionStart hook on app startup', async ({
       rig,
     }) => {
@@ -1156,7 +1156,7 @@ fi`;
     });
   });
 
-  describe('Compression Hooks', () => {
+  describe.concurrent('Compression Hooks', () => {
     it<LocalTestContext>('should fire PreCompress hook on automatic compression', async ({
       rig,
     }) => {
@@ -1226,7 +1226,7 @@ fi`;
     });
   });
 
-  describe('SessionEnd on Exit', () => {
+  describe.concurrent('SessionEnd on Exit', () => {
     it<LocalTestContext>('should fire SessionEnd hook on graceful exit in non-interactive mode', async ({
       rig,
     }) => {
@@ -1315,7 +1315,7 @@ fi`;
     });
   });
 
-  describe('Hook Disabling', () => {
+  describe.concurrent('Hook Disabling', () => {
     it<LocalTestContext>('should not execute hooks disabled in settings file', async ({
       rig,
     }) => {
