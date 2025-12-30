@@ -596,6 +596,15 @@ describe('Server Config (config.ts)', () => {
     expect(config.getTelemetryEnabled()).toBe(TELEMETRY_SETTINGS.enabled);
   });
 
+  it('Config constructor should default enableEnvironmentVariableRedaction to true if not provided', () => {
+    const paramsWithoutRedaction: ConfigParameters = { ...baseParams };
+    delete paramsWithoutRedaction.enableEnvironmentVariableRedaction;
+    const config = new Config(paramsWithoutRedaction);
+    expect(config.sanitizationConfig.enableEnvironmentVariableRedaction).toBe(
+      true,
+    );
+  });
+
   it('Config constructor should set telemetry useCollector to true when provided', () => {
     const paramsWithTelemetry: ConfigParameters = {
       ...baseParams,
