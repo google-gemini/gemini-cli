@@ -79,6 +79,9 @@ vi.mock('../ui/commands/resumeCommand.js', () => ({ resumeCommand: {} }));
 vi.mock('../ui/commands/statsCommand.js', () => ({ statsCommand: {} }));
 vi.mock('../ui/commands/themeCommand.js', () => ({ themeCommand: {} }));
 vi.mock('../ui/commands/toolsCommand.js', () => ({ toolsCommand: {} }));
+vi.mock('../ui/commands/skillsCommand.js', () => ({
+  skillsCommand: { name: 'skills' },
+}));
 vi.mock('../ui/commands/mcpCommand.js', () => ({
   mcpCommand: {
     name: 'mcp',
@@ -98,6 +101,7 @@ describe('BuiltinCommandLoader', () => {
       getFolderTrust: vi.fn().mockReturnValue(true),
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
+      isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
       getSkillManager: vi.fn().mockReturnValue({
         getAllSkills: vi.fn().mockReturnValue([]),
       }),
@@ -193,6 +197,7 @@ describe('BuiltinCommandLoader profile', () => {
       getCheckpointingEnabled: () => false,
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
+      isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
       getSkillManager: vi.fn().mockReturnValue({
         getAllSkills: vi.fn().mockReturnValue([]),
       }),

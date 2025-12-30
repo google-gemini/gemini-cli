@@ -1481,6 +1481,10 @@ export class Config {
     );
   }
 
+  isSkillsSupportEnabled(): boolean {
+    return this.skillsSupport;
+  }
+
   isInteractive(): boolean {
     return this.interactive;
   }

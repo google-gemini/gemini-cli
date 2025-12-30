@@ -90,9 +90,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       statsCommand,
       themeCommand,
       toolsCommand,
-      ...(this.config?.getSkillManager().getAllSkills().length
-        ? [skillsCommand]
-        : []),
+      ...(this.config?.isSkillsSupportEnabled() ? [skillsCommand] : []),
       settingsCommand,
       vimCommand,
       setupGithubCommand,

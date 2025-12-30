@@ -17,14 +17,29 @@ describe('skillsCommand', () => {
 
   beforeEach(() => {
     const skills = [
-      { name: 'skill1', description: 'desc1' },
-      { name: 'skill2', description: 'desc2' },
+      {
+        name: 'skill1',
+        description: 'desc1',
+        location: '/loc1',
+        body: 'body1',
+      },
+      {
+        name: 'skill2',
+        description: 'desc2',
+        location: '/loc2',
+        body: 'body2',
+      },
     ];
     context = createMockCommandContext({
       services: {
         config: {
           getSkillManager: vi.fn().mockReturnValue({
             getAllSkills: vi.fn().mockReturnValue(skills),
+            getSkill: vi
+              .fn()
+              .mockImplementation(
+                (name: string) => skills.find((s) => s.name === name) ?? null,
+              ),
           }),
         } as unknown as Config,
         settings: {
@@ -53,7 +68,8 @@ describe('skillsCommand', () => {
   });
 
   it('should list skills when "list" subcommand is used', async () => {
-    await skillsCommand.action!(context, 'list');
+    const listCmd = skillsCommand.subCommands!.find((s) => s.name === 'list')!;
+    await listCmd.action!(context, '');
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -69,7 +85,8 @@ describe('skillsCommand', () => {
   });
 
   it('should disable descriptions if "nodesc" arg is provided to list', async () => {
-    await skillsCommand.action!(context, 'list nodesc');
+    const listCmd = skillsCommand.subCommands!.find((s) => s.name === 'list')!;
+    await listCmd.action!(context, 'nodesc');
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -90,7 +107,10 @@ describe('skillsCommand', () => {
     });
 
     it('should disable a skill', async () => {
-      await skillsCommand.action!(context, 'disable skill1');
+      const disableCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'disable',
+      )!;
+      await disableCmd.action!(context, 'skill1');
 
       expect(context.services.settings.setValue).toHaveBeenCalledWith(
         SettingScope.Workspace,
@@ -107,8 +127,11 @@ describe('skillsCommand', () => {
     });
 
     it('should enable a skill', async () => {
+      const enableCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'enable',
+      )!;
       context.services.settings.merged.skills = { disabled: ['skill1'] };
-      await skillsCommand.action!(context, 'enable skill1');
+      await enableCmd.action!(context, 'skill1');
 
       expect(context.services.settings.setValue).toHaveBeenCalledWith(
         SettingScope.Workspace,
@@ -125,7 +148,10 @@ describe('skillsCommand', () => {
     });
 
     it('should show error if skill not found during disable', async () => {
-      await skillsCommand.action!(context, 'disable non-existent');
+      const disableCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'disable',
+      )!;
+      await disableCmd.action!(context, 'non-existent');
 
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -134,6 +160,68 @@ describe('skillsCommand', () => {
         }),
         expect.any(Number),
       );
+    });
+  });
+
+  describe('completions', () => {
+    it('should provide completions for disable (only enabled skills)', async () => {
+      const disableCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'disable',
+      )!;
+      const skillManager = context.services.config!.getSkillManager();
+      const mockSkills = [
+        {
+          name: 'skill1',
+          description: 'desc1',
+          disabled: false,
+          location: '/loc1',
+          body: 'body1',
+        },
+        {
+          name: 'skill2',
+          description: 'desc2',
+          disabled: true,
+          location: '/loc2',
+          body: 'body2',
+        },
+      ];
+      vi.mocked(skillManager.getAllSkills).mockReturnValue(mockSkills);
+      vi.mocked(skillManager.getSkill).mockImplementation(
+        (name: string) => mockSkills.find((s) => s.name === name) ?? null,
+      );
+
+      const completions = await disableCmd.completion!(context, 'sk');
+      expect(completions).toEqual(['skill1']);
+    });
+
+    it('should provide completions for enable (only disabled skills)', async () => {
+      const enableCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'enable',
+      )!;
+      const skillManager = context.services.config!.getSkillManager();
+      const mockSkills = [
+        {
+          name: 'skill1',
+          description: 'desc1',
+          disabled: false,
+          location: '/loc1',
+          body: 'body1',
+        },
+        {
+          name: 'skill2',
+          description: 'desc2',
+          disabled: true,
+          location: '/loc2',
+          body: 'body2',
+        },
+      ];
+      vi.mocked(skillManager.getAllSkills).mockReturnValue(mockSkills);
+      vi.mocked(skillManager.getSkill).mockImplementation(
+        (name: string) => mockSkills.find((s) => s.name === name) ?? null,
+      );
+
+      const completions = await enableCmd.completion!(context, 'sk');
+      expect(completions).toEqual(['skill2']);
     });
   });
 });

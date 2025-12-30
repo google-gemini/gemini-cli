@@ -144,7 +144,7 @@ export class SkillManager {
   /**
    * Reads the full content (metadata + body) of a skill by name.
    */
-  getSkillContent(name: string): SkillMetadata | null {
+  getSkill(name: string): SkillMetadata | null {
     return this.skills.find((s) => s.name === name) ?? null;
   }
 
