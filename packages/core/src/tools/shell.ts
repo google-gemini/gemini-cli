@@ -36,12 +36,9 @@ import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
-  getCommandRoot,
   getCommandRoots,
   initializeShellParsers,
   stripShellWrapper,
-  splitCommands,
-  hasRedirection,
 } from '../utils/shell-utils.js';
 import {
   isCommandAllowed,
@@ -110,56 +107,42 @@ export class ShellToolInvocation extends BaseToolInvocation<
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
-    let rootCommands = [...new Set(getCommandRoots(command))];
+    const rootCommands = [...new Set(getCommandRoots(command))];
 
-    // Fallback for UI display if parser fails
-    if (rootCommands.length === 0 && command.trim()) {
-      const fallback = command.trim().split(/\s+/)[0];
-      if (fallback) {
-        rootCommands = [fallback];
-      }
-    }
-
-    // In non-interactive mode, strictly validate allowed tools
+    // In non-interactive mode, we need to prevent the tool from hanging while
+    // waiting for user input. If a tool is not fully allowed (e.g. via
+    // --allowed-tools="ShellTool(wc)"), we should throw an error instead of
+    // prompting for confirmation. This check is skipped in YOLO mode.
     if (
       !this.config.isInteractive() &&
       this.config.getApprovalMode() !== ApprovalMode.YOLO
     ) {
       if (this.isInvocationAllowlisted(command)) {
+        // If it's an allowed shell command, we don't need to confirm execution.
         return false;
       }
+
       throw new Error(
         `Command "${command}" is not in the list of allowed tools for non-interactive mode.`,
       );
     }
 
-    const commandParts = splitCommands(command);
-    // If all command parts are already allowed, skip confirmation
-    if (
-      commandParts.length > 0 &&
-      commandParts.every((part) => {
-        if (this.allowlist.has(part)) return true;
-        const root = getCommandRoot(part);
-        // If root is allowed, we must ensure there's no redirection (which would be a security bypass)
-        return root && this.allowlist.has(root) && !hasRedirection(part);
-      })
-    ) {
-      return false;
+    const commandsToConfirm = rootCommands.filter(
+      (command) => !this.allowlist.has(command),
+    );
+
+    if (commandsToConfirm.length === 0) {
+      return false; // already approved and allowlisted
     }
 
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Shell Command',
       command: this.params.command,
-      rootCommand: rootCommands.join(', '),
+      rootCommand: commandsToConfirm.join(', '),
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          // Allow all parts individually
-          for (const part of commandParts) {
-            this.allowlist.add(getCommandRoot(part) ?? part);
-          }
-          // Also allow the full original command as a fallback
-          this.allowlist.add(command);
+          commandsToConfirm.forEach((command) => this.allowlist.add(command));
         }
         await this.publishPolicyUpdate(outcome);
       },
@@ -524,6 +507,9 @@ export class ShellTool extends BaseDeclarativeTool<
         return `Command is not allowed: ${params.command}`;
       }
       return commandCheck.reason;
+    }
+    if (getCommandRoots(params.command).length === 0) {
+      return 'Could not identify command root to obtain permission from user.';
     }
     if (params.dir_path) {
       const resolvedPath = path.resolve(

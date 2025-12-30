@@ -37,7 +37,6 @@ vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
 import { initializeShellParsers } from '../utils/shell-utils.js';
-import * as shellUtils from '../utils/shell-utils.js';
 import { isCommandAllowed } from '../utils/shell-permissions.js';
 import { ShellTool } from './shell.js';
 import { type Config } from '../config/config.js';
@@ -496,104 +495,6 @@ describe('ShellTool', () => {
       expect(secondConfirmation).toBe(false);
     });
 
-    it('should allow auto-execution of chained commands if all parts are allowlisted', async () => {
-      // First, allowlist "echo"
-      let invocation = shellTool.build({ command: 'echo "hello"' });
-      let confirmation = await invocation.shouldConfirmExecute(
-        new AbortController().signal,
-      );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (confirmation as any).onConfirm(
-        ToolConfirmationOutcome.ProceedAlways,
-      );
-
-      // Then allowlist "ls"
-      invocation = shellTool.build({ command: 'ls' });
-      confirmation = await invocation.shouldConfirmExecute(
-        new AbortController().signal,
-      );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (confirmation as any).onConfirm(
-        ToolConfirmationOutcome.ProceedAlways,
-      );
-
-      // Now try a chained command "echo 'hello' && ls"
-      invocation = shellTool.build({ command: 'echo "hello" && ls' });
-      const chainedConfirmation = await invocation.shouldConfirmExecute(
-        new AbortController().signal,
-      );
-      expect(chainedConfirmation).toBe(false);
-    });
-
-    it('should require confirmation for chained commands if any part is NOT allowlisted', async () => {
-      // Allowlist "echo"
-      const invocation = shellTool.build({ command: 'echo "hello"' });
-      const confirmation = await invocation.shouldConfirmExecute(
-        new AbortController().signal,
-      );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (confirmation as any).onConfirm(
-        ToolConfirmationOutcome.ProceedAlways,
-      );
-
-      // Try "echo 'hello' && unknown_cmd"
-      const chainedInvocation = shellTool.build({
-        command: 'echo "hello" && unknown_cmd',
-      });
-      const chainedConfirmation = await chainedInvocation.shouldConfirmExecute(
-        new AbortController().signal,
-      );
-      expect(chainedConfirmation).not.toBe(false);
-    });
-
-    it('should require confirmation for chained commands if any part has redirection, even if root is allowlisted', async () => {
-      // Allowlist "echo"
-      const invocation = shellTool.build({ command: 'echo "hello"' });
-      const confirmation = await invocation.shouldConfirmExecute(
-        new AbortController().signal,
-      );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (confirmation as any).onConfirm(
-        ToolConfirmationOutcome.ProceedAlways,
-      );
-
-      // Try "echo 'hello' > file.txt" - should require confirmation because of >
-      const redirectedInvocation = shellTool.build({
-        command: 'echo "hello" > file.txt',
-      });
-      const redirectedConfirmation =
-        await redirectedInvocation.shouldConfirmExecute(
-          new AbortController().signal,
-        );
-      expect(redirectedConfirmation).not.toBe(false);
-    });
-
-    it('should allowlist all parts when confirming a chained command', async () => {
-      // Confirm "cmd1 && cmd2"
-      const invocation = shellTool.build({ command: 'cmd1 && cmd2' });
-      const confirmation = await invocation.shouldConfirmExecute(
-        new AbortController().signal,
-      );
-      expect(confirmation).not.toBe(false);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (confirmation as any).onConfirm(
-        ToolConfirmationOutcome.ProceedAlways,
-      );
-
-      // Now "cmd1" should be allowed
-      const cmd1Invocation = shellTool.build({ command: 'cmd1' });
-      expect(
-        await cmd1Invocation.shouldConfirmExecute(new AbortController().signal),
-      ).toBe(false);
-
-      // And "cmd2" should be allowed
-      const cmd2Invocation = shellTool.build({ command: 'cmd2' });
-      expect(
-        await cmd2Invocation.shouldConfirmExecute(new AbortController().signal),
-      ).toBe(false);
-    });
-
     it('should throw an error if validation fails', () => {
       expect(() => shellTool.build({ command: '' })).toThrow();
     });
@@ -668,28 +569,6 @@ describe('ShellTool', () => {
       mockPlatform.mockReturnValue('linux');
       const shellTool = new ShellTool(mockConfig);
       expect(shellTool.description).toMatchSnapshot();
-    });
-  });
-
-  describe('getConfirmationDetails fallback', () => {
-    it('should use the first word of the command as a fallback root if the parser fails', async () => {
-      // 1. Mock the parser to simulate failure (returning empty arrays)
-      vi.spyOn(shellUtils, 'getCommandRoots').mockReturnValue([]);
-      vi.spyOn(shellUtils, 'splitCommands').mockReturnValue([]);
-      vi.spyOn(shellUtils, 'getCommandRoot').mockReturnValue(undefined);
-
-      // 2. Build the tool invocation with a command
-      const invocation = shellTool.build({ command: 'my_custom_tool --flag' });
-
-      // 3. Trigger confirmation details retrieval
-      // Use any to access protected method
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const details = await (invocation as any).getConfirmationDetails(
-        new AbortController().signal,
-      );
-
-      // 4. Verify that rootCommand uses the fallback ('my_custom_tool')
-      expect(details.rootCommand).toBe('my_custom_tool');
     });
   });
 });
