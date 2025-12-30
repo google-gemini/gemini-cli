@@ -135,11 +135,13 @@ describe('createPolicyUpdater', () => {
 describe('ShellToolInvocation Policy Update', () => {
   let mockConfig: Config;
   let mockMessageBus: MessageBus;
+  let mockAllowlist: Set<string>;
 
   beforeEach(() => {
     vi.resetAllMocks();
     mockConfig = {} as Config;
     mockMessageBus = {} as MessageBus;
+    mockAllowlist = new Set<string>();
 
     vi.mocked(shellUtils.stripShellWrapper).mockImplementation(
       (c: string) => c,
@@ -152,6 +154,7 @@ describe('ShellToolInvocation Policy Update', () => {
     const invocation = new ShellToolInvocation(
       mockConfig,
       { command: 'git status && npm test' },
+      mockAllowlist,
       mockMessageBus,
       'run_shell_command',
       'Shell',
@@ -173,6 +176,7 @@ describe('ShellToolInvocation Policy Update', () => {
     const invocation = new ShellToolInvocation(
       mockConfig,
       { command: 'ls -la /tmp' },
+      mockAllowlist,
       mockMessageBus,
       'run_shell_command',
       'Shell',
