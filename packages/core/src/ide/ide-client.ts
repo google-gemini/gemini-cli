@@ -30,7 +30,7 @@ const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   debug: (...args: any[]) => debugLogger.debug('[DEBUG] [IDEClient]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  error: (...args: any[]) => console.error('[ERROR] [IDEClient]', ...args),
+  error: (...args: any[]) => debugLogger.error('[ERROR] [IDEClient]', ...args),
 };
 
 export type DiffUpdateResult =
