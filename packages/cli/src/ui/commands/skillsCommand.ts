@@ -191,35 +191,34 @@ export const skillsCommand: SlashCommand = {
   ): Promise<void | SlashCommandActionReturn> => {
     const subCommand = args.trim();
 
+    const subCommandsByName = new Map(
+      skillsCommand.subCommands!.map((cmd) => [cmd.name, cmd]),
+    );
+
+    const listAction = subCommandsByName.get('list')!.action!;
+    const disableAction = subCommandsByName.get('disable')!.action!;
+    const enableAction = subCommandsByName.get('enable')!.action!;
+
     if (subCommand.startsWith('list ')) {
-      return skillsCommand.subCommands![0].action!(
-        context,
-        subCommand.slice('list '.length),
-      );
+      return listAction(context, subCommand.slice('list '.length));
     }
     if (subCommand === 'list') {
-      return skillsCommand.subCommands![0].action!(context, '');
+      return listAction(context, '');
     }
     if (subCommand.startsWith('disable ')) {
-      return skillsCommand.subCommands![1].action!(
-        context,
-        subCommand.slice('disable '.length),
-      );
+      return disableAction(context, subCommand.slice('disable '.length));
     }
     if (subCommand === 'disable') {
-      return skillsCommand.subCommands![1].action!(context, '');
+      return disableAction(context, '');
     }
     if (subCommand.startsWith('enable ')) {
-      return skillsCommand.subCommands![2].action!(
-        context,
-        subCommand.slice('enable '.length),
-      );
+      return enableAction(context, subCommand.slice('enable '.length));
     }
     if (subCommand === 'enable') {
-      return skillsCommand.subCommands![2].action!(context, '');
+      return enableAction(context, '');
     }
 
     // Default to 'list' if no other subcommand matches
-    return skillsCommand.subCommands![0].action!(context, subCommand);
+    return listAction(context, subCommand);
   },
 };

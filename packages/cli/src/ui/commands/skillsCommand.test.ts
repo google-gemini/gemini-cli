@@ -24,7 +24,6 @@ describe('skillsCommand', () => {
       services: {
         config: {
           getSkillManager: vi.fn().mockReturnValue({
-            getSkills: vi.fn().mockReturnValue(skills),
             getAllSkills: vi.fn().mockReturnValue(skills),
           }),
         } as unknown as Config,
