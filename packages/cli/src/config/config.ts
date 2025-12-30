@@ -282,7 +282,14 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       return true;
     });
 
-  if (settings?.experimental?.extensionManagement ?? true) {
+  const extensionsEnabled =
+    settings.admin?.cliFeatureSetting?.extensionsSetting?.extensionsEnabled ??
+    true;
+
+  if (
+    (settings?.experimental?.extensionManagement ?? true) &&
+    extensionsEnabled
+  ) {
     yargsInstance.command(extensionsCommand);
   }
 
@@ -500,9 +507,17 @@ export async function loadCliConfig(
   }
 
   // Override approval mode if disableYoloMode is set.
-  if (settings.security?.disableYoloMode) {
+  if (settings.security?.disableYoloMode || settings.admin?.secureModeEnabled) {
     if (approvalMode === ApprovalMode.YOLO) {
-      debugLogger.error('YOLO mode is disabled by the "disableYolo" setting.');
+      if (settings.admin?.secureModeEnabled) {
+        debugLogger.error(
+          'YOLO mode is disabled by the "admin.secureModeEnabled" setting.',
+        );
+      } else {
+        debugLogger.error(
+          'YOLO mode is disabled by the "disableYolo" setting.',
+        );
+      }
       throw new FatalConfigError(
         'Cannot start in YOLO mode when it is disabled by settings',
       );
@@ -607,6 +622,8 @@ export async function loadCliConfig(
 
   const ptyInfo = await getPty();
 
+  const mcpEnabled = settings.admin?.mcpSetting?.mcpEnabled ?? true;
+
   return new Config({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -625,12 +642,16 @@ export async function loadCliConfig(
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
-    mcpServerCommand: settings.mcp?.serverCommand,
-    mcpServers: settings.mcpServers,
-    allowedMcpServers: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
-    blockedMcpServers: argv.allowedMcpServerNames
-      ? undefined
-      : settings.mcp?.excluded,
+    mcpServerCommand: mcpEnabled ? settings.mcp?.serverCommand : undefined,
+    mcpServers: mcpEnabled ? settings.mcpServers : {},
+    allowedMcpServers: mcpEnabled
+      ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
+      : undefined,
+    blockedMcpServers: mcpEnabled
+      ? argv.allowedMcpServerNames
+        ? undefined
+        : settings.mcp?.excluded
+      : undefined,
     blockedEnvironmentVariables:
       settings.security?.environmentVariableRedaction?.blocked,
     enableEnvironmentVariableRedaction:

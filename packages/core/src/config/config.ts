@@ -85,6 +85,7 @@ import type { PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
+import type { GeminiCodeAssistSetting } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
@@ -463,6 +464,7 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
+  private remoteAdminSettings: GeminiCodeAssistSetting | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -845,6 +847,14 @@ export class Config {
 
   getTerminalBackground(): string | undefined {
     return this.terminalBackground;
+  }
+
+  getRemoteAdminSettings(): GeminiCodeAssistSetting | undefined {
+    return this.remoteAdminSettings;
+  }
+
+  setRemoteAdminSettings(settings: GeminiCodeAssistSetting): void {
+    this.remoteAdminSettings = settings;
   }
 
   shouldLoadMemoryFromIncludeDirectories(): boolean {
