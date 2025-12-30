@@ -63,6 +63,8 @@ export interface ShellExecutionResult {
   error: Error | null;
   /** A boolean indicating if the command was aborted by the user. */
   aborted: boolean;
+  /** A boolean indicating if the command was backgrounded by the user. */
+  backgrounded?: boolean;
   /** The process ID of the spawned shell. */
   pid: number | undefined;
   /** The method used to execute the shell command. */
@@ -114,6 +116,7 @@ export type ShellOutputEvent =
 interface ActivePty {
   ptyProcess: IPty;
   headlessTerminal: pkg.Terminal;
+  detach: () => void;
 }
 
 const getFullBufferText = (terminal: pkg.Terminal): string => {
@@ -491,7 +494,11 @@ export class ShellExecutionService {
         });
         headlessTerminal.scrollToTop();
 
-        this.activePtys.set(ptyProcess.pid, { ptyProcess, headlessTerminal });
+        this.activePtys.set(ptyProcess.pid, {
+          ptyProcess,
+          headlessTerminal,
+          detach: () => {},
+        });
 
         let processingChain = Promise.resolve();
         let decoder: TextDecoder | null = null;
@@ -725,6 +732,29 @@ export class ShellExecutionService {
         };
 
         abortSignal.addEventListener('abort', abortHandler, { once: true });
+
+        const activePty = this.activePtys.get(ptyProcess.pid);
+        if (activePty) {
+          activePty.detach = () => {
+            exited = true;
+            abortSignal.removeEventListener('abort', abortHandler);
+            this.activePtys.delete(ptyProcess.pid);
+
+            const finalBuffer = Buffer.concat(outputChunks);
+
+            resolve({
+              rawOutput: finalBuffer,
+              output: getFullBufferText(headlessTerminal),
+              exitCode: null,
+              signal: null,
+              error: null,
+              aborted: false,
+              pid: ptyProcess.pid,
+              executionMethod: ptyInfo?.name ?? 'node-pty',
+              backgrounded: true,
+            });
+          };
+        }
       });
 
       return { pid: ptyProcess.pid, result };
@@ -846,6 +876,22 @@ export class ShellExecutionService {
           throw e;
         }
       }
+    }
+  }
+
+  /**
+   * Detaches the pseudo-terminal (PTY) of a running process, allowing it to run in the background.
+   *
+   * @param pid The process ID of the target PTY.
+   */
+  static detach(pid: number): void {
+    if (!this.isPtyActive(pid)) {
+      return;
+    }
+
+    const activePty = this.activePtys.get(pid);
+    if (activePty) {
+      activePty.detach();
     }
   }
 }

@@ -302,7 +302,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       let llmContent = '';
       let timeoutMessage = '';
-      if (result.aborted) {
+      if (result.backgrounded) {
+        llmContent = `Command backgrounded by user. The process (PID: ${result.pid}) is still running.`;
+        if (result.output.trim()) {
+          llmContent += `\nOutput so far:\n${result.output}`;
+        }
+      } else if (result.aborted) {
         if (timeoutController.signal.aborted) {
           timeoutMessage = `Command was automatically cancelled because it exceeded the timeout of ${(
             timeoutMs / 60000
@@ -345,7 +350,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
         if (result.output.trim()) {
           returnDisplayMessage = result.output;
         } else {
-          if (result.aborted) {
+          if (result.backgrounded) {
+            returnDisplayMessage = `Command backgrounded (PID: ${result.pid}).`;
+          } else if (result.aborted) {
             if (timeoutMessage) {
               returnDisplayMessage = timeoutMessage;
             } else {

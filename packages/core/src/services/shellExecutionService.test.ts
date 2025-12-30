@@ -417,6 +417,7 @@ describe('ShellExecutionService', () => {
         ptyProcess: mockPtyProcess as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         headlessTerminal: mockHeadlessTerminal as any,
+        detach: vi.fn(),
       });
     });
 

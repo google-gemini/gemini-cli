@@ -43,6 +43,11 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
         return;
       }
 
+      if (key.ctrl && key.name === 'b') {
+        ShellExecutionService.detach(activeShellPtyId);
+        return;
+      }
+
       const ansiSequence = keyToAnsi(key);
       if (ansiSequence) {
         handleShellInputSubmit(ansiSequence);
