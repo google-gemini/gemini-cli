@@ -48,7 +48,12 @@ export class AgentRegistry {
     this.loadBuiltInAgents();
 
     coreEvents.on(CoreEvent.ModelChanged, () => {
-      void this.refreshAgents();
+      this.refreshAgents().catch((e) => {
+        debugLogger.error(
+          '[AgentRegistry] Failed to refresh agents on model change:',
+          e,
+        );
+      });
     });
 
     if (!this.config.isAgentsEnabled()) {
