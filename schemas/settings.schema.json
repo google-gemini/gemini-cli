@@ -1373,6 +1373,13 @@
           "default": false,
           "type": "boolean"
         },
+        "enableRealTimeHints": {
+          "title": "Enable Real-Time Hints",
+          "description": "Allows providing guidance to the model mid-execution without interrupting the tool chain.",
+          "markdownDescription": "Allows providing guidance to the model mid-execution without interrupting the tool chain.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "codebaseInvestigatorSettings": {
           "title": "Codebase Investigator Settings",
           "description": "Configuration for Codebase Investigator.",

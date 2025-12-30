@@ -334,6 +334,7 @@ export interface ConfigParameters {
   enableAgents?: boolean;
   experimentalJitContext?: boolean;
   onModelChange?: (model: string) => void;
+  enableRealTimeHints?: boolean;
 }
 
 export class Config {
@@ -459,6 +460,7 @@ export class Config {
   private readonly onModelChange: ((model: string) => void) | undefined;
 
   private readonly enableAgents: boolean;
+  private readonly enableRealTimeHints: boolean;
 
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
@@ -526,6 +528,7 @@ export class Config {
     this.model = params.model;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
+    this.enableRealTimeHints = params.enableRealTimeHints ?? false;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
@@ -1337,6 +1340,10 @@ export class Config {
 
   isAgentsEnabled(): boolean {
     return this.enableAgents;
+  }
+
+  isRealTimeHintsEnabled(): boolean {
+    return this.enableRealTimeHints;
   }
 
   getNoBrowser(): boolean {
