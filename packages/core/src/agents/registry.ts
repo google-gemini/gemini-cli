@@ -11,6 +11,7 @@ import type { AgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './toml-loader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { IntrospectionAgent } from './introspection-agent.js';
+import { A2AClientManager } from './a2a-client-manager.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
@@ -44,10 +45,10 @@ export class AgentRegistry {
    * Discovers and loads agents.
    */
   async initialize(): Promise<void> {
-    this.loadBuiltInAgents();
+    await this.loadBuiltInAgents();
 
     coreEvents.on(CoreEvent.ModelChanged, () => {
-      this.refreshAgents();
+      void this.refreshAgents();
     });
 
     if (!this.config.isAgentsEnabled()) {
@@ -63,9 +64,9 @@ export class AgentRegistry {
       );
       coreEvents.emitFeedback('error', `Agent loading error: ${error.message}`);
     }
-    for (const agent of userAgents.agents) {
-      this.registerAgent(agent);
-    }
+    await Promise.all(
+      userAgents.agents.map((agent) => this.registerAgent(agent)),
+    );
 
     // Load project-level agents: .gemini/agents/ (relative to Project Root)
     const folderTrustEnabled = this.config.getFolderTrust();
@@ -80,9 +81,9 @@ export class AgentRegistry {
           `Agent loading error: ${error.message}`,
         );
       }
-      for (const agent of projectAgents.agents) {
-        this.registerAgent(agent);
-      }
+      await Promise.all(
+        projectAgents.agents.map((agent) => this.registerAgent(agent)),
+      );
     } else {
       coreEvents.emitFeedback(
         'info',
@@ -97,7 +98,7 @@ export class AgentRegistry {
     }
   }
 
-  private loadBuiltInAgents(): void {
+  private async loadBuiltInAgents(): Promise<void> {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
     const introspectionSettings = this.config.getIntrospectionAgentSettings();
 
@@ -135,20 +136,22 @@ export class AgentRegistry {
             CodebaseInvestigatorAgent.runConfig.max_turns,
         },
       };
-      this.registerAgent(agentDef);
+      await this.registerAgent(agentDef);
     }
 
     // Register the introspection agent if it's explicitly enabled.
     if (introspectionSettings.enabled) {
-      this.registerAgent(IntrospectionAgent);
+      await this.registerAgent(IntrospectionAgent);
     }
   }
 
-  private refreshAgents(): void {
-    this.loadBuiltInAgents();
-    for (const agent of this.agents.values()) {
-      this.registerAgent(agent);
-    }
+  private async refreshAgents(): Promise<void> {
+    await this.loadBuiltInAgents();
+    await Promise.all(
+      Array.from(this.agents.values()).map((agent) =>
+        this.registerAgent(agent),
+      ),
+    );
   }
 
   /**
@@ -156,9 +159,9 @@ export class AgentRegistry {
    * it will be overwritten, respecting the precedence established by the
    * initialization order.
    */
-  protected registerAgent<TOutput extends z.ZodTypeAny>(
+  protected async registerAgent<TOutput extends z.ZodTypeAny>(
     definition: AgentDefinition<TOutput>,
-  ): void {
+  ): Promise<void> {
     // Basic validation
     if (!definition.name || !definition.description) {
       debugLogger.warn(
@@ -203,10 +206,32 @@ export class AgentRegistry {
     }
 
     // Log remote A2A agent registration for visibility.
-    if (definition.kind === 'remote' && this.config.getDebugMode()) {
-      debugLogger.log(
-        `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,
-      );
+    if (definition.kind === 'remote') {
+      try {
+        const clientManager = A2AClientManager.getInstance();
+        const agentCard = await clientManager.loadAgent(
+          definition.name,
+          definition.agentCardUrl,
+        );
+        if (agentCard.skills && agentCard.skills.length > 0) {
+          definition.description = agentCard.skills
+            .map(
+              (skill: { name: string; description: string }) =>
+                `${skill.name}: ${skill.description}`,
+            )
+            .join('\n');
+        }
+        if (this.config.getDebugMode()) {
+          debugLogger.log(
+            `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,
+          );
+        }
+      } catch (e) {
+        debugLogger.warn(
+          `[AgentRegistry] Error loading A2A agent "${definition.name}":`,
+          e,
+        );
+      }
     }
   }
 
