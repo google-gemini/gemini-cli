@@ -36,7 +36,7 @@ export function handleAutoUpdate(
 
   const installationInfo = getInstallationInfo(
     projectRoot,
-    settings.merged.general?.enableAutoUpdate === false,
+    settings.merged.general?.enableAutoUpdate !== false,
   );
 
   if (
