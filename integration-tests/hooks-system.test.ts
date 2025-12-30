@@ -464,7 +464,7 @@ jq -c '{decision: "allow", systemMessage: ("Hook received response: " + (.prompt
         {
           fakeResponsesPath: join(
             import.meta.dirname,
-            'hooks-system.before-agent.responses', // Reusing an existing response set
+            'hooks-system.after-agent.responses',
           ),
           settings: {
             tools: {
@@ -532,7 +532,7 @@ jq -c '{decision: "allow", systemMessage: ("Interactive hook received response: 
         {
           fakeResponsesPath: join(
             import.meta.dirname,
-            'hooks-system.before-agent.responses', // Reusing an existing response set
+            'hooks-system.after-agent.responses',
           ),
           settings: {
             tools: {
