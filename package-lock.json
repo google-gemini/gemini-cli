@@ -1,12 +1,12 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.22.4",
+  "version": "0.22.5",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "@google/gemini-cli",
-      "version": "0.22.4",
+      "version": "0.22.5",
       "workspaces": [
         "packages/*"
       ],
@@ -17671,7 +17671,7 @@
     },
     "packages/a2a-server": {
       "name": "@google/gemini-cli-a2a-server",
-      "version": "0.22.4",
+      "version": "0.22.5",
       "dependencies": {
         "@a2a-js/sdk": "^0.3.2",
         "@google-cloud/storage": "^7.16.0",
@@ -17981,7 +17981,7 @@
     },
     "packages/cli": {
       "name": "@google/gemini-cli",
-      "version": "0.22.4",
+      "version": "0.22.5",
       "license": "Apache-2.0",
       "dependencies": {
         "@google/gemini-cli-core": "file:../core",
@@ -18083,7 +18083,7 @@
     },
     "packages/core": {
       "name": "@google/gemini-cli-core",
-      "version": "0.22.4",
+      "version": "0.22.5",
       "license": "Apache-2.0",
       "dependencies": {
         "@google-cloud/logging": "^11.2.1",
@@ -18228,7 +18228,7 @@
     },
     "packages/test-utils": {
       "name": "@google/gemini-cli-test-utils",
-      "version": "0.22.4",
+      "version": "0.22.5",
       "license": "Apache-2.0",
       "devDependencies": {
         "typescript": "^5.3.3"
@@ -18239,7 +18239,7 @@
     },
     "packages/vscode-ide-companion": {
       "name": "gemini-cli-vscode-ide-companion",
-      "version": "0.22.4",
+      "version": "0.22.5",
       "license": "LICENSE",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.23.0",
