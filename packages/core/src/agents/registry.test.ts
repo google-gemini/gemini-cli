@@ -85,7 +85,7 @@ describe('AgentRegistry', () => {
       });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
       const debugLogSpy = vi
-        .spyOn(debugLogger, 'log')
+        .spyOn(debugLogger, 'debug')
         .mockImplementation(() => {});
 
       await debugRegistry.initialize();
@@ -273,7 +273,7 @@ describe('AgentRegistry', () => {
       const debugConfig = makeFakeConfig({ debugMode: true });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
       const debugLogSpy = vi
-        .spyOn(debugLogger, 'log')
+        .spyOn(debugLogger, 'debug')
         .mockImplementation(() => {});
 
       const remoteAgent: AgentDefinition = {
@@ -347,7 +347,7 @@ describe('AgentRegistry', () => {
       const debugConfig = makeFakeConfig({ debugMode: true });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
       const debugLogSpy = vi
-        .spyOn(debugLogger, 'log')
+        .spyOn(debugLogger, 'debug')
         .mockImplementation(() => {});
 
       debugRegistry.testRegisterAgent(MOCK_AGENT_V1);
@@ -360,7 +360,7 @@ describe('AgentRegistry', () => {
 
     it('should not log overwrites when not in debug mode', () => {
       const debugLogSpy = vi
-        .spyOn(debugLogger, 'log')
+        .spyOn(debugLogger, 'debug')
         .mockImplementation(() => {});
 
       registry.testRegisterAgent(MOCK_AGENT_V1);

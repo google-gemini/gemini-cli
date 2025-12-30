@@ -91,7 +91,7 @@ export class AgentRegistry {
     }
 
     if (this.config.getDebugMode()) {
-      debugLogger.log(
+      debugLogger.debug(
         `[AgentRegistry] Initialized with ${this.agents.size} agents.`,
       );
     }
@@ -168,7 +168,9 @@ export class AgentRegistry {
     }
 
     if (this.agents.has(definition.name) && this.config.getDebugMode()) {
-      debugLogger.log(`[AgentRegistry] Overriding agent '${definition.name}'`);
+      debugLogger.debug(
+        `[AgentRegistry] Overriding agent '${definition.name}'`,
+      );
     }
 
     this.agents.set(definition.name, definition);
@@ -204,7 +206,7 @@ export class AgentRegistry {
 
     // Log remote A2A agent registration for visibility.
     if (definition.kind === 'remote' && this.config.getDebugMode()) {
-      debugLogger.log(
+      debugLogger.debug(
         `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,
       );
     }
