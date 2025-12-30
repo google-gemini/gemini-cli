@@ -822,6 +822,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.skills`** (boolean):
+  - **Description:** Enable Agent Skills (experimental).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.codebaseInvestigatorSettings.enabled`** (boolean):
   - **Description:** Enable the Codebase Investigator agent.
   - **Default:** `true`
@@ -852,6 +857,13 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.introspectionAgentSettings.enabled`** (boolean):
   - **Description:** Enable the Introspection Agent.
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+#### `skills`
+
+- **`skills.disabled`** (array):
+  - **Description:** List of disabled skills.
+  - **Default:** `[]`
   - **Requires restart:** Yes
 
 #### `hooks`

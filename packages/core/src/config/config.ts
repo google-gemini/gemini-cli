@@ -94,6 +94,7 @@ import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { SkillManager } from '../services/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 
 import { ApprovalMode } from '../policy/types.js';
@@ -348,6 +349,8 @@ export interface ConfigParameters {
   };
   previewFeatures?: boolean;
   enableAgents?: boolean;
+  skillsSupport?: boolean;
+  disabledSkills?: string[];
   experimentalJitContext?: boolean;
   onModelChange?: (model: string) => void;
 }
@@ -363,6 +366,7 @@ export class Config {
   private promptRegistry!: PromptRegistry;
   private resourceRegistry!: ResourceRegistry;
   private agentRegistry!: AgentRegistry;
+  private skillManager!: SkillManager;
   private sessionId: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
@@ -475,6 +479,8 @@ export class Config {
   private readonly onModelChange: ((model: string) => void) | undefined;
 
   private readonly enableAgents: boolean;
+  private readonly skillsSupport: boolean;
+  private readonly disabledSkills: string[];
 
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
@@ -542,9 +548,11 @@ export class Config {
     this.model = params.model;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
-    this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.skillsSupport = params.skillsSupport ?? false;
+    this.disabledSkills = params.disabledSkills ?? [];
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
+    this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalZedIntegration =
       params.experimentalZedIntegration ?? false;
@@ -624,6 +632,7 @@ export class Config {
         params.approvalMode ?? params.policyEngineConfig?.approvalMode,
     });
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
+    this.skillManager = new SkillManager();
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
@@ -720,6 +729,12 @@ export class Config {
       await this.getExtensionLoader().start(this),
     ]);
     initMcpHandle?.end();
+
+    // Discover skills if enabled
+    if (this.skillsSupport) {
+      await this.getSkillManager().discoverSkills(this.storage);
+      this.getSkillManager().setDisabledSkills(this.disabledSkills);
+    }
 
     // Initialize hook system if enabled
     if (this.enableHooks) {
@@ -971,6 +986,10 @@ export class Config {
 
   getPromptRegistry(): PromptRegistry {
     return this.promptRegistry;
+  }
+
+  getSkillManager(): SkillManager {
+    return this.skillManager;
   }
 
   getResourceRegistry(): ResourceRegistry {
@@ -1476,6 +1495,10 @@ export class Config {
       this.ptyInfo !== 'child_process' &&
       this.enableInteractiveShell
     );
+  }
+
+  isSkillsSupportEnabled(): boolean {
+    return this.skillsSupport;
   }
 
   isInteractive(): boolean {
