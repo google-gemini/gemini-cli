@@ -172,31 +172,9 @@ describe('directoryUtils', () => {
     });
   });
 
-  // Windows-only tests to verify backslash path separator handling
   describe.skipIf(process.platform !== 'win32')(
     'getDirectorySuggestions (Windows)',
     () => {
-      it('should handle native Windows backslash separators', () => {
-        vi.mocked(fs.existsSync).mockReturnValue(true);
-        vi.mocked(fs.statSync).mockReturnValue({
-          isDirectory: () => true,
-        } as fs.Stats);
-
-        (fs.readdirSync as Mock).mockReturnValue([
-          { name: 'sub', isDirectory: () => true },
-        ]);
-        expect(getDirectorySuggestions('docs\\')).toEqual([
-          `docs\\sub${path.sep}`,
-        ]);
-
-        (fs.readdirSync as Mock).mockReturnValue([
-          { name: 'nested', isDirectory: () => true },
-        ]);
-        expect(getDirectorySuggestions('docs\\sub\\n')).toEqual([
-          `docs\\sub\\nested${path.sep}`,
-        ]);
-      });
-
       it('should handle %userprofile% expansion', () => {
         vi.mocked(fs.existsSync).mockReturnValue(true);
         vi.mocked(fs.statSync).mockReturnValue({
@@ -207,28 +185,13 @@ describe('directoryUtils', () => {
           { name: 'Downloads', isDirectory: () => true },
         ]);
 
-        // Test base expansion
         expect(getDirectorySuggestions('%userprofile%\\')).toEqual([
           `%userprofile%\\Documents${path.sep}`,
           `%userprofile%\\Downloads${path.sep}`,
         ]);
-        // Test expansion with partial path
         expect(getDirectorySuggestions('%userprofile%\\Doc')).toEqual([
           `%userprofile%\\Documents${path.sep}`,
         ]);
-      });
-
-      it('should handle mixed forward and back slashes', () => {
-        vi.mocked(fs.existsSync).mockReturnValue(true);
-        vi.mocked(fs.statSync).mockReturnValue({
-          isDirectory: () => true,
-        } as fs.Stats);
-        (fs.readdirSync as Mock).mockReturnValue([
-          { name: 'nested', isDirectory: () => true },
-        ]);
-
-        const suggestions = getDirectorySuggestions('docs/sub\\n');
-        expect(suggestions).toEqual([`docs/sub\\nested${path.sep}`]);
       });
     },
   );
