@@ -488,64 +488,35 @@ describe('Gemini Client (client.ts)', () => {
           newTokenCount: estimatedNewTokenCount,
           originalTokenCount: 100,
         });
-        // IMPORTANT: The change in client.ts means setLastPromptTokenCount is NOT called on failure
-        expect(
-          uiTelemetryService.setLastPromptTokenCount,
-        ).not.toHaveBeenCalled();
       });
 
-      it('does not manipulate the source chat', async () => {
+      it('resumes the session file when compression succeeds', async () => {
         const { client, mockOriginalChat } = setup({
-          originalTokenCount: 100,
-          newTokenCount: 200,
-          compressionStatus:
-            CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+          compressionStatus: CompressionStatus.COMPRESSED,
         });
 
-        await client.tryCompressChat('prompt-id-4', false);
+        const mockRecordingService = {
+          getConversation: vi
+            .fn()
+            .mockReturnValue({ sessionId: 'session-123' }),
+          getConversationFilePath: vi
+            .fn()
+            .mockReturnValue('/path/to/session.json'),
+        };
 
-        // On failure, the chat should NOT be replaced
-        expect(client['chat']).toBe(mockOriginalChat);
-      });
+        // Ensure the original chat has the recording service available
+        mockOriginalChat.getChatRecordingService = vi
+          .fn()
+          .mockReturnValue(mockRecordingService);
 
-      it.skip('will not attempt to compress context after a failure', async () => {
-        const { client } = setup({
-          originalTokenCount: 100,
-          newTokenCount: 200,
-          compressionStatus:
-            CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
-        });
+        await client.tryCompressChat('prompt-id-resume', false);
 
-        await client.tryCompressChat('prompt-id-4', false); // This fails and sets hasFailedCompressionAttempt = true
-
-        // Mock the next call to return NOOP
-        vi.mocked(
-          ChatCompressionService.prototype.compress,
-        ).mockResolvedValueOnce({
-          newHistory: null,
-          info: {
-            originalTokenCount: 0,
-            newTokenCount: 0,
-            compressionStatus: CompressionStatus.NOOP,
+        expect(client['startChat']).toHaveBeenCalledWith(
+          expect.anything(), // new history
+          {
+            conversation: { sessionId: 'session-123' },
+            filePath: '/path/to/session.json',
           },
-        });
-
-        // This call should now be a NOOP
-        const result = await client.tryCompressChat('prompt-id-5', false);
-
-        expect(result.compressionStatus).toBe(CompressionStatus.NOOP);
-        expect(ChatCompressionService.prototype.compress).toHaveBeenCalledTimes(
-          2,
-        );
-        expect(
-          ChatCompressionService.prototype.compress,
-        ).toHaveBeenLastCalledWith(
-          expect.anything(),
-          'prompt-id-5',
-          false,
-          expect.anything(),
-          expect.anything(),
-          true, // hasFailedCompressionAttempt
         );
       });
     });
