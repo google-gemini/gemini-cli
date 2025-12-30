@@ -47,7 +47,6 @@ import {
   saveApiKey,
   debugLogger,
   coreEvents,
-  CoreEvent,
   refreshServerHierarchicalMemory,
   type MemoryChangedPayload,
   writeToStdout,
@@ -62,6 +61,7 @@ import {
   fireSessionStartHook,
   fireSessionEndHook,
   generateSummary,
+  CoreEvent,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -98,7 +98,6 @@ import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
-import { appEvents, AppEvent } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
@@ -1028,11 +1027,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
     const handlePasteTimeout = () => {
       handleWarning('Paste Timed out. Possibly due to slow connection.');
     };
-    appEvents.on(AppEvent.SelectionWarning, handleSelectionWarning);
-    appEvents.on(AppEvent.PasteTimeout, handlePasteTimeout);
+    coreEvents.on(CoreEvent.UserFeedback, handleSelectionWarning);
+    coreEvents.on(CoreEvent.UserFeedback, handlePasteTimeout);
     return () => {
-      appEvents.off(AppEvent.SelectionWarning, handleSelectionWarning);
-      appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
+      coreEvents.off(CoreEvent.UserFeedback, handleSelectionWarning);
+      coreEvents.off(CoreEvent.UserFeedback, handlePasteTimeout);
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
@@ -1083,10 +1082,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setShowErrorDetails(true);
       setConstrainHeight(false);
     };
-    appEvents.on(AppEvent.OpenDebugConsole, openDebugConsole);
+    coreEvents.on(CoreEvent.OpenDebugConsole, openDebugConsole);
 
     return () => {
-      appEvents.off(AppEvent.OpenDebugConsole, openDebugConsole);
+      coreEvents.off(CoreEvent.OpenDebugConsole, openDebugConsole);
     };
   }, [config]);
 

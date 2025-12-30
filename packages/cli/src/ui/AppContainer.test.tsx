@@ -267,13 +267,17 @@ describe('AppContainer State Management', () => {
       proQuotaRequest: null,
       handleProQuotaChoice: vi.fn(),
     });
-    mockedUseHistory.mockReturnValue({
+
+    // Create a stable mock object for history manager
+    const mockHistoryManager = {
       history: [],
       addItem: vi.fn(),
       updateItem: vi.fn(),
       clearItems: vi.fn(),
       loadHistory: vi.fn(),
-    });
+    };
+    mockedUseHistory.mockReturnValue(mockHistoryManager);
+
     mockedUseThemeCommand.mockReturnValue({
       isThemeDialogOpen: false,
       openThemeDialog: vi.fn(),
@@ -1819,11 +1823,11 @@ describe('AppContainer State Management', () => {
       });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
-      // Get the registered handler
-      const handler = mockCoreEvents.on.mock.calls.find(
-        (call: unknown[]) => call[0] === CoreEvent.UserFeedback,
-      )?.[1];
-      expect(handler).toBeDefined();
+      // Get all registered handlers
+      const handlers = mockCoreEvents.on.mock.calls
+        .filter((call: unknown[]) => call[0] === CoreEvent.UserFeedback)
+        .map((call: unknown[]) => call[1]);
+      expect(handlers.length).toBeGreaterThan(0);
 
       // Simulate an event
       const payload: UserFeedbackPayload = {
@@ -1831,7 +1835,9 @@ describe('AppContainer State Management', () => {
         message: 'Test error message',
       };
       act(() => {
-        handler(payload);
+        handlers.forEach((handler: (payload: UserFeedbackPayload) => void) => {
+          handler(payload);
+        });
       });
 
       expect(mockedUseHistory().addItem).toHaveBeenCalledWith(

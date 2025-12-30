@@ -25,8 +25,9 @@ import {
   SlashCommandStatus,
   ToolConfirmationOutcome,
   makeFakeConfig,
+  coreEvents,
+  CoreEvent,
 } from '@google/gemini-cli-core';
-import { appEvents } from '../../utils/events.js';
 
 const {
   logSlashCommand,
@@ -1119,7 +1120,7 @@ describe('useSlashCommandProcessor', () => {
     // We should not see a change until we fire an event.
     await waitFor(() => expect(result.current.slashCommands).toEqual([]));
     act(() => {
-      appEvents.emit('extensionsStarting');
+      coreEvents.emit(CoreEvent.ExtensionsStarting, { total: 1, completed: 0 });
     });
     await waitFor(() =>
       expect(result.current.slashCommands).toEqual([newCommand]),

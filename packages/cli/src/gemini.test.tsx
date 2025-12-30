@@ -24,7 +24,6 @@ import os from 'node:os';
 import v8 from 'node:v8';
 import { type CliArgs } from './config/config.js';
 import { type LoadedSettings } from './config/settings.js';
-import { appEvents, AppEvent } from './utils/events.js';
 import {
   type Config,
   type ResumedSessionData,
@@ -33,6 +32,7 @@ import {
 } from '@google/gemini-cli-core';
 import { act } from 'react';
 import { type InitializationResult } from './core/initializer.js';
+import { CoreEvent, coreEvents } from '@google/gemini-cli-core';
 
 const performance = vi.hoisted(() => ({
   now: vi.fn(),
@@ -159,16 +159,6 @@ vi.mock('update-notifier', () => ({
     notify: vi.fn(),
   })),
 }));
-
-vi.mock('./utils/events.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./utils/events.js')>();
-  return {
-    ...actual,
-    appEvents: {
-      emit: vi.fn(),
-    },
-  };
-});
 
 vi.mock('./utils/sandbox.js', () => ({
   sandbox_command: vi.fn(() => ''), // Default to no sandbox command
@@ -320,7 +310,7 @@ describe('gemini.tsx main function', () => {
       .mockImplementation((code) => {
         throw new MockProcessExitError(code);
       });
-    const appEventsMock = vi.mocked(appEvents);
+    const emitSpy = vi.spyOn(coreEvents, 'emit');
     const debugLoggerErrorSpy = vi.spyOn(debugLogger, 'error');
     const rejectionError = new Error('Test unhandled rejection');
 
@@ -333,7 +323,7 @@ describe('gemini.tsx main function', () => {
     // We need to wait for the rejection handler to be called.
     await new Promise(process.nextTick);
 
-    expect(appEventsMock.emit).toHaveBeenCalledWith(AppEvent.OpenDebugConsole);
+    expect(emitSpy).toHaveBeenCalledWith(CoreEvent.OpenDebugConsole);
     expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining('Unhandled Promise Rejection'),
     );
@@ -347,8 +337,8 @@ describe('gemini.tsx main function', () => {
     await new Promise(process.nextTick);
 
     // Ensure emit was only called once for OpenDebugConsole
-    const openDebugConsoleCalls = appEventsMock.emit.mock.calls.filter(
-      (call) => call[0] === AppEvent.OpenDebugConsole,
+    const openDebugConsoleCalls = emitSpy.mock.calls.filter(
+      (call) => call[0] === CoreEvent.OpenDebugConsole,
     );
     expect(openDebugConsoleCalls.length).toBe(1);
 
@@ -704,6 +694,9 @@ describe('gemini.tsx main function kitty protocol', () => {
       getProjectRoot: () => '/',
       refreshAuth: vi.fn(),
       setTerminalBackground: vi.fn(),
+      getToolRegistry: vi.fn(),
+      getEnableExtensionReloading: vi.fn(),
+      getModel: vi.fn(),
     } as unknown as Config;
 
     vi.mocked(loadCliConfig).mockResolvedValue(mockConfig);
@@ -1124,6 +1117,10 @@ describe('gemini.tsx main function exit codes', () => {
     vi.mocked(loadSandboxConfig).mockResolvedValue({} as any);
     vi.mocked(loadCliConfig).mockResolvedValue({
       refreshAuth: vi.fn().mockRejectedValue(new Error('Auth failed')),
+      getPolicyEngine: vi.fn(),
+      getToolRegistry: vi.fn(),
+      getModel: vi.fn(),
+      getEnableExtensionReloading: vi.fn(),
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue({
       merged: {

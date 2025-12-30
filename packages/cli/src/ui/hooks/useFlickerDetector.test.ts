@@ -5,54 +5,61 @@
  */
 
 import { renderHook } from '../../test-utils/render.js';
-import { vi, type Mock } from 'vitest';
+import {
+  vi,
+  type Mock,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from 'vitest';
 import { useFlickerDetector } from './useFlickerDetector.js';
 import { useConfig } from '../contexts/ConfigContext.js';
-import { recordFlickerFrame } from '@google/gemini-cli-core';
+import {
+  recordFlickerFrame,
+  CoreEvent,
+  coreEvents,
+} from '@google/gemini-cli-core';
 import { type Config } from '@google/gemini-cli-core';
 import { type DOMElement, measureElement } from 'ink';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { appEvents, AppEvent } from '../../utils/events.js';
 
-// Mock dependencies
 vi.mock('../contexts/ConfigContext.js');
 vi.mock('../contexts/UIStateContext.js');
+vi.mock('ink', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ink')>();
+  return {
+    ...actual,
+    measureElement: vi.fn(),
+  };
+});
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
     recordFlickerFrame: vi.fn(),
-    GEMINI_DIR: '.gemini',
+    coreEvents: {
+      emit: vi.fn(),
+    },
   };
 });
-vi.mock('ink', async (importOriginal) => {
-  const original = await importOriginal<typeof import('ink')>();
-  return {
-    ...original,
-    measureElement: vi.fn(),
-  };
-});
-vi.mock('../../utils/events.js', () => ({
-  appEvents: {
-    emit: vi.fn(),
-  },
-  AppEvent: {
-    Flicker: 'flicker',
-  },
-}));
 
 const mockUseConfig = useConfig as Mock;
 const mockUseUIState = useUIState as Mock;
 const mockRecordFlickerFrame = recordFlickerFrame as Mock;
 const mockMeasureElement = measureElement as Mock;
-const mockAppEventsEmit = appEvents.emit as Mock;
 
 describe('useFlickerDetector', () => {
   const mockConfig = {} as Config;
   let mockRef: React.RefObject<DOMElement | null>;
+  let emitSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    emitSpy = vi.spyOn(coreEvents, 'emit');
+
     mockUseConfig.mockReturnValue(mockConfig);
     mockRef = { current: { yogaNode: {} } as DOMElement };
     // Default UI state
@@ -67,14 +74,14 @@ describe('useFlickerDetector', () => {
     mockMeasureElement.mockReturnValue({ width: 80, height: 20 });
     renderHook(() => useFlickerDetector(mockRef, 25));
     expect(mockRecordFlickerFrame).not.toHaveBeenCalled();
-    expect(mockAppEventsEmit).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
   });
 
   it('should not record a flicker when height is equal to terminal height', () => {
     mockMeasureElement.mockReturnValue({ width: 80, height: 25 });
     renderHook(() => useFlickerDetector(mockRef, 25));
     expect(mockRecordFlickerFrame).not.toHaveBeenCalled();
-    expect(mockAppEventsEmit).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
   });
 
   it('should record a flicker when height is greater than terminal height and height is constrained', () => {
@@ -82,8 +89,8 @@ describe('useFlickerDetector', () => {
     renderHook(() => useFlickerDetector(mockRef, 25));
     expect(mockRecordFlickerFrame).toHaveBeenCalledTimes(1);
     expect(mockRecordFlickerFrame).toHaveBeenCalledWith(mockConfig);
-    expect(mockAppEventsEmit).toHaveBeenCalledTimes(1);
-    expect(mockAppEventsEmit).toHaveBeenCalledWith(AppEvent.Flicker);
+    expect(emitSpy).toHaveBeenCalledTimes(1);
+    expect(emitSpy).toHaveBeenCalledWith(CoreEvent.Flicker);
   });
 
   it('should NOT record a flicker when height is greater than terminal height but height is NOT constrained', () => {
@@ -92,7 +99,7 @@ describe('useFlickerDetector', () => {
     mockMeasureElement.mockReturnValue({ width: 80, height: 30 });
     renderHook(() => useFlickerDetector(mockRef, 25));
     expect(mockRecordFlickerFrame).not.toHaveBeenCalled();
-    expect(mockAppEventsEmit).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
   });
 
   it('should not check for flicker if the ref is not set', () => {
@@ -101,7 +108,7 @@ describe('useFlickerDetector', () => {
     renderHook(() => useFlickerDetector(mockRef, 25));
     expect(mockMeasureElement).not.toHaveBeenCalled();
     expect(mockRecordFlickerFrame).not.toHaveBeenCalled();
-    expect(mockAppEventsEmit).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
   });
 
   it('should re-evaluate on re-render', () => {
@@ -115,6 +122,6 @@ describe('useFlickerDetector', () => {
     rerender();
 
     expect(mockRecordFlickerFrame).toHaveBeenCalledTimes(1);
-    expect(mockAppEventsEmit).toHaveBeenCalledTimes(1);
+    expect(emitSpy).toHaveBeenCalledTimes(1);
   });
 });
