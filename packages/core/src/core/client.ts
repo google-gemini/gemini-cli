@@ -163,7 +163,6 @@ export class GeminiClient {
       request,
       finalResponseText,
     );
-    this.hookStateMap.delete(prompt_id);
     return hookOutput;
   }
 

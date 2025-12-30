@@ -32,13 +32,21 @@ describe('Hooks Agent Flow', () => {
       });
 
       const hookScript = `
-console.log(JSON.stringify({
-  decision: "allow",
-  hookSpecificOutput: {
-    hookEventName: "BeforeAgent",
-    additionalContext: "SYSTEM INSTRUCTION: This is injected context."
-  }
-}));`;
+      try {
+        const output = {
+          decision: "allow",
+          hookSpecificOutput: {
+            hookEventName: "BeforeAgent",
+            additionalContext: "SYSTEM INSTRUCTION: This is injected context."
+          }
+        };
+        process.stdout.write(JSON.stringify(output));
+      } catch (e) {
+        console.error('Failed to write stdout:', e);
+        process.exit(1);
+      }
+      console.error('DEBUG: BeforeAgent hook executed');
+      `;
 
       const scriptPath = join(rig.testDir!, 'before_agent_context.cjs');
       writeFileSync(scriptPath, hookScript);
@@ -94,11 +102,29 @@ console.log(JSON.stringify({
       });
 
       const hookScript = `
-const fs = require('fs');
-const input = fs.readFileSync(0, 'utf-8');
-console.log("Received Input: " + input);
-console.log(JSON.stringify({decision: "allow"}));
-`;
+      const fs = require('fs');
+      try {
+        const input = fs.readFileSync(0, 'utf-8');
+        console.error('DEBUG: AfterAgent hook input received');
+        process.stdout.write("Received Input: " + input);
+        // Ensure separation between the echo and the JSON output if they were to run together (though relying on separate console calls usually separates by newline)
+        // usage of process.stdout.write does NOT add newline.
+        // But here we want strictly the output "Received Input..." to be present.
+        // We also need to output the JSON decision for the hook runner to consider it successful?
+        // Actually HookRunner parses the *last* valid JSON block or treats text as system message.
+        // If we output mixed text and JSON, HookRunner might get confused if we don't handle it right.
+        // Existing test expects "Received Input" in stdout. And "Hello World".
+        // It DOES NOT parse the decision?
+        // Wait, HookRunner logic:
+        // "if (exitCode === EXIT_CODE_SUCCESS && stdout.trim()) ... JSON.parse ..."
+        // If JSON.parse fails: "Not JSON, convert plain text to structured output"
+        // So if we output formatted text, it becomes "systemMessage".
+        // That is fine for this test as we don't check the decision, just the stdout content.
+      } catch (err) {
+        console.error('Hook Failed:', err);
+        process.exit(1);
+      }
+      `;
 
       const scriptPath = join(rig.testDir!, 'after_agent_verify.cjs');
       writeFileSync(scriptPath, hookScript);
