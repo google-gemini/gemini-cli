@@ -134,6 +134,20 @@ export interface CodebaseInvestigatorSettings {
   model?: string;
 }
 
+export interface ExtensionSetting {
+  name: string;
+  description: string;
+  envVar: string;
+  sensitive?: boolean;
+}
+
+export interface ResolvedExtensionSetting {
+  name: string;
+  envVar: string;
+  value: string;
+  sensitive: boolean;
+}
+
 export interface IntrospectionAgentSettings {
   enabled?: boolean;
 }
@@ -155,6 +169,8 @@ export interface GeminiCLIExtension {
   excludeTools?: string[];
   id: string;
   hooks?: { [K in HookEventName]?: HookDefinition[] };
+  settings?: ExtensionSetting[];
+  resolvedSettings?: ResolvedExtensionSetting[];
 }
 
 export interface ExtensionInstallMetadata {
