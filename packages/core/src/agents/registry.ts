@@ -69,7 +69,7 @@ export class AgentRegistry {
       );
       coreEvents.emitFeedback('error', `Agent loading error: ${error.message}`);
     }
-    await Promise.all(
+    await Promise.allSettled(
       userAgents.agents.map((agent) => this.registerAgent(agent)),
     );
 
@@ -86,7 +86,7 @@ export class AgentRegistry {
           `Agent loading error: ${error.message}`,
         );
       }
-      await Promise.all(
+      await Promise.allSettled(
         projectAgents.agents.map((agent) => this.registerAgent(agent)),
       );
     } else {
@@ -152,7 +152,7 @@ export class AgentRegistry {
 
   private async refreshAgents(): Promise<void> {
     this.loadBuiltInAgents();
-    await Promise.all(
+    await Promise.allSettled(
       Array.from(this.agents.values()).map((agent) =>
         this.registerAgent(agent),
       ),
@@ -248,8 +248,6 @@ export class AgentRegistry {
       debugLogger.log(`[AgentRegistry] Overriding agent '${definition.name}'`);
     }
 
-    this.agents.set(definition.name, definition);
-
     // Log remote A2A agent registration for visibility.
     try {
       const clientManager = A2AClientManager.getInstance();
@@ -270,6 +268,7 @@ export class AgentRegistry {
           `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,
         );
       }
+      this.agents.set(definition.name, definition);
     } catch (e) {
       debugLogger.warn(
         `[AgentRegistry] Error loading A2A agent "${definition.name}":`,
