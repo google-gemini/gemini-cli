@@ -124,10 +124,12 @@ function validateAfterAgentInput(input: Record<string, unknown>): {
   prompt: string;
   promptResponse: string;
   stopHookActive: boolean;
+  hasPendingToolCalls: boolean;
 } {
   const prompt = input['prompt'];
   const promptResponse = input['prompt_response'];
   const stopHookActive = input['stop_hook_active'];
+  const hasPendingToolCalls = input['has_pending_tool_calls'];
   if (typeof prompt !== 'string') {
     throw new Error(
       'Invalid input for AfterAgent hook event: prompt must be a string',
@@ -144,6 +146,8 @@ function validateAfterAgentInput(input: Record<string, unknown>): {
     promptResponse,
     stopHookActive:
       typeof stopHookActive === 'boolean' ? stopHookActive : false,
+    hasPendingToolCalls:
+      typeof hasPendingToolCalls === 'boolean' ? hasPendingToolCalls : false,
   };
 }
 
@@ -382,12 +386,14 @@ export class HookEventHandler {
     prompt: string,
     promptResponse: string,
     stopHookActive: boolean = false,
+    hasPendingToolCalls: boolean = false,
   ): Promise<AggregatedHookResult> {
     const input: AfterAgentInput = {
       ...this.createBaseInput(HookEventName.AfterAgent),
       prompt,
       prompt_response: promptResponse,
       stop_hook_active: stopHookActive,
+      has_pending_tool_calls: hasPendingToolCalls,
     };
 
     return this.executeHooks(HookEventName.AfterAgent, input);
@@ -717,12 +723,17 @@ export class HookEventHandler {
           break;
         }
         case HookEventName.AfterAgent: {
-          const { prompt, promptResponse, stopHookActive } =
-            validateAfterAgentInput(enrichedInput);
+          const {
+            prompt,
+            promptResponse,
+            stopHookActive,
+            hasPendingToolCalls,
+          } = validateAfterAgentInput(enrichedInput);
           result = await this.fireAfterAgentEvent(
             prompt,
             promptResponse,
             stopHookActive,
+            hasPendingToolCalls,
           );
           break;
         }
