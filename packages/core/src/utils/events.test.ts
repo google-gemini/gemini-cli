@@ -274,4 +274,35 @@ describe('CoreEventEmitter', () => {
       expect(listener).toHaveBeenCalledWith({ model: newModel });
     });
   });
+
+  describe('Hook Events', () => {
+    it('should emit HookStart event with correct payload using helper', () => {
+      const listener = vi.fn();
+      events.on(CoreEvent.HookStart, listener);
+
+      const payload = {
+        hookName: 'test-hook',
+        eventName: 'before-agent',
+        hookIndex: 1,
+        totalHooks: 1,
+      };
+      events.emitHookStart(payload);
+
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should emit HookEnd event with correct payload using helper', () => {
+      const listener = vi.fn();
+      events.on(CoreEvent.HookEnd, listener);
+
+      const payload = {
+        hookName: 'test-hook',
+        eventName: 'before-agent',
+        success: true,
+      };
+      events.emitHookEnd(payload);
+
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+  });
 });

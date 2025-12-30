@@ -1512,6 +1512,13 @@
             "type": "string"
           }
         },
+        "notifications": {
+          "title": "Hook Notifications",
+          "description": "Show visual indicators when hooks are executing.",
+          "markdownDescription": "Show visual indicators when hooks are executing.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "BeforeTool": {
           "title": "Before Tool Hooks",
           "description": "Hooks that execute before tool execution. Can intercept, validate, or modify tool calls.",
