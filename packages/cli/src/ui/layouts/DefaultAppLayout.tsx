@@ -11,6 +11,7 @@ import { MainContent } from '../components/MainContent.js';
 import { DialogManager } from '../components/DialogManager.js';
 import { Composer } from '../components/Composer.js';
 import { ExitWarning } from '../components/ExitWarning.js';
+import { ShellBackgroundHandler } from '../components/ShellBackgroundHandler.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
@@ -37,6 +38,7 @@ export const DefaultAppLayout: React.FC = () => {
       overflow="hidden"
       ref={uiState.rootUiRef}
     >
+      <ShellBackgroundHandler />
       <MainContent />
 
       <Box
