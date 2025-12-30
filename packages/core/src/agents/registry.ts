@@ -45,7 +45,7 @@ export class AgentRegistry {
    * Discovers and loads agents.
    */
   async initialize(): Promise<void> {
-    await this.loadBuiltInAgents();
+    this.loadBuiltInAgents();
 
     coreEvents.on(CoreEvent.ModelChanged, () => {
       void this.refreshAgents();
@@ -98,7 +98,7 @@ export class AgentRegistry {
     }
   }
 
-  private async loadBuiltInAgents(): Promise<void> {
+  private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
     const introspectionSettings = this.config.getIntrospectionAgentSettings();
 
@@ -136,17 +136,17 @@ export class AgentRegistry {
             CodebaseInvestigatorAgent.runConfig.max_turns,
         },
       };
-      await this.registerAgent(agentDef);
+      this.registerLocalAgent(agentDef);
     }
 
     // Register the introspection agent if it's explicitly enabled.
     if (introspectionSettings.enabled) {
-      await this.registerAgent(IntrospectionAgent);
+      this.registerLocalAgent(IntrospectionAgent);
     }
   }
 
   private async refreshAgents(): Promise<void> {
-    await this.loadBuiltInAgents();
+    this.loadBuiltInAgents();
     await Promise.all(
       Array.from(this.agents.values()).map((agent) =>
         this.registerAgent(agent),
@@ -162,6 +162,23 @@ export class AgentRegistry {
   protected async registerAgent<TOutput extends z.ZodTypeAny>(
     definition: AgentDefinition<TOutput>,
   ): Promise<void> {
+    if (definition.kind === 'local') {
+      this.registerLocalAgent(definition);
+    } else if (definition.kind === 'remote') {
+      await this.registerRemoteAgent(definition);
+    }
+  }
+
+  /**
+   * Registers a local agent definition synchronously.
+   */
+  protected registerLocalAgent<TOutput extends z.ZodTypeAny>(
+    definition: AgentDefinition<TOutput>,
+  ): void {
+    if (definition.kind !== 'local') {
+      return;
+    }
+
     // Basic validation
     if (!definition.name || !definition.description) {
       debugLogger.warn(
@@ -178,60 +195,81 @@ export class AgentRegistry {
 
     // Register model config.
     // TODO(12916): Migrate sub-agents where possible to static configs.
-    if (definition.kind === 'local') {
-      const modelConfig = definition.modelConfig;
-      let model = modelConfig.model;
-      if (model === 'inherit') {
-        model = this.config.getModel();
-      }
-
-      const runtimeAlias: ModelConfigAlias = {
-        modelConfig: {
-          model,
-          generateContentConfig: {
-            temperature: modelConfig.temp,
-            topP: modelConfig.top_p,
-            thinkingConfig: {
-              includeThoughts: true,
-              thinkingBudget: modelConfig.thinkingBudget ?? -1,
-            },
-          },
-        },
-      };
-
-      this.config.modelConfigService.registerRuntimeModelConfig(
-        getModelConfigAlias(definition),
-        runtimeAlias,
-      );
+    const modelConfig = definition.modelConfig;
+    let model = modelConfig.model;
+    if (model === 'inherit') {
+      model = this.config.getModel();
     }
 
+    const runtimeAlias: ModelConfigAlias = {
+      modelConfig: {
+        model,
+        generateContentConfig: {
+          temperature: modelConfig.temp,
+          topP: modelConfig.top_p,
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingBudget: modelConfig.thinkingBudget ?? -1,
+          },
+        },
+      },
+    };
+
+    this.config.modelConfigService.registerRuntimeModelConfig(
+      getModelConfigAlias(definition),
+      runtimeAlias,
+    );
+  }
+
+  /**
+   * Registers a remote agent definition asynchronously.
+   */
+  protected async registerRemoteAgent<TOutput extends z.ZodTypeAny>(
+    definition: AgentDefinition<TOutput>,
+  ): Promise<void> {
+    if (definition.kind !== 'remote') {
+      return;
+    }
+
+    // Basic validation
+    if (!definition.name || !definition.description) {
+      debugLogger.warn(
+        `[AgentRegistry] Skipping invalid agent definition. Missing name or description.`,
+      );
+      return;
+    }
+
+    if (this.agents.has(definition.name) && this.config.getDebugMode()) {
+      debugLogger.log(`[AgentRegistry] Overriding agent '${definition.name}'`);
+    }
+
+    this.agents.set(definition.name, definition);
+
     // Log remote A2A agent registration for visibility.
-    if (definition.kind === 'remote') {
-      try {
-        const clientManager = A2AClientManager.getInstance();
-        const agentCard = await clientManager.loadAgent(
-          definition.name,
-          definition.agentCardUrl,
-        );
-        if (agentCard.skills && agentCard.skills.length > 0) {
-          definition.description = agentCard.skills
-            .map(
-              (skill: { name: string; description: string }) =>
-                `${skill.name}: ${skill.description}`,
-            )
-            .join('\n');
-        }
-        if (this.config.getDebugMode()) {
-          debugLogger.log(
-            `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,
-          );
-        }
-      } catch (e) {
-        debugLogger.warn(
-          `[AgentRegistry] Error loading A2A agent "${definition.name}":`,
-          e,
+    try {
+      const clientManager = A2AClientManager.getInstance();
+      const agentCard = await clientManager.loadAgent(
+        definition.name,
+        definition.agentCardUrl,
+      );
+      if (agentCard.skills && agentCard.skills.length > 0) {
+        definition.description = agentCard.skills
+          .map(
+            (skill: { name: string; description: string }) =>
+              `${skill.name}: ${skill.description}`,
+          )
+          .join('\n');
+      }
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,
         );
       }
+    } catch (e) {
+      debugLogger.warn(
+        `[AgentRegistry] Error loading A2A agent "${definition.name}":`,
+        e,
+      );
     }
   }
 
