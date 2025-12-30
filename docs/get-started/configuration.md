@@ -764,7 +764,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`security.environmentVariableRedaction.enabled`** (boolean):
   - **Description:** Enable redaction of environment variables that may contain
     secrets.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`security.auth.selectedType`** (string):
