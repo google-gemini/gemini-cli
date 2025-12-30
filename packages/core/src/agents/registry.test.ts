@@ -257,6 +257,40 @@ describe('AgentRegistry', () => {
       });
     });
 
+    it('should register a remote agent definition', () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputs: {} },
+      };
+      registry.testRegisterAgent(remoteAgent);
+      expect(registry.getDefinition('RemoteAgent')).toEqual(remoteAgent);
+    });
+
+    it('should log remote agent registration in debug mode', () => {
+      const debugConfig = makeFakeConfig({ debugMode: true });
+      const debugRegistry = new TestableAgentRegistry(debugConfig);
+      const debugLogSpy = vi
+        .spyOn(debugLogger, 'log')
+        .mockImplementation(() => {});
+
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputs: {} },
+      };
+
+      debugRegistry.testRegisterAgent(remoteAgent);
+
+      expect(debugLogSpy).toHaveBeenCalledWith(
+        `[AgentRegistry] Registered remote agent 'RemoteAgent' with card: https://example.com/card`,
+      );
+    });
+
     it('should handle special characters in agent names', () => {
       const specialAgent = {
         ...MOCK_AGENT_V1,
