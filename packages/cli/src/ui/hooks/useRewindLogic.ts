@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import type {
   ConversationRecord,
   MessageRecord,
@@ -33,21 +33,27 @@ export function useRewindLogic(conversation: ConversationRecord) {
     return prompts;
   }, [conversation.messages]);
 
-  const getStats = (userMessage: MessageRecord) =>
-    calculateTurnStats(conversation, userMessage);
+  const getStats = useCallback(
+    (userMessage: MessageRecord) =>
+      calculateTurnStats(conversation, userMessage),
+    [conversation],
+  );
 
-  const selectMessage = (messageId: string) => {
-    const msg = conversation.messages.find((m) => m.id === messageId);
-    if (msg) {
-      setSelectedMessageId(messageId);
-      setConfirmationStats(calculateRewindImpact(conversation, msg));
-    }
-  };
+  const selectMessage = useCallback(
+    (messageId: string) => {
+      const msg = interactions.find((m) => m.id === messageId);
+      if (msg) {
+        setSelectedMessageId(messageId);
+        setConfirmationStats(calculateRewindImpact(conversation, msg));
+      }
+    },
+    [conversation, interactions],
+  );
 
-  const clearSelection = () => {
+  const clearSelection = useCallback(() => {
     setSelectedMessageId(null);
     setConfirmationStats(null);
-  };
+  }, []);
 
   return {
     interactions,
