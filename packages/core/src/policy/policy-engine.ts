@@ -149,6 +149,7 @@ export class PolicyEngine {
     command: string | undefined,
     ruleDecision: PolicyDecision,
     serverName: string | undefined,
+    dir_path: string | undefined,
     allowRedirection?: boolean,
   ): Promise<PolicyDecision> {
     if (!command) {
@@ -160,16 +161,19 @@ export class PolicyEngine {
 
     if (subCommands.length === 0) {
       debugLogger.debug(
-        `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to safe decision.`,
+        `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to ASK_USER.`,
       );
       return this.applyNonInteractiveMode(PolicyDecision.ASK_USER);
     }
 
-    if (subCommands.length > 1) {
+    // If there are multiple parts, or if we just want to validate the single part against DENY rules
+    if (subCommands.length > 0) {
       debugLogger.debug(
-        `[PolicyEngine.check] Compound command detected: ${subCommands.length} parts`,
+        `[PolicyEngine.check] Validating shell command: ${subCommands.length} parts`,
       );
-      let aggregateDecision = PolicyDecision.ALLOW;
+
+      // Start with the decision for the full command string
+      let aggregateDecision = ruleDecision;
 
       for (const subCmd of subCommands) {
         // Prevent infinite recursion for the root command
@@ -178,24 +182,32 @@ export class PolicyEngine {
             debugLogger.debug(
               `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${subCmd}`,
             );
-            aggregateDecision = PolicyDecision.ASK_USER;
+            // Redirection always downgrades ALLOW to ASK_USER
+            if (aggregateDecision === PolicyDecision.ALLOW) {
+              aggregateDecision = PolicyDecision.ASK_USER;
+            }
           }
           continue;
         }
 
         const subResult = await this.check(
-          { name: toolName, args: { command: subCmd } },
+          { name: toolName, args: { command: subCmd, dir_path } },
           serverName,
         );
 
+        // If any part is DENIED, the whole command is DENIED
         if (subResult.decision === PolicyDecision.DENY) {
           return PolicyDecision.DENY;
         }
+
+        // If any part requires ASK_USER, the whole command requires ASK_USER (unless already DENY)
         if (subResult.decision === PolicyDecision.ASK_USER) {
-          aggregateDecision = PolicyDecision.ASK_USER;
+          if (aggregateDecision === PolicyDecision.ALLOW) {
+            aggregateDecision = PolicyDecision.ASK_USER;
+          }
         }
 
-        // Check for redirection in allowed sub-commands (unless already downgraded)
+        // Check for redirection in allowed sub-commands
         if (
           subResult.decision === PolicyDecision.ALLOW &&
           !allowRedirection &&
@@ -204,18 +216,12 @@ export class PolicyEngine {
           debugLogger.debug(
             `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${subCmd}`,
           );
-          aggregateDecision = PolicyDecision.ASK_USER;
+          if (aggregateDecision === PolicyDecision.ALLOW) {
+            aggregateDecision = PolicyDecision.ASK_USER;
+          }
         }
       }
-      return aggregateDecision;
-    }
-
-    // Base case: Single command
-    if (!allowRedirection && hasRedirection(command)) {
-      debugLogger.debug(
-        `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${command}`,
-      );
-      return this.applyNonInteractiveMode(PolicyDecision.ASK_USER);
+      return this.applyNonInteractiveMode(aggregateDecision);
     }
 
     return this.applyNonInteractiveMode(ruleDecision);
@@ -264,16 +270,14 @@ export class PolicyEngine {
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
 
-        if (
-          toolCall.name &&
-          SHELL_TOOL_NAMES.includes(toolCall.name) &&
-          rule.decision === PolicyDecision.ALLOW
-        ) {
+        if (toolCall.name && SHELL_TOOL_NAMES.includes(toolCall.name)) {
+          const args = toolCall.args as { command?: string; dir_path?: string };
           decision = await this.checkShellCommand(
             toolCall.name,
-            (toolCall.args as { command?: string })?.command,
+            args?.command,
             rule.decision,
             serverName,
+            args?.dir_path,
             rule.allowRedirection,
           );
         } else {
