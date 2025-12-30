@@ -1745,4 +1745,56 @@ describe('runNonInteractive', () => {
     );
     expect(getWrittenOutput()).toContain('Done');
   });
+
+  it('should stop agent execution immediately when a tool call returns STOP_EXECUTION error', async () => {
+    const toolCallEvent: ServerGeminiStreamEvent = {
+      type: GeminiEventType.ToolCallRequest,
+      value: {
+        callId: 'stop-call',
+        name: 'stopTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-stop',
+      },
+    };
+
+    // Mock tool execution returning STOP_EXECUTION
+    mockCoreExecuteToolCall.mockResolvedValue({
+      status: 'error',
+      request: toolCallEvent.value,
+      tool: {} as AnyDeclarativeTool,
+      invocation: {} as AnyToolInvocation,
+      response: {
+        callId: 'stop-call',
+        responseParts: [{ text: 'error occurred' }],
+        errorType: ToolErrorType.STOP_EXECUTION,
+        error: new Error('Stop reason from hook'),
+        resultDisplay: undefined,
+      },
+    });
+
+    const firstCallEvents: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'Executing tool...' },
+      toolCallEvent,
+    ];
+
+    // Setup the mock to return events for the first call.
+    // We expect the loop to terminate after the tool execution.
+    // If it doesn't, it might call sendMessageStream again, which we'll assert against.
+    mockGeminiClient.sendMessageStream
+      .mockReturnValueOnce(createStreamFromEvents(firstCallEvents))
+      .mockReturnValueOnce(createStreamFromEvents([]));
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Run stop tool',
+      prompt_id: 'prompt-id-stop',
+    });
+
+    expect(mockCoreExecuteToolCall).toHaveBeenCalled();
+
+    // The key assertion: sendMessageStream should have been called ONLY ONCE (initial user input).
+    expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+  });
 });

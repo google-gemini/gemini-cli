@@ -273,6 +273,19 @@ export async function executeToolWithHooks(
       toolInput,
     );
 
+    // Check if hook requested to stop entire agent execution
+    if (beforeOutput?.shouldStopExecution()) {
+      const reason = beforeOutput.getEffectiveReason();
+      return {
+        llmContent: `Agent execution stopped by hook: ${reason}`,
+        returnDisplay: `Agent execution stopped by hook: ${reason}`,
+        error: {
+          type: ToolErrorType.STOP_EXECUTION,
+          message: reason,
+        },
+      };
+    }
+
     // Check if hook blocked the tool execution
     const blockingError = beforeOutput?.getBlockingError();
     if (blockingError?.blocked) {
@@ -282,19 +295,6 @@ export async function executeToolWithHooks(
         error: {
           type: ToolErrorType.EXECUTION_FAILED,
           message: blockingError.reason,
-        },
-      };
-    }
-
-    // Check if hook requested to stop entire agent execution
-    if (beforeOutput?.shouldStopExecution()) {
-      const reason = beforeOutput.getEffectiveReason();
-      return {
-        llmContent: `Agent execution stopped by hook: ${reason}`,
-        returnDisplay: `Agent execution stopped by hook: ${reason}`,
-        error: {
-          type: ToolErrorType.EXECUTION_FAILED,
-          message: `Agent execution stopped: ${reason}`,
         },
       };
     }
@@ -387,8 +387,21 @@ export async function executeToolWithHooks(
         llmContent: `Agent execution stopped by hook: ${reason}`,
         returnDisplay: `Agent execution stopped by hook: ${reason}`,
         error: {
+          type: ToolErrorType.STOP_EXECUTION,
+          message: reason,
+        },
+      };
+    }
+
+    // Check if hook blocked the tool result
+    const blockingError = afterOutput?.getBlockingError();
+    if (blockingError?.blocked) {
+      return {
+        llmContent: `Tool result blocked: ${blockingError.reason}`,
+        returnDisplay: `Tool result blocked: ${blockingError.reason}`,
+        error: {
           type: ToolErrorType.EXECUTION_FAILED,
-          message: `Agent execution stopped: ${reason}`,
+          message: blockingError.reason,
         },
       };
     }
