@@ -49,6 +49,7 @@ import type {
   HistoryItemModel,
 } from '../types.js';
 import { StreamingState, MessageType, ToolCallStatus } from '../types.js';
+import { checkExhaustive } from '../../utils/checks.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
@@ -873,16 +874,8 @@ export const useGeminiStream = (
           case ServerGeminiEventType.InvalidStream:
             // Will add the missing logic later
             break;
-          default: {
-            // enforces exhaustive switch-case
-            const unreachable: never = event;
-            debugLogger.warn(`Unhandled event type: ${unreachable}`);
-            return {
-              status: StreamProcessingStatus.Error,
-              text: hookTextBuffer,
-              hasToolCalls: false,
-            };
-          }
+          default:
+            checkExhaustive(event);
         }
       }
       if (toolCallRequests.length > 0) {
