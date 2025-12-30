@@ -13,19 +13,33 @@ import {
   type HookCheckerRule,
   type HookExecutionContext,
   getHookSource,
+  ApprovalMode,
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
 import type { HookExecutionRequest } from '../confirmation-bus/types.js';
+import {
+  SHELL_TOOL_NAMES,
+  initializeShellParsers,
+  splitCommands,
+} from '../utils/shell-utils.js';
 
 function ruleMatches(
   rule: PolicyRule | SafetyCheckerRule,
   toolCall: FunctionCall,
   stringifiedArgs: string | undefined,
   serverName: string | undefined,
+  currentApprovalMode: ApprovalMode,
 ): boolean {
+  // Check if rule applies to current approval mode
+  if (rule.modes && rule.modes.length > 0) {
+    if (!rule.modes.includes(currentApprovalMode)) {
+      return false;
+    }
+  }
+
   // Check tool name if specified
   if (rule.toolName) {
     // Support wildcard patterns: "serverName__*" matches "serverName__anyTool"
@@ -93,6 +107,7 @@ export class PolicyEngine {
   private readonly nonInteractive: boolean;
   private readonly checkerRunner?: CheckerRunner;
   private readonly allowHooks: boolean;
+  private approvalMode: ApprovalMode;
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
     this.rules = (config.rules ?? []).sort(
@@ -108,6 +123,21 @@ export class PolicyEngine {
     this.nonInteractive = config.nonInteractive ?? false;
     this.checkerRunner = checkerRunner;
     this.allowHooks = config.allowHooks ?? true;
+    this.approvalMode = config.approvalMode ?? ApprovalMode.DEFAULT;
+  }
+
+  /**
+   * Update the current approval mode.
+   */
+  setApprovalMode(mode: ApprovalMode): void {
+    this.approvalMode = mode;
+  }
+
+  /**
+   * Get the current approval mode.
+   */
+  getApprovalMode(): ApprovalMode {
+    return this.approvalMode;
   }
 
   /**
@@ -140,12 +170,79 @@ export class PolicyEngine {
     let decision: PolicyDecision | undefined;
 
     for (const rule of this.rules) {
-      if (ruleMatches(rule, toolCall, stringifiedArgs, serverName)) {
+      if (
+        ruleMatches(
+          rule,
+          toolCall,
+          stringifiedArgs,
+          serverName,
+          this.approvalMode,
+        )
+      ) {
         debugLogger.debug(
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
+
+        // Special handling for shell commands: check sub-commands if present
+        if (
+          toolCall.name &&
+          SHELL_TOOL_NAMES.includes(toolCall.name) &&
+          rule.decision === PolicyDecision.ALLOW
+        ) {
+          const command = (toolCall.args as { command?: string })?.command;
+          if (command) {
+            await initializeShellParsers();
+            const subCommands = splitCommands(command);
+
+            // If there are multiple sub-commands, we must verify EACH of them matches an ALLOW rule.
+            // If any sub-command results in DENY -> the whole thing is DENY.
+            // If any sub-command results in ASK_USER -> the whole thing is ASK_USER (unless one is DENY).
+            // Only if ALL sub-commands are ALLOW do we proceed with ALLOW.
+            if (subCommands.length === 0) {
+              // This case occurs if the command is non-empty but parsing fails.
+              // An ALLOW rule for a prefix might have matched, but since the rest of
+              // the command is un-parseable, it's unsafe to proceed.
+              // Fall back to a safe decision.
+              debugLogger.debug(
+                `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to safe decision because implicit ALLOW is unsafe.`,
+              );
+              decision = this.applyNonInteractiveMode(PolicyDecision.ASK_USER);
+            } else if (subCommands.length > 1) {
+              debugLogger.debug(
+                `[PolicyEngine.check] Compound command detected: ${subCommands.length} parts`,
+              );
+              let aggregateDecision = PolicyDecision.ALLOW;
+
+              for (const subCmd of subCommands) {
+                // Recursively check each sub-command
+                const subCall = {
+                  name: toolCall.name,
+                  args: { command: subCmd },
+                };
+                const subResult = await this.check(subCall, serverName);
+
+                if (subResult.decision === PolicyDecision.DENY) {
+                  aggregateDecision = PolicyDecision.DENY;
+                  break; // Fail fast
+                } else if (subResult.decision === PolicyDecision.ASK_USER) {
+                  aggregateDecision = PolicyDecision.ASK_USER;
+                  // efficient: we can only strictly downgrade from ALLOW to ASK_USER,
+                  // but we must continue looking for DENY.
+                }
+              }
+
+              decision = aggregateDecision;
+            } else {
+              // Single command, rule match is valid
+              decision = this.applyNonInteractiveMode(rule.decision);
+            }
+          } else {
+            decision = this.applyNonInteractiveMode(rule.decision);
+          }
+        } else {
+          decision = this.applyNonInteractiveMode(rule.decision);
+        }
         matchedRule = rule;
-        decision = this.applyNonInteractiveMode(rule.decision);
         break;
       }
     }
@@ -161,7 +258,15 @@ export class PolicyEngine {
     // If decision is not DENY, run safety checkers
     if (decision !== PolicyDecision.DENY && this.checkerRunner) {
       for (const checkerRule of this.checkers) {
-        if (ruleMatches(checkerRule, toolCall, stringifiedArgs, serverName)) {
+        if (
+          ruleMatches(
+            checkerRule,
+            toolCall,
+            stringifiedArgs,
+            serverName,
+            this.approvalMode,
+          )
+        ) {
           debugLogger.debug(
             `[PolicyEngine.check] Running safety checker: ${checkerRule.checker.name}`,
           );

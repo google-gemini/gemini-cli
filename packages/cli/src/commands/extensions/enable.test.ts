@@ -14,7 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import { format } from 'node:util';
-import { type CommandModule, type Argv } from 'yargs';
+import { type Argv } from 'yargs';
 import { handleEnable, enableCommand } from './enable.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import {
@@ -137,7 +137,7 @@ describe('extensions enable command', () => {
   });
 
   describe('enableCommand', () => {
-    const command = enableCommand as CommandModule;
+    const command = enableCommand;
 
     it('should have correct command and describe', () => {
       expect(command.command).toBe('enable [--scope] <name>');
@@ -205,7 +205,9 @@ describe('extensions enable command', () => {
         _: [],
         $0: '',
       };
-      await (command.handler as unknown as (args: TestArgv) => void)(argv);
+      await (command.handler as unknown as (args: TestArgv) => Promise<void>)(
+        argv,
+      );
 
       expect(
         mockExtensionManager.prototype.enableExtension,

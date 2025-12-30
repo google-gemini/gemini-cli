@@ -11,6 +11,7 @@ import type {
 } from '@a2a-js/sdk';
 import {
   ApprovalMode,
+  DEFAULT_GEMINI_MODEL,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   GeminiClient,
@@ -32,6 +33,7 @@ export function createMockConfig(
     }),
     getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     getIdeMode: vi.fn().mockReturnValue(false),
+    isInteractive: () => true,
     getAllowedTools: vi.fn().mockReturnValue([]),
     getWorkspaceContext: vi.fn().mockReturnValue({
       isPathWithinWorkspace: () => true,
@@ -45,6 +47,7 @@ export function createMockConfig(
     getTruncateToolOutputThreshold: () =>
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
     getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+    getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
     getDebugMode: vi.fn().mockReturnValue(false),
     getContentGeneratorConfig: vi.fn().mockReturnValue({ model: 'gemini-pro' }),
     getModel: vi.fn().mockReturnValue('gemini-pro'),
@@ -56,7 +59,6 @@ export function createMockConfig(
     getEmbeddingModel: vi.fn().mockReturnValue('text-embedding-004'),
     getSessionId: vi.fn().mockReturnValue('test-session-id'),
     getUserTier: vi.fn(),
-    getEnableMessageBusIntegration: vi.fn().mockReturnValue(false),
     getMessageBus: vi.fn(),
     getPolicyEngine: vi.fn(),
     getEnableExtensionReloading: vi.fn().mockReturnValue(false),

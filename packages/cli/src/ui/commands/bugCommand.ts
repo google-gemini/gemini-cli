@@ -14,8 +14,8 @@ import {
 import { MessageType } from '../types.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
-import { getCliVersion } from '../../utils/version.js';
-import { IdeClient, sessionId } from '@google/gemini-cli-core';
+import { IdeClient, sessionId, getVersion } from '@google/gemini-cli-core';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 export const bugCommand: SlashCommand = {
   name: 'bug',
@@ -36,9 +36,16 @@ export const bugCommand: SlashCommand = {
       })`;
     }
     const modelVersion = config?.getModel() || 'Unknown';
-    const cliVersion = await getCliVersion();
+    const cliVersion = await getVersion();
     const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
     const ideClient = await getIdeClientName(context);
+    const terminalName =
+      terminalCapabilityManager.getTerminalName() || 'Unknown';
+    const terminalBgColor =
+      terminalCapabilityManager.getTerminalBackgroundColor() || 'Unknown';
+    const kittyProtocol = terminalCapabilityManager.isKittyProtocolEnabled()
+      ? 'Supported'
+      : 'Unsupported';
 
     let info = `
 * **CLI Version:** ${cliVersion}
@@ -48,6 +55,9 @@ export const bugCommand: SlashCommand = {
 * **Sandbox Environment:** ${sandboxEnv}
 * **Model Version:** ${modelVersion}
 * **Memory Usage:** ${memoryUsage}
+* **Terminal Name:** ${terminalName}
+* **Terminal Background:** ${terminalBgColor}
+* **Kitty Keyboard Protocol:** ${kittyProtocol}
 `;
     if (ideClient) {
       info += `* **IDE Client:** ${ideClient}\n`;

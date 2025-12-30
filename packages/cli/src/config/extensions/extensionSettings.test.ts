@@ -397,6 +397,48 @@ describe('extensionSettings', () => {
       const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
       expect(actualContent).toBe('VAR1="a value with spaces"\n');
     });
+
+    it('should not attempt to clear secrets if keychain is unavailable', async () => {
+      // Arrange
+      const mockIsAvailable = vi.fn().mockResolvedValue(false);
+      const mockListSecrets = vi.fn();
+
+      vi.mocked(KeychainTokenStorage).mockImplementation(
+        () =>
+          ({
+            isAvailable: mockIsAvailable,
+            listSecrets: mockListSecrets,
+            deleteSecret: vi.fn(),
+            getSecret: vi.fn(),
+            setSecret: vi.fn(),
+          }) as unknown as KeychainTokenStorage,
+      );
+
+      const config: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [], // Empty settings triggers clearSettings
+      };
+
+      const previousConfig: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [{ name: 's1', description: 'd1', envVar: 'VAR1' }],
+      };
+
+      // Act
+      await maybePromptForSettings(
+        config,
+        '12345',
+        mockRequestSetting,
+        previousConfig,
+        undefined,
+      );
+
+      // Assert
+      expect(mockIsAvailable).toHaveBeenCalled();
+      expect(mockListSecrets).not.toHaveBeenCalled();
+    });
   });
 
   describe('promptForSetting', () => {

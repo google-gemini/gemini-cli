@@ -164,8 +164,11 @@ export default tseslint.config(
       'prefer-arrow-callback': 'error',
       'prefer-const': ['error', { destructuring: 'all' }],
       radix: 'error',
+      'no-console': 'error',
       'default-case': 'error',
+      '@typescript-eslint/await-thenable': ['error'],
       '@typescript-eslint/no-floating-promises': ['error'],
+      '@typescript-eslint/no-unnecessary-type-assertion': ['error'],
     },
   },
   {

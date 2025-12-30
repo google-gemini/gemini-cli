@@ -21,8 +21,7 @@ import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
-
-export const DISCOVERED_TOOL_PREFIX = 'discovered_tool_';
+import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -417,7 +416,7 @@ export class ToolRegistry {
         );
       }
     } catch (e) {
-      console.error(`Tool discovery command "${discoveryCmd}" failed:`, e);
+      debugLogger.error(`Tool discovery command "${discoveryCmd}" failed:`, e);
       throw e;
     }
   }

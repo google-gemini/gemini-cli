@@ -10,7 +10,7 @@ import type { GeminiClient } from '../core/client.js';
 import { getErrorMessage } from './errors.js';
 import { z } from 'zod';
 import type { Content } from '@google/genai';
-import type { ToolCallRequestInfo } from '../core/turn.js';
+import type { ToolCallRequestInfo } from '../scheduler/types.js';
 
 export interface ToolCallData<HistoryType = unknown, ArgsType = unknown> {
   history?: HistoryType;
@@ -48,7 +48,7 @@ export function getToolCallDataSchema(historyItemSchema?: z.ZodTypeAny) {
 export function generateCheckpointFileName(
   toolCall: ToolCallRequestInfo,
 ): string | null {
-  const toolArgs = toolCall.args as Record<string, unknown>;
+  const toolArgs = toolCall.args;
   const toolFilePath = toolArgs['file_path'] as string;
 
   if (!toolFilePath) {
@@ -125,7 +125,7 @@ export async function processRestorableToolCalls<HistoryType>(
         continue;
       }
 
-      const clientHistory = await geminiClient.getHistory();
+      const clientHistory = geminiClient.getHistory();
       const checkpointData: ToolCallData<HistoryType> = {
         history,
         clientHistory,

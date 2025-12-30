@@ -4,46 +4,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
-  ToolCallConfirmationDetails,
-  ToolResult,
-  ToolResultDisplay,
-  EditorType,
-  Config,
-  ToolConfirmationPayload,
-  AnyDeclarativeTool,
-  AnyToolInvocation,
-  AnsiOutput,
-} from '../index.js';
 import {
+  type ToolResult,
+  type ToolResultDisplay,
+  type AnyDeclarativeTool,
+  type AnyToolInvocation,
+  type ToolCallConfirmationDetails,
+  type ToolConfirmationPayload,
   ToolConfirmationOutcome,
-  ApprovalMode,
-  logToolCall,
-  ToolErrorType,
-  ToolCallEvent,
-  logToolOutputTruncated,
-  ToolOutputTruncatedEvent,
-  runInDevTraceSpan,
-} from '../index.js';
-import { READ_FILE_TOOL_NAME, SHELL_TOOL_NAME } from '../tools/tool-names.js';
-import type { Part, PartListUnion } from '@google/genai';
-import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
+} from '../tools/tools.js';
+import type { EditorType } from '../utils/editor.js';
+import type { Config } from '../config/config.js';
+import type { AnsiOutput } from '../utils/terminalSerializer.js';
+import { ApprovalMode } from '../policy/types.js';
+import { logToolCall, logToolOutputTruncated } from '../telemetry/loggers.js';
+import { ToolErrorType } from '../tools/tool-error.js';
+import { ToolCallEvent, ToolOutputTruncatedEvent } from '../telemetry/types.js';
+import { runInDevTraceSpan } from '../telemetry/trace.js';
+import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import type { ModifyContext } from '../tools/modifiable-tool.js';
 import {
   isModifiableDeclarativeTool,
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
 import * as Diff from 'diff';
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
+import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
 import {
-  isShellInvocationAllowlisted,
-  SHELL_TOOL_NAMES,
-} from '../utils/shell-utils.js';
-import { doesToolInvocationMatch } from '../utils/tool-utils.js';
-import levenshtein from 'fast-levenshtein';
+  doesToolInvocationMatch,
+  getToolSuggestion,
+} from '../utils/tool-utils.js';
+import { isShellInvocationAllowlisted } from '../utils/shell-permissions.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
@@ -52,195 +42,45 @@ import {
   fireToolNotificationHook,
   executeToolWithHooks,
 } from './coreToolHookTriggers.js';
+import {
+  type ToolCall,
+  type ValidatingToolCall,
+  type ScheduledToolCall,
+  type ErroredToolCall,
+  type SuccessfulToolCall,
+  type ExecutingToolCall,
+  type CancelledToolCall,
+  type WaitingToolCall,
+  type Status,
+  type CompletedToolCall,
+  type ConfirmHandler,
+  type OutputUpdateHandler,
+  type AllToolCallsCompleteHandler,
+  type ToolCallsUpdateHandler,
+  type ToolCallRequestInfo,
+  type ToolCallResponseInfo,
+} from '../scheduler/types.js';
+import { saveTruncatedContent } from '../utils/fileUtils.js';
+import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
 
-export type ValidatingToolCall = {
-  status: 'validating';
-  request: ToolCallRequestInfo;
-  tool: AnyDeclarativeTool;
-  invocation: AnyToolInvocation;
-  startTime?: number;
-  outcome?: ToolConfirmationOutcome;
+export type {
+  ToolCall,
+  ValidatingToolCall,
+  ScheduledToolCall,
+  ErroredToolCall,
+  SuccessfulToolCall,
+  ExecutingToolCall,
+  CancelledToolCall,
+  WaitingToolCall,
+  Status,
+  CompletedToolCall,
+  ConfirmHandler,
+  OutputUpdateHandler,
+  AllToolCallsCompleteHandler,
+  ToolCallsUpdateHandler,
+  ToolCallRequestInfo,
+  ToolCallResponseInfo,
 };
-
-export type ScheduledToolCall = {
-  status: 'scheduled';
-  request: ToolCallRequestInfo;
-  tool: AnyDeclarativeTool;
-  invocation: AnyToolInvocation;
-  startTime?: number;
-  outcome?: ToolConfirmationOutcome;
-};
-
-export type ErroredToolCall = {
-  status: 'error';
-  request: ToolCallRequestInfo;
-  response: ToolCallResponseInfo;
-  tool?: AnyDeclarativeTool;
-  durationMs?: number;
-  outcome?: ToolConfirmationOutcome;
-};
-
-export type SuccessfulToolCall = {
-  status: 'success';
-  request: ToolCallRequestInfo;
-  tool: AnyDeclarativeTool;
-  response: ToolCallResponseInfo;
-  invocation: AnyToolInvocation;
-  durationMs?: number;
-  outcome?: ToolConfirmationOutcome;
-};
-
-export type ExecutingToolCall = {
-  status: 'executing';
-  request: ToolCallRequestInfo;
-  tool: AnyDeclarativeTool;
-  invocation: AnyToolInvocation;
-  liveOutput?: string | AnsiOutput;
-  startTime?: number;
-  outcome?: ToolConfirmationOutcome;
-  pid?: number;
-};
-
-export type CancelledToolCall = {
-  status: 'cancelled';
-  request: ToolCallRequestInfo;
-  response: ToolCallResponseInfo;
-  tool: AnyDeclarativeTool;
-  invocation: AnyToolInvocation;
-  durationMs?: number;
-  outcome?: ToolConfirmationOutcome;
-};
-
-export type WaitingToolCall = {
-  status: 'awaiting_approval';
-  request: ToolCallRequestInfo;
-  tool: AnyDeclarativeTool;
-  invocation: AnyToolInvocation;
-  confirmationDetails: ToolCallConfirmationDetails;
-  startTime?: number;
-  outcome?: ToolConfirmationOutcome;
-};
-
-export type Status = ToolCall['status'];
-
-export type ToolCall =
-  | ValidatingToolCall
-  | ScheduledToolCall
-  | ErroredToolCall
-  | SuccessfulToolCall
-  | ExecutingToolCall
-  | CancelledToolCall
-  | WaitingToolCall;
-
-export type CompletedToolCall =
-  | SuccessfulToolCall
-  | CancelledToolCall
-  | ErroredToolCall;
-
-export type ConfirmHandler = (
-  toolCall: WaitingToolCall,
-) => Promise<ToolConfirmationOutcome>;
-
-export type OutputUpdateHandler = (
-  toolCallId: string,
-  outputChunk: string | AnsiOutput,
-) => void;
-
-export type AllToolCallsCompleteHandler = (
-  completedToolCalls: CompletedToolCall[],
-) => Promise<void>;
-
-export type ToolCallsUpdateHandler = (toolCalls: ToolCall[]) => void;
-
-/**
- * Formats tool output for a Gemini FunctionResponse.
- */
-function createFunctionResponsePart(
-  callId: string,
-  toolName: string,
-  output: string,
-): Part {
-  return {
-    functionResponse: {
-      id: callId,
-      name: toolName,
-      response: { output },
-    },
-  };
-}
-
-export function convertToFunctionResponse(
-  toolName: string,
-  callId: string,
-  llmContent: PartListUnion,
-): Part[] {
-  const contentToProcess =
-    Array.isArray(llmContent) && llmContent.length === 1
-      ? llmContent[0]
-      : llmContent;
-
-  if (typeof contentToProcess === 'string') {
-    return [createFunctionResponsePart(callId, toolName, contentToProcess)];
-  }
-
-  if (Array.isArray(contentToProcess)) {
-    const functionResponse = createFunctionResponsePart(
-      callId,
-      toolName,
-      'Tool execution succeeded.',
-    );
-    return [functionResponse, ...toParts(contentToProcess)];
-  }
-
-  // After this point, contentToProcess is a single Part object.
-  if (contentToProcess.functionResponse) {
-    if (contentToProcess.functionResponse.response?.['content']) {
-      const stringifiedOutput =
-        getResponseTextFromParts(
-          contentToProcess.functionResponse.response['content'] as Part[],
-        ) || '';
-      return [createFunctionResponsePart(callId, toolName, stringifiedOutput)];
-    }
-    // It's a functionResponse that we should pass through as is.
-    return [contentToProcess];
-  }
-
-  if (contentToProcess.inlineData || contentToProcess.fileData) {
-    const mimeType =
-      contentToProcess.inlineData?.mimeType ||
-      contentToProcess.fileData?.mimeType ||
-      'unknown';
-    const functionResponse = createFunctionResponsePart(
-      callId,
-      toolName,
-      `Binary content of type ${mimeType} was processed.`,
-    );
-    return [functionResponse, contentToProcess];
-  }
-
-  if (contentToProcess.text !== undefined) {
-    return [
-      createFunctionResponsePart(callId, toolName, contentToProcess.text),
-    ];
-  }
-
-  // Default case for other kinds of parts.
-  return [
-    createFunctionResponsePart(callId, toolName, 'Tool execution succeeded.'),
-  ];
-}
-
-function toParts(input: PartListUnion): Part[] {
-  const parts: Part[] = [];
-  for (const part of Array.isArray(input) ? input : [input]) {
-    if (typeof part === 'string') {
-      parts.push({ text: part });
-    } else if (part) {
-      parts.push(part);
-    }
-  }
-  return parts;
-}
 
 const createErrorResponse = (
   request: ToolCallRequestInfo,
@@ -262,70 +102,6 @@ const createErrorResponse = (
   errorType,
   contentLength: error.message.length,
 });
-
-export async function truncateAndSaveToFile(
-  content: string,
-  callId: string,
-  projectTempDir: string,
-  threshold: number,
-  truncateLines: number,
-): Promise<{ content: string; outputFile?: string }> {
-  if (content.length <= threshold) {
-    return { content };
-  }
-
-  let lines = content.split('\n');
-  let fileContent = content;
-
-  // If the content is long but has few lines, wrap it to enable line-based truncation.
-  if (lines.length <= truncateLines) {
-    const wrapWidth = 120; // A reasonable width for wrapping.
-    const wrappedLines: string[] = [];
-    for (const line of lines) {
-      if (line.length > wrapWidth) {
-        for (let i = 0; i < line.length; i += wrapWidth) {
-          wrappedLines.push(line.substring(i, i + wrapWidth));
-        }
-      } else {
-        wrappedLines.push(line);
-      }
-    }
-    lines = wrappedLines;
-    fileContent = lines.join('\n');
-  }
-
-  const head = Math.floor(truncateLines / 5);
-  const beginning = lines.slice(0, head);
-  const end = lines.slice(-(truncateLines - head));
-  const truncatedContent =
-    beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
-
-  // Sanitize callId to prevent path traversal.
-  const safeFileName = `${path.basename(callId)}.output`;
-  const outputFile = path.join(projectTempDir, safeFileName);
-  try {
-    await fs.writeFile(outputFile, fileContent);
-
-    return {
-      content: `Tool output was too large and has been truncated.
-The full output has been saved to: ${outputFile}
-To read the complete output, use the ${READ_FILE_TOOL_NAME} tool with the absolute file path above. For large files, you can use the offset and limit parameters to read specific sections:
-- ${READ_FILE_TOOL_NAME} tool with offset=0, limit=100 to see the first 100 lines
-- ${READ_FILE_TOOL_NAME} tool with offset=N to skip N lines from the beginning
-- ${READ_FILE_TOOL_NAME} tool with limit=M to read only M lines at a time
-The truncated output below shows the beginning and end of the content. The marker '... [CONTENT TRUNCATED] ...' indicates where content was removed.
-This allows you to efficiently examine different parts of the output without loading the entire file.
-Truncated part of the output:
-${truncatedContent}`,
-      outputFile,
-    };
-  } catch (_error) {
-    return {
-      content:
-        truncatedContent + `\n[Note: Could not save full output to file]`,
-    };
-  }
-}
 
 interface CoreToolSchedulerOptions {
   config: Config;
@@ -372,32 +148,30 @@ export class CoreToolScheduler {
     // Use a static WeakMap to ensure we only subscribe ONCE per MessageBus instance
     // This prevents memory leaks when multiple CoreToolScheduler instances are created
     // (e.g., on every React render, or for each non-interactive tool call)
-    if (this.config.getEnableMessageBusIntegration()) {
-      const messageBus = this.config.getMessageBus();
+    const messageBus = this.config.getMessageBus();
 
-      // Check if we've already subscribed a handler to this message bus
-      if (!CoreToolScheduler.subscribedMessageBuses.has(messageBus)) {
-        // Create a shared handler that will be used for this message bus
-        const sharedHandler = (request: ToolConfirmationRequest) => {
-          // When ASK_USER policy decision is made, respond with requiresUserConfirmation=true
-          // to tell tools to use their legacy confirmation flow
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          messageBus.publish({
-            type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-            correlationId: request.correlationId,
-            confirmed: false,
-            requiresUserConfirmation: true,
-          });
-        };
+    // Check if we've already subscribed a handler to this message bus
+    if (!CoreToolScheduler.subscribedMessageBuses.has(messageBus)) {
+      // Create a shared handler that will be used for this message bus
+      const sharedHandler = (request: ToolConfirmationRequest) => {
+        // When ASK_USER policy decision is made, respond with requiresUserConfirmation=true
+        // to tell tools to use their legacy confirmation flow
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        messageBus.publish({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: request.correlationId,
+          confirmed: false,
+          requiresUserConfirmation: true,
+        });
+      };
 
-        messageBus.subscribe(
-          MessageBusType.TOOL_CONFIRMATION_REQUEST,
-          sharedHandler,
-        );
+      messageBus.subscribe(
+        MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        sharedHandler,
+      );
 
-        // Store the handler in the WeakMap so we don't subscribe again
-        CoreToolScheduler.subscribedMessageBuses.set(messageBus, sharedHandler);
-      }
+      // Store the handler in the WeakMap so we don't subscribe again
+      CoreToolScheduler.subscribedMessageBuses.set(messageBus, sharedHandler);
     }
   }
 
@@ -508,7 +282,7 @@ export class CoreToolScheduler {
           // Preserve diff for cancelled edit operations
           let resultDisplay: ToolResultDisplay | undefined = undefined;
           if (currentCall.status === 'awaiting_approval') {
-            const waitingCall = currentCall as WaitingToolCall;
+            const waitingCall = currentCall;
             if (waitingCall.confirmationDetails.type === 'edit') {
               resultDisplay = {
                 fileDiff: waitingCall.confirmationDetails.fileDiff,
@@ -633,40 +407,6 @@ export class CoreToolScheduler {
     }
   }
 
-  /**
-   * Generates a suggestion string for a tool name that was not found in the registry.
-   * It finds the closest matches based on Levenshtein distance.
-   * @param unknownToolName The tool name that was not found.
-   * @param topN The number of suggestions to return. Defaults to 3.
-   * @returns A suggestion string like " Did you mean 'tool'?" or " Did you mean one of: 'tool1', 'tool2'?", or an empty string if no suggestions are found.
-   */
-  private getToolSuggestion(unknownToolName: string, topN = 3): string {
-    const allToolNames = this.config.getToolRegistry().getAllToolNames();
-
-    const matches = allToolNames.map((toolName) => ({
-      name: toolName,
-      distance: levenshtein.get(unknownToolName, toolName),
-    }));
-
-    matches.sort((a, b) => a.distance - b.distance);
-
-    const topNResults = matches.slice(0, topN);
-
-    if (topNResults.length === 0) {
-      return '';
-    }
-
-    const suggestedNames = topNResults
-      .map((match) => `"${match.name}"`)
-      .join(', ');
-
-    if (topNResults.length > 1) {
-      return ` Did you mean one of: ${suggestedNames}?`;
-    } else {
-      return ` Did you mean ${suggestedNames}?`;
-    }
-  }
-
   schedule(
     request: ToolCallRequestInfo | ToolCallRequestInfo[],
     signal: AbortSignal,
@@ -761,7 +501,10 @@ export class CoreToolScheduler {
             .getToolRegistry()
             .getTool(reqInfo.name);
           if (!toolInstance) {
-            const suggestion = this.getToolSuggestion(reqInfo.name);
+            const suggestion = getToolSuggestion(
+              reqInfo.name,
+              this.config.getToolRegistry().getAllToolNames(),
+            );
             const errorMessage = `Tool "${reqInfo.name}" not found in registry. Tools must use the exact names that are registered.${suggestion}`;
             return {
               status: 'error',
@@ -872,6 +615,13 @@ export class CoreToolScheduler {
             );
             this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
           } else {
+            if (!this.config.isInteractive()) {
+              throw new Error(
+                `Tool execution for "${
+                  toolCall.tool.displayName || toolCall.tool.name
+                }" requires user confirmation, which is not supported in non-interactive mode.`,
+              );
+            }
             // Fire Notification hook before showing confirmation to user
             const messageBus = this.config.getMessageBus();
             const hooksEnabled = this.config.getEnableHooks();
@@ -1150,6 +900,7 @@ export class CoreToolScheduler {
                 signal,
                 messageBus,
                 hooksEnabled,
+                toolCall.tool,
                 liveOutputCallback,
                 shellExecutionConfig,
                 setPidCallback,
@@ -1161,6 +912,7 @@ export class CoreToolScheduler {
                 signal,
                 messageBus,
                 hooksEnabled,
+                toolCall.tool,
                 liveOutputCallback,
                 shellExecutionConfig,
               );
@@ -1192,7 +944,7 @@ export class CoreToolScheduler {
                   const threshold =
                     this.config.getTruncateToolOutputThreshold();
                   const lines = this.config.getTruncateToolOutputLines();
-                  const truncatedResult = await truncateAndSaveToFile(
+                  const truncatedResult = await saveTruncatedContent(
                     content,
                     callId,
                     this.config.storage.getProjectTempDir(),
@@ -1223,6 +975,7 @@ export class CoreToolScheduler {
                   toolName,
                   callId,
                   content,
+                  this.config.getActiveModel(),
                 );
                 const successResponse: ToolCallResponseInfo = {
                   callId,

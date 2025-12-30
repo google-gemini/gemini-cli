@@ -23,6 +23,7 @@ import { InstallationManager } from '../utils/installationManager.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
+import { getVersion, resolveModel } from '../../index.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -65,7 +66,7 @@ export async function createContentGeneratorConfig(
   authType: AuthType | undefined,
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey =
-    (await loadApiKey()) || process.env['GEMINI_API_KEY'] || undefined;
+    process.env['GEMINI_API_KEY'] || (await loadApiKey()) || undefined;
   const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
   const googleCloudProject =
     process.env['GOOGLE_CLOUD_PROJECT'] ||
@@ -115,10 +116,14 @@ export async function createContentGenerator(
     if (gcConfig.fakeResponses) {
       return FakeContentGenerator.fromFile(gcConfig.fakeResponses);
     }
-    const version = process.env['CLI_VERSION'] || process.version;
+    const version = await getVersion();
+    const model = resolveModel(
+      gcConfig.getModel(),
+      gcConfig.getPreviewFeatures(),
+    );
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
-    const userAgent = `GeminiCLI/${version} (${process.platform}; ${process.arch})`;
+    const userAgent = `GeminiCLI/${version}/${model} (${process.platform}; ${process.arch})`;
     const customHeadersMap = parseCustomHeaders(customHeadersEnv);
     const apiKeyAuthMechanism =
       process.env['GEMINI_API_KEY_AUTH_MECHANISM'] || 'x-goog-api-key';

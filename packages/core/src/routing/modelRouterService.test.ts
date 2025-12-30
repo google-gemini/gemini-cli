@@ -7,10 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ModelRouterService } from './modelRouterService.js';
 import { Config } from '../config/config.js';
-import {
-  PREVIEW_GEMINI_MODEL,
-  DEFAULT_GEMINI_MODEL,
-} from '../config/models.js';
+
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { RoutingContext, RoutingDecision } from './routingStrategy.js';
 import { DefaultStrategy } from './strategies/defaultStrategy.js';
@@ -150,82 +147,6 @@ describe('ModelRouterService', () => {
         mockConfig,
         expect.any(ModelRoutingEvent),
       );
-    });
-
-    it('should upgrade to Preview Model when preview features are enabled and model is 2.5 Pro', async () => {
-      vi.spyOn(mockCompositeStrategy, 'route').mockResolvedValue({
-        model: DEFAULT_GEMINI_MODEL,
-        metadata: { source: 'test', latencyMs: 0, reasoning: 'test' },
-      });
-      vi.spyOn(mockConfig, 'getPreviewFeatures').mockReturnValue(true);
-      vi.spyOn(mockConfig, 'isPreviewModelFallbackMode').mockReturnValue(false);
-
-      const decision = await service.route(mockContext);
-
-      expect(decision.model).toBe(PREVIEW_GEMINI_MODEL);
-    });
-
-    it('should NOT upgrade to Preview Model when preview features are disabled', async () => {
-      vi.spyOn(mockCompositeStrategy, 'route').mockResolvedValue({
-        model: DEFAULT_GEMINI_MODEL,
-        metadata: { source: 'test', latencyMs: 0, reasoning: 'test' },
-      });
-      vi.spyOn(mockConfig, 'getPreviewFeatures').mockReturnValue(false);
-
-      const decision = await service.route(mockContext);
-
-      expect(decision.model).toBe(DEFAULT_GEMINI_MODEL);
-    });
-
-    it('should upgrade to Preview Model when preview features are enabled and model is explicitly set to Pro', async () => {
-      // Simulate OverrideStrategy returning Preview Model (as resolveModel would do for "pro")
-      vi.spyOn(mockCompositeStrategy, 'route').mockResolvedValue({
-        model: PREVIEW_GEMINI_MODEL,
-        metadata: {
-          source: 'override',
-          latencyMs: 0,
-          reasoning: 'User selected',
-        },
-      });
-      vi.spyOn(mockConfig, 'getPreviewFeatures').mockReturnValue(true);
-      vi.spyOn(mockConfig, 'isPreviewModelFallbackMode').mockReturnValue(false);
-
-      const decision = await service.route(mockContext);
-
-      expect(decision.model).toBe(PREVIEW_GEMINI_MODEL);
-    });
-
-    it('should NOT upgrade to Preview Model when preview features are enabled and model is explicitly set to a specific string', async () => {
-      // Simulate OverrideStrategy returning a specific model (e.g. "gemini-2.5-pro")
-      // This happens when user explicitly sets model to "gemini-2.5-pro" instead of "pro"
-      vi.spyOn(mockCompositeStrategy, 'route').mockResolvedValue({
-        model: DEFAULT_GEMINI_MODEL,
-        metadata: {
-          source: 'override',
-          latencyMs: 0,
-          reasoning: 'User selected',
-        },
-      });
-      vi.spyOn(mockConfig, 'getPreviewFeatures').mockReturnValue(true);
-      vi.spyOn(mockConfig, 'isPreviewModelFallbackMode').mockReturnValue(false);
-
-      const decision = await service.route(mockContext);
-
-      // Should NOT upgrade to Preview Model because source is 'override' and model is specific
-      expect(decision.model).toBe(DEFAULT_GEMINI_MODEL);
-    });
-
-    it('should upgrade to Preview Model even if fallback mode is active (probing behavior)', async () => {
-      vi.spyOn(mockCompositeStrategy, 'route').mockResolvedValue({
-        model: DEFAULT_GEMINI_MODEL,
-        metadata: { source: 'default', latencyMs: 0, reasoning: 'Default' },
-      });
-      vi.spyOn(mockConfig, 'getPreviewFeatures').mockReturnValue(true);
-      vi.spyOn(mockConfig, 'isPreviewModelFallbackMode').mockReturnValue(true);
-
-      const decision = await service.route(mockContext);
-
-      expect(decision.model).toBe(PREVIEW_GEMINI_MODEL);
     });
   });
 });
