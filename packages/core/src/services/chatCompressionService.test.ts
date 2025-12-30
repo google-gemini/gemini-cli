@@ -138,15 +138,26 @@ describe('ChatCompressionService', () => {
       getLastPromptTokenCount: vi.fn().mockReturnValue(500),
     } as unknown as GeminiChat;
 
-    const mockGenerateContent = vi.fn().mockResolvedValue({
-      candidates: [
-        {
-          content: {
-            parts: [{ text: 'Summary' }],
+    const mockGenerateContent = vi
+      .fn()
+      .mockResolvedValueOnce({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'Initial Summary' }],
+            },
           },
-        },
-      ],
-    } as unknown as GenerateContentResponse);
+        ],
+      } as unknown as GenerateContentResponse)
+      .mockResolvedValueOnce({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'Verified Summary' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
 
     mockConfig = {
       getCompressionThreshold: vi.fn(),
@@ -159,6 +170,7 @@ describe('ChatCompressionService', () => {
       }),
       getEnableHooks: vi.fn().mockReturnValue(false),
       getMessageBus: vi.fn().mockReturnValue(undefined),
+      getBaseLlmClientKey: vi.fn().mockReturnValue('mock-client'),
     } as unknown as Config;
 
     vi.mocked(tokenLimit).mockReturnValue(1000);
@@ -207,7 +219,11 @@ describe('ChatCompressionService', () => {
     ]);
     vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600);
     vi.mocked(tokenLimit).mockReturnValue(1000);
-    // Threshold is 0.7 * 1000 = 700. 600 < 700, so NOOP.
+    // Threshold is 0.5 * 1000 = 500. 600 > 500, so it SHOULD compress.
+    // Wait, the default threshold is 0.5.
+    // Let's set it explicitly.
+    vi.mocked(mockConfig.getCompressionThreshold).mockResolvedValue(0.7);
+    // 600 < 700, so NOOP.
 
     const result = await service.compress(
       mockChat,
@@ -221,7 +237,7 @@ describe('ChatCompressionService', () => {
     expect(result.newHistory).toBeNull();
   });
 
-  it('should compress if over token threshold', async () => {
+  it('should compress if over token threshold with verification turn', async () => {
     const history: Content[] = [
       { role: 'user', parts: [{ text: 'msg1' }] },
       { role: 'model', parts: [{ text: 'msg2' }] },
@@ -243,8 +259,42 @@ describe('ChatCompressionService', () => {
 
     expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
     expect(result.newHistory).not.toBeNull();
-    expect(result.newHistory![0].parts![0].text).toBe('Summary');
-    expect(mockConfig.getBaseLlmClient().generateContent).toHaveBeenCalled();
+    // It should contain the final verified summary
+    expect(result.newHistory![0].parts![0].text).toBe('Verified Summary');
+    expect(mockConfig.getBaseLlmClient().generateContent).toHaveBeenCalledTimes(
+      2,
+    );
+  });
+
+  it('should use anchored instruction when a previous snapshot is present', async () => {
+    const history: Content[] = [
+      {
+        role: 'user',
+        parts: [{ text: '<state_snapshot>old</state_snapshot>' }],
+      },
+      { role: 'model', parts: [{ text: 'msg2' }] },
+      { role: 'user', parts: [{ text: 'msg3' }] },
+      { role: 'model', parts: [{ text: 'msg4' }] },
+    ];
+    vi.mocked(mockChat.getHistory).mockReturnValue(history);
+    vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(800);
+    vi.mocked(tokenLimit).mockReturnValue(1000);
+
+    await service.compress(
+      mockChat,
+      mockPromptId,
+      false,
+      mockModel,
+      mockConfig,
+      false,
+    );
+
+    const firstCall = vi.mocked(mockConfig.getBaseLlmClient().generateContent)
+      .mock.calls[0][0];
+    const lastContent = firstCall.contents?.[firstCall.contents.length - 1];
+    expect(lastContent?.parts?.[0].text).toContain(
+      'A previous <state_snapshot> exists',
+    );
   });
 
   it('should force compress even if under threshold', async () => {
