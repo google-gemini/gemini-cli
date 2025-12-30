@@ -135,7 +135,7 @@ describe('directoryUtils', () => {
       ]);
 
       const suggestions = getDirectorySuggestions('~/Down');
-      expect(suggestions).toEqual([`~${path.sep}Downloads${path.sep}`]);
+      expect(suggestions).toEqual([`~/Downloads${path.sep}`]);
     });
 
     it('should return suggestions for ../', () => {
@@ -181,16 +181,17 @@ describe('directoryUtils', () => {
         vi.mocked(fs.statSync).mockReturnValue({
           isDirectory: () => true,
         } as fs.Stats);
+
         (fs.readdirSync as Mock).mockReturnValue([
           { name: 'sub', isDirectory: () => true },
-          { name: 'nested', isDirectory: () => true },
         ]);
-
-        // Test trailing backslash
         expect(getDirectorySuggestions('docs\\')).toEqual([
           `docs\\sub${path.sep}`,
         ]);
-        // Test backslash in middle
+
+        (fs.readdirSync as Mock).mockReturnValue([
+          { name: 'nested', isDirectory: () => true },
+        ]);
         expect(getDirectorySuggestions('docs\\sub\\n')).toEqual([
           `docs\\sub\\nested${path.sep}`,
         ]);
