@@ -5,7 +5,11 @@
  */
 
 import { expect, it, describe, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+} from './test-helper.js';
 import { TestMcpServer } from './test-mcp-server.js';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -17,14 +21,9 @@ import stripAnsi from 'strip-ansi';
 
 const itIf = (condition: boolean) => (condition ? it : it.skip);
 
-describe('extension reloading', () => {
-  let rig: TestRig;
-
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
+describe.concurrent('extension reloading', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
   const sandboxEnv = env['GEMINI_SANDBOX'];
   // Fails in linux non-sandbox e2e tests
@@ -34,9 +33,9 @@ describe('extension reloading', () => {
     (!sandboxEnv || sandboxEnv === 'false') &&
       platform() !== 'win32' &&
       platform() !== 'linux',
-  )(
+  )<LocalTestContext>(
     'installs a local extension, updates it, checks it was reloaded properly',
-    async () => {
+    async ({ rig }) => {
       const serverA = new TestMcpServer();
       const portA = await serverA.start({
         hello: () => ({ content: [{ type: 'text', text: 'world' }] }),

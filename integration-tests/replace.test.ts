@@ -5,17 +5,19 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+} from './test-helper.js';
 
-describe('replace', () => {
-  let rig: TestRig;
+describe.concurrent('replace', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
-  it('should be able to replace content in a file', async () => {
+  it<LocalTestContext>('should be able to replace content in a file', async ({
+    rig,
+  }) => {
     await rig.setup('should be able to replace content in a file', {
       settings: { tools: { core: ['replace', 'read_file'] } },
     });
@@ -36,7 +38,9 @@ describe('replace', () => {
     expect(rig.readFile(fileName)).toBe(expectedContent);
   });
 
-  it.skip('should handle $ literally when replacing text ending with $', async () => {
+  it.skip<LocalTestContext>('should handle $ literally when replacing text ending with $', async ({
+    rig,
+  }) => {
     await rig.setup(
       'should handle $ literally when replacing text ending with $',
       { settings: { tools: { core: ['replace', 'read_file'] } } },
@@ -58,7 +62,9 @@ describe('replace', () => {
     expect(rig.readFile(fileName)).toBe(expectedContent);
   });
 
-  it.skip('should insert a multi-line block of text', async () => {
+  it.skip<LocalTestContext>('should insert a multi-line block of text', async ({
+    rig,
+  }) => {
     await rig.setup('should insert a multi-line block of text', {
       settings: { tools: { core: ['replace', 'read_file'] } },
     });
@@ -78,7 +84,9 @@ describe('replace', () => {
     expect(rig.readFile(fileName)).toBe(expectedContent);
   });
 
-  it.skip('should delete a block of text', async () => {
+  it.skip<LocalTestContext>('should delete a block of text', async ({
+    rig,
+  }) => {
     await rig.setup('should delete a block of text', {
       settings: { tools: { core: ['replace', 'read_file'] } },
     });

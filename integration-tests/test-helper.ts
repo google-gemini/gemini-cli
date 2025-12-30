@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect } from 'vitest';
+import { expect, type TestContext } from 'vitest';
 import { execSync, spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -25,6 +25,20 @@ function getDefaultTimeout() {
   if (env['CI']) return 60000; // 1 minute in CI
   if (env['GEMINI_SANDBOX']) return 30000; // 30s in containers
   return 15000; // 15s locally
+}
+
+export interface LocalTestContext extends TestContext {
+  rig: TestRig;
+}
+
+export async function setupTestRig(context: LocalTestContext) {
+  context.rig = new TestRig();
+}
+
+export async function cleanupTestRig(context: LocalTestContext) {
+  if (context.rig) {
+    await context.rig.cleanup();
+  }
 }
 
 export async function poll(
@@ -376,6 +390,18 @@ export class TestRig {
     return { command, initialArgs };
   }
 
+  /**
+   * Returns a process environment with HOME and GEMINI_CONFIG_DIR pointed
+   * to the test-specific directory to ensure isolation.
+   */
+  private _getEnv(): NodeJS.ProcessEnv {
+    return {
+      ...env,
+      HOME: this.testDir!,
+      GEMINI_CONFIG_DIR: join(this.testDir!, GEMINI_DIR),
+    };
+  }
+
   run(options: {
     args?: string | string[];
     stdin?: string;
@@ -411,7 +437,7 @@ export class TestRig {
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
-      env: env,
+      env: this._getEnv(),
     });
 
     let stdout = '';
@@ -515,6 +541,7 @@ export class TestRig {
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
+      env: this._getEnv(),
     });
 
     let stdout = '';
@@ -1038,7 +1065,7 @@ export class TestRig {
       rows: 80,
       cwd: this.testDir!,
       env: Object.fromEntries(
-        Object.entries(env).filter(([, v]) => v !== undefined),
+        Object.entries(this._getEnv()).filter(([, v]) => v !== undefined),
       ) as { [key: string]: string },
     };
 

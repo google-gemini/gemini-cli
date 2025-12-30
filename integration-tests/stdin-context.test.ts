@@ -5,18 +5,21 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+  printDebugInfo,
+  validateModelOutput,
+} from './test-helper.js';
 
-describe.skip('stdin context', () => {
-  let rig: TestRig;
+describe.skip.concurrent('stdin context', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
-
-  it('should be able to use stdin as context for a prompt', async () => {
+  it<LocalTestContext>('should be able to use stdin as context for a prompt', async ({
+    rig,
+  }) => {
     await rig.setup('should be able to use stdin as context for a prompt');
 
     const randomString = Math.random().toString(36).substring(7);
@@ -75,7 +78,9 @@ describe.skip('stdin context', () => {
     ).toBeTruthy();
   });
 
-  it('should exit quickly if stdin stream does not end', async () => {
+  it<LocalTestContext>('should exit quickly if stdin stream does not end', async ({
+    rig,
+  }) => {
     /*
       This simulates scenario where gemini gets stuck waiting for stdin.
       This happens in situations where process.stdin.isTTY is false

@@ -5,7 +5,11 @@
  */
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+} from './test-helper.js';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -19,16 +23,13 @@ const extensionUpdate = `{
   "version": "0.0.2"
 }`;
 
-describe('extension install', () => {
-  let rig: TestRig;
+describe.concurrent('extension install', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
-
-  it('installs a local extension, verifies a command, and updates it', async () => {
+  it<LocalTestContext>('installs a local extension, verifies a command, and updates it', async ({
+    rig,
+  }) => {
     rig.setup('extension install test');
     const testServerPath = join(rig.testDir!, 'gemini-extension.json');
     writeFileSync(testServerPath, extension);

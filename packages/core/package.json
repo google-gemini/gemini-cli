@@ -83,6 +83,7 @@
     "@types/fast-levenshtein": "^0.0.4",
     "@types/minimatch": "^5.1.2",
     "@types/picomatch": "^4.0.1",
+    "@types/uuid": "^10.0.0",
     "msw": "^2.3.4",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"

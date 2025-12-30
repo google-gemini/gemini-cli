@@ -5,18 +5,21 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+  printDebugInfo,
+  validateModelOutput,
+} from './test-helper.js';
 
-describe('read_many_files', () => {
-  let rig: TestRig;
+describe.concurrent('read_many_files', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
-
-  it.skip('should be able to read multiple files', async () => {
+  it.skip<LocalTestContext>('should be able to read multiple files', async ({
+    rig,
+  }) => {
     await rig.setup('should be able to read multiple files', {
       settings: { tools: { core: ['read_many_files', 'read_file'] } },
     });

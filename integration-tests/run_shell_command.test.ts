@@ -5,7 +5,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+  printDebugInfo,
+  validateModelOutput,
+} from './test-helper.js';
 import { getShellConfiguration } from '../packages/core/src/utils/shell-utils.js';
 
 const { shell } = getShellConfiguration();
@@ -83,15 +89,13 @@ function getChainedEchoCommand(): { allowPattern: string; command: string } {
   }
 }
 
-describe('run_shell_command', () => {
-  let rig: TestRig;
+describe.concurrent('run_shell_command', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
-  it('should be able to run a shell command', async () => {
+  it<LocalTestContext>('should be able to run a shell command', async ({
+    rig,
+  }) => {
     await rig.setup('should be able to run a shell command', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
@@ -124,7 +128,9 @@ describe('run_shell_command', () => {
     );
   });
 
-  it('should be able to run a shell command via stdin', async () => {
+  it<LocalTestContext>('should be able to run a shell command via stdin', async ({
+    rig,
+  }) => {
     await rig.setup('should be able to run a shell command via stdin', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
@@ -153,7 +159,9 @@ describe('run_shell_command', () => {
     validateModelOutput(result, 'test-stdin', 'Shell command stdin test');
   });
 
-  it.skip('should run allowed sub-command in non-interactive mode', async () => {
+  it.skip<LocalTestContext>('should run allowed sub-command in non-interactive mode', async ({
+    rig,
+  }) => {
     await rig.setup('should run allowed sub-command in non-interactive mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
@@ -197,7 +205,9 @@ describe('run_shell_command', () => {
     expect(toolCall.toolRequest.success).toBe(true);
   });
 
-  it.skip('should succeed with no parens in non-interactive mode', async () => {
+  it.skip<LocalTestContext>('should succeed with no parens in non-interactive mode', async ({
+    rig,
+  }) => {
     await rig.setup('should succeed with no parens in non-interactive mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
@@ -231,7 +241,7 @@ describe('run_shell_command', () => {
     expect(toolCall.toolRequest.success).toBe(true);
   });
 
-  it('should succeed with --yolo mode', async () => {
+  it<LocalTestContext>('should succeed with --yolo mode', async ({ rig }) => {
     await rig.setup('should succeed with --yolo mode', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
@@ -266,7 +276,9 @@ describe('run_shell_command', () => {
     expect(toolCall.toolRequest.success).toBe(true);
   });
 
-  it.skip('should work with ShellTool alias', async () => {
+  it.skip<LocalTestContext>('should work with ShellTool alias', async ({
+    rig,
+  }) => {
     await rig.setup('should work with ShellTool alias');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
@@ -311,7 +323,9 @@ describe('run_shell_command', () => {
 
   // TODO(#11062): Un-skip this once we can make it reliable by using hard coded
   // model responses.
-  it.skip('should combine multiple --allowed-tools flags', async () => {
+  it.skip<LocalTestContext>('should combine multiple --allowed-tools flags', async ({
+    rig,
+  }) => {
     await rig.setup('should combine multiple --allowed-tools flags');
 
     const { tool, command } = getLineCountCommand();
@@ -360,7 +374,9 @@ describe('run_shell_command', () => {
     }
   });
 
-  it('should reject commands not on the allowlist', async () => {
+  it<LocalTestContext>('should reject commands not on the allowlist', async ({
+    rig,
+  }) => {
     await rig.setup('should reject commands not on the allowlist', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
@@ -427,7 +443,9 @@ describe('run_shell_command', () => {
   });
 
   // TODO(#11966): Deflake this test and re-enable once the underlying race is resolved.
-  it.skip('should reject chained commands when only the first segment is allowlisted in non-interactive mode', async () => {
+  it.skip<LocalTestContext>('should reject chained commands when only the first segment is allowlisted in non-interactive mode', async ({
+    rig,
+  }) => {
     await rig.setup(
       'should reject chained commands when only the first segment is allowlisted',
     );
@@ -453,7 +471,9 @@ describe('run_shell_command', () => {
     }
   });
 
-  it('should allow all with "ShellTool" and other specific tools', async () => {
+  it<LocalTestContext>('should allow all with "ShellTool" and other specific tools', async ({
+    rig,
+  }) => {
     await rig.setup(
       'should allow all with "ShellTool" and other specific tools',
       {
@@ -502,7 +522,9 @@ describe('run_shell_command', () => {
     );
   });
 
-  it('should propagate environment variables to the child process', async () => {
+  it<LocalTestContext>('should propagate environment variables to the child process', async ({
+    rig,
+  }) => {
     await rig.setup('should propagate environment variables', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
@@ -535,7 +557,9 @@ describe('run_shell_command', () => {
     }
   });
 
-  it.skip('should run a platform-specific file listing command', async () => {
+  it.skip<LocalTestContext>('should run a platform-specific file listing command', async ({
+    rig,
+  }) => {
     await rig.setup('should run platform-specific file listing');
     const fileName = `test-file-${Math.random().toString(36).substring(7)}.txt`;
     rig.createFile(fileName, 'test content');
@@ -562,7 +586,7 @@ describe('run_shell_command', () => {
     expect(result).toContain(fileName);
   });
 
-  it('rejects invalid shell expressions', async () => {
+  it<LocalTestContext>('rejects invalid shell expressions', async ({ rig }) => {
     await rig.setup('rejects invalid shell expressions', {
       settings: { tools: { core: ['run_shell_command'] } },
     });

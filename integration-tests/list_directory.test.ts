@@ -6,24 +6,23 @@
 
 import { describe, it, beforeEach, afterEach } from 'vitest';
 import {
-  TestRig,
   poll,
   printDebugInfo,
   validateModelOutput,
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
 } from './test-helper.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-describe('list_directory', () => {
-  let rig: TestRig;
+describe.concurrent('list_directory', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
-
-  it('should be able to list a directory', async () => {
+  it<LocalTestContext>('should be able to list a directory', async ({
+    rig,
+  }) => {
     await rig.setup('should be able to list a directory', {
       settings: { tools: { core: ['list_directory'] } },
     });

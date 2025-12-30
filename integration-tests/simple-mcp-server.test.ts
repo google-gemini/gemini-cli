@@ -11,7 +11,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, poll, validateModelOutput } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+  poll,
+  validateModelOutput,
+} from './test-helper.js';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 
@@ -164,16 +170,11 @@ rpc.send({
 });
 `;
 
-describe('simple-mcp-server', () => {
-  let rig: TestRig;
+describe.concurrent('simple-mcp-server', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
-
-  it('should add two numbers', async () => {
+  it<LocalTestContext>('should add two numbers', async ({ rig }) => {
     // Setup test directory with MCP server configuration
     await rig.setup('simple-mcp-server', {
       settings: {

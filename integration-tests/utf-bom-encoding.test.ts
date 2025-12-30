@@ -7,7 +7,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { TestRig } from './test-helper.js';
+import {
+  TestRig,
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+} from './test-helper.js';
 
 // BOM encoders
 const utf8BOM = (s: string) =>
@@ -47,19 +52,18 @@ const utf32BE = (s: string) => {
   return Buffer.concat([bom, payload]);
 };
 
-describe('BOM end-to-end integraion', () => {
-  let rig: TestRig;
-
-  beforeEach(async () => {
-    rig = new TestRig();
-    await rig.setup('bom-integration', {
+describe.concurrent('BOM end-to-end integraion', () => {
+  beforeEach<LocalTestContext>(async (context) => {
+    await setupTestRig(context);
+    await context.rig.setup('bom-integration', {
       settings: { tools: { core: ['read_file'] } },
     });
   });
 
-  afterEach(async () => await rig.cleanup());
+  afterEach<LocalTestContext>(cleanupTestRig);
 
   async function runAndAssert(
+    rig: TestRig,
     filename: string,
     content: Buffer,
     expectedText: string | null,
@@ -81,43 +85,52 @@ describe('BOM end-to-end integraion', () => {
     }
   }
 
-  it('UTF-8 BOM', async () => {
-    await runAndAssert('utf8.txt', utf8BOM('BOM_OK UTF-8'), 'BOM_OK UTF-8');
+  it<LocalTestContext>('UTF-8 BOM', async ({ rig }) => {
+    await runAndAssert(
+      rig,
+      'utf8.txt',
+      utf8BOM('BOM_OK UTF-8'),
+      'BOM_OK UTF-8',
+    );
   });
 
-  it('UTF-16 LE BOM', async () => {
+  it<LocalTestContext>('UTF-16 LE BOM', async ({ rig }) => {
     await runAndAssert(
+      rig,
       'utf16le.txt',
       utf16LE('BOM_OK UTF-16LE'),
       'BOM_OK UTF-16LE',
     );
   });
 
-  it('UTF-16 BE BOM', async () => {
+  it<LocalTestContext>('UTF-16 BE BOM', async ({ rig }) => {
     await runAndAssert(
+      rig,
       'utf16be.txt',
       utf16BE('BOM_OK UTF-16BE'),
       'BOM_OK UTF-16BE',
     );
   });
 
-  it('UTF-32 LE BOM', async () => {
+  it<LocalTestContext>('UTF-32 LE BOM', async ({ rig }) => {
     await runAndAssert(
+      rig,
       'utf32le.txt',
       utf32LE('BOM_OK UTF-32LE'),
       'BOM_OK UTF-32LE',
     );
   });
 
-  it('UTF-32 BE BOM', async () => {
+  it<LocalTestContext>('UTF-32 BE BOM', async ({ rig }) => {
     await runAndAssert(
+      rig,
       'utf32be.txt',
       utf32BE('BOM_OK UTF-32BE'),
       'BOM_OK UTF-32BE',
     );
   });
 
-  it('Can describe a PNG file', async () => {
+  it<LocalTestContext>('Can describe a PNG file', async ({ rig }) => {
     const imagePath = resolve(
       process.cwd(),
       'docs/assets/gemini-screenshot.png',

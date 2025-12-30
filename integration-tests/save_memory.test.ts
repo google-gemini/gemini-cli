@@ -5,18 +5,19 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+  printDebugInfo,
+  validateModelOutput,
+} from './test-helper.js';
 
-describe('save_memory', () => {
-  let rig: TestRig;
+describe.concurrent('save_memory', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
-
-  it('should be able to save to memory', async () => {
+  it<LocalTestContext>('should be able to save to memory', async ({ rig }) => {
     await rig.setup('should be able to save to memory', {
       settings: { tools: { core: ['save_memory'] } },
     });

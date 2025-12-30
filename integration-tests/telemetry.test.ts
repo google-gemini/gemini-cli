@@ -5,18 +5,19 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+} from './test-helper.js';
 
-describe('telemetry', () => {
-  let rig: TestRig;
+describe.concurrent('telemetry', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
-
-  it('should emit a metric and a log event', async () => {
+  it<LocalTestContext>('should emit a metric and a log event', async ({
+    rig,
+  }) => {
     rig.setup('should emit a metric and a log event');
 
     // Run a simple command that should trigger telemetry
