@@ -115,5 +115,9 @@ describe('formatters', () => {
       const past = NOW.getTime() - 10 * 60 * 1000; // 10 minutes ago
       expect(formatTimeAgo(past)).toBe('10m ago');
     });
+    it('should handle invalid timestamps', () => {
+      const past = 'hello';
+      expect(formatTimeAgo(past)).toBe('invalid date');
+    });
   });
 });
