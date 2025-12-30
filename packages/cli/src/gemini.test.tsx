@@ -29,6 +29,7 @@ import {
   type Config,
   type ResumedSessionData,
   debugLogger,
+  coreEvents,
 } from '@google/gemini-cli-core';
 import { act } from 'react';
 import { type InitializationResult } from './core/initializer.js';
@@ -280,6 +281,7 @@ describe('gemini.tsx main function', () => {
         getOutputFormat: () => 'text',
         getExtensions: () => [],
         getUsageStatisticsEnabled: () => false,
+        refreshAuth: vi.fn(),
         setTerminalBackground: vi.fn(),
       } as unknown as Config;
     });
@@ -782,6 +784,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getFileFilteringRespectGitIgnore: () => true,
       getOutputFormat: () => 'text',
       getUsageStatisticsEnabled: () => false,
+      refreshAuth: vi.fn(),
       setTerminalBackground: vi.fn(),
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -819,9 +822,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       .mockImplementation((code) => {
         throw new MockProcessExitError(code);
       });
-    const consoleErrorSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
     vi.mocked(loadSettings).mockReturnValue({
       merged: { advanced: {}, security: { auth: {} }, ui: { theme: 'test' } },
@@ -875,12 +876,13 @@ describe('gemini.tsx main function kitty protocol', () => {
       if (!(e instanceof MockProcessExitError)) throw e;
     }
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
       expect.stringContaining('Error resuming session: Session not found'),
     );
     expect(processExitSpy).toHaveBeenCalledWith(42);
     processExitSpy.mockRestore();
-    consoleErrorSpy.mockRestore();
+    emitFeedbackSpy.mockRestore();
   });
 
   it.skip('should log error when cleanupExpiredSessions fails', async () => {
@@ -1019,6 +1021,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getFileFilteringRespectGitIgnore: () => true,
       getOutputFormat: () => 'text',
       getUsageStatisticsEnabled: () => false,
+      refreshAuth: vi.fn(),
       setTerminalBackground: vi.fn(),
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
