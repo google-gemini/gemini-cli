@@ -1459,4 +1459,170 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       expect(disabledHookCalls.length).toBe(0);
     });
   });
+
+  describe('BeforeTool Hooks - Input Override', () => {
+    it('should override tool input parameters via BeforeTool hook', async () => {
+      // 1. First setup to get the test directory and prepare the hook script
+      await rig.setup(
+        'should override tool input parameters via BeforeTool hook',
+      );
+
+      // Create a hook script that overrides the tool input
+      const hookOutput = {
+        decision: 'allow',
+        hookSpecificOutput: {
+          hookEventName: 'BeforeTool',
+          tool_input: {
+            file_path: 'modified.txt',
+            content: 'modified content',
+          },
+        },
+      };
+
+      const hookScript = `process.stdout.write(JSON.stringify(${JSON.stringify(
+        hookOutput,
+      )}));`;
+
+      const scriptPath = join(rig.testDir!, 'input_override_hook.js');
+      writeFileSync(scriptPath, hookScript);
+
+      // Ensure path is properly escaped for command line usage on all platforms
+      // On Windows, backslashes in the command string need to be handled carefully
+      // Using forward slashes works well with Node.js on all platforms
+      const commandPath = scriptPath.replace(/\\/g, '/');
+
+      // 2. Full setup with settings and fake responses
+      await rig.setup(
+        'should override tool input parameters via BeforeTool hook',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.input-modification.responses',
+          ),
+          settings: {
+            tools: {
+              enableHooks: true,
+            },
+            hooks: {
+              BeforeTool: [
+                {
+                  matcher: 'write_file',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${commandPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      );
+
+      // Run the agent. The fake response will attempt to call write_file with
+      // file_path="original.txt" and content="original content"
+      await rig.run({
+        args: 'Create a file called original.txt with content "original content"',
+      });
+
+      // 1. Verify that 'modified.txt' was created with 'modified content' (Override successful)
+      const modifiedContent = rig.readFile('modified.txt');
+      expect(modifiedContent).toBe('modified content');
+
+      // 2. Verify that 'original.txt' was NOT created (Override replaced original)
+      let originalExists = false;
+      try {
+        rig.readFile('original.txt');
+        originalExists = true;
+      } catch {
+        originalExists = false;
+      }
+      expect(originalExists).toBe(false);
+
+      // 3. Verify hook telemetry
+      const hookTelemetryFound = await rig.waitForTelemetryEvent('hook_call');
+      expect(hookTelemetryFound).toBeTruthy();
+
+      const hookLogs = rig.readHookLogs();
+      expect(hookLogs.length).toBe(1);
+      expect(hookLogs[0].hookCall.hook_name).toContain(
+        'input_override_hook.js',
+      );
+
+      // 4. Verify that the agent didn't try to work-around the hook input change
+      const toolLogs = rig.readToolLogs();
+      expect(toolLogs.length).toBe(1);
+      expect(toolLogs[0].toolRequest.name).toBe('write_file');
+      expect(JSON.parse(toolLogs[0].toolRequest.args).file_path).toBe(
+        'modified.txt',
+      );
+    });
+  });
+
+  describe('BeforeTool Hooks - Stop Execution', () => {
+    it('should stop agent execution via BeforeTool hook', async () => {
+      // Create a hook script that stops execution
+      const hookOutput = {
+        continue: false,
+        reason: 'Emergency Stop triggered by hook',
+        hookSpecificOutput: {
+          hookEventName: 'BeforeTool',
+        },
+      };
+
+      const hookScript = `console.log(JSON.stringify(${JSON.stringify(
+        hookOutput,
+      )}));`;
+
+      await rig.setup('should stop agent execution via BeforeTool hook');
+      const scriptPath = join(rig.testDir!, 'before_tool_stop_hook.js');
+      writeFileSync(scriptPath, hookScript);
+      const commandPath = scriptPath.replace(/\\/g, '/');
+
+      await rig.setup('should stop agent execution via BeforeTool hook', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.before-tool-stop.responses',
+        ),
+        settings: {
+          tools: {
+            enableHooks: true,
+          },
+          hooks: {
+            BeforeTool: [
+              {
+                matcher: 'write_file',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${commandPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      const result = await rig.run({
+        args: 'Run tool',
+      });
+
+      // The hook should have stopped execution message (returned from tool)
+      expect(result).toContain(
+        'Agent execution stopped: Emergency Stop triggered by hook',
+      );
+
+      // Tool should NOT be called successfully (it was blocked/stopped)
+      const toolLogs = rig.readToolLogs();
+      const writeFileCalls = toolLogs.filter(
+        (t) =>
+          t.toolRequest.name === 'write_file' && t.toolRequest.success === true,
+      );
+      expect(writeFileCalls).toHaveLength(0);
+    });
+  });
 });

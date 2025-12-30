@@ -13,6 +13,7 @@ import {
   AfterModelHookOutput,
   HookEventName,
   HookType,
+  BeforeToolHookOutput,
 } from './types.js';
 import { defaultHookTranslator } from './hookTranslator.js';
 import type {
@@ -91,6 +92,11 @@ describe('Hook Output Classes', () => {
     it('should return BeforeToolSelectionHookOutput for BeforeToolSelection event', () => {
       const output = createHookOutput(HookEventName.BeforeToolSelection, {});
       expect(output).toBeInstanceOf(BeforeToolSelectionHookOutput);
+    });
+
+    it('should return BeforeToolHookOutput for BeforeTool event', () => {
+      const output = createHookOutput(HookEventName.BeforeTool, {});
+      expect(output).toBeInstanceOf(BeforeToolHookOutput);
     });
   });
 

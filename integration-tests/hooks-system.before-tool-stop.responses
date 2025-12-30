@@ -1,0 +1,2 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"functionCall":{"name":"write_file","args":{"file_path":"test.txt","content":"hello"}}}],"role":"model"},"finishReason":"STOP","index":0}]}]}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"Okay, stopping."}],"role":"model"},"finishReason":"STOP","index":0}]}]}
