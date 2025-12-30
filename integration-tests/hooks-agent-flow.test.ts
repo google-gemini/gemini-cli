@@ -62,7 +62,7 @@ describe('Hooks Agent Flow', () => {
                 hooks: [
                   {
                     type: 'command',
-                    command: `"node" "${scriptPath}"`,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -140,7 +140,7 @@ describe('Hooks Agent Flow', () => {
                 hooks: [
                   {
                     type: 'command',
-                    command: `"node" "${scriptPath}"`,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -188,7 +188,7 @@ describe('Hooks Agent Flow', () => {
                   hooks: [
                     {
                       type: 'command',
-                      command: `"node" -e "console.log('BeforeAgent Fired')"`,
+                      command: `node -e "console.log('BeforeAgent Fired')"`,
                       timeout: 5000,
                     },
                   ],
@@ -199,7 +199,7 @@ describe('Hooks Agent Flow', () => {
                   hooks: [
                     {
                       type: 'command',
-                      command: `"node" -e "console.log('AfterAgent Fired')"`,
+                      command: `node -e "console.log('AfterAgent Fired')"`,
                       timeout: 5000,
                     },
                   ],
