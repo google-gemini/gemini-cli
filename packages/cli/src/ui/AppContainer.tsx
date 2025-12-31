@@ -283,6 +283,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const lastTitleRef = useRef<string | null>(null);
   const staticExtraHeight = 3;
 
+  const { addItem: addHistoryItem } = historyManager;
+
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
@@ -307,7 +309,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
         if (result) {
           if (result.systemMessage) {
-            historyManager.addItem(
+            addHistoryItem(
               {
                 type: MessageType.INFO,
                 text: result.systemMessage,
@@ -345,11 +347,11 @@ export const AppContainer = (props: AppContainerProps) => {
         await fireSessionEndHook(hookMessageBus, SessionEndReason.Exit);
       }
     });
-  }, [config, resumedSessionData, historyManager]);
+  }, [config, resumedSessionData, addHistoryItem]);
 
   useEffect(
-    () => setUpdateHandler(historyManager.addItem, setUpdateInfo),
-    [historyManager],
+    () => setUpdateHandler(addHistoryItem, setUpdateInfo),
+    [addHistoryItem],
   );
 
   // Subscribe to fallback mode and model changes from core
@@ -691,7 +693,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   );
 
   const performMemoryRefresh = useCallback(async () => {
-    historyManager.addItem(
+    addHistoryItem(
       {
         type: MessageType.INFO,
         text: 'Refreshing hierarchical memory (GEMINI.md or other context files)...',
@@ -702,7 +704,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       const { memoryContent, fileCount } =
         await refreshServerHierarchicalMemory(config);
 
-      historyManager.addItem(
+      addHistoryItem(
         {
           type: MessageType.INFO,
           text: `Memory refreshed successfully. ${
@@ -723,7 +725,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
     } catch (error) {
       const errorMessage = getErrorMessage(error);
-      historyManager.addItem(
+      addHistoryItem(
         {
           type: MessageType.ERROR,
           text: `Error refreshing memory: ${errorMessage}`,
@@ -732,7 +734,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       );
       debugLogger.warn('Error refreshing memory:', error);
     }
-  }, [config, historyManager]);
+  }, [config, addHistoryItem]);
 
   const cancelHandlerRef = useRef<(shouldRestorePrompt?: boolean) => void>(
     () => {},
@@ -1341,7 +1343,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           );
       }
 
-      historyManager.addItem(
+      addHistoryItem(
         {
           type,
           text: payload.message,
@@ -1367,7 +1369,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     return () => {
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     };
-  }, [historyManager]);
+  }, [addHistoryItem]);
 
   const filteredConsoleMessages = useMemo(() => {
     if (config.getDebugMode()) {

@@ -13,7 +13,7 @@ import {
   flushTelemetry,
 } from '@google/gemini-cli-core';
 import type { SlashCommand } from './types.js';
-import { CommandKind } from './types.js';
+import { CommandKind, MessageType } from './types.js';
 import { randomUUID } from 'node:crypto';
 
 export const clearCommand: SlashCommand = {
@@ -53,7 +53,20 @@ export const clearCommand: SlashCommand = {
 
     // Fire SessionStart hook after clearing
     if (config?.getEnableHooks() && messageBus) {
-      await fireSessionStartHook(messageBus, SessionStartSource.Clear);
+      const result = await fireSessionStartHook(
+        messageBus,
+        SessionStartSource.Clear,
+      );
+
+      if (result?.systemMessage) {
+        context.ui.addItem(
+          {
+            type: MessageType.INFO,
+            text: result.systemMessage,
+          },
+          Date.now(),
+        );
+      }
     }
 
     // Give the event loop a chance to process any pending telemetry operations
