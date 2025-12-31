@@ -374,6 +374,16 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the window title bar',
         showInDialog: true,
       },
+      showInlineThinking: {
+        type: 'boolean',
+        label: 'Show Inline Thinking',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Show model thinking summaries inline in the conversation.',
+        showInDialog: true,
+      },
       showStatusInTitle: {
         type: 'boolean',
         label: 'Show Status in Title',

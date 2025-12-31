@@ -46,6 +46,7 @@ import type {
   HistoryItem,
   HistoryItemWithoutId,
   HistoryItemToolGroup,
+  HistoryItemThinking,
   SlashCommandProcessorResult,
   HistoryItemModel,
 } from '../types.js';
@@ -118,8 +119,29 @@ export const useGeminiStream = (
   const activeQueryIdRef = useRef<string | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
+  const thoughtsBufferRef = useRef<ThoughtSummary[]>([]);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
+
+  const flushThoughts = useCallback(
+    (userMessageTimestamp: number) => {
+      if (
+        thoughtsBufferRef.current.length > 0 &&
+        settings.merged.ui?.showInlineThinking
+      ) {
+        addItem(
+          {
+            type: 'thinking',
+            thoughts: [...thoughtsBufferRef.current],
+          } as HistoryItemThinking,
+          userMessageTimestamp,
+        );
+        thoughtsBufferRef.current = [];
+      }
+    },
+    [addItem, settings],
+  );
+
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
@@ -535,6 +557,7 @@ export const useGeminiStream = (
       currentGeminiMessageBuffer: string,
       userMessageTimestamp: number,
     ): string => {
+      flushThoughts(userMessageTimestamp);
       if (turnCancelledRef.current) {
         // Prevents additional output after a user initiated cancel.
         return '';
@@ -584,7 +607,7 @@ export const useGeminiStream = (
       }
       return newGeminiMessageBuffer;
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, flushThoughts],
   );
 
   const handleUserCancelledEvent = useCallback(
@@ -805,6 +828,7 @@ export const useGeminiStream = (
         switch (event.type) {
           case ServerGeminiEventType.Thought:
             setThought(event.value);
+            thoughtsBufferRef.current.push(event.value);
             break;
           case ServerGeminiEventType.Content:
             geminiMessageBuffer = handleContentEvent(
@@ -814,12 +838,15 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.ToolCallRequest:
+            flushThoughts(userMessageTimestamp);
             toolCallRequests.push(event.value);
             break;
           case ServerGeminiEventType.UserCancelled:
+            flushThoughts(userMessageTimestamp);
             handleUserCancelledEvent(userMessageTimestamp);
             break;
           case ServerGeminiEventType.Error:
+            flushThoughts(userMessageTimestamp);
             handleErrorEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.ChatCompressed:
@@ -839,6 +866,7 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.Finished:
+            flushThoughts(userMessageTimestamp);
             handleFinishedEvent(event, userMessageTimestamp);
             break;
           case ServerGeminiEventType.Citation:
@@ -879,6 +907,7 @@ export const useGeminiStream = (
       handleContextWindowWillOverflowEvent,
       handleCitationEvent,
       handleChatModelEvent,
+      flushThoughts,
     ],
   );
   const submitQuery = useCallback(
@@ -943,6 +972,7 @@ export const useGeminiStream = (
               }
               startNewPrompt();
               setThought(null); // Reset thought when starting a new prompt
+              thoughtsBufferRef.current = [];
             }
 
             setIsResponding(true);
