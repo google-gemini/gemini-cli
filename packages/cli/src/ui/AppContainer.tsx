@@ -300,7 +300,31 @@ export const AppContainer = (props: AppContainerProps) => {
         const sessionStartSource = resumedSessionData
           ? SessionStartSource.Resume
           : SessionStartSource.Startup;
-        await fireSessionStartHook(hookMessageBus, sessionStartSource);
+        const result = await fireSessionStartHook(
+          hookMessageBus,
+          sessionStartSource,
+        );
+
+        if (result) {
+          if (result.systemMessage) {
+            historyManager.addItem(
+              {
+                type: MessageType.INFO,
+                text: result.systemMessage,
+              },
+              Date.now(),
+            );
+          }
+
+          const additionalContext = result.getAdditionalContext();
+          const geminiClient = config.getGeminiClient();
+          if (additionalContext && geminiClient) {
+            await geminiClient.addHistory({
+              role: 'user',
+              parts: [{ text: additionalContext }],
+            });
+          }
+        }
       }
 
       // Fire-and-forget: generate summary for previous session in background
@@ -321,11 +345,11 @@ export const AppContainer = (props: AppContainerProps) => {
         await fireSessionEndHook(hookMessageBus, SessionEndReason.Exit);
       }
     });
-  }, [config, resumedSessionData]);
+  }, [config, resumedSessionData, historyManager]);
 
   useEffect(
     () => setUpdateHandler(historyManager.addItem, setUpdateInfo),
-    [historyManager.addItem],
+    [historyManager],
   );
 
   // Subscribe to fallback mode and model changes from core
