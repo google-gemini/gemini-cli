@@ -8,6 +8,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 
+const MAX_SUGGESTIONS = 50;
+
 export function expandHomeDir(p: string): string {
   if (!p) {
     return '';
@@ -66,7 +68,8 @@ export function getDirectorySuggestions(partialPath: string): string[] {
       .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
       .map((entry) => entry.name)
       .filter((name) => name.toLowerCase().startsWith(filter.toLowerCase()))
-      .sort();
+      .sort()
+      .slice(0, MAX_SUGGESTIONS);
 
     return directories.map((name) => {
       let resultPrefix = '';
