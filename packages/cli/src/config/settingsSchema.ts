@@ -393,13 +393,13 @@ const SETTINGS_SCHEMA = {
         description: 'Hide helpful tips in the UI',
         showInDialog: true,
       },
-      hideBanner: {
+      showBanner: {
         type: 'boolean',
-        label: 'Hide Banner',
+        label: 'Show Banner',
         category: 'UI',
         requiresRestart: false,
-        default: false,
-        description: 'Hide the application banner',
+        default: true,
+        description: 'Show the application banner',
         showInDialog: true,
       },
       hideContextSummary: {

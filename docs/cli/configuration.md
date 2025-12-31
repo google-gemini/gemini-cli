@@ -312,14 +312,14 @@ contain other project-specific files related to Gemini CLI's operation, such as:
     "hideTips": true
     ```
 
-- **`hideBanner`** (boolean):
+- **`showBanner`** (boolean):
   - **Description:** Enables or disables the startup banner (ASCII art logo) in
     the CLI interface.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Example:**
 
     ```json
-    "hideBanner": true
+    "showBanner": false
     ```
 
 - **`maxSessionTurns`** (number):
@@ -410,7 +410,7 @@ contain other project-specific files related to Gemini CLI's operation, such as:
   },
   "usageStatisticsEnabled": true,
   "hideTips": false,
-  "hideBanner": false,
+  "showBanner": true,
   "maxSessionTurns": 10,
   "summarizeToolOutput": {
     "run_shell_command": {

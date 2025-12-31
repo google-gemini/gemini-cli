@@ -178,7 +178,7 @@ describe('SettingsSchema', () => {
       expect(getSettingsSchema().ui.properties.hideTips.showInDialog).toBe(
         true,
       );
-      expect(getSettingsSchema().ui.properties.hideBanner.showInDialog).toBe(
+      expect(getSettingsSchema().ui.properties.showBanner.showInDialog).toBe(
         true,
       );
       expect(
