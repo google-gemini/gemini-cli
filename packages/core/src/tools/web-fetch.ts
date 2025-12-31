@@ -136,7 +136,12 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     try {
       const response = await retryWithBackoff(
         async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS);
+          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
+            headers: {
+              // Prefer markdown, then anything.
+              Accept: 'text/markdown, */*',
+            },
+          });
           if (!res.ok) {
             const error = new Error(
               `Request failed with status code ${res.status} ${res.statusText}`,
