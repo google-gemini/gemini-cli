@@ -7,7 +7,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob } from 'glob';
-// @ts-expect-error js-yaml does not have a default export with types in some environments
 import yaml from 'js-yaml';
 import { debugLogger } from '../utils/debugLogger.js';
 import { Storage } from '../config/storage.js';
