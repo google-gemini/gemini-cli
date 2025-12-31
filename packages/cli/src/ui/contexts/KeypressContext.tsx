@@ -438,7 +438,10 @@ function* emitKeys(
         }
       } else {
         name = 'undefined';
-        if ((ctrl || meta) && (code.endsWith('u') || code.endsWith('~'))) {
+        if (
+          (ctrl || meta || shift) &&
+          (code.endsWith('u') || code.endsWith('~'))
+        ) {
           // CSI-u or tilde-coded functional keys: ESC [ <code> ; <mods> (u|~)
           const codeNumber = parseInt(code.slice(1, -1), 10);
           if (
@@ -446,6 +449,15 @@ function* emitKeys(
             codeNumber <= 'z'.charCodeAt(0)
           ) {
             name = String.fromCharCode(codeNumber);
+          } else if (codeNumber === ' '.charCodeAt(0)) {
+            // Handle space key (ASCII 32) - e.g., Shift+Space in Kitty protocol
+            name = 'space';
+            if (!ctrl && !meta) {
+              // For insertable keys, normalize the raw CSI-u sequence to the
+              // actual character so downstream text insertion uses the right input.
+              sequence = ' ';
+              insertable = true;
+            }
           }
         }
       }
