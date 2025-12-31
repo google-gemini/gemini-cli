@@ -246,6 +246,16 @@ describe('KeypressContext', () => {
           sequence: ' ',
         },
       },
+      {
+        name: 'Alt+Space (Escape sequence)',
+        sequence: '\x1b ',
+        expected: {
+          name: 'space',
+          meta: true,
+          insertable: true,
+          sequence: ' ',
+        },
+      },
     ])(
       'should recognize $name as insertable space',
       async ({ sequence, expected }) => {

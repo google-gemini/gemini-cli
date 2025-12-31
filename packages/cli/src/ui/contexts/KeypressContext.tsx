@@ -437,10 +437,6 @@ function* emitKeys(
         if (keyInfo.ctrl) {
           ctrl = true;
         }
-        if (name === 'space') {
-          insertable = true;
-          sequence = ' ';
-        }
       } else {
         name = 'undefined';
         if ((ctrl || meta) && (code.endsWith('u') || code.endsWith('~'))) {
@@ -477,7 +473,6 @@ function* emitKeys(
     } else if (ch === ' ') {
       name = 'space';
       meta = escaped;
-      insertable = true;
     } else if (!escaped && ch <= '\x1a') {
       // ctrl+letter
       name = String.fromCharCode(ch.charCodeAt(0) + 'a'.charCodeAt(0) - 1);
@@ -513,6 +508,12 @@ function* emitKeys(
     } else {
       // Any other character is considered printable.
       insertable = true;
+    }
+
+    // Consolidate space handling: ensure consistent insertable state and sequence
+    if (name === 'space' && !ctrl) {
+      insertable = true;
+      sequence = ' ';
     }
 
     if (
