@@ -4,7 +4,8 @@
     "outDir": "dist",
     "jsx": "react-jsx",
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+    "tsBuildInfoFile": "../../.cache/cli.tsbuildinfo"
   },
   "include": [
     "index.ts",

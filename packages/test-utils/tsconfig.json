@@ -4,6 +4,7 @@
     "outDir": "dist",
     "lib": ["DOM", "DOM.Iterable", "ES2021"],
     "composite": true,
+    "tsBuildInfoFile": "../../.cache/test-utils.tsbuildinfo",
     "types": ["node"]
   },
   "include": ["index.ts", "src/**/*.ts", "src/**/*.json"],
