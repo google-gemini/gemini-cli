@@ -437,7 +437,7 @@ function* emitKeys(
         if (keyInfo.ctrl) {
           ctrl = true;
         }
-        if (name === 'space') {
+        if (name === 'space' && code === '[32u') {
           insertable = true;
           sequence = ' ';
         }
