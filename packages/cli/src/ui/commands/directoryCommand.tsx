@@ -83,7 +83,8 @@ export const directoryCommand: SlashCommand = {
         'Add directories to the workspace. Use comma to separate multiple paths',
       kind: CommandKind.BUILT_IN,
       autoExecute: false,
-      completion: (context: CommandContext, partialArg: string) => {
+      showCompletionLoading: false,
+      completion: async (context: CommandContext, partialArg: string) => {
         // Support multiple paths separated by commas
         const parts = partialArg.split(',');
         const lastPart = parts[parts.length - 1];
@@ -94,7 +95,7 @@ export const directoryCommand: SlashCommand = {
           return [];
         }
 
-        const suggestions = getDirectorySuggestions(trimmedLastPart);
+        const suggestions = await getDirectorySuggestions(trimmedLastPart);
 
         if (parts.length > 1) {
           const prefix = parts.slice(0, -1).join(',') + ',';

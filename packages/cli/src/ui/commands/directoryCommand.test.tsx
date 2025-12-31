@@ -245,7 +245,7 @@ describe('directoryCommand', () => {
 
       it('should return suggestions for a single path', async () => {
         if (!addCommand?.completion) throw new Error('No completion');
-        vi.mocked(getDirectorySuggestions).mockReturnValue(['docs/', 'src/']);
+        vi.mocked(getDirectorySuggestions).mockResolvedValue(['docs/', 'src/']);
 
         const results = await addCommand.completion(mockContext, 'd');
 
@@ -255,7 +255,7 @@ describe('directoryCommand', () => {
 
       it('should return suggestions for multiple paths', async () => {
         if (!addCommand?.completion) throw new Error('No completion');
-        vi.mocked(getDirectorySuggestions).mockReturnValue(['src/']);
+        vi.mocked(getDirectorySuggestions).mockResolvedValue(['src/']);
 
         const results = await addCommand.completion(mockContext, 'docs/,s');
 
@@ -265,7 +265,7 @@ describe('directoryCommand', () => {
 
       it('should handle leading whitespace in suggestions', async () => {
         if (!addCommand?.completion) throw new Error('No completion');
-        vi.mocked(getDirectorySuggestions).mockReturnValue(['src/']);
+        vi.mocked(getDirectorySuggestions).mockResolvedValue(['src/']);
 
         const results = await addCommand.completion(mockContext, 'docs/, s');
 

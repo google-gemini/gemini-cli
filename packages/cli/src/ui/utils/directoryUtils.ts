@@ -7,8 +7,10 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import { opendir } from 'node:fs/promises';
 
 const MAX_SUGGESTIONS = 50;
+const MATCH_BUFFER_MULTIPLIER = 3;
 
 export function expandHomeDir(p: string): string {
   if (!p) {
@@ -23,76 +25,109 @@ export function expandHomeDir(p: string): string {
   return path.normalize(expandedPath);
 }
 
+interface ParsedPath {
+  searchDir: string;
+  filter: string;
+  isHomeExpansion: boolean;
+  resultPrefix: string;
+}
+
+function parsePartialPath(partialPath: string): ParsedPath {
+  const isHomeExpansion = partialPath.startsWith('~');
+  const expandedPath = expandHomeDir(partialPath || '.');
+
+  let searchDir: string;
+  let filter: string;
+
+  if (
+    partialPath === '' ||
+    partialPath.endsWith('/') ||
+    partialPath.endsWith(path.sep)
+  ) {
+    searchDir = expandedPath;
+    filter = '';
+  } else {
+    searchDir = path.dirname(expandedPath);
+    filter = path.basename(expandedPath);
+
+    // Special case for ~ because path.dirname('~') can be '.'
+    if (
+      isHomeExpansion &&
+      !partialPath.includes('/') &&
+      !partialPath.includes(path.sep)
+    ) {
+      searchDir = os.homedir();
+      filter = partialPath.substring(1);
+    }
+  }
+
+  // Calculate result prefix
+  let resultPrefix = '';
+  if (
+    partialPath === '' ||
+    partialPath.endsWith('/') ||
+    partialPath.endsWith(path.sep)
+  ) {
+    resultPrefix = partialPath;
+  } else {
+    const lastSlashIndex = Math.max(
+      partialPath.lastIndexOf('/'),
+      partialPath.lastIndexOf(path.sep),
+    );
+    if (lastSlashIndex !== -1) {
+      resultPrefix = partialPath.substring(0, lastSlashIndex + 1);
+    } else if (isHomeExpansion) {
+      resultPrefix = `~${path.sep}`;
+    }
+  }
+
+  return { searchDir, filter, isHomeExpansion, resultPrefix };
+}
+
 /**
  * Gets directory suggestions based on a partial path.
+ * Uses async iteration with fs.opendir for efficient handling of large directories.
  *
  * @param partialPath The partial path typed by the user.
- * @returns An array of directory path suggestions.
+ * @returns A promise resolving to an array of directory path suggestions.
  */
-export function getDirectorySuggestions(partialPath: string): string[] {
+export async function getDirectorySuggestions(
+  partialPath: string,
+): Promise<string[]> {
   try {
-    const isHomeExpansion = partialPath.startsWith('~');
-    const expandedPath = expandHomeDir(partialPath || '.');
-
-    let searchDir: string;
-    let filter: string;
-
-    if (
-      partialPath === '' ||
-      partialPath.endsWith('/') ||
-      partialPath.endsWith(path.sep)
-    ) {
-      searchDir = expandedPath;
-      filter = '';
-    } else {
-      searchDir = path.dirname(expandedPath);
-      filter = path.basename(expandedPath);
-
-      // Special case for ~ because path.dirname('~') can be '.'
-      if (
-        isHomeExpansion &&
-        !partialPath.includes('/') &&
-        !partialPath.includes(path.sep)
-      ) {
-        searchDir = os.homedir();
-        filter = partialPath.substring(1);
-      }
-    }
+    const { searchDir, filter, resultPrefix } = parsePartialPath(partialPath);
 
     if (!fs.existsSync(searchDir) || !fs.statSync(searchDir).isDirectory()) {
       return [];
     }
 
-    const entries = fs.readdirSync(searchDir, { withFileTypes: true });
-    const directories = entries
-      .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
-      .map((entry) => entry.name)
-      .filter((name) => name.toLowerCase().startsWith(filter.toLowerCase()))
-      .sort()
-      .slice(0, MAX_SUGGESTIONS);
+    const matches: string[] = [];
+    const filterLower = filter.toLowerCase();
+    const dir = await opendir(searchDir);
 
-    return directories.map((name) => {
-      let resultPrefix = '';
-      if (
-        partialPath === '' ||
-        partialPath.endsWith('/') ||
-        partialPath.endsWith(path.sep)
-      ) {
-        resultPrefix = partialPath;
-      } else {
-        const lastSlashIndex = Math.max(
-          partialPath.lastIndexOf('/'),
-          partialPath.lastIndexOf(path.sep),
-        );
-        if (lastSlashIndex !== -1) {
-          resultPrefix = partialPath.substring(0, lastSlashIndex + 1);
-        } else if (isHomeExpansion) {
-          resultPrefix = `~${path.sep}`;
+    try {
+      for await (const entry of dir) {
+        if (!entry.isDirectory() || entry.name.startsWith('.')) {
+          continue;
+        }
+
+        if (entry.name.toLowerCase().startsWith(filterLower)) {
+          matches.push(entry.name);
+
+          // Early termination with buffer for sorting
+          if (matches.length >= MAX_SUGGESTIONS * MATCH_BUFFER_MULTIPLIER) {
+            break;
+          }
         }
       }
+    } finally {
+      await dir.close().catch(() => {});
+    }
 
-      return resultPrefix + name + path.sep;
-    });
+    return matches
+      .sort()
+      .slice(0, MAX_SUGGESTIONS)
+      .map((name) => resultPrefix + name + path.sep);
   } catch (_) {
     return [];
   }
