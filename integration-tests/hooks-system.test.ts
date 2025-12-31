@@ -1019,6 +1019,74 @@ fi`;
       expect(requestText).toContain('protocol droid');
     });
 
+    it('should fire SessionStart hook and display systemMessage in interactive mode', async () => {
+      // Create inline hook command that outputs JSON with systemMessage and additionalContext
+      const sessionStartCommand =
+        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"Interactive Session Start Message\\", \\"hookSpecificOutput\\": {\\"hookEventName\\": \\"SessionStart\\", \\"additionalContext\\": \\"The user is a Jedi Master.\\"}}"';
+
+      await rig.setup(
+        'should fire SessionStart hook and display systemMessage in interactive mode',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.session-startup.responses',
+          ),
+          settings: {
+            tools: {
+              enableHooks: true,
+            },
+            hooks: {
+              SessionStart: [
+                {
+                  matcher: 'startup',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: sessionStartCommand,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      );
+
+      const run = await rig.runInteractive();
+
+      // Verify systemMessage is displayed
+      await run.expectText('Interactive Session Start Message', 10000);
+
+      // Send a prompt to establish a session and trigger an API call
+      await run.sendKeys('Hello');
+      await run.sendKeys('\r');
+
+      // Wait for response to ensure API call happened
+      await run.expectText('Hello', 15000);
+
+      // Wait for telemetry to be written to disk
+      await rig.waitForTelemetryReady();
+
+      // Verify the API request contained the injected context
+      // We may need to poll for API requests as they are written asynchronously
+      const pollResult = await poll(
+        () => {
+          const apiRequests = rig.readAllApiRequest();
+          return apiRequests.length > 0;
+        },
+        15000,
+        500,
+      );
+
+      expect(pollResult).toBe(true);
+
+      const apiRequests = rig.readAllApiRequest();
+      // The injected context should be in the request_text of the API request
+      const requestText = apiRequests[0].attributes?.request_text || '';
+      expect(requestText).toContain('Jedi Master');
+    });
+
     it('should fire SessionEnd and SessionStart hooks on /clear command', async () => {
       // Create inline hook commands for both SessionEnd and SessionStart
       const sessionEndCommand =
