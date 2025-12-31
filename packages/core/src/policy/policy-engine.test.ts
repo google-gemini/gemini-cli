@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 import { PolicyEngine } from './policy-engine.js';
 import {
   PolicyDecision,
@@ -17,10 +17,15 @@ import {
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
+import { initializeShellParsers } from '../utils/shell-utils.js';
 
 describe('PolicyEngine', () => {
   let engine: PolicyEngine;
   let mockCheckerRunner: CheckerRunner;
+
+  beforeAll(async () => {
+    await initializeShellParsers();
+  });
 
   beforeEach(() => {
     mockCheckerRunner = {
@@ -945,6 +950,94 @@ describe('PolicyEngine', () => {
             {
               name: 'run_shell_command',
               args: { command: 'echo "-> arrow"' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should preserve dir_path during recursive shell command checks', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          // Rule that only allows echo in a specific directory
+          // Note: stableStringify sorts keys alphabetically and has no spaces: {"command":"echo hello","dir_path":"/safe/path"}
+          argsPattern: /"command":"echo hello".*"dir_path":"\/safe\/path"/,
+          decision: PolicyDecision.ALLOW,
+        },
+        {
+          // Catch-all ALLOW for shell but with low priority
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          priority: -100,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Compound command. The decomposition will call check() for "echo hello"
+      // which should match our specific high-priority rule IF dir_path is preserved.
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello && pwd', dir_path: '/safe/path' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should DENY redirected shell commands in non-interactive mode', async () => {
+      const config: PolicyEngineConfig = {
+        nonInteractive: true,
+        rules: [
+          {
+            toolName: 'run_shell_command',
+            decision: PolicyDecision.ALLOW,
+          },
+        ],
+      };
+
+      engine = new PolicyEngine(config);
+
+      // Redirected command should be DENIED in non-interactive mode
+      // (Normally ASK_USER, but ASK_USER -> DENY in non-interactive)
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'run_shell_command',
+              args: { command: 'echo "hello" > file.txt' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.DENY);
+    });
+
+    it('should allow redirected shell commands in non-interactive mode if allowRedirection is true', async () => {
+      const config: PolicyEngineConfig = {
+        nonInteractive: true,
+        rules: [
+          {
+            toolName: 'run_shell_command',
+            decision: PolicyDecision.ALLOW,
+            allowRedirection: true,
+          },
+        ],
+      };
+
+      engine = new PolicyEngine(config);
+
+      // Redirected command should stay ALLOW even in non-interactive mode
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'run_shell_command',
+              args: { command: 'echo "hello" > file.txt' },
             },
             undefined,
           )

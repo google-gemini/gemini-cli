@@ -16,11 +16,8 @@ import {
   type PolicySettings,
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
-import {
-  loadPoliciesFromToml,
-  type PolicyFileError,
-  escapeRegex,
-} from './toml-loader.js';
+import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
+import { buildArgsPatterns } from './utils.js';
 import toml from '@iarna/toml';
 import {
   MessageBusType,
@@ -263,26 +260,19 @@ export function createPolicyUpdater(
 
       if (message.commandPrefix) {
         // Convert commandPrefix(es) to argsPatterns for in-memory rules
-        const prefixes = Array.isArray(message.commandPrefix)
-          ? message.commandPrefix
-          : [message.commandPrefix];
-
-        for (const prefix of prefixes) {
-          const escapedPrefix = escapeRegex(prefix);
-          // Use robust regex to match whole words (e.g. "git" but not "github")
-          const argsPattern = new RegExp(
-            `"command":"${escapedPrefix}(?:[\\s"]|$)`,
-          );
-
-          policyEngine.addRule({
-            toolName,
-            decision: PolicyDecision.ALLOW,
-            // User tier (2) + high priority (950/1000) = 2.95
-            // This ensures user "always allow" selections are high priority
-            // but still lose to admin policies (3.xxx) and settings excludes (200)
-            priority: 2.95,
-            argsPattern,
-          });
+        const patterns = buildArgsPatterns(undefined, message.commandPrefix);
+        for (const pattern of patterns) {
+          if (pattern) {
+            policyEngine.addRule({
+              toolName,
+              decision: PolicyDecision.ALLOW,
+              // User tier (2) + high priority (950/1000) = 2.95
+              // This ensures user "always allow" selections are high priority
+              // but still lose to admin policies (3.xxx) and settings excludes (200)
+              priority: 2.95,
+              argsPattern: new RegExp(pattern),
+            });
+          }
         }
       } else {
         const argsPattern = message.argsPattern

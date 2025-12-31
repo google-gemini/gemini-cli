@@ -9,7 +9,7 @@ import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
-import { debugLogger, type AnyToolInvocation } from '../index.js';
+import { debugLogger } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
 import type {
   ToolInvocation,
@@ -24,7 +24,6 @@ import {
   Kind,
   type PolicyUpdateOptions,
 } from './tools.js';
-import { ApprovalMode } from '../policy/types.js';
 
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
@@ -40,10 +39,6 @@ import {
   initializeShellParsers,
   stripShellWrapper,
 } from '../utils/shell-utils.js';
-import {
-  isCommandAllowed,
-  isShellInvocationAllowlisted,
-} from '../utils/shell-permissions.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
@@ -106,24 +101,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
-    const rootCommands = [...new Set(getCommandRoots(command))];
+    let rootCommands = [...new Set(getCommandRoots(command))];
 
-    // In non-interactive mode, we need to prevent the tool from hanging while
-    // waiting for user input. If a tool is not fully allowed (e.g. via
-    // --allowed-tools="ShellTool(wc)"), we should throw an error instead of
-    // prompting for confirmation. This check is skipped in YOLO mode.
-    if (
-      !this.config.isInteractive() &&
-      this.config.getApprovalMode() !== ApprovalMode.YOLO
-    ) {
-      if (this.isInvocationAllowlisted(command)) {
-        // If it's an allowed shell command, we don't need to confirm execution.
-        return false;
+    // Fallback for UI display if parser fails
+    if (rootCommands.length === 0 && command.trim()) {
+      const fallback = command.trim().split(/\s+/)[0];
+      if (fallback) {
+        rootCommands = [fallback];
       }
-
-      throw new Error(
-        `Command "${command}" is not in the list of allowed tools for non-interactive mode.`,
-      );
     }
 
     // Rely entirely on PolicyEngine for interactive confirmation.
@@ -394,16 +379,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
     }
   }
-
-  private isInvocationAllowlisted(command: string): boolean {
-    const allowedTools = this.config.getAllowedTools() || [];
-    if (allowedTools.length === 0) {
-      return false;
-    }
-
-    const invocation = { params: { command } } as unknown as AnyToolInvocation;
-    return isShellInvocationAllowlisted(invocation, allowedTools);
-  }
 }
 
 function getShellToolDescription(): string {
@@ -487,19 +462,6 @@ export class ShellTool extends BaseDeclarativeTool<
       return 'Command cannot be empty.';
     }
 
-    const commandCheck = isCommandAllowed(params.command, this.config);
-    if (!commandCheck.allowed) {
-      if (!commandCheck.reason) {
-        debugLogger.error(
-          'Unexpected: isCommandAllowed returned false without a reason',
-        );
-        return `Command is not allowed: ${params.command}`;
-      }
-      return commandCheck.reason;
-    }
-    if (getCommandRoots(params.command).length === 0) {
-      return 'Could not identify command root to obtain permission from user.';
-    }
     if (params.dir_path) {
       const resolvedPath = path.resolve(
         this.config.getTargetDir(),

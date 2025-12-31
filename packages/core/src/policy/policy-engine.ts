@@ -195,13 +195,15 @@ export class PolicyEngine {
           serverName,
         );
 
+        const subDecision = this.applyNonInteractiveMode(subResult.decision);
+
         // If any part is DENIED, the whole command is DENIED
-        if (subResult.decision === PolicyDecision.DENY) {
+        if (subDecision === PolicyDecision.DENY) {
           return PolicyDecision.DENY;
         }
 
         // If any part requires ASK_USER, the whole command requires ASK_USER (unless already DENY)
-        if (subResult.decision === PolicyDecision.ASK_USER) {
+        if (subDecision === PolicyDecision.ASK_USER) {
           if (aggregateDecision === PolicyDecision.ALLOW) {
             aggregateDecision = PolicyDecision.ASK_USER;
           }
@@ -209,7 +211,7 @@ export class PolicyEngine {
 
         // Check for redirection in allowed sub-commands
         if (
-          subResult.decision === PolicyDecision.ALLOW &&
+          subDecision === PolicyDecision.ALLOW &&
           !allowRedirection &&
           hasRedirection(subCmd)
         ) {
