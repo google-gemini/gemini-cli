@@ -15,6 +15,7 @@ import { runExitCleanup } from './src/utils/cleanup.js';
 // Suppress known race condition error in node-pty on Windows
 process.on('uncaughtException', (error) => {
   if (
+    process.platform === 'win32' &&
     error instanceof Error &&
     error.message === 'Cannot resize a pty that has already exited'
   ) {
