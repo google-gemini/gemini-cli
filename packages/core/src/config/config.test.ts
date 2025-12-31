@@ -249,16 +249,14 @@ describe('Server Config (config.ts)', () => {
       await expect(config.initialize()).resolves.toBeUndefined();
     });
 
-    it('should throw an error if initialized more than once', async () => {
+    it('should not throw an error if initialized more than once', async () => {
       const config = new Config({
         ...baseParams,
         checkpointing: false,
       });
 
       await expect(config.initialize()).resolves.toBeUndefined();
-      await expect(config.initialize()).rejects.toThrow(
-        'Config was already initialized',
-      );
+      await expect(config.initialize()).resolves.toBeUndefined();
     });
 
     describe('getCompressionThreshold', () => {
