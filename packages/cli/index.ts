@@ -11,6 +11,28 @@ import { FatalError, writeToStderr } from '@google/gemini-cli-core';
 import { runExitCleanup } from './src/utils/cleanup.js';
 
 // --- Global Entry Point ---
+
+// Suppress known race condition error in node-pty on Windows
+process.on('uncaughtException', (error) => {
+  if (
+    error instanceof Error &&
+    error.message === 'Cannot resize a pty that has already exited'
+  ) {
+    // This error happens on Windows with node-pty when resizing a pty that has just exited.
+    // It is a race condition in node-pty that we cannot prevent, so we silence it.
+    return;
+  }
+
+  // For other errors, we rely on the default behavior, but since we attached a listener,
+  // we must manually replicate it.
+  if (error instanceof Error) {
+    writeToStderr(error.stack + '\n');
+  } else {
+    writeToStderr(String(error) + '\n');
+  }
+  process.exit(1);
+});
+
 main().catch(async (error) => {
   await runExitCleanup();
 
