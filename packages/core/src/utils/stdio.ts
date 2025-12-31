@@ -111,3 +111,13 @@ export function createWorkingStdio() {
 
   return { stdout: inkStdout, stderr: inkStderr };
 }
+
+/**
+ * Restores the original stdout and stderr write methods.
+ * This is useful when MCP server mode needs direct access to stdio
+ * without any monkey patching.
+ */
+export function restoreOriginalStdio(): void {
+  process.stdout.write = originalStdoutWrite;
+  process.stderr.write = originalStderrWrite;
+}
