@@ -187,6 +187,13 @@
           "default": false,
           "type": "boolean"
         },
+        "showInlineThinking": {
+          "title": "Show Inline Thinking",
+          "description": "Show model thinking summaries inline in the conversation.",
+          "markdownDescription": "Show model thinking summaries inline in the conversation.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "showStatusInTitle": {
           "title": "Show Status in Title",
           "description": "Show Gemini CLI status and thoughts in the terminal window title",
