@@ -275,32 +275,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
         setPidCallback(pid);
       }
 
-      const isInteractive = this.config.isInteractive();
-      const wasRaw = process.stdin.isRaw;
-      const stdinListener = (data: Buffer) => {
-        if (data.length === 1 && data[0] === 0x02) {
-          // CTRL+b
-          if (pid) {
-            ShellExecutionService.detach(pid);
-          }
-        }
-      };
-
-      if (isInteractive) {
-        process.stdin.setRawMode(true);
-        process.stdin.resume();
-        process.stdin.on('data', stdinListener);
-      }
-
       const result = await resultPromise;
 
-      if (isInteractive) {
-        process.stdin.removeListener('data', stdinListener);
-        process.stdin.setRawMode(wasRaw);
-      }
-
       const backgroundPIDs: number[] = [];
-      if (os.platform() !== 'win32') {
+      if (!result.backgrounded && os.platform() !== 'win32') {
         if (fs.existsSync(tempFilePath)) {
           const pgrepLines = fs
             .readFileSync(tempFilePath, 'utf8')
@@ -433,8 +411,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (timeoutTimer) clearTimeout(timeoutTimer);
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
-      if (fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
+      // Only cleanup temp file if NOT backgrounded, otherwise the bg process will fail to write to it
+      try {
+        if (
+          typeof result !== 'undefined' &&
+          !result.backgrounded &&
+          fs.existsSync(tempFilePath)
+        ) {
+          fs.unlinkSync(tempFilePath);
+        }
+      } catch {
+        // Ignore cleanup errors
       }
     }
   }
