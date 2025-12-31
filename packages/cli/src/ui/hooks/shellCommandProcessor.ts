@@ -20,7 +20,7 @@ import { isBinary, ShellExecutionService } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
-import { formatMemoryUsage } from '../utils/formatters.js';
+import { formatBytes } from '../utils/formatters.js';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
@@ -192,7 +192,7 @@ export const useShellCommandProcessor = (
               let currentDisplayOutput: string | AnsiOutput;
               if (isBinaryStream) {
                 if (binaryBytesReceived > 0) {
-                  currentDisplayOutput = `[Receiving binary output... ${formatMemoryUsage(
+                  currentDisplayOutput = `[Receiving binary output... ${formatBytes(
                     binaryBytesReceived,
                   )} received]`;
                 } else {
