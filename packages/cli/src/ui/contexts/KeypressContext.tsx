@@ -84,6 +84,7 @@ const KEY_INFO_MAP: Record<
   '[13u': { name: 'return' },
   '[27u': { name: 'escape' },
   '[127u': { name: 'backspace' },
+  '[32u': { name: 'space' },
   '[57414u': { name: 'return' }, // Numpad Enter
   '[a': { name: 'up', shift: true },
   '[b': { name: 'down', shift: true },
@@ -435,6 +436,10 @@ function* emitKeys(
         }
         if (keyInfo.ctrl) {
           ctrl = true;
+        }
+        if (name === 'space') {
+          insertable = true;
+          sequence = ' ';
         }
       } else {
         name = 'undefined';
