@@ -1,0 +1,10 @@
+
+> @google/gemini-cli@0.24.0-nightly.20251227.37be16243 lint
+> eslint . --ext .ts,.tsx && eslint integration-tests && eslint scripts
+
+
+/Users/gundermanc/code/gemini-cli/packages/cli/src/ui/AppContainer.tsx
+  348:6  warning  React Hook useEffect has a missing dependency: 'historyManager'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 1 problem (0 errors, 1 warning)
+

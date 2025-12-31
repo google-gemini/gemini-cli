@@ -50,7 +50,7 @@ import { ExtensionManager } from './extension-manager.js';
 import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
 import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
-import type { EventEmitter } from 'node:stream';
+import type { EventEmitter } from 'node:events';
 import { runExitCleanup } from '../utils/cleanup.js';
 
 export interface CliArgs {
@@ -444,7 +444,7 @@ export async function loadCliConfig(
     requestSetting: promptForSetting,
     workspaceDir: cwd,
     enabledExtensionOverrides: argv.extensions,
-    eventEmitter: appEvents as EventEmitter<ExtensionEvents>,
+    eventEmitter: appEvents as unknown as EventEmitter<ExtensionEvents>,
   });
   await extensionManager.loadExtensions();
 
@@ -541,9 +541,6 @@ export async function loadCliConfig(
     settings,
     approvalMode,
   );
-
-  const enableMessageBusIntegration =
-    settings.tools?.enableMessageBusIntegration ?? true;
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -670,6 +667,8 @@ export async function loadCliConfig(
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
+    skillsSupport: settings.experimental?.skills,
+    disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
@@ -695,7 +694,6 @@ export async function loadCliConfig(
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
-    enableMessageBusIntegration,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
     introspectionAgentSettings:
