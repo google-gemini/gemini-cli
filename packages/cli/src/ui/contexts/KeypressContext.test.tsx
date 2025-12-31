@@ -224,6 +224,44 @@ describe('KeypressContext', () => {
     });
   });
 
+  describe('Space key handling', () => {
+    it.each([
+      {
+        name: 'Space (CSI u)',
+        sequence: '\x1b[32u',
+        expected: {
+          name: 'space',
+          shift: false,
+          insertable: true,
+          sequence: ' ',
+        },
+      },
+      {
+        name: 'Shift+Space (CSI u)',
+        sequence: '\x1b[32;2u',
+        expected: {
+          name: 'space',
+          shift: true,
+          insertable: true,
+          sequence: ' ',
+        },
+      },
+    ])(
+      'should recognize $name as insertable space',
+      async ({ sequence, expected }) => {
+        const { keyHandler } = setupKeypressTest();
+
+        act(() => {
+          stdin.write(sequence);
+        });
+
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining(expected),
+        );
+      },
+    );
+  });
+
   describe('Tab and Backspace handling', () => {
     it.each([
       {
