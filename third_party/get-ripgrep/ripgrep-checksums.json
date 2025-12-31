@@ -1,0 +1,51 @@
+{
+  "repository": "microsoft/ripgrep-prebuilt",
+  "version": "v13.0.0-10",
+  "generatedAt": "2025-10-21T01:10:32.652Z",
+  "assets": {
+    "aarch64-apple-darwin.tar.gz": {
+      "url": "https://github.com/microsoft/ripgrep-prebuilt/releases/download/v13.0.0-10/ripgrep-v13.0.0-10-aarch64-apple-darwin.tar.gz",
+      "sha256": "de44338ca53677968bdd7403ddc1cf9c735e708f7b63e3b34367f9411010a7db"
+    },
+    "x86_64-apple-darwin.tar.gz": {
+      "url": "https://github.com/microsoft/ripgrep-prebuilt/releases/download/v13.0.0-10/ripgrep-v13.0.0-10-x86_64-apple-darwin.tar.gz",
+      "sha256": "3b501c05ff9b1d24ae8897dd1c6b5bf842fd12a6f7114264407ac42bc222b25b"
+    },
+    "x86_64-pc-windows-msvc.zip": {
+      "url": "https://github.com/microsoft/ripgrep-prebuilt/releases/download/v13.0.0-10/ripgrep-v13.0.0-10-x86_64-pc-windows-msvc.zip",
+      "sha256": "7b35b95cf3d7f92d8fe087006899617b1b5a6dac4bbed5d4f6ace6f0934799dc"
+    },
+    "aarch64-pc-windows-msvc.zip": {
+      "url": "https://github.com/microsoft/ripgrep-prebuilt/releases/download/v13.0.0-10/ripgrep-v13.0.0-10-aarch64-pc-windows-msvc.zip",
+      "sha256": "6c12d2c95073a4b981e5706981f42327b6359fc4cd7449ebd11f6769768dea97"
+    },
+    "i686-pc-windows-msvc.zip": {
+      "url": "https://github.com/microsoft/ripgrep-prebuilt/releases/download/v13.0.0-10/ripgrep-v13.0.0-10-i686-pc-windows-msvc.zip",
+      "sha256": "c18a56d0bf9c779e04794de4c070bd42c99ce2e9b4b5e27cb674f29807423c05"
+    },
+    "x86_64-unknown-linux-musl.tar.gz": {
+      "url": "https://github.com/microsoft/ripgrep-prebuilt/releases/download/v13.0.0-10/ripgrep-v13.0.0-10-x86_64-unknown-linux-musl.tar.gz",
+      "sha256": "ef820a62c1d6fdc396646762ff0f0e47e127947073ed8b5aa4ceea8b61cb1659"
+    },
+    "arm-unknown-linux-gnueabihf.tar.gz": {
+      "url": "https://github.com/microsoft/ripgrep-prebuilt/releases/download/v13.0.0-10/ripgrep-v13.0.0-10-arm-unknown-linux-gnueabihf.tar.gz",
+      "sha256": "83d245530e53c687f4a36690c407ee934fed9d642d4c4fccd26fb5802b4e5f7a"
+    },
+    "aarch64-unknown-linux-gnu.tar.gz": {
+      "url": "https://github.com/microsoft/ripgrep-prebuilt/releases/download/v13.0.0-10/ripgrep-v13.0.0-10-aarch64-unknown-linux-gnu.tar.gz",
+      "sha256": "705fc9bcd14baa18bd4dda8fe0651bff440fc0fb934fcdb8e745a85efd7b2afa"
+    },
+    "powerpc64le-unknown-linux-gnu.tar.gz": {
+      "url": "https://github.com/microsoft/ripgrep-prebuilt/releases/download/v13.0.0-10/ripgrep-v13.0.0-10-powerpc64le-unknown-linux-gnu.tar.gz",
+      "sha256": "40979af23debe10e33432ff98a49e30217c0a53c55affc3b3331ab2b2bc99f3f"
+    },
+    "s390x-unknown-linux-gnu.tar.gz": {
+      "url": "https://github.com/microsoft/ripgrep-prebuilt/releases/download/v13.0.0-10/ripgrep-v13.0.0-10-s390x-unknown-linux-gnu.tar.gz",
+      "sha256": "61afc474f39ebe51424438c981a201ab1eed5ae55f3e82ff7561b6a8c9bd8b87"
+    },
+    "i686-unknown-linux-musl.tar.gz": {
+      "url": "https://github.com/microsoft/ripgrep-prebuilt/releases/download/v13.0.0-10/ripgrep-v13.0.0-10-i686-unknown-linux-musl.tar.gz",
+      "sha256": "5607d1bb138b4f1bcd3ac2efda7c75127829e3a97df3ee1fedf1c106faa63e21"
+    }
+  }
+}
