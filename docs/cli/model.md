@@ -9,6 +9,9 @@ or the (recommended) **Auto** setting to choose the best model for your tasks.
 > model used by sub-agents. Consequently, even when using the `/model` flag you
 > may see other models used in your model usage reports.
 
+**Note:** The `/model` command is only available when you have
+[model routing](./model-routing) enabled.
+
 ## How to use the `/model` command
 
 Use the following command in Gemini CLI:
