@@ -667,6 +667,11 @@ export interface DiffStat {
 export interface ToolEditConfirmationDetails {
   type: 'edit';
   title: string;
+  /**
+   * Optional extra context to display to the user in the confirmation prompt.
+   * Used for cases like hooks forcing confirmation (decision: 'ask').
+   */
+  systemMessage?: string;
   onConfirm: (
     outcome: ToolConfirmationOutcome,
     payload?: ToolConfirmationPayload,
@@ -689,6 +694,11 @@ export interface ToolConfirmationPayload {
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';
   title: string;
+  /**
+   * Optional extra context to display to the user in the confirmation prompt.
+   * Used for cases like hooks forcing confirmation (decision: 'ask').
+   */
+  systemMessage?: string;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   command: string;
   rootCommand: string;
@@ -697,6 +707,11 @@ export interface ToolExecuteConfirmationDetails {
 export interface ToolMcpConfirmationDetails {
   type: 'mcp';
   title: string;
+  /**
+   * Optional extra context to display to the user in the confirmation prompt.
+   * Used for cases like hooks forcing confirmation (decision: 'ask').
+   */
+  systemMessage?: string;
   serverName: string;
   toolName: string;
   toolDisplayName: string;
@@ -706,6 +721,11 @@ export interface ToolMcpConfirmationDetails {
 export interface ToolInfoConfirmationDetails {
   type: 'info';
   title: string;
+  /**
+   * Optional extra context to display to the user in the confirmation prompt.
+   * Used for cases like hooks forcing confirmation (decision: 'ask').
+   */
+  systemMessage?: string;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   prompt: string;
   urls?: string[];

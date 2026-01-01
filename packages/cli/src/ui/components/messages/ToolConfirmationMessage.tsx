@@ -245,12 +245,18 @@ export const ToolConfirmationMessage: React.FC<
       const HEIGHT_QUESTION = 1; // The question text is one line.
       const MARGIN_QUESTION_BOTTOM = 1; // Margin on the question container.
       const HEIGHT_OPTIONS = options.length; // Each option in the radio select takes one line.
+      const HEIGHT_SYSTEM_MESSAGE = confirmationDetails.systemMessage ? 1 : 0;
+      const MARGIN_SYSTEM_MESSAGE_BOTTOM = confirmationDetails.systemMessage
+        ? 1
+        : 0;
 
       const surroundingElementsHeight =
         PADDING_OUTER_Y +
         MARGIN_BODY_BOTTOM +
         HEIGHT_QUESTION +
         MARGIN_QUESTION_BOTTOM +
+        HEIGHT_SYSTEM_MESSAGE +
+        MARGIN_SYSTEM_MESSAGE_BOTTOM +
         HEIGHT_OPTIONS;
       return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
     }
@@ -370,6 +376,16 @@ export const ToolConfirmationMessage: React.FC<
       <Box flexGrow={1} flexShrink={1} overflow="hidden" marginBottom={1}>
         {bodyContent}
       </Box>
+
+      {/* Hook/System context */}
+      {confirmationDetails.systemMessage && (
+        <Box marginBottom={1} flexShrink={0}>
+          <RenderInline
+            text={confirmationDetails.systemMessage}
+            defaultColor={theme.text.secondary}
+          />
+        </Box>
+      )}
 
       {/* Confirmation Question */}
       <Box marginBottom={1} flexShrink={0}>
