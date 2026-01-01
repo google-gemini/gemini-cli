@@ -11,7 +11,12 @@ import {
   cleanupOldClipboardImages,
   splitEscapedPaths,
   parsePastedPaths,
+  mayContainImagePaths,
+  categorizePathsByType,
 } from './clipboardUtils.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
 
 describe('clipboardUtils', () => {
   describe('clipboardHasImage', () => {
@@ -235,6 +240,166 @@ describe('clipboardUtils', () => {
         () => true,
       );
       expect(result).toBe('@\\\\server\\share\\file.txt ');
+    });
+  });
+
+  describe('mayContainImagePaths', () => {
+    it('should return true for single image path', () => {
+      expect(mayContainImagePaths('/path/to/image.png')).toBe(true);
+    });
+
+    it('should return true for multiple image paths', () => {
+      expect(mayContainImagePaths('/img1.png /img2.jpg')).toBe(true);
+    });
+
+    it('should return false for non-image paths', () => {
+      expect(mayContainImagePaths('/path/to/file.txt')).toBe(false);
+    });
+
+    it('should return false for non-path text', () => {
+      expect(mayContainImagePaths('hello world')).toBe(false);
+    });
+
+    it('should return true for mixed paths with at least one image', () => {
+      expect(mayContainImagePaths('/file.txt /image.png')).toBe(true);
+    });
+
+    it('should handle paths with escaped spaces', () => {
+      expect(mayContainImagePaths('/my\\ image.png')).toBe(true);
+    });
+
+    it('should handle Windows paths', () => {
+      expect(mayContainImagePaths('C:\\Users\\image.png')).toBe(true);
+    });
+
+    it('should handle tilde paths', () => {
+      expect(mayContainImagePaths('~/images/photo.jpg')).toBe(true);
+    });
+
+    it('should handle relative paths', () => {
+      expect(mayContainImagePaths('./image.png')).toBe(true);
+    });
+
+    it('should be case insensitive for extensions', () => {
+      expect(mayContainImagePaths('/image.PNG')).toBe(true);
+      expect(mayContainImagePaths('/image.Jpg')).toBe(true);
+    });
+
+    it('should handle all supported image extensions', () => {
+      expect(mayContainImagePaths('/a.png')).toBe(true);
+      expect(mayContainImagePaths('/a.jpg')).toBe(true);
+      expect(mayContainImagePaths('/a.jpeg')).toBe(true);
+      expect(mayContainImagePaths('/a.webp')).toBe(true);
+      expect(mayContainImagePaths('/a.heic')).toBe(true);
+      expect(mayContainImagePaths('/a.heif')).toBe(true);
+    });
+
+    it('should return false for unsupported image formats', () => {
+      expect(mayContainImagePaths('/a.gif')).toBe(false);
+      expect(mayContainImagePaths('/a.bmp')).toBe(false);
+      expect(mayContainImagePaths('/a.tiff')).toBe(false);
+    });
+  });
+
+  describe('categorizePathsByType', () => {
+    let tempDir: string;
+
+    // Create temp files for testing
+    const setupTempFiles = async () => {
+      tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'clipboard-test-'));
+      await fs.writeFile(path.join(tempDir, 'image.png'), 'fake png');
+      await fs.writeFile(path.join(tempDir, 'image.jpg'), 'fake jpg');
+      await fs.writeFile(path.join(tempDir, 'document.txt'), 'text content');
+      await fs.writeFile(path.join(tempDir, 'script.js'), 'js content');
+      return tempDir;
+    };
+
+    const cleanupTempFiles = async () => {
+      if (tempDir) {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      }
+    };
+
+    it('should return empty result for non-path text', async () => {
+      const result = await categorizePathsByType('hello world');
+      expect(result.imagePaths).toEqual([]);
+      expect(result.nonImagePaths).toEqual([]);
+      expect(result.invalidSegments).toEqual(['hello', 'world']);
+    });
+
+    it('should categorize non-existent paths as invalid', async () => {
+      const result = await categorizePathsByType('/nonexistent/image.png');
+      expect(result.imagePaths).toEqual([]);
+      expect(result.nonImagePaths).toEqual([]);
+      expect(result.invalidSegments).toEqual(['/nonexistent/image.png']);
+    });
+
+    it('should categorize existing images correctly', async () => {
+      await setupTempFiles();
+      try {
+        const imagePath = path.join(tempDir, 'image.png');
+        const result = await categorizePathsByType(imagePath);
+        expect(result.imagePaths).toEqual([imagePath]);
+        expect(result.nonImagePaths).toEqual([]);
+        expect(result.invalidSegments).toEqual([]);
+      } finally {
+        await cleanupTempFiles();
+      }
+    });
+
+    it('should categorize existing non-images correctly', async () => {
+      await setupTempFiles();
+      try {
+        const textPath = path.join(tempDir, 'document.txt');
+        const result = await categorizePathsByType(textPath);
+        expect(result.imagePaths).toEqual([]);
+        expect(result.nonImagePaths).toEqual([textPath]);
+        expect(result.invalidSegments).toEqual([]);
+      } finally {
+        await cleanupTempFiles();
+      }
+    });
+
+    it('should handle mixed paths correctly', async () => {
+      await setupTempFiles();
+      try {
+        const imagePath = path.join(tempDir, 'image.png');
+        const textPath = path.join(tempDir, 'document.txt');
+        const nonexistent = '/nonexistent/file.xyz';
+        const input = `${imagePath} ${textPath} ${nonexistent}`;
+
+        const result = await categorizePathsByType(input);
+        expect(result.imagePaths).toEqual([imagePath]);
+        expect(result.nonImagePaths).toEqual([textPath]);
+        expect(result.invalidSegments).toEqual([nonexistent]);
+      } finally {
+        await cleanupTempFiles();
+      }
+    });
+
+    it('should handle multiple images', async () => {
+      await setupTempFiles();
+      try {
+        const png = path.join(tempDir, 'image.png');
+        const jpg = path.join(tempDir, 'image.jpg');
+        const input = `${png} ${jpg}`;
+
+        const result = await categorizePathsByType(input);
+        expect(result.imagePaths).toContain(png);
+        expect(result.imagePaths).toContain(jpg);
+        expect(result.imagePaths.length).toBe(2);
+        expect(result.nonImagePaths).toEqual([]);
+        expect(result.invalidSegments).toEqual([]);
+      } finally {
+        await cleanupTempFiles();
+      }
+    });
+
+    it('should return empty arrays for empty string', async () => {
+      const result = await categorizePathsByType('');
+      expect(result.imagePaths).toEqual([]);
+      expect(result.nonImagePaths).toEqual([]);
+      expect(result.invalidSegments).toEqual([]);
     });
   });
 });

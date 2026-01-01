@@ -14,6 +14,8 @@ export enum AppEvent {
   McpClientUpdate = 'mcp-client-update',
   SelectionWarning = 'selection-warning',
   PasteTimeout = 'paste-timeout',
+  ImageWarning = 'image-warning',
+  ImageProcessing = 'image-processing',
 }
 
 export interface AppEvents extends ExtensionEvents {
@@ -23,6 +25,8 @@ export interface AppEvents extends ExtensionEvents {
   [AppEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
   [AppEvent.SelectionWarning]: never[];
   [AppEvent.PasteTimeout]: never[];
+  [AppEvent.ImageWarning]: string[];
+  [AppEvent.ImageProcessing]: string[];
 }
 
 export const appEvents = new EventEmitter<AppEvents>();

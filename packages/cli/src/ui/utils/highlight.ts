@@ -9,14 +9,16 @@ import { cpLen, cpSlice } from './textUtils.js';
 
 export type HighlightToken = {
   text: string;
-  type: 'default' | 'command' | 'file';
+  type: 'default' | 'command' | 'file' | 'image';
 };
 
-// Matches slash commands (e.g., /help) and @ references (files or MCP resource URIs).
+// Matches slash commands (e.g., /help), @ references (files or MCP resource URIs),
+// and image placeholders (e.g., [Image #1]).
 // The @ pattern uses a negated character class to support URIs like `@file:///example.txt`
 // which contain colons. It matches any character except delimiters: comma, whitespace,
 // semicolon, common punctuation, and brackets.
-const HIGHLIGHT_REGEX = /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[^,\s;!?()[\]{}])+)/g;
+const HIGHLIGHT_REGEX =
+  /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[^,\s;!?()[\]{}])+|\[Image #\d+\])/g;
 
 export function parseInputForHighlighting(
   text: string,
@@ -46,7 +48,15 @@ export function parseInputForHighlighting(
         tokens.push({ text: text.slice(last, matchIndex), type: 'default' });
       }
 
-      const type = fullMatch.startsWith('/') ? 'command' : 'file';
+      let type: HighlightToken['type'];
+      if (fullMatch.startsWith('/')) {
+        type = 'command';
+      } else if (fullMatch.startsWith('[Image')) {
+        type = 'image';
+      } else {
+        type = 'file';
+      }
+
       if (type === 'command' && index !== 0) {
         tokens.push({ text: fullMatch, type: 'default' });
       } else {
