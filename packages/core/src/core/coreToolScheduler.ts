@@ -609,6 +609,7 @@ export class CoreToolScheduler {
         const messageBus = this.config.getMessageBus();
         const hooksEnabled = this.config.getEnableHooks();
         let forceUserConfirmation = false;
+        let forcedConfirmationMessage: string | undefined;
 
         if (hooksEnabled && messageBus) {
           const toolInput = (invocation.params || {}) as Record<
@@ -657,9 +658,10 @@ export class CoreToolScheduler {
             }
 
             // Check if hook requested user confirmation
-            // TODO: beforeOutput.systemMessage can be used to display reason for forced confirmation
             if (beforeOutput.isAskDecision()) {
               forceUserConfirmation = true;
+              forcedConfirmationMessage =
+                beforeOutput.systemMessage ?? beforeOutput.reason;
             }
 
             // Check if hook requested to update tool input
@@ -700,14 +702,25 @@ export class CoreToolScheduler {
 
         const confirmationDetails =
           await invocation.shouldConfirmExecute(signal);
+        const confirmationDetailsWithForcedMessage =
+          confirmationDetails &&
+          forceUserConfirmation &&
+          forcedConfirmationMessage &&
+          typeof confirmationDetails === 'object'
+            ? {
+                ...confirmationDetails,
+                systemMessage: forcedConfirmationMessage,
+              }
+            : confirmationDetails;
 
-        if (!confirmationDetails) {
+        if (!confirmationDetailsWithForcedMessage) {
           this.setToolCallOutcome(
             reqInfo.callId,
             ToolConfirmationOutcome.ProceedAlways,
           );
           this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
         } else {
+          const confirmationDetails = confirmationDetailsWithForcedMessage;
           // Check forceUserConfirmation first (from hook decision: 'ask')
           // before checking isAutoApproved
           const activeCall = this.toolCalls[0] as ValidatingToolCall;

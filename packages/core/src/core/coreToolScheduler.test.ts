@@ -1826,7 +1826,7 @@ describe('CoreToolScheduler BeforeTool hooks', () => {
           success: true,
           output: {
             decision: 'ask',
-            reason: 'Require user confirmation for this tool',
+            systemMessage: 'Forced confirmation by hook',
           },
         };
       }
@@ -1868,6 +1868,10 @@ describe('CoreToolScheduler BeforeTool hooks', () => {
     await vi.waitFor(() => {
       const calls = onToolCallsUpdate.mock.calls.at(-1)?.[0] as ToolCall[];
       expect(calls?.[0]?.status).toBe('awaiting_approval');
+      const awaitingApproval = calls?.[0] as WaitingToolCall | undefined;
+      expect(awaitingApproval?.confirmationDetails?.systemMessage).toBe(
+        'Forced confirmation by hook',
+      );
     });
 
     // Verify the tool was NOT executed yet (waiting for approval)
