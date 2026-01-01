@@ -56,6 +56,7 @@ jobs:
         with:
           node-version-file: './release/.nvmrc'
           cache: 'npm'
+          cache-dependency-path: './release/package-lock.json'
 
       - name: 'Install Dependencies'
         working-directory: './release'
@@ -137,7 +138,7 @@ jobs:
           a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
 
       - name: 'Create and Merge Pull Request'
-        if: "github.event.inputs.environment != 'dev'"
+        if: ${{ github.event.inputs.environment != 'dev' }}
         uses: './.github/actions/create-pull-request'
         with:
           branch-name: 'release/${{ steps.nightly_version.outputs.RELEASE_TAG }}'
