@@ -38,6 +38,7 @@ import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
   initializeShellParsers,
+  parseCommandDetails,
   stripShellWrapper,
 } from '../utils/shell-utils.js';
 import {
@@ -90,6 +91,35 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return description;
   }
 
+  private analyzeCommand(command: string): {
+    rootCommands: string[];
+    destructiveRoots: Set<string>;
+    destructiveTextByRoot: Map<string, string>;
+  } {
+    const parsed = parseCommandDetails(command);
+    const details = parsed && !parsed.hasError ? parsed.details : [];
+    const rootCommands = [
+      ...new Set(details.map((detail) => detail.name)),
+    ].filter((root): root is string => Boolean(root));
+
+    const destructiveRoots = new Set<string>();
+    const destructiveTextByRoot = new Map<string, string>();
+
+    for (const detail of details) {
+      if (!detail.name) {
+        continue;
+      }
+      if (isDestructiveCommand(detail.name, detail.text)) {
+        destructiveRoots.add(detail.name);
+        if (!destructiveTextByRoot.has(detail.name)) {
+          destructiveTextByRoot.set(detail.name, detail.text);
+        }
+      }
+    }
+
+    return { rootCommands, destructiveRoots, destructiveTextByRoot };
+  }
+
   protected override getPolicyUpdateOptions(
     outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
@@ -98,9 +128,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
       outcome === ToolConfirmationOutcome.ProceedAlways
     ) {
       const command = stripShellWrapper(this.params.command);
-      const rootCommands = [...new Set(getCommandRoots(command))];
-      if (rootCommands.length > 0) {
-        return { commandPrefix: rootCommands };
+      const { rootCommands, destructiveRoots } = this.analyzeCommand(command);
+      const allowlistableRoots = rootCommands.filter(
+        (root) => !destructiveRoots.has(root),
+      );
+      if (allowlistableRoots.length > 0) {
+        return { commandPrefix: allowlistableRoots };
       }
       return { commandPrefix: this.params.command };
     }
@@ -111,7 +144,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
-    const rootCommands = [...new Set(getCommandRoots(command))];
+    const { rootCommands, destructiveRoots, destructiveTextByRoot } =
+      this.analyzeCommand(command);
 
     // In non-interactive mode, we need to prevent the tool from hanging while
     // waiting for user input. If a tool is not fully allowed (e.g. via
@@ -135,13 +169,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
     // confirmation even if their root command is in the session allowlist.
     // This prevents accidental execution of dangerous operations like
     // 'git push' when user only intended to allow 'git log'.
-    const hasDestructive = rootCommands.some((rootCmd) =>
-      isDestructiveCommand(rootCmd, command),
-    );
+    const hasDestructive = destructiveRoots.size > 0;
 
     // Filter out already-approved commands, but keep destructive ones
     const commandsToConfirm = rootCommands.filter(
-      (cmd) => !this.allowlist.has(cmd) || isDestructiveCommand(cmd, command),
+      (cmd) => !this.allowlist.has(cmd) || destructiveRoots.has(cmd),
     );
 
     if (commandsToConfirm.length === 0) {
@@ -149,9 +181,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
     }
 
     // Get destructive warning message if applicable
-    const destructiveWarning = hasDestructive
-      ? getDestructiveWarning(rootCommands[0], command)
+    const firstDestructiveRoot = rootCommands.find((cmd) =>
+      destructiveRoots.has(cmd),
+    );
+    const destructiveWarning = firstDestructiveRoot
+      ? getDestructiveWarning(
+          firstDestructiveRoot,
+          destructiveTextByRoot.get(firstDestructiveRoot) ?? command,
+        )
       : undefined;
+
+    const allowlistableCommands = commandsToConfirm.filter(
+      (cmd) => !destructiveRoots.has(cmd),
+    );
 
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
@@ -165,9 +207,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           // Only add non-destructive commands to the session allowlist.
           // Destructive commands should always require confirmation.
-          commandsToConfirm
-            .filter((cmd) => !isDestructiveCommand(cmd, command))
-            .forEach((cmd) => this.allowlist.add(cmd));
+          allowlistableCommands.forEach((cmd) => this.allowlist.add(cmd));
+        }
+        if (
+          hasDestructive &&
+          (outcome === ToolConfirmationOutcome.ProceedAlways ||
+            outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave)
+        ) {
+          return;
         }
         await this.publishPolicyUpdate(outcome);
       },
