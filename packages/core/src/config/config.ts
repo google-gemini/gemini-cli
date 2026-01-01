@@ -412,6 +412,8 @@ export class Config {
   private model: string;
   private previewFeatures: boolean | undefined;
   private hasAccessToPreviewModel: boolean = false;
+  private cachedQuota?: RetrieveUserQuotaResponse;
+  private lastQuotaFetchTime?: number;
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
@@ -1034,7 +1036,25 @@ export class Config {
     this.hasAccessToPreviewModel = hasAccess;
   }
 
-  async refreshUserQuota(): Promise<RetrieveUserQuotaResponse | undefined> {
+  getCachedQuota(): RetrieveUserQuotaResponse | undefined {
+    return this.cachedQuota;
+  }
+
+  async refreshUserQuota(
+    force: boolean = false,
+  ): Promise<RetrieveUserQuotaResponse | undefined> {
+    const now = Date.now();
+    const THROTTLE_MS = 60000; // 60 seconds
+
+    if (
+      !force &&
+      this.cachedQuota &&
+      this.lastQuotaFetchTime &&
+      now - this.lastQuotaFetchTime < THROTTLE_MS
+    ) {
+      return this.cachedQuota;
+    }
+
     const codeAssistServer = getCodeAssistServer(this);
     if (!codeAssistServer || !codeAssistServer.projectId) {
       return undefined;
@@ -1046,6 +1066,10 @@ export class Config {
       const hasAccess =
         quota.buckets?.some((b) => b.modelId === PREVIEW_GEMINI_MODEL) ?? false;
       this.setHasAccessToPreviewModel(hasAccess);
+
+      this.cachedQuota = quota;
+      this.lastQuotaFetchTime = now;
+
       return quota;
     } catch (e) {
       debugLogger.debug('Failed to retrieve user quota', e);

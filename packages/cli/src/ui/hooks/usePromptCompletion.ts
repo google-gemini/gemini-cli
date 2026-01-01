@@ -6,13 +6,27 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { Config } from '@google/gemini-cli-core';
-import { debugLogger, getResponseText } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  getResponseText,
+  TerminalQuotaError,
+  RetryableQuotaError,
+} from '@google/gemini-cli-core';
 import type { Content } from '@google/genai';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 
 export const PROMPT_COMPLETION_MIN_LENGTH = 5;
-export const PROMPT_COMPLETION_DEBOUNCE_MS = 250;
+// Debounce increased from 250ms to 1000ms to reduce API call frequency and
+// help users stay within quota limits. Maintainers: adjust if UX feels sluggish.
+export const PROMPT_COMPLETION_DEBOUNCE_MS = 1000;
+const RPM_COOLDOWN_MS = 60000; // 1 minute cooldown on 429 RPM
+
+// Prompt completion uses the flash-lite model for cost efficiency
+const PROMPT_COMPLETION_MODEL_ID = 'gemini-2.5-flash-lite';
+// Disable prompt completions when quota drops below this threshold to preserve
+// quota for core agent functionality (e.g., tool calls, main completions)
+const QUOTA_GUARDRAIL_THRESHOLD = 0.2;
 
 export interface PromptCompletion {
   text: string;
@@ -41,6 +55,8 @@ export function usePromptCompletion({
     useState<boolean>(false);
   const lastSelectedTextRef = useRef<string>('');
   const lastRequestedTextRef = useRef<string>('');
+  const [isQuotaDisabled, setIsQuotaDisabled] = useState<boolean>(false);
+  const retryAfterRef = useRef<number>(0);
 
   const isPromptCompletionEnabled =
     enabled && (config?.getEnablePromptCompletion() ?? false);
@@ -66,7 +82,7 @@ export function usePromptCompletion({
 
   const generatePromptSuggestions = useCallback(async () => {
     const trimmedText = buffer.text.trim();
-    const geminiClient = config?.getGeminiClient();
+    const now = Date.now();
 
     if (trimmedText === lastRequestedTextRef.current) {
       return;
@@ -78,13 +94,40 @@ export function usePromptCompletion({
 
     if (
       trimmedText.length < PROMPT_COMPLETION_MIN_LENGTH ||
-      !geminiClient ||
       isSlashCommand(trimmedText) ||
       trimmedText.includes('@') ||
-      !isPromptCompletionEnabled
+      !isPromptCompletionEnabled ||
+      isQuotaDisabled ||
+      now < retryAfterRef.current
     ) {
       clearGhostText();
       lastRequestedTextRef.current = '';
+      return;
+    }
+
+    const geminiClient = config?.getGeminiClient();
+    if (!geminiClient) {
+      return;
+    }
+
+    // Proactive Quota Check (20% Guardrail)
+    // We call refreshUserQuota which will use the cached value if within 60s
+    await config?.refreshUserQuota();
+    const lastQuota = config?.getCachedQuota();
+    const liteBucket = lastQuota?.buckets?.find(
+      (b) => b.modelId === PROMPT_COMPLETION_MODEL_ID,
+    );
+
+    if (
+      liteBucket &&
+      liteBucket.remainingFraction !== undefined &&
+      liteBucket.remainingFraction < QUOTA_GUARDRAIL_THRESHOLD
+    ) {
+      debugLogger.warn(
+        '[WARN] prompt completion proactively disabled to save remaining quota for internal tools.',
+      );
+      setIsQuotaDisabled(true);
+      clearGhostText();
       return;
     }
 
@@ -139,9 +182,21 @@ export function usePromptCompletion({
           (error instanceof Error && error.name === 'AbortError')
         )
       ) {
-        debugLogger.warn(
-          `[WARN] prompt completion failed: : (${error instanceof Error ? error.message : String(error)})`,
-        );
+        if (error instanceof TerminalQuotaError) {
+          debugLogger.warn(
+            '[WARN] prompt completion quota exhausted. Disabling for this session.',
+          );
+          setIsQuotaDisabled(true);
+        } else if (error instanceof RetryableQuotaError) {
+          debugLogger.warn(
+            `[WARN] prompt completion rate limited. Cooling down for ${RPM_COOLDOWN_MS / 1000}s.`,
+          );
+          retryAfterRef.current = Date.now() + RPM_COOLDOWN_MS;
+        } else {
+          debugLogger.warn(
+            `[WARN] prompt completion failed: : (${error instanceof Error ? error.message : String(error)})`,
+          );
+        }
       }
       clearGhostText();
     } finally {
@@ -149,7 +204,13 @@ export function usePromptCompletion({
         setIsLoadingGhostText(false);
       }
     }
-  }, [buffer.text, config, clearGhostText, isPromptCompletionEnabled]);
+  }, [
+    buffer.text,
+    config,
+    clearGhostText,
+    isPromptCompletionEnabled,
+    isQuotaDisabled,
+  ]);
 
   const isCursorAtEnd = useCallback(() => {
     const [cursorRow, cursorCol] = buffer.cursor;
