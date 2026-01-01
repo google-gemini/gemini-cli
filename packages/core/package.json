@@ -57,6 +57,7 @@
     "js-yaml": "^4.1.1",
     "marked": "^15.0.12",
     "mime": "4.0.7",
+    "minimatch": "^9.0.4",
     "mnemonist": "^0.40.3",
     "open": "^10.1.2",
     "picomatch": "^4.0.1",
