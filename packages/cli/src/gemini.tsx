@@ -17,6 +17,10 @@ import dns from 'node:dns';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
 import {
+  loadTrustedFolders,
+  type TrustedFoldersError,
+} from './config/trustedFolders.js';
+import {
   loadSettings,
   migrateDeprecatedSettings,
   SettingScope,
@@ -37,6 +41,7 @@ import {
   type ResumedSessionData,
   type OutputPayload,
   type ConsoleLogPayload,
+  type UserFeedbackPayload,
   sessionId,
   logUserPrompt,
   AuthType,
@@ -299,6 +304,19 @@ export async function main() {
   const settings = loadSettings();
   loadSettingsHandle?.end();
 
+  // Report settings errors once during startup
+  settings.errors.forEach((error) => {
+    coreEvents.emitFeedback('warning', error.message);
+  });
+
+  const trustedFolders = loadTrustedFolders();
+  trustedFolders.errors.forEach((error: TrustedFoldersError) => {
+    coreEvents.emitFeedback(
+      'warning',
+      `Error in ${error.path}: ${error.message}`,
+    );
+  });
+
   const migrateHandle = startupProfiler.start('migrate_settings');
   migrateDeprecatedSettings(
     settings,
@@ -376,24 +394,35 @@ export async function main() {
         settings.merged,
         sessionId,
         argv,
+        { projectHooks: settings.workspace.settings.hooks },
       );
 
       if (
         settings.merged.security?.auth?.selectedType &&
         !settings.merged.security?.auth?.useExternal
       ) {
-        // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
         try {
-          const err = validateAuthMethod(
-            settings.merged.security.auth.selectedType,
-          );
-          if (err) {
-            throw new Error(err);
-          }
+          if (partialConfig.isInteractive()) {
+            // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
+            const err = validateAuthMethod(
+              settings.merged.security.auth.selectedType,
+            );
+            if (err) {
+              throw new Error(err);
+            }
 
-          await partialConfig.refreshAuth(
-            settings.merged.security.auth.selectedType,
-          );
+            await partialConfig.refreshAuth(
+              settings.merged.security.auth.selectedType,
+            );
+          } else {
+            const authType = await validateNonInteractiveAuth(
+              settings.merged.security?.auth?.selectedType,
+              settings.merged.security?.auth?.useExternal,
+              partialConfig,
+              settings,
+            );
+            await partialConfig.refreshAuth(authType);
+          }
         } catch (err) {
           debugLogger.error('Error authenticating:', err);
           await runExitCleanup();
@@ -447,7 +476,9 @@ export async function main() {
   // may have side effects.
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
-    const config = await loadCliConfig(settings.merged, sessionId, argv);
+    const config = await loadCliConfig(settings.merged, sessionId, argv, {
+      projectHooks: settings.workspace.settings.hooks,
+    });
     loadConfigHandle?.end();
 
     // Register config for telemetry shutdown
@@ -577,7 +608,8 @@ export async function main() {
         // Use the existing session ID to continue recording to the same session
         config.setSessionId(resumedSessionData.conversation.sessionId);
       } catch (error) {
-        console.error(
+        coreEvents.emitFeedback(
+          'error',
           `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
         await runExitCleanup();
@@ -645,12 +677,13 @@ export async function main() {
       ),
     );
 
-    const nonInteractiveConfig = await validateNonInteractiveAuth(
+    const authType = await validateNonInteractiveAuth(
       settings.merged.security?.auth?.selectedType,
       settings.merged.security?.auth?.useExternal,
       config,
       settings,
     );
+    await config.refreshAuth(authType);
 
     if (config.getDebugMode()) {
       debugLogger.log('Session ID: %s', sessionId);
@@ -662,7 +695,7 @@ export async function main() {
     initializeOutputListenersAndFlush();
 
     await runNonInteractive({
-      config: nonInteractiveConfig,
+      config,
       settings,
       input,
       prompt_id,
@@ -699,13 +732,25 @@ export function initializeOutputListenersAndFlush() {
       }
     });
 
-    coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
-      if (payload.type === 'error' || payload.type === 'warn') {
-        writeToStderr(payload.content);
-      } else {
-        writeToStdout(payload.content);
-      }
-    });
+    if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
+      coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
+        if (payload.type === 'error' || payload.type === 'warn') {
+          writeToStderr(payload.content);
+        } else {
+          writeToStdout(payload.content);
+        }
+      });
+    }
+
+    if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
+      coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
+        if (payload.severity === 'error' || payload.severity === 'warning') {
+          writeToStderr(payload.message);
+        } else {
+          writeToStdout(payload.message);
+        }
+      });
+    }
   }
   coreEvents.drainBacklogs();
 }

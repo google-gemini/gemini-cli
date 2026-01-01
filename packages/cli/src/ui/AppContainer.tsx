@@ -253,10 +253,7 @@ export const AppContainer = (props: AppContainerProps) => {
     [],
   );
 
-  // Helper to determine the effective model, considering the fallback state.
-  const getEffectiveModel = useCallback(() => config.getModel(), [config]);
-
-  const [currentModel, setCurrentModel] = useState(getEffectiveModel());
+  const [currentModel, setCurrentModel] = useState(config.getModel());
 
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
 
@@ -341,7 +338,7 @@ export const AppContainer = (props: AppContainerProps) => {
     return () => {
       coreEvents.off(CoreEvent.ModelChanged, handleModelChanged);
     };
-  }, [getEffectiveModel, config]);
+  }, [config]);
 
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();
@@ -845,16 +842,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const handleClearScreen = useCallback(() => {
     historyManager.clearItems();
     clearConsoleMessagesState();
-    if (!isAlternateBuffer) {
-      console.clear();
-    }
     refreshStatic();
-  }, [
-    historyManager,
-    clearConsoleMessagesState,
-    refreshStatic,
-    isAlternateBuffer,
-  ]);
+  }, [historyManager, clearConsoleMessagesState, refreshStatic]);
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
@@ -902,6 +891,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ),
     pager: settings.merged.tools?.shell?.pager,
     showColor: settings.merged.tools?.shell?.showColor,
+    sanitizationConfig: config.sanitizationConfig,
   });
 
   const isFocused = useFocus();

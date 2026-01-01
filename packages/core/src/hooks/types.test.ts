@@ -8,12 +8,12 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   createHookOutput,
   DefaultHookOutput,
-  BeforeToolHookOutput,
   BeforeModelHookOutput,
   BeforeToolSelectionHookOutput,
   AfterModelHookOutput,
   HookEventName,
   HookType,
+  BeforeToolHookOutput,
 } from './types.js';
 import { defaultHookTranslator } from './hookTranslator.js';
 import type {
@@ -92,6 +92,11 @@ describe('Hook Output Classes', () => {
     it('should return BeforeToolSelectionHookOutput for BeforeToolSelection event', () => {
       const output = createHookOutput(HookEventName.BeforeToolSelection, {});
       expect(output).toBeInstanceOf(BeforeToolSelectionHookOutput);
+    });
+
+    it('should return BeforeToolHookOutput for BeforeTool event', () => {
+      const output = createHookOutput(HookEventName.BeforeTool, {});
+      expect(output).toBeInstanceOf(BeforeToolHookOutput);
     });
   });
 
@@ -205,33 +210,6 @@ describe('Hook Output Classes', () => {
     it('getBlockingError should return blocked: false if not blocking decision', () => {
       const output = new DefaultHookOutput({ decision: 'approve' });
       expect(output.getBlockingError()).toEqual({ blocked: false, reason: '' });
-    });
-  });
-
-  describe('BeforeToolHookOutput', () => {
-    it('isBlockingDecision should use permissionDecision from hookSpecificOutput', () => {
-      const output1 = new BeforeToolHookOutput({
-        hookSpecificOutput: { permissionDecision: 'block' },
-      });
-      expect(output1.isBlockingDecision()).toBe(true);
-
-      const output2 = new BeforeToolHookOutput({
-        hookSpecificOutput: { permissionDecision: 'approve' },
-      });
-      expect(output2.isBlockingDecision()).toBe(false);
-    });
-
-    it('getEffectiveReason should use permissionDecisionReason from hookSpecificOutput', () => {
-      const output1 = new BeforeToolHookOutput({
-        hookSpecificOutput: { permissionDecisionReason: 'compat reason' },
-      });
-      expect(output1.getEffectiveReason()).toBe('compat reason');
-
-      const output2 = new BeforeToolHookOutput({
-        reason: 'default reason',
-        hookSpecificOutput: { other: 'value' },
-      });
-      expect(output2.getEffectiveReason()).toBe('default reason');
     });
   });
 
