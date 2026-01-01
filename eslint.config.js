@@ -226,7 +226,7 @@ export default tseslint.config(
           patterns: {
             year: {
               pattern: '202[5-9]',
-              defaultValue: '2025',
+              defaultValue: `${new Date().getUTCFullYear()}`,
             },
           },
         },
