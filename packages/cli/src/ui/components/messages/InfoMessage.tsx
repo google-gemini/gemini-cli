@@ -22,7 +22,7 @@ export const InfoMessage: React.FC<InfoMessageProps> = ({
 }) => {
   color ??= theme.status.warning;
   const prefix = icon ?? 'ℹ ';
-  const prefixWidth = prefix.length;
+  const prefixWidth = 3;
 
   return (
     <Box flexDirection="row" marginTop={1}>
