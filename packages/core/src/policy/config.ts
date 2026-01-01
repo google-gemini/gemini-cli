@@ -28,6 +28,7 @@ import {
 } from '../confirmation-bus/types.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -124,7 +125,7 @@ export async function createPolicyEngineConfig(
     rules: tomlRules,
     checkers: tomlCheckers,
     errors,
-  } = await loadPoliciesFromToml(approvalMode, policyDirs, (dir) =>
+  } = await loadPoliciesFromToml(policyDirs, (dir) =>
     getPolicyTier(dir, defaultPoliciesDir),
   );
 
@@ -236,6 +237,7 @@ export async function createPolicyEngineConfig(
     rules,
     checkers,
     defaultDecision: PolicyDecision.ASK_USER,
+    approvalMode,
   };
 }
 
@@ -244,7 +246,7 @@ interface TomlRule {
   mcpName?: string;
   decision?: string;
   priority?: number;
-  commandPrefix?: string;
+  commandPrefix?: string | string[];
   argsPattern?: string;
   // Index signature to satisfy Record type if needed for toml.stringify
   [key: string]: unknown;
@@ -258,26 +260,45 @@ export function createPolicyUpdater(
     MessageBusType.UPDATE_POLICY,
     async (message: UpdatePolicy) => {
       const toolName = message.toolName;
-      let argsPattern = message.argsPattern
-        ? new RegExp(message.argsPattern)
-        : undefined;
 
       if (message.commandPrefix) {
-        // Convert commandPrefix to argsPattern for in-memory rule
-        // This mimics what toml-loader does
-        const escapedPrefix = escapeRegex(message.commandPrefix);
-        argsPattern = new RegExp(`"command":"${escapedPrefix}`);
-      }
+        // Convert commandPrefix(es) to argsPatterns for in-memory rules
+        const prefixes = Array.isArray(message.commandPrefix)
+          ? message.commandPrefix
+          : [message.commandPrefix];
 
-      policyEngine.addRule({
-        toolName,
-        decision: PolicyDecision.ALLOW,
-        // User tier (2) + high priority (950/1000) = 2.95
-        // This ensures user "always allow" selections are high priority
-        // but still lose to admin policies (3.xxx) and settings excludes (200)
-        priority: 2.95,
-        argsPattern,
-      });
+        for (const prefix of prefixes) {
+          const escapedPrefix = escapeRegex(prefix);
+          // Use robust regex to match whole words (e.g. "git" but not "github")
+          const argsPattern = new RegExp(
+            `"command":"${escapedPrefix}(?:[\\s"]|$)`,
+          );
+
+          policyEngine.addRule({
+            toolName,
+            decision: PolicyDecision.ALLOW,
+            // User tier (2) + high priority (950/1000) = 2.95
+            // This ensures user "always allow" selections are high priority
+            // but still lose to admin policies (3.xxx) and settings excludes (200)
+            priority: 2.95,
+            argsPattern,
+          });
+        }
+      } else {
+        const argsPattern = message.argsPattern
+          ? new RegExp(message.argsPattern)
+          : undefined;
+
+        policyEngine.addRule({
+          toolName,
+          decision: PolicyDecision.ALLOW,
+          // User tier (2) + high priority (950/1000) = 2.95
+          // This ensures user "always allow" selections are high priority
+          // but still lose to admin policies (3.xxx) and settings excludes (200)
+          priority: 2.95,
+          argsPattern,
+        });
+      }
 
       if (message.persist) {
         try {
@@ -292,7 +313,7 @@ export function createPolicyUpdater(
             existingData = toml.parse(fileContent) as { rule?: TomlRule[] };
           } catch (error) {
             if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-              console.warn(
+              debugLogger.warn(
                 `Failed to parse ${policyFile}, overwriting with new policy.`,
                 error,
               );
