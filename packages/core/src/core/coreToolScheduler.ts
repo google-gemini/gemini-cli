@@ -601,10 +601,11 @@ export class CoreToolScheduler {
           return;
         }
 
-        const confirmationDetails =
-          await invocation.shouldConfirmExecute(signal);
-
-        // Fire BeforeTool hook before the isAutoApproved check
+        // Fire BeforeTool hook before computing confirmation details / auto-approval.
+        // This allows hooks to:
+        // - block/stop execution early
+        // - modify tool input before confirmation is calculated
+        // - force user confirmation via decision: 'ask'
         const messageBus = this.config.getMessageBus();
         const hooksEnabled = this.config.getEnableHooks();
         let forceUserConfirmation = false;
@@ -697,6 +698,9 @@ export class CoreToolScheduler {
           }
         }
 
+        const confirmationDetails =
+          await invocation.shouldConfirmExecute(signal);
+
         if (!confirmationDetails) {
           this.setToolCallOutcome(
             reqInfo.callId,
@@ -706,7 +710,8 @@ export class CoreToolScheduler {
         } else {
           // Check forceUserConfirmation first (from hook decision: 'ask')
           // before checking isAutoApproved
-          if (!forceUserConfirmation && this.isAutoApproved(toolCall)) {
+          const activeCall = this.toolCalls[0] as ValidatingToolCall;
+          if (!forceUserConfirmation && this.isAutoApproved(activeCall)) {
             this.setToolCallOutcome(
               reqInfo.callId,
               ToolConfirmationOutcome.ProceedAlways,
