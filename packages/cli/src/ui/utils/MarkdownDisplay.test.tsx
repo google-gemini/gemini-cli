@@ -209,13 +209,13 @@ Another paragraph.
       expect(lastFrame()).not.toContain(' 1 ');
     });
 
-    it('shows line numbers in code blocks by default', () => {
+    it('does not show line numbers in code blocks by default', () => {
       const text = '```javascript\nconst x = 1;\n```'.replace(/\n/g, eol);
       const { lastFrame } = renderWithProviders(
         <MarkdownDisplay {...baseProps} text={text} />,
       );
       expect(lastFrame()).toMatchSnapshot();
-      expect(lastFrame()).toContain(' 1 ');
+      expect(lastFrame()).not.toContain(' 1 ');
     });
   });
 });

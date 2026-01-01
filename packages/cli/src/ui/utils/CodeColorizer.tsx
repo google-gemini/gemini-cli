@@ -137,9 +137,10 @@ export function colorizeCode(
 ): React.ReactNode {
   const codeToHighlight = code.replace(/\n$/, '');
   const activeTheme = theme || themeManager.getActiveTheme();
+  // Default: do NOT show line numbers unless explicitly enabled in settings or hideLineNumbers is false
   const showLineNumbers = hideLineNumbers
     ? false
-    : (settings?.merged.ui?.showLineNumbers ?? true);
+    : (settings?.merged.ui?.showLineNumbers ?? false);
 
   try {
     // Render the HAST tree using the adapted theme
