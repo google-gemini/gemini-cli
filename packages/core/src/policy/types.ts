@@ -96,6 +96,11 @@ export type SafetyCheckerConfig =
 
 export interface PolicyRule {
   /**
+   * A unique name for the policy rule, useful for identification and debugging.
+   */
+  name?: string;
+
+  /**
    * The name of the tool this rule applies to.
    * If undefined, the rule applies to all tools.
    */
