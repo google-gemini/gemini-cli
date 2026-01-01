@@ -227,7 +227,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`ui.showCitations`** (boolean):
   - **Description:** Show citations for generated text in the chat.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`ui.showModelInfoInChat`** (boolean):
   - **Description:** Show the model name in the chat for each model turn.

@@ -52,7 +52,7 @@ they appear in the UI.
 | Hide Footer                    | `ui.hideFooter`                          | Hide the footer from the UI.                                         | `false` |
 | Show Memory Usage              | `ui.showMemoryUsage`                     | Display memory usage information in the UI.                          | `false` |
 | Show Line Numbers              | `ui.showLineNumbers`                     | Show line numbers in the chat.                                       | `false` |
-| Show Citations                 | `ui.showCitations`                       | Show citations for generated text in the chat.                       | `false` |
+| Show Citations                 | `ui.showCitations`                       | Show citations for generated text in the chat.                       | `true`  |
 | Use Full Width                 | `ui.useFullWidth`                        | Use the entire width of the terminal for output.                     | `true`  |
 | Use Alternate Screen Buffer    | `ui.useAlternateBuffer`                  | Use an alternate screen buffer for the UI, preserving shell history. | `true`  |
 | Disable Loading Phrases        | `ui.accessibility.disableLoadingPhrases` | Disable loading phrases for accessibility.                           | `false` |
