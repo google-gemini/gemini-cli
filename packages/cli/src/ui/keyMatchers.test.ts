@@ -22,65 +22,6 @@ describe('keyMatchers', () => {
     ...mods,
   });
 
-  // Original hard-coded logic (for comparison)
-  const originalMatchers: Record<Command, (key: Key) => boolean> = {
-    [Command.RETURN]: (key: Key) => key.name === 'return',
-    [Command.HOME]: (key: Key) => key.ctrl && key.name === 'a',
-    [Command.END]: (key: Key) => key.ctrl && key.name === 'e',
-    [Command.KILL_LINE_RIGHT]: (key: Key) => key.ctrl && key.name === 'k',
-    [Command.KILL_LINE_LEFT]: (key: Key) => key.ctrl && key.name === 'u',
-    [Command.CLEAR_INPUT]: (key: Key) => key.ctrl && key.name === 'c',
-    [Command.DELETE_WORD_BACKWARD]: (key: Key) =>
-      (key.ctrl || key.meta) && key.name === 'backspace',
-    [Command.CLEAR_SCREEN]: (key: Key) => key.ctrl && key.name === 'l',
-    [Command.SCROLL_UP]: (key: Key) => key.name === 'up' && !!key.shift,
-    [Command.SCROLL_DOWN]: (key: Key) => key.name === 'down' && !!key.shift,
-    [Command.SCROLL_HOME]: (key: Key) => key.name === 'home',
-    [Command.SCROLL_END]: (key: Key) => key.name === 'end',
-    [Command.PAGE_UP]: (key: Key) => key.name === 'pageup',
-    [Command.PAGE_DOWN]: (key: Key) => key.name === 'pagedown',
-    [Command.HISTORY_UP]: (key: Key) => key.ctrl && key.name === 'p',
-    [Command.HISTORY_DOWN]: (key: Key) => key.ctrl && key.name === 'n',
-    [Command.NAVIGATION_UP]: (key: Key) => key.name === 'up',
-    [Command.NAVIGATION_DOWN]: (key: Key) => key.name === 'down',
-    [Command.DIALOG_NAVIGATION_UP]: (key: Key) =>
-      !key.shift && (key.name === 'up' || key.name === 'k'),
-    [Command.DIALOG_NAVIGATION_DOWN]: (key: Key) =>
-      !key.shift && (key.name === 'down' || key.name === 'j'),
-    [Command.ACCEPT_SUGGESTION]: (key: Key) =>
-      key.name === 'tab' || (key.name === 'return' && !key.ctrl),
-    [Command.COMPLETION_UP]: (key: Key) =>
-      key.name === 'up' || (key.ctrl && key.name === 'p'),
-    [Command.COMPLETION_DOWN]: (key: Key) =>
-      key.name === 'down' || (key.ctrl && key.name === 'n'),
-    [Command.ESCAPE]: (key: Key) => key.name === 'escape',
-    [Command.SUBMIT]: (key: Key) =>
-      key.name === 'return' && !key.ctrl && !key.meta && !key.paste,
-    [Command.NEWLINE]: (key: Key) =>
-      key.name === 'return' && (key.ctrl || key.meta || key.paste),
-    [Command.OPEN_EXTERNAL_EDITOR]: (key: Key) =>
-      key.ctrl && (key.name === 'x' || key.sequence === '\x18'),
-    [Command.PASTE_CLIPBOARD]: (key: Key) => key.ctrl && key.name === 'v',
-    [Command.SHOW_ERROR_DETAILS]: (key: Key) => key.name === 'f12',
-    [Command.SHOW_FULL_TODOS]: (key: Key) => key.ctrl && key.name === 't',
-    [Command.TOGGLE_IDE_CONTEXT_DETAIL]: (key: Key) =>
-      key.ctrl && key.name === 'g',
-    [Command.TOGGLE_MARKDOWN]: (key: Key) => key.meta && key.name === 'm',
-    [Command.TOGGLE_COPY_MODE]: (key: Key) => key.ctrl && key.name === 's',
-    [Command.QUIT]: (key: Key) => key.ctrl && key.name === 'c',
-    [Command.EXIT]: (key: Key) => key.ctrl && key.name === 'd',
-    [Command.SHOW_MORE_LINES]: (key: Key) => key.ctrl && key.name === 's',
-    [Command.REVERSE_SEARCH]: (key: Key) => key.ctrl && key.name === 'r',
-    [Command.SUBMIT_REVERSE_SEARCH]: (key: Key) =>
-      key.name === 'return' && !key.ctrl,
-    [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: (key: Key) =>
-      key.name === 'tab',
-    [Command.TOGGLE_SHELL_INPUT_FOCUS]: (key: Key) =>
-      key.ctrl && key.name === 'f',
-    [Command.EXPAND_SUGGESTION]: (key: Key) => key.name === 'right',
-    [Command.COLLAPSE_SUGGESTION]: (key: Key) => key.name === 'left',
-  };
-
   // Test data for each command with positive and negative test cases
   const testCases = [
     // Basic bindings
@@ -332,9 +273,9 @@ describe('keyMatchers', () => {
       negative: [createKey('return'), createKey('space')],
     },
     {
-      command: Command.TOGGLE_SHELL_INPUT_FOCUS,
-      positive: [createKey('f', { ctrl: true })],
-      negative: [createKey('f')],
+      command: Command.TOGGLE_SHELL_INPUT_FOCUS_IN,
+      positive: [createKey('tab')],
+      negative: [createKey('f', { ctrl: true }), createKey('f')],
     },
   ];
 
@@ -346,20 +287,12 @@ describe('keyMatchers', () => {
             keyMatchers[command](key),
             `Expected ${command} to match ${JSON.stringify(key)}`,
           ).toBe(true);
-          expect(
-            originalMatchers[command](key),
-            `Original matcher should also match ${JSON.stringify(key)}`,
-          ).toBe(true);
         });
 
         negative.forEach((key) => {
           expect(
             keyMatchers[command](key),
             `Expected ${command} to NOT match ${JSON.stringify(key)}`,
-          ).toBe(false);
-          expect(
-            originalMatchers[command](key),
-            `Original matcher should also NOT match ${JSON.stringify(key)}`,
           ).toBe(false);
         });
       });
