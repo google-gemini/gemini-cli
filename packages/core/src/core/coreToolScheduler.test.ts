@@ -1779,3 +1779,258 @@ describe('CoreToolScheduler Sequential Execution', () => {
     modifyWithEditorSpy.mockRestore();
   });
 });
+
+describe('CoreToolScheduler BeforeTool hooks', () => {
+  it('should force user confirmation when BeforeTool hook returns decision: ask', async () => {
+    const executeFn = vi.fn().mockResolvedValue({
+      llmContent: 'Tool executed',
+      returnDisplay: 'Tool executed',
+    });
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      execute: executeFn,
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
+    const declarativeTool = mockTool;
+
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getToolByName: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    // Configure scheduler in YOLO mode (would normally auto-approve)
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+      getApprovalMode: () => ApprovalMode.YOLO,
+      isInteractive: () => true, // Must be interactive for confirmation prompt
+    });
+    const mockMessageBus = createMockMessageBus();
+    // Mock BeforeTool hook to return decision: 'ask'
+    mockMessageBus.request = vi.fn().mockImplementation(async (request) => {
+      if (request.eventName === 'BeforeTool') {
+        return {
+          type: 'HOOK_EXECUTION_RESPONSE',
+          correlationId: 'test-id',
+          success: true,
+          output: {
+            decision: 'ask',
+            reason: 'Require user confirmation for this tool',
+          },
+        };
+      }
+      // Return empty output for other hooks
+      return {
+        type: 'HOOK_EXECUTION_RESPONSE',
+        correlationId: 'test-id',
+        success: true,
+        output: {},
+      };
+    });
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(true);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: 'mockTool',
+      args: { param: 'value' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-ask-hook',
+    };
+
+    // Schedule the tool - don't await since it should wait for approval
+    void scheduler.schedule([request], abortController.signal);
+
+    // Wait for the tool to be awaiting approval
+    // Even in YOLO mode, the hook's decision: 'ask' should force confirmation
+    await vi.waitFor(() => {
+      const calls = onToolCallsUpdate.mock.calls.at(-1)?.[0] as ToolCall[];
+      expect(calls?.[0]?.status).toBe('awaiting_approval');
+    });
+
+    // Verify the tool was NOT executed yet (waiting for approval)
+    expect(executeFn).not.toHaveBeenCalled();
+  });
+
+  it('should block execution when BeforeTool hook returns decision: block', async () => {
+    const executeFn = vi.fn().mockResolvedValue({
+      llmContent: 'Tool executed',
+      returnDisplay: 'Tool executed',
+    });
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      execute: executeFn,
+    });
+    const declarativeTool = mockTool;
+
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getToolByName: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+      getApprovalMode: () => ApprovalMode.YOLO,
+      isInteractive: () => false,
+    });
+    const mockMessageBus = createMockMessageBus();
+    // Mock BeforeTool hook to return decision: 'block'
+    mockMessageBus.request = vi.fn().mockResolvedValue({
+      type: 'HOOK_EXECUTION_RESPONSE',
+      correlationId: 'test-id',
+      success: true,
+      output: {
+        decision: 'block',
+        reason: 'Tool execution blocked by policy',
+      },
+    });
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(true);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: 'mockTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-block-hook',
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls[0].status).toBe('error');
+
+    // Verify the tool was NOT executed
+    expect(executeFn).not.toHaveBeenCalled();
+  });
+
+  it('should stop agent execution when BeforeTool hook returns continue: false', async () => {
+    const executeFn = vi.fn().mockResolvedValue({
+      llmContent: 'Tool executed',
+      returnDisplay: 'Tool executed',
+    });
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      execute: executeFn,
+    });
+    const declarativeTool = mockTool;
+
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getToolByName: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+      getApprovalMode: () => ApprovalMode.YOLO,
+      isInteractive: () => false,
+    });
+    const mockMessageBus = createMockMessageBus();
+    // Mock BeforeTool hook to return continue: false
+    mockMessageBus.request = vi.fn().mockResolvedValue({
+      type: 'HOOK_EXECUTION_RESPONSE',
+      correlationId: 'test-id',
+      success: true,
+      output: {
+        continue: false,
+        stopReason: 'Emergency stop requested',
+      },
+    });
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(true);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: 'mockTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-stop-hook',
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls[0].status).toBe('error');
+
+    // Verify the tool was NOT executed
+    expect(executeFn).not.toHaveBeenCalled();
+  });
+});

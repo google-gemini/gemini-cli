@@ -40,8 +40,10 @@ import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   fireToolNotificationHook,
+  fireBeforeToolHook,
   executeToolWithHooks,
 } from './coreToolHookTriggers.js';
+import { BeforeToolHookOutput } from '../hooks/types.js';
 import {
   type ToolCall,
   type ValidatingToolCall,
@@ -583,7 +585,8 @@ export class CoreToolScheduler {
 
     // This logic is moved from the old `for` loop in `_schedule`.
     if (toolCall.status === 'validating') {
-      const { request: reqInfo, invocation } = toolCall;
+      const { request: reqInfo } = toolCall;
+      let { invocation } = toolCall;
 
       try {
         if (signal.aborted) {
@@ -601,6 +604,99 @@ export class CoreToolScheduler {
         const confirmationDetails =
           await invocation.shouldConfirmExecute(signal);
 
+        // Fire BeforeTool hook before the isAutoApproved check
+        const messageBus = this.config.getMessageBus();
+        const hooksEnabled = this.config.getEnableHooks();
+        let forceUserConfirmation = false;
+
+        if (hooksEnabled && messageBus) {
+          const toolInput = (invocation.params || {}) as Record<
+            string,
+            unknown
+          >;
+          const beforeOutput = await fireBeforeToolHook(
+            messageBus,
+            toolCall.tool.name,
+            toolInput,
+          );
+
+          if (beforeOutput) {
+            // Check if hook requested to stop entire agent execution
+            if (beforeOutput.shouldStopExecution()) {
+              const reason = beforeOutput.getEffectiveReason();
+              this.setStatusInternal(
+                reqInfo.callId,
+                'error',
+                signal,
+                createErrorResponse(
+                  reqInfo,
+                  new Error(`Agent execution stopped by hook: ${reason}`),
+                  ToolErrorType.STOP_EXECUTION,
+                ),
+              );
+              await this.checkAndNotifyCompletion(signal);
+              return;
+            }
+
+            // Check if hook blocked the tool execution
+            const blockingError = beforeOutput.getBlockingError();
+            if (blockingError.blocked) {
+              this.setStatusInternal(
+                reqInfo.callId,
+                'error',
+                signal,
+                createErrorResponse(
+                  reqInfo,
+                  new Error(`Tool execution blocked: ${blockingError.reason}`),
+                  ToolErrorType.EXECUTION_FAILED,
+                ),
+              );
+              await this.checkAndNotifyCompletion(signal);
+              return;
+            }
+
+            // Check if hook requested user confirmation
+            // TODO: beforeOutput.systemMessage can be used to display reason for forced confirmation
+            if (beforeOutput.isAskDecision()) {
+              forceUserConfirmation = true;
+            }
+
+            // Check if hook requested to update tool input
+            if (beforeOutput instanceof BeforeToolHookOutput) {
+              const modifiedInput = beforeOutput.getModifiedToolInput();
+              if (modifiedInput) {
+                Object.assign(invocation.params, modifiedInput);
+                try {
+                  invocation = toolCall.tool.build(invocation.params);
+                  // Update the toolCall's invocation
+                  this.toolCalls = this.toolCalls.map((tc) =>
+                    tc.request.callId === reqInfo.callId
+                      ? { ...tc, invocation }
+                      : tc,
+                  );
+                } catch (error) {
+                  this.setStatusInternal(
+                    reqInfo.callId,
+                    'error',
+                    signal,
+                    createErrorResponse(
+                      reqInfo,
+                      new Error(
+                        `Tool parameter modification by hook failed validation: ${
+                          error instanceof Error ? error.message : String(error)
+                        }`,
+                      ),
+                      ToolErrorType.INVALID_TOOL_PARAMS,
+                    ),
+                  );
+                  await this.checkAndNotifyCompletion(signal);
+                  return;
+                }
+              }
+            }
+          }
+        }
+
         if (!confirmationDetails) {
           this.setToolCallOutcome(
             reqInfo.callId,
@@ -608,7 +704,9 @@ export class CoreToolScheduler {
           );
           this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
         } else {
-          if (this.isAutoApproved(toolCall)) {
+          // Check forceUserConfirmation first (from hook decision: 'ask')
+          // before checking isAutoApproved
+          if (!forceUserConfirmation && this.isAutoApproved(toolCall)) {
             this.setToolCallOutcome(
               reqInfo.callId,
               ToolConfirmationOutcome.ProceedAlways,
