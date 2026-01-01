@@ -44,6 +44,10 @@ import {
   isCommandAllowed,
   isShellInvocationAllowlisted,
 } from '../utils/shell-permissions.js';
+import {
+  isDestructiveCommand,
+  getDestructiveWarning,
+} from '../utils/command-classifier.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
@@ -127,22 +131,43 @@ export class ShellToolInvocation extends BaseToolInvocation<
       );
     }
 
+    // Check if any command is destructive - destructive commands require
+    // confirmation even if their root command is in the session allowlist.
+    // This prevents accidental execution of dangerous operations like
+    // 'git push' when user only intended to allow 'git log'.
+    const hasDestructive = rootCommands.some((rootCmd) =>
+      isDestructiveCommand(rootCmd, command),
+    );
+
+    // Filter out already-approved commands, but keep destructive ones
     const commandsToConfirm = rootCommands.filter(
-      (command) => !this.allowlist.has(command),
+      (cmd) => !this.allowlist.has(cmd) || isDestructiveCommand(cmd, command),
     );
 
     if (commandsToConfirm.length === 0) {
-      return false; // already approved and allowlisted
+      return false; // already approved and allowlisted (and not destructive)
     }
+
+    // Get destructive warning message if applicable
+    const destructiveWarning = hasDestructive
+      ? getDestructiveWarning(rootCommands[0], command)
+      : undefined;
 
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
-      title: 'Confirm Shell Command',
+      title: hasDestructive
+        ? 'Confirm Destructive Command'
+        : 'Confirm Shell Command',
       command: this.params.command,
       rootCommand: commandsToConfirm.join(', '),
+      systemMessage: destructiveWarning,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          commandsToConfirm.forEach((command) => this.allowlist.add(command));
+          // Only add non-destructive commands to the session allowlist.
+          // Destructive commands should always require confirmation.
+          commandsToConfirm
+            .filter((cmd) => !isDestructiveCommand(cmd, command))
+            .forEach((cmd) => this.allowlist.add(cmd));
         }
         await this.publishPolicyUpdate(outcome);
       },
