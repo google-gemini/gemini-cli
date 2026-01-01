@@ -57,7 +57,7 @@ try {
 
 const fileContent = `/**
  * @license
- * Copyright ${new Date().getFullYear()} Google LLC
+ * Copyright ${new Date().getUTCFullYear()} Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
