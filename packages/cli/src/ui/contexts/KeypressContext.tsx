@@ -510,9 +510,10 @@ function* emitKeys(
       insertable = true;
     }
 
-    // Consolidate space handling: ensure consistent insertable state and sequence
-    if (name === 'space' && !ctrl) {
-      insertable = true;
+    // Consolidate space handling: normalize sequence for all space encodings.
+    // Space is only insertable when Ctrl is not pressed.
+    if (name === 'space') {
+      insertable = !ctrl;
       sequence = ' ';
     }
 

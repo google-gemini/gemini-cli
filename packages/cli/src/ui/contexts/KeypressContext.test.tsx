@@ -247,6 +247,16 @@ describe('KeypressContext', () => {
         },
       },
       {
+        name: 'Ctrl+Space (CSI u)',
+        sequence: '\x1b[32;5u',
+        expected: {
+          name: 'space',
+          ctrl: true,
+          insertable: false,
+          sequence: ' ',
+        },
+      },
+      {
         name: 'Alt+Space (Escape sequence)',
         sequence: '\x1b ',
         expected: {
