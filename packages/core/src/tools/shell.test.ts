@@ -495,6 +495,99 @@ describe('ShellTool', () => {
       expect(secondConfirmation).toBe(false);
     });
 
+    it('should require confirmation for destructive git commands even if git is allowlisted', async () => {
+      const statusInvocation = shellTool.build({ command: 'git status' });
+      const statusConfirmation = await statusInvocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(statusConfirmation).not.toBe(false);
+      if (statusConfirmation === false || statusConfirmation.type !== 'exec') {
+        throw new Error('Expected exec confirmation for git status');
+      }
+
+      await statusConfirmation.onConfirm(ToolConfirmationOutcome.ProceedAlways);
+
+      const pushInvocation = shellTool.build({
+        command: 'git push origin main',
+      });
+      const pushConfirmation = await pushInvocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(pushConfirmation).not.toBe(false);
+      if (pushConfirmation === false || pushConfirmation.type !== 'exec') {
+        throw new Error('Expected exec confirmation for git push');
+      }
+      expect(pushConfirmation.title).toBe('Confirm Destructive Command');
+      expect(pushConfirmation.rootCommand).toContain('git');
+      expect(pushConfirmation.systemMessage).toContain(
+        'push changes to a remote repository',
+      );
+
+      // Even if the user selects "Always", destructive commands should never become
+      // allowlisted and should keep prompting.
+      await pushConfirmation.onConfirm(ToolConfirmationOutcome.ProceedAlways);
+
+      const pushConfirmationAgain = await shellTool
+        .build({ command: 'git push origin main' })
+        .shouldConfirmExecute(new AbortController().signal);
+
+      expect(pushConfirmationAgain).not.toBe(false);
+      if (
+        pushConfirmationAgain === false ||
+        pushConfirmationAgain.type !== 'exec'
+      ) {
+        throw new Error('Expected exec confirmation for git push (again)');
+      }
+      expect(pushConfirmationAgain.title).toBe('Confirm Destructive Command');
+    });
+
+    it('should treat chained commands as destructive if any segment is destructive', async () => {
+      // Allowlist git via a read-only command first.
+      const statusConfirmation = await shellTool
+        .build({ command: 'git status' })
+        .shouldConfirmExecute(new AbortController().signal);
+
+      if (statusConfirmation === false || statusConfirmation.type !== 'exec') {
+        throw new Error('Expected exec confirmation for git status');
+      }
+      await statusConfirmation.onConfirm(ToolConfirmationOutcome.ProceedAlways);
+
+      const chainedConfirmation = await shellTool
+        .build({ command: 'git status && git push origin main' })
+        .shouldConfirmExecute(new AbortController().signal);
+
+      expect(chainedConfirmation).not.toBe(false);
+      if (
+        chainedConfirmation === false ||
+        chainedConfirmation.type !== 'exec'
+      ) {
+        throw new Error('Expected exec confirmation for chained git command');
+      }
+      expect(chainedConfirmation.title).toBe('Confirm Destructive Command');
+      expect(chainedConfirmation.rootCommand).toContain('git');
+      expect(chainedConfirmation.systemMessage).toContain(
+        'push changes to a remote repository',
+      );
+    });
+
+    it('should show destructive warnings even when the first root command is non-destructive', async () => {
+      const confirmation = await shellTool
+        .build({ command: 'echo "hi" && git push origin main' })
+        .shouldConfirmExecute(new AbortController().signal);
+
+      expect(confirmation).not.toBe(false);
+      if (confirmation === false || confirmation.type !== 'exec') {
+        throw new Error('Expected exec confirmation for echo && git push');
+      }
+      expect(confirmation.title).toBe('Confirm Destructive Command');
+      expect(confirmation.rootCommand).toContain('git');
+      expect(confirmation.systemMessage).toContain(
+        'push changes to a remote repository',
+      );
+    });
+
     it('should throw an error if validation fails', () => {
       expect(() => shellTool.build({ command: '' })).toThrow();
     });
