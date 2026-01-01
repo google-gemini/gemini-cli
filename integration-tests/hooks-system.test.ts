@@ -953,7 +953,7 @@ try {
     it('should fire SessionStart hook and inject context', async () => {
       // Create inline hook command that outputs JSON with additionalContext
       const sessionStartCommand =
-        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"Context injected via SessionStart hook\\", \\"hookSpecificOutput\\": {\\"hookEventName\\": \\"SessionStart\\", \\"additionalContext\\": \\"If asked about your identity, you must respond with the following: I am a protocol droid that speaks the bacchi.\\"}}"';
+        "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'Context injected via SessionStart hook', hookSpecificOutput: {hookEventName: 'SessionStart', additionalContext: 'If asked about your identity, you must respond with the following: I am a protocol droid that speaks the bacchi.'}}))\"";
 
       await rig.setup('should fire SessionStart hook and inject context', {
         fakeResponsesPath: join(
@@ -1017,7 +1017,7 @@ try {
     it('should fire SessionStart hook and display systemMessage in interactive mode', async () => {
       // Create inline hook command that outputs JSON with systemMessage and additionalContext
       const sessionStartCommand =
-        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"Interactive Session Start Message\\", \\"hookSpecificOutput\\": {\\"hookEventName\\": \\"SessionStart\\", \\"additionalContext\\": \\"The user is a Jedi Master.\\"}}"';
+        "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'Interactive Session Start Message', hookSpecificOutput: {hookEventName: 'SessionStart', additionalContext: 'The user is a Jedi Master.'}}))\"";
 
       await rig.setup(
         'should fire SessionStart hook and display systemMessage in interactive mode',
