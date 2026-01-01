@@ -86,6 +86,9 @@ export const DefaultLight: Theme = new Theme(
     'hljs-attr': {
       color: lightTheme.AccentRed,
     },
+    'hljs-property': {
+      color: lightTheme.AccentRed,
+    },
     'hljs-symbol': {
       color: lightTheme.AccentCyan,
     },
