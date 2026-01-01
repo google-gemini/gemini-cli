@@ -94,6 +94,7 @@ import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { SkillManager } from '../services/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 
 import { ApprovalMode } from '../policy/types.js';
@@ -134,6 +135,24 @@ export interface CodebaseInvestigatorSettings {
   model?: string;
 }
 
+export interface ExtensionSetting {
+  name: string;
+  description: string;
+  envVar: string;
+  sensitive?: boolean;
+}
+
+export interface ResolvedExtensionSetting {
+  name: string;
+  envVar: string;
+  value: string;
+  sensitive: boolean;
+}
+
+export interface IntrospectionAgentSettings {
+  enabled?: boolean;
+}
+
 /**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
@@ -151,6 +170,8 @@ export interface GeminiCLIExtension {
   excludeTools?: string[];
   id: string;
   hooks?: { [K in HookEventName]?: HookDefinition[] };
+  settings?: ExtensionSetting[];
+  resolvedSettings?: ResolvedExtensionSetting[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -173,6 +194,7 @@ import {
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
+import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 
 export type { FileFilteringOptions };
 export {
@@ -280,6 +302,9 @@ export interface ConfigParameters {
   enableExtensionReloading?: boolean;
   allowedMcpServers?: string[];
   blockedMcpServers?: string[];
+  allowedEnvironmentVariables?: string[];
+  blockedEnvironmentVariables?: string[];
+  enableEnvironmentVariableRedaction?: boolean;
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   folderTrust?: boolean;
@@ -304,9 +329,9 @@ export interface ConfigParameters {
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
-  enableMessageBusIntegration?: boolean;
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
+  introspectionAgentSettings?: IntrospectionAgentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -318,16 +343,16 @@ export interface ConfigParameters {
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   experiments?: Experiments;
-  hooks?:
-    | {
-        [K in HookEventName]?: HookDefinition[];
-      }
-    | ({
-        [K in HookEventName]?: HookDefinition[];
-      } & { disabled?: string[] });
+  hooks?: { [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] };
+  projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
+    disabled?: string[];
+  };
   previewFeatures?: boolean;
   enableAgents?: boolean;
+  skillsSupport?: boolean;
+  disabledSkills?: string[];
   experimentalJitContext?: boolean;
+  onModelChange?: (model: string) => void;
 }
 
 export class Config {
@@ -335,9 +360,13 @@ export class Config {
   private mcpClientManager?: McpClientManager;
   private allowedMcpServers: string[];
   private blockedMcpServers: string[];
+  private allowedEnvironmentVariables: string[];
+  private blockedEnvironmentVariables: string[];
+  private readonly enableEnvironmentVariableRedaction: boolean;
   private promptRegistry!: PromptRegistry;
   private resourceRegistry!: ResourceRegistry;
   private agentRegistry!: AgentRegistry;
+  private skillManager!: SkillManager;
   private sessionId: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
@@ -360,7 +389,6 @@ export class Config {
   private userMemory: string;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
-  private approvalMode: ApprovalMode;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
@@ -427,8 +455,8 @@ export class Config {
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
-  private readonly enableMessageBusIntegration: boolean;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
+  private readonly introspectionAgentSettings: IntrospectionAgentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -441,12 +469,18 @@ export class Config {
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
+  private readonly projectHooks:
+    | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
+    | undefined;
   private readonly disabledHooks: string[];
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
+  private readonly onModelChange: ((model: string) => void) | undefined;
 
   private readonly enableAgents: boolean;
+  private readonly skillsSupport: boolean;
+  private readonly disabledSkills: string[];
 
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
@@ -474,10 +508,13 @@ export class Config {
     this.mcpServers = params.mcpServers;
     this.allowedMcpServers = params.allowedMcpServers ?? [];
     this.blockedMcpServers = params.blockedMcpServers ?? [];
+    this.allowedEnvironmentVariables = params.allowedEnvironmentVariables ?? [];
+    this.blockedEnvironmentVariables = params.blockedEnvironmentVariables ?? [];
+    this.enableEnvironmentVariableRedaction =
+      params.enableEnvironmentVariableRedaction ?? false;
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
-    this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
     this.accessibility = params.accessibility ?? {};
     this.telemetrySettings = {
@@ -511,9 +548,11 @@ export class Config {
     this.model = params.model;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
-    this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.skillsSupport = params.skillsSupport ?? false;
+    this.disabledSkills = params.disabledSkills ?? [];
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
+    this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalZedIntegration =
       params.experimentalZedIntegration ?? false;
@@ -543,6 +582,7 @@ export class Config {
       terminalHeight: params.shellExecutionConfig?.terminalHeight ?? 24,
       showColor: params.shellExecutionConfig?.showColor ?? false,
       pager: params.shellExecutionConfig?.pager ?? 'cat',
+      sanitizationConfig: this.sanitizationConfig,
     };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
@@ -561,14 +601,6 @@ export class Config {
         ? params.hooks.disabled
         : undefined) ?? [];
 
-    // Enable MessageBus integration if:
-    // 1. Explicitly enabled via setting, OR
-    // 2. Hooks are enabled and hooks are configured
-    const hasHooks = params.hooks && Object.keys(params.hooks).length > 0;
-    const hooksNeedMessageBus = this.enableHooks && hasHooks;
-    this.enableMessageBusIntegration =
-      params.enableMessageBusIntegration ??
-      (hooksNeedMessageBus ? true : false);
     this.codebaseInvestigatorSettings = {
       enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
       maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 10,
@@ -577,6 +609,9 @@ export class Config {
         params.codebaseInvestigatorSettings?.thinkingBudget ??
         DEFAULT_THINKING_MODE,
       model: params.codebaseInvestigatorSettings?.model,
+    };
+    this.introspectionAgentSettings = {
+      enabled: params.introspectionAgentSettings?.enabled ?? false,
     };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
@@ -591,15 +626,22 @@ export class Config {
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
-    this.policyEngine = new PolicyEngine(params.policyEngineConfig);
+    this.policyEngine = new PolicyEngine({
+      ...params.policyEngineConfig,
+      approvalMode:
+        params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+    });
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
+    this.skillManager = new SkillManager();
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
+    this.projectHooks = params.projectHooks;
     this.experiments = params.experiments;
+    this.onModelChange = params.onModelChange;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -688,6 +730,12 @@ export class Config {
     ]);
     initMcpHandle?.end();
 
+    // Discover skills if enabled
+    if (this.skillsSupport) {
+      await this.getSkillManager().discoverSkills(this.storage);
+      this.getSkillManager().setDisabledSkills(this.disabledSkills);
+    }
+
     // Initialize hook system if enabled
     if (this.enableHooks) {
       this.hookSystem = new HookSystem(this);
@@ -696,6 +744,7 @@ export class Config {
 
     if (this.experimentalJitContext) {
       this.contextManager = new ContextManager(this);
+      await this.contextManager.refresh();
     }
 
     await this.geminiClient.initialize();
@@ -849,12 +898,15 @@ export class Config {
     return this.model;
   }
 
-  setModel(newModel: string): void {
+  setModel(newModel: string, isFallbackModel: boolean = false): void {
     if (this.model !== newModel || this._activeModel !== newModel) {
       this.model = newModel;
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
+      if (this.onModelChange && !isFallbackModel) {
+        this.onModelChange(newModel);
+      }
     }
     this.modelAvailabilityService.reset();
   }
@@ -934,6 +986,10 @@ export class Config {
 
   getPromptRegistry(): PromptRegistry {
     return this.promptRegistry;
+  }
+
+  getSkillManager(): SkillManager {
+    return this.skillManager;
   }
 
   getResourceRegistry(): ResourceRegistry {
@@ -1057,11 +1113,28 @@ export class Config {
     return this.blockedMcpServers;
   }
 
+  get sanitizationConfig(): EnvironmentSanitizationConfig {
+    return {
+      allowedEnvironmentVariables: this.allowedEnvironmentVariables,
+      blockedEnvironmentVariables: this.blockedEnvironmentVariables,
+      enableEnvironmentVariableRedaction:
+        this.enableEnvironmentVariableRedaction,
+    };
+  }
+
   setMcpServers(mcpServers: Record<string, MCPServerConfig>): void {
     this.mcpServers = mcpServers;
   }
 
   getUserMemory(): string {
+    if (this.experimentalJitContext && this.contextManager) {
+      return [
+        this.contextManager.getGlobalMemory(),
+        this.contextManager.getEnvironmentMemory(),
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+    }
     return this.userMemory;
   }
 
@@ -1086,6 +1159,9 @@ export class Config {
   }
 
   getGeminiMdFileCount(): number {
+    if (this.experimentalJitContext && this.contextManager) {
+      return this.contextManager.getLoadedPaths().size;
+    }
     return this.geminiMdFileCount;
   }
 
@@ -1094,6 +1170,9 @@ export class Config {
   }
 
   getGeminiMdFilePaths(): string[] {
+    if (this.experimentalJitContext && this.contextManager) {
+      return Array.from(this.contextManager.getLoadedPaths());
+    }
     return this.geminiMdFilePaths;
   }
 
@@ -1102,7 +1181,7 @@ export class Config {
   }
 
   getApprovalMode(): ApprovalMode {
-    return this.approvalMode;
+    return this.policyEngine.getApprovalMode();
   }
 
   setApprovalMode(mode: ApprovalMode): void {
@@ -1111,7 +1190,7 @@ export class Config {
         'Cannot enable privileged approval modes in an untrusted folder.',
       );
     }
-    this.approvalMode = mode;
+    this.policyEngine.setApprovalMode(mode);
   }
 
   isYoloModeDisabled(): boolean {
@@ -1418,6 +1497,10 @@ export class Config {
     );
   }
 
+  isSkillsSupportEnabled(): boolean {
+    return this.skillsSupport;
+  }
+
   isInteractive(): boolean {
     return this.interactive;
   }
@@ -1462,6 +1545,9 @@ export class Config {
         config.terminalHeight ?? this.shellExecutionConfig.terminalHeight,
       showColor: config.showColor ?? this.shellExecutionConfig.showColor,
       pager: config.pager ?? this.shellExecutionConfig.pager,
+      sanitizationConfig:
+        config.sanitizationConfig ??
+        this.shellExecutionConfig.sanitizationConfig,
     };
   }
   getScreenReader(): boolean {
@@ -1523,10 +1609,6 @@ export class Config {
     return this.policyEngine;
   }
 
-  getEnableMessageBusIntegration(): boolean {
-    return this.enableMessageBusIntegration;
-  }
-
   getEnableHooks(): boolean {
     return this.enableHooks;
   }
@@ -1535,13 +1617,15 @@ export class Config {
     return this.codebaseInvestigatorSettings;
   }
 
+  getIntrospectionAgentSettings(): IntrospectionAgentSettings {
+    return this.introspectionAgentSettings;
+  }
+
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this);
 
     // Set message bus on tool registry before discovery so MCP tools can access it
-    if (this.getEnableMessageBusIntegration()) {
-      registry.setMessageBus(this.messageBus);
-    }
+    registry.setMessageBus(this.messageBus);
 
     // helper to create & register core tools that are enabled
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1567,11 +1651,7 @@ export class Config {
         // Pass message bus to tools when feature flag is enabled
         // This first implementation is only focused on the general case of
         // the tool registry.
-        const messageBusEnabled = this.getEnableMessageBusIntegration();
-
-        const toolArgs = messageBusEnabled
-          ? [...args, this.getMessageBus()]
-          : args;
+        const toolArgs = [...args, this.getMessageBus()];
 
         registry.registerTool(new ToolClass(...toolArgs));
       }
@@ -1625,11 +1705,10 @@ export class Config {
         !allowedTools || allowedTools.includes(DELEGATE_TO_AGENT_TOOL_NAME);
 
       if (isAllowed) {
-        const messageBusEnabled = this.getEnableMessageBusIntegration();
         const delegateTool = new DelegateToAgentTool(
           this.agentRegistry,
           this,
-          messageBusEnabled ? this.getMessageBus() : undefined,
+          this.getMessageBus(),
         );
         registry.registerTool(delegateTool);
       }
@@ -1652,6 +1731,15 @@ export class Config {
    */
   getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.hooks;
+  }
+
+  /**
+   * Get project-specific hooks configuration
+   */
+  getProjectHooks():
+    | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
+    | undefined {
+    return this.projectHooks;
   }
 
   /**

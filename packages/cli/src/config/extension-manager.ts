@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { stat } from 'node:fs/promises';
 import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import { type Settings, SettingScope } from './settings.js';
@@ -43,6 +44,7 @@ import {
   type GeminiCLIExtension,
   type HookDefinition,
   type HookEventName,
+  type ResolvedExtensionSetting,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -198,7 +200,9 @@ export class ExtensionManager extends ExtensionLoader {
               installMetadata.type === 'git') ||
             // Otherwise ask the user if they would like to try a git clone.
             (await this.requestConsent(
-              `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.\n\nWould you like to attempt to install via "git clone" instead?`,
+              `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.
+
+Would you like to attempt to install via "git clone" instead?`,
             ))
           ) {
             await cloneFromGit(installMetadata, tempDir);
@@ -506,6 +510,24 @@ export class ExtensionManager extends ExtensionLoader {
       );
       config = resolveEnvVarsInObject(config, customEnv);
 
+      const resolvedSettings: ResolvedExtensionSetting[] = [];
+      if (config.settings) {
+        for (const setting of config.settings) {
+          const value = customEnv[setting.envVar];
+          resolvedSettings.push({
+            name: setting.name,
+            envVar: setting.envVar,
+            value:
+              value === undefined
+                ? '[not set]'
+                : setting.sensitive
+                  ? '***'
+                  : value,
+            sensitive: setting.sensitive ?? false,
+          });
+        }
+      }
+
       if (config.mcpServers) {
         config.mcpServers = Object.fromEntries(
           Object.entries(config.mcpServers).map(([key, value]) => [
@@ -529,7 +551,7 @@ export class ExtensionManager extends ExtensionLoader {
         });
       }
 
-      const extension = {
+      const extension: GeminiCLIExtension = {
         name: config.name,
         version: config.version,
         path: effectiveExtensionPath,
@@ -543,6 +565,8 @@ export class ExtensionManager extends ExtensionLoader {
           this.workspaceDir,
         ),
         id: getExtensionId(config, installMetadata),
+        settings: config.settings,
+        resolvedSettings,
       };
       this.loadedExtensions = [...this.loadedExtensions, extension];
 
@@ -697,6 +721,13 @@ export class ExtensionManager extends ExtensionLoader {
         output += `\n  ${tool}`;
       });
     }
+    const resolvedSettings = extension.resolvedSettings;
+    if (resolvedSettings && resolvedSettings.length > 0) {
+      output += `\n Settings:`;
+      resolvedSettings.forEach((setting) => {
+        output += `\n  ${setting.name}: ${setting.value}`;
+      });
+    }
     return output;
   }
 
@@ -797,7 +828,46 @@ function validateName(name: string) {
   }
 }
 
-function getExtensionId(
+export async function inferInstallMetadata(
+  source: string,
+  args: {
+    ref?: string;
+    autoUpdate?: boolean;
+    allowPreRelease?: boolean;
+  } = {},
+): Promise<ExtensionInstallMetadata> {
+  if (
+    source.startsWith('http://') ||
+    source.startsWith('https://') ||
+    source.startsWith('git@') ||
+    source.startsWith('sso://')
+  ) {
+    return {
+      source,
+      type: 'git',
+      ref: args.ref,
+      autoUpdate: args.autoUpdate,
+      allowPreRelease: args.allowPreRelease,
+    };
+  } else {
+    if (args.ref || args.autoUpdate) {
+      throw new Error(
+        '--ref and --auto-update are not applicable for local extensions.',
+      );
+    }
+    try {
+      await stat(source);
+      return {
+        source,
+        type: 'local',
+      };
+    } catch {
+      throw new Error('Install source not found.');
+    }
+  }
+}
+
+export function getExtensionId(
   config: ExtensionConfig,
   installMetadata?: ExtensionInstallMetadata,
 ): string {

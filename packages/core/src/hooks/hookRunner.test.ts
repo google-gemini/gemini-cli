@@ -7,10 +7,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { HookRunner } from './hookRunner.js';
-import { HookEventName, HookType } from './types.js';
+import { HookEventName, HookType, ConfigSource } from './types.js';
 import type { HookConfig } from './types.js';
 import type { HookInput } from './types.js';
 import type { Readable, Writable } from 'node:stream';
+import type { Config } from '../config/config.js';
 
 // Mock type for the child_process spawn
 type MockChildProcessWithoutNullStreams = ChildProcessWithoutNullStreams & {
@@ -53,6 +54,7 @@ vi.stubGlobal('console', mockConsole);
 describe('HookRunner', () => {
   let hookRunner: HookRunner;
   let mockSpawn: MockChildProcessWithoutNullStreams;
+  let mockConfig: Config;
 
   const mockInput: HookInput = {
     session_id: 'test-session',
@@ -65,7 +67,14 @@ describe('HookRunner', () => {
   beforeEach(() => {
     vi.resetAllMocks();
 
-    hookRunner = new HookRunner();
+    mockConfig = {
+      isTrustedFolder: vi.fn().mockReturnValue(true),
+      sanitizationConfig: {
+        enableEnvironmentVariableRedaction: true,
+      },
+    } as unknown as Config;
+
+    hookRunner = new HookRunner(mockConfig);
 
     // Mock spawn with accessible mock functions
     const mockStdoutOn = vi.fn();
@@ -100,6 +109,89 @@ describe('HookRunner', () => {
   });
 
   describe('executeHook', () => {
+    describe('security checks', () => {
+      it('should block project hooks in untrusted folders', async () => {
+        vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(false);
+
+        const projectHookConfig: HookConfig = {
+          type: HookType.Command,
+          command: './hooks/test.sh',
+          source: ConfigSource.Project,
+        };
+
+        const result = await hookRunner.executeHook(
+          projectHookConfig,
+          HookEventName.BeforeTool,
+          mockInput,
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error?.message).toContain(
+          'Security: Blocked execution of project hook in untrusted folder',
+        );
+        expect(mockDebugLogger.warn).toHaveBeenCalledWith(
+          expect.stringContaining('Security: Blocked execution'),
+        );
+        expect(spawn).not.toHaveBeenCalled();
+      });
+
+      it('should allow project hooks in trusted folders', async () => {
+        vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(true);
+
+        const projectHookConfig: HookConfig = {
+          type: HookType.Command,
+          command: './hooks/test.sh',
+          source: ConfigSource.Project,
+        };
+
+        // Mock successful execution
+        mockSpawn.mockProcessOn.mockImplementation(
+          (event: string, callback: (code: number) => void) => {
+            if (event === 'close') {
+              setTimeout(() => callback(0), 10);
+            }
+          },
+        );
+
+        const result = await hookRunner.executeHook(
+          projectHookConfig,
+          HookEventName.BeforeTool,
+          mockInput,
+        );
+
+        expect(result.success).toBe(true);
+        expect(spawn).toHaveBeenCalled();
+      });
+
+      it('should allow non-project hooks even in untrusted folders', async () => {
+        vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(false);
+
+        const systemHookConfig: HookConfig = {
+          type: HookType.Command,
+          command: './hooks/test.sh',
+          source: ConfigSource.System,
+        };
+
+        // Mock successful execution
+        mockSpawn.mockProcessOn.mockImplementation(
+          (event: string, callback: (code: number) => void) => {
+            if (event === 'close') {
+              setTimeout(() => callback(0), 10);
+            }
+          },
+        );
+
+        const result = await hookRunner.executeHook(
+          systemHookConfig,
+          HookEventName.BeforeTool,
+          mockInput,
+        );
+
+        expect(result.success).toBe(true);
+        expect(spawn).toHaveBeenCalled();
+      });
+    });
+
     describe('command hooks', () => {
       const commandConfig: HookConfig = {
         type: HookType.Command,
@@ -114,9 +206,8 @@ describe('HookRunner', () => {
         mockSpawn.mockStdoutOn.mockImplementation(
           (event: string, callback: (data: Buffer) => void) => {
             if (event === 'data') {
-              setTimeout(
-                () => callback(Buffer.from(JSON.stringify(mockOutput))),
-                10,
+              setImmediate(() =>
+                callback(Buffer.from(JSON.stringify(mockOutput))),
               );
             }
           },
@@ -125,7 +216,7 @@ describe('HookRunner', () => {
         mockSpawn.mockProcessOn.mockImplementation(
           (event: string, callback: (code: number) => void) => {
             if (event === 'close') {
-              setTimeout(() => callback(0), 20);
+              setImmediate(() => callback(0));
             }
           },
         );
@@ -150,7 +241,7 @@ describe('HookRunner', () => {
         mockSpawn.mockStderrOn.mockImplementation(
           (event: string, callback: (data: Buffer) => void) => {
             if (event === 'data') {
-              setTimeout(() => callback(Buffer.from(errorMessage)), 10);
+              setImmediate(() => callback(Buffer.from(errorMessage)));
             }
           },
         );
@@ -158,7 +249,7 @@ describe('HookRunner', () => {
         mockSpawn.mockProcessOn.mockImplementation(
           (event: string, callback: (code: number) => void) => {
             if (event === 'close') {
-              setTimeout(() => callback(1), 20);
+              setImmediate(() => callback(1));
             }
           },
         );
@@ -223,9 +314,9 @@ describe('HookRunner', () => {
           killWasCalled = true;
           // Simulate that killing the process triggers the close event
           if (closeCallback) {
-            setTimeout(() => {
+            setImmediate(() => {
               closeCallback!(128); // Exit code 128 indicates process was killed by signal
-            }, 5);
+            });
           }
           return true;
         });
@@ -251,7 +342,7 @@ describe('HookRunner', () => {
         mockSpawn.mockProcessOn.mockImplementation(
           (event: string, callback: (code: number) => void) => {
             if (event === 'close') {
-              setTimeout(() => callback(0), 10);
+              setImmediate(() => callback(0));
             }
           },
         );
@@ -263,14 +354,54 @@ describe('HookRunner', () => {
         );
 
         expect(spawn).toHaveBeenCalledWith(
-          '/test/project/hooks/test.sh',
+          expect.stringMatching(/bash|powershell/),
+          expect.arrayContaining([
+            expect.stringMatching(/['"]?\/test\/project['"]?\/hooks\/test\.sh/),
+          ]),
           expect.objectContaining({
-            shell: true,
+            shell: false,
             env: expect.objectContaining({
               GEMINI_PROJECT_DIR: '/test/project',
               CLAUDE_PROJECT_DIR: '/test/project',
             }),
           }),
+        );
+      });
+
+      it('should not allow command injection via GEMINI_PROJECT_DIR', async () => {
+        const maliciousCwd = '/test/project; echo "pwned" > /tmp/pwned';
+        const mockMaliciousInput: HookInput = {
+          ...mockInput,
+          cwd: maliciousCwd,
+        };
+
+        const config: HookConfig = {
+          type: HookType.Command,
+          command: 'ls $GEMINI_PROJECT_DIR',
+        };
+
+        // Mock the process closing immediately
+        mockSpawn.mockProcessOn.mockImplementation(
+          (event: string, callback: (code: number) => void) => {
+            if (event === 'close') {
+              setImmediate(() => callback(0));
+            }
+          },
+        );
+
+        await hookRunner.executeHook(
+          config,
+          HookEventName.BeforeTool,
+          mockMaliciousInput,
+        );
+
+        // If secure, spawn will be called with the shell executable and escaped command
+        expect(spawn).toHaveBeenCalledWith(
+          expect.stringMatching(/bash|powershell/),
+          expect.arrayContaining([
+            expect.stringMatching(/ls (['"]).*echo.*pwned.*\1/),
+          ]),
+          expect.objectContaining({ shell: false }),
         );
       });
     });
@@ -287,7 +418,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(0), 10);
+            setImmediate(() => callback(0));
           }
         },
       );
@@ -314,7 +445,7 @@ describe('HookRunner', () => {
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
             const exitCode = callCount++ === 0 ? 0 : 1; // First succeeds, second fails
-            setTimeout(() => callback(exitCode), 10);
+            setImmediate(() => callback(exitCode));
           }
         },
       );
@@ -344,10 +475,12 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            const command =
-              vi.mocked(spawn).mock.calls[executionOrder.length][0];
+            const args = vi.mocked(spawn).mock.calls[
+              executionOrder.length
+            ][1] as string[];
+            const command = args[args.length - 1];
             executionOrder.push(command);
-            setTimeout(() => callback(0), 10);
+            setImmediate(() => callback(0));
           }
         },
       );
@@ -377,7 +510,7 @@ describe('HookRunner', () => {
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data' && callCount === 1) {
             // Second hook fails
-            setTimeout(() => callback(Buffer.from('Hook 2 failed')), 10);
+            setImmediate(() => callback(Buffer.from('Hook 2 failed')));
           }
         },
       );
@@ -386,7 +519,7 @@ describe('HookRunner', () => {
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
             const exitCode = callCount++ === 1 ? 1 : 0; // Second fails, others succeed
-            setTimeout(() => callback(exitCode), 20);
+            setImmediate(() => callback(exitCode));
           }
         },
       );
@@ -427,9 +560,8 @@ describe('HookRunner', () => {
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
             if (hookCallCount === 0) {
-              setTimeout(
-                () => callback(Buffer.from(JSON.stringify(mockOutput1))),
-                10,
+              setImmediate(() =>
+                callback(Buffer.from(JSON.stringify(mockOutput1))),
               );
             }
           }
@@ -440,7 +572,7 @@ describe('HookRunner', () => {
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
             hookCallCount++;
-            setTimeout(() => callback(0), 20);
+            setImmediate(() => callback(0));
           }
         },
       );
@@ -491,9 +623,8 @@ describe('HookRunner', () => {
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
             if (hookCallCount === 0) {
-              setTimeout(
-                () => callback(Buffer.from(JSON.stringify(mockOutput1))),
-                10,
+              setImmediate(() =>
+                callback(Buffer.from(JSON.stringify(mockOutput1))),
               );
             }
           }
@@ -504,7 +635,7 @@ describe('HookRunner', () => {
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
             hookCallCount++;
-            setTimeout(() => callback(0), 20);
+            setImmediate(() => callback(0));
           }
         },
       );
@@ -535,7 +666,7 @@ describe('HookRunner', () => {
       mockSpawn.mockStderrOn.mockImplementation(
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
-            setTimeout(() => callback(Buffer.from('Hook failed')), 10);
+            setImmediate(() => callback(Buffer.from('Hook failed')));
           }
         },
       );
@@ -543,7 +674,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(1), 20); // All hooks fail
+            setImmediate(() => callback(1)); // All hooks fail
           }
         },
       );
@@ -580,7 +711,7 @@ describe('HookRunner', () => {
       mockSpawn.mockStdoutOn.mockImplementation(
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
-            setTimeout(() => callback(Buffer.from(invalidJson)), 10);
+            setImmediate(() => callback(Buffer.from(invalidJson)));
           }
         },
       );
@@ -588,7 +719,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(0), 20);
+            setImmediate(() => callback(0));
           }
         },
       );
@@ -614,7 +745,7 @@ describe('HookRunner', () => {
       mockSpawn.mockStdoutOn.mockImplementation(
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
-            setTimeout(() => callback(Buffer.from(malformedJson)), 10);
+            setImmediate(() => callback(Buffer.from(malformedJson)));
           }
         },
       );
@@ -622,7 +753,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(0), 20);
+            setImmediate(() => callback(0));
           }
         },
       );
@@ -646,7 +777,7 @@ describe('HookRunner', () => {
       mockSpawn.mockStderrOn.mockImplementation(
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
-            setTimeout(() => callback(Buffer.from(invalidJson)), 10);
+            setImmediate(() => callback(Buffer.from(invalidJson)));
           }
         },
       );
@@ -654,7 +785,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(1), 20);
+            setImmediate(() => callback(1));
           }
         },
       );
@@ -679,7 +810,7 @@ describe('HookRunner', () => {
       mockSpawn.mockStderrOn.mockImplementation(
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
-            setTimeout(() => callback(Buffer.from(invalidJson)), 10);
+            setImmediate(() => callback(Buffer.from(invalidJson)));
           }
         },
       );
@@ -687,7 +818,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(2), 20);
+            setImmediate(() => callback(2));
           }
         },
       );
@@ -710,7 +841,7 @@ describe('HookRunner', () => {
       mockSpawn.mockStdoutOn.mockImplementation(
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
-            setTimeout(() => callback(Buffer.from('')), 10);
+            setImmediate(() => callback(Buffer.from('')));
           }
         },
       );
@@ -718,7 +849,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(0), 20);
+            setImmediate(() => callback(0));
           }
         },
       );
@@ -741,7 +872,7 @@ describe('HookRunner', () => {
       mockSpawn.mockStdoutOn.mockImplementation(
         (event: string, callback: (data: Buffer) => void) => {
           if (event === 'data') {
-            setTimeout(() => callback(Buffer.from(doubleEncodedJson)), 10);
+            setImmediate(() => callback(Buffer.from(doubleEncodedJson)));
           }
         },
       );
@@ -749,7 +880,7 @@ describe('HookRunner', () => {
       mockSpawn.mockProcessOn.mockImplementation(
         (event: string, callback: (code: number) => void) => {
           if (event === 'close') {
-            setTimeout(() => callback(0), 20);
+            setImmediate(() => callback(0));
           }
         },
       );

@@ -8,6 +8,7 @@ import type { MCPServerConfig } from '@google/gemini-cli-core';
 import { MCPServerStatus } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
 import type React from 'react';
+import { MAX_MCP_RESOURCES_TO_SHOW } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
 import type {
   HistoryItemMcpStatus,
@@ -251,28 +252,40 @@ export const McpStatus: React.FC<McpStatusProps> = ({
             {serverResources.length > 0 && (
               <Box flexDirection="column" marginLeft={2}>
                 <Text color={theme.text.primary}>Resources:</Text>
-                {serverResources.map((resource, index) => {
-                  const label = resource.name || resource.uri || 'resource';
-                  return (
-                    <Box
-                      key={`${resource.serverName}-resource-${index}`}
-                      flexDirection="column"
-                    >
-                      <Text>
-                        - <Text color={theme.text.primary}>{label}</Text>
-                        {resource.uri ? ` (${resource.uri})` : ''}
-                        {resource.mimeType ? ` [${resource.mimeType}]` : ''}
-                      </Text>
-                      {showDescriptions && resource.description && (
-                        <Box marginLeft={2}>
-                          <Text color={theme.text.secondary}>
-                            {resource.description.trim()}
-                          </Text>
-                        </Box>
-                      )}
-                    </Box>
-                  );
-                })}
+                {serverResources
+                  .slice(0, MAX_MCP_RESOURCES_TO_SHOW)
+                  .map((resource, index) => {
+                    const label = resource.name || resource.uri || 'resource';
+                    return (
+                      <Box
+                        key={`${resource.serverName}-resource-${index}`}
+                        flexDirection="column"
+                      >
+                        <Text>
+                          - <Text color={theme.text.primary}>{label}</Text>
+                          {resource.uri ? ` (${resource.uri})` : ''}
+                          {resource.mimeType ? ` [${resource.mimeType}]` : ''}
+                        </Text>
+                        {showDescriptions && resource.description && (
+                          <Box marginLeft={2}>
+                            <Text color={theme.text.secondary}>
+                              {resource.description.trim()}
+                            </Text>
+                          </Box>
+                        )}
+                      </Box>
+                    );
+                  })}
+                {serverResources.length > MAX_MCP_RESOURCES_TO_SHOW && (
+                  <Text color={theme.text.secondary}>
+                    {'  '}...{' '}
+                    {serverResources.length - MAX_MCP_RESOURCES_TO_SHOW}{' '}
+                    {serverResources.length - MAX_MCP_RESOURCES_TO_SHOW === 1
+                      ? 'resource'
+                      : 'resources'}{' '}
+                    hidden
+                  </Text>
+                )}
               </Box>
             )}
           </Box>
