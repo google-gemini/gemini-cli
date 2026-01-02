@@ -152,7 +152,6 @@ describe('ShellToolInvocation Policy Update', () => {
     const invocation = new ShellToolInvocation(
       mockConfig,
       { command: 'git status && npm test' },
-      new Set(),
       mockMessageBus,
       'run_shell_command',
       'Shell',
@@ -174,7 +173,6 @@ describe('ShellToolInvocation Policy Update', () => {
     const invocation = new ShellToolInvocation(
       mockConfig,
       { command: 'ls -la /tmp' },
-      new Set(),
       mockMessageBus,
       'run_shell_command',
       'Shell',
