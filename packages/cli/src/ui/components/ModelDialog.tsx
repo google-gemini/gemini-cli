@@ -32,6 +32,7 @@ interface ModelDialogProps {
 export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
   const [view, setView] = useState<'main' | 'manual'>('main');
+  const [persistMode, setPersistMode] = useState(false);
 
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
@@ -61,6 +62,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         } else {
           onClose();
         }
+      }
+      if (key.name === 'tab') {
+        setPersistMode((prev) => !prev);
       }
     },
     { isActive: true },
@@ -157,13 +161,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       }
 
       if (config) {
-        config.setModel(model);
+        config.setModel(model, !persistMode);
         const event = new ModelSlashCommandEvent(model);
         logModelSlashCommand(config, event);
       }
       onClose();
     },
-    [config, onClose],
+    [config, onClose, persistMode],
   );
 
   let header;
@@ -213,9 +217,25 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         />
       </Box>
       <Box marginTop={1} flexDirection="column">
-        <Text color={theme.text.secondary}>
-          Applies to this session and future Gemini CLI sessions.
-        </Text>
+        {persistMode ? (
+          <Box flexDirection="column">
+            <Text color={theme.status.success}>
+              Selection will be saved for all future sessions.
+            </Text>
+            <Text color={theme.text.secondary}>
+              (Press Tab to switch to session-only mode)
+            </Text>
+          </Box>
+        ) : (
+          <Box flexDirection="column">
+            <Text color={theme.status.success}>
+              Applies to this session only.
+            </Text>
+            <Text color={theme.text.secondary}>
+              (Press Tab to persist for future sessions)
+            </Text>
+          </Box>
+        )}
       </Box>
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.text.secondary}>

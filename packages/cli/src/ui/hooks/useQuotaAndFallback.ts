@@ -133,7 +133,7 @@ export function useQuotaAndFallback({
         // Set the model to the fallback model for the current session.
         // This ensures the Footer updates and future turns use this model.
         // The change is not persisted, so the original model is restored on restart.
-        config.setModel(proQuotaRequest.fallbackModel, true);
+        config.setModel(proQuotaRequest.fallbackModel);
 
         historyManager.addItem(
           {

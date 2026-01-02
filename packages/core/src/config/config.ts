@@ -898,13 +898,13 @@ export class Config {
     return this.model;
   }
 
-  setModel(newModel: string, isFallbackModel: boolean = false): void {
+  setModel(newModel: string, isTemporary: boolean = true): void {
     if (this.model !== newModel || this._activeModel !== newModel) {
       this.model = newModel;
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
-      if (this.onModelChange && !isFallbackModel) {
+      if (this.onModelChange && !isTemporary) {
         this.onModelChange(newModel);
       }
     }
