@@ -54,6 +54,8 @@ export interface ModelConfigServiceConfig {
   customOverrides?: ModelConfigOverride[];
 }
 
+const MAX_ALIAS_CHAIN_DEPTH = 100;
+
 export type ResolvedModelConfig = _ResolvedModelConfig & {
   readonly _brand: unique symbol;
 };
@@ -78,6 +80,11 @@ export class ModelConfigService {
     aliases: Record<string, ModelConfigAlias>,
     visited = new Set<string>(),
   ): ModelConfigAlias {
+    if (visited.size >= MAX_ALIAS_CHAIN_DEPTH) {
+      throw new Error(
+        `Alias inheritance chain exceeded maximum depth of ${MAX_ALIAS_CHAIN_DEPTH}.`,
+      );
+    }
     if (visited.has(aliasName)) {
       throw new Error(
         `Circular alias dependency: ${[...visited, aliasName].join(' -> ')}`,
@@ -107,87 +114,130 @@ export class ModelConfigService {
     };
   }
 
+  private getAliasChain(
+    aliasName: string,
+    aliases: Record<string, ModelConfigAlias>,
+  ): string[] {
+    const chain: string[] = [];
+    let current: string | undefined = aliasName;
+    const visited = new Set<string>();
+    while (current && aliases[current]) {
+      if (visited.size >= MAX_ALIAS_CHAIN_DEPTH) {
+        throw new Error(
+          `Alias inheritance chain exceeded maximum depth of ${MAX_ALIAS_CHAIN_DEPTH}.`,
+        );
+      }
+      if (visited.has(current)) {
+        break;
+      }
+      visited.add(current);
+      chain.push(current);
+      current = aliases[current].extends;
+    }
+    return chain;
+  }
+
   private internalGetResolvedConfig(context: ModelConfigKey): {
     model: string | undefined;
     generateContentConfig: GenerateContentConfig;
   } {
-    const config = this.config || {};
     const {
       aliases = {},
       customAliases = {},
       overrides = [],
       customOverrides = [],
-    } = config;
+    } = this.config || {};
     const allAliases = {
       ...aliases,
       ...customAliases,
       ...this.runtimeAliases,
     };
     const allOverrides = [...overrides, ...customOverrides];
+
     let baseModel: string | undefined = context.model;
     let resolvedConfig: GenerateContentConfig = {};
+    let currentModelSourceIndex = allAliases[context.model] ? Infinity : 0;
 
     // Step 1: Alias Resolution
+    const aliasChain = allAliases[context.model]
+      ? this.getAliasChain(context.model, allAliases)
+      : [context.model];
+
     if (allAliases[context.model]) {
       const resolvedAlias = this.resolveAlias(context.model, allAliases);
-      baseModel = resolvedAlias.modelConfig.model; // This can now be undefined
+      baseModel = resolvedAlias.modelConfig.model;
       resolvedConfig = this.deepMerge(
         resolvedConfig,
         resolvedAlias.modelConfig.generateContentConfig,
       );
+
+      // Identify which alias in the chain provided the model name.
+      if (baseModel) {
+        for (let i = 0; i < aliasChain.length; i++) {
+          if (allAliases[aliasChain[i]].modelConfig.model) {
+            currentModelSourceIndex = i;
+            break;
+          }
+        }
+      }
     }
 
-    // If an alias was used but didn't resolve to a model, `baseModel` is undefined.
-    // We still need a model for matching overrides. We'll use the original alias name
-    // for matching if no model is resolved yet.
-    const modelForMatching = baseModel ?? context.model;
-
-    const finalContext = {
-      ...context,
-      model: modelForMatching,
-    };
+    // Prepare models for override matching (Chain + Resolved Model Name).
+    const modelsToMatch = [...aliasChain];
+    if (baseModel && !modelsToMatch.includes(baseModel)) {
+      modelsToMatch.push(baseModel);
+    }
 
     // Step 2: Override Application
     const matches = allOverrides
       .map((override, index) => {
         const matchEntries = Object.entries(override.match);
-        if (matchEntries.length === 0) {
-          return null;
-        }
+        if (matchEntries.length === 0) return null;
 
+        let matchedAliasIndex = Infinity;
         const isMatch = matchEntries.every(([key, value]) => {
           if (key === 'model') {
-            return value === context.model || value === finalContext.model;
+            const matchIndex = modelsToMatch.indexOf(value as string);
+            if (matchIndex === -1) return false;
+
+            // Precedence tie-breaker: Requested Alias (0) > Resolved Model Name (-1) > Parents (1..N).
+            const isResolvedModelName =
+              matchIndex === modelsToMatch.length - 1 &&
+              value === baseModel &&
+              !allAliases[value];
+            matchedAliasIndex = isResolvedModelName ? -1 : matchIndex;
+            return true;
           }
           if (key === 'overrideScope' && value === 'core') {
-            // The 'core' overrideScope is special. It should match if the
-            // overrideScope is explicitly 'core' or if the overrideScope
-            // is not specified.
             return context.overrideScope === 'core' || !context.overrideScope;
           }
-          return finalContext[key as keyof ModelConfigKey] === value;
+          return context[key as keyof ModelConfigKey] === value;
         });
 
-        if (isMatch) {
-          return {
-            specificity: matchEntries.length,
-            modelConfig: override.modelConfig,
-            index,
-          };
-        }
-        return null;
+        return isMatch
+          ? {
+              specificity: matchEntries.length,
+              aliasIndex: matchedAliasIndex,
+              modelConfig: override.modelConfig,
+              index,
+            }
+          : null;
       })
-      .filter((match): match is NonNullable<typeof match> => match !== null);
+      .filter((m): m is NonNullable<typeof m> => m !== null);
 
-    // The override application logic is designed to be both simple and powerful.
-    // By first sorting all matching overrides by specificity (and then by their
-    // original order as a tie-breaker), we ensure that as we merge the `config`
-    // objects, the settings from the most specific rules are applied last,
-    // correctly overwriting any values from broader, less-specific rules.
-    // This achieves a per-property override effect without complex per-property logic.
+    // Sort: Higher specificity wins. For same specificity, use alias depth as a tie-breaker
+    // between model matches, otherwise fall back to configuration order.
+    const getWeight = (idx: number) => (idx === -1 ? 0.5 : idx);
     matches.sort((a, b) => {
       if (a.specificity !== b.specificity) {
         return a.specificity - b.specificity;
+      }
+      if (
+        a.aliasIndex !== Infinity &&
+        b.aliasIndex !== Infinity &&
+        a.aliasIndex !== b.aliasIndex
+      ) {
+        return getWeight(b.aliasIndex) - getWeight(a.aliasIndex);
       }
       return a.index - b.index;
     });
@@ -195,7 +245,14 @@ export class ModelConfigService {
     // Apply matching overrides
     for (const match of matches) {
       if (match.modelConfig.model) {
-        baseModel = match.modelConfig.model;
+        // Protect child-defined models from parent overrides.
+        if (
+          baseModel === undefined ||
+          match.aliasIndex <= currentModelSourceIndex
+        ) {
+          baseModel = match.modelConfig.model;
+          currentModelSourceIndex = match.aliasIndex;
+        }
       }
       if (match.modelConfig.generateContentConfig) {
         resolvedConfig = this.deepMerge(
@@ -205,10 +262,7 @@ export class ModelConfigService {
       }
     }
 
-    return {
-      model: baseModel,
-      generateContentConfig: resolvedConfig,
-    };
+    return { model: baseModel, generateContentConfig: resolvedConfig };
   }
 
   getResolvedConfig(context: ModelConfigKey): ResolvedModelConfig {
