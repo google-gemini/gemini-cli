@@ -24,6 +24,7 @@ import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
 import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
 import { GlobTool } from '../tools/glob.js';
+import { ActivateSkillTool } from '../tools/activate-skill.js';
 import { EditTool } from '../tools/edit.js';
 import { SmartEditTool } from '../tools/smart-edit.js';
 import { ShellTool } from '../tools/shell.js';
@@ -737,6 +738,13 @@ export class Config {
     if (this.skillsSupport) {
       await this.getSkillManager().discoverSkills(this.storage);
       this.getSkillManager().setDisabledSkills(this.disabledSkills);
+
+      // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
+      if (this.getSkillManager().getSkills().length > 0) {
+        this.getToolRegistry().registerTool(
+          new ActivateSkillTool(this, this.messageBus),
+        );
+      }
     }
 
     // Initialize hook system if enabled
@@ -1690,6 +1698,7 @@ export class Config {
     }
 
     registerCoreTool(GlobTool, this);
+    registerCoreTool(ActivateSkillTool, this);
     if (this.getUseSmartEdit()) {
       registerCoreTool(SmartEditTool, this);
     } else {
