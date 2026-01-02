@@ -33,6 +33,8 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
   ActivateSkillToolParams,
   ToolResult
 > {
+  private cachedFolderStructure: string | undefined;
+
   constructor(
     private config: Config,
     params: ActivateSkillToolParams,
@@ -52,6 +54,17 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
     return `"${skillName}" (⚠️ unknown skill)`;
   }
 
+  private async getOrFetchFolderStructure(
+    skillLocation: string,
+  ): Promise<string> {
+    if (this.cachedFolderStructure === undefined) {
+      this.cachedFolderStructure = await getFolderStructure(
+        path.dirname(skillLocation),
+      );
+    }
+    return this.cachedFolderStructure;
+  }
+
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
@@ -66,8 +79,8 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
       return false;
     }
 
-    const folderStructure = await getFolderStructure(
-      path.dirname(skill.location),
+    const folderStructure = await this.getOrFetchFolderStructure(
+      skill.location,
     );
 
     const confirmationDetails: ToolCallConfirmationDetails = {
@@ -102,23 +115,20 @@ ${folderStructure}`,
 
     skillManager.activateSkill(skillName);
 
-    const folderStructure = await getFolderStructure(
-      path.dirname(skill.location),
+    const folderStructure = await this.getOrFetchFolderStructure(
+      skill.location,
     );
 
     return {
-      llmContent: `Skill "${skillName}" activated successfully. 
+      llmContent: `<ACTIVATED_SKILL name="${skillName}">
+  <INSTRUCTIONS>
+    ${skill.body}
+  </INSTRUCTIONS>
 
-### Specialized Skill Guidance
-The following instructions for "${skillName}" provide the primary procedural framework for your current task. You should prioritize these specialized rules and steps over your general internal defaults. Follow them strictly and sequentially while continuing to uphold your core safety and security standards.
-
-### Available Resources
-Below is the file structure of the "${skillName}" skill directory. You can use these resources (scripts, references, assets) as needed to complete your task.
-
-${folderStructure}
-
-# Skill: ${skill.name}
-${skill.body}`,
+  <AVAILABLE_RESOURCES>
+    ${folderStructure}
+  </AVAILABLE_RESOURCES>
+</ACTIVATED_SKILL>`,
       returnDisplay: `Skill **${skillName}** activated. Resources loaded from \`${path.dirname(skill.location)}\`:\n\n${folderStructure}`,
     };
   }
@@ -156,7 +166,7 @@ export class ActivateSkillTool extends BaseDeclarativeTool<
     super(
       ActivateSkillTool.Name,
       'Activate Skill',
-      "Activates a specialized agent skill by name. Once activated, the skill's full instructions and rules are returned as a tool result and injected into the conversation. You MUST strictly follow these instructions for all subsequent turns. Use this when you identify a task that matches a skill's description.",
+      "Activates a specialized agent skill by name. Returns the skill's instructions wrapped in `<ACTIVATED_SKILL>` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description.",
       Kind.Other,
       zodToJsonSchema(schema),
       true,

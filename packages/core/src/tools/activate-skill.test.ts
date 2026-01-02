@@ -75,7 +75,7 @@ describe('ActivateSkillTool', () => {
     expect(details.prompt).toContain('Mock folder structure');
   });
 
-  it('should activate a valid skill and return its content', async () => {
+  it('should activate a valid skill and return its content in XML tags', async () => {
     const params = { name: 'test-skill' };
     const invocation = tool.build(params);
     const result = await invocation.execute(new AbortController().signal);
@@ -83,13 +83,14 @@ describe('ActivateSkillTool', () => {
     expect(mockConfig.getSkillManager().activateSkill).toHaveBeenCalledWith(
       'test-skill',
     );
-    expect(result.llmContent).toContain(
-      'Skill "test-skill" activated successfully',
-    );
-    expect(result.llmContent).toContain('Specialized Skill Guidance');
-    expect(result.llmContent).toContain('Available Resources');
-    expect(result.llmContent).toContain('Mock folder structure');
+    expect(result.llmContent).toContain('<ACTIVATED_SKILL name="test-skill">');
+    expect(result.llmContent).toContain('<INSTRUCTIONS>');
     expect(result.llmContent).toContain('Skill instructions content.');
+    expect(result.llmContent).toContain('</INSTRUCTIONS>');
+    expect(result.llmContent).toContain('<AVAILABLE_RESOURCES>');
+    expect(result.llmContent).toContain('Mock folder structure');
+    expect(result.llmContent).toContain('</AVAILABLE_RESOURCES>');
+    expect(result.llmContent).toContain('</ACTIVATED_SKILL>');
     expect(result.returnDisplay).toContain('Skill **test-skill** activated');
     expect(result.returnDisplay).toContain('Mock folder structure');
   });
