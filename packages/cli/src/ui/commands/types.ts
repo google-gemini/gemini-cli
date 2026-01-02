@@ -201,5 +201,11 @@ export interface SlashCommand {
     partialArg: string,
   ) => Promise<string[]> | string[];
 
+  /**
+   * Whether to show the loading indicator while fetching completions.
+   * Defaults to true. Set to false for fast completions to avoid flicker.
+   */
+  showCompletionLoading?: boolean;
+
   subCommands?: SlashCommand[];
 }

@@ -212,7 +212,10 @@ function useCommandSuggestions(
           return;
         }
 
-        setIsLoading(true);
+        const showLoading = leafCommand.showCompletionLoading !== false;
+        if (showLoading) {
+          setIsLoading(true);
+        }
         try {
           const rawParts = [...commandPathParts];
           if (partial) rawParts.push(partial);
