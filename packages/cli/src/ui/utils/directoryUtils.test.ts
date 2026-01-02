@@ -149,7 +149,7 @@ describe('directoryUtils', () => {
       );
 
       const suggestions = await getDirectorySuggestions('docs/');
-      expect(suggestions).toEqual([`docs/sub${path.sep}`]);
+      expect(suggestions).toEqual(['docs/sub/']);
     });
 
     it('should return suggestions for a path with ~', async () => {
@@ -164,7 +164,7 @@ describe('directoryUtils', () => {
       );
 
       const suggestions = await getDirectorySuggestions('~/');
-      expect(suggestions).toEqual([`~/Downloads${path.sep}`]);
+      expect(suggestions).toEqual(['~/Downloads/']);
     });
 
     it('should return suggestions for a partial path with ~', async () => {
@@ -179,7 +179,7 @@ describe('directoryUtils', () => {
       );
 
       const suggestions = await getDirectorySuggestions('~/Down');
-      expect(suggestions).toEqual([`~/Downloads${path.sep}`]);
+      expect(suggestions).toEqual(['~/Downloads/']);
     });
 
     it('should return suggestions for ../', async () => {
@@ -194,7 +194,7 @@ describe('directoryUtils', () => {
       );
 
       const suggestions = await getDirectorySuggestions('../');
-      expect(suggestions).toEqual([`../other-project${path.sep}`]);
+      expect(suggestions).toEqual(['../other-project/']);
     });
 
     it('should ignore hidden directories', async () => {
@@ -211,6 +211,24 @@ describe('directoryUtils', () => {
 
       const suggestions = await getDirectorySuggestions('');
       expect(suggestions).toEqual([`src${path.sep}`]);
+    });
+
+    it('should show hidden directories when filter starts with .', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.statSync).mockReturnValue({
+        isDirectory: () => true,
+      } as fs.Stats);
+      vi.mocked(fsPromises.opendir).mockResolvedValue(
+        createMockDir([
+          { name: '.git', isDirectory: () => true },
+          { name: '.github', isDirectory: () => true },
+          { name: '.vscode', isDirectory: () => true },
+          { name: 'src', isDirectory: () => true },
+        ]) as unknown as fs.Dir,
+      );
+
+      const suggestions = await getDirectorySuggestions('.g');
+      expect(suggestions).toEqual([`.git${path.sep}`, `.github${path.sep}`]);
     });
 
     it('should return empty array if directory does not exist', async () => {
