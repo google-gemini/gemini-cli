@@ -5,20 +5,19 @@
  */
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+} from './test-helper.js';
 
-describe('Interactive file system', () => {
-  let rig: TestRig;
+describe.concurrent('Interactive file system', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => {
-    await rig.cleanup();
-  });
-
-  it('should perform a read-then-write sequence', async () => {
+  it<LocalTestContext>('should perform a read-then-write sequence', async ({
+    rig,
+  }) => {
     const fileName = 'version.txt';
     await rig.setup('interactive-read-then-write', {
       settings: {

@@ -13,11 +13,13 @@ export default defineConfig({
     reporters: ['default'],
     include: ['**/*.test.ts'],
     retry: 2,
+    pool: 'forks',
     fileParallelism: true,
+    maxWorkers: 16,
+    minWorkers: 8,
     poolOptions: {
-      threads: {
-        minThreads: 8,
-        maxThreads: 16,
+      forks: {
+        isolate: true,
       },
     },
   },

@@ -5,18 +5,19 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+} from './test-helper.js';
 
-describe('mixed input crash prevention', () => {
-  let rig: TestRig;
+describe.concurrent('mixed input crash prevention', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
-
-  it('should not crash when using mixed prompt inputs', async () => {
+  it<LocalTestContext>('should not crash when using mixed prompt inputs', async ({
+    rig,
+  }) => {
     rig.setup('should not crash when using mixed prompt inputs');
 
     // Test: echo "say '1'." | gemini --prompt-interactive="say '2'." say '3'.
@@ -44,7 +45,9 @@ describe('mixed input crash prevention', () => {
     expect(lastRequest).toBeNull();
   });
 
-  it('should provide clear error message for mixed input', async () => {
+  it<LocalTestContext>('should provide clear error message for mixed input', async ({
+    rig,
+  }) => {
     rig.setup('should provide clear error message for mixed input');
 
     try {

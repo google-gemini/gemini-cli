@@ -5,23 +5,25 @@
  */
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+} from './test-helper.js';
 import { join } from 'node:path';
 import { ExitCodes } from '@google/gemini-cli-core/src/index.js';
 
-describe('JSON output', () => {
-  let rig: TestRig;
-
-  beforeEach(async () => {
-    rig = new TestRig();
-    await rig.setup('json-output-test');
+describe.concurrent('JSON output', () => {
+  beforeEach<LocalTestContext>(async (context) => {
+    await setupTestRig(context);
+    await context.rig.setup('json-output-test');
   });
 
-  afterEach(async () => {
-    await rig.cleanup();
-  });
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  it('should return a valid JSON with response and stats', async () => {
+  it<LocalTestContext>('should return a valid JSON with response and stats', async ({
+    rig,
+  }) => {
     const result = await rig.run({
       args: ['What is the capital of France?', '--output-format', 'json'],
     });
@@ -35,7 +37,9 @@ describe('JSON output', () => {
     expect(typeof parsed.stats).toBe('object');
   });
 
-  it('should return a valid JSON with a session ID', async () => {
+  it<LocalTestContext>('should return a valid JSON with a session ID', async ({
+    rig,
+  }) => {
     const result = await rig.run({
       args: ['Hello', '--output-format', 'json'],
     });
@@ -46,7 +50,9 @@ describe('JSON output', () => {
     expect(parsed.session_id).not.toBe('');
   });
 
-  it('should return a JSON error for sd auth mismatch before running', async () => {
+  it<LocalTestContext>('should return a JSON error for sd auth mismatch before running', async ({
+    rig,
+  }) => {
     process.env['GOOGLE_GENAI_USE_GCA'] = 'true';
     await rig.setup('json-output-auth-mismatch', {
       settings: {
@@ -101,7 +107,9 @@ describe('JSON output', () => {
     expect(payload.session_id).not.toBe('');
   });
 
-  it('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
+  it<LocalTestContext>('should not exit on tool errors and allow model to self-correct in JSON mode', async ({
+    rig,
+  }) => {
     rig.setup('json-output-error', {
       fakeResponsesPath: join(
         import.meta.dirname,

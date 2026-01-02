@@ -5,19 +5,20 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+} from './test-helper.js';
 import { join } from 'node:path';
 
-describe('Flicker Detector', () => {
-  let rig: TestRig;
+describe.concurrent('Flicker Detector', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
-
-  it('should not detect a flicker under the max height budget', async () => {
+  it<LocalTestContext>('should not detect a flicker under the max height budget', async ({
+    rig,
+  }) => {
     rig.setup('flicker-detector-test', {
       fakeResponsesPath: join(
         import.meta.dirname,

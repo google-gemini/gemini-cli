@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type TestContext,
+} from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
@@ -33,31 +40,45 @@ class MockConfig {
   }
 }
 
-describe('ripgrep-real-direct', () => {
-  let tempDir: string;
-  let tool: RipGrepTool;
+interface LocalTestContext extends TestContext {
+  tempDir: string;
+  tool: RipGrepTool;
+}
 
-  beforeAll(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ripgrep-real-test-'));
+describe.concurrent('ripgrep-real-direct', () => {
+  beforeEach<LocalTestContext>(async (context) => {
+    context.tempDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'ripgrep-real-test-'),
+    );
 
     // Create test files
-    await fs.writeFile(path.join(tempDir, 'file1.txt'), 'hello world\n');
-    await fs.mkdir(path.join(tempDir, 'subdir'));
     await fs.writeFile(
-      path.join(tempDir, 'subdir', 'file2.txt'),
+      path.join(context.tempDir, 'file1.txt'),
+      'hello world\n',
+    );
+    await fs.mkdir(path.join(context.tempDir, 'subdir'));
+    await fs.writeFile(
+      path.join(context.tempDir, 'subdir', 'file2.txt'),
       'hello universe\n',
     );
-    await fs.writeFile(path.join(tempDir, 'file3.txt'), 'goodbye moon\n');
+    await fs.writeFile(
+      path.join(context.tempDir, 'file3.txt'),
+      'goodbye moon\n',
+    );
 
-    const config = new MockConfig(tempDir) as unknown as Config;
-    tool = new RipGrepTool(config);
+    const config = new MockConfig(context.tempDir) as unknown as Config;
+    context.tool = new RipGrepTool(config);
   });
 
-  afterAll(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+  afterEach<LocalTestContext>(async ({ tempDir }) => {
+    if (tempDir) {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
   });
 
-  it('should find matches using the real ripgrep binary', async () => {
+  it<LocalTestContext>('should find matches using the real ripgrep binary', async ({
+    tool,
+  }) => {
     const invocation = tool.build({ pattern: 'hello' });
     const result = await invocation.execute(new AbortController().signal);
 
@@ -71,14 +92,19 @@ describe('ripgrep-real-direct', () => {
     expect(result.llmContent).not.toContain('goodbye moon');
   });
 
-  it('should handle no matches correctly', async () => {
+  it<LocalTestContext>('should handle no matches correctly', async ({
+    tool,
+  }) => {
     const invocation = tool.build({ pattern: 'nonexistent_pattern_123' });
     const result = await invocation.execute(new AbortController().signal);
 
     expect(result.llmContent).toContain('No matches found');
   });
 
-  it('should respect include filters', async () => {
+  it<LocalTestContext>('should respect include filters', async ({
+    tool,
+    tempDir,
+  }) => {
     // Create a .js file
     await fs.writeFile(
       path.join(tempDir, 'script.js'),

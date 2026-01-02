@@ -6,18 +6,19 @@
 
 import { WEB_SEARCH_TOOL_NAME } from '../packages/core/src/tools/tool-names.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+  printDebugInfo,
+  validateModelOutput,
+} from './test-helper.js';
 
-describe('web search tool', () => {
-  let rig: TestRig;
+describe.concurrent('web search tool', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
-
-  it('should be able to search the web', async () => {
+  it<LocalTestContext>('should be able to search the web', async ({ rig }) => {
     await rig.setup('should be able to search the web', {
       settings: { tools: { core: [WEB_SEARCH_TOOL_NAME] } },
     });

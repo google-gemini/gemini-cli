@@ -6,18 +6,19 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as os from 'node:os';
-import { TestRig } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+} from './test-helper.js';
 
-describe('Ctrl+C exit', () => {
-  let rig: TestRig;
+describe.concurrent('Ctrl+C exit', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
-
-  it('should exit gracefully on second Ctrl+C', async () => {
+  it<LocalTestContext>('should exit gracefully on second Ctrl+C', async ({
+    rig,
+  }) => {
     await rig.setup('should exit gracefully on second Ctrl+C', {
       settings: { tools: { useRipgrep: false } },
     });

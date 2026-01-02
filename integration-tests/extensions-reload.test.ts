@@ -5,7 +5,11 @@
  */
 
 import { expect, it, describe, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+} from './test-helper.js';
 import { TestMcpServer } from './test-mcp-server.js';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,13 +22,8 @@ import stripAnsi from 'strip-ansi';
 const itIf = (condition: boolean) => (condition ? it : it.skip);
 
 describe('extension reloading', () => {
-  let rig: TestRig;
-
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
   const sandboxEnv = env['GEMINI_SANDBOX'];
   // Fails in linux non-sandbox e2e tests
@@ -34,9 +33,9 @@ describe('extension reloading', () => {
     (!sandboxEnv || sandboxEnv === 'false') &&
       platform() !== 'win32' &&
       platform() !== 'linux',
-  )(
+  )<LocalTestContext>(
     'installs a local extension, updates it, checks it was reloaded properly',
-    async () => {
+    async ({ rig }) => {
       const serverA = new TestMcpServer();
       const portA = await serverA.start({
         hello: () => ({ content: [{ type: 'text', text: 'world' }] }),
@@ -56,7 +55,9 @@ describe('extension reloading', () => {
           experimental: { extensionReloading: true },
         },
       });
-      const testServerPath = join(rig.testDir!, 'gemini-extension.json');
+      const extensionSourceDir = join(rig.testDir!, 'extension-source');
+      rig.mkdir('extension-source');
+      const testServerPath = join(extensionSourceDir, 'gemini-extension.json');
       writeFileSync(testServerPath, safeJsonStringify(extension, 2));
       // defensive cleanup from previous tests.
       try {
@@ -66,7 +67,7 @@ describe('extension reloading', () => {
       }
 
       const result = await rig.runCommand(
-        ['extensions', 'install', `${rig.testDir!}`],
+        ['extensions', 'install', extensionSourceDir],
         { stdin: 'y\n' },
       );
       expect(result).toContain('test-extension');

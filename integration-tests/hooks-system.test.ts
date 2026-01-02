@@ -5,25 +5,23 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, poll } from './test-helper.js';
+import {
+  poll,
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+} from './test-helper.js';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 
-describe('Hooks System Integration', () => {
-  let rig: TestRig;
+describe.concurrent('Hooks System Integration', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => {
-    if (rig) {
-      await rig.cleanup();
-    }
-  });
-
-  describe('Command Hooks - Blocking Behavior', () => {
-    it('should block tool execution when hook returns block decision', async () => {
+  describe.concurrent('Command Hooks - Blocking Behavior', () => {
+    it<LocalTestContext>('should block tool execution when hook returns block decision', async ({
+      rig,
+    }) => {
       await rig.setup(
         'should block tool execution when hook returns block decision',
         {
@@ -77,7 +75,9 @@ describe('Hooks System Integration', () => {
       expect(hookTelemetryFound).toBeTruthy();
     });
 
-    it('should allow tool execution when hook returns allow decision', async () => {
+    it<LocalTestContext>('should allow tool execution when hook returns allow decision', async ({
+      rig,
+    }) => {
       await rig.setup(
         'should allow tool execution when hook returns allow decision',
         {
@@ -126,8 +126,10 @@ describe('Hooks System Integration', () => {
     });
   });
 
-  describe('Command Hooks - Additional Context', () => {
-    it('should add additional context from AfterTool hooks', async () => {
+  describe.concurrent('Command Hooks - Additional Context', () => {
+    it<LocalTestContext>('should add additional context from AfterTool hooks', async ({
+      rig,
+    }) => {
       const command =
         "node -e \"console.log(JSON.stringify({hookSpecificOutput: {hookEventName: 'AfterTool', additionalContext: 'Security scan: File content appears safe'}}))\"";
       await rig.setup('should add additional context from AfterTool hooks', {
@@ -180,8 +182,10 @@ describe('Hooks System Integration', () => {
     });
   });
 
-  describe('BeforeModel Hooks - LLM Request Modification', () => {
-    it('should modify LLM requests with BeforeModel hooks', async () => {
+  describe.concurrent('BeforeModel Hooks - LLM Request Modification', () => {
+    it<LocalTestContext>('should modify LLM requests with BeforeModel hooks', async ({
+      rig,
+    }) => {
       // Create a hook script that replaces the LLM request with a modified version
       // Note: Providing messages in the hook output REPLACES the entire conversation
       await rig.setup('should modify LLM requests with BeforeModel hooks', {
@@ -258,10 +262,10 @@ console.log(JSON.stringify({
     });
   });
 
-  describe('AfterModel Hooks - LLM Response Modification', () => {
-    it.skipIf(process.platform === 'win32')(
+  describe.concurrent('AfterModel Hooks - LLM Response Modification', () => {
+    it.skipIf(process.platform === 'win32')<LocalTestContext>(
       'should modify LLM responses with AfterModel hooks',
-      async () => {
+      async ({ rig }) => {
         await rig.setup('should modify LLM responses with AfterModel hooks', {
           fakeResponsesPath: join(
             import.meta.dirname,
@@ -327,8 +331,10 @@ console.log(JSON.stringify({
     );
   });
 
-  describe('BeforeToolSelection Hooks - Tool Configuration', () => {
-    it('should modify tool selection with BeforeToolSelection hooks', async () => {
+  describe.concurrent('BeforeToolSelection Hooks - Tool Configuration', () => {
+    it<LocalTestContext>('should modify tool selection with BeforeToolSelection hooks', async ({
+      rig,
+    }) => {
       await rig.setup(
         'should modify tool selection with BeforeToolSelection hooks',
         {
@@ -392,8 +398,10 @@ console.log(JSON.stringify({
     });
   });
 
-  describe('BeforeAgent Hooks - Prompt Augmentation', () => {
-    it('should augment prompts with BeforeAgent hooks', async () => {
+  describe.concurrent('BeforeAgent Hooks - Prompt Augmentation', () => {
+    it<LocalTestContext>('should augment prompts with BeforeAgent hooks', async ({
+      rig,
+    }) => {
       await rig.setup('should augment prompts with BeforeAgent hooks', {
         fakeResponsesPath: join(
           import.meta.dirname,
@@ -445,8 +453,10 @@ console.log(JSON.stringify({
     });
   });
 
-  describe('Notification Hooks - Permission Handling', () => {
-    it('should handle notification hooks for tool permissions', async () => {
+  describe.concurrent('Notification Hooks - Permission Handling', () => {
+    it<LocalTestContext>('should handle notification hooks for tool permissions', async ({
+      rig,
+    }) => {
       // Create inline hook command (works on both Unix and Windows)
       // Create inline hook command (works on both Unix and Windows)
       const hookCommand =
@@ -540,8 +550,10 @@ console.log(JSON.stringify({
     });
   });
 
-  describe('Sequential Hook Execution', () => {
-    it('should execute hooks sequentially when configured', async () => {
+  describe.concurrent('Sequential Hook Execution', () => {
+    it<LocalTestContext>('should execute hooks sequentially when configured', async ({
+      rig,
+    }) => {
       // Create inline hook commands (works on both Unix and Windows)
       const hook1Command =
         "node -e \"console.log(JSON.stringify({decision: 'allow', hookSpecificOutput: {hookEventName: 'BeforeAgent', additionalContext: 'Step 1: Initial validation passed.'}}))\"";
@@ -608,8 +620,10 @@ console.log(JSON.stringify({
     });
   });
 
-  describe('Hook Input/Output Validation', () => {
-    it('should provide correct input format to hooks', async () => {
+  describe.concurrent('Hook Input/Output Validation', () => {
+    it<LocalTestContext>('should provide correct input format to hooks', async ({
+      rig,
+    }) => {
       await rig.setup('should provide correct input format to hooks', {
         fakeResponsesPath: join(
           import.meta.dirname,
@@ -673,8 +687,10 @@ try {
     });
   });
 
-  describe('Multiple Event Types', () => {
-    it('should handle hooks for all major event types', async () => {
+  describe.concurrent('Multiple Event Types', () => {
+    it<LocalTestContext>('should handle hooks for all major event types', async ({
+      rig,
+    }) => {
       // Create inline hook commands (works on both Unix and Windows)
       const beforeToolCommand =
         "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'BeforeTool: File operation logged'}))\"";
@@ -786,8 +802,10 @@ try {
     });
   });
 
-  describe('Hook Error Handling', () => {
-    it('should handle hook failures gracefully', async () => {
+  describe.concurrent('Hook Error Handling', () => {
+    it<LocalTestContext>('should handle hook failures gracefully', async ({
+      rig,
+    }) => {
       await rig.setup('should handle hook failures gracefully', {
         fakeResponsesPath: join(
           import.meta.dirname,
@@ -846,8 +864,10 @@ try {
     });
   });
 
-  describe('Hook Telemetry and Observability', () => {
-    it('should generate telemetry events for hook executions', async () => {
+  describe.concurrent('Hook Telemetry and Observability', () => {
+    it<LocalTestContext>('should generate telemetry events for hook executions', async ({
+      rig,
+    }) => {
       // Create inline hook command (works on both Unix and Windows)
       const hookCommand =
         "node -e \"console.log(JSON.stringify({decision: 'allow', reason: 'Telemetry test hook'}))\"";
@@ -889,8 +909,10 @@ try {
     });
   });
 
-  describe('Session Lifecycle Hooks', () => {
-    it('should fire SessionStart hook on app startup', async () => {
+  describe.concurrent('Session Lifecycle Hooks', () => {
+    it<LocalTestContext>('should fire SessionStart hook on app startup', async ({
+      rig,
+    }) => {
       // Create inline hook command that outputs JSON
       const sessionStartCommand =
         "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'Session starting on startup'}))\"";
@@ -950,7 +972,9 @@ try {
       }
     });
 
-    it('should fire SessionEnd and SessionStart hooks on /clear command', async () => {
+    it<LocalTestContext>('should fire SessionEnd and SessionStart hooks on /clear command', async ({
+      rig,
+    }) => {
       // Create inline hook commands for both SessionEnd and SessionStart
       const sessionEndCommand =
         "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'Session ending due to clear'}))\"";
@@ -1127,8 +1151,10 @@ try {
     });
   });
 
-  describe('Compression Hooks', () => {
-    it('should fire PreCompress hook on automatic compression', async () => {
+  describe.concurrent('Compression Hooks', () => {
+    it<LocalTestContext>('should fire PreCompress hook on automatic compression', async ({
+      rig,
+    }) => {
       // Create inline hook command that outputs JSON
       const preCompressCommand =
         "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'PreCompress hook executed for automatic compression'}))\"";
@@ -1195,8 +1221,10 @@ try {
     });
   });
 
-  describe('SessionEnd on Exit', () => {
-    it('should fire SessionEnd hook on graceful exit in non-interactive mode', async () => {
+  describe.concurrent('SessionEnd on Exit', () => {
+    it<LocalTestContext>('should fire SessionEnd hook on graceful exit in non-interactive mode', async ({
+      rig,
+    }) => {
       const sessionEndCommand =
         "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'SessionEnd hook executed on exit'}))\"";
 
@@ -1282,8 +1310,10 @@ try {
     });
   });
 
-  describe('Hook Disabling', () => {
-    it('should not execute hooks disabled in settings file', async () => {
+  describe.concurrent('Hook Disabling', () => {
+    it<LocalTestContext>('should not execute hooks disabled in settings file', async ({
+      rig,
+    }) => {
       await rig.setup('should not execute hooks disabled in settings file', {
         fakeResponsesPath: join(
           import.meta.dirname,
@@ -1360,7 +1390,9 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       expect(disabledHookLog).toBeUndefined();
     });
 
-    it('should respect disabled hooks across multiple operations', async () => {
+    it<LocalTestContext>('should respect disabled hooks across multiple operations', async ({
+      rig,
+    }) => {
       await rig.setup(
         'should respect disabled hooks across multiple operations',
         {

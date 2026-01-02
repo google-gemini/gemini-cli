@@ -6,22 +6,19 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  TestRig,
   createToolCallErrorMessage,
   printDebugInfo,
   validateModelOutput,
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
 } from './test-helper.js';
 
-describe('write_file', () => {
-  let rig: TestRig;
+describe.concurrent('write_file', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => await rig.cleanup());
-
-  it('should be able to write a file', async () => {
+  it<LocalTestContext>('should be able to write a file', async ({ rig }) => {
     await rig.setup('should be able to write a file', {
       settings: { tools: { core: ['write_file', 'read_file'] } },
     });

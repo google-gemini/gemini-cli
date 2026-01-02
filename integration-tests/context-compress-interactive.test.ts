@@ -5,21 +5,20 @@
  */
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import {
+  setupTestRig,
+  cleanupTestRig,
+  type LocalTestContext,
+} from './test-helper.js';
 import { join } from 'node:path';
 
-describe('Interactive Mode', () => {
-  let rig: TestRig;
+describe.concurrent('Interactive Mode', () => {
+  beforeEach<LocalTestContext>(setupTestRig);
+  afterEach<LocalTestContext>(cleanupTestRig);
 
-  beforeEach(() => {
-    rig = new TestRig();
-  });
-
-  afterEach(async () => {
-    await rig.cleanup();
-  });
-
-  it('should trigger chat compression with /compress command', async () => {
+  it<LocalTestContext>('should trigger chat compression with /compress command', async ({
+    rig,
+  }) => {
     await rig.setup('interactive-compress-success', {
       fakeResponsesPath: join(
         import.meta.dirname,
@@ -54,7 +53,9 @@ describe('Interactive Mode', () => {
   // TODO: Context compression is broken and doesn't include the system
   // instructions or tool counts, so it thinks compression is beneficial when
   // it is in fact not.
-  it.skip('should handle compression failure on token inflation', async () => {
+  it.skip<LocalTestContext>('should handle compression failure on token inflation', async ({
+    rig,
+  }) => {
     await rig.setup('interactive-compress-failure', {
       fakeResponsesPath: join(
         import.meta.dirname,
@@ -84,7 +85,9 @@ describe('Interactive Mode', () => {
     ).toBe(true);
   });
 
-  it('should handle /compress command on empty history', async () => {
+  it<LocalTestContext>('should handle /compress command on empty history', async ({
+    rig,
+  }) => {
     rig.setup('interactive-compress-empty', {
       fakeResponsesPath: join(
         import.meta.dirname,
