@@ -73,6 +73,9 @@ describe('SimpleExtensionLoader', () => {
       getHookSystem: () => ({
         initialize: mockHookSystemInit,
       }),
+      getCommandManager: () => ({
+        reloadCommands: vi.fn(),
+      }),
     } as unknown as Config;
   });
 

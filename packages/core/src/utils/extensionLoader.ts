@@ -79,9 +79,7 @@ export abstract class ExtensionLoader {
       // loading/unloading to reduce churn, see the `maybeRefreshMemories` call
       // below.
 
-      // TODO: Update custom command updating away from the event based system
-      // and call directly into a custom command manager here. See the
-      // useSlashCommandProcessor hook which responds to events fired here today.
+      await this.config.getCommandManager()?.reloadCommands();
     } finally {
       this.startCompletedCount++;
       this.eventEmitter?.emit('extensionsStarting', {
@@ -170,9 +168,7 @@ export abstract class ExtensionLoader {
       // loading/unloading to reduce churn, see the `maybeRefreshMemories` call
       // below.
 
-      // TODO: Update custom command updating away from the event based system
-      // and call directly into a custom command manager here. See the
-      // useSlashCommandProcessor hook which responds to events fired here today.
+      await this.config.getCommandManager()?.reloadCommands();
     } finally {
       this.stopCompletedCount++;
       this.eventEmitter?.emit('extensionsStopping', {

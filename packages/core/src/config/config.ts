@@ -70,6 +70,7 @@ import type { ModelConfigServiceConfig } from '../services/modelConfigService.js
 import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
+import type { CommandManager } from '../commands/commandManager.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
@@ -353,10 +354,12 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   experimentalJitContext?: boolean;
   onModelChange?: (model: string) => void;
+  commandManager?: CommandManager;
 }
 
 export class Config {
   private toolRegistry!: ToolRegistry;
+  private commandManager?: CommandManager;
   private mcpClientManager?: McpClientManager;
   private allowedMcpServers: string[];
   private blockedMcpServers: string[];
@@ -642,6 +645,7 @@ export class Config {
     this.projectHooks = params.projectHooks;
     this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
+    this.commandManager = params.commandManager;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -1799,6 +1803,10 @@ export class Config {
       compact: false,
     });
     debugLogger.debug('Experiments loaded', summaryString);
+  }
+
+  getCommandManager(): CommandManager | undefined {
+    return this.commandManager;
   }
 }
 // Export model constants for use in CLI
