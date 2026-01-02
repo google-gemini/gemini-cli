@@ -19,11 +19,27 @@ process_pr() {
     local PR_NUMBER=$1
     echo "🔄 Processing PR #${PR_NUMBER}"
 
-    # Get closing issue number with error handling
-    local ISSUE_NUMBER
-    if ! ISSUE_NUMBER=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json closingIssuesReferences -q '.closingIssuesReferences.nodes[0].number' 2>/dev/null); then
-        echo "   ⚠️ Could not fetch closing issue for PR #${PR_NUMBER}"
+    # Get PR body with error handling
+    local PR_BODY
+    if ! PR_BODY=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json body -q .body 2>/dev/null); then
+        echo "   ⚠️ Could not fetch PR #${PR_NUMBER} details"
+        return 1
     fi
+
+    # Look for issue references using explicit keyword patterns only
+    local ISSUE_NUMBER=""
+
+    # Only detect explicit closing keywords to avoid false positives
+    # Matches: "Closes #123", "Fixes #456", "Resolves #789" (case-insensitive)
+    if [[ -z "${ISSUE_NUMBER}" ]]; then
+        ISSUE_NUMBER=$(printf '%s\n' "${PR_BODY}" | grep -iE '(closes?|fixes?|resolves?) #[0-9]+' | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
+    fi
+
+    # If no issue found with keyword + #<number>, try full GitHub issue URIs
+    if [[ -z "${ISSUE_NUMBER}" ]]; then
+        ISSUE_NUMBER=$(printf '%s\n' "${PR_BODY}" | grep -iE 'https?://github.com/[^/]+/[^/]+/issues/[0-9]+' | head -1 | sed -E 's/.*issues\/([0-9]+).*/\1/' 2>/dev/null || echo "")
+    fi
+
 
     if [[ -z "${ISSUE_NUMBER}" ]]; then
         echo "⚠️  No linked issue found for PR #${PR_NUMBER}, adding status/need-issue label"
