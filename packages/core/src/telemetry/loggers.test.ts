@@ -1748,7 +1748,6 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
-      getUseSmartEdit: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 
@@ -1799,7 +1798,6 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
-      getUseSmartEdit: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 
@@ -1852,7 +1850,6 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
-      getUseSmartEdit: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 

@@ -255,7 +255,6 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
     getToolRegistry: () => defaultToolRegistry,
     getActiveModel: () => DEFAULT_GEMINI_MODEL,
-    getUseSmartEdit: () => false,
     getGeminiClient: () => null,
     getMessageBus: () => createMockMessageBus(),
     getEnableHooks: () => false,
