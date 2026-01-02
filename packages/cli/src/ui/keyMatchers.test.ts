@@ -69,7 +69,7 @@ describe('keyMatchers', () => {
     [Command.TOGGLE_COPY_MODE]: (key: Key) => key.ctrl && key.name === 's',
     [Command.QUIT]: (key: Key) => key.ctrl && key.name === 'c',
     [Command.EXIT]: (key: Key) => key.ctrl && key.name === 'd',
-    [Command.SHOW_MORE_LINES]: (key: Key) => key.ctrl && key.name === 's',
+    [Command.SHOW_MORE_LINES]: (key: Key) => key.ctrl && key.name === 'o',
     [Command.REVERSE_SEARCH]: (key: Key) => key.ctrl && key.name === 'r',
     [Command.SUBMIT_REVERSE_SEARCH]: (key: Key) =>
       key.name === 'return' && !key.ctrl,
@@ -311,7 +311,7 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.SHOW_MORE_LINES,
-      positive: [createKey('s', { ctrl: true })],
+      positive: [createKey('o', { ctrl: true })],
       negative: [createKey('s'), createKey('l', { ctrl: true })],
     },
 
