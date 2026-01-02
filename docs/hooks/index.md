@@ -27,6 +27,28 @@ With hooks, you can:
 Hooks run synchronously as part of the agent loop—when a hook event fires,
 Gemini CLI waits for all matching hooks to complete before continuing.
 
+## Security and Risks
+
+> [!WARNING] **Hooks execute arbitrary code with your user privileges.**
+
+By configuring hooks, you are explicitly allowing Gemini CLI to run shell
+commands on your machine. Malicious or poorly configured hooks can:
+
+- **Exfiltrate data**: Read sensitive files (`.env`, ssh keys) and send them to
+  remote servers.
+- **Modify system**: Delete files, install malware, or change system settings.
+- **Consume resources**: Run infinite loops or crash your system.
+
+**Project-level hooks** (in `.gemini/settings.json`) and **Extension hooks** are
+particularly risky when opening third-party projects or extensions from
+untrusted authors. Gemini CLI will **warn you** the first time it detects a new
+project hook (identified by its name and command), but it is **your
+responsibility** to review these hooks (and any installed extensions) before
+trusting them.
+
+See [Security Considerations](best-practices.md#using-hooks-securely) for a
+detailed threat model and mitigation strategies.
+
 ## Core concepts
 
 ### Hook events
