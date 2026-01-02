@@ -147,9 +147,10 @@ export function colorizeCode({
 }: ColorizeCodeOptions): React.ReactNode {
   const codeToHighlight = code.replace(/\n$/, '');
   const activeTheme = theme || themeManager.getActiveTheme();
+  // Default: do NOT show line numbers unless explicitly enabled in settings or hideLineNumbers is false
   const showLineNumbers = hideLineNumbers
     ? false
-    : (settings?.merged.ui?.showLineNumbers ?? true);
+    : (settings?.merged.ui?.showLineNumbers ?? false);
 
   const useMaxSizedBox = !isAlternateBufferEnabled(settings);
   try {

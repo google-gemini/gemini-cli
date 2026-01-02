@@ -1,0 +1,178 @@
+﻿From 95c38f75f6750672e0bcdfbe3218bf4355e90d83 Mon Sep 17 00:00:00 2001
+From: Ayush Debnath <139256624+Solventerritory@users.noreply.github.com>
+Date: Mon, 10 Nov 2025 14:53:20 +0000
+Subject: [PATCH] docs(auth): improve GCA error message and add auth setup
+ guide
+
+---
+ docs/auth-setup.md                     | 105 +++++++++++++++++++++++++
+ docs/sidebar.json                      |   4 +
+ packages/core/src/code_assist/setup.ts |   9 ++-
+ packages/core/src/global.d.ts          |  11 +++
+ 4 files changed, 128 insertions(+), 1 deletion(-)
+ create mode 100644 docs/auth-setup.md
+ create mode 100644 packages/core/src/global.d.ts
+
+diff --git a/docs/auth-setup.md b/docs/auth-setup.md
+new file mode 100644
+index 00000000..55f96265
+--- /dev/null
++++ b/docs/auth-setup.md
++/**
++ * @license
++ * Copyright 2025 Google LLC
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++# Authentication Setup Guide
++
++There are two main ways to authenticate with the Gemini CLI:
++
++1. Using a Gemini API Key (Recommended for simplicity)
++2. Using a Google Cloud Account
++
++## Option 1: Gemini API Key Setup
++
++This is the simplest way to get started:
++
++1. Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
++2. Click "Create API Key" to generate a new key
++3. Set the API key in your environment:
++
++   ```bash
++   export GEMINI_API_KEY=your-api-key
++   ```
++
++   Or add it to your `~/.gemini/.env` file:
++
++   ```bash
++   echo "GEMINI_API_KEY=your-api-key" >> ~/.gemini/.env
++   ```
++
++## Option 2: Google Cloud Account Setup
++
++If you prefer to use your Google account:
++
++1. Install and initialize gcloud:
++
++   ```bash
++   # Install Google Cloud CLI
++   curl https://sdk.cloud.google.com | bash
++
++   # Restart your shell, then run:
++   gcloud init
++   ```
++
++2. Set your project ID:
++
++   ```bash
++   # Replace with your project ID
++   export GOOGLE_CLOUD_PROJECT=your-project-id
++   ```
++
++   Or add it to your `~/.gemini/.env` file:
++
++   ```bash
++   echo "GOOGLE_CLOUD_PROJECT=your-project-id" >> ~/.gemini/.env
++   ```
++
++3. Authenticate:
++   ```bash
++   gcloud auth application-default login
++   ```
++
++## Troubleshooting
++
++### Common Issues
++
++1. **"Request contains an invalid argument" error**
++   - When using Google account auth, you need to set GOOGLE_CLOUD_PROJECT
++   - Consider switching to API key auth for simpler setup
++
++2. **API Key not working**
++   - Verify the key is valid in AI Studio
++   - Check for typos or extra spaces
++   - Try regenerating the key
++
++3. **Project ID not found**
++   - Verify your project exists in Google Cloud Console
++   - Ensure you have the necessary permissions
++   - Try creating a new project if needed
++
++### Environment Variables
++
++The CLI looks for these environment variables in order:
++
++1. Command line environment
++2. `.gemini/.env` file in your home directory
++3. `.env` file in your current directory
++
++### Getting Help
++
++If you continue to have issues:
++
++1. Run the CLI with debug mode: `DEBUG=true gemini ...`
++2. Check the error output for specific details
++3. Visit our [GitHub issues](https://github.com/google-gemini/gemini-cli/issues)
++   for known problems
++4. Join our [Discord community](https://discord.gg/gemini-cli) for help
++
++## Security Notes
++
++- Never commit API keys to source control
++- Use environment variables or `.env` files (added to .gitignore)
++- Rotate keys regularly, especially if you suspect they've been compromised
++- Follow the principle of least privilege when setting up service accounts
+diff --git a/docs/sidebar.json b/docs/sidebar.json
+index 2b9c2a90..a618f025 100644
+--- a/docs/sidebar.json
++++ b/docs/sidebar.json
+@@ -27,6 +27,10 @@
+         "label": "Authentication",
+         "slug": "docs/get-started/authentication"
+       },
++      {
++        "label": "Authentication Setup",
++        "slug": "docs/auth-setup"
++      },
+       {
+         "label": "Configuration",
+         "slug": "docs/get-started/configuration"
+diff --git a/packages/core/src/code_assist/setup.ts b/packages/core/src/code_assist/setup.ts
+index d33c019d..5d8a71fe 100644
+--- a/packages/core/src/code_assist/setup.ts
++++ b/packages/core/src/code_assist/setup.ts
+@@ -17,7 +17,14 @@ import type { AuthClient } from 'google-auth-library';
+ export class ProjectIdRequiredError extends Error {
+   constructor() {
+     super(
+-      'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://goo.gle/gemini-cli-auth-docs#workspace-gca',
++      'Google Cloud Project ID Required\n\n' +
++        'When using Google account authentication (GCA), you must set a Google Cloud Project ID.\n\n' +
++        'Option 1: Set your project ID:\n' +
++        '  export GOOGLE_CLOUD_PROJECT=your-project-id\n\n' +
++        'Option 2: Switch to using an API key instead:\n' +
++        '  1. Get an API key from https://aistudio.google.com/app/apikey\n' +
++        '  2. export GEMINI_API_KEY=your-api-key\n\n' +
++        'For more details see: https://goo.gle/gemini-cli-auth-docs#workspace-gca',
+     );
+   }
+ }
+diff --git a/packages/core/src/global.d.ts b/packages/core/src/global.d.ts
+new file mode 100644
+index 00000000..cc01bf50
+--- /dev/null
++++ b/packages/core/src/global.d.ts
++/**
++ * @license
++ * Copyright 2025 Google LLC
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++declare const process: {
++  env: {
++    [key: string]: string | undefined;
++  };
++};
+-- 
+2.50.1
