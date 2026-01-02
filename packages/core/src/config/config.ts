@@ -348,6 +348,12 @@ export interface ConfigParameters {
     disabled?: string[];
   };
   previewFeatures?: boolean;
+  enableModelAvailabilityService?: boolean;
+  mcpAutoRestart?: {
+    enabled?: boolean;
+    healthCheckIntervalMs?: number;
+    unhealthyTimeoutMs?: number;
+  };
   enableAgents?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
@@ -478,6 +484,11 @@ export class Config {
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
 
+  private readonly mcpAutoRestart: {
+    enabled: boolean;
+    healthCheckIntervalMs: number;
+    unhealthyTimeoutMs: number;
+  };
   private readonly enableAgents: boolean;
   private readonly skillsSupport: boolean;
   private readonly disabledSkills: string[];
@@ -546,6 +557,12 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.mcpAutoRestart = {
+      enabled: params.mcpAutoRestart?.enabled ?? true,
+      healthCheckIntervalMs:
+        params.mcpAutoRestart?.healthCheckIntervalMs ?? 15000,
+      unhealthyTimeoutMs: params.mcpAutoRestart?.unhealthyTimeoutMs ?? 30000,
+    };
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
     this.skillsSupport = params.skillsSupport ?? false;
@@ -1372,6 +1389,10 @@ export class Config {
 
   isAgentsEnabled(): boolean {
     return this.enableAgents;
+  }
+
+  getMcpAutoRestartConfig() {
+    return this.mcpAutoRestart;
   }
 
   getNoBrowser(): boolean {
