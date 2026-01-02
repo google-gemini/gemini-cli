@@ -5,7 +5,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { appEvents, AppEvent } from '../../utils/events.js';
 import {
   profiler,
   DebugProfiler,
@@ -16,6 +15,7 @@ import { render } from '../../test-utils/render.js';
 import { useUIState, type UIState } from '../contexts/UIStateContext.js';
 import { FixedDeque } from 'mnemonist';
 import { debugState } from '../debug.js';
+import { coreEvents, CoreEvent } from '@google/gemini-cli-core';
 
 vi.mock('../contexts/UIStateContext.js', () => ({
   useUIState: vi.fn(),
@@ -173,7 +173,7 @@ describe('DebugProfiler', () => {
     const reportActionSpy = vi.spyOn(profiler, 'reportAction');
     const cleanup = profiler.registerFlickerHandler(true);
 
-    appEvents.emit(AppEvent.Flicker);
+    coreEvents.emit(CoreEvent.Flicker);
 
     expect(profiler.totalFlickerFrames).toBe(1);
     expect(reportActionSpy).toHaveBeenCalled();

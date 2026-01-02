@@ -10,8 +10,7 @@ import { FixedDeque } from 'mnemonist';
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { debugState } from '../debug.js';
-import { appEvents, AppEvent } from '../../utils/events.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, coreEvents, CoreEvent } from '@google/gemini-cli-core';
 
 // Frames that render at least this far before or after an action are considered
 // idle frames.
@@ -108,7 +107,7 @@ export const profiler = {
     if (idleInPastSecond >= 5) {
       if (this.openedDebugConsole === false) {
         this.openedDebugConsole = true;
-        appEvents.emit(AppEvent.OpenDebugConsole);
+        coreEvents.emit(CoreEvent.OpenDebugConsole);
       }
       debugLogger.error(
         `${idleInPastSecond} frames rendered while the app was ` +
@@ -136,9 +135,9 @@ export const profiler = {
         );
       }
     };
-    appEvents.on(AppEvent.Flicker, flickerHandler);
+    coreEvents.on(CoreEvent.Flicker, flickerHandler);
     return () => {
-      appEvents.off(AppEvent.Flicker, flickerHandler);
+      coreEvents.off(CoreEvent.Flicker, flickerHandler);
     };
   },
 };

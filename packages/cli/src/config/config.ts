@@ -35,13 +35,13 @@ import {
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  coreEvents,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import { saveModelChange, loadSettings } from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
-import { appEvents } from '../utils/events.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -50,7 +50,7 @@ import { ExtensionManager } from './extension-manager.js';
 import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
 import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
-import type { EventEmitter } from 'node:stream';
+import type { EventEmitter } from 'node:events';
 import { runExitCleanup } from '../utils/cleanup.js';
 
 export interface CliArgs {
@@ -444,7 +444,7 @@ export async function loadCliConfig(
     requestSetting: promptForSetting,
     workspaceDir: cwd,
     enabledExtensionOverrides: argv.extensions,
-    eventEmitter: appEvents as EventEmitter<ExtensionEvents>,
+    eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
   });
   await extensionManager.loadExtensions();
 
@@ -688,7 +688,7 @@ export async function loadCliConfig(
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     truncateToolOutputLines: settings.tools?.truncateToolOutputLines,
     enableToolOutputTruncation: settings.tools?.enableToolOutputTruncation,
-    eventEmitter: appEvents,
+    eventEmitter: coreEvents,
     useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
     output: {
