@@ -292,9 +292,12 @@ export class CodeAssistServer implements ContentGenerator {
     return res.data as T;
   }
 
-  async requestGet<T>(method: string, signal?: AbortSignal): Promise<T> {
+  private async makeGetRequest<T>(
+    url: string,
+    signal?: AbortSignal,
+  ): Promise<T> {
     const res = await this.client.request({
-      url: this.getMethodUrl(method),
+      url,
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -306,18 +309,12 @@ export class CodeAssistServer implements ContentGenerator {
     return res.data as T;
   }
 
+  async requestGet<T>(method: string, signal?: AbortSignal): Promise<T> {
+    return this.makeGetRequest<T>(this.getMethodUrl(method), signal);
+  }
+
   async requestGetOperation<T>(name: string, signal?: AbortSignal): Promise<T> {
-    const res = await this.client.request({
-      url: this.getOperationUrl(name),
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.httpOptions.headers,
-      },
-      responseType: 'json',
-      signal,
-    });
-    return res.data as T;
+    return this.makeGetRequest<T>(this.getOperationUrl(name), signal);
   }
 
   async requestStreamingPost<T>(
@@ -362,16 +359,18 @@ export class CodeAssistServer implements ContentGenerator {
     })();
   }
 
-  getMethodUrl(method: string): string {
+  private getBaseUrl(): string {
     const endpoint =
       process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
-    return `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`;
+    return `${endpoint}/${CODE_ASSIST_API_VERSION}`;
+  }
+
+  getMethodUrl(method: string): string {
+    return `${this.getBaseUrl()}:${method}`;
   }
 
   getOperationUrl(name: string): string {
-    const endpoint =
-      process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
-    return `${endpoint}/${CODE_ASSIST_API_VERSION}/${name}`;
+    return `${this.getBaseUrl()}/${name}`;
   }
 }
 
