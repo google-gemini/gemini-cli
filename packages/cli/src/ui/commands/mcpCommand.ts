@@ -20,6 +20,8 @@ import {
   getErrorMessage,
   MCPOAuthTokenStorage,
   mcpServerRequiresOAuth,
+  CoreEvent,
+  coreEvents,
 } from '@google/gemini-cli-core';
 
 import { MessageType, type HistoryItemMcpStatus } from '../types.js';
@@ -90,6 +92,11 @@ const authCommand: SlashCommand = {
     // Always attempt OAuth authentication, even if not explicitly configured
     // The authentication process will discover OAuth requirements automatically
 
+    const displayListener = (message: string) => {
+      context.ui.addItem({ type: 'info', text: message }, Date.now());
+    };
+
+    coreEvents.on(CoreEvent.OauthDisplayMessage, displayListener);
     try {
       context.ui.addItem(
         {
@@ -151,6 +158,8 @@ const authCommand: SlashCommand = {
         messageType: 'error',
         content: `Failed to authenticate with MCP server '${serverName}': ${getErrorMessage(error)}`,
       };
+    } finally {
+      coreEvents.removeListener(CoreEvent.OauthDisplayMessage, displayListener);
     }
   },
   completion: async (context: CommandContext, partialArg: string) => {

@@ -84,6 +84,7 @@ export enum CoreEvent {
   McpClientUpdate = 'mcp-client-update',
   ExtensionsStarting = 'extensionsStarting',
   ExtensionsStopping = 'extensionsStopping',
+  OauthDisplayMessage = 'oauth-display-message',
 }
 
 export interface CoreEvents {
@@ -98,6 +99,7 @@ export interface CoreEvents {
   [CoreEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
   [CoreEvent.ExtensionsStarting]: [ExtensionsStartingEvent];
   [CoreEvent.ExtensionsStopping]: [ExtensionsStoppingEvent];
+  [CoreEvent.OauthDisplayMessage]: string[];
 }
 
 type EventBacklogItem = {
