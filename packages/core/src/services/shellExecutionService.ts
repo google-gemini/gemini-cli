@@ -10,7 +10,7 @@ import { getPty } from '../utils/getPty.js';
 import { spawn as cpSpawn } from 'node:child_process';
 import { TextDecoder } from 'node:util';
 import os from 'node:os';
-import type { IPty } from '@lydell/node-pty';
+import type { IPty } from '../utils/pty/types.js';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import {
   getShellConfiguration,
@@ -70,7 +70,12 @@ export interface ShellExecutionResult {
   /** The process ID of the spawned shell. */
   pid: number | undefined;
   /** The method used to execute the shell command. */
-  executionMethod: 'lydell-node-pty' | 'node-pty' | 'child_process' | 'none';
+  executionMethod:
+    | 'lydell-node-pty'
+    | 'node-pty'
+    | 'script-pty'
+    | 'child_process'
+    | 'none';
 }
 
 /** A handle for an ongoing shell execution. */
@@ -92,6 +97,7 @@ export interface ShellExecutionConfig {
   // Used for testing
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
+  ptyBackend?: string;
 }
 
 /**
@@ -184,7 +190,7 @@ export class ShellExecutionService {
     shellExecutionConfig: ShellExecutionConfig,
   ): Promise<ShellExecutionHandle> {
     if (shouldUseNodePty) {
-      const ptyInfo = await getPty();
+      const ptyInfo = await getPty(shellExecutionConfig.ptyBackend);
       if (ptyInfo) {
         try {
           return await this.executeWithPty(
@@ -491,6 +497,7 @@ export class ShellExecutionService {
           PAGER: shellExecutionConfig.pager ?? 'cat',
           GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
         },
+        encoding: null,
         handleFlowControl: true,
       });
 
@@ -662,9 +669,8 @@ export class ShellExecutionService {
           );
         };
 
-        ptyProcess.onData((data: string) => {
-          const bufferData = Buffer.from(data, 'utf-8');
-          handleOutput(bufferData);
+        ptyProcess.onData((data: Buffer) => {
+          handleOutput(data);
         });
 
         ptyProcess.onExit(
