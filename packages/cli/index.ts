@@ -13,6 +13,7 @@ import { runExitCleanup } from './src/utils/cleanup.js';
 // --- Global Entry Point ---
 
 // Suppress known race condition error in node-pty on Windows
+// Tracking bug: https://github.com/microsoft/node-pty/issues/827
 process.on('uncaughtException', (error) => {
   if (
     process.platform === 'win32' &&
