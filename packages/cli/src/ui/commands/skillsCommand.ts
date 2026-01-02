@@ -45,6 +45,8 @@ async function listAction(
       name: skill.name,
       description: skill.description,
       disabled: skill.disabled,
+      location: skill.location,
+      body: skill.body,
     })),
     showDescriptions: useShowDescriptions,
   };

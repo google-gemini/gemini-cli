@@ -58,8 +58,20 @@ describe('skillsCommand', () => {
       expect.objectContaining({
         type: MessageType.SKILLS_LIST,
         skills: [
-          { name: 'skill1', description: 'desc1' },
-          { name: 'skill2', description: 'desc2' },
+          {
+            name: 'skill1',
+            description: 'desc1',
+            disabled: undefined,
+            location: '/loc1',
+            body: 'body1',
+          },
+          {
+            name: 'skill2',
+            description: 'desc2',
+            disabled: undefined,
+            location: '/loc2',
+            body: 'body2',
+          },
         ],
         showDescriptions: true,
       }),
@@ -75,8 +87,20 @@ describe('skillsCommand', () => {
       expect.objectContaining({
         type: MessageType.SKILLS_LIST,
         skills: [
-          { name: 'skill1', description: 'desc1' },
-          { name: 'skill2', description: 'desc2' },
+          {
+            name: 'skill1',
+            description: 'desc1',
+            disabled: undefined,
+            location: '/loc1',
+            body: 'body1',
+          },
+          {
+            name: 'skill2',
+            description: 'desc2',
+            disabled: undefined,
+            location: '/loc2',
+            body: 'body2',
+          },
         ],
         showDescriptions: true,
       }),
