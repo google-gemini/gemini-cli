@@ -52,6 +52,7 @@ import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
+import { BridgeCommandManager } from '../services/BridgeCommandManager.js';
 
 export interface CliArgs {
   query: string | undefined;
@@ -607,6 +608,8 @@ export async function loadCliConfig(
 
   const ptyInfo = await getPty();
 
+  const commandManager = new BridgeCommandManager();
+
   return new Config({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -708,6 +711,7 @@ export async function loadCliConfig(
     hooks: settings.hooks || {},
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
+    commandManager,
   });
 }
 

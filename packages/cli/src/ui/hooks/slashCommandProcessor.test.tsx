@@ -26,7 +26,7 @@ import {
   ToolConfirmationOutcome,
   makeFakeConfig,
 } from '@google/gemini-cli-core';
-import { appEvents } from '../../utils/events.js';
+import { BridgeCommandManager } from '../../services/BridgeCommandManager.js';
 
 const {
   logSlashCommand,
@@ -1105,6 +1105,9 @@ describe('useSlashCommandProcessor', () => {
   });
 
   it('should reload commands on extension events', async () => {
+    const commandManager = new BridgeCommandManager();
+    vi.spyOn(mockConfig, 'getCommandManager').mockReturnValue(commandManager);
+
     const result = await setupProcessorHook();
     await waitFor(() => expect(result.current.slashCommands).toEqual([]));
 
@@ -1118,8 +1121,8 @@ describe('useSlashCommandProcessor', () => {
 
     // We should not see a change until we fire an event.
     await waitFor(() => expect(result.current.slashCommands).toEqual([]));
-    act(() => {
-      appEvents.emit('extensionsStarting');
+    await act(async () => {
+      await commandManager.reloadCommands();
     });
     await waitFor(() =>
       expect(result.current.slashCommands).toEqual([newCommand]),
