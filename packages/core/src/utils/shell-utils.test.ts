@@ -69,6 +69,24 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+const mockPowerShellResult = (
+  commands: Array<{ name: string; text: string }>,
+  hasRedirection: boolean,
+) => {
+  mockSpawnSync.mockReturnValue({
+    stdout: Buffer.from(
+      JSON.stringify({
+        success: true,
+        commands,
+        hasRedirection,
+      }),
+    ),
+    stderr: Buffer.from(''),
+    status: 0,
+    error: undefined,
+  });
+};
+
 describe('getCommandRoots', () => {
   it('should return a single command', () => {
     expect(getCommandRoots('ls -l')).toEqual(['ls']);
@@ -197,21 +215,13 @@ describeWindowsOnly('PowerShell integration', () => {
   });
 
   it('should return command roots using PowerShell AST output', () => {
-    mockSpawnSync.mockReturnValue({
-      stdout: Buffer.from(
-        JSON.stringify({
-          success: true,
-          commands: [
-            { name: 'Get-ChildItem', text: 'Get-ChildItem' },
-            { name: 'Select-Object', text: 'Select-Object Name' },
-          ],
-          hasRedirection: false,
-        }),
-      ),
-      stderr: Buffer.from(''),
-      status: 0,
-      error: undefined,
-    });
+    mockPowerShellResult(
+      [
+        { name: 'Get-ChildItem', text: 'Get-ChildItem' },
+        { name: 'Select-Object', text: 'Select-Object Name' },
+      ],
+      false,
+    );
 
     const roots = getCommandRoots('Get-ChildItem | Select-Object Name');
     expect(roots.length).toBeGreaterThan(0);
@@ -393,24 +403,6 @@ describe('hasRedirection (PowerShell via mock)', () => {
     mockPlatform.mockReturnValue('win32');
     process.env['ComSpec'] = 'powershell.exe';
   });
-
-  const mockPowerShellResult = (
-    commands: Array<{ name: string; text: string }>,
-    hasRedirection: boolean,
-  ) => {
-    mockSpawnSync.mockReturnValue({
-      stdout: Buffer.from(
-        JSON.stringify({
-          success: true,
-          commands,
-          hasRedirection,
-        }),
-      ),
-      stderr: Buffer.from(''),
-      status: 0,
-      error: undefined,
-    });
-  };
 
   it('should return true when PowerShell parser detects redirection', () => {
     mockPowerShellResult([{ name: 'echo', text: 'echo hello' }], true);
