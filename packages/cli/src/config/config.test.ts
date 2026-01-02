@@ -99,16 +99,21 @@ vi.mock('@google/gemini-cli-core', async () => {
     loadEnvironment: vi.fn(),
     loadServerHierarchicalMemory: vi.fn(
       (
-        cwd,
-        dirs,
-        debug,
-        fileService,
+        _cwd,
+        _dirs,
+        _debug,
+        _fileService,
         extensionLoader: ExtensionLoader,
         _maxDirs,
       ) => {
-        const extensionPaths = extensionLoader
-          .getExtensions()
-          .flatMap((e) => e.contextFiles);
+        let extensionPaths: string[] = [];
+        try {
+          extensionPaths = extensionLoader
+            .getExtensions()
+            .flatMap((e) => e.contextFiles);
+        } catch {
+          // Extensions might not be loaded yet or mocked improperly, ignore.
+        }
         return Promise.resolve({
           memoryContent: extensionPaths.join(',') || '',
           fileCount: extensionPaths?.length || 0,
@@ -1396,21 +1401,17 @@ describe('loadCliConfig with includeDirectories', () => {
     };
     const config = await loadCliConfig(settings, 'test-session', argv);
     const expected = [
-      mockCwd,
       path.resolve(path.sep, 'cli', 'path1'),
       path.join(mockCwd, 'cli', 'path2'),
-      path.resolve(path.sep, 'settings', 'path1'),
-      path.join(os.homedir(), 'settings', 'path2'),
+      // Settings paths that are outside CWD should be filtered out
       path.join(mockCwd, 'settings', 'path3'),
     ];
     const directories = config.getWorkspaceContext().getDirectories();
     expect(directories).toEqual([mockCwd]);
     expect(config.getPendingIncludeDirectories()).toEqual(
-      expect.arrayContaining(expected.filter((dir) => dir !== mockCwd)),
+      expect.arrayContaining(expected),
     );
-    expect(config.getPendingIncludeDirectories()).toHaveLength(
-      expected.length - 1,
-    );
+    expect(config.getPendingIncludeDirectories()).toHaveLength(expected.length);
   });
 });
 

@@ -7,6 +7,7 @@
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
+import * as path from 'node:path';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { hooksCommand } from '../commands/hooks.js';
@@ -435,8 +436,21 @@ export async function loadCliConfig(
   };
 
   const includeDirectories = (settings.context?.includeDirectories || [])
-    .map(resolvePath)
-    .concat((argv.includeDirectories || []).map(resolvePath));
+    .map((p) => resolvePath(p, cwd))
+    .filter((p) => {
+      const relative = path.relative(cwd, p);
+      if (
+        (relative.startsWith('..') && !path.isAbsolute(relative)) ||
+        path.isAbsolute(relative)
+      ) {
+        debugLogger.warn(
+          `Ignoring includeDirectory '${p}' because it is outside the project root.`,
+        );
+        return false;
+      }
+      return true;
+    })
+    .concat((argv.includeDirectories || []).map((p) => resolvePath(p, cwd)));
 
   const extensionManager = new ExtensionManager({
     settings,
@@ -590,14 +604,7 @@ export async function loadCliConfig(
     extraExcludes.length > 0 ? extraExcludes : undefined,
   );
 
-  const defaultModel = settings.general?.previewFeatures
-    ? PREVIEW_GEMINI_MODEL_AUTO
-    : DEFAULT_GEMINI_MODEL_AUTO;
-  const resolvedModel: string =
-    argv.model ||
-    process.env['GEMINI_MODEL'] ||
-    settings.model?.name ||
-    defaultModel;
+  const { model: resolvedModel, useModelRouter } = resolveModel(settings, argv);
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
   const screenReader =
@@ -694,6 +701,7 @@ export async function loadCliConfig(
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
+    useModelRouter,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
     introspectionAgentSettings:
@@ -706,6 +714,8 @@ export async function loadCliConfig(
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.tools?.enableHooks ?? false,
     hooks: settings.hooks || {},
+    simpleTaskModel: settings.experimental?.modelRouter?.simpleTaskModel,
+    complexTaskModel: settings.experimental?.modelRouter?.complexTaskModel,
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
   });
@@ -720,4 +730,25 @@ function mergeExcludeTools(
     ...(extraExcludes || []),
   ]);
   return [...allExcludeTools];
+}
+
+function resolveModel(
+  settings: Settings,
+  argv: CliArgs,
+): { model: string; useModelRouter: boolean } {
+  const useModelRouter = settings.experimental?.modelRouter?.enabled ?? false;
+
+  const defaultAutoModel = settings.general?.previewFeatures
+    ? PREVIEW_GEMINI_MODEL_AUTO
+    : DEFAULT_GEMINI_MODEL_AUTO;
+
+  const defaultModel = defaultAutoModel;
+
+  const model =
+    argv.model ||
+    process.env['GEMINI_MODEL'] ||
+    settings.model?.name ||
+    defaultModel;
+
+  return { model, useModelRouter };
 }

@@ -1,0 +1,9 @@
+{
+  "experimental": {
+    "useModelRouter": true,
+    "router": {
+      "simpleTaskModel": "my-custom-flash",
+      "complexTaskModel": "my-custom-pro"
+    }
+  }
+}

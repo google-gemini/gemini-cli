@@ -13,14 +13,9 @@ import {
   isFunctionCall,
   isFunctionResponse,
 } from '../../utils/messageInspectors.js';
-import {
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
-} from '../../config/models.js';
+
 import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
-import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
 vi.mock('../../core/baseLlmClient.js');
@@ -31,7 +26,6 @@ describe('ClassifierStrategy', () => {
   let mockContext: RoutingContext;
   let mockConfig: Config;
   let mockBaseLlmClient: BaseLlmClient;
-  let mockResolvedConfig: ResolvedModelConfig;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -42,17 +36,9 @@ describe('ClassifierStrategy', () => {
       request: [{ text: 'simple task' }],
       signal: new AbortController().signal,
     };
-
-    mockResolvedConfig = {
-      model: 'classifier',
-      generateContentConfig: {},
-    } as unknown as ResolvedModelConfig;
     mockConfig = {
-      modelConfigService: {
-        getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
-      },
-      getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
-      getPreviewFeatures: () => false,
+      getSimpleTaskModel: vi.fn(() => 'test-flash-model'),
+      getComplexTaskModel: vi.fn(() => 'test-pro-model'),
     } as unknown as Config;
     mockBaseLlmClient = {
       generateJson: vi.fn(),
@@ -74,13 +60,13 @@ describe('ClassifierStrategy', () => {
 
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
       expect.objectContaining({
-        modelConfigKey: { model: mockResolvedConfig.model },
+        modelConfigKey: { model: 'classifier' },
         promptId: 'test-prompt-id',
       }),
     );
   });
 
-  it('should route to FLASH model for a simple task', async () => {
+  it('should route to the configured simple task model for a simple task', async () => {
     const mockApiResponse = {
       reasoning: 'This is a simple task.',
       model_choice: 'flash',
@@ -97,16 +83,17 @@ describe('ClassifierStrategy', () => {
 
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledOnce();
     expect(decision).toEqual({
-      model: DEFAULT_GEMINI_FLASH_MODEL,
+      model: 'test-flash-model',
       metadata: {
         source: 'Classifier',
         latencyMs: expect.any(Number),
         reasoning: mockApiResponse.reasoning,
       },
     });
+    expect(mockConfig.getSimpleTaskModel).toHaveBeenCalledOnce();
   });
 
-  it('should route to PRO model for a complex task', async () => {
+  it('should route to the configured complex task model for a complex task', async () => {
     const mockApiResponse = {
       reasoning: 'This is a complex task.',
       model_choice: 'pro',
@@ -124,13 +111,14 @@ describe('ClassifierStrategy', () => {
 
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledOnce();
     expect(decision).toEqual({
-      model: DEFAULT_GEMINI_MODEL,
+      model: 'test-pro-model',
       metadata: {
         source: 'Classifier',
         latencyMs: expect.any(Number),
         reasoning: mockApiResponse.reasoning,
       },
     });
+    expect(mockConfig.getComplexTaskModel).toHaveBeenCalledOnce();
   });
 
   it('should return null if the classifier API call fails', async () => {

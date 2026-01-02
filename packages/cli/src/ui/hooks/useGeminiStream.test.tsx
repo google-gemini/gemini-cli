@@ -56,6 +56,7 @@ const MockedGeminiClientClass = vi.hoisted(() =>
     this.getChat = vi.fn().mockReturnValue({
       recordCompletedToolCalls: vi.fn(),
     });
+    this.getCurrentSequenceModel = vi.fn().mockReturnValue(null);
     this.getChatRecordingService = vi.fn().mockReturnValue({
       recordThought: vi.fn(),
       initialize: vi.fn(),
