@@ -4,10 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import { directoryCommand } from './directoryCommand.js';
-import { expandHomeDir } from '../utils/directoryUtils.js';
+import {
+  expandHomeDir,
+  getDirectorySuggestions,
+} from '../utils/directoryUtils.js';
 import type { Config, WorkspaceContext } from '@google/gemini-cli-core';
 import type { MultiFolderTrustDialogProps } from '../components/MultiFolderTrustDialog.js';
 import type { CommandContext, OpenCustomDialogActionReturn } from './types.js';
@@ -16,6 +19,15 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as trustedFolders from '../../config/trustedFolders.js';
 import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
+
+vi.mock('../utils/directoryUtils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/directoryUtils.js')>();
+  return {
+    ...actual,
+    getDirectorySuggestions: vi.fn(),
+  };
+});
 
 describe('directoryCommand', () => {
   let mockContext: CommandContext;
@@ -216,6 +228,47 @@ describe('directoryCommand', () => {
         }),
         expect.any(Number),
       );
+    });
+
+    describe('completion', () => {
+      const completion = addCommand!.completion!;
+
+      it('should return empty suggestions for an empty path', async () => {
+        const results = await completion(mockContext, '');
+        expect(results).toEqual([]);
+      });
+
+      it('should return empty suggestions for whitespace only path', async () => {
+        const results = await completion(mockContext, '  ');
+        expect(results).toEqual([]);
+      });
+
+      it('should return suggestions for a single path', async () => {
+        vi.mocked(getDirectorySuggestions).mockResolvedValue(['docs/', 'src/']);
+
+        const results = await completion(mockContext, 'd');
+
+        expect(getDirectorySuggestions).toHaveBeenCalledWith('d');
+        expect(results).toEqual(['docs/', 'src/']);
+      });
+
+      it('should return suggestions for multiple paths', async () => {
+        vi.mocked(getDirectorySuggestions).mockResolvedValue(['src/']);
+
+        const results = await completion(mockContext, 'docs/,s');
+
+        expect(getDirectorySuggestions).toHaveBeenCalledWith('s');
+        expect(results).toEqual(['docs/,src/']);
+      });
+
+      it('should handle leading whitespace in suggestions', async () => {
+        vi.mocked(getDirectorySuggestions).mockResolvedValue(['src/']);
+
+        const results = await completion(mockContext, 'docs/, s');
+
+        expect(getDirectorySuggestions).toHaveBeenCalledWith('s');
+        expect(results).toEqual(['docs/, src/']);
+      });
     });
   });
 
