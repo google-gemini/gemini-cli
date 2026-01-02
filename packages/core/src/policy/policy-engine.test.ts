@@ -864,6 +864,116 @@ describe('PolicyEngine', () => {
         (await engine.check({ name: 'test', args }, undefined)).decision,
       ).toBe(PolicyDecision.ALLOW);
     });
+    it('should downgrade ALLOW to ASK_USER for redirected shell commands', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          // Matches "echo" prefix
+          argsPattern: /"command":"echo/,
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Safe command should be allowed
+      expect(
+        (
+          await engine.check(
+            { name: 'run_shell_command', args: { command: 'echo "hello"' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Redirected command should be downgraded to ASK_USER
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'run_shell_command',
+              args: { command: 'echo "hello" > file.txt' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should allow redirected shell commands when allowRedirection is true', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          // Matches "echo" prefix
+          argsPattern: /"command":"echo/,
+          decision: PolicyDecision.ALLOW,
+          allowRedirection: true,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Redirected command should stay ALLOW
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'run_shell_command',
+              args: { command: 'echo "hello" > file.txt' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should NOT downgrade ALLOW to ASK_USER for quoted redirection chars', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo/,
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Should remain ALLOW because it's not a real redirection
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'run_shell_command',
+              args: { command: 'echo "-> arrow"' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should avoid infinite recursion for commands with substitution', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Command with substitution triggers splitCommands returning the same command as its first element.
+      // This verifies the fix for the infinite recursion bug.
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo $(ls)' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
   });
 
   describe('safety checker integration', () => {
