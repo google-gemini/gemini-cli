@@ -161,7 +161,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       }
 
       if (config) {
-        config.setModel(model, !persistMode);
+        config.setModel(model, persistMode ? false : true);
         const event = new ModelSlashCommandEvent(model);
         logModelSlashCommand(config, event);
       }

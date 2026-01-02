@@ -47,7 +47,7 @@ describe('<ModelDialog />', () => {
   const mockGetHasAccessToPreviewModel = vi.fn();
 
   interface MockConfig extends Partial<Config> {
-    setModel: (model: string, shouldPersist?: boolean) => void;
+    setModel: (model: string, isTemporary?: boolean) => void;
     getModel: () => string;
     getPreviewFeatures: () => boolean;
     getHasAccessToPreviewModel: () => boolean;
@@ -148,7 +148,7 @@ describe('<ModelDialog />', () => {
 
     expect(mockSetModel).toHaveBeenCalledWith(
       DEFAULT_GEMINI_MODEL_AUTO,
-      false, // Session only by default
+      true, // Session only by default
     );
     expect(mockOnClose).toHaveBeenCalled();
   });
@@ -166,7 +166,7 @@ describe('<ModelDialog />', () => {
     stdin.write('\r');
     await waitForUpdate();
 
-    expect(mockSetModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL, false);
+    expect(mockSetModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL, true);
     expect(mockOnClose).toHaveBeenCalled();
   });
 
@@ -189,7 +189,7 @@ describe('<ModelDialog />', () => {
 
     expect(mockSetModel).toHaveBeenCalledWith(
       DEFAULT_GEMINI_MODEL_AUTO,
-      true, // Persist enabled
+      false, // Persist enabled
     );
     expect(mockOnClose).toHaveBeenCalled();
   });
