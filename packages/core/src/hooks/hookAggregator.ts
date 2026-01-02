@@ -158,6 +158,14 @@ export class HookAggregator {
         merged.suppressOutput = true;
       }
 
+      // Merge hookSpecificOutput
+      if (output.hookSpecificOutput) {
+        merged.hookSpecificOutput = {
+          ...(merged.hookSpecificOutput || {}),
+          ...output.hookSpecificOutput,
+        };
+      }
+
       // Collect additional context from hook-specific outputs
       this.extractAdditionalContext(output, additionalContexts);
     }

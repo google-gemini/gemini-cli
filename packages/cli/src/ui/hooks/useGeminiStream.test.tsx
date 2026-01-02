@@ -694,6 +694,99 @@ describe('useGeminiStream', () => {
     });
   });
 
+  it('should stop agent execution immediately when a tool call returns STOP_EXECUTION error', async () => {
+    const stopExecutionToolCalls: TrackedToolCall[] = [
+      {
+        request: {
+          callId: 'stop-call',
+          name: 'stopTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-stop',
+        },
+        status: 'error',
+        response: {
+          callId: 'stop-call',
+          responseParts: [{ text: 'error occurred' }],
+          errorType: ToolErrorType.STOP_EXECUTION,
+          error: new Error('Stop reason from hook'),
+          resultDisplay: undefined,
+        },
+        responseSubmittedToGemini: false,
+        tool: {
+          displayName: 'stop tool',
+        },
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
+      } as unknown as TrackedCompletedToolCall,
+    ];
+    const client = new MockedGeminiClientClass(mockConfig);
+
+    // Capture the onComplete callback
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseReactToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+      ];
+    });
+
+    const { result } = renderHook(() =>
+      useGeminiStream(
+        client,
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // Trigger the onComplete callback with STOP_EXECUTION tool
+    await act(async () => {
+      if (capturedOnComplete) {
+        await (capturedOnComplete as any)(stopExecutionToolCalls);
+      }
+    });
+
+    await waitFor(() => {
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['stop-call']);
+      // Should add an info message to history
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining(
+            'Agent execution stopped: Stop reason from hook',
+          ),
+        }),
+        expect.any(Number),
+      );
+      // Ensure we do NOT call back to the API
+      expect(mockSendMessageStream).not.toHaveBeenCalled();
+      // Streaming state should be Idle
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+  });
+
   it('should group multiple cancelled tool call responses into a single history entry', async () => {
     const cancelledToolCall1: TrackedCancelledToolCall = {
       request: {

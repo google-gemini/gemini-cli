@@ -80,7 +80,6 @@ const mockConfig = {
   getUseSmartEdit: () => false,
   getGeminiClient: () => null, // No client needed for these tests
   getShellExecutionConfig: () => ({ terminalWidth: 80, terminalHeight: 24 }),
-  getEnableMessageBusIntegration: () => false,
   getMessageBus: () => null,
   getPolicyEngine: () => null,
   isInteractive: () => false,

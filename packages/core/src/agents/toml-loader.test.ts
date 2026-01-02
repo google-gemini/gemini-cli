@@ -46,12 +46,117 @@ describe('toml-loader', () => {
       `);
 
       const result = await parseAgentToml(filePath);
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
         name: 'test-agent',
         description: 'A test agent',
         prompts: {
           system_prompt: 'You are a test agent.',
         },
+      });
+    });
+
+    it('should parse a valid remote agent TOML file', async () => {
+      const filePath = await writeAgentToml(`
+        kind = "remote"
+        name = "remote-agent"
+        description = "A remote agent"
+        agent_card_url = "https://example.com/card"
+      `);
+
+      const result = await parseAgentToml(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        kind: 'remote',
+        name: 'remote-agent',
+        description: 'A remote agent',
+        agent_card_url: 'https://example.com/card',
+      });
+    });
+
+    it('should infer remote agent kind from agent_card_url', async () => {
+      const filePath = await writeAgentToml(`
+        name = "inferred-remote"
+        description = "Inferred"
+        agent_card_url = "https://example.com/inferred"
+      `);
+
+      const result = await parseAgentToml(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        kind: 'remote',
+        name: 'inferred-remote',
+        description: 'Inferred',
+        agent_card_url: 'https://example.com/inferred',
+      });
+    });
+
+    it('should parse a remote agent without description', async () => {
+      const filePath = await writeAgentToml(`
+        kind = "remote"
+        name = "no-description-remote"
+        agent_card_url = "https://example.com/card"
+      `);
+
+      const result = await parseAgentToml(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        kind: 'remote',
+        name: 'no-description-remote',
+        agent_card_url: 'https://example.com/card',
+      });
+      expect(result[0].description).toBeUndefined();
+
+      // defined after conversion to AgentDefinition
+      const agentDef = tomlToAgentDefinition(result[0]);
+      expect(agentDef.description).toBe('(Loading description...)');
+    });
+
+    it('should parse multiple agents in one file', async () => {
+      const filePath = await writeAgentToml(`
+        [[remote_agents]]
+        kind = "remote"
+        name = "agent-1"
+        description = "Remote 1"
+        agent_card_url = "https://example.com/1"
+
+        [[remote_agents]]
+        kind = "remote"
+        name = "agent-2"
+        description = "Remote 2"
+        agent_card_url = "https://example.com/2"
+      `);
+
+      const result = await parseAgentToml(filePath);
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('agent-1');
+      expect(result[0].kind).toBe('remote');
+      expect(result[1].name).toBe('agent-2');
+      expect(result[1].kind).toBe('remote');
+    });
+
+    it('should allow omitting kind in remote_agents block', async () => {
+      const filePath = await writeAgentToml(`
+        [[remote_agents]]
+        name = "implicit-remote-1"
+        agent_card_url = "https://example.com/1"
+
+        [[remote_agents]]
+        name = "implicit-remote-2"
+        agent_card_url = "https://example.com/2"
+      `);
+
+      const result = await parseAgentToml(filePath);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'implicit-remote-1',
+        agent_card_url: 'https://example.com/1',
+      });
+      expect(result[1]).toMatchObject({
+        kind: 'remote',
+        name: 'implicit-remote-2',
+        agent_card_url: 'https://example.com/2',
       });
     });
 
@@ -112,7 +217,36 @@ describe('toml-loader', () => {
         system_prompt = "You are a test agent."
       `);
       await expect(parseAgentToml(filePath)).rejects.toThrow(
-        /Validation failed: tools.0: Invalid tool name/,
+        /Validation failed:[\s\S]*tools.0: Invalid tool name/,
+      );
+    });
+
+    it('should throw AgentLoadError if file contains both single and multiple agents', async () => {
+      const filePath = await writeAgentToml(`
+            name = "top-level-agent"
+            description = "I should not be here"
+            [prompts]
+            system_prompt = "..."
+
+            [[remote_agents]]
+            kind = "remote"
+            name = "array-agent"
+            description = "I am in an array"
+            agent_card_url = "https://example.com/card"
+          `);
+
+      await expect(parseAgentToml(filePath)).rejects.toThrow(
+        /Validation failed/,
+      );
+    });
+
+    it('should show both options in error message when validation fails ambiguously', async () => {
+      const filePath = await writeAgentToml(`
+        name = "ambiguous-agent"
+        description = "I have neither prompts nor card"
+      `);
+      await expect(parseAgentToml(filePath)).rejects.toThrow(
+        /Validation failed: Agent Definition:\n\(Local Agent\) prompts: Required\n\(Remote Agent\) agent_card_url: Required/,
       );
     });
   });
@@ -120,6 +254,7 @@ describe('toml-loader', () => {
   describe('tomlToAgentDefinition', () => {
     it('should convert valid TOML to AgentDefinition with defaults', () => {
       const toml = {
+        kind: 'local' as const,
         name: 'test-agent',
         description: 'A test agent',
         prompts: {
@@ -154,6 +289,7 @@ describe('toml-loader', () => {
 
     it('should pass through model aliases', () => {
       const toml = {
+        kind: 'local' as const,
         name: 'test-agent',
         description: 'A test agent',
         model: {
@@ -170,6 +306,7 @@ describe('toml-loader', () => {
 
     it('should pass through unknown model names (e.g. auto)', () => {
       const toml = {
+        kind: 'local' as const,
         name: 'test-agent',
         description: 'A test agent',
         model: {

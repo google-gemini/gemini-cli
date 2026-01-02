@@ -11,6 +11,7 @@ import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+import { A2AClientManager } from './a2a-client-manager.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   GEMINI_MODEL_ALIAS_AUTO,
@@ -26,10 +27,16 @@ vi.mock('./toml-loader.js', () => ({
     .mockResolvedValue({ agents: [], errors: [] }),
 }));
 
+vi.mock('./a2a-client-manager.js', () => ({
+  A2AClientManager: {
+    getInstance: vi.fn(),
+  },
+}));
+
 // A test-only subclass to expose the protected `registerAgent` method.
 class TestableAgentRegistry extends AgentRegistry {
-  testRegisterAgent(definition: AgentDefinition): void {
-    this.registerAgent(definition);
+  async testRegisterAgent(definition: AgentDefinition): Promise<void> {
+    await this.registerAgent(definition);
   }
 }
 
@@ -237,8 +244,8 @@ describe('AgentRegistry', () => {
   });
 
   describe('registration logic', () => {
-    it('should register a valid agent definition', () => {
-      registry.testRegisterAgent(MOCK_AGENT_V1);
+    it('should register a valid agent definition', async () => {
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
       expect(registry.getDefinition('MockAgent')).toEqual(MOCK_AGENT_V1);
       expect(
         mockConfig.modelConfigService.getResolvedConfig({
@@ -257,80 +264,123 @@ describe('AgentRegistry', () => {
       });
     });
 
-    it('should handle special characters in agent names', () => {
-      const specialAgent = {
-        ...MOCK_AGENT_V1,
-        name: 'Agent-123_$pecial.v2',
+    it('should register a remote agent definition', async () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputs: {} },
       };
-      registry.testRegisterAgent(specialAgent);
-      expect(registry.getDefinition('Agent-123_$pecial.v2')).toEqual(
-        specialAgent,
-      );
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue({ name: 'RemoteAgent' }),
+      } as unknown as A2AClientManager);
+
+      await registry.testRegisterAgent(remoteAgent);
+      expect(registry.getDefinition('RemoteAgent')).toEqual(remoteAgent);
     });
 
-    it('should reject an agent definition missing a name', () => {
-      const invalidAgent = { ...MOCK_AGENT_V1, name: '' };
-      const debugWarnSpy = vi
-        .spyOn(debugLogger, 'warn')
-        .mockImplementation(() => {});
-
-      registry.testRegisterAgent(invalidAgent);
-
-      expect(registry.getDefinition('MockAgent')).toBeUndefined();
-      expect(debugWarnSpy).toHaveBeenCalledWith(
-        '[AgentRegistry] Skipping invalid agent definition. Missing name or description.',
-      );
-    });
-
-    it('should reject an agent definition missing a description', () => {
-      const invalidAgent = { ...MOCK_AGENT_V1, description: '' };
-      const debugWarnSpy = vi
-        .spyOn(debugLogger, 'warn')
-        .mockImplementation(() => {});
-
-      registry.testRegisterAgent(invalidAgent as AgentDefinition);
-
-      expect(registry.getDefinition('MockAgent')).toBeUndefined();
-      expect(debugWarnSpy).toHaveBeenCalledWith(
-        '[AgentRegistry] Skipping invalid agent definition. Missing name or description.',
-      );
-    });
-
-    it('should overwrite an existing agent definition', () => {
-      registry.testRegisterAgent(MOCK_AGENT_V1);
-      expect(registry.getDefinition('MockAgent')?.description).toBe(
-        'Mock Description V1',
-      );
-
-      registry.testRegisterAgent(MOCK_AGENT_V2);
-      expect(registry.getDefinition('MockAgent')?.description).toBe(
-        'Mock Description V2 (Updated)',
-      );
-      expect(registry.getAllDefinitions()).toHaveLength(1);
-    });
-
-    it('should log overwrites when in debug mode', () => {
+    it('should log remote agent registration in debug mode', async () => {
       const debugConfig = makeFakeConfig({ debugMode: true });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
       const debugLogSpy = vi
         .spyOn(debugLogger, 'log')
         .mockImplementation(() => {});
 
-      debugRegistry.testRegisterAgent(MOCK_AGENT_V1);
-      debugRegistry.testRegisterAgent(MOCK_AGENT_V2);
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputs: {} },
+      };
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue({ name: 'RemoteAgent' }),
+      } as unknown as A2AClientManager);
+
+      await debugRegistry.testRegisterAgent(remoteAgent);
+
+      expect(debugLogSpy).toHaveBeenCalledWith(
+        `[AgentRegistry] Registered remote agent 'RemoteAgent' with card: https://example.com/card`,
+      );
+    });
+
+    it('should handle special characters in agent names', async () => {
+      const specialAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'Agent-123_$pecial.v2',
+      };
+      await registry.testRegisterAgent(specialAgent);
+      expect(registry.getDefinition('Agent-123_$pecial.v2')).toEqual(
+        specialAgent,
+      );
+    });
+
+    it('should reject an agent definition missing a name', async () => {
+      const invalidAgent = { ...MOCK_AGENT_V1, name: '' };
+      const debugWarnSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+
+      await registry.testRegisterAgent(invalidAgent);
+
+      expect(registry.getDefinition('MockAgent')).toBeUndefined();
+      expect(debugWarnSpy).toHaveBeenCalledWith(
+        '[AgentRegistry] Skipping invalid agent definition. Missing name or description.',
+      );
+    });
+
+    it('should reject an agent definition missing a description', async () => {
+      const invalidAgent = { ...MOCK_AGENT_V1, description: '' };
+      const debugWarnSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+
+      await registry.testRegisterAgent(invalidAgent as AgentDefinition);
+
+      expect(registry.getDefinition('MockAgent')).toBeUndefined();
+      expect(debugWarnSpy).toHaveBeenCalledWith(
+        '[AgentRegistry] Skipping invalid agent definition. Missing name or description.',
+      );
+    });
+
+    it('should overwrite an existing agent definition', async () => {
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+      expect(registry.getDefinition('MockAgent')?.description).toBe(
+        'Mock Description V1',
+      );
+
+      await registry.testRegisterAgent(MOCK_AGENT_V2);
+      expect(registry.getDefinition('MockAgent')?.description).toBe(
+        'Mock Description V2 (Updated)',
+      );
+      expect(registry.getAllDefinitions()).toHaveLength(1);
+    });
+
+    it('should log overwrites when in debug mode', async () => {
+      const debugConfig = makeFakeConfig({ debugMode: true });
+      const debugRegistry = new TestableAgentRegistry(debugConfig);
+      const debugLogSpy = vi
+        .spyOn(debugLogger, 'log')
+        .mockImplementation(() => {});
+
+      await debugRegistry.testRegisterAgent(MOCK_AGENT_V1);
+      await debugRegistry.testRegisterAgent(MOCK_AGENT_V2);
 
       expect(debugLogSpy).toHaveBeenCalledWith(
         `[AgentRegistry] Overriding agent 'MockAgent'`,
       );
     });
 
-    it('should not log overwrites when not in debug mode', () => {
+    it('should not log overwrites when not in debug mode', async () => {
       const debugLogSpy = vi
         .spyOn(debugLogger, 'log')
         .mockImplementation(() => {});
 
-      registry.testRegisterAgent(MOCK_AGENT_V1);
-      registry.testRegisterAgent(MOCK_AGENT_V2);
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+      await registry.testRegisterAgent(MOCK_AGENT_V2);
 
       expect(debugLogSpy).not.toHaveBeenCalledWith(
         `[AgentRegistry] Overriding agent 'MockAgent'`,
@@ -339,12 +389,10 @@ describe('AgentRegistry', () => {
 
     it('should handle bulk registrations correctly', async () => {
       const promises = Array.from({ length: 100 }, (_, i) =>
-        Promise.resolve(
-          registry.testRegisterAgent({
-            ...MOCK_AGENT_V1,
-            name: `Agent${i}`,
-          }),
-        ),
+        registry.testRegisterAgent({
+          ...MOCK_AGENT_V1,
+          name: `Agent${i}`,
+        }),
       );
 
       await Promise.all(promises);
@@ -353,7 +401,7 @@ describe('AgentRegistry', () => {
   });
 
   describe('inheritance and refresh', () => {
-    it('should resolve "inherit" to the current model from configuration', () => {
+    it('should resolve "inherit" to the current model from configuration', async () => {
       const config = makeFakeConfig({ model: 'current-model' });
       const registry = new TestableAgentRegistry(config);
 
@@ -362,7 +410,7 @@ describe('AgentRegistry', () => {
         modelConfig: { ...MOCK_AGENT_V1.modelConfig, model: 'inherit' },
       };
 
-      registry.testRegisterAgent(agent);
+      await registry.testRegisterAgent(agent);
 
       const resolved = config.modelConfigService.getResolvedConfig({
         model: getModelConfigAlias(agent),
@@ -381,7 +429,7 @@ describe('AgentRegistry', () => {
         modelConfig: { ...MOCK_AGENT_V1.modelConfig, model: 'inherit' },
       };
 
-      registry.testRegisterAgent(agent);
+      await registry.testRegisterAgent(agent);
 
       // Verify initial state
       let resolved = config.modelConfigService.getResolvedConfig({
@@ -393,6 +441,17 @@ describe('AgentRegistry', () => {
       vi.spyOn(config, 'getModel').mockReturnValue('new-model');
       coreEvents.emit(CoreEvent.ModelChanged, {
         model: 'new-model',
+      });
+
+      // Since the listener is async but not awaited by emit, we should manually
+      // trigger refresh or wait.
+      await vi.waitFor(() => {
+        const resolved = config.modelConfigService.getResolvedConfig({
+          model: getModelConfigAlias(agent),
+        });
+        if (resolved.model !== 'new-model') {
+          throw new Error('Model not updated yet');
+        }
       });
 
       // Verify refreshed state
@@ -409,9 +468,9 @@ describe('AgentRegistry', () => {
       name: 'AnotherAgent',
     };
 
-    beforeEach(() => {
-      registry.testRegisterAgent(MOCK_AGENT_V1);
-      registry.testRegisterAgent(ANOTHER_AGENT);
+    beforeEach(async () => {
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+      await registry.testRegisterAgent(ANOTHER_AGENT);
     });
 
     it('getDefinition should return the correct definition', () => {
@@ -438,9 +497,9 @@ describe('AgentRegistry', () => {
       );
     });
 
-    it('should return formatted list of agents when agents are available', () => {
-      registry.testRegisterAgent(MOCK_AGENT_V1);
-      registry.testRegisterAgent({
+    it('should return formatted list of agents when agents are available', async () => {
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+      await registry.testRegisterAgent({
         ...MOCK_AGENT_V2,
         name: 'AnotherAgent',
         description: 'Another agent description',

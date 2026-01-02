@@ -18,10 +18,14 @@ import {
 /**
  * DTO for TOML parsing - represents the raw structure of the TOML file.
  */
-interface TomlAgentDefinition {
+interface TomlBaseAgentDefinition {
   name: string;
-  description: string;
   display_name?: string;
+}
+
+interface TomlLocalAgentDefinition extends TomlBaseAgentDefinition {
+  kind: 'local';
+  description: string;
   tools?: string[];
   prompts: {
     system_prompt: string;
@@ -36,6 +40,14 @@ interface TomlAgentDefinition {
     timeout_mins?: number;
   };
 }
+
+interface TomlRemoteAgentDefinition extends TomlBaseAgentDefinition {
+  description?: string;
+  kind: 'remote';
+  agent_card_url: string;
+}
+
+type TomlAgentDefinition = TomlLocalAgentDefinition | TomlRemoteAgentDefinition;
 
 /**
  * Error thrown when an agent definition is invalid or cannot be loaded.
@@ -58,45 +70,104 @@ export interface AgentLoadResult {
   errors: AgentLoadError[];
 }
 
-const tomlSchema = z.object({
-  name: z.string().regex(/^[a-z0-9-_]+$/, 'Name must be a valid slug'),
-  description: z.string().min(1),
-  display_name: z.string().optional(),
-  tools: z
-    .array(
-      z.string().refine((val) => isValidToolName(val), {
-        message: 'Invalid tool name',
-      }),
-    )
-    .optional(),
-  prompts: z.object({
-    system_prompt: z.string().min(1),
-    query: z.string().optional(),
-  }),
-  model: z
-    .object({
-      model: z.string().optional(),
-      temperature: z.number().optional(),
+const nameSchema = z
+  .string()
+  .regex(/^[a-z0-9-_]+$/, 'Name must be a valid slug');
+
+const localAgentSchema = z
+  .object({
+    kind: z.literal('local').optional().default('local'),
+    name: nameSchema,
+    description: z.string().min(1),
+    display_name: z.string().optional(),
+    tools: z
+      .array(
+        z.string().refine((val) => isValidToolName(val), {
+          message: 'Invalid tool name',
+        }),
+      )
+      .optional(),
+    prompts: z.object({
+      system_prompt: z.string().min(1),
+      query: z.string().optional(),
+    }),
+    model: z
+      .object({
+        model: z.string().optional(),
+        temperature: z.number().optional(),
+      })
+      .optional(),
+    run: z
+      .object({
+        max_turns: z.number().int().positive().optional(),
+        timeout_mins: z.number().int().positive().optional(),
+      })
+      .optional(),
+  })
+  .strict();
+
+const remoteAgentSchema = z
+  .object({
+    kind: z.literal('remote').optional().default('remote'),
+    name: nameSchema,
+    description: z.string().optional(),
+    display_name: z.string().optional(),
+    agent_card_url: z.string().url(),
+  })
+  .strict();
+
+const remoteAgentsConfigSchema = z
+  .object({
+    remote_agents: z.array(remoteAgentSchema),
+  })
+  .strict();
+
+// Use a Zod union to automatically discriminate between local and remote
+// agent types. This is more robust than manually checking the 'kind' field,
+// as it correctly handles cases where 'kind' is omitted by relying on
+// the presence of unique fields like `agent_card_url` or `prompts`.
+const agentUnionOptions = [
+  { schema: localAgentSchema, label: 'Local Agent' },
+  { schema: remoteAgentSchema, label: 'Remote Agent' },
+] as const;
+
+const singleAgentSchema = z.union([
+  agentUnionOptions[0].schema,
+  agentUnionOptions[1].schema,
+]);
+
+function formatZodError(error: z.ZodError, context: string): string {
+  const issues = error.issues
+    .map((i) => {
+      // Handle union errors specifically to give better context
+      if (i.code === z.ZodIssueCode.invalid_union) {
+        return i.unionErrors
+          .map((unionError, index) => {
+            const label =
+              agentUnionOptions[index]?.label ?? `Agent type #${index + 1}`;
+            const unionIssues = unionError.issues
+              .map((u) => `${u.path.join('.')}: ${u.message}`)
+              .join(', ');
+            return `(${label}) ${unionIssues}`;
+          })
+          .join('\n');
+      }
+      return `${i.path.join('.')}: ${i.message}`;
     })
-    .optional(),
-  run: z
-    .object({
-      max_turns: z.number().int().positive().optional(),
-      timeout_mins: z.number().int().positive().optional(),
-    })
-    .optional(),
-});
+    .join('\n');
+  return `${context}:\n${issues}`;
+}
 
 /**
- * Parses and validates an agent TOML file.
+ * Parses and validates an agent TOML file. Returns a validated array of RemoteAgentDefinitions or a single LocalAgentDefinition.
  *
  * @param filePath Path to the TOML file.
- * @returns The parsed and validated TomlAgentDefinition.
+ * @returns An array of parsed and validated TomlAgentDefinitions.
  * @throws AgentLoadError if parsing or validation fails.
  */
 export async function parseAgentToml(
   filePath: string,
-): Promise<TomlAgentDefinition> {
+): Promise<TomlAgentDefinition[]> {
   let content: string;
   try {
     content = await fs.readFile(filePath, 'utf-8');
@@ -117,25 +188,43 @@ export async function parseAgentToml(
     );
   }
 
-  const result = tomlSchema.safeParse(raw);
-  if (!result.success) {
-    const issues = result.error.issues
-      .map((i) => `${i.path.join('.')}: ${i.message}`)
-      .join(', ');
-    throw new AgentLoadError(filePath, `Validation failed: ${issues}`);
+  // Check for `remote_agents` array
+  if (
+    typeof raw === 'object' &&
+    raw !== null &&
+    'remote_agents' in (raw as Record<string, unknown>)
+  ) {
+    const result = remoteAgentsConfigSchema.safeParse(raw);
+    if (!result.success) {
+      throw new AgentLoadError(
+        filePath,
+        `Validation failed: ${formatZodError(result.error, 'Remote Agents Config')}`,
+      );
+    }
+    return result.data.remote_agents as TomlAgentDefinition[];
   }
 
-  const definition = result.data as TomlAgentDefinition;
+  // Single Agent Logic
+  const result = singleAgentSchema.safeParse(raw);
+
+  if (!result.success) {
+    throw new AgentLoadError(
+      filePath,
+      `Validation failed: ${formatZodError(result.error, 'Agent Definition')}`,
+    );
+  }
+
+  const toml = result.data as TomlAgentDefinition;
 
   // Prevent sub-agents from delegating to other agents (to prevent recursion/complexity)
-  if (definition.tools?.includes(DELEGATE_TO_AGENT_TOOL_NAME)) {
+  if ('tools' in toml && toml.tools?.includes(DELEGATE_TO_AGENT_TOOL_NAME)) {
     throw new AgentLoadError(
       filePath,
       `Validation failed: tools list cannot include '${DELEGATE_TO_AGENT_TOOL_NAME}'. Sub-agents cannot delegate to other agents.`,
     );
   }
 
-  return definition;
+  return [toml];
 }
 
 /**
@@ -147,6 +236,27 @@ export async function parseAgentToml(
 export function tomlToAgentDefinition(
   toml: TomlAgentDefinition,
 ): AgentDefinition {
+  const inputConfig = {
+    inputs: {
+      query: {
+        type: 'string' as const,
+        description: 'The task for the agent.',
+        required: false,
+      },
+    },
+  };
+
+  if (toml.kind === 'remote') {
+    return {
+      kind: 'remote',
+      name: toml.name,
+      description: toml.description || '(Loading description...)',
+      displayName: toml.display_name,
+      agentCardUrl: toml.agent_card_url,
+      inputConfig,
+    };
+  }
+
   // If a model is specified, use it. Otherwise, inherit
   const modelName = toml.model?.model || 'inherit';
 
@@ -173,16 +283,7 @@ export function tomlToAgentDefinition(
           tools: toml.tools,
         }
       : undefined,
-    // Default input config for MVA
-    inputConfig: {
-      inputs: {
-        query: {
-          type: 'string',
-          description: 'The task for the agent.',
-          required: false,
-        },
-      },
-    },
+    inputConfig,
   };
 }
 
@@ -230,9 +331,11 @@ export async function loadAgentsFromDirectory(
   for (const file of files) {
     const filePath = path.join(dir, file);
     try {
-      const toml = await parseAgentToml(filePath);
-      const agent = tomlToAgentDefinition(toml);
-      result.agents.push(agent);
+      const tomls = await parseAgentToml(filePath);
+      for (const toml of tomls) {
+        const agent = tomlToAgentDefinition(toml);
+        result.agents.push(agent);
+      }
     } catch (error) {
       if (error instanceof AgentLoadError) {
         result.errors.push(error);

@@ -1073,18 +1073,6 @@ const SETTINGS_SCHEMA = {
         description: 'The number of lines to keep when truncating tool output.',
         showInDialog: true,
       },
-      enableMessageBusIntegration: {
-        type: 'boolean',
-        label: 'Enable Message Bus Integration',
-        category: 'Tools',
-        requiresRestart: true,
-        default: true,
-        description: oneLine`
-          Enable policy-based tool confirmation via message bus integration.
-          When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.
-        `,
-        showInDialog: true,
-      },
       enableHooks: {
         type: 'boolean',
         label: 'Enable Hooks System',
@@ -1395,6 +1383,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Just-In-Time (JIT) context loading.',
         showInDialog: false,
       },
+      skills: {
+        type: 'boolean',
+        label: 'Agent Skills',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable Agent Skills (experimental).',
+        showInDialog: false,
+      },
       codebaseInvestigatorSettings: {
         type: 'object',
         label: 'Codebase Investigator Settings',
@@ -1506,6 +1503,29 @@ const SETTINGS_SCHEMA = {
         default: [] as string[],
         description:
           'List of workspaces for which the migration nudge has been shown.',
+        showInDialog: false,
+        items: { type: 'string' },
+        mergeStrategy: MergeStrategy.UNION,
+      },
+    },
+  },
+
+  skills: {
+    type: 'object',
+    label: 'Skills',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: {},
+    description: 'Settings for agent skills.',
+    showInDialog: true,
+    properties: {
+      disabled: {
+        type: 'array',
+        label: 'Disabled Skills',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: [] as string[],
+        description: 'List of disabled skills.',
         showInDialog: false,
         items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,

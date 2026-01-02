@@ -44,7 +44,7 @@ describe('Hooks System Integration', () => {
                     {
                       type: 'command',
                       command:
-                        'echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"File writing blocked by security policy\\"}"',
+                        "node -e \"console.log(JSON.stringify({decision: 'block', reason: 'File writing blocked by security policy'}))\"",
                       timeout: 5000,
                     },
                   ],
@@ -97,7 +97,7 @@ describe('Hooks System Integration', () => {
                     {
                       type: 'command',
                       command:
-                        'echo "{\\"decision\\": \\"allow\\", \\"reason\\": \\"File writing approved\\"}"',
+                        "node -e \"console.log(JSON.stringify({decision: 'allow', reason: 'File writing approved'}))\"",
                       timeout: 5000,
                     },
                   ],
@@ -129,7 +129,7 @@ describe('Hooks System Integration', () => {
   describe('Command Hooks - Additional Context', () => {
     it('should add additional context from AfterTool hooks', async () => {
       const command =
-        'echo "{\\"hookSpecificOutput\\": {\\"hookEventName\\": \\"AfterTool\\", \\"additionalContext\\": \\"Security scan: File content appears safe\\"}}"';
+        "node -e \"console.log(JSON.stringify({hookSpecificOutput: {hookEventName: 'AfterTool', additionalContext: 'Security scan: File content appears safe'}}))\"";
       await rig.setup('should add additional context from AfterTool hooks', {
         fakeResponsesPath: join(
           import.meta.dirname,
@@ -190,27 +190,24 @@ describe('Hooks System Integration', () => {
           'hooks-system.before-model.responses',
         ),
       });
-      const hookScript = `#!/bin/bash
-echo '{
-  "decision": "allow",
-  "hookSpecificOutput": {
-    "hookEventName": "BeforeModel",
-    "llm_request": {
-      "messages": [
+      const hookScript = `const fs = require('fs');
+console.log(JSON.stringify({
+  decision: "allow",
+  hookSpecificOutput: {
+    hookEventName: "BeforeModel",
+    llm_request: {
+      messages: [
         {
-          "role": "user",
-          "content": "Please respond with exactly: The security hook modified this request successfully."
+          role: "user",
+          content: "Please respond with exactly: The security hook modified this request successfully."
         }
       ]
     }
   }
-}'`;
+}));`;
 
-      const scriptPath = join(rig.testDir!, 'before_model_hook.sh');
+      const scriptPath = join(rig.testDir!, 'before_model_hook.cjs');
       writeFileSync(scriptPath, hookScript);
-      // Make executable
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${scriptPath}"`);
 
       await rig.setup('should modify LLM requests with BeforeModel hooks', {
         settings: {
@@ -223,7 +220,7 @@ echo '{
                 hooks: [
                   {
                     type: 'command',
-                    command: scriptPath,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -250,7 +247,9 @@ echo '{
       expect(hookTelemetryFound[0].hookCall.hook_event_name).toBe(
         'BeforeModel',
       );
-      expect(hookTelemetryFound[0].hookCall.hook_name).toBe(scriptPath);
+      expect(hookTelemetryFound[0].hookCall.hook_name).toBe(
+        `node "${scriptPath}"`,
+      );
       expect(hookTelemetryFound[0].hookCall.hook_input).toBeDefined();
       expect(hookTelemetryFound[0].hookCall.hook_output).toBeDefined();
       expect(hookTelemetryFound[0].hookCall.exit_code).toBe(0);
@@ -270,30 +269,28 @@ echo '{
           ),
         });
         // Create a hook script that modifies the LLM response
-        const hookScript = `#!/bin/bash
-echo '{
-  "hookSpecificOutput": {
-    "hookEventName": "AfterModel",
-    "llm_response": {
-      "candidates": [
+        const hookScript = `const fs = require('fs');
+console.log(JSON.stringify({
+  hookSpecificOutput: {
+    hookEventName: "AfterModel",
+    llm_response: {
+      candidates: [
         {
-          "content": {
-            "role": "model",
-            "parts": [
+          content: {
+            role: "model",
+            parts: [
               "[FILTERED] Response has been filtered for security compliance."
             ]
           },
-          "finishReason": "STOP"
+          finishReason: "STOP"
         }
       ]
     }
   }
-}'`;
+}));`;
 
-        const scriptPath = join(rig.testDir!, 'after_model_hook.sh');
+        const scriptPath = join(rig.testDir!, 'after_model_hook.cjs');
         writeFileSync(scriptPath, hookScript);
-        const { execSync } = await import('node:child_process');
-        execSync(`chmod +x "${scriptPath}"`);
 
         await rig.setup('should modify LLM responses with AfterModel hooks', {
           settings: {
@@ -306,7 +303,7 @@ echo '{
                   hooks: [
                     {
                       type: 'command',
-                      command: scriptPath,
+                      command: `node "${scriptPath}"`,
                       timeout: 5000,
                     },
                   ],
@@ -343,7 +340,7 @@ echo '{
       );
       // Create inline hook command (works on both Unix and Windows)
       const hookCommand =
-        'echo "{\\"hookSpecificOutput\\": {\\"hookEventName\\": \\"BeforeToolSelection\\", \\"toolConfig\\": {\\"mode\\": \\"ANY\\", \\"allowedFunctionNames\\": [\\"read_file\\", \\"run_shell_command\\"]}}}"';
+        "node -e \"console.log(JSON.stringify({hookSpecificOutput: {hookEventName: 'BeforeToolSelection', toolConfig: {mode: 'ANY', allowedFunctionNames: ['read_file', 'run_shell_command']}}}))\"";
 
       await rig.setup(
         'should modify tool selection with BeforeToolSelection hooks',
@@ -404,19 +401,17 @@ echo '{
         ),
       });
       // Create a hook script that adds context to the prompt
-      const hookScript = `#!/bin/bash
-echo '{
-  "decision": "allow",
-  "hookSpecificOutput": {
-    "hookEventName": "BeforeAgent",
-    "additionalContext": "SYSTEM INSTRUCTION: You are in a secure environment. Always mention security compliance in your responses."
+      const hookScript = `const fs = require('fs');
+console.log(JSON.stringify({
+  decision: "allow",
+  hookSpecificOutput: {
+    hookEventName: "BeforeAgent",
+    additionalContext: "SYSTEM INSTRUCTION: You are in a secure environment. Always mention security compliance in your responses."
   }
-}'`;
+}));`;
 
-      const scriptPath = join(rig.testDir!, 'before_agent_hook.sh');
+      const scriptPath = join(rig.testDir!, 'before_agent_hook.cjs');
       writeFileSync(scriptPath, hookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${scriptPath}"`);
 
       await rig.setup('should augment prompts with BeforeAgent hooks', {
         settings: {
@@ -429,7 +424,7 @@ echo '{
                 hooks: [
                   {
                     type: 'command',
-                    command: scriptPath,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -453,8 +448,9 @@ echo '{
   describe('Notification Hooks - Permission Handling', () => {
     it('should handle notification hooks for tool permissions', async () => {
       // Create inline hook command (works on both Unix and Windows)
+      // Create inline hook command (works on both Unix and Windows)
       const hookCommand =
-        'echo "{\\"suppressOutput\\": false, \\"systemMessage\\": \\"Permission request logged by security hook\\"}"';
+        'node -e "console.log(JSON.stringify({suppressOutput: false, systemMessage: \'Permission request logged by security hook\'}))"';
 
       await rig.setup('should handle notification hooks for tool permissions', {
         fakeResponsesPath: join(
@@ -548,9 +544,9 @@ echo '{
     it('should execute hooks sequentially when configured', async () => {
       // Create inline hook commands (works on both Unix and Windows)
       const hook1Command =
-        'echo "{\\"decision\\": \\"allow\\", \\"hookSpecificOutput\\": {\\"hookEventName\\": \\"BeforeAgent\\", \\"additionalContext\\": \\"Step 1: Initial validation passed.\\"}}"';
+        "node -e \"console.log(JSON.stringify({decision: 'allow', hookSpecificOutput: {hookEventName: 'BeforeAgent', additionalContext: 'Step 1: Initial validation passed.'}}))\"";
       const hook2Command =
-        'echo "{\\"decision\\": \\"allow\\", \\"hookSpecificOutput\\": {\\"hookEventName\\": \\"BeforeAgent\\", \\"additionalContext\\": \\"Step 2: Security check completed.\\"}}"';
+        "node -e \"console.log(JSON.stringify({decision: 'allow', hookSpecificOutput: {hookEventName: 'BeforeAgent', additionalContext: 'Step 2: Security check completed.'}}))\"";
 
       await rig.setup('should execute hooks sequentially when configured', {
         fakeResponsesPath: join(
@@ -621,23 +617,22 @@ echo '{
         ),
       });
       // Create a hook script that validates the input format
-      const hookScript = `#!/bin/bash
-# Read JSON input from stdin
-input=$(cat)
+      const hookScript = `const fs = require('fs');
+const input = fs.readFileSync(0, 'utf-8');
+try {
+  const json = JSON.parse(input);
+  // Check fields
+  if (json.session_id && json.cwd && json.hook_event_name && json.timestamp && json.tool_name && json.tool_input) {
+     console.log(JSON.stringify({decision: "allow", reason: "Input format is correct"}));
+  } else {
+     console.log(JSON.stringify({decision: "block", reason: "Input format is invalid"}));
+  }
+} catch (e) {
+  console.log(JSON.stringify({decision: "block", reason: "Invalid JSON"}));
+}`;
 
-# Check for required fields
-if echo "$input" | jq -e '.session_id and .cwd and .hook_event_name and .timestamp and .tool_name and .tool_input' > /dev/null 2>&1; then
-  echo '{"decision": "allow", "reason": "Input format is correct"}'
-  exit 0
-else
-  echo '{"decision": "block", "reason": "Input format is invalid"}'
-  exit 0
-fi`;
-
-      const scriptPath = join(rig.testDir!, 'input_validation_hook.sh');
+      const scriptPath = join(rig.testDir!, 'input_validation_hook.cjs');
       writeFileSync(scriptPath, hookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${scriptPath}"`);
 
       await rig.setup('should provide correct input format to hooks', {
         settings: {
@@ -650,7 +645,7 @@ fi`;
                 hooks: [
                   {
                     type: 'command',
-                    command: scriptPath,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -682,11 +677,11 @@ fi`;
     it('should handle hooks for all major event types', async () => {
       // Create inline hook commands (works on both Unix and Windows)
       const beforeToolCommand =
-        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"BeforeTool: File operation logged\\"}"';
+        "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'BeforeTool: File operation logged'}))\"";
       const afterToolCommand =
-        'echo "{\\"hookSpecificOutput\\": {\\"hookEventName\\": \\"AfterTool\\", \\"additionalContext\\": \\"AfterTool: Operation completed successfully\\"}}"';
+        "node -e \"console.log(JSON.stringify({hookSpecificOutput: {hookEventName: 'AfterTool', additionalContext: 'AfterTool: Operation completed successfully'}}))\"";
       const beforeAgentCommand =
-        'echo "{\\"decision\\": \\"allow\\", \\"hookSpecificOutput\\": {\\"hookEventName\\": \\"BeforeAgent\\", \\"additionalContext\\": \\"BeforeAgent: User request processed\\"}}"';
+        "node -e \"console.log(JSON.stringify({decision: 'allow', hookSpecificOutput: {hookEventName: 'BeforeAgent', additionalContext: 'BeforeAgent: User request processed'}}))\"";
 
       await rig.setup('should handle hooks for all major event types', {
         fakeResponsesPath: join(
@@ -802,10 +797,10 @@ fi`;
       // Create a hook script that fails
       // Create inline hook commands (works on both Unix and Windows)
       // Failing hook: exits with non-zero code
-      const failingCommand = 'exit 1';
+      const failingCommand = 'node -e "process.exit(1)"';
       // Working hook: returns success with JSON
       const workingCommand =
-        'echo "{\\"decision\\": \\"allow\\", \\"reason\\": \\"Working hook succeeded\\"}"';
+        "node -e \"console.log(JSON.stringify({decision: 'allow', reason: 'Working hook succeeded'}))\"";
 
       await rig.setup('should handle hook failures gracefully', {
         settings: {
@@ -855,7 +850,7 @@ fi`;
     it('should generate telemetry events for hook executions', async () => {
       // Create inline hook command (works on both Unix and Windows)
       const hookCommand =
-        'echo "{\\"decision\\": \\"allow\\", \\"reason\\": \\"Telemetry test hook\\"}"';
+        "node -e \"console.log(JSON.stringify({decision: 'allow', reason: 'Telemetry test hook'}))\"";
 
       await rig.setup('should generate telemetry events for hook executions', {
         fakeResponsesPath: join(
@@ -898,7 +893,7 @@ fi`;
     it('should fire SessionStart hook on app startup', async () => {
       // Create inline hook command that outputs JSON
       const sessionStartCommand =
-        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"Session starting on startup\\"}"';
+        "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'Session starting on startup'}))\"";
 
       await rig.setup('should fire SessionStart hook on app startup', {
         fakeResponsesPath: join(
@@ -958,9 +953,9 @@ fi`;
     it('should fire SessionEnd and SessionStart hooks on /clear command', async () => {
       // Create inline hook commands for both SessionEnd and SessionStart
       const sessionEndCommand =
-        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"Session ending due to clear\\"}"';
+        "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'Session ending due to clear'}))\"";
       const sessionStartCommand =
-        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"Session starting after clear\\"}"';
+        "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'Session starting after clear'}))\"";
 
       await rig.setup(
         'should fire SessionEnd and SessionStart hooks on /clear command',
@@ -1136,7 +1131,7 @@ fi`;
     it('should fire PreCompress hook on automatic compression', async () => {
       // Create inline hook command that outputs JSON
       const preCompressCommand =
-        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"PreCompress hook executed for automatic compression\\"}"';
+        "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'PreCompress hook executed for automatic compression'}))\"";
 
       await rig.setup('should fire PreCompress hook on automatic compression', {
         fakeResponsesPath: join(
@@ -1203,7 +1198,7 @@ fi`;
   describe('SessionEnd on Exit', () => {
     it('should fire SessionEnd hook on graceful exit in non-interactive mode', async () => {
       const sessionEndCommand =
-        'echo "{\\"decision\\": \\"allow\\", \\"systemMessage\\": \\"SessionEnd hook executed on exit\\"}"';
+        "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'SessionEnd hook executed on exit'}))\"";
 
       await rig.setup('should fire SessionEnd hook on graceful exit', {
         fakeResponsesPath: join(
@@ -1297,20 +1292,17 @@ fi`;
       });
 
       // Create two hook scripts - one enabled, one disabled
-      const enabledHookScript = `#!/bin/bash
-echo '{"decision": "allow", "systemMessage": "Enabled hook executed"}'`;
+      const enabledHookScript = `const fs = require('fs');
+console.log(JSON.stringify({decision: "allow", systemMessage: "Enabled hook executed"}));`;
 
-      const disabledHookScript = `#!/bin/bash
-echo '{"decision": "block", "systemMessage": "Disabled hook should not execute", "reason": "This hook should be disabled"}'`;
+      const disabledHookScript = `const fs = require('fs');
+console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook should not execute", reason: "This hook should be disabled"}));`;
 
-      const enabledPath = join(rig.testDir!, 'enabled_hook.sh');
-      const disabledPath = join(rig.testDir!, 'disabled_hook.sh');
+      const enabledPath = join(rig.testDir!, 'enabled_hook.cjs');
+      const disabledPath = join(rig.testDir!, 'disabled_hook.cjs');
 
       writeFileSync(enabledPath, enabledHookScript);
       writeFileSync(disabledPath, disabledHookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${enabledPath}"`);
-      execSync(`chmod +x "${disabledPath}"`);
 
       await rig.setup('should not execute hooks disabled in settings file', {
         settings: {
@@ -1323,18 +1315,18 @@ echo '{"decision": "block", "systemMessage": "Disabled hook should not execute",
                 hooks: [
                   {
                     type: 'command',
-                    command: enabledPath,
+                    command: `node "${enabledPath}"`,
                     timeout: 5000,
                   },
                   {
                     type: 'command',
-                    command: disabledPath,
+                    command: `node "${disabledPath}"`,
                     timeout: 5000,
                   },
                 ],
               },
             ],
-            disabled: [disabledPath], // Disable the second hook
+            disabled: [`node "${disabledPath}"`], // Disable the second hook
           },
         },
       });
@@ -1358,10 +1350,10 @@ echo '{"decision": "block", "systemMessage": "Disabled hook should not execute",
       // Check hook telemetry - only enabled hook should have executed
       const hookLogs = rig.readHookLogs();
       const enabledHookLog = hookLogs.find(
-        (log) => log.hookCall.hook_name === enabledPath,
+        (log) => log.hookCall.hook_name === `node "${enabledPath}"`,
       );
       const disabledHookLog = hookLogs.find(
-        (log) => log.hookCall.hook_name === disabledPath,
+        (log) => log.hookCall.hook_name === `node "${disabledPath}"`,
       );
 
       expect(enabledHookLog).toBeDefined();
@@ -1380,20 +1372,17 @@ echo '{"decision": "block", "systemMessage": "Disabled hook should not execute",
       );
 
       // Create two hook scripts - one that will be disabled, one that won't
-      const activeHookScript = `#!/bin/bash
-echo '{"decision": "allow", "systemMessage": "Active hook executed"}'`;
+      const activeHookScript = `const fs = require('fs');
+console.log(JSON.stringify({decision: "allow", systemMessage: "Active hook executed"}));`;
 
-      const disabledHookScript = `#!/bin/bash
-echo '{"decision": "block", "systemMessage": "Disabled hook should not execute", "reason": "This hook is disabled"}'`;
+      const disabledHookScript = `const fs = require('fs');
+console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook should not execute", reason: "This hook is disabled"}));`;
 
-      const activePath = join(rig.testDir!, 'active_hook.sh');
-      const disabledPath = join(rig.testDir!, 'disabled_hook.sh');
+      const activePath = join(rig.testDir!, 'active_hook.cjs');
+      const disabledPath = join(rig.testDir!, 'disabled_hook.cjs');
 
       writeFileSync(activePath, activeHookScript);
       writeFileSync(disabledPath, disabledHookScript);
-      const { execSync } = await import('node:child_process');
-      execSync(`chmod +x "${activePath}"`);
-      execSync(`chmod +x "${disabledPath}"`);
 
       await rig.setup(
         'should respect disabled hooks across multiple operations',
@@ -1408,18 +1397,18 @@ echo '{"decision": "block", "systemMessage": "Disabled hook should not execute",
                   hooks: [
                     {
                       type: 'command',
-                      command: activePath,
+                      command: `node "${activePath}"`,
                       timeout: 5000,
                     },
                     {
                       type: 'command',
-                      command: disabledPath,
+                      command: `node "${disabledPath}"`,
                       timeout: 5000,
                     },
                   ],
                 },
               ],
-              disabled: [disabledPath], // Disable the second hook
+              disabled: [`node "${disabledPath}"`], // Disable the second hook
             },
           },
         },
@@ -1441,10 +1430,10 @@ echo '{"decision": "block", "systemMessage": "Disabled hook should not execute",
       // Check hook telemetry
       const hookLogs1 = rig.readHookLogs();
       const activeHookLog1 = hookLogs1.find(
-        (log) => log.hookCall.hook_name === activePath,
+        (log) => log.hookCall.hook_name === `node "${activePath}"`,
       );
       const disabledHookLog1 = hookLogs1.find(
-        (log) => log.hookCall.hook_name === disabledPath,
+        (log) => log.hookCall.hook_name === `node "${disabledPath}"`,
       );
 
       expect(activeHookLog1).toBeDefined();
@@ -1465,9 +1454,175 @@ echo '{"decision": "block", "systemMessage": "Disabled hook should not execute",
       // Verify disabled hook still hasn't executed
       const hookLogs2 = rig.readHookLogs();
       const disabledHookCalls = hookLogs2.filter(
-        (log) => log.hookCall.hook_name === disabledPath,
+        (log) => log.hookCall.hook_name === `node "${disabledPath}"`,
       );
       expect(disabledHookCalls.length).toBe(0);
+    });
+  });
+
+  describe('BeforeTool Hooks - Input Override', () => {
+    it('should override tool input parameters via BeforeTool hook', async () => {
+      // 1. First setup to get the test directory and prepare the hook script
+      await rig.setup(
+        'should override tool input parameters via BeforeTool hook',
+      );
+
+      // Create a hook script that overrides the tool input
+      const hookOutput = {
+        decision: 'allow',
+        hookSpecificOutput: {
+          hookEventName: 'BeforeTool',
+          tool_input: {
+            file_path: 'modified.txt',
+            content: 'modified content',
+          },
+        },
+      };
+
+      const hookScript = `process.stdout.write(JSON.stringify(${JSON.stringify(
+        hookOutput,
+      )}));`;
+
+      const scriptPath = join(rig.testDir!, 'input_override_hook.js');
+      writeFileSync(scriptPath, hookScript);
+
+      // Ensure path is properly escaped for command line usage on all platforms
+      // On Windows, backslashes in the command string need to be handled carefully
+      // Using forward slashes works well with Node.js on all platforms
+      const commandPath = scriptPath.replace(/\\/g, '/');
+
+      // 2. Full setup with settings and fake responses
+      await rig.setup(
+        'should override tool input parameters via BeforeTool hook',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.input-modification.responses',
+          ),
+          settings: {
+            tools: {
+              enableHooks: true,
+            },
+            hooks: {
+              BeforeTool: [
+                {
+                  matcher: 'write_file',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${commandPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      );
+
+      // Run the agent. The fake response will attempt to call write_file with
+      // file_path="original.txt" and content="original content"
+      await rig.run({
+        args: 'Create a file called original.txt with content "original content"',
+      });
+
+      // 1. Verify that 'modified.txt' was created with 'modified content' (Override successful)
+      const modifiedContent = rig.readFile('modified.txt');
+      expect(modifiedContent).toBe('modified content');
+
+      // 2. Verify that 'original.txt' was NOT created (Override replaced original)
+      let originalExists = false;
+      try {
+        rig.readFile('original.txt');
+        originalExists = true;
+      } catch {
+        originalExists = false;
+      }
+      expect(originalExists).toBe(false);
+
+      // 3. Verify hook telemetry
+      const hookTelemetryFound = await rig.waitForTelemetryEvent('hook_call');
+      expect(hookTelemetryFound).toBeTruthy();
+
+      const hookLogs = rig.readHookLogs();
+      expect(hookLogs.length).toBe(1);
+      expect(hookLogs[0].hookCall.hook_name).toContain(
+        'input_override_hook.js',
+      );
+
+      // 4. Verify that the agent didn't try to work-around the hook input change
+      const toolLogs = rig.readToolLogs();
+      expect(toolLogs.length).toBe(1);
+      expect(toolLogs[0].toolRequest.name).toBe('write_file');
+      expect(JSON.parse(toolLogs[0].toolRequest.args).file_path).toBe(
+        'modified.txt',
+      );
+    });
+  });
+
+  describe('BeforeTool Hooks - Stop Execution', () => {
+    it('should stop agent execution via BeforeTool hook', async () => {
+      // Create a hook script that stops execution
+      const hookOutput = {
+        continue: false,
+        reason: 'Emergency Stop triggered by hook',
+        hookSpecificOutput: {
+          hookEventName: 'BeforeTool',
+        },
+      };
+
+      const hookScript = `console.log(JSON.stringify(${JSON.stringify(
+        hookOutput,
+      )}));`;
+
+      await rig.setup('should stop agent execution via BeforeTool hook');
+      const scriptPath = join(rig.testDir!, 'before_tool_stop_hook.js');
+      writeFileSync(scriptPath, hookScript);
+      const commandPath = scriptPath.replace(/\\/g, '/');
+
+      await rig.setup('should stop agent execution via BeforeTool hook', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.before-tool-stop.responses',
+        ),
+        settings: {
+          tools: {
+            enableHooks: true,
+          },
+          hooks: {
+            BeforeTool: [
+              {
+                matcher: 'write_file',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${commandPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      const result = await rig.run({
+        args: 'Use write_file to create test.txt',
+      });
+
+      // The hook should have stopped execution message (returned from tool)
+      expect(result).toContain(
+        'Agent execution stopped: Emergency Stop triggered by hook',
+      );
+
+      // Tool should NOT be called successfully (it was blocked/stopped)
+      const toolLogs = rig.readToolLogs();
+      const writeFileCalls = toolLogs.filter(
+        (t) =>
+          t.toolRequest.name === 'write_file' && t.toolRequest.success === true,
+      );
+      expect(writeFileCalls).toHaveLength(0);
     });
   });
 });
