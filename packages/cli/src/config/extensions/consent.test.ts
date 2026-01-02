@@ -5,15 +5,17 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import chalk from 'chalk';
 import {
   requestConsentNonInteractive,
   requestConsentInteractive,
   maybeRequestConsentOrFail,
   INSTALL_WARNING_MESSAGE,
+  SKILLS_WARNING_MESSAGE,
 } from './consent.js';
 import type { ConfirmationRequest } from '../../ui/types.js';
 import type { ExtensionConfig } from '../extension.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, type SkillDefinition } from '@google/gemini-cli-core';
 
 const mockReadline = vi.hoisted(() => ({
   createInterface: vi.fn().mockReturnValue({
@@ -38,6 +40,17 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     },
   };
 });
+
+// Mocking fs/promises for skill directory item counting
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    readdir: vi.fn().mockResolvedValue(['SKILL.md']), // Default mock
+  };
+});
+
+import * as fs from 'node:fs/promises';
 
 describe('consent', () => {
   beforeEach(() => {
@@ -249,6 +262,97 @@ describe('consent', () => {
           false,
         );
         expect(requestConsent).toHaveBeenCalledTimes(1);
+      });
+
+      it('should request consent if skills change', async () => {
+        // @ts-expect-error - Complex readdir overloads are hard to mock strictly
+        vi.spyOn(fs, 'readdir').mockImplementation(async (dir: unknown) => {
+          const dirStr = String(dir);
+          if (dirStr.includes('loc1')) return ['SKILL.md', 'extra.txt'];
+          if (dirStr.includes('loc2')) return ['SKILL.md'];
+          return [];
+        });
+
+        const skill1: SkillDefinition = {
+          name: 'skill1',
+          description: 'desc1',
+          location: 'loc1/SKILL.md',
+          body: 'body1',
+        };
+        const skill2: SkillDefinition = {
+          name: 'skill2',
+          description: 'desc2',
+          location: 'loc2/SKILL.md',
+          body: 'body2',
+        };
+
+        const config: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: {
+            server1: { command: 'npm', args: ['start'] },
+            server2: { httpUrl: 'https://remote.com' },
+          },
+          contextFileName: 'my-context.md',
+          excludeTools: ['tool1', 'tool2'],
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          config,
+          requestConsent,
+          false,
+          undefined,
+          false,
+          [skill1, skill2],
+        );
+
+        const expectedConsentString = [
+          'Installing extension "test-ext".',
+          INSTALL_WARNING_MESSAGE,
+          'This extension will run the following MCP servers:',
+          '  * server1 (local): npm start',
+          '  * server2 (remote): https://remote.com',
+          'This extension will append info to your gemini.md context using my-context.md',
+          'This extension will exclude the following core tools: tool1,tool2',
+          '',
+          chalk.bold('Agent Skills:'),
+          SKILLS_WARNING_MESSAGE,
+          'This extension will install the following agent skills:',
+          `  * ${chalk.bold('skill1')}: desc1`,
+          '    (Location: loc1/SKILL.md) (2 items in directory)',
+          `  * ${chalk.bold('skill2')}: desc2`,
+          '    (Location: loc2/SKILL.md) (1 items in directory)',
+        ].join('\n');
+
+        expect(requestConsent).toHaveBeenCalledWith(expectedConsentString);
+      });
+
+      it('should show a warning if the skill directory cannot be read', async () => {
+        vi.spyOn(fs, 'readdir').mockImplementation(async () => {
+          throw new Error('Permission denied');
+        });
+
+        const skill: SkillDefinition = {
+          name: 'locked-skill',
+          description: 'A skill in a locked dir',
+          location: 'locked/SKILL.md',
+          body: 'body',
+        };
+
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          baseConfig,
+          requestConsent,
+          false,
+          undefined,
+          false,
+          [skill],
+        );
+
+        expect(requestConsent).toHaveBeenCalledWith(
+          expect.stringContaining(
+            `    (Location: locked/SKILL.md) ${chalk.red('⚠️ (Could not count items in directory)')}`,
+          ),
+        );
       });
     });
   });

@@ -97,7 +97,10 @@ import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { SkillManager } from '../skills/skillManager.js';
+import {
+  SkillManager,
+  type SkillDefinition,
+} from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 
 import { ApprovalMode } from '../policy/types.js';
@@ -175,6 +178,7 @@ export interface GeminiCLIExtension {
   hooks?: { [K in HookEventName]?: HookDefinition[] };
   settings?: ExtensionSetting[];
   resolvedSettings?: ResolvedExtensionSetting[];
+  skills?: SkillDefinition[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -732,7 +736,10 @@ export class Config {
 
     // Discover skills if enabled
     if (this.skillsSupport) {
-      await this.getSkillManager().discoverSkills(this.storage);
+      await this.getSkillManager().discoverSkills(
+        this.storage,
+        this.getExtensions(),
+      );
       this.getSkillManager().setDisabledSkills(this.disabledSkills);
 
       // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
