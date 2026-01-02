@@ -423,7 +423,7 @@ export function migrateSettingsToV1(
   return v1Settings;
 }
 
-function getDefaultsFromSchema(
+export function getDefaultsFromSchema(
   schema: SettingsSchema = getSettingsSchema(),
 ): Settings {
   const defaults: Record<string, unknown> = {};

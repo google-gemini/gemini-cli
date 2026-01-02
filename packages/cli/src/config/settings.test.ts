@@ -35,6 +35,14 @@ vi.mock('./trustedFolders.js', () => ({
     .mockReturnValue({ isTrusted: true, source: 'file' }),
 }));
 
+vi.mock('./settingsSchema.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./settingsSchema.js')>();
+  return {
+    ...actual,
+    getSettingsSchema: vi.fn(actual.getSettingsSchema),
+  };
+});
+
 // NOW import everything else, including the (now effectively re-exported) settings.js
 import path, * as pathActual from 'node:path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
 import {
@@ -65,10 +73,16 @@ import {
   SettingScope,
   saveSettings,
   type SettingsFile,
+  getDefaultsFromSchema,
 } from './settings.js';
 import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
 import { ExtensionManager } from './extension-manager.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
+import {
+  getSettingsSchema,
+  MergeStrategy,
+  type SettingsSchema,
+} from './settingsSchema.js';
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
 // Use the (mocked) GEMINI_DIR for consistency
@@ -149,362 +163,6 @@ describe('Settings Loading and Merging', () => {
   });
 
   describe('loadSettings', () => {
-    it('should load schema defaults if no files exist', () => {
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.system.settings).toEqual({});
-      expect(settings.user.settings).toEqual({});
-      expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual({
-        advanced: {
-          autoConfigureMemory: false,
-          excludedEnvVars: ['DEBUG', 'DEBUG_MODE'],
-        },
-        context: {
-          discoveryMaxDirs: 200,
-          fileFiltering: {
-            disableFuzzySearch: false,
-            enableRecursiveFileSearch: true,
-            respectGeminiIgnore: true,
-            respectGitIgnore: true,
-          },
-          includeDirectories: [],
-          loadMemoryFromIncludeDirectories: false,
-        },
-        experimental: {
-          codebaseInvestigatorSettings: {
-            enabled: true,
-            maxNumTurns: 10,
-            maxTimeMinutes: 3,
-            model: 'auto',
-            thinkingBudget: 8192,
-          },
-          enableAgents: false,
-          extensionManagement: true,
-          extensionReloading: false,
-          introspectionAgentSettings: {
-            enabled: false,
-          },
-          jitContext: false,
-        },
-        extensions: {
-          disabled: [],
-          workspacesWithMigrationNudge: [],
-        },
-        general: {
-          checkpointing: {
-            enabled: false,
-          },
-          debugKeystrokeLogging: false,
-          disableAutoUpdate: false,
-          disableUpdateNag: false,
-          enablePromptCompletion: false,
-          previewFeatures: false,
-          retryFetchErrors: false,
-          sessionRetention: {
-            enabled: false,
-            minRetention: '1d',
-          },
-          vimMode: false,
-        },
-        hooks: {
-          AfterAgent: [],
-          AfterModel: [],
-          AfterTool: [],
-          BeforeAgent: [],
-          BeforeModel: [],
-          BeforeTool: [],
-          BeforeToolSelection: [],
-          Notification: [],
-          PreCompress: [],
-          SessionEnd: [],
-          SessionStart: [],
-          disabled: [],
-        },
-        ide: {
-          enabled: false,
-          hasSeenNudge: false,
-        },
-        mcpServers: {},
-        model: {
-          compressionThreshold: 0.5,
-          maxSessionTurns: -1,
-          skipNextSpeakerCheck: true,
-        },
-        modelConfigs: {
-          aliases: {
-            base: {
-              modelConfig: {
-                generateContentConfig: {
-                  temperature: 0,
-                  topP: 1,
-                },
-              },
-            },
-            'chat-base': {
-              extends: 'base',
-              modelConfig: {
-                generateContentConfig: {
-                  temperature: 1,
-                  thinkingConfig: {
-                    includeThoughts: true,
-                  },
-                  topK: 64,
-                  topP: 0.95,
-                },
-              },
-            },
-            'chat-base-2.5': {
-              extends: 'chat-base',
-              modelConfig: {
-                generateContentConfig: {
-                  thinkingConfig: {
-                    thinkingBudget: 8192,
-                  },
-                },
-              },
-            },
-            'chat-base-3': {
-              extends: 'chat-base',
-              modelConfig: {
-                generateContentConfig: {
-                  thinkingConfig: {
-                    thinkingLevel: 'HIGH',
-                  },
-                },
-              },
-            },
-            'chat-compression-2.5-flash': {
-              modelConfig: {
-                model: 'gemini-2.5-flash',
-              },
-            },
-            'chat-compression-2.5-flash-lite': {
-              modelConfig: {
-                model: 'gemini-2.5-flash-lite',
-              },
-            },
-            'chat-compression-2.5-pro': {
-              modelConfig: {
-                model: 'gemini-2.5-pro',
-              },
-            },
-            'chat-compression-3-flash': {
-              modelConfig: {
-                model: 'gemini-3-flash-preview',
-              },
-            },
-            'chat-compression-3-pro': {
-              modelConfig: {
-                model: 'gemini-3-pro-preview',
-              },
-            },
-            'chat-compression-default': {
-              modelConfig: {
-                model: 'gemini-2.5-pro',
-              },
-            },
-            classifier: {
-              extends: 'base',
-              modelConfig: {
-                generateContentConfig: {
-                  maxOutputTokens: 1024,
-                  thinkingConfig: {
-                    thinkingBudget: 512,
-                  },
-                },
-                model: 'gemini-2.5-flash-lite',
-              },
-            },
-            'edit-corrector': {
-              extends: 'base',
-              modelConfig: {
-                generateContentConfig: {
-                  thinkingConfig: {
-                    thinkingBudget: 0,
-                  },
-                },
-                model: 'gemini-2.5-flash-lite',
-              },
-            },
-            'gemini-2.5-flash': {
-              extends: 'chat-base-2.5',
-              modelConfig: {
-                model: 'gemini-2.5-flash',
-              },
-            },
-            'gemini-2.5-flash-base': {
-              extends: 'base',
-              modelConfig: {
-                model: 'gemini-2.5-flash',
-              },
-            },
-            'gemini-2.5-flash-lite': {
-              extends: 'chat-base-2.5',
-              modelConfig: {
-                model: 'gemini-2.5-flash-lite',
-              },
-            },
-            'gemini-2.5-pro': {
-              extends: 'chat-base-2.5',
-              modelConfig: {
-                model: 'gemini-2.5-pro',
-              },
-            },
-            'gemini-3-flash-preview': {
-              extends: 'chat-base-3',
-              modelConfig: {
-                model: 'gemini-3-flash-preview',
-              },
-            },
-            'gemini-3-pro-preview': {
-              extends: 'chat-base-3',
-              modelConfig: {
-                model: 'gemini-3-pro-preview',
-              },
-            },
-            'llm-edit-fixer': {
-              extends: 'gemini-2.5-flash-base',
-              modelConfig: {},
-            },
-            'loop-detection': {
-              extends: 'gemini-2.5-flash-base',
-              modelConfig: {},
-            },
-            'loop-detection-double-check': {
-              extends: 'base',
-              modelConfig: {
-                model: 'gemini-2.5-pro',
-              },
-            },
-            'next-speaker-checker': {
-              extends: 'gemini-2.5-flash-base',
-              modelConfig: {},
-            },
-            'prompt-completion': {
-              extends: 'base',
-              modelConfig: {
-                generateContentConfig: {
-                  maxOutputTokens: 16000,
-                  temperature: 0.3,
-                  thinkingConfig: {
-                    thinkingBudget: 0,
-                  },
-                },
-                model: 'gemini-2.5-flash-lite',
-              },
-            },
-            'summarizer-default': {
-              extends: 'base',
-              modelConfig: {
-                generateContentConfig: {
-                  maxOutputTokens: 2000,
-                },
-                model: 'gemini-2.5-flash-lite',
-              },
-            },
-            'summarizer-shell': {
-              extends: 'base',
-              modelConfig: {
-                generateContentConfig: {
-                  maxOutputTokens: 2000,
-                },
-                model: 'gemini-2.5-flash-lite',
-              },
-            },
-            'web-fetch': {
-              extends: 'gemini-2.5-flash-base',
-              modelConfig: {
-                generateContentConfig: {
-                  tools: [
-                    {
-                      urlContext: {},
-                    },
-                  ],
-                },
-              },
-            },
-            'web-fetch-fallback': {
-              extends: 'gemini-2.5-flash-base',
-              modelConfig: {},
-            },
-            'web-search': {
-              extends: 'gemini-2.5-flash-base',
-              modelConfig: {
-                generateContentConfig: {
-                  tools: [
-                    {
-                      googleSearch: {},
-                    },
-                  ],
-                },
-              },
-            },
-          },
-          customAliases: {},
-          customOverrides: [],
-          overrides: [],
-        },
-        output: {
-          format: 'text',
-        },
-        privacy: {
-          usageStatisticsEnabled: true,
-        },
-        security: {
-          blockGitExtensions: false,
-          disableYoloMode: false,
-          enablePermanentToolApproval: false,
-          folderTrust: {
-            enabled: false,
-          },
-        },
-        tools: {
-          autoAccept: false,
-          enableHooks: false,
-          enableMessageBusIntegration: true,
-          enableToolOutputTruncation: true,
-          shell: {
-            enableInteractiveShell: true,
-            inactivityTimeout: 300,
-            pager: 'cat',
-            showColor: false,
-          },
-          truncateToolOutputLines: 1000,
-          truncateToolOutputThreshold: 4000000,
-          useRipgrep: true,
-        },
-        ui: {
-          accessibility: {
-            disableLoadingPhrases: false,
-            screenReader: false,
-          },
-          customThemes: {},
-          customWittyPhrases: [],
-          footer: {
-            hideCWD: false,
-            hideContextPercentage: true,
-            hideModelInfo: false,
-            hideSandboxStatus: false,
-          },
-          hideBanner: false,
-          hideContextSummary: false,
-          hideFooter: false,
-          hideTips: false,
-          hideWindowTitle: false,
-          incrementalRendering: true,
-          showCitations: false,
-          showLineNumbers: true,
-          showMemoryUsage: false,
-          showModelInfoInChat: false,
-          showStatusInTitle: false,
-          useAlternateBuffer: false,
-          useFullWidth: true,
-        },
-        useSmartEdit: true,
-        useWriteTodos: true,
-      });
-    });
-
     it.each([
       {
         scope: 'system',
@@ -794,7 +452,30 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.advanced?.excludedEnvVars).toHaveLength(4);
     });
 
-    it('should merge all settings files(including schema defaults) with the correct precedence', () => {
+    it('should merge all settings files with the correct precedence', () => {
+      // Mock schema to test defaults application
+      const mockSchema = {
+        ui: { type: 'object', default: {}, properties: {} },
+        tools: { type: 'object', default: {}, properties: {} },
+        context: {
+          type: 'object',
+          default: {},
+          properties: {
+            discoveryMaxDirs: { type: 'number', default: 200 },
+            includeDirectories: {
+              type: 'array',
+              default: [],
+              mergeStrategy: MergeStrategy.CONCAT,
+            },
+          },
+        },
+        mcpServers: { type: 'object', default: {} },
+      };
+
+      (getSettingsSchema as Mock).mockReturnValue(
+        mockSchema as unknown as SettingsSchema,
+      );
+
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const systemDefaultsContent = {
         ui: {
@@ -857,19 +538,8 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
-        advanced: {
-          autoConfigureMemory: false,
-          excludedEnvVars: ['DEBUG', 'DEBUG_MODE'],
-        },
         context: {
           discoveryMaxDirs: 200,
-          fileFiltering: {
-            disableFuzzySearch: false,
-            enableRecursiveFileSearch: true,
-            respectGeminiIgnore: true,
-            respectGitIgnore: true,
-          },
-          fileName: 'WORKSPACE_CONTEXT.md',
           includeDirectories: [
             '/system/defaults/dir',
             '/user/dir1',
@@ -877,343 +547,12 @@ describe('Settings Loading and Merging', () => {
             '/workspace/dir',
             '/system/dir',
           ],
-          loadMemoryFromIncludeDirectories: false,
-        },
-        experimental: {
-          codebaseInvestigatorSettings: {
-            enabled: true,
-            maxNumTurns: 10,
-            maxTimeMinutes: 3,
-            model: 'auto',
-            thinkingBudget: 8192,
-          },
-          enableAgents: false,
-          extensionManagement: true,
-          extensionReloading: false,
-          introspectionAgentSettings: {
-            enabled: false,
-          },
-          jitContext: false,
-        },
-        extensions: {
-          disabled: [],
-          workspacesWithMigrationNudge: [],
-        },
-        general: {
-          checkpointing: {
-            enabled: false,
-          },
-          debugKeystrokeLogging: false,
-          disableAutoUpdate: false,
-          disableUpdateNag: false,
-          enablePromptCompletion: false,
-          previewFeatures: false,
-          retryFetchErrors: false,
-          sessionRetention: {
-            enabled: false,
-            minRetention: '1d',
-          },
-          vimMode: false,
-        },
-        hooks: {
-          AfterAgent: [],
-          AfterModel: [],
-          AfterTool: [],
-          BeforeAgent: [],
-          BeforeModel: [],
-          BeforeTool: [],
-          BeforeToolSelection: [],
-          Notification: [],
-          PreCompress: [],
-          SessionEnd: [],
-          SessionStart: [],
-          disabled: [],
-        },
-        ide: {
-          enabled: false,
-          hasSeenNudge: false,
+          fileName: 'WORKSPACE_CONTEXT.md',
         },
         mcpServers: {},
-        model: {
-          compressionThreshold: 0.5,
-          maxSessionTurns: -1,
-          skipNextSpeakerCheck: true,
-        },
-        modelConfigs: {
-          aliases: {
-            base: {
-              modelConfig: {
-                generateContentConfig: {
-                  temperature: 0,
-                  topP: 1,
-                },
-              },
-            },
-            'chat-base': {
-              extends: 'base',
-              modelConfig: {
-                generateContentConfig: {
-                  temperature: 1,
-                  thinkingConfig: {
-                    includeThoughts: true,
-                  },
-                  topK: 64,
-                  topP: 0.95,
-                },
-              },
-            },
-            'chat-base-2.5': {
-              extends: 'chat-base',
-              modelConfig: {
-                generateContentConfig: {
-                  thinkingConfig: {
-                    thinkingBudget: 8192,
-                  },
-                },
-              },
-            },
-            'chat-base-3': {
-              extends: 'chat-base',
-              modelConfig: {
-                generateContentConfig: {
-                  thinkingConfig: {
-                    thinkingLevel: 'HIGH',
-                  },
-                },
-              },
-            },
-            'chat-compression-2.5-flash': {
-              modelConfig: {
-                model: 'gemini-2.5-flash',
-              },
-            },
-            'chat-compression-2.5-flash-lite': {
-              modelConfig: {
-                model: 'gemini-2.5-flash-lite',
-              },
-            },
-            'chat-compression-2.5-pro': {
-              modelConfig: {
-                model: 'gemini-2.5-pro',
-              },
-            },
-            'chat-compression-3-flash': {
-              modelConfig: {
-                model: 'gemini-3-flash-preview',
-              },
-            },
-            'chat-compression-3-pro': {
-              modelConfig: {
-                model: 'gemini-3-pro-preview',
-              },
-            },
-            'chat-compression-default': {
-              modelConfig: {
-                model: 'gemini-2.5-pro',
-              },
-            },
-            classifier: {
-              extends: 'base',
-              modelConfig: {
-                generateContentConfig: {
-                  maxOutputTokens: 1024,
-                  thinkingConfig: {
-                    thinkingBudget: 512,
-                  },
-                },
-                model: 'gemini-2.5-flash-lite',
-              },
-            },
-            'edit-corrector': {
-              extends: 'base',
-              modelConfig: {
-                generateContentConfig: {
-                  thinkingConfig: {
-                    thinkingBudget: 0,
-                  },
-                },
-                model: 'gemini-2.5-flash-lite',
-              },
-            },
-            'gemini-2.5-flash': {
-              extends: 'chat-base-2.5',
-              modelConfig: {
-                model: 'gemini-2.5-flash',
-              },
-            },
-            'gemini-2.5-flash-base': {
-              extends: 'base',
-              modelConfig: {
-                model: 'gemini-2.5-flash',
-              },
-            },
-            'gemini-2.5-flash-lite': {
-              extends: 'chat-base-2.5',
-              modelConfig: {
-                model: 'gemini-2.5-flash-lite',
-              },
-            },
-            'gemini-2.5-pro': {
-              extends: 'chat-base-2.5',
-              modelConfig: {
-                model: 'gemini-2.5-pro',
-              },
-            },
-            'gemini-3-flash-preview': {
-              extends: 'chat-base-3',
-              modelConfig: {
-                model: 'gemini-3-flash-preview',
-              },
-            },
-            'gemini-3-pro-preview': {
-              extends: 'chat-base-3',
-              modelConfig: {
-                model: 'gemini-3-pro-preview',
-              },
-            },
-            'llm-edit-fixer': {
-              extends: 'gemini-2.5-flash-base',
-              modelConfig: {},
-            },
-            'loop-detection': {
-              extends: 'gemini-2.5-flash-base',
-              modelConfig: {},
-            },
-            'loop-detection-double-check': {
-              extends: 'base',
-              modelConfig: {
-                model: 'gemini-2.5-pro',
-              },
-            },
-            'next-speaker-checker': {
-              extends: 'gemini-2.5-flash-base',
-              modelConfig: {},
-            },
-            'prompt-completion': {
-              extends: 'base',
-              modelConfig: {
-                generateContentConfig: {
-                  maxOutputTokens: 16000,
-                  temperature: 0.3,
-                  thinkingConfig: {
-                    thinkingBudget: 0,
-                  },
-                },
-                model: 'gemini-2.5-flash-lite',
-              },
-            },
-            'summarizer-default': {
-              extends: 'base',
-              modelConfig: {
-                generateContentConfig: {
-                  maxOutputTokens: 2000,
-                },
-                model: 'gemini-2.5-flash-lite',
-              },
-            },
-            'summarizer-shell': {
-              extends: 'base',
-              modelConfig: {
-                generateContentConfig: {
-                  maxOutputTokens: 2000,
-                },
-                model: 'gemini-2.5-flash-lite',
-              },
-            },
-            'web-fetch': {
-              extends: 'gemini-2.5-flash-base',
-              modelConfig: {
-                generateContentConfig: {
-                  tools: [
-                    {
-                      urlContext: {},
-                    },
-                  ],
-                },
-              },
-            },
-            'web-fetch-fallback': {
-              extends: 'gemini-2.5-flash-base',
-              modelConfig: {},
-            },
-            'web-search': {
-              extends: 'gemini-2.5-flash-base',
-              modelConfig: {
-                generateContentConfig: {
-                  tools: [
-                    {
-                      googleSearch: {},
-                    },
-                  ],
-                },
-              },
-            },
-          },
-          customAliases: {},
-          customOverrides: [],
-          overrides: [],
-        },
-        output: {
-          format: 'text',
-        },
-        privacy: {
-          usageStatisticsEnabled: true,
-        },
-        security: {
-          blockGitExtensions: false,
-          disableYoloMode: false,
-          enablePermanentToolApproval: false,
-          folderTrust: {
-            enabled: false,
-          },
-        },
+        ui: { theme: 'system-theme' },
+        tools: { sandbox: false },
         telemetry: false,
-        tools: {
-          autoAccept: false,
-          enableHooks: false,
-          enableMessageBusIntegration: true,
-          enableToolOutputTruncation: true,
-          sandbox: false,
-          shell: {
-            enableInteractiveShell: true,
-            inactivityTimeout: 300,
-            pager: 'cat',
-            showColor: false,
-          },
-          truncateToolOutputLines: 1000,
-          truncateToolOutputThreshold: 4000000,
-          useRipgrep: true,
-        },
-        ui: {
-          accessibility: {
-            disableLoadingPhrases: false,
-            screenReader: false,
-          },
-          customThemes: {},
-          customWittyPhrases: [],
-          footer: {
-            hideCWD: false,
-            hideContextPercentage: true,
-            hideModelInfo: false,
-            hideSandboxStatus: false,
-          },
-          hideBanner: false,
-          hideContextSummary: false,
-          hideFooter: false,
-          hideTips: false,
-          hideWindowTitle: false,
-          incrementalRendering: true,
-          showCitations: false,
-          showLineNumbers: true,
-          showMemoryUsage: false,
-          showModelInfoInChat: false,
-          showStatusInTitle: false,
-          theme: 'system-theme',
-          useAlternateBuffer: false,
-          useFullWidth: true,
-        },
-        useSmartEdit: true,
-        useWriteTodos: true,
       });
     });
 
@@ -3133,6 +2472,44 @@ describe('Settings Loading and Merging', () => {
         'There was an error saving your latest settings changes.',
         error,
       );
+    });
+  });
+
+  describe('getDefaultsFromSchema', () => {
+    it('should extract defaults from a schema', () => {
+      const mockSchema = {
+        prop1: {
+          type: 'string',
+          default: 'default1',
+          label: 'Prop 1',
+          category: 'General',
+          requiresRestart: false,
+        },
+        nested: {
+          type: 'object',
+          label: 'Nested',
+          category: 'General',
+          requiresRestart: false,
+          default: {},
+          properties: {
+            prop2: {
+              type: 'number',
+              default: 42,
+              label: 'Prop 2',
+              category: 'General',
+              requiresRestart: false,
+            },
+          },
+        },
+      };
+
+      const defaults = getDefaultsFromSchema(mockSchema as SettingsSchema);
+      expect(defaults).toEqual({
+        prop1: 'default1',
+        nested: {
+          prop2: 42,
+        },
+      });
     });
   });
 });
