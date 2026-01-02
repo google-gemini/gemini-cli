@@ -156,6 +156,7 @@ function formatBinding(binding: KeyBinding): string {
   const modifiers: string[] = [];
   if (binding.ctrl) modifiers.push('Ctrl');
   if (binding.command) modifiers.push('Cmd');
+  if (binding.alt) modifiers.push('Alt');
   if (binding.shift) modifiers.push('Shift');
   if (binding.paste) modifiers.push('Paste');
 
