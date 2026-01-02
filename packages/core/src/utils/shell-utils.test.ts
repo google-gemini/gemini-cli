@@ -197,6 +197,22 @@ describeWindowsOnly('PowerShell integration', () => {
   });
 
   it('should return command roots using PowerShell AST output', () => {
+    mockSpawnSync.mockReturnValue({
+      stdout: Buffer.from(
+        JSON.stringify({
+          success: true,
+          commands: [
+            { name: 'Get-ChildItem', text: 'Get-ChildItem' },
+            { name: 'Select-Object', text: 'Select-Object Name' },
+          ],
+          hasRedirection: false,
+        }),
+      ),
+      stderr: Buffer.from(''),
+      status: 0,
+      error: undefined,
+    });
+
     const roots = getCommandRoots('Get-ChildItem | Select-Object Name');
     expect(roots.length).toBeGreaterThan(0);
     expect(roots).toContain('Get-ChildItem');
