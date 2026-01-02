@@ -199,6 +199,7 @@ describe('runNonInteractive', () => {
     );
     vi.mocked(handleAtCommand).mockImplementation(async ({ query }) => ({
       processedQuery: [{ text: query }],
+      shouldProceed: true,
     }));
   });
 
@@ -573,6 +574,7 @@ describe('runNonInteractive', () => {
     // 3. Setup the mock to return the processed parts
     mockHandleAtCommand.mockResolvedValue({
       processedQuery: processedParts,
+      shouldProceed: true,
     });
 
     // Mock a simple stream response from the Gemini client

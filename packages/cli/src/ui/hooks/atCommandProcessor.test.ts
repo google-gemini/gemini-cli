@@ -1318,6 +1318,89 @@ describe('handleAtCommand', () => {
     });
   });
 
+  describe('edge cases for external editor input (issue #14919)', () => {
+    it('should pass through prompts without @ symbol efficiently', async () => {
+      const query = 'This is a regular question without any file references.';
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 200,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [{ text: query }],
+      });
+      // Verify no debug messages were logged (fast path taken)
+      expect(mockOnDebugMessage).not.toHaveBeenCalled();
+    });
+
+    it('should not process email addresses as file references', async () => {
+      const query = 'Contact me at user@example.com for more info.';
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 201,
+        signal: abortController.signal,
+      });
+
+      // The @ in email is parsed as an @-path but not treated as a valid file path.
+      // Note: The parser adds a space before the @ when reconstructing the query.
+      // No tool calls should be made.
+      expect(result).toEqual({
+        processedQuery: [
+          { text: 'Contact me at user @example.com for more info.' },
+        ],
+      });
+      expect(mockAddItem).not.toHaveBeenCalled();
+    });
+
+    it('should handle multi-line prompts from external editor with @file on non-first line', async () => {
+      const fileContent = 'File content here';
+      const filePath = await createTestFile(
+        path.join(testRootDir, 'test-file.ts'),
+        fileContent,
+      );
+      const relativePath = getRelativePath(filePath);
+
+      // Simulate external editor multi-line input
+      const query = `Please analyze the following file:
+
+@${filePath}
+
+Then explain the main logic.`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 202,
+        signal: abortController.signal,
+      });
+
+      expect(result.processedQuery).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            text: expect.stringContaining(`@${relativePath}`),
+          }),
+          expect.objectContaining({
+            text: expect.stringContaining('Content from referenced files'),
+          }),
+          expect.objectContaining({
+            text: fileContent,
+          }),
+        ]),
+      );
+    });
+  });
+
   it('should return error if the read_many_files tool is cancelled by user', async () => {
     const fileContent = 'Some content';
     const filePath = await createTestFile(

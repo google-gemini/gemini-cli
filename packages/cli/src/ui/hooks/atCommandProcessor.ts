@@ -35,6 +35,7 @@ interface HandleAtCommandParams {
 
 interface HandleAtCommandResult {
   processedQuery: PartListUnion | null;
+  shouldProceed?: boolean;
   error?: string;
 }
 
@@ -135,6 +136,11 @@ export async function handleAtCommand({
   messageId: userMessageTimestamp,
   signal,
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {
+  // Fast path: if no @ symbol exists, skip all parsing
+  if (!query.includes('@')) {
+    return { processedQuery: [{ text: query }] };
+  }
+
   const resourceRegistry = config.getResourceRegistry();
   const mcpClientManager = config.getMcpClientManager();
 
