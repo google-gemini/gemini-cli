@@ -100,7 +100,7 @@ export async function initializeShellParsers(): Promise<void> {
       treeSitterInitialization = null;
       // Log the error but don't throw, allowing the application to fall back to safe defaults (ASK_USER)
       // or regex checks where appropriate.
-      debugLogger.log('Failed to initialize shell parsers:', error);
+      debugLogger.debug('Failed to initialize shell parsers:', error);
     });
   }
 
