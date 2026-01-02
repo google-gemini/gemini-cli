@@ -120,13 +120,13 @@ describe('SettingsUtils', () => {
             description: 'Accessibility settings.',
             showInDialog: false,
             properties: {
-              disableLoadingPhrases: {
+              enableLoadingPhrases: {
                 type: 'boolean',
-                label: 'Disable Loading Phrases',
+                label: 'Enable Loading Phrases',
                 category: 'UI',
                 requiresRestart: true,
-                default: false,
-                description: 'Disable loading phrases for accessibility',
+                default: true,
+                description: 'Enable loading phrases during operations.',
                 showInDialog: true,
               },
             },
@@ -284,18 +284,18 @@ describe('SettingsUtils', () => {
 
       it('should handle nested settings correctly', () => {
         const settings = makeMockSettings({
-          ui: { accessibility: { disableLoadingPhrases: true } },
+          ui: { accessibility: { enableLoadingPhrases: false } },
         });
         const mergedSettings = makeMockSettings({
-          ui: { accessibility: { disableLoadingPhrases: false } },
+          ui: { accessibility: { enableLoadingPhrases: true } },
         });
 
         const value = getEffectiveValue(
-          'ui.accessibility.disableLoadingPhrases',
+          'ui.accessibility.enableLoadingPhrases',
           settings,
           mergedSettings,
         );
-        expect(value).toBe(true);
+        expect(value).toBe(false);
       });
 
       it('should return undefined for invalid settings', () => {
@@ -315,7 +315,7 @@ describe('SettingsUtils', () => {
       it('should return all setting keys', () => {
         const keys = getAllSettingKeys();
         expect(keys).toContain('test');
-        expect(keys).toContain('ui.accessibility.disableLoadingPhrases');
+        expect(keys).toContain('ui.accessibility.enableLoadingPhrases');
       });
     });
 
@@ -342,9 +342,9 @@ describe('SettingsUtils', () => {
     describe('isValidSettingKey', () => {
       it('should return true for valid setting keys', () => {
         expect(isValidSettingKey('ui.requiresRestart')).toBe(true);
-        expect(
-          isValidSettingKey('ui.accessibility.disableLoadingPhrases'),
-        ).toBe(true);
+        expect(isValidSettingKey('ui.accessibility.enableLoadingPhrases')).toBe(
+          true,
+        );
       });
 
       it('should return false for invalid setting keys', () => {
@@ -357,7 +357,7 @@ describe('SettingsUtils', () => {
       it('should return correct category for valid settings', () => {
         expect(getSettingCategory('ui.requiresRestart')).toBe('UI');
         expect(
-          getSettingCategory('ui.accessibility.disableLoadingPhrases'),
+          getSettingCategory('ui.accessibility.enableLoadingPhrases'),
         ).toBe('UI');
       });
 
@@ -391,7 +391,7 @@ describe('SettingsUtils', () => {
         const uiSettings = categories['UI'];
         const uiKeys = uiSettings.map((s) => s.key);
         expect(uiKeys).toContain('ui.requiresRestart');
-        expect(uiKeys).toContain('ui.accessibility.disableLoadingPhrases');
+        expect(uiKeys).toContain('ui.accessibility.enableLoadingPhrases');
         expect(uiKeys).not.toContain('ui.theme'); // This is now marked false
       });
 
@@ -421,7 +421,7 @@ describe('SettingsUtils', () => {
 
         const keys = booleanSettings.map((s) => s.key);
         expect(keys).toContain('ui.requiresRestart');
-        expect(keys).toContain('ui.accessibility.disableLoadingPhrases');
+        expect(keys).toContain('ui.accessibility.enableLoadingPhrases');
         expect(keys).not.toContain('privacy.usageStatisticsEnabled');
         expect(keys).not.toContain('security.auth.selectedType'); // Advanced setting
         expect(keys).not.toContain('security.auth.useExternal'); // Advanced setting
@@ -454,7 +454,7 @@ describe('SettingsUtils', () => {
         expect(dialogKeys).toContain('ui.requiresRestart');
 
         // Should include nested settings marked for dialog
-        expect(dialogKeys).toContain('ui.accessibility.disableLoadingPhrases');
+        expect(dialogKeys).toContain('ui.accessibility.enableLoadingPhrases');
 
         // Should NOT include settings marked as hidden
         expect(dialogKeys).not.toContain('ui.theme'); // Hidden
@@ -601,14 +601,14 @@ describe('SettingsUtils', () => {
       it('should return true when value differs from default', () => {
         expect(isSettingModified('ui.requiresRestart', true)).toBe(true);
         expect(
-          isSettingModified('ui.accessibility.disableLoadingPhrases', true),
+          isSettingModified('ui.accessibility.enableLoadingPhrases', false),
         ).toBe(true);
       });
 
       it('should return false when value matches default', () => {
         expect(isSettingModified('ui.requiresRestart', false)).toBe(false);
         expect(
-          isSettingModified('ui.accessibility.disableLoadingPhrases', false),
+          isSettingModified('ui.accessibility.enableLoadingPhrases', true),
         ).toBe(false);
       });
     });
@@ -628,11 +628,11 @@ describe('SettingsUtils', () => {
 
       it('should return true for nested settings that exist', () => {
         const settings = makeMockSettings({
-          ui: { accessibility: { disableLoadingPhrases: true } },
+          ui: { accessibility: { enableLoadingPhrases: true } },
         });
         expect(
           settingExistsInScope(
-            'ui.accessibility.disableLoadingPhrases',
+            'ui.accessibility.enableLoadingPhrases',
             settings,
           ),
         ).toBe(true);
@@ -642,7 +642,7 @@ describe('SettingsUtils', () => {
         const settings = makeMockSettings({});
         expect(
           settingExistsInScope(
-            'ui.accessibility.disableLoadingPhrases',
+            'ui.accessibility.enableLoadingPhrases',
             settings,
           ),
         ).toBe(false);
@@ -652,7 +652,7 @@ describe('SettingsUtils', () => {
         const settings = makeMockSettings({ ui: { accessibility: {} } });
         expect(
           settingExistsInScope(
-            'ui.accessibility.disableLoadingPhrases',
+            'ui.accessibility.enableLoadingPhrases',
             settings,
           ),
         ).toBe(false);
@@ -674,25 +674,25 @@ describe('SettingsUtils', () => {
       it('should set nested setting value', () => {
         const pendingSettings = makeMockSettings({});
         const result = setPendingSettingValue(
-          'ui.accessibility.disableLoadingPhrases',
+          'ui.accessibility.enableLoadingPhrases',
           true,
           pendingSettings,
         );
 
-        expect(result.ui?.accessibility?.disableLoadingPhrases).toBe(true);
+        expect(result.ui?.accessibility?.enableLoadingPhrases).toBe(true);
       });
 
       it('should preserve existing nested settings', () => {
         const pendingSettings = makeMockSettings({
-          ui: { accessibility: { disableLoadingPhrases: false } },
+          ui: { accessibility: { enableLoadingPhrases: false } },
         });
         const result = setPendingSettingValue(
-          'ui.accessibility.disableLoadingPhrases',
+          'ui.accessibility.enableLoadingPhrases',
           true,
           pendingSettings,
         );
 
-        expect(result.ui?.accessibility?.disableLoadingPhrases).toBe(true);
+        expect(result.ui?.accessibility?.enableLoadingPhrases).toBe(true);
       });
 
       it('should not mutate original settings', () => {
@@ -1029,7 +1029,7 @@ describe('SettingsUtils', () => {
         const settings = makeMockSettings({}); // nested setting doesn't exist
 
         const result = isDefaultValue(
-          'ui.accessibility.disableLoadingPhrases',
+          'ui.accessibility.enableLoadingPhrases',
           settings,
         );
         expect(result).toBe(true);
@@ -1037,11 +1037,11 @@ describe('SettingsUtils', () => {
 
       it('should return false when nested setting exists in scope', () => {
         const settings = makeMockSettings({
-          ui: { accessibility: { disableLoadingPhrases: true } },
+          ui: { accessibility: { enableLoadingPhrases: true } },
         }); // nested setting exists
 
         const result = isDefaultValue(
-          'ui.accessibility.disableLoadingPhrases',
+          'ui.accessibility.enableLoadingPhrases',
           settings,
         );
         expect(result).toBe(false);
@@ -1079,14 +1079,14 @@ describe('SettingsUtils', () => {
 
       it('should return false for nested settings that exist in scope', () => {
         const settings = makeMockSettings({
-          ui: { accessibility: { disableLoadingPhrases: true } },
+          ui: { accessibility: { enableLoadingPhrases: true } },
         });
         const mergedSettings = makeMockSettings({
-          ui: { accessibility: { disableLoadingPhrases: true } },
+          ui: { accessibility: { enableLoadingPhrases: true } },
         });
 
         const result = isValueInherited(
-          'ui.accessibility.disableLoadingPhrases',
+          'ui.accessibility.enableLoadingPhrases',
           settings,
           mergedSettings,
         );
@@ -1096,11 +1096,11 @@ describe('SettingsUtils', () => {
       it('should return true for nested settings that do not exist in scope', () => {
         const settings = makeMockSettings({});
         const mergedSettings = makeMockSettings({
-          ui: { accessibility: { disableLoadingPhrases: true } },
+          ui: { accessibility: { enableLoadingPhrases: true } },
         });
 
         const result = isValueInherited(
-          'ui.accessibility.disableLoadingPhrases',
+          'ui.accessibility.enableLoadingPhrases',
           settings,
           mergedSettings,
         );
