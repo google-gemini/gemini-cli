@@ -238,4 +238,40 @@ describe('McpClientManager', () => {
       );
     });
   });
+
+  describe('Promise rejection handling', () => {
+    it('should handle errors thrown during client initialization', async () => {
+      vi.mocked(McpClient).mockImplementation(() => {
+        throw new Error('Client initialization failed');
+      });
+
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': {},
+      });
+
+      const manager = new McpClientManager({} as ToolRegistry, mockConfig);
+
+      await expect(manager.startConfiguredMcpServers()).resolves.not.toThrow();
+    });
+
+    it('should handle errors thrown in the async IIFE before try block', async () => {
+      let disconnectCallCount = 0;
+      mockedMcpClient.disconnect.mockImplementation(async () => {
+        disconnectCallCount++;
+        if (disconnectCallCount === 1) {
+          throw new Error('Disconnect failed unexpectedly');
+        }
+      });
+      mockedMcpClient.getServerConfig.mockReturnValue({});
+
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': {},
+      });
+
+      const manager = new McpClientManager({} as ToolRegistry, mockConfig);
+      await manager.startConfiguredMcpServers();
+
+      await expect(manager.restartServer('test-server')).resolves.not.toThrow();
+    });
+  });
 });
