@@ -60,7 +60,7 @@ import {
   maybePromptForSettings,
   type ExtensionSetting,
 } from './extensions/extensionSettings.js';
-import type { EventEmitter } from 'node:events';
+import type { EventEmitter } from 'node:stream';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];

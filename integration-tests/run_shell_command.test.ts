@@ -375,7 +375,7 @@ describe('run_shell_command', () => {
       `If it succeeds, respond with SUCCESS.`;
 
     const result = await rig.run({
-      args: [`--allowed-tools=run_shell_command(${allowedCommand})`, '--debug'],
+      args: `--allowed-tools=run_shell_command(${allowedCommand})`,
       stdin: prompt,
       yolo: false,
     });
