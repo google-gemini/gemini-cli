@@ -447,7 +447,6 @@ export class Config {
   private readonly truncateToolOutputLines: number;
   private readonly enableToolOutputTruncation: boolean;
   private initialized: boolean = false;
-  private initializationPromise: Promise<void> | null = null;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
@@ -697,74 +696,58 @@ export class Config {
   }
 
   /**
-   * Must only be called once, returns early if called again.
+   * Must only be called once, throws if called again.
    */
   async initialize(): Promise<void> {
     if (this.initialized) {
-      return;
+      throw Error('Config was already initialized');
+    }
+    this.initialized = true;
+
+    // Initialize centralized FileDiscoveryService
+    const discoverToolsHandle = startupProfiler.start('discover_tools');
+    this.getFileService();
+    if (this.getCheckpointingEnabled()) {
+      await this.getGitService();
+    }
+    this.promptRegistry = new PromptRegistry();
+    this.resourceRegistry = new ResourceRegistry();
+
+    this.agentRegistry = new AgentRegistry(this);
+    await this.agentRegistry.initialize();
+
+    this.toolRegistry = await this.createToolRegistry();
+    discoverToolsHandle?.end();
+    this.mcpClientManager = new McpClientManager(
+      this.toolRegistry,
+      this,
+      this.eventEmitter,
+    );
+    const initMcpHandle = startupProfiler.start('initialize_mcp_clients');
+    await Promise.all([
+      await this.mcpClientManager.startConfiguredMcpServers(),
+      await this.getExtensionLoader().start(this),
+    ]);
+    initMcpHandle?.end();
+
+    // Discover skills if enabled
+    if (this.skillsSupport) {
+      await this.getSkillManager().discoverSkills(this.storage);
+      this.getSkillManager().setDisabledSkills(this.disabledSkills);
     }
 
-    if (this.initializationPromise) {
-      return this.initializationPromise;
+    // Initialize hook system if enabled
+    if (this.enableHooks) {
+      this.hookSystem = new HookSystem(this);
+      await this.hookSystem.initialize();
     }
 
-    this.initializationPromise = (async () => {
-      // Initialize centralized FileDiscoveryService
-      const discoverToolsHandle = startupProfiler.start('discover_tools');
-      this.getFileService();
-      if (this.getCheckpointingEnabled()) {
-        await this.getGitService();
-      }
-      this.promptRegistry = new PromptRegistry();
-      this.resourceRegistry = new ResourceRegistry();
-
-      this.agentRegistry = new AgentRegistry(this);
-      await this.agentRegistry.initialize();
-
-      this.toolRegistry = await this.createToolRegistry();
-      discoverToolsHandle?.end();
-      this.mcpClientManager = new McpClientManager(
-        this.toolRegistry,
-        this,
-        this.eventEmitter,
-      );
-      const initMcpHandle = startupProfiler.start('initialize_mcp_clients');
-      await Promise.all([
-        await this.mcpClientManager.startConfiguredMcpServers(),
-        await this.getExtensionLoader().start(this),
-      ]);
-      initMcpHandle?.end();
-
-      // Discover skills if enabled
-      if (this.skillsSupport) {
-        await this.getSkillManager().discoverSkills(this.storage);
-        this.getSkillManager().setDisabledSkills(this.disabledSkills);
-      }
-
-      // Initialize hook system if enabled
-      if (this.enableHooks) {
-        this.hookSystem = new HookSystem(this);
-        await this.hookSystem.initialize();
-      }
-
-      if (this.experimentalJitContext) {
-        this.contextManager = new ContextManager(this);
-        await this.contextManager.refresh();
-      }
-
-      await this.geminiClient.initialize();
-      this.initialized = true;
-    })();
-
-    try {
-      await this.initializationPromise;
-    } finally {
-      this.initializationPromise = null;
+    if (this.experimentalJitContext) {
+      this.contextManager = new ContextManager(this);
+      await this.contextManager.refresh();
     }
-  }
 
-  isInitialized(): boolean {
-    return this.initialized;
+    await this.geminiClient.initialize();
   }
 
   getContentGenerator(): ContentGenerator {
