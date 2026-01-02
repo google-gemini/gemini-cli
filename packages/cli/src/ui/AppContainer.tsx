@@ -300,7 +300,31 @@ export const AppContainer = (props: AppContainerProps) => {
         const sessionStartSource = resumedSessionData
           ? SessionStartSource.Resume
           : SessionStartSource.Startup;
-        await fireSessionStartHook(hookMessageBus, sessionStartSource);
+        const result = await fireSessionStartHook(
+          hookMessageBus,
+          sessionStartSource,
+        );
+
+        if (result) {
+          if (result.systemMessage) {
+            historyManager.addItem(
+              {
+                type: MessageType.INFO,
+                text: result.systemMessage,
+              },
+              Date.now(),
+            );
+          }
+
+          const additionalContext = result.getAdditionalContext();
+          const geminiClient = config.getGeminiClient();
+          if (additionalContext && geminiClient) {
+            await geminiClient.addHistory({
+              role: 'user',
+              parts: [{ text: additionalContext }],
+            });
+          }
+        }
       }
 
       // Fire-and-forget: generate summary for previous session in background
@@ -321,6 +345,12 @@ export const AppContainer = (props: AppContainerProps) => {
         await fireSessionEndHook(hookMessageBus, SessionEndReason.Exit);
       }
     });
+    // Disable the dependencies check here. historyManager gets flagged
+    // but we don't want to react to changes to it because each new history
+    // item, including the ones from the start session hook will cause a
+    // re-render and an error when we try to reload config.
+    //
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, resumedSessionData]);
 
   useEffect(
