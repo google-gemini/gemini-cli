@@ -90,12 +90,26 @@ const createMockCallableTool = (
 });
 
 // Helper to create a DiscoveredMCPTool
+const mockMessageBusForHelper = {
+  publish: vi.fn(),
+  subscribe: vi.fn(),
+  unsubscribe: vi.fn(),
+} as unknown as MessageBus;
+
 const createMCPTool = (
   serverName: string,
   toolName: string,
   description: string,
   mockCallable: CallableTool = {} as CallableTool,
-) => new DiscoveredMCPTool(mockCallable, serverName, toolName, description, {});
+) =>
+  new DiscoveredMCPTool(
+    mockCallable,
+    serverName,
+    toolName,
+    description,
+    {},
+    mockMessageBusForHelper,
+  );
 
 // Helper to create a mock spawn process for tool discovery
 const createDiscoveryProcess = (toolDeclarations: FunctionDeclaration[]) => {
@@ -171,6 +185,11 @@ const baseConfigParams: ConfigParameters = {
 describe('ToolRegistry', () => {
   let config: Config;
   let toolRegistry: ToolRegistry;
+  const mockMessageBus = {
+    publish: vi.fn(),
+    subscribe: vi.fn(),
+    unsubscribe: vi.fn(),
+  } as unknown as MessageBus;
   let mockConfigGetToolDiscoveryCommand: ReturnType<typeof vi.spyOn>;
   let mockConfigGetExcludedTools: MockInstance<
     typeof Config.prototype.getExcludeTools
@@ -182,7 +201,7 @@ describe('ToolRegistry', () => {
       isDirectory: () => true,
     } as fs.Stats);
     config = new Config(baseConfigParams);
-    toolRegistry = new ToolRegistry(config);
+    toolRegistry = new ToolRegistry(config, mockMessageBus);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'debug').mockImplementation(() => {});
@@ -372,6 +391,7 @@ describe('ToolRegistry', () => {
         DISCOVERED_TOOL_PREFIX + 'discovered-1',
         'desc',
         {},
+        mockMessageBus,
       );
       const mcpZebra = createMCPTool('zebra-server', 'mcp-zebra', 'desc');
       const mcpApple = createMCPTool('apple-server', 'mcp-apple', 'desc');
@@ -482,13 +502,6 @@ describe('ToolRegistry', () => {
       const discoveryCommand = 'my-discovery-command';
       mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
 
-      const mockMessageBus = {
-        publish: vi.fn(),
-        subscribe: vi.fn(),
-        unsubscribe: vi.fn(),
-      } as unknown as MessageBus;
-      toolRegistry.setMessageBus(mockMessageBus);
-
       const toolDeclaration: FunctionDeclaration = {
         name: 'policy-test-tool',
         description: 'tests policy',
@@ -520,6 +533,7 @@ describe('ToolRegistry', () => {
         DISCOVERED_TOOL_PREFIX + 'test-tool',
         'A test tool',
         {},
+        mockMessageBus,
       );
       const params = { param: 'testValue' };
       const invocation = tool.build(params);

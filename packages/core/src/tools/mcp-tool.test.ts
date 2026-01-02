@@ -13,6 +13,10 @@ import type { ToolResult } from './tools.js';
 import { ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
 import type { CallableTool, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
+import {
+  createMockMessageBus,
+  getMockMessageBusInstance,
+} from '../test-utils/mock-message-bus.js';
 
 // Mock @google/genai mcpToTool and CallableTool
 // We only need to mock the parts of CallableTool that DiscoveredMCPTool uses.
@@ -85,12 +89,15 @@ describe('DiscoveredMCPTool', () => {
   beforeEach(() => {
     mockCallTool.mockClear();
     mockToolMethod.mockClear();
+    const bus = createMockMessageBus();
+    getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
     tool = new DiscoveredMCPTool(
       mockCallableToolInstance,
       serverName,
       serverToolName,
       baseDescription,
       inputSchema,
+      bus,
     );
     // Clear allowlist before each relevant test, especially for shouldConfirmExecute
     const invocation = tool.build({ param: 'mock' }) as any;
@@ -190,6 +197,12 @@ describe('DiscoveredMCPTool', () => {
           serverToolName,
           baseDescription,
           inputSchema,
+          createMockMessageBus(),
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
         );
         const params = { param: 'isErrorTrueCase' };
         const functionCall = {
@@ -230,6 +243,12 @@ describe('DiscoveredMCPTool', () => {
         serverToolName,
         baseDescription,
         inputSchema,
+        createMockMessageBus(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
       );
       const params = { param: 'isErrorTopLevelCase' };
       const functionCall = {
@@ -273,6 +292,12 @@ describe('DiscoveredMCPTool', () => {
           serverToolName,
           baseDescription,
           inputSchema,
+          createMockMessageBus(),
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
         );
         const params = { param: 'isErrorFalseCase' };
         const mockToolSuccessResultObject = {
@@ -728,9 +753,12 @@ describe('DiscoveredMCPTool', () => {
         serverToolName,
         baseDescription,
         inputSchema,
+        createMockMessageBus(),
         true,
         undefined,
         { isTrustedFolder: () => true } as any,
+        undefined,
+        undefined,
       );
       const invocation = trustedTool.build({ param: 'mock' });
       expect(
@@ -868,9 +896,12 @@ describe('DiscoveredMCPTool', () => {
         serverToolName,
         baseDescription,
         inputSchema,
+        createMockMessageBus(),
         trust,
         undefined,
         mockConfig(isTrusted) as any,
+        undefined,
+        undefined,
       );
       const invocation = testTool.build({ param: 'mock' });
       const confirmation = await invocation.shouldConfirmExecute(

@@ -13,6 +13,7 @@ import type { LocalAgentDefinition, AgentInputs } from './types.js';
 import type { Config } from '../config/config.js';
 import { Kind } from '../tools/tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 // Mock dependencies to isolate the SubagentToolWrapper class
 vi.mock('./local-invocation.js');
@@ -25,6 +26,7 @@ const mockConvertInputConfigToJsonSchema = vi.mocked(
 
 // Define reusable test data
 let mockConfig: Config;
+let mockMessageBus: MessageBus;
 
 const mockDefinition: LocalAgentDefinition = {
   kind: 'local',
@@ -59,6 +61,7 @@ describe('SubagentToolWrapper', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
+    mockMessageBus = createMockMessageBus();
     // Provide a mock implementation for the schema conversion utility
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockConvertInputConfigToJsonSchema.mockReturnValue(mockSchema as any);
@@ -66,7 +69,7 @@ describe('SubagentToolWrapper', () => {
 
   describe('constructor', () => {
     it('should call convertInputConfigToJsonSchema with the correct agent inputConfig', () => {
-      new SubagentToolWrapper(mockDefinition, mockConfig);
+      new SubagentToolWrapper(mockDefinition, mockConfig, mockMessageBus);
 
       expect(convertInputConfigToJsonSchema).toHaveBeenCalledExactlyOnceWith(
         mockDefinition.inputConfig,
@@ -74,7 +77,11 @@ describe('SubagentToolWrapper', () => {
     });
 
     it('should correctly configure the tool properties from the agent definition', () => {
-      const wrapper = new SubagentToolWrapper(mockDefinition, mockConfig);
+      const wrapper = new SubagentToolWrapper(
+        mockDefinition,
+        mockConfig,
+        mockMessageBus,
+      );
 
       expect(wrapper.name).toBe(mockDefinition.name);
       expect(wrapper.displayName).toBe(mockDefinition.displayName);
@@ -92,12 +99,17 @@ describe('SubagentToolWrapper', () => {
       const wrapper = new SubagentToolWrapper(
         definitionWithoutDisplayName,
         mockConfig,
+        mockMessageBus,
       );
       expect(wrapper.displayName).toBe(definitionWithoutDisplayName.name);
     });
 
     it('should generate a valid tool schema using the definition and converted schema', () => {
-      const wrapper = new SubagentToolWrapper(mockDefinition, mockConfig);
+      const wrapper = new SubagentToolWrapper(
+        mockDefinition,
+        mockConfig,
+        mockMessageBus,
+      );
       const schema = wrapper.schema;
 
       expect(schema.name).toBe(mockDefinition.name);
@@ -108,7 +120,11 @@ describe('SubagentToolWrapper', () => {
 
   describe('createInvocation', () => {
     it('should create a LocalSubagentInvocation with the correct parameters', () => {
-      const wrapper = new SubagentToolWrapper(mockDefinition, mockConfig);
+      const wrapper = new SubagentToolWrapper(
+        mockDefinition,
+        mockConfig,
+        mockMessageBus,
+      );
       const params: AgentInputs = { goal: 'Test the invocation', priority: 1 };
 
       // The public `build` method calls the protected `createInvocation` after validation
@@ -119,18 +135,22 @@ describe('SubagentToolWrapper', () => {
         mockDefinition,
         mockConfig,
         params,
-        undefined,
+        mockMessageBus,
         mockDefinition.name,
         mockDefinition.displayName,
       );
     });
 
     it('should pass the messageBus to the LocalSubagentInvocation constructor', () => {
-      const mockMessageBus = {} as MessageBus;
+      const specificMessageBus = {
+        publish: vi.fn(),
+        subscribe: vi.fn(),
+        unsubscribe: vi.fn(),
+      } as unknown as MessageBus;
       const wrapper = new SubagentToolWrapper(
         mockDefinition,
         mockConfig,
-        mockMessageBus,
+        specificMessageBus,
       );
       const params: AgentInputs = { goal: 'Test the invocation', priority: 1 };
 
@@ -140,14 +160,18 @@ describe('SubagentToolWrapper', () => {
         mockDefinition,
         mockConfig,
         params,
-        mockMessageBus,
+        specificMessageBus,
         mockDefinition.name,
         mockDefinition.displayName,
       );
     });
 
     it('should throw a validation error for invalid parameters before creating an invocation', () => {
-      const wrapper = new SubagentToolWrapper(mockDefinition, mockConfig);
+      const wrapper = new SubagentToolWrapper(
+        mockDefinition,
+        mockConfig,
+        mockMessageBus,
+      );
       // Missing the required 'goal' parameter
       const invalidParams = { priority: 1 };
 

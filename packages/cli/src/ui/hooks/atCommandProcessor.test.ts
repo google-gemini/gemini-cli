@@ -54,6 +54,12 @@ describe('handleAtCommand', () => {
 
     const getToolRegistry = vi.fn();
 
+    const mockMessageBus = {
+      publish: vi.fn(),
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    } as unknown as core.MessageBus;
+
     mockConfig = {
       getToolRegistry,
       getTargetDir: () => testRootDir,
@@ -94,11 +100,12 @@ describe('handleAtCommand', () => {
       getMcpClientManager: () => ({
         getClient: () => undefined,
       }),
+      getMessageBus: () => mockMessageBus,
     } as unknown as Config;
 
-    const registry = new ToolRegistry(mockConfig);
-    registry.registerTool(new ReadManyFilesTool(mockConfig));
-    registry.registerTool(new GlobTool(mockConfig));
+    const registry = new ToolRegistry(mockConfig, mockMessageBus);
+    registry.registerTool(new ReadManyFilesTool(mockConfig, mockMessageBus));
+    registry.registerTool(new GlobTool(mockConfig, mockMessageBus));
     getToolRegistry.mockReturnValue(registry);
   });
 

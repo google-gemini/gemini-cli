@@ -118,7 +118,7 @@ class EditToolInvocation
   constructor(
     private readonly config: Config,
     params: EditToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     toolName?: string,
     displayName?: string,
   ) {
@@ -492,7 +492,7 @@ export class EditTool
 
   constructor(
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(
       EditTool.Name,
@@ -535,9 +535,9 @@ Expectation for required parameters:
         required: ['file_path', 'old_string', 'new_string'],
         type: 'object',
       },
+      messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
-      messageBus,
     );
   }
 
@@ -568,14 +568,14 @@ Expectation for required parameters:
 
   protected createInvocation(
     params: EditToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     toolName?: string,
     displayName?: string,
   ): ToolInvocation<EditToolParams, ToolResult> {
     return new EditToolInvocation(
       this.config,
       params,
-      messageBus ?? this.messageBus,
+      messageBus,
       toolName ?? this.name,
       displayName ?? this.displayName,
     );

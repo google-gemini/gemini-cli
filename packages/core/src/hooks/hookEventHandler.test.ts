@@ -18,6 +18,7 @@ import {
   SessionStartSource,
   type HookExecutionResult,
 } from './types.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 // Mock debugLogger
 const mockDebugLogger = vi.hoisted(() => ({
@@ -92,6 +93,7 @@ describe('HookEventHandler', () => {
       mockHookPlanner,
       mockHookRunner,
       mockHookAggregator,
+      createMockMessageBus(),
     );
   });
 

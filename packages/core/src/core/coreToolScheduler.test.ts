@@ -49,7 +49,10 @@ vi.mock('fs/promises', () => ({
 class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
   static readonly Name = 'testApprovalTool';
 
-  constructor(private config: Config) {
+  constructor(
+    private config: Config,
+    messageBus: MessageBus,
+  ) {
     super(
       TestApprovalTool.Name,
       'TestApprovalTool',
@@ -60,20 +63,17 @@ class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
         required: ['id'],
         type: 'object',
       },
+      messageBus,
     );
   }
 
   protected createInvocation(
     params: { id: string },
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<{ id: string }, ToolResult> {
-    return new TestApprovalInvocation(
-      this.config,
-      params,
-      messageBus ?? this.messageBus,
-    );
+    return new TestApprovalInvocation(this.config, params, messageBus);
   }
 }
 
@@ -84,7 +84,7 @@ class TestApprovalInvocation extends BaseToolInvocation<
   constructor(
     private config: Config,
     params: { id: string },
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(params, messageBus);
   }
@@ -133,7 +133,7 @@ class AbortDuringConfirmationInvocation extends BaseToolInvocation<
     private readonly abortController: AbortController,
     private readonly abortError: Error,
     params: Record<string, unknown>,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(params, messageBus);
   }
@@ -161,6 +161,7 @@ class AbortDuringConfirmationTool extends BaseDeclarativeTool<
   constructor(
     private readonly abortController: AbortController,
     private readonly abortError: Error,
+    messageBus: MessageBus,
   ) {
     super(
       'abortDuringConfirmationTool',
@@ -171,12 +172,13 @@ class AbortDuringConfirmationTool extends BaseDeclarativeTool<
         type: 'object',
         properties: {},
       },
+      messageBus,
     );
   }
 
   protected createInvocation(
     params: Record<string, unknown>,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<Record<string, unknown>, ToolResult> {
@@ -184,7 +186,7 @@ class AbortDuringConfirmationTool extends BaseDeclarativeTool<
       this.abortController,
       this.abortError,
       params,
-      messageBus ?? this.messageBus,
+      messageBus,
     );
   }
 }
@@ -547,6 +549,7 @@ describe('CoreToolScheduler', () => {
     const declarativeTool = new AbortDuringConfirmationTool(
       abortController,
       abortError,
+      createMockMessageBus(),
     );
 
     const mockToolRegistry = {
@@ -742,7 +745,7 @@ class MockEditToolInvocation extends BaseToolInvocation<
   Record<string, unknown>,
   ToolResult
 > {
-  constructor(params: Record<string, unknown>, messageBus?: MessageBus) {
+  constructor(params: Record<string, unknown>, messageBus: MessageBus) {
     super(params, messageBus);
   }
 
@@ -778,23 +781,30 @@ class MockEditTool extends BaseDeclarativeTool<
   Record<string, unknown>,
   ToolResult
 > {
-  constructor() {
-    super('mockEditTool', 'mockEditTool', 'A mock edit tool', Kind.Edit, {});
+  constructor(messageBus: MessageBus) {
+    super(
+      'mockEditTool',
+      'mockEditTool',
+      'A mock edit tool',
+      Kind.Edit,
+      {},
+      messageBus,
+    );
   }
 
   protected createInvocation(
     params: Record<string, unknown>,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<Record<string, unknown>, ToolResult> {
-    return new MockEditToolInvocation(params, messageBus ?? this.messageBus);
+    return new MockEditToolInvocation(params, messageBus);
   }
 }
 
 describe('CoreToolScheduler edit cancellation', () => {
   it('should preserve diff when an edit is cancelled', async () => {
-    const mockEditTool = new MockEditTool();
+    const mockEditTool = new MockEditTool(createMockMessageBus());
     const mockToolRegistry = {
       getTool: () => mockEditTool,
       getFunctionDeclarations: () => [],
@@ -1363,7 +1373,7 @@ describe('CoreToolScheduler request queueing', () => {
       .fn()
       .mockReturnValue(new HookSystem(mockConfig));
 
-    const testTool = new TestApprovalTool(mockConfig);
+    const testTool = new TestApprovalTool(mockConfig, mockMessageBus);
     const toolRegistry = {
       getTool: () => testTool,
       getFunctionDeclarations: () => [],

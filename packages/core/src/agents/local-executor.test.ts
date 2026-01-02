@@ -269,8 +269,13 @@ describe('LocalAgentExecutor', () => {
     vi.useFakeTimers();
 
     mockConfig = makeFakeConfig();
-    parentToolRegistry = new ToolRegistry(mockConfig);
-    parentToolRegistry.registerTool(new LSTool(mockConfig));
+    parentToolRegistry = new ToolRegistry(
+      mockConfig,
+      mockConfig.getMessageBus(),
+    );
+    parentToolRegistry.registerTool(
+      new LSTool(mockConfig, mockConfig.getMessageBus()),
+    );
     parentToolRegistry.registerTool(
       new MockTool({ name: READ_FILE_TOOL_NAME }),
     );

@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { IntrospectionAgent } from './introspection-agent.js';
-import { GetInternalDocsTool } from '../tools/get-internal-docs.js';
+import { GET_INTERNAL_DOCS_TOOL_NAME } from '../tools/tool-names.js';
 import { GEMINI_MODEL_ALIAS_FLASH } from '../config/models.js';
 import type { LocalAgentDefinition } from './types.js';
 
@@ -32,9 +32,7 @@ describe('IntrospectionAgent', () => {
     expect(localAgent.modelConfig?.model).toBe(GEMINI_MODEL_ALIAS_FLASH);
 
     const tools = localAgent.toolConfig?.tools || [];
-    const hasInternalDocsTool = tools.some(
-      (t) => t instanceof GetInternalDocsTool,
-    );
+    const hasInternalDocsTool = tools.includes(GET_INTERNAL_DOCS_TOOL_NAME);
     expect(hasInternalDocsTool).toBe(true);
   });
 

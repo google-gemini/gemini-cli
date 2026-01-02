@@ -8,6 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { DeclarativeTool, hasCycleInSchema, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 class TestToolInvocation implements ToolInvocation<object, ToolResult> {
   constructor(
@@ -36,7 +37,16 @@ class TestTool extends DeclarativeTool<object, ToolResult> {
   private readonly buildFn: (params: object) => TestToolInvocation;
 
   constructor(buildFn: (params: object) => TestToolInvocation) {
-    super('test-tool', 'Test Tool', 'A tool for testing', Kind.Other, {});
+    super(
+      'test-tool',
+      'Test Tool',
+      'A tool for testing',
+      Kind.Other,
+      {},
+      createMockMessageBus(),
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+    );
     this.buildFn = buildFn;
   }
 

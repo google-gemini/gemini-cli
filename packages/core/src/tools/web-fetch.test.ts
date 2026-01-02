@@ -10,6 +10,7 @@ import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import * as fetchUtils from '../utils/fetch.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
@@ -163,12 +164,12 @@ describe('WebFetchTool', () => {
         expectedError: 'Error(s) in prompt URLs:',
       },
     ])('should throw if $name', ({ prompt, expectedError }) => {
-      const tool = new WebFetchTool(mockConfig);
+      const tool = new WebFetchTool(mockConfig, createMockMessageBus());
       expect(() => tool.build({ prompt })).toThrow(expectedError);
     });
 
     it('should pass if prompt contains at least one valid URL', () => {
-      const tool = new WebFetchTool(mockConfig);
+      const tool = new WebFetchTool(mockConfig, createMockMessageBus());
       expect(() =>
         tool.build({ prompt: 'fetch https://example.com' }),
       ).not.toThrow();
@@ -181,7 +182,7 @@ describe('WebFetchTool', () => {
       vi.spyOn(fetchUtils, 'fetchWithTimeout').mockRejectedValue(
         new Error('fetch failed'),
       );
-      const tool = new WebFetchTool(mockConfig);
+      const tool = new WebFetchTool(mockConfig, createMockMessageBus());
       const params = { prompt: 'fetch https://private.ip' };
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
@@ -191,7 +192,7 @@ describe('WebFetchTool', () => {
     it('should return WEB_FETCH_PROCESSING_ERROR on general processing failure', async () => {
       vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
       mockGenerateContent.mockRejectedValue(new Error('API error'));
-      const tool = new WebFetchTool(mockConfig);
+      const tool = new WebFetchTool(mockConfig, createMockMessageBus());
       const params = { prompt: 'fetch https://public.ip' };
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
@@ -209,7 +210,7 @@ describe('WebFetchTool', () => {
         candidates: [{ content: { parts: [{ text: 'fallback response' }] } }],
       });
 
-      const tool = new WebFetchTool(mockConfig);
+      const tool = new WebFetchTool(mockConfig, createMockMessageBus());
       const params = { prompt: 'fetch https://private.ip' };
       const invocation = tool.build(params);
       await invocation.execute(new AbortController().signal);
@@ -237,7 +238,7 @@ describe('WebFetchTool', () => {
         candidates: [{ content: { parts: [{ text: 'fallback response' }] } }],
       });
 
-      const tool = new WebFetchTool(mockConfig);
+      const tool = new WebFetchTool(mockConfig, createMockMessageBus());
       const params = { prompt: 'fetch https://public.ip' };
       const invocation = tool.build(params);
       await invocation.execute(new AbortController().signal);
@@ -306,7 +307,7 @@ describe('WebFetchTool', () => {
           ],
         }));
 
-        const tool = new WebFetchTool(mockConfig);
+        const tool = new WebFetchTool(mockConfig, createMockMessageBus());
         const params = { prompt: 'fetch https://example.com' };
         const invocation = tool.build(params);
         const result = await invocation.execute(new AbortController().signal);
@@ -330,7 +331,7 @@ describe('WebFetchTool', () => {
 
   describe('shouldConfirmExecute', () => {
     it('should return confirmation details with the correct prompt and parsed urls', async () => {
-      const tool = new WebFetchTool(mockConfig);
+      const tool = new WebFetchTool(mockConfig, createMockMessageBus());
       const params = { prompt: 'fetch https://example.com' };
       const invocation = tool.build(params);
       const confirmationDetails = await invocation.shouldConfirmExecute(
@@ -347,7 +348,7 @@ describe('WebFetchTool', () => {
     });
 
     it('should convert github urls to raw format', async () => {
-      const tool = new WebFetchTool(mockConfig);
+      const tool = new WebFetchTool(mockConfig, createMockMessageBus());
       const params = {
         prompt:
           'fetch https://github.com/google/gemini-react/blob/main/README.md',
@@ -373,7 +374,7 @@ describe('WebFetchTool', () => {
       vi.spyOn(mockConfig, 'getApprovalMode').mockReturnValue(
         ApprovalMode.AUTO_EDIT,
       );
-      const tool = new WebFetchTool(mockConfig);
+      const tool = new WebFetchTool(mockConfig, createMockMessageBus());
       const params = { prompt: 'fetch https://example.com' };
       const invocation = tool.build(params);
       const confirmationDetails = await invocation.shouldConfirmExecute(
@@ -384,7 +385,7 @@ describe('WebFetchTool', () => {
     });
 
     it('should call setApprovalMode when onConfirm is called with ProceedAlways', async () => {
-      const tool = new WebFetchTool(mockConfig);
+      const tool = new WebFetchTool(mockConfig, createMockMessageBus());
       const params = { prompt: 'fetch https://example.com' };
       const invocation = tool.build(params);
       const confirmationDetails = await invocation.shouldConfirmExecute(
@@ -413,7 +414,7 @@ describe('WebFetchTool', () => {
     let mockUUID: Mock;
 
     const createToolWithMessageBus = (bus?: MessageBus) => {
-      const tool = new WebFetchTool(mockConfig, bus);
+      const tool = new WebFetchTool(mockConfig, bus ?? createMockMessageBus());
       const params = { prompt: 'fetch https://example.com' };
       return { tool, invocation: tool.build(params) };
     };
