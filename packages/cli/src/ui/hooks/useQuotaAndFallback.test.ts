@@ -33,6 +33,7 @@ import {
 import { useQuotaAndFallback } from './useQuotaAndFallback.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType } from '../types.js';
+import type { LoadedSettings } from '../../config/settings.js';
 
 // Use a type alias for SpyInstance as it's not directly exported
 type SpyInstance = ReturnType<typeof vi.spyOn>;
@@ -43,9 +44,23 @@ describe('useQuotaAndFallback', () => {
   let mockSetModelSwitchedFromQuotaError: Mock;
   let setFallbackHandlerSpy: SpyInstance;
   let mockGoogleApiError: GoogleApiError;
+  let mockSettings: LoadedSettings;
 
   beforeEach(() => {
     mockConfig = makeFakeConfig();
+    mockSettings = {
+      merged: {
+        general: {
+          disableModelFallback: false,
+        },
+      },
+      applyCliOverrides: vi.fn((overrides) => {
+        (mockSettings as { merged: LoadedSettings['merged'] }).merged = {
+          ...mockSettings.merged,
+          ...overrides,
+        };
+      }),
+    } as unknown as LoadedSettings;
     mockGoogleApiError = {
       code: 429,
       message: 'mock error',
@@ -83,6 +98,7 @@ describe('useQuotaAndFallback', () => {
         historyManager: mockHistoryManager,
         userTier: UserTierId.FREE,
         setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+        settings: mockSettings,
       }),
     );
 
@@ -99,6 +115,7 @@ describe('useQuotaAndFallback', () => {
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          settings: mockSettings,
         }),
       );
       return setFallbackHandlerSpy.mock.calls[0][0] as FallbackModelHandler;
@@ -125,6 +142,7 @@ describe('useQuotaAndFallback', () => {
             historyManager: mockHistoryManager,
             userTier: UserTierId.FREE,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            settings: mockSettings,
           }),
         );
 
@@ -179,6 +197,7 @@ describe('useQuotaAndFallback', () => {
             historyManager: mockHistoryManager,
             userTier: UserTierId.FREE,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            settings: mockSettings,
           }),
         );
 
@@ -244,6 +263,7 @@ describe('useQuotaAndFallback', () => {
               userTier: UserTierId.FREE,
               setModelSwitchedFromQuotaError:
                 mockSetModelSwitchedFromQuotaError,
+              settings: mockSettings,
             }),
           );
 
@@ -301,6 +321,7 @@ describe('useQuotaAndFallback', () => {
             historyManager: mockHistoryManager,
             userTier: UserTierId.FREE,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            settings: mockSettings,
           }),
         );
 
@@ -355,6 +376,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          settings: mockSettings,
         }),
       );
 
@@ -372,6 +394,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          settings: mockSettings,
         }),
       );
 
@@ -402,6 +425,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          settings: mockSettings,
         }),
       );
 
@@ -444,6 +468,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          settings: mockSettings,
         }),
       );
 
@@ -479,6 +504,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          settings: mockSettings,
         }),
       );
 
