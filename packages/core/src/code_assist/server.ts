@@ -51,7 +51,6 @@ import {
   recordConversationOffered,
 } from './telemetry.js';
 import { getClientMetadata } from './experiments/client_metadata.js';
-
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
   /** Additional HTTP headers to be sent with the request. */
@@ -158,6 +157,10 @@ export class CodeAssistServer implements ContentGenerator {
     req: OnboardUserRequest,
   ): Promise<LongRunningOperationResponse> {
     return this.requestPost<LongRunningOperationResponse>('onboardUser', req);
+  }
+
+  async getOperation(name: string): Promise<LongRunningOperationResponse> {
+    return this.requestGetOperation<LongRunningOperationResponse>(name);
   }
 
   async loadCodeAssist(
@@ -303,6 +306,20 @@ export class CodeAssistServer implements ContentGenerator {
     return res.data as T;
   }
 
+  async requestGetOperation<T>(name: string, signal?: AbortSignal): Promise<T> {
+    const res = await this.client.request({
+      url: this.getOperationUrl(name),
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.httpOptions.headers,
+      },
+      responseType: 'json',
+      signal,
+    });
+    return res.data as T;
+  }
+
   async requestStreamingPost<T>(
     method: string,
     req: object,
@@ -349,6 +366,12 @@ export class CodeAssistServer implements ContentGenerator {
     const endpoint =
       process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
     return `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`;
+  }
+
+  getOperationUrl(name: string): string {
+    const endpoint =
+      process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
+    return `${endpoint}/${CODE_ASSIST_API_VERSION}/${name}`;
   }
 }
 
