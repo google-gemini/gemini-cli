@@ -1172,13 +1172,6 @@
       },
       "additionalProperties": false
     },
-    "useSmartEdit": {
-      "title": "Use Smart Edit",
-      "description": "Enable the smart-edit tool instead of the replace tool.",
-      "markdownDescription": "Enable the smart-edit tool instead of the replace tool.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
-      "default": true,
-      "type": "boolean"
-    },
     "useWriteTodos": {
       "title": "Use WriteTodos",
       "description": "Enable the write_todos tool.",
