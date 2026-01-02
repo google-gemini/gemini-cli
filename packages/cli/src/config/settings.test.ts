@@ -371,6 +371,31 @@ describe('Settings Loading and Merging', () => {
       expect((settings.merged as TestSettings)['allowedTools']).toBeUndefined();
     });
 
+    it('should migrate loadMemoryFromIncludeDirectories to context.loadMemoryFromIncludeDirectories', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const legacySettingsContent = {
+        loadMemoryFromIncludeDirectories: true,
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(legacySettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.context?.loadMemoryFromIncludeDirectories).toBe(
+        true,
+      );
+      expect(
+        (settings.merged as TestSettings)['loadMemoryFromIncludeDirectories'],
+      ).toBeUndefined();
+    });
+
     it('should allow V2 settings to override V1 settings when both are present (zombie setting fix)', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
