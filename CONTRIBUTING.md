@@ -185,8 +185,13 @@ cd gemini-cli
 To install dependencies defined in `package.json` as well as root dependencies:
 
 ```bash
-npm install
+npm ci
 ```
+
+> Use `npm ci` instead of `npm install` for regular development. `npm ci`
+> strictly adheres to `package-lock.json` and does not modify it, which prevents
+> unintended changes (like `peer: true`) caused by different `npm` versions. Use
+> `npm install` only when adding or updating dependencies.
 
 To build the entire project (all packages):
 
