@@ -151,8 +151,12 @@ export function AuthDialog({
     if (error) {
       onAuthError(error);
     } else {
+      const targetScope = settings.workspace.settings.security?.auth
+        ?.selectedType
+        ? SettingScope.Workspace
+        : SettingScope.User;
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      onSelect(authMethod, SettingScope.User);
+      onSelect(authMethod, targetScope);
     }
   };
 
