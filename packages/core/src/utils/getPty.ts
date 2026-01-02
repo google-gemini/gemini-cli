@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createNodePtyModule } from './pty/NodePty.js';
 import { ScriptPtyModule } from './pty/ScriptPty.js';
 import type { PtyModule } from './pty/types.js';
 import { spawn } from 'node:child_process';
@@ -25,12 +26,17 @@ const getNodePty = async (): Promise<PtyImplementation> => {
   try {
     const lydell = '@lydell/node-pty';
     const module = await import(lydell);
-    return { module: module.default || module, name: 'lydell-node-pty' };
+    const rawModule = module.default || module;
+    return {
+      module: createNodePtyModule(rawModule),
+      name: 'lydell-node-pty',
+    };
   } catch (_e) {
     try {
       const nodePty = 'node-pty';
       const module = await import(nodePty);
-      return { module: module.default || module, name: 'node-pty' };
+      const rawModule = module.default || module;
+      return { module: createNodePtyModule(rawModule), name: 'node-pty' };
     } catch (_e2) {
       return null;
     }
