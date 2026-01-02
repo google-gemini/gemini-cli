@@ -80,6 +80,10 @@ Slash commands provide meta-level control over the CLI itself.
     - On macOS, it requires `pbcopy`, and on Windows, it requires `clip`. These
       tools are typically pre-installed on their respective systems.
 
+- **`/copyprompt`**
+  - **Description:** Copies the last prompt you sent to your clipboard, for easy
+    sharing or reuse.
+
 - **`/directory`** (or **`/dir`**)
   - **Description:** Manage workspace directories for multi-directory support.
   - **Sub-commands:**
