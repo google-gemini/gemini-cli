@@ -726,24 +726,11 @@ export class ShellExecutionService {
 
         const abortHandler = async () => {
           if (ptyProcess.pid && !exited) {
-            if (os.platform() === 'win32') {
-              ptyProcess.kill();
-            } else {
-              try {
-                // Kill the entire process group
-                process.kill(-ptyProcess.pid, 'SIGTERM');
-                await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
-                if (!exited) {
-                  process.kill(-ptyProcess.pid, 'SIGKILL');
-                }
-              } catch (_e) {
-                // Fallback to killing just the process if the group kill fails
-                ptyProcess.kill('SIGTERM');
-                await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
-                if (!exited) {
-                  ptyProcess.kill('SIGKILL');
-                }
-              }
+            // PTY implementations handle process group kill internally
+            ptyProcess.kill('SIGTERM');
+            await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
+            if (!exited) {
+              ptyProcess.kill('SIGKILL');
             }
           }
         };

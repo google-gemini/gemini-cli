@@ -603,12 +603,12 @@ describe('ShellExecutionService', () => {
     });
 
     it('should send SIGTERM and then SIGKILL on abort', async () => {
+      // Track when SIGKILL is sent so we can exit the process after
       const sigkillPromise = new Promise<void>((resolve) => {
-        mockProcessKill.mockImplementation((pid, signal) => {
-          if (signal === 'SIGKILL' && pid === -mockPtyProcess.pid) {
+        mockPtyProcess.kill.mockImplementation((signal: string) => {
+          if (signal === 'SIGKILL') {
             resolve();
           }
-          return true;
         });
       });
 
@@ -623,18 +623,11 @@ describe('ShellExecutionService', () => {
 
       expect(result.aborted).toBe(true);
 
-      // Verify the calls were made in the correct order.
-      const killCalls = mockProcessKill.mock.calls;
-      const sigtermCallIndex = killCalls.findIndex(
-        (call) => call[0] === -mockPtyProcess.pid && call[1] === 'SIGTERM',
-      );
-      const sigkillCallIndex = killCalls.findIndex(
-        (call) => call[0] === -mockPtyProcess.pid && call[1] === 'SIGKILL',
-      );
-
-      expect(sigtermCallIndex).toBe(0);
-      expect(sigkillCallIndex).toBe(1);
-      expect(sigtermCallIndex).toBeLessThan(sigkillCallIndex);
+      // Verify ptyProcess.kill was called with SIGTERM then SIGKILL.
+      // The PTY implementation handles process group kill internally.
+      const killCalls = mockPtyProcess.kill.mock.calls;
+      expect(killCalls[0][0]).toBe('SIGTERM');
+      expect(killCalls[1][0]).toBe('SIGKILL');
 
       expect(result.signal).toBe(9);
     });

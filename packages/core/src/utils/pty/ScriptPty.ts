@@ -114,34 +114,27 @@ export class ScriptPty implements IPty {
   kill(signal?: string): void {
     // Kill entire process group to avoid orphaned child processes.
     // No win32 special case needed since 'script' command is Unix-only.
-    if (this._process.pid) {
-      try {
-        process.kill(-this._process.pid, signal as NodeJS.Signals);
-      } catch (e) {
-        // ESRCH means process group doesn't exist anymore - nothing more to do.
-        if ((e as NodeJS.ErrnoException).code === 'ESRCH') {
-          return;
-        }
-
-        // Log other errors and attempt fallback kill on the main process.
-        debugLogger.debug(`Failed to kill process group ${-this._process.pid}:`, e);
-        if (!this._process.killed) {
-          try {
-            this._process.kill(signal as NodeJS.Signals);
-          } catch (fallbackError) {
-            // ESRCH is expected if process died in the meantime.
-            if ((fallbackError as NodeJS.ErrnoException).code !== 'ESRCH') {
-              debugLogger.debug(`Fallback kill failed for process ${this._process.pid}:`, fallbackError);
-            }
-          }
-        }
+    try {
+      process.kill(-this._pid, signal as NodeJS.Signals);
+    } catch (e) {
+      // ESRCH means process group doesn't exist anymore - nothing more to do.
+      if ((e as NodeJS.ErrnoException).code === 'ESRCH') {
+        return;
       }
-    } else {
-      try {
-        this._process.kill(signal as NodeJS.Signals);
-      } catch (e) {
-        if ((e as NodeJS.ErrnoException).code !== 'ESRCH') {
-          debugLogger.debug('Failed to kill process without PID:', e);
+
+      // Log other errors and attempt fallback kill on the main process.
+      debugLogger.debug(`Failed to kill process group ${-this._pid}:`, e);
+      if (!this._process.killed) {
+        try {
+          this._process.kill(signal as NodeJS.Signals);
+        } catch (fallbackError) {
+          // ESRCH is expected if process died in the meantime.
+          if ((fallbackError as NodeJS.ErrnoException).code !== 'ESRCH') {
+            debugLogger.debug(
+              `Fallback kill failed for process ${this._pid}:`,
+              fallbackError,
+            );
+          }
         }
       }
     }
