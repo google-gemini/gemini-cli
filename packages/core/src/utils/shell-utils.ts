@@ -98,7 +98,9 @@ export async function initializeShellParsers(): Promise<void> {
   if (!treeSitterInitialization) {
     treeSitterInitialization = loadBashLanguage().catch((error) => {
       treeSitterInitialization = null;
-      throw error;
+      // Log the error but don't throw, allowing the application to fall back to safe defaults (ASK_USER)
+      // or regex checks where appropriate.
+      debugLogger.debug('Failed to initialize shell parsers:', error);
     });
   }
 
@@ -113,6 +115,7 @@ export interface ParsedCommandDetail {
 interface CommandParseResult {
   details: ParsedCommandDetail[];
   hasError: boolean;
+  hasRedirection?: boolean;
 }
 
 const POWERSHELL_COMMAND_ENV = '__GCLI_POWERSHELL_COMMAND__';
@@ -136,7 +139,11 @@ if ($errors -and $errors.Count -gt 0) {
 }
 $commandAsts = $ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)
 $commandObjects = @()
+$hasRedirection = $false
 foreach ($commandAst in $commandAsts) {
+  if ($commandAst.Redirections.Count -gt 0) {
+    $hasRedirection = $true
+  }
   $name = $commandAst.GetCommandName()
   if ([string]::IsNullOrWhiteSpace($name)) {
     continue
@@ -149,6 +156,7 @@ foreach ($commandAst in $commandAsts) {
 [PSCustomObject]@{
   success = $true
   commands = $commandObjects
+  hasRedirection = $hasRedirection
 } | ConvertTo-Json -Compress
 `,
   'utf16le',
@@ -230,22 +238,45 @@ function collectCommandDetails(
   const details: ParsedCommandDetail[] = [];
 
   while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) {
-      continue;
+    const current = stack.pop()!;
+
+    let name: string | null = null;
+    let ignoreChildId: number | undefined;
+
+    if (current.type === 'redirected_statement') {
+      const body = current.childForFieldName('body');
+      if (body) {
+        const bodyName = extractNameFromNode(body);
+        if (bodyName) {
+          name = bodyName;
+          ignoreChildId = body.id;
+
+          // If we ignore the body node (because we used it to name the redirected_statement),
+          // we must still traverse its children to find nested commands (e.g. command substitution).
+          for (let i = body.namedChildCount - 1; i >= 0; i -= 1) {
+            const grandChild = body.namedChild(i);
+            if (grandChild) {
+              stack.push(grandChild);
+            }
+          }
+        }
+      }
     }
 
-    const commandName = extractNameFromNode(current);
-    if (commandName) {
+    if (!name) {
+      name = extractNameFromNode(current);
+    }
+
+    if (name) {
       details.push({
-        name: commandName,
+        name,
         text: source.slice(current.startIndex, current.endIndex).trim(),
       });
     }
 
     for (let i = current.namedChildCount - 1; i >= 0; i -= 1) {
       const child = current.namedChild(i);
-      if (child) {
+      if (child && child.id !== ignoreChildId) {
         stack.push(child);
       }
     }
@@ -290,7 +321,11 @@ function hasPromptCommandTransform(root: Node): boolean {
 
 function parseBashCommandDetails(command: string): CommandParseResult | null {
   if (treeSitterInitializationError) {
-    throw treeSitterInitializationError;
+    debugLogger.debug(
+      'Bash parser not initialized:',
+      treeSitterInitializationError,
+    );
+    return null;
   }
 
   if (!bashLanguage) {
@@ -384,6 +419,7 @@ function parsePowerShellCommandDetails(
     let parsed: {
       success?: boolean;
       commands?: Array<{ name?: string; text?: string }>;
+      hasRedirection?: boolean;
     } | null = null;
     try {
       parsed = JSON.parse(output);
@@ -417,6 +453,7 @@ function parsePowerShellCommandDetails(
     return {
       details,
       hasError: details.length === 0,
+      hasRedirection: parsed.hasRedirection,
     };
   } catch {
     return null;
@@ -514,6 +551,50 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
  * @param command The shell command string to parse
  * @returns An array of individual command strings
  */
+/**
+ * Checks if a command contains redirection operators.
+ * Uses shell-specific parsers where possible, falling back to a broad regex check.
+ */
+export function hasRedirection(command: string): boolean {
+  const fallbackCheck = () => /[><]/.test(command);
+  const configuration = getShellConfiguration();
+
+  if (configuration.shell === 'powershell') {
+    const parsed = parsePowerShellCommandDetails(
+      command,
+      configuration.executable,
+    );
+    return parsed && !parsed.hasError
+      ? !!parsed.hasRedirection
+      : fallbackCheck();
+  }
+
+  if (configuration.shell === 'bash' && bashLanguage) {
+    const tree = parseCommandTree(command);
+    if (!tree) return fallbackCheck();
+
+    const stack: Node[] = [tree.rootNode];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      if (
+        current.type === 'redirected_statement' ||
+        current.type === 'file_redirect' ||
+        current.type === 'heredoc_redirect' ||
+        current.type === 'herestring_redirect'
+      ) {
+        return true;
+      }
+      for (let i = current.childCount - 1; i >= 0; i -= 1) {
+        const child = current.child(i);
+        if (child) stack.push(child);
+      }
+    }
+    return false;
+  }
+
+  return fallbackCheck();
+}
+
 export function splitCommands(command: string): string[] {
   const parsed = parseCommandDetails(command);
   if (!parsed || parsed.hasError) {
