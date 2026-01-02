@@ -103,11 +103,15 @@ export async function getDirectorySuggestions(
 
     const matches: string[] = [];
     const filterLower = filter.toLowerCase();
+    const showHidden = filter.startsWith('.');
     const dir = await opendir(searchDir);
 
     try {
       for await (const entry of dir) {
-        if (!entry.isDirectory() || entry.name.startsWith('.')) {
+        if (!entry.isDirectory()) {
+          continue;
+        }
+        if (entry.name.startsWith('.') && !showHidden) {
           continue;
         }
 
@@ -124,10 +128,13 @@ export async function getDirectorySuggestions(
       await dir.close().catch(() => {});
     }
 
+    // Use the separator style from user's input for consistency
+    const userSep = resultPrefix.includes('/') ? '/' : path.sep;
+
     return matches
       .sort()
       .slice(0, MAX_SUGGESTIONS)
-      .map((name) => resultPrefix + name + path.sep);
+      .map((name) => resultPrefix + name + userSep);
   } catch (_) {
     return [];
   }
