@@ -87,3 +87,5 @@ ignore:
   - 'third_party/'
   - 'vendor/'
   - 'node_modules/'
+  - name: Run Gemini CLI
+    uses: google-github-actions/run-gemini-cli@v0.1.16
