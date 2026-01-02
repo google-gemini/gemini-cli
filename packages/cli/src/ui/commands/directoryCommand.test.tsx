@@ -231,43 +231,40 @@ describe('directoryCommand', () => {
     });
 
     describe('completion', () => {
+      const completion = addCommand!.completion!;
+
       it('should return empty suggestions for an empty path', async () => {
-        if (!addCommand?.completion) throw new Error('No completion');
-        const results = await addCommand.completion(mockContext, '');
+        const results = await completion(mockContext, '');
         expect(results).toEqual([]);
       });
 
       it('should return empty suggestions for whitespace only path', async () => {
-        if (!addCommand?.completion) throw new Error('No completion');
-        const results = await addCommand.completion(mockContext, '  ');
+        const results = await completion(mockContext, '  ');
         expect(results).toEqual([]);
       });
 
       it('should return suggestions for a single path', async () => {
-        if (!addCommand?.completion) throw new Error('No completion');
         vi.mocked(getDirectorySuggestions).mockResolvedValue(['docs/', 'src/']);
 
-        const results = await addCommand.completion(mockContext, 'd');
+        const results = await completion(mockContext, 'd');
 
         expect(getDirectorySuggestions).toHaveBeenCalledWith('d');
         expect(results).toEqual(['docs/', 'src/']);
       });
 
       it('should return suggestions for multiple paths', async () => {
-        if (!addCommand?.completion) throw new Error('No completion');
         vi.mocked(getDirectorySuggestions).mockResolvedValue(['src/']);
 
-        const results = await addCommand.completion(mockContext, 'docs/,s');
+        const results = await completion(mockContext, 'docs/,s');
 
         expect(getDirectorySuggestions).toHaveBeenCalledWith('s');
         expect(results).toEqual(['docs/,src/']);
       });
 
       it('should handle leading whitespace in suggestions', async () => {
-        if (!addCommand?.completion) throw new Error('No completion');
         vi.mocked(getDirectorySuggestions).mockResolvedValue(['src/']);
 
-        const results = await addCommand.completion(mockContext, 'docs/, s');
+        const results = await completion(mockContext, 'docs/, s');
 
         expect(getDirectorySuggestions).toHaveBeenCalledWith('s');
         expect(results).toEqual(['docs/, src/']);
