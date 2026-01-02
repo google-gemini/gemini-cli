@@ -312,6 +312,13 @@ your prompt to Gemini. These commands include git-aware filtering.
     passed as-is to the Gemini model. This might be useful if you are
     specifically talking _about_ the `@` symbol in your prompt.
 
+- **Escaping `@`**
+  - **Description:** To use the `@` symbol literally in your prompt (e.g., for
+    TypeScript decorators like `@Component`), you can escape it with a
+    backslash: `\@Component`. This prevents the CLI from interpreting it as a
+    file or directory command and avoids unwanted file suggestions. For example:
+    `Explain the \@Component decorator in Angular.`
+
 ### Error handling for `@` commands
 
 - If the path specified after `@` is not found or is invalid, an error message
