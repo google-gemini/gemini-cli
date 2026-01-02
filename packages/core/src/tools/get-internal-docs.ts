@@ -80,8 +80,13 @@ class GetInternalDocsInvocation extends BaseToolInvocation<
   GetInternalDocsParams,
   ToolResult
 > {
-  constructor(params: GetInternalDocsParams, messageBus?: MessageBus) {
-    super(params, messageBus, GET_INTERNAL_DOCS_TOOL_NAME);
+  constructor(
+    params: GetInternalDocsParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ) {
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   override async shouldConfirmExecute(
@@ -181,7 +186,14 @@ export class GetInternalDocsTool extends BaseDeclarativeTool<
   protected createInvocation(
     params: GetInternalDocsParams,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<GetInternalDocsParams, ToolResult> {
-    return new GetInternalDocsInvocation(params, messageBus);
+    return new GetInternalDocsInvocation(
+      params,
+      messageBus ?? this.messageBus,
+      _toolName ?? GetInternalDocsTool.Name,
+      _toolDisplayName,
+    );
   }
 }

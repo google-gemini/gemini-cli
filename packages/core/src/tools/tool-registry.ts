@@ -179,9 +179,9 @@ Signal: Signal number or \`(none)\` if no signal was received.
     return new DiscoveredToolInvocation(
       this.config,
       this.originalName,
-      this.name,
+      _toolName ?? this.name,
       params,
-      messageBus,
+      messageBus ?? this.messageBus,
     );
   }
 }

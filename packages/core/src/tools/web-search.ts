@@ -238,7 +238,7 @@ export class WebSearchTool extends BaseDeclarativeTool<
     return new WebSearchToolInvocation(
       this.config,
       params,
-      messageBus,
+      messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );

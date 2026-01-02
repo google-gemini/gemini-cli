@@ -484,7 +484,7 @@ export class ShellTool extends BaseDeclarativeTool<
     return new ShellToolInvocation(
       this.config,
       params,
-      messageBus,
+      messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );

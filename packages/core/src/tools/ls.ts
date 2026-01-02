@@ -337,7 +337,7 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
     return new LSToolInvocation(
       this.config,
       params,
-      messageBus,
+      messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );

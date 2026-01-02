@@ -145,7 +145,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
 > {
   static readonly Name = WRITE_TODOS_TOOL_NAME;
 
-  constructor() {
+  constructor(messageBus?: MessageBus) {
     super(
       WriteTodosTool.Name,
       'WriteTodos',
@@ -180,6 +180,9 @@ export class WriteTodosTool extends BaseDeclarativeTool<
         required: ['todos'],
         additionalProperties: false,
       },
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+      messageBus,
     );
   }
 
@@ -248,13 +251,13 @@ export class WriteTodosTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: WriteTodosToolParams,
-    _messageBus?: MessageBus,
+    messageBus?: MessageBus,
     _toolName?: string,
     _displayName?: string,
   ): ToolInvocation<WriteTodosToolParams, ToolResult> {
     return new WriteTodosToolInvocation(
       params,
-      _messageBus,
+      messageBus ?? this.messageBus,
       _toolName,
       _displayName,
     );

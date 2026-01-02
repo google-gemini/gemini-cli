@@ -594,7 +594,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
       this.config,
       this.geminiIgnoreParser,
       params,
-      messageBus,
+      messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );

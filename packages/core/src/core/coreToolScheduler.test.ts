@@ -20,6 +20,7 @@ import type {
   Config,
   ToolRegistry,
   AnyToolInvocation,
+  MessageBus,
 } from '../index.js';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -62,10 +63,17 @@ class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
     );
   }
 
-  protected createInvocation(params: {
-    id: string;
-  }): ToolInvocation<{ id: string }, ToolResult> {
-    return new TestApprovalInvocation(this.config, params);
+  protected createInvocation(
+    params: { id: string },
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ): ToolInvocation<{ id: string }, ToolResult> {
+    return new TestApprovalInvocation(
+      this.config,
+      params,
+      messageBus ?? this.messageBus,
+    );
   }
 }
 
@@ -76,8 +84,9 @@ class TestApprovalInvocation extends BaseToolInvocation<
   constructor(
     private config: Config,
     params: { id: string },
+    messageBus?: MessageBus,
   ) {
-    super(params);
+    super(params, messageBus);
   }
 
   getDescription(): string {
@@ -124,8 +133,9 @@ class AbortDuringConfirmationInvocation extends BaseToolInvocation<
     private readonly abortController: AbortController,
     private readonly abortError: Error,
     params: Record<string, unknown>,
+    messageBus?: MessageBus,
   ) {
-    super(params);
+    super(params, messageBus);
   }
 
   override async shouldConfirmExecute(
@@ -166,11 +176,15 @@ class AbortDuringConfirmationTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: Record<string, unknown>,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<Record<string, unknown>, ToolResult> {
     return new AbortDuringConfirmationInvocation(
       this.abortController,
       this.abortError,
       params,
+      messageBus ?? this.messageBus,
     );
   }
 }
@@ -728,8 +742,8 @@ class MockEditToolInvocation extends BaseToolInvocation<
   Record<string, unknown>,
   ToolResult
 > {
-  constructor(params: Record<string, unknown>) {
-    super(params);
+  constructor(params: Record<string, unknown>, messageBus?: MessageBus) {
+    super(params, messageBus);
   }
 
   getDescription(): string {
@@ -770,8 +784,11 @@ class MockEditTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: Record<string, unknown>,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<Record<string, unknown>, ToolResult> {
-    return new MockEditToolInvocation(params);
+    return new MockEditToolInvocation(params, messageBus ?? this.messageBus);
   }
 }
 
