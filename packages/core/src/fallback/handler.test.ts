@@ -36,6 +36,7 @@ import {
   RetryableQuotaError,
   TerminalQuotaError,
 } from '../utils/googleQuotaErrors.js';
+import { logFlashFallback } from '../telemetry/index.js';
 
 // Mock the telemetry logger and event class
 vi.mock('../telemetry/index.js', () => ({
@@ -406,7 +407,7 @@ describe('handleFallback', () => {
 
       expect(result).toBe(false);
       expect(policyConfig.setActiveModel).not.toHaveBeenCalled();
-      // TODO: add logging expect statement
+      expect(logFlashFallback).not.toHaveBeenCalled();
     });
 
     it('does NOT call setActiveModel when handler returns "retry_once"', async () => {
