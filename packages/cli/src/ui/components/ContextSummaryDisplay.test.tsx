@@ -34,14 +34,16 @@ describe('<ContextSummaryDisplay />', () => {
         openFiles: [{ path: '/a/b/c', timestamp: Date.now() }],
       },
     },
+    skillCount: 1,
   };
 
   it('should render on a single line on a wide screen', () => {
     const { lastFrame, unmount } = renderWithWidth(120, baseProps);
     const output = lastFrame()!;
     expect(output).toContain(
-      'Using: 1 open file (ctrl+g to view) | 1 GEMINI.md file | 1 MCP server',
+      '1 open file (ctrl+g to view) | 1 GEMINI.md file | 1 MCP server | 1 skill',
     );
+    expect(output).not.toContain('Using:');
     // Check for absence of newlines
     expect(output.includes('\n')).toBe(false);
     unmount();
@@ -51,10 +53,10 @@ describe('<ContextSummaryDisplay />', () => {
     const { lastFrame, unmount } = renderWithWidth(60, baseProps);
     const output = lastFrame()!;
     const expectedLines = [
-      ' Using:',
-      '   - 1 open file (ctrl+g to view)',
-      '   - 1 GEMINI.md file',
-      '   - 1 MCP server',
+      ' - 1 open file (ctrl+g to view)',
+      ' - 1 GEMINI.md file',
+      ' - 1 MCP server',
+      ' - 1 skill',
     ];
     const actualLines = output.split('\n');
     expect(actualLines).toEqual(expectedLines);
@@ -86,9 +88,10 @@ describe('<ContextSummaryDisplay />', () => {
       geminiMdFileCount: 0,
       contextFileNames: [],
       mcpServers: {},
+      skillCount: 0,
     };
     const { lastFrame, unmount } = renderWithWidth(60, props);
-    const expectedLines = [' Using:', '   - 1 open file (ctrl+g to view)'];
+    const expectedLines = [' - 1 open file (ctrl+g to view)'];
     const actualLines = lastFrame()!.split('\n');
     expect(actualLines).toEqual(expectedLines);
     unmount();
