@@ -24,7 +24,7 @@ export class MockMessageBus {
   publishedMessages: Message[] = [];
   hookRequests: HookExecutionRequest[] = [];
   hookResponses: HookExecutionResponse[] = [];
-  defaultToolDecision: 'allow' | 'deny' | 'ask_user' = 'allow';
+  defaultToolDecision: 'allow' | 'deny' | 'ask_user' = 'ask_user';
 
   /**
    * Mock publish method that captures messages and simulates responses

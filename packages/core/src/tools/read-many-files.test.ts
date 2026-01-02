@@ -21,6 +21,7 @@ import {
   DEFAULT_FILE_EXCLUDES,
 } from '../utils/ignorePatterns.js';
 import * as glob from 'glob';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 vi.mock('glob', { spy: true });
 
@@ -90,7 +91,7 @@ describe('ReadManyFilesTool', () => {
       }),
       isInteractive: () => false,
     } as Partial<Config> as Config;
-    tool = new ReadManyFilesTool(mockConfig);
+    tool = new ReadManyFilesTool(mockConfig, createMockMessageBus());
 
     mockReadFileFn = mockControl.mockReadFile;
     mockReadFileFn.mockReset();
@@ -505,7 +506,7 @@ describe('ReadManyFilesTool', () => {
         }),
         isInteractive: () => false,
       } as Partial<Config> as Config;
-      tool = new ReadManyFilesTool(mockConfig);
+      tool = new ReadManyFilesTool(mockConfig, createMockMessageBus());
 
       fs.writeFileSync(path.join(tempDir1, 'file1.txt'), 'Content1');
       fs.writeFileSync(path.join(tempDir2, 'file2.txt'), 'Content2');

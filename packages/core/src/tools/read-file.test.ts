@@ -17,6 +17,7 @@ import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
@@ -46,7 +47,7 @@ describe('ReadFileTool', () => {
       },
       isInteractive: () => false,
     } as unknown as Config;
-    tool = new ReadFileTool(mockConfigInstance);
+    tool = new ReadFileTool(mockConfigInstance, createMockMessageBus());
   });
 
   afterEach(async () => {
@@ -438,7 +439,7 @@ describe('ReadFileTool', () => {
             getProjectTempDir: () => path.join(tempRootDir, '.temp'),
           },
         } as unknown as Config;
-        tool = new ReadFileTool(mockConfigInstance);
+        tool = new ReadFileTool(mockConfigInstance, createMockMessageBus());
       });
 
       it('should throw error if path is ignored by a .geminiignore pattern', async () => {

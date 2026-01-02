@@ -8,6 +8,7 @@ import { expect, describe, it } from 'vitest';
 import { doesToolInvocationMatch, getToolSuggestion } from './tool-utils.js';
 import type { AnyToolInvocation, Config } from '../index.js';
 import { ReadFileTool } from '../tools/read-file.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 describe('getToolSuggestion', () => {
   it('should suggest the top N closest tool names for a typo', () => {
@@ -83,7 +84,7 @@ describe('doesToolInvocationMatch', () => {
   });
 
   describe('for non-shell tools', () => {
-    const readFileTool = new ReadFileTool({} as Config);
+    const readFileTool = new ReadFileTool({} as Config, createMockMessageBus());
     const invocation = {
       params: { file: 'test.txt' },
     } as AnyToolInvocation;

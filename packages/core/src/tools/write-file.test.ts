@@ -41,6 +41,7 @@ import { StandardFileSystemService } from '../services/fileSystemService.js';
 import type { DiffUpdateResult } from '../ide/ide-client.js';
 import { IdeClient } from '../ide/ide-client.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
 
@@ -150,7 +151,7 @@ describe('WriteFileTool', () => {
       mockBaseLlmClientInstance,
     );
 
-    tool = new WriteFileTool(mockConfig);
+    tool = new WriteFileTool(mockConfig, createMockMessageBus());
 
     // Reset mocks before each test
     mockConfigInternal.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);

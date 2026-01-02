@@ -14,6 +14,7 @@ import type { Config } from '../config/config.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { ToolErrorType } from './tool-error.js';
 import * as glob from 'glob';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 vi.mock('glob', { spy: true });
 
@@ -47,7 +48,7 @@ describe('GrepTool', () => {
 
   beforeEach(async () => {
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'grep-tool-root-'));
-    grepTool = new GrepTool(mockConfig);
+    grepTool = new GrepTool(mockConfig, createMockMessageBus());
 
     // Create some test files and directories
     await fs.writeFile(
@@ -270,7 +271,10 @@ describe('GrepTool', () => {
         }),
       } as unknown as Config;
 
-      const multiDirGrepTool = new GrepTool(multiDirConfig);
+      const multiDirGrepTool = new GrepTool(
+        multiDirConfig,
+        createMockMessageBus(),
+      );
       const params: GrepToolParams = { pattern: 'world' };
       const invocation = multiDirGrepTool.build(params);
       const result = await invocation.execute(abortSignal);
@@ -323,7 +327,10 @@ describe('GrepTool', () => {
         }),
       } as unknown as Config;
 
-      const multiDirGrepTool = new GrepTool(multiDirConfig);
+      const multiDirGrepTool = new GrepTool(
+        multiDirConfig,
+        createMockMessageBus(),
+      );
 
       // Search only in the 'sub' directory of the first workspace
       const params: GrepToolParams = { pattern: 'world', dir_path: 'sub' };
@@ -385,7 +392,10 @@ describe('GrepTool', () => {
         }),
       } as unknown as Config;
 
-      const multiDirGrepTool = new GrepTool(multiDirConfig);
+      const multiDirGrepTool = new GrepTool(
+        multiDirConfig,
+        createMockMessageBus(),
+      );
       const params: GrepToolParams = { pattern: 'testPattern' };
       const invocation = multiDirGrepTool.build(params);
       expect(invocation.getDescription()).toBe(
