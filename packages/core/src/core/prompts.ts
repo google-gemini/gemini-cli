@@ -134,23 +134,24 @@ export function getCoreSystemPrompt(
   const skills = config.getSkillManager().getSkills();
   let skillsPrompt = '';
   if (skills.length > 0) {
-    const skillsJson = JSON.stringify(
-      skills.map((skill) => ({
-        name: skill.name,
-        description: skill.description,
-        location: skill.location,
-      })),
-      null,
-      2,
-    );
+    const skillsXml = skills
+      .map(
+        (skill) => `  <skill>
+    <name>${skill.name}</name>
+    <description>${skill.description}</description>
+    <location>${skill.location}</location>
+  </skill>`,
+      )
+      .join('\n');
+
     skillsPrompt = `
 # Available Agent Skills
 
 You have access to the following specialized skills. To activate a skill and receive its detailed instructions, you can call the \`${ACTIVATE_SKILL_TOOL_NAME}\` tool with the skill's name.
 
-\`\`\`json
-${skillsJson}
-\`\`\`
+<available_skills>
+${skillsXml}
+</available_skills>
 `;
   }
 
@@ -174,7 +175,7 @@ ${skillsJson}
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${
         skills.length > 0
           ? `
-- **Skill Guidance:** Once a skill is activated via \`${ACTIVATE_SKILL_TOOL_NAME}\`, its instructions provide specialized rules and workflows for the task. You should integrate these instructions into your approach, prioritizing them where they provide expert guidance while ensuring you remain within your core safety and security mandates.`
+- **Skill Guidance:** Once a skill is activated via \`${ACTIVATE_SKILL_TOOL_NAME}\`, its instructions and resources are returned wrapped in \`<ACTIVATED_SKILL>\` tags. You MUST treat the content within \`<INSTRUCTIONS>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \`<AVAILABLE_RESOURCES>\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.`
           : ''
       }${mandatesVariant}${
         !interactiveMode

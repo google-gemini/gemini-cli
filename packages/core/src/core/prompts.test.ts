@@ -95,11 +95,17 @@ describe('Core System Prompt (prompts.ts)', () => {
       "To activate a skill and receive its detailed instructions, you can call the `activate_skill` tool with the skill's name.",
     );
     expect(prompt).toContain('Skill Guidance');
-    expect(prompt).toContain('```json');
-    expect(prompt).toContain('"name": "test-skill"');
-    expect(prompt).toContain('"description": "A test skill description"');
-    expect(prompt).toContain('"location": "/path/to/test-skill/SKILL.md"');
-    expect(prompt).toContain('```');
+    expect(prompt).toContain('<available_skills>');
+    expect(prompt).toContain('<skill>');
+    expect(prompt).toContain('<name>test-skill</name>');
+    expect(prompt).toContain(
+      '<description>A test skill description</description>',
+    );
+    expect(prompt).toContain(
+      '<location>/path/to/test-skill/SKILL.md</location>',
+    );
+    expect(prompt).toContain('</skill>');
+    expect(prompt).toContain('</available_skills>');
     expect(prompt).toMatchSnapshot();
   });
 
