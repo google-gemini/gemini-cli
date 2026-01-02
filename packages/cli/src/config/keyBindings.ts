@@ -93,6 +93,8 @@ export interface KeyBinding {
   command?: boolean;
   /** Paste operation requirement: true=must be paste, false=must not be paste, undefined=ignore */
   paste?: boolean;
+  /** Alt/Option key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
+  alt?: boolean;
 }
 
 /**
@@ -201,7 +203,10 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
   [Command.SHOW_FULL_TODOS]: [{ key: 't', ctrl: true }],
   [Command.TOGGLE_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
-  [Command.TOGGLE_MARKDOWN]: [{ key: 'm', command: true }],
+  [Command.TOGGLE_MARKDOWN]: [
+    { key: 'm', command: true },
+    { key: 'm', alt: true },
+  ],
   [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
@@ -348,7 +353,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.OPEN_EXTERNAL_EDITOR]:
     'Open the current prompt in an external editor.',
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
-  [Command.SHOW_ERROR_DETAILS]: 'Toggle detailed error information.',
+  [Command.SHOW_ERROR_DETAILS]:
+    'Toggle debug console / detailed error information.',
   [Command.SHOW_FULL_TODOS]: 'Toggle the full TODO list.',
   [Command.TOGGLE_IDE_CONTEXT_DETAIL]: 'Toggle IDE context details.',
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
