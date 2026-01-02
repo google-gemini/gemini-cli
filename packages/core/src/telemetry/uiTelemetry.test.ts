@@ -117,6 +117,7 @@ describe('UiTelemetryService', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     });
     expect(service.getLastPromptTokenCount()).toBe(0);
   });

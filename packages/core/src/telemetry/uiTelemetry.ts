@@ -72,6 +72,7 @@ export interface SessionMetrics {
     totalLinesAdded: number;
     totalLinesRemoved: number;
   };
+  rewinds: number;
 }
 
 const createInitialModelMetrics = (): ModelMetrics => ({
@@ -110,6 +111,7 @@ const createInitialMetrics = (): SessionMetrics => ({
     totalLinesAdded: 0,
     totalLinesRemoved: 0,
   },
+  rewinds: 0,
 });
 
 export class UiTelemetryService extends EventEmitter {
@@ -235,6 +237,11 @@ export class UiTelemetryService extends EventEmitter {
         files.totalLinesRemoved += event.metadata['model_removed_lines'];
       }
     }
+  }
+
+  recordRewind() {
+    const metrics = this.getMetrics();
+    metrics.rewinds += 1;
   }
 }
 

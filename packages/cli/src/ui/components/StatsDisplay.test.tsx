@@ -64,6 +64,7 @@ const createTestMetrics = (
     totalLinesAdded: 0,
     totalLinesRemoved: 0,
   },
+  rewinds: 0,
   ...overrides,
 });
 

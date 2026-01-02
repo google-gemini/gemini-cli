@@ -55,6 +55,7 @@ const mockSessionStats: SessionStatsState = {
       byName: {},
     },
     files: { totalLinesAdded: 0, totalLinesRemoved: 0 },
+    rewinds: 0,
   },
 };
 

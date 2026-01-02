@@ -4,8 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
-import { formatDuration, formatMemoryUsage } from './formatters.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  formatDuration,
+  formatMemoryUsage,
+  formatTimeAgo,
+} from './formatters.js';
 
 describe('formatters', () => {
   describe('formatMemoryUsage', () => {
@@ -67,6 +71,49 @@ describe('formatters', () => {
 
     it('should handle negative durations', () => {
       expect(formatDuration(-100)).toBe('0s');
+    });
+  });
+
+  describe('formatTimeAgo', () => {
+    const NOW = new Date('2025-01-01T12:00:00Z');
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should return "just now" for dates less than a minute ago', () => {
+      const past = new Date(NOW.getTime() - 30 * 1000);
+      expect(formatTimeAgo(past)).toBe('just now');
+    });
+
+    it('should return minutes ago', () => {
+      const past = new Date(NOW.getTime() - 5 * 60 * 1000);
+      expect(formatTimeAgo(past)).toBe('5m ago');
+    });
+
+    it('should return hours ago', () => {
+      const past = new Date(NOW.getTime() - 3 * 60 * 60 * 1000);
+      expect(formatTimeAgo(past)).toBe('3h ago');
+    });
+
+    it('should return days ago', () => {
+      const past = new Date(NOW.getTime() - 2 * 24 * 60 * 60 * 1000);
+      expect(formatTimeAgo(past)).toBe('2d ago');
+    });
+
+    it('should handle string dates', () => {
+      const past = '2025-01-01T11:00:00Z'; // 1 hour ago
+      expect(formatTimeAgo(past)).toBe('1h ago');
+    });
+
+    it('should handle number timestamps', () => {
+      const past = NOW.getTime() - 10 * 60 * 1000; // 10 minutes ago
+      expect(formatTimeAgo(past)).toBe('10m ago');
     });
   });
 });

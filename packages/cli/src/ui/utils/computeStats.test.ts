@@ -134,6 +134,7 @@ describe('computeSessionStats', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     };
 
     const result = computeSessionStats(metrics);
@@ -184,6 +185,7 @@ describe('computeSessionStats', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     };
 
     const result = computeSessionStats(metrics);
@@ -223,6 +225,7 @@ describe('computeSessionStats', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     };
 
     const result = computeSessionStats(metrics);
@@ -245,6 +248,7 @@ describe('computeSessionStats', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     };
 
     const result = computeSessionStats(metrics);
@@ -268,6 +272,7 @@ describe('computeSessionStats', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      rewinds: 0,
     };
 
     const result = computeSessionStats(metrics);
@@ -294,6 +299,7 @@ describe('computeSessionStats', () => {
         totalLinesAdded: 42,
         totalLinesRemoved: 18,
       },
+      rewinds: 0,
     };
 
     const result = computeSessionStats(metrics);

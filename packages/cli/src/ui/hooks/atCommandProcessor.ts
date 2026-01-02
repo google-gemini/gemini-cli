@@ -476,10 +476,17 @@ export async function handleAtCommand({
   const resourceResults = await Promise.all(resourcePromises);
   const resourceReadDisplays: IndividualToolCallDisplay[] = [];
   let resourceErrorOccurred = false;
+  let hasAddedReferenceHeader = false;
 
   for (const result of resourceResults) {
     resourceReadDisplays.push(result.display);
     if (result.success) {
+      if (!hasAddedReferenceHeader) {
+        processedQueryParts.push({
+          text: '\n--- Content from referenced files ---',
+        });
+        hasAddedReferenceHeader = true;
+      }
       processedQueryParts.push({ text: `\nContent from @${result.uri}:\n` });
       processedQueryParts.push(...result.parts);
     } else {
@@ -517,6 +524,9 @@ export async function handleAtCommand({
         userMessageTimestamp,
       );
     }
+    if (hasAddedReferenceHeader) {
+      processedQueryParts.push({ text: '\n--- End of content ---' });
+    }
     return { processedQuery: processedQueryParts };
   }
 
@@ -547,9 +557,12 @@ export async function handleAtCommand({
 
     if (Array.isArray(result.llmContent)) {
       const fileContentRegex = /^--- (.*?) ---\n\n([\s\S]*?)\n\n$/;
-      processedQueryParts.push({
-        text: '\n--- Content from referenced files ---',
-      });
+      if (!hasAddedReferenceHeader) {
+        processedQueryParts.push({
+          text: '\n--- Content from referenced files ---',
+        });
+        hasAddedReferenceHeader = true;
+      }
       for (const part of result.llmContent) {
         if (typeof part === 'string') {
           const match = fileContentRegex.exec(part);
