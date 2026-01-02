@@ -57,6 +57,11 @@ decision = "ask_user"
 priority = 10
 
 [[rule]]
+toolName = "activate_skill"
+decision = "ask_user"
+priority = 10
+
+[[rule]]
 toolName = "write_file"
 decision = "allow"
 priority = 15
