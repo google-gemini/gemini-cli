@@ -257,6 +257,7 @@ export interface SandboxConfig {
 
 export interface ConfigParameters {
   sessionId: string;
+  clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
   targetDir: string;
@@ -368,6 +369,7 @@ export class Config {
   private agentRegistry!: AgentRegistry;
   private skillManager!: SkillManager;
   private sessionId: string;
+  private clientVersion: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
@@ -488,6 +490,7 @@ export class Config {
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
+    this.clientVersion = params.clientVersion ?? 'unknown';
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
@@ -719,6 +722,7 @@ export class Config {
     this.toolRegistry = await this.createToolRegistry();
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
+      this.clientVersion,
       this.toolRegistry,
       this,
       this.eventEmitter,

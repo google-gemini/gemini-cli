@@ -69,6 +69,7 @@ interface ExtensionManagerParams {
   requestSetting: ((setting: ExtensionSetting) => Promise<string>) | null;
   workspaceDir: string;
   eventEmitter?: EventEmitter<ExtensionEvents>;
+  clientVersion?: string;
 }
 
 /**
@@ -98,6 +99,7 @@ export class ExtensionManager extends ExtensionLoader {
       telemetry: options.settings.telemetry,
       interactive: false,
       sessionId: randomUUID(),
+      clientVersion: options.clientVersion ?? 'unknown',
       targetDir: options.workspaceDir,
       cwd: options.workspaceDir,
       model: '',
