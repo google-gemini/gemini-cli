@@ -34,9 +34,23 @@ describe('getIdeProcessInfo', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    delete process.env['GEMINI_CLI_IDE_PID'];
   });
 
   describe('on Unix', () => {
+    it('should use GEMINI_CLI_IDE_PID and fetch command', async () => {
+      (os.platform as Mock).mockReturnValue('linux');
+      process.env['GEMINI_CLI_IDE_PID'] = '12345';
+      mockedExec.mockResolvedValueOnce({ stdout: '0 my-ide-command' }); // getProcessInfo result
+
+      const result = await getIdeProcessInfo();
+
+      expect(result).toEqual({ pid: 12345, command: 'my-ide-command' });
+      expect(mockedExec).toHaveBeenCalledWith(
+        expect.stringContaining('ps -o ppid=,command= -p 12345'),
+      );
+    });
+
     it('should traverse up to find the shell and return grandparent process info', async () => {
       (os.platform as Mock).mockReturnValue('linux');
       // process (1000) -> shell (800) -> IDE (700)

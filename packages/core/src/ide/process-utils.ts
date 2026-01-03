@@ -113,12 +113,27 @@ async function getProcessInfo(pid: number): Promise<{
  * find that shell's parent process (the IDE). To get the true IDE process,
  * we traverse one level higher to get the grandparent.
  *
+ * This function can be overridden by setting the `GEMINI_CLI_IDE_PID`
+ * environment variable. This is useful for launching Gemini CLI in a
+ * standalone terminal while still connecting to an IDE instance.
+ *
+ * If `GEMINI_CLI_IDE_PID` is set, the function uses that PID and fetches
+ * the command for it.
+ *
  * @returns A promise that resolves to the PID and command of the IDE process.
  */
 async function getIdeProcessInfoForUnix(): Promise<{
   pid: number;
   command: string;
 }> {
+  if (process.env['GEMINI_CLI_IDE_PID']) {
+    const idePid = parseInt(process.env['GEMINI_CLI_IDE_PID'], 10);
+    if (!isNaN(idePid)) {
+      const { command } = await getProcessInfo(idePid);
+      return { pid: idePid, command };
+    }
+  }
+
   const shells = ['zsh', 'bash', 'sh', 'tcsh', 'csh', 'ksh', 'fish', 'dash'];
   let currentPid = process.pid;
 
