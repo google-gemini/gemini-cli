@@ -56,19 +56,21 @@ detailed threat model and mitigation strategies.
 Hooks are triggered by specific events in Gemini CLI's lifecycle. The following
 table lists all available hook events:
 
-| Event                 | When It Fires                                 | Common Use Cases                           |
-| --------------------- | --------------------------------------------- | ------------------------------------------ |
-| `SessionStart`        | When a session begins                         | Initialize resources, load context         |
-| `SessionEnd`          | When a session ends                           | Clean up, save state                       |
-| `BeforeAgent`         | After user submits prompt, before planning    | Add context, validate prompts              |
-| `AfterAgent`          | When agent loop ends                          | Review output, force continuation          |
-| `BeforeModel`         | Before sending request to LLM                 | Modify prompts, add instructions           |
-| `AfterModel`          | After receiving LLM response                  | Filter responses, log interactions         |
-| `BeforeToolSelection` | Before LLM selects tools (after BeforeModel)  | Filter available tools, optimize selection |
-| `BeforeTool`          | Before a tool executes                        | Validate arguments, block dangerous ops    |
-| `AfterTool`           | After a tool executes                         | Process results, run tests                 |
-| `PreCompress`         | Before context compression                    | Save state, notify user                    |
-| `Notification`        | When a notification occurs (e.g., permission) | Auto-approve, log decisions                |
+| Event                 | When It Fires                                 | Common Use Cases                              |
+| --------------------- | --------------------------------------------- | --------------------------------------------- |
+| `SessionStart`        | When a session begins                         | Initialize resources, load context            |
+| `SessionEnd`          | When a session ends                           | Clean up, save state                          |
+| `BeforeAgent`         | After user submits prompt, before planning    | Add context, validate prompts                 |
+| `AfterAgent`          | When agent loop ends                          | Review output, force continuation             |
+| `BeforeSubAgent`      | Before a subagent starts executing            | Intercept, validate, or modify subagent calls |
+| `AfterSubAgent`       | When a subagent completes                     | Process results, add context                  |
+| `BeforeModel`         | Before sending request to LLM                 | Modify prompts, add instructions              |
+| `AfterModel`          | After receiving LLM response                  | Filter responses, log interactions            |
+| `BeforeToolSelection` | Before LLM selects tools (after BeforeModel)  | Filter available tools, optimize selection    |
+| `BeforeTool`          | Before a tool executes                        | Validate arguments, block dangerous ops       |
+| `AfterTool`           | After a tool executes                         | Process results, run tests                    |
+| `PreCompress`         | Before context compression                    | Save state, notify user                       |
+| `Notification`        | When a notification occurs (e.g., permission) | Auto-approve, log decisions                   |
 
 ### Hook types
 
@@ -221,6 +223,67 @@ Or simple exit codes:
   "hookSpecificOutput": {
     "hookEventName": "BeforeAgent",
     "additionalContext": "Recent project decisions: ..."
+  }
+}
+```
+
+#### BeforeSubAgent
+
+**Input:**
+
+```json
+{
+  "subagent_name": "code-reviewer",
+  "subagent_display_name": "Code Reviewer",
+  "subagent_inputs": {
+    "task": "Review the authentication changes",
+    "context": "..."
+  }
+}
+```
+
+**Output:**
+
+```json
+{
+  "decision": "allow|deny|block",
+  "reason": "Explanation shown to agent",
+  "hookSpecificOutput": {
+    "hookEventName": "BeforeSubAgent",
+    "additionalContext": "Project guidelines: ...",
+    "subagent_inputs": {
+      "task": "Modified task description",
+      "context": "Additional context"
+    }
+  }
+}
+```
+
+#### AfterSubAgent
+
+**Input:**
+
+```json
+{
+  "subagent_name": "code-reviewer",
+  "subagent_display_name": "Code Reviewer",
+  "subagent_inputs": {
+    "task": "Review the authentication changes"
+  },
+  "subagent_output": {
+    "result": "Code review complete. Found 2 issues...",
+    "terminate_reason": "task_complete"
+  }
+}
+```
+
+**Output:**
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "AfterSubAgent",
+    "additionalContext": "Logged review results to tracking system"
   }
 }
 ```
