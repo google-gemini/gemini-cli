@@ -208,6 +208,10 @@ export class CodeAssistServer implements ContentGenerator {
     throw Error();
   }
 
+  async listModels(): Promise<Array<import('../core/contentGenerator.js').Model>> {
+    return [];
+  }
+
   async listExperiments(
     metadata: ClientMetadata,
   ): Promise<ListExperimentsResponse> {

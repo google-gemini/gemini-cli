@@ -5,19 +5,17 @@
  */
 
 import type React from 'react';
-import { useCallback, useContext, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Box, Text } from 'ink';
 import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
-  DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   ModelSlashCommandEvent,
   logModelSlashCommand,
   getDisplayString,
+  type Model,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -32,6 +30,10 @@ interface ModelDialogProps {
 export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
   const [view, setView] = useState<'main' | 'manual'>('main');
+  const [fetchedModels, setFetchedModels] = useState<Model[] | undefined>(
+    undefined,
+  );
+  const [isLoading, setIsLoading] = useState(true);
 
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
@@ -39,19 +41,49 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const shouldShowPreviewModels =
     config?.getPreviewFeatures() && config.getHasAccessToPreviewModel();
 
+  useEffect(() => {
+    let mounted = true;
+    async function fetchModels() {
+      if (!config) return;
+      try {
+        const models = await config.getContentGenerator().listModels();
+        if (mounted) {
+          setFetchedModels(models);
+          setIsLoading(false);
+        }
+      } catch {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+    void fetchModels();
+    return () => {
+      mounted = false;
+    };
+  }, [config]);
+
   const manualModelSelected = useMemo(() => {
-    const manualModels = [
-      DEFAULT_GEMINI_MODEL,
-      DEFAULT_GEMINI_FLASH_MODEL,
-      DEFAULT_GEMINI_FLASH_LITE_MODEL,
-      PREVIEW_GEMINI_MODEL,
-      PREVIEW_GEMINI_FLASH_MODEL,
-    ];
-    if (manualModels.includes(preferredModel)) {
-      return preferredModel;
+    // If we have fetched models, check if the preferred model is in that list
+    if (fetchedModels && fetchedModels.length > 0) {
+      if (fetchedModels.some((m) => m.name === preferredModel)) {
+        return preferredModel;
+      }
+    } else {
+      // Fallback check
+      const manualModels = [
+        'gemini-pro',
+        'gemini-1.5-pro-latest',
+        'gemini-1.5-flash-latest',
+        PREVIEW_GEMINI_MODEL,
+        PREVIEW_GEMINI_FLASH_MODEL,
+      ];
+      if (manualModels.includes(preferredModel)) {
+        return preferredModel;
+      }
     }
     return '';
-  }, [preferredModel]);
+  }, [preferredModel, fetchedModels]);
 
   useKeypress(
     (key) => {
@@ -98,21 +130,46 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   }, [shouldShowPreviewModels, manualModelSelected]);
 
   const manualOptions = useMemo(() => {
+    // If we successfully fetched models, show them
+    if (fetchedModels && fetchedModels.length > 0) {
+      // Filter for generateContent support if available info
+      const supportedModels = fetchedModels.filter(
+        (m) =>
+          !m.supportedGenerationMethods ||
+          m.supportedGenerationMethods.includes('generateContent'),
+      );
+      // Sort by name for stability
+      supportedModels.sort((a, b) => a.name.localeCompare(b.name));
+
+      return supportedModels.map((m) => ({
+        value: m.name,
+        title: m.displayName || m.name,
+        description: m.description,
+        key: m.name,
+      }));
+    }
+
+    // Fallback default list
     const list = [
       {
-        value: DEFAULT_GEMINI_MODEL,
-        title: DEFAULT_GEMINI_MODEL,
-        key: DEFAULT_GEMINI_MODEL,
+        value: 'gemini-2.5-pro',
+        title: 'gemini-2.5-pro',
+        key: 'gemini-2.5-pro',
       },
       {
-        value: DEFAULT_GEMINI_FLASH_MODEL,
-        title: DEFAULT_GEMINI_FLASH_MODEL,
-        key: DEFAULT_GEMINI_FLASH_MODEL,
+        value: 'gemini-2.5-flash',
+        title: 'gemini-2.5-flash',
+        key: 'gemini-2.5-flash',
       },
       {
-        value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-        title: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-        key: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        value: 'gemini-1.5-pro',
+        title: 'gemini-1.5-pro',
+        key: 'gemini-1.5-pro',
+      },
+      {
+        value: 'gemini-1.5-flash',
+        title: 'gemini-1.5-flash',
+        key: 'gemini-1.5-flash',
       },
     ];
 
@@ -131,7 +188,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       );
     }
     return list;
-  }, [shouldShowPreviewModels]);
+  }, [shouldShowPreviewModels, fetchedModels]);
 
   const options = view === 'main' ? mainOptions : manualOptions;
 
@@ -184,6 +241,18 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     subheader = undefined;
   }
 
+  // Add info about model list source
+  let listSourceInfo;
+  if (view === 'manual') {
+    if (isLoading) {
+      listSourceInfo = 'Loading models...';
+    } else if (fetchedModels && fetchedModels.length > 0) {
+      listSourceInfo = 'Active/recent list of available models.';
+    } else {
+      listSourceInfo = 'Default list (could not retrieve from API).';
+    }
+  }
+
   return (
     <Box
       borderStyle="round"
@@ -212,6 +281,11 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
           showNumbers={true}
         />
       </Box>
+      {listSourceInfo && (
+        <Box marginTop={1} flexDirection="column">
+          <Text color={theme.text.secondary}>{listSourceInfo}</Text>
+        </Box>
+      )}
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.text.secondary}>
           Applies to this session and future Gemini CLI sessions.

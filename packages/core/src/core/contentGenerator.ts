@@ -24,6 +24,7 @@ import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
+import { GeminiContentGenerator } from './geminiContentGenerator.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -43,7 +44,16 @@ export interface ContentGenerator {
 
   embedContent(request: EmbedContentParameters): Promise<EmbedContentResponse>;
 
+  listModels(): Promise<Model[]>;
+
   userTier?: UserTierId;
+}
+
+export interface Model {
+  name: string;
+  displayName?: string;
+  description?: string;
+  supportedGenerationMethods?: string[];
 }
 
 export enum AuthType {
@@ -177,7 +187,10 @@ export async function createContentGenerator(
         vertexai: config.vertexai,
         httpOptions,
       });
-      return new LoggingContentGenerator(googleGenAI.models, gcConfig);
+      return new LoggingContentGenerator(
+        new GeminiContentGenerator(googleGenAI, config.apiKey),
+        gcConfig,
+      );
     }
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
