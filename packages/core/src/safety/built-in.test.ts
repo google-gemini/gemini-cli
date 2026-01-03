@@ -20,18 +20,20 @@ const canCreateSymlinks = (): boolean => {
   }
 
   // Windows: Attempt to create a test symlink
-  const testDir = fsSync.mkdtempSync(path.join(os.tmpdir(), 'symlink-test-'));
-  const targetFile = path.join(testDir, 'target-file');
-  const testLink = path.join(testDir, 'test-link');
+  let testDir: string | undefined;
   try {
+    testDir = fsSync.mkdtempSync(path.join(os.tmpdir(), 'symlink-test-'));
+    const targetFile = path.join(testDir, 'target-file');
+    const testLink = path.join(testDir, 'test-link');
     fsSync.writeFileSync(targetFile, 'x');
     fsSync.symlinkSync(targetFile, testLink);
-    fsSync.unlinkSync(testLink);
     return true;
   } catch {
     return false;
   } finally {
-    fsSync.rmSync(testDir, { recursive: true, force: true });
+    if (testDir) {
+      fsSync.rmSync(testDir, { recursive: true, force: true });
+    }
   }
 };
 
