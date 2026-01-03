@@ -10,9 +10,11 @@ import { escapeRegex, buildArgsPatterns } from './utils.js';
 describe('policy/utils', () => {
   describe('escapeRegex', () => {
     it('should escape special regex characters', () => {
-      const input = '.-*+?^${}()|[]\\ ';
+      const input = '.-*+?^${}()|[]\\ "';
       const escaped = escapeRegex(input);
-      expect(escaped).toBe('\\.\\-\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\\\ ');
+      expect(escaped).toBe(
+        '\\.\\-\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\\\ \\"',
+      );
     });
 
     it('should return the same string if no special characters are present', () => {
@@ -58,6 +60,13 @@ describe('policy/utils', () => {
     it('should escape characters in commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'git checkout -b', undefined);
       expect(result).toEqual(['"command":"git\\ checkout\\ \\-b(?:[\\s"]|$)']);
+    });
+
+    it('should correctly escape quotes in commandPrefix', () => {
+      const result = buildArgsPatterns(undefined, 'git "fix"', undefined);
+      expect(result).toEqual([
+        '"command":"git\\ \\\\\\"fix\\\\\\"(?:[\\s"]|$)',
+      ]);
     });
 
     it('should handle undefined correctly when no inputs are provided', () => {

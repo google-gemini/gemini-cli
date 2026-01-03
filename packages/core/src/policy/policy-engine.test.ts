@@ -18,6 +18,7 @@ import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { initializeShellParsers } from '../utils/shell-utils.js';
+import { buildArgsPatterns } from './utils.js';
 
 describe('PolicyEngine', () => {
   let engine: PolicyEngine;
@@ -460,6 +461,29 @@ describe('PolicyEngine', () => {
       expect((await engine.check({ name: 'edit' }, undefined)).decision).toBe(
         PolicyDecision.DENY,
       );
+    });
+
+    it('should correctly match commands with quotes in commandPrefix', async () => {
+      const prefix = 'git commit -m "fix"';
+      const patterns = buildArgsPatterns(undefined, prefix);
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: new RegExp(patterns[0]!),
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+      engine = new PolicyEngine({ rules });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'git commit -m "fix"' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
     it('should handle tools with no args', async () => {
@@ -989,6 +1013,114 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should upgrade ASK_USER to ALLOW if all sub-commands are allowed', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"git status/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"ls/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          // Catch-all ASK_USER for shell
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // "git status && ls" matches the catch-all ASK_USER rule initially.
+      // But since both parts are explicitly ALLOWed, the result should be upgraded to ALLOW.
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'git status && ls' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should respect explicit DENY for compound commands even if parts are allowed', async () => {
+      const rules: PolicyRule[] = [
+        {
+          // Explicitly DENY the compound command
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"git status && ls"/,
+          decision: PolicyDecision.DENY,
+          priority: 30,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"git status/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"ls/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'git status && ls' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should propagate DENY from any sub-command', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"rm/,
+          decision: PolicyDecision.DENY,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // "echo hello && rm -rf /" -> echo is ALLOW, rm is DENY -> Result DENY
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello && rm -rf /' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.DENY);
+    });
+
     it('should DENY redirected shell commands in non-interactive mode', async () => {
       const config: PolicyEngineConfig = {
         nonInteractive: true,
@@ -1015,6 +1147,32 @@ describe('PolicyEngine', () => {
           )
         ).decision,
       ).toBe(PolicyDecision.DENY);
+    });
+
+    it('should default to ASK_USER for atomic commands when matching a wildcard ASK_USER rule', async () => {
+      // Regression test: atomic commands were auto-allowing because of optimistic initialization
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Atomic command "whoami" matches the wildcard rule (ASK_USER).
+      // It should NOT be upgraded to ALLOW.
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'run_shell_command',
+              args: { command: 'whoami' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ASK_USER);
     });
 
     it('should allow redirected shell commands in non-interactive mode if allowRedirection is true', async () => {

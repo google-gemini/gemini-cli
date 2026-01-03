@@ -103,7 +103,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const command = stripShellWrapper(this.params.command);
     let rootCommands = [...new Set(getCommandRoots(command))];
 
-    // Fallback for UI display if parser fails
+    // Fallback for UI display if parser fails or returns no commands (e.g.
+    // variable assignments only)
     if (rootCommands.length === 0 && command.trim()) {
       const fallback = command.trim().split(/\s+/)[0];
       if (fallback) {

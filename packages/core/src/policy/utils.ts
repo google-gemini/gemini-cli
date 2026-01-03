@@ -8,7 +8,7 @@
  * Escapes a string for use in a regular expression.
  */
 export function escapeRegex(text: string): string {
-  return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+  return text.replace(/[-[\]{}()*+?.,\\^$|#\s"]/g, '\\$&');
 }
 
 /**
@@ -27,24 +27,24 @@ export function buildArgsPatterns(
   commandPrefix?: string | string[],
   commandRegex?: string,
 ): Array<string | undefined> {
-  let effectiveArgsPattern = argsPattern;
-  const commandPrefixes: string[] = [];
-
   if (commandPrefix) {
     const prefixes = Array.isArray(commandPrefix)
       ? commandPrefix
       : [commandPrefix];
-    commandPrefixes.push(...prefixes);
-  } else if (commandRegex) {
-    effectiveArgsPattern = `"command":"${commandRegex}`;
+
+    // Expand command prefixes to multiple patterns.
+    // We append [\\s"] to ensure we match whole words only (e.g., "git" but not
+    // "github"). Since we match against JSON stringified args, the value is
+    // always followed by a space or a closing quote.
+    return prefixes.map((prefix) => {
+      const jsonPrefix = JSON.stringify(prefix).slice(1, -1);
+      return `"command":"${escapeRegex(jsonPrefix)}(?:[\\s"]|$)`;
+    });
   }
 
-  // Expand command prefixes to multiple patterns.
-  // We append [\\s"] to ensure we match whole words only (e.g., "git" but not "github").
-  // Since we match against JSON stringified args, the value is always followed by a space or a closing quote.
-  return commandPrefixes.length > 0
-    ? commandPrefixes.map(
-        (prefix) => `"command":"${escapeRegex(prefix)}(?:[\\s"]|$)`,
-      )
-    : [effectiveArgsPattern];
+  if (commandRegex) {
+    return [`"command":"${commandRegex}`];
+  }
+
+  return [argsPattern];
 }

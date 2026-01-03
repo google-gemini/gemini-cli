@@ -172,8 +172,13 @@ export class PolicyEngine {
         `[PolicyEngine.check] Validating shell command: ${subCommands.length} parts`,
       );
 
-      // Start with the decision for the full command string
-      let aggregateDecision = ruleDecision;
+      if (ruleDecision === PolicyDecision.DENY) {
+        return PolicyDecision.DENY;
+      }
+
+      // Start optimistically. If all parts are ALLOW, the whole is ALLOW.
+      // We will downgrade if any part is ASK_USER or DENY.
+      let aggregateDecision = PolicyDecision.ALLOW;
 
       for (const subCmd of subCommands) {
         // Prevent infinite recursion for the root command
@@ -186,6 +191,17 @@ export class PolicyEngine {
             if (aggregateDecision === PolicyDecision.ALLOW) {
               aggregateDecision = PolicyDecision.ASK_USER;
             }
+          } else {
+            // If the command is atomic (cannot be split further) and didn't
+            // trigger infinite recursion checks, we must respect the decision
+            // of the rule that triggered this check. If the rule was ASK_USER
+            // (e.g. wildcard), we must downgrade.
+            if (
+              ruleDecision === PolicyDecision.ASK_USER &&
+              aggregateDecision === PolicyDecision.ALLOW
+            ) {
+              aggregateDecision = PolicyDecision.ASK_USER;
+            }
           }
           continue;
         }
@@ -195,14 +211,15 @@ export class PolicyEngine {
           serverName,
         );
 
-        const subDecision = this.applyNonInteractiveMode(subResult.decision);
+        // subResult.decision is already filtered through applyNonInteractiveMode by this.check()
+        const subDecision = subResult.decision;
 
         // If any part is DENIED, the whole command is DENIED
         if (subDecision === PolicyDecision.DENY) {
           return PolicyDecision.DENY;
         }
 
-        // If any part requires ASK_USER, the whole command requires ASK_USER (unless already DENY)
+        // If any part requires ASK_USER, the whole command requires ASK_USER
         if (subDecision === PolicyDecision.ASK_USER) {
           if (aggregateDecision === PolicyDecision.ALLOW) {
             aggregateDecision = PolicyDecision.ASK_USER;
