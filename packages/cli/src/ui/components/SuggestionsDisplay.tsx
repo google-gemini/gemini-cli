@@ -113,7 +113,7 @@ export function SuggestionsDisplay({
             )}
             {isActive && isLong && (
               <Box width={3} flexShrink={0}>
-                <Text color={Colors.Gray}>{isExpanded ? ' ← ' : ' → '}</Text>
+                <Text color={Colors.Gray}>{isExpanded ? ' ￩ ' : ' ￫ '}</Text>
               </Box>
             )}
           </Box>
