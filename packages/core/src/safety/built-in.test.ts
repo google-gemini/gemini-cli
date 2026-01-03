@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { AllowedPathChecker } from './built-in.js';
@@ -13,8 +14,29 @@ import type { SafetyCheckInput } from './protocol.js';
 import { SafetyCheckDecision } from './protocol.js';
 import type { FunctionCall } from '@google/genai';
 
+const canCreateSymlinks = (): boolean => {
+  if (process.platform !== 'win32') {
+    return true; // Non-Windows platforms usually support symlinks
+  }
+
+  // Windows: Attempt to create a test symlink
+  const testDir = fsSync.mkdtempSync(path.join(os.tmpdir(), 'symlink-test-'));
+  const targetFile = path.join(testDir, 'target-file');
+  const testLink = path.join(testDir, 'test-link');
+  try {
+    fsSync.writeFileSync(targetFile, 'x');
+    fsSync.symlinkSync(targetFile, testLink);
+    fsSync.unlinkSync(testLink);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    fsSync.rmSync(testDir, { recursive: true, force: true });
+  }
+};
+
 // Create a conditional it for tests that require symlink support
-const itIfSymlinksSupported = process.platform !== 'win32' ? it : it.skip;
+const symlinksSupported = canCreateSymlinks();
 
 describe('AllowedPathChecker', () => {
   let checker: AllowedPathChecker;
@@ -120,7 +142,7 @@ describe('AllowedPathChecker', () => {
     expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
   });
 
-  itIfSymlinksSupported(
+  it.runIf(symlinksSupported)(
     'should deny access if path contains a symlink pointing outside allowed directories',
     async () => {
       const symlinkPath = path.join(mockCwd, 'symlink');
@@ -139,7 +161,7 @@ describe('AllowedPathChecker', () => {
     },
   );
 
-  itIfSymlinksSupported(
+  it.runIf(symlinksSupported)(
     'should allow access if path contains a symlink pointing INSIDE allowed directories',
     async () => {
       const symlinkPath = path.join(mockCwd, 'symlink-inside');
