@@ -328,7 +328,10 @@ export async function main() {
     const expressApp = await createApp();
     const port = process.env['CODER_AGENT_PORT'] || 0;
 
-    const server = expressApp.listen(port, () => {
+    // SECURITY: Bind to localhost only (127.0.0.1) to ensure single-user access.
+    // Worker IDs are not authenticated - this is a local development server only.
+    // Multi-user deployments require additional auth infrastructure.
+    const server = expressApp.listen(Number(port), '127.0.0.1', () => {
       const address = server.address();
       let actualPort;
       if (process.env['CODER_AGENT_PORT']) {
@@ -340,10 +343,10 @@ export async function main() {
       }
       updateCoderAgentCardUrl(Number(actualPort));
       logger.info(
-        `[CoreAgent] Agent Server started on http://localhost:${actualPort}`,
+        `[CoreAgent] Agent Server started on http://127.0.0.1:${actualPort} (localhost only)`,
       );
       logger.info(
-        `[CoreAgent] Agent Card: http://localhost:${actualPort}/.well-known/agent-card.json`,
+        `[CoreAgent] Agent Card: http://127.0.0.1:${actualPort}/.well-known/agent-card.json`,
       );
       logger.info('[CoreAgent] Press Ctrl+C to stop the server');
     });
