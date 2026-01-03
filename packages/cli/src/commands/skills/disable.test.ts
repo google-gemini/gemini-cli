@@ -1,0 +1,116 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { format } from 'node:util';
+import { handleDisable, disableCommand } from './disable.js';
+import {
+  loadSettings,
+  SettingScope,
+  type LoadedSettings,
+  type LoadableSettingScope,
+} from '../../config/settings.js';
+
+// Mock dependencies
+const emitConsoleLog = vi.hoisted(() => vi.fn());
+const debugLogger = vi.hoisted(() => ({
+  log: vi.fn((message, ...args) => {
+    emitConsoleLog('log', format(message, ...args));
+  }),
+}));
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    debugLogger,
+  };
+});
+
+vi.mock('../../config/settings.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../config/settings.js')>();
+  return {
+    ...actual,
+    loadSettings: vi.fn(),
+  };
+});
+
+vi.mock('../utils.js', () => ({
+  exitCli: vi.fn(),
+}));
+
+describe('skills disable command', () => {
+  const mockLoadSettings = vi.mocked(loadSettings);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('handleDisable', () => {
+    it('should disable an enabled skill in user scope', async () => {
+      const mockSettings = {
+        forScope: vi.fn().mockReturnValue({
+          settings: { skills: { disabled: [] } },
+        }),
+        setValue: vi.fn(),
+      };
+      mockLoadSettings.mockReturnValue(
+        mockSettings as unknown as LoadedSettings,
+      );
+
+      await handleDisable({
+        name: 'skill1',
+        scope: SettingScope.User as LoadableSettingScope,
+      });
+
+      expect(mockSettings.setValue).toHaveBeenCalledWith(
+        SettingScope.User,
+        'skills.disabled',
+        ['skill1'],
+      );
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Skill "skill1" successfully disabled in scope "User".',
+      );
+    });
+
+    it('should log a message if the skill is already disabled', async () => {
+      const mockSettings = {
+        forScope: vi.fn().mockReturnValue({
+          settings: { skills: { disabled: ['skill1'] } },
+        }),
+        setValue: vi.fn(),
+      };
+      mockLoadSettings.mockReturnValue(
+        mockSettings as unknown as LoadedSettings,
+      );
+
+      await handleDisable({
+        name: 'skill1',
+        scope: SettingScope.User as LoadableSettingScope,
+      });
+
+      expect(mockSettings.setValue).not.toHaveBeenCalled();
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Skill "skill1" is already disabled in scope "User".',
+      );
+    });
+  });
+
+  describe('disableCommand', () => {
+    it('should have correct command and describe', () => {
+      expect(disableCommand.command).toBe('disable <name>');
+      expect(disableCommand.describe).toBe('Disables an agent skill.');
+    });
+  });
+});
