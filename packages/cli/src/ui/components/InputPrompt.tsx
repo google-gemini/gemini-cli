@@ -137,9 +137,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [recentUnsafePasteTime, setRecentUnsafePasteTime] = useState<
-    number | null
-  >(null);
+  const recentUnsafePasteTimeRef = useRef<number | null>(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const innerBoxRef = useRef<DOMElement>(null);
 
@@ -318,7 +316,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     // clipboard content as stdin keyboard input. Set paste protection to prevent
     // the stdin newlines from being interpreted as submit commands.
     if (process.platform === 'win32') {
-      setRecentUnsafePasteTime(Date.now());
+      recentUnsafePasteTimeRef.current = Date.now();
 
       if (pasteTimeoutRef.current) {
         clearTimeout(pasteTimeoutRef.current);
@@ -327,7 +325,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // 100ms timeout: longer than keyboard paste (40ms) to account for
       // async clipboard read + Windows stdin echo delay
       pasteTimeoutRef.current = setTimeout(() => {
-        setRecentUnsafePasteTime(null);
+        recentUnsafePasteTimeRef.current = null;
         pasteTimeoutRef.current = null;
       }, 100);
     }
@@ -411,7 +409,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (key.paste) {
         // Record paste time to prevent accidental auto-submission
         if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
-          setRecentUnsafePasteTime(Date.now());
+          recentUnsafePasteTimeRef.current = Date.now();
 
           // Clear any existing paste timeout
           if (pasteTimeoutRef.current) {
@@ -428,7 +426,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           // can type at 200 words per minute which roughly translates to 50ms
           // per letter.
           pasteTimeoutRef.current = setTimeout(() => {
-            setRecentUnsafePasteTime(null);
+            recentUnsafePasteTimeRef.current = null;
             pasteTimeoutRef.current = null;
           }, 40);
         }
@@ -763,7 +761,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (keyMatchers[Command.SUBMIT](key)) {
         if (buffer.text.trim()) {
           // Check if a paste operation occurred recently to prevent accidental auto-submission
-          if (recentUnsafePasteTime !== null) {
+          if (recentUnsafePasteTimeRef.current !== null) {
             // Paste occurred recently in a terminal where we don't trust pastes
             // to be reported correctly so assume this paste was really a
             // newline that was part of the paste.
@@ -875,7 +873,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchActive,
       textBeforeReverseSearch,
       cursorPosition,
-      recentUnsafePasteTime,
       commandSearchActive,
       commandSearchCompletion,
       kittyProtocol.enabled,
