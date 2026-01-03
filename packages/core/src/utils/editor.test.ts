@@ -24,7 +24,7 @@ import {
 import { execSync, spawn, spawnSync } from 'node:child_process';
 import { debugLogger } from './debugLogger.js';
 
-vi.mock('child_process', () => ({
+vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
   spawn: vi.fn(),
   spawnSync: vi.fn(() => ({ error: null, status: 0 })),
@@ -34,7 +34,7 @@ const originalPlatform = process.platform;
 
 describe('editor utils', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     vi.unstubAllEnvs();
     Object.defineProperty(process, 'platform', {
       value: originalPlatform,
@@ -75,8 +75,8 @@ describe('editor utils', () => {
       { editor: 'emacs', commands: ['emacs'], win32Commands: ['emacs.exe'] },
       {
         editor: 'antigravity',
-        commands: ['agy'],
-        win32Commands: ['agy.cmd'],
+        commands: ['agy', 'antigravity'],
+        win32Commands: ['agy.cmd', 'antigravity.cmd'],
       },
     ];
 
@@ -179,8 +179,8 @@ describe('editor utils', () => {
       { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
       {
         editor: 'antigravity',
-        commands: ['agy'],
-        win32Commands: ['agy.cmd'],
+        commands: ['agy', 'antigravity'],
+        win32Commands: ['agy.cmd', 'antigravity.cmd'],
       },
     ];
 
@@ -332,6 +332,7 @@ describe('editor utils', () => {
       'windsurf',
       'cursor',
       'zed',
+      'antigravity',
     ];
 
     for (const editor of guiEditors) {
@@ -447,6 +448,7 @@ describe('editor utils', () => {
       'windsurf',
       'cursor',
       'zed',
+      'antigravity',
     ];
     for (const editor of guiEditors) {
       it(`should not allow ${editor} in sandbox mode`, () => {
