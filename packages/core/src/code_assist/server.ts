@@ -46,6 +46,7 @@ import {
   toCountTokenRequest,
   toGenerateContentRequest,
 } from './converter.js';
+import type { ReceiveEventsResponse } from './events/types.js';
 import {
   formatProtoJsonDuration,
   recordConversationOffered,
@@ -60,6 +61,8 @@ export interface HttpOptions {
 
 export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
 export const CODE_ASSIST_API_VERSION = 'v1internal';
+
+const METHOD_WITH_PARAMS = 'event:receive?client_type=GEMINI_CLI';
 
 export class CodeAssistServer implements ContentGenerator {
   constructor(
@@ -231,6 +234,14 @@ export class CodeAssistServer implements ContentGenerator {
     );
   }
 
+  async receiveEvents(): Promise<ReceiveEventsResponse> {
+    const response: ReceiveEventsResponse = await this.requestGet(
+      METHOD_WITH_PARAMS,
+      false,
+    );
+    return response;
+  }
+
   async recordConversationOffered(
     conversationOffered: ConversationOffered,
   ): Promise<void> {
@@ -289,9 +300,13 @@ export class CodeAssistServer implements ContentGenerator {
     return res.data as T;
   }
 
-  async requestGet<T>(method: string, signal?: AbortSignal): Promise<T> {
+  async requestGet<T>(
+    method: string,
+    requiresColonFormat?: boolean,
+    signal?: AbortSignal,
+  ): Promise<T> {
     const res = await this.client.request({
-      url: this.getMethodUrl(method),
+      url: this.getMethodUrl(method, requiresColonFormat),
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -345,10 +360,13 @@ export class CodeAssistServer implements ContentGenerator {
     })();
   }
 
-  getMethodUrl(method: string): string {
+  getMethodUrl(method: string, requiresColonFormat?: boolean): string {
     const endpoint =
       process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
-    return `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`;
+
+    return requiresColonFormat !== false
+      ? `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`
+      : `${endpoint}/${CODE_ASSIST_API_VERSION}/${method}`;
   }
 }
 

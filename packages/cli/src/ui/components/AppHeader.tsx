@@ -20,20 +20,21 @@ interface AppHeaderProps {
 export const AppHeader = ({ version }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
-  const { nightly, mainAreaWidth, bannerData, bannerVisible } = useUIState();
+  const { nightly, mainAreaWidth, banner, bannerVisible } = useUIState();
 
-  const { bannerText } = useBanner(bannerData, config);
+  const { title, body } = useBanner(banner, config);
 
   return (
     <Box flexDirection="column">
       {!(settings.merged.ui?.hideBanner || config.getScreenReader()) && (
         <>
           <Header version={version} nightly={nightly} />
-          {bannerVisible && bannerText && (
+          {bannerVisible && (title || body) && (
             <Banner
               width={mainAreaWidth}
-              bannerText={bannerText}
-              isWarning={bannerData.warningText !== ''}
+              title={title}
+              body={body}
+              isWarning={banner.isWarning}
             />
           )}
         </>

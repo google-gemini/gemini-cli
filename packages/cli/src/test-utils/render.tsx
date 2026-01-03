@@ -135,6 +135,8 @@ const baseMockUiState = {
   terminalWidth: 120,
   currentModel: 'gemini-pro',
   terminalBackgroundColor: undefined,
+  history: [],
+  historyRemountKey: 0,
 };
 
 const mockUIActions: UIActions = {
