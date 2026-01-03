@@ -16,6 +16,7 @@ import {
   logModelSlashCommand,
   getDisplayString,
   type Model,
+  AuthType,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -152,24 +153,199 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     // Fallback default list
     const list = [
       {
-        value: 'gemini-2.5-pro',
-        title: 'gemini-2.5-pro',
-        key: 'gemini-2.5-pro',
+        value: 'gemini-2.0-flash',
+        title: 'Gemini 2.0 Flash',
+        description: 'Gemini 2.0 Flash',
+        key: 'gemini-2.0-flash',
+      },
+      {
+        value: 'gemini-2.0-flash-001',
+        title: 'Gemini 2.0 Flash 001',
+        description:
+          'Stable version of Gemini 2.0 Flash, our fast and versatile multimodal model for scaling across diverse tasks, released in January of 2025.',
+        key: 'gemini-2.0-flash-001',
+      },
+      {
+        value: 'gemini-2.0-flash-exp',
+        title: 'Gemini 2.0 Flash Experimental',
+        description: 'Gemini 2.0 Flash Experimental',
+        key: 'gemini-2.0-flash-exp',
+      },
+      {
+        value: 'gemini-2.0-flash-lite',
+        title: 'Gemini 2.0 Flash-Lite',
+        description: 'Gemini 2.0 Flash-Lite',
+        key: 'gemini-2.0-flash-lite',
+      },
+      {
+        value: 'gemini-2.0-flash-lite-001',
+        title: 'Gemini 2.0 Flash-Lite 001',
+        description: 'Stable version of Gemini 2.0 Flash-Lite',
+        key: 'gemini-2.0-flash-lite-001',
+      },
+      {
+        value: 'gemini-2.0-flash-lite-preview',
+        title: 'Gemini 2.0 Flash-Lite Preview',
+        description:
+          'Preview release (February 5th, 2025) of Gemini 2.0 Flash-Lite',
+        key: 'gemini-2.0-flash-lite-preview',
+      },
+      {
+        value: 'gemini-2.0-flash-lite-preview-02-05',
+        title: 'Gemini 2.0 Flash-Lite Preview 02-05',
+        description:
+          'Preview release (February 5th, 2025) of Gemini 2.0 Flash-Lite',
+        key: 'gemini-2.0-flash-lite-preview-02-05',
       },
       {
         value: 'gemini-2.5-flash',
-        title: 'gemini-2.5-flash',
+        title: 'Gemini 2.5 Flash',
+        description:
+          'Stable version of Gemini 2.5 Flash, our mid-size multimodal model that supports up to 1 million tokens, released in June of 2025.',
         key: 'gemini-2.5-flash',
       },
       {
-        value: 'gemini-1.5-pro',
-        title: 'gemini-1.5-pro',
-        key: 'gemini-1.5-pro',
+        value: 'gemini-2.5-flash-lite',
+        title: 'Gemini 2.5 Flash-Lite',
+        description:
+          'Stable version of Gemini 2.5 Flash-Lite, released in July of 2025',
+        key: 'gemini-2.5-flash-lite',
       },
       {
-        value: 'gemini-1.5-flash',
-        title: 'gemini-1.5-flash',
-        key: 'gemini-1.5-flash',
+        value: 'gemini-2.5-flash-lite-preview-09-25',
+        title: 'Gemini 2.5 Flash-Lite Preview Sep 2025',
+        description:
+          'Preview release (Septempber 25th, 2025) of Gemini 2.5 Flash-Lite',
+        key: 'gemini-2.5-flash-lite-preview-09-25',
+      },
+      {
+        value: 'gemini-2.5-flash-preview-09-25',
+        title: 'Gemini 2.5 Flash Preview Sep 2025',
+        description: 'Gemini 2.5 Flash Preview Sep 2025',
+        key: 'gemini-2.5-flash-preview-09-25',
+      },
+      {
+        value: 'gemini-2.5-flash-preview-tts',
+        title: 'Gemini 2.5 Flash Preview TTS',
+        description: 'Gemini 2.5 Flash Preview TTS',
+        key: 'gemini-2.5-flash-preview-tts',
+      },
+      {
+        value: 'gemini-2.5-pro',
+        title: 'Gemini 2.5 Pro',
+        description: 'Stable release (June 17th, 2025) of Gemini 2.5 Pro',
+        key: 'gemini-2.5-pro',
+      },
+      {
+        value: 'gemini-2.5-pro-preview-tts',
+        title: 'Gemini 2.5 Pro Preview TTS',
+        description: 'Gemini 2.5 Pro Preview TTS',
+        key: 'gemini-2.5-pro-preview-tts',
+      },
+      {
+        value: 'gemini-3-flash-preview',
+        title: 'Gemini 3 Flash Preview',
+        description: 'Gemini 3 Flash Preview',
+        key: 'gemini-3-flash-preview',
+      },
+      {
+        value: 'gemini-3-pro-preview',
+        title: 'Gemini 3 Pro Preview',
+        description: 'Gemini 3 Pro Preview',
+        key: 'gemini-3-pro-preview',
+      },
+      {
+        value: 'gemini-exp-1206',
+        title: 'Gemini Experimental 1206',
+        description:
+          'Experimental release (March 25th, 2025) of Gemini 2.5 Pro',
+        key: 'gemini-exp-1206',
+      },
+      {
+        value: 'gemini-flash-latest',
+        title: 'Gemini Flash Latest',
+        description: 'Latest release of Gemini Flash',
+        key: 'gemini-flash-latest',
+      },
+      {
+        value: 'gemini-flash-lite-latest',
+        title: 'Gemini Flash-Lite Latest',
+        description: 'Latest release of Gemini Flash-Lite',
+        key: 'gemini-flash-lite-latest',
+      },
+      {
+        value: 'gemini-pro-latest',
+        title: 'Gemini Pro Latest',
+        description: 'Latest release of Gemini Pro',
+        key: 'gemini-pro-latest',
+      },
+      {
+        value: 'gemma-3-12b',
+        title: 'Gemma 3 12B',
+        description: 'Gemma 3 12B',
+        key: 'gemma-3-12b',
+      },
+      {
+        value: 'gemma-3-1b',
+        title: 'Gemma 3 1B',
+        description: 'Gemma 3 1B',
+        key: 'gemma-3-1b',
+      },
+      {
+        value: 'gemma-3-27b',
+        title: 'Gemma 3 27B',
+        description: 'Gemma 3 27B',
+        key: 'gemma-3-27b',
+      },
+      {
+        value: 'gemma-3-4b',
+        title: 'Gemma 3 4B',
+        description: 'Gemma 3 4B',
+        key: 'gemma-3-4b',
+      },
+      {
+        value: 'gemma-3n-e2b',
+        title: 'Gemma 3n E2B',
+        description: 'Gemma 3n E2B',
+        key: 'gemma-3n-e2b',
+      },
+      {
+        value: 'gemma-3n-e4b',
+        title: 'Gemma 3n E4B',
+        description: 'Gemma 3n E4B',
+        key: 'gemma-3n-e4b',
+      },
+      // Fun/Preview models
+      {
+        value: 'deep-research-pro-preview',
+        title: 'Deep Research Pro Preview (Dec-12-2025)',
+        description:
+          'Preview release (December 12th, 2025) of Deep Research Pro',
+        key: 'deep-research-pro-preview',
+      },
+      {
+        value: 'gemini-2.5-computer-use-preview-10-2025',
+        title: 'Gemini 2.5 Computer Use Preview 10-2025',
+        description: 'Gemini 2.5 Computer Use Preview 10-2025',
+        key: 'gemini-2.5-computer-use-preview-10-2025',
+      },
+      {
+        value: 'gemini-2.5-flash-preview-image',
+        title: 'Nano Banana (Gemini 2.5 Flash Preview Image)',
+        description: 'Gemini 2.5 Flash Preview Image',
+        key: 'gemini-2.5-flash-preview-image',
+      },
+      {
+        value: 'gemini-3-pro-image-preview',
+        title: 'Nano Banana Pro (Gemini 3 Pro Image Preview)',
+        description: 'Gemini 3 Pro Image Preview',
+        key: 'gemini-3-pro-image-preview',
+      },
+      {
+        value: 'gemini-robotics-er-1.5-preview',
+        title: 'Gemini Robotics-ER 1.5 Preview',
+        description: 'Gemini Robotics-ER 1.5 Preview',
+        key: 'gemini-robotics-er-1.5-preview',
       },
     ];
 
@@ -178,11 +354,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         {
           value: PREVIEW_GEMINI_MODEL,
           title: PREVIEW_GEMINI_MODEL,
+          description: 'Preview model',
           key: PREVIEW_GEMINI_MODEL,
         },
         {
           value: PREVIEW_GEMINI_FLASH_MODEL,
           title: PREVIEW_GEMINI_FLASH_MODEL,
+          description: 'Preview Flash model',
           key: PREVIEW_GEMINI_FLASH_MODEL,
         },
       );
@@ -249,7 +427,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     } else if (fetchedModels && fetchedModels.length > 0) {
       listSourceInfo = 'Active/recent list of available models.';
     } else {
-      listSourceInfo = 'Default list (could not retrieve from API).';
+      const authType = config?.getContentGeneratorConfig()?.authType;
+      if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+        listSourceInfo =
+          'Default list (dynamic fetching not supported with Google Login).\nTo use API Key, use the /auth command to switch methods.';
+      } else {
+        listSourceInfo = 'Default list (could not retrieve from API).';
+      }
     }
   }
 

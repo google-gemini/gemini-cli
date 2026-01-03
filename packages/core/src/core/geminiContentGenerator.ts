@@ -68,15 +68,21 @@ export class GeminiContentGenerator implements ContentGenerator {
       if (!response.ok) {
         return [];
       }
-       
-      const data = (await response.json());
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (data.models || []).map((m: any) => ({
-        name: m.name.replace(/^models\//, ''),
-        displayName: m.displayName,
-        description: m.description,
-        supportedGenerationMethods: m.supportedGenerationMethods,
-      }));
+
+      const data = await response.json();
+      return (data.models || []).map(
+        (m: {
+          name: string;
+          displayName: string;
+          description: string;
+          supportedGenerationMethods: string[];
+        }) => ({
+          name: m.name.replace(/^models\//, ''),
+          displayName: m.displayName,
+          description: m.description,
+          supportedGenerationMethods: m.supportedGenerationMethods,
+        }),
+      );
     } catch {
       return [];
     }
