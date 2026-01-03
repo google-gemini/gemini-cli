@@ -312,8 +312,26 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     return false;
   }, [buffer, popAllMessages, inputHistory]);
 
-  // Handle clipboard image pasting with Ctrl+V
+  // Handle clipboard image pasting with Ctrl+V or right-click
   const handleClipboardPaste = useCallback(async () => {
+    // On Windows, right-click paste triggers QuickEdit mode which also sends
+    // clipboard content as stdin keyboard input. Set paste protection to prevent
+    // the stdin newlines from being interpreted as submit commands.
+    if (process.platform === 'win32') {
+      setRecentUnsafePasteTime(Date.now());
+
+      if (pasteTimeoutRef.current) {
+        clearTimeout(pasteTimeoutRef.current);
+      }
+
+      // 100ms timeout: longer than keyboard paste (40ms) to account for
+      // async clipboard read + Windows stdin echo delay
+      pasteTimeoutRef.current = setTimeout(() => {
+        setRecentUnsafePasteTime(null);
+        pasteTimeoutRef.current = null;
+      }, 100);
+    }
+
     try {
       if (await clipboardHasImage()) {
         const imagePath = await saveClipboardImage(config.getTargetDir());

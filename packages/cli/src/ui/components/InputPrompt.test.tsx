@@ -2799,6 +2799,109 @@ describe('InputPrompt', () => {
       unmount();
     });
   });
+
+  describe('Windows right-click paste protection', () => {
+    const originalPlatform = process.platform;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+        configurable: true,
+      });
+      mockedUseKittyKeyboardProtocol.mockReturnValue({
+        enabled: false,
+        checking: false,
+      });
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+      vi.mocked(clipboardy.read).mockResolvedValue('line1\nline2\nline3');
+      props.buffer.text = '';
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        configurable: true,
+      });
+    });
+
+    it('should prevent stdin newlines from triggering submit after right-click paste on Windows', async () => {
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { mouseEventsEnabled: true, uiActions },
+      );
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      // Simulate right-click release (triggers handleClipboardPaste)
+      await act(async () => {
+        stdin.write('\x1b[<2;10;20m'); // Right button release at position 10,20
+      });
+
+      // Allow clipboard read promise to resolve, but NOT the full paste protection timeout (100ms)
+      // Use advanceTimersByTime with a small value to let promises settle
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+      });
+
+      // Now simulate Enter keypress from Windows stdin echo (simulating QuickEdit behavior)
+      // First set buffer text to simulate text was inserted
+      props.buffer.text = 'line1\nline2\nline3';
+      await act(async () => {
+        stdin.write('\r');
+      });
+
+      // Key assertion: Enter should NOT trigger submit, should call newline() instead
+      // because recentUnsafePasteTime is still set (100ms hasn't passed yet)
+      expect(props.onSubmit).not.toHaveBeenCalled();
+      expect(props.buffer.newline).toHaveBeenCalled();
+
+      unmount();
+    });
+
+    it('should not affect non-Windows platforms', async () => {
+      Object.defineProperty(process, 'platform', {
+        value: 'darwin',
+        configurable: true,
+      });
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { mouseEventsEnabled: true, uiActions },
+      );
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      // Simulate right-click release
+      await act(async () => {
+        stdin.write('\x1b[<2;10;20m');
+      });
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      // On macOS, Enter after right-click paste SHOULD submit (no QuickEdit issue)
+      props.buffer.text = 'some text';
+      await act(async () => {
+        stdin.write('\r');
+      });
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      // On macOS, should submit normally (no protection needed)
+      expect(props.onSubmit).toHaveBeenCalled();
+
+      unmount();
+    });
+  });
 });
 
 function clean(str: string | undefined): string {
