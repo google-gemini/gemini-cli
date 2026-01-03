@@ -2444,4 +2444,108 @@ describe('Settings Loading and Merging', () => {
       );
     });
   });
+
+  describe('LoadedSettings Store Infrastructure', () => {
+    it('subscribe registers a listener and returns an unsubscribe function', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(false);
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      const listener = vi.fn();
+
+      const unsubscribe = settings.subscribe(listener);
+
+      expect(typeof unsubscribe).toBe('function');
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('unsubscribe prevents listener from being called on setValue', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(false);
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      const listener = vi.fn();
+
+      const unsubscribe = settings.subscribe(listener);
+      unsubscribe();
+
+      settings.setValue(SettingScope.User, 'ui.theme', 'dark');
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('getSnapshot returns the current snapshot', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(false);
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      const snapshot = settings.getSnapshot();
+
+      expect(snapshot).toBeDefined();
+      expect(snapshot.isTrusted).toBe(true);
+      expect(snapshot.merged).toEqual({});
+    });
+
+    it('getSnapshot returns a new object reference after setValue', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(false);
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      const snapshotBefore = settings.getSnapshot();
+
+      settings.setValue(SettingScope.User, 'ui.theme', 'dark');
+      const snapshotAfter = settings.getSnapshot();
+
+      expect(snapshotBefore).not.toBe(snapshotAfter);
+    });
+
+    it('setValue calls subscribed listeners', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(false);
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      const listener = vi.fn();
+
+      settings.subscribe(listener);
+      settings.setValue(SettingScope.User, 'ui.theme', 'dark');
+
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it('setValue calls multiple listeners', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(false);
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      const listener1 = vi.fn();
+      const listener2 = vi.fn();
+
+      settings.subscribe(listener1);
+      settings.subscribe(listener2);
+      settings.setValue(SettingScope.User, 'ui.theme', 'dark');
+
+      expect(listener1).toHaveBeenCalledTimes(1);
+      expect(listener2).toHaveBeenCalledTimes(1);
+    });
+
+    it('snapshot is independent of the original object (deep clone)', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(false);
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      const snapshot = settings.getSnapshot();
+
+      // Mutate the live settings file
+      (settings.user.settings as Record<string, unknown>)['mutatedKey'] =
+        'mutatedValue';
+
+      // Snapshot should be unaffected
+      expect(
+        (snapshot.user.settings as Record<string, unknown>)['mutatedKey'],
+      ).toBeUndefined();
+    });
+
+    it('snapshots from different points in time are independent', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(false);
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      const snapshot1 = settings.getSnapshot();
+
+      settings.setValue(SettingScope.User, 'ui.theme', 'dark');
+      const snapshot2 = settings.getSnapshot();
+
+      // Modify snapshot2's merged settings
+      (snapshot2.merged as Record<string, unknown>)['testKey'] = 'testValue';
+
+      // snapshot1 should be unaffected
+      expect(
+        (snapshot1.merged as Record<string, unknown>)['testKey'],
+      ).toBeUndefined();
+    });
+  });
 });
