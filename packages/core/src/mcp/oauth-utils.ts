@@ -55,30 +55,26 @@ export const FIVE_MIN_BUFFER_MS = 5 * 60 * 1000;
  */
 export class OAuthUtils {
   /**
-   * Construct well-known OAuth endpoint URLs.
-   * By default, uses standard root-based well-known URLs.
-   * If includePathSuffix is true, appends any path from the base URL to the well-known endpoints.
+   * Construct well-known OAuth endpoint URLs per RFC 9728 §3.1.
+   *
+   * The well-known URI is constructed by inserting /.well-known/oauth-protected-resource
+   * between the host and any existing path component. This preserves the resource's
+   * path structure in the metadata URL.
+   *
+   * Examples:
+   * - https://example.com -> https://example.com/.well-known/oauth-protected-resource
+   * - https://example.com/api/resource -> https://example.com/.well-known/oauth-protected-resource/api/resource
+   *
+   * @param baseUrl The resource URL
+   * @param useRootDiscovery If true, ignores path and uses root-based discovery (for fallback compatibility)
    */
-  static buildWellKnownUrls(baseUrl: string, includePathSuffix = false) {
+  static buildWellKnownUrls(baseUrl: string, useRootDiscovery = false) {
     const serverUrl = new URL(baseUrl);
     const base = `${serverUrl.protocol}//${serverUrl.host}`;
+    const pathSuffix = useRootDiscovery
+      ? ''
+      : serverUrl.pathname.replace(/\/$/, ''); // Remove trailing slash
 
-    if (!includePathSuffix) {
-      // Standard discovery: use root-based well-known URLs
-      return {
-        protectedResource: new URL(
-          '/.well-known/oauth-protected-resource',
-          base,
-        ).toString(),
-        authorizationServer: new URL(
-          '/.well-known/oauth-authorization-server',
-          base,
-        ).toString(),
-      };
-    }
-
-    // Path-based discovery: append path suffix to well-known URLs
-    const pathSuffix = serverUrl.pathname.replace(/\/$/, ''); // Remove trailing slash
     return {
       protectedResource: new URL(
         `/.well-known/oauth-protected-resource${pathSuffix}`,
@@ -234,21 +230,21 @@ export class OAuthUtils {
     serverUrl: string,
   ): Promise<MCPOAuthConfig | null> {
     try {
-      // First try standard root-based discovery
-      const wellKnownUrls = this.buildWellKnownUrls(serverUrl, false);
-
-      // Try to get the protected resource metadata at root
+      // RFC 9728 §3.1: Construct well-known URL by inserting /.well-known/oauth-protected-resource
+      // between the host and path. This is the RFC-compliant approach.
+      const wellKnownUrls = this.buildWellKnownUrls(serverUrl);
       let resourceMetadata = await this.fetchProtectedResourceMetadata(
         wellKnownUrls.protectedResource,
       );
 
-      // If root discovery fails and we have a path, try path-based discovery
+      // Fallback: If path-based discovery fails and we have a path, try root-based discovery
+      // for backwards compatibility with servers that don't implement RFC 9728 path handling
       if (!resourceMetadata) {
         const url = new URL(serverUrl);
         if (url.pathname && url.pathname !== '/') {
-          const pathBasedUrls = this.buildWellKnownUrls(serverUrl, true);
+          const rootBasedUrls = this.buildWellKnownUrls(serverUrl, true);
           resourceMetadata = await this.fetchProtectedResourceMetadata(
-            pathBasedUrls.protectedResource,
+            rootBasedUrls.protectedResource,
           );
         }
       }
