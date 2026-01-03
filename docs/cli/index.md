@@ -20,6 +20,8 @@ overview of Gemini CLI, see the [main documentation page](../index.md).
 - **[Keyboard shortcuts](./keyboard-shortcuts.md):** A reference for all
   keyboard shortcuts to improve your workflow.
 - **[Tutorials](./tutorials.md):** Step-by-step guides for common tasks.
+- **[Alternate Screen Buffer](./alternate-buffer.md):** Enable a flicker-free,
+  full-screen experience with sticky headers and mouse support.
 
 ## Advanced features
 
