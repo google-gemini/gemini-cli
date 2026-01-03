@@ -2317,3 +2317,42 @@ describe('Telemetry configuration via environment variables', () => {
     expect(config.getTelemetryLogPromptsEnabled()).toBe(false);
   });
 });
+
+describe('PolicyEngine nonInteractive wiring', () => {
+  const originalIsTTY = process.stdin.isTTY;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    process.stdin.isTTY = originalIsTTY;
+    vi.restoreAllMocks();
+  });
+
+  it('should set nonInteractive to true in one-shot mode', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', 'echo hello']; // Positional query makes it one-shot
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.isInteractive()).toBe(false);
+    expect(
+      (config.getPolicyEngine() as unknown as { nonInteractive: boolean })
+        .nonInteractive,
+    ).toBe(true);
+  });
+
+  it('should set nonInteractive to false in interactive mode', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.isInteractive()).toBe(true);
+    expect(
+      (config.getPolicyEngine() as unknown as { nonInteractive: boolean })
+        .nonInteractive,
+    ).toBe(false);
+  });
+});
