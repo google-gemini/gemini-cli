@@ -103,6 +103,8 @@ npm install -g @google/gemini-cli@nightly
 - Use MCP servers to connect new capabilities, including
   [media generation with Imagen, Veo or Lyria](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia)
 - Run non-interactively in scripts for workflow automation
+- Automate routine checks like project health reports or code analysis using
+  custom commands.
 
 ### Advanced Capabilities
 
