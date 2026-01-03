@@ -1,10 +1,15 @@
 # STAGE 1: Builder
-FROM docker.io/library/node:20-slim
+FROM docker.io/library/node:20-slim AS builder
 
 WORKDIR /app
 
 # Copy source
 COPY . .
+
+# install git for npm scripts/generate-git-commit-info.js
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
 
 # 1. Install dependencies
 RUN npm install
@@ -28,7 +33,7 @@ ARG CLI_VERSION_ARG
 ENV SANDBOX="$SANDBOX_NAME"
 ENV CLI_VERSION=$CLI_VERSION_ARG
 
-# install minimal set of packages, then clean up
+# install minimal set of packages for using by agent, then clean up
 RUN apt-get update && apt-get install -y --no-install-recommends \
   python3 \
   make \
