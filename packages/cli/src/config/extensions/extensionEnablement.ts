@@ -112,6 +112,7 @@ export class ExtensionEnablementManager {
   // If non-empty, this overrides all other extension configuration and enables
   // only the ones in this list.
   private enabledExtensionNamesOverride: string[];
+  private cachedConfig: AllExtensionsEnablementConfig | undefined;
 
   constructor(enabledExtensionNames?: string[]) {
     this.configDir = ExtensionStorage.getUserExtensionsDir();
@@ -177,29 +178,37 @@ export class ExtensionEnablementManager {
   }
 
   readConfig(): AllExtensionsEnablementConfig {
+    if (this.cachedConfig) {
+      return this.cachedConfig;
+    }
+
     try {
       const content = fs.readFileSync(this.configFilePath, 'utf-8');
-      return JSON.parse(content);
+      this.cachedConfig = JSON.parse(content);
+      return this.cachedConfig!;
     } catch (error) {
       if (
         error instanceof Error &&
         'code' in error &&
-        error.code === 'ENOENT'
+        (error as { code: string }).code === 'ENOENT'
       ) {
-        return {};
+        this.cachedConfig = {};
+        return this.cachedConfig;
       }
       coreEvents.emitFeedback(
         'error',
-        'Failed to read extension enablement config.',
+        `Failed to read extension enablement config at ${this.configFilePath}.`,
         error,
       );
-      return {};
+      this.cachedConfig = {};
+      return this.cachedConfig;
     }
   }
 
   writeConfig(config: AllExtensionsEnablementConfig): void {
     fs.mkdirSync(this.configDir, { recursive: true });
     fs.writeFileSync(this.configFilePath, JSON.stringify(config, null, 2));
+    this.cachedConfig = config;
   }
 
   enable(
