@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { SkillManager } from './skillManager.js';
 import { Storage } from '../config/storage.js';
+import { type GeminiCLIExtension } from '../config/config.js';
 
 describe('SkillManager', () => {
   let testRootDir: string;
@@ -25,39 +26,116 @@ describe('SkillManager', () => {
     vi.restoreAllMocks();
   });
 
-  it('should discover skills from Storage with project precedence', async () => {
+  it('should discover skills from extensions, user, and project with precedence', async () => {
     const userDir = path.join(testRootDir, 'user');
     const projectDir = path.join(testRootDir, 'project');
     await fs.mkdir(path.join(userDir, 'skill-a'), { recursive: true });
-    await fs.mkdir(path.join(projectDir, 'skill-a'), { recursive: true });
+    await fs.mkdir(path.join(projectDir, 'skill-b'), { recursive: true });
 
     await fs.writeFile(
       path.join(userDir, 'skill-a', 'SKILL.md'),
       `---
-name: skill-a
+name: skill-user
 description: user-desc
 ---
 `,
     );
     await fs.writeFile(
-      path.join(projectDir, 'skill-a', 'SKILL.md'),
+      path.join(projectDir, 'skill-b', 'SKILL.md'),
       `---
-name: skill-a
+name: skill-project
 description: project-desc
 ---
 `,
     );
+
+    const mockExtension: GeminiCLIExtension = {
+      name: 'test-ext',
+      version: '1.0.0',
+      isActive: true,
+      path: '/ext',
+      contextFiles: [],
+      id: 'ext-id',
+      skills: [
+        {
+          name: 'skill-extension',
+          description: 'ext-desc',
+          location: '/ext/skills/SKILL.md',
+          body: 'body',
+        },
+      ],
+    };
 
     vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
     const storage = new Storage('/dummy');
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
 
     const service = new SkillManager();
-    await service.discoverSkills(storage);
+    await service.discoverSkills(storage, [mockExtension]);
+
+    const skills = service.getSkills();
+    expect(skills).toHaveLength(3);
+    const names = skills.map((s) => s.name);
+    expect(names).toContain('skill-extension');
+    expect(names).toContain('skill-user');
+    expect(names).toContain('skill-project');
+  });
+
+  it('should respect precedence: Project > User > Extension', async () => {
+    const userDir = path.join(testRootDir, 'user');
+    const projectDir = path.join(testRootDir, 'project');
+    await fs.mkdir(path.join(userDir, 'skill'), { recursive: true });
+    await fs.mkdir(path.join(projectDir, 'skill'), { recursive: true });
+
+    await fs.writeFile(
+      path.join(userDir, 'skill', 'SKILL.md'),
+      `---
+name: same-name
+description: user-desc
+---
+`,
+    );
+    await fs.writeFile(
+      path.join(projectDir, 'skill', 'SKILL.md'),
+      `---
+name: same-name
+description: project-desc
+---
+`,
+    );
+
+    const mockExtension: GeminiCLIExtension = {
+      name: 'test-ext',
+      version: '1.0.0',
+      isActive: true,
+      path: '/ext',
+      contextFiles: [],
+      id: 'ext-id',
+      skills: [
+        {
+          name: 'same-name',
+          description: 'ext-desc',
+          location: '/ext/skills/SKILL.md',
+          body: 'body',
+        },
+      ],
+    };
+
+    vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
+    const storage = new Storage('/dummy');
+    vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
+
+    const service = new SkillManager();
+    await service.discoverSkills(storage, [mockExtension]);
 
     const skills = service.getSkills();
     expect(skills).toHaveLength(1);
     expect(skills[0].description).toBe('project-desc');
+
+    // Test User > Extension
+    vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue('/non-existent');
+    await service.discoverSkills(storage, [mockExtension]);
+    expect(service.getSkills()[0].description).toBe('user-desc');
   });
 
   it('should filter disabled skills in getSkills but not in getAllSkills', async () => {
