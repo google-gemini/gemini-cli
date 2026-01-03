@@ -93,8 +93,8 @@ export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
-export * from './services/skillManager.js';
-export * from './services/skillLoader.js';
+export * from './skills/skillManager.js';
+export * from './skills/skillLoader.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';

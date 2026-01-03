@@ -8,9 +8,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { SkillLoader } from './skillLoader.js';
+import { loadSkillsFromDir } from './skillLoader.js';
 
-describe('SkillLoader', () => {
+describe('skillLoader', () => {
   let testRootDir: string;
 
   beforeEach(async () => {
@@ -33,7 +33,7 @@ describe('SkillLoader', () => {
       `---\nname: my-skill\ndescription: A test skill\n---\n# Instructions\nDo something.\n`,
     );
 
-    const skills = await SkillLoader.loadSkillsFromDir(testRootDir);
+    const skills = await loadSkillsFromDir(testRootDir);
 
     expect(skills).toHaveLength(1);
     expect(skills[0].name).toBe('my-skill');
@@ -46,7 +46,7 @@ describe('SkillLoader', () => {
     const notASkillDir = path.join(testRootDir, 'not-a-skill');
     await fs.mkdir(notASkillDir, { recursive: true });
 
-    const skills = await SkillLoader.loadSkillsFromDir(testRootDir);
+    const skills = await loadSkillsFromDir(testRootDir);
 
     expect(skills).toHaveLength(0);
   });
@@ -57,13 +57,13 @@ describe('SkillLoader', () => {
     const skillFile = path.join(skillDir, 'SKILL.md');
     await fs.writeFile(skillFile, '# No frontmatter here');
 
-    const skills = await SkillLoader.loadSkillsFromDir(testRootDir);
+    const skills = await loadSkillsFromDir(testRootDir);
 
     expect(skills).toHaveLength(0);
   });
 
   it('should return empty array for non-existent directory', async () => {
-    const skills = await SkillLoader.loadSkillsFromDir('/non/existent/path');
+    const skills = await loadSkillsFromDir('/non/existent/path');
     expect(skills).toEqual([]);
   });
 });

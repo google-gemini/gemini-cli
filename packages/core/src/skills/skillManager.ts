@@ -5,9 +5,7 @@
  */
 
 import { Storage } from '../config/storage.js';
-import { type SkillDefinition, SkillLoader } from './skillLoader.js';
-
-export { type SkillDefinition };
+import { type SkillDefinition, loadSkillsFromDir } from './skillLoader.js';
 
 export class SkillManager {
   private skills: SkillDefinition[] = [];
@@ -28,13 +26,11 @@ export class SkillManager {
     this.clearSkills();
 
     // 1. User skills
-    const userSkills = await SkillLoader.loadSkillsFromDir(
-      Storage.getUserSkillsDir(),
-    );
+    const userSkills = await loadSkillsFromDir(Storage.getUserSkillsDir());
     this.addSkillsWithPrecedence(userSkills);
 
     // 2. Project skills (highest precedence)
-    const projectSkills = await SkillLoader.loadSkillsFromDir(
+    const projectSkills = await loadSkillsFromDir(
       storage.getProjectSkillsDir(),
     );
     this.addSkillsWithPrecedence(projectSkills);
