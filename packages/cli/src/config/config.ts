@@ -73,7 +73,6 @@ export interface CliArgs {
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
-  useSmartEdit: boolean | undefined;
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
@@ -667,6 +666,8 @@ export async function loadCliConfig(
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
+    skillsSupport: settings.experimental?.skills,
+    disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
@@ -687,7 +688,6 @@ export async function loadCliConfig(
     truncateToolOutputLines: settings.tools?.truncateToolOutputLines,
     enableToolOutputTruncation: settings.tools?.enableToolOutputTruncation,
     eventEmitter: appEvents,
-    useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,

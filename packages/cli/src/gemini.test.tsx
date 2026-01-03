@@ -281,6 +281,7 @@ describe('gemini.tsx main function', () => {
         getOutputFormat: () => 'text',
         getExtensions: () => [],
         getUsageStatisticsEnabled: () => false,
+        refreshAuth: vi.fn(),
         setTerminalBackground: vi.fn(),
       } as unknown as Config;
     });
@@ -545,7 +546,6 @@ describe('gemini.tsx main function kitty protocol', () => {
       listExtensions: undefined,
       includeDirectories: undefined,
       screenReader: undefined,
-      useSmartEdit: undefined,
       useWriteTodos: undefined,
       resume: undefined,
       listSessions: undefined,
@@ -783,6 +783,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getFileFilteringRespectGitIgnore: () => true,
       getOutputFormat: () => 'text',
       getUsageStatisticsEnabled: () => false,
+      refreshAuth: vi.fn(),
       setTerminalBackground: vi.fn(),
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -1019,6 +1020,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getFileFilteringRespectGitIgnore: () => true,
       getOutputFormat: () => 'text',
       getUsageStatisticsEnabled: () => false,
+      refreshAuth: vi.fn(),
       setTerminalBackground: vi.fn(),
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
