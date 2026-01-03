@@ -341,6 +341,7 @@ export interface ConfigParameters {
   fakeResponses?: string;
   recordResponses?: string;
   ptyInfo?: string;
+  ptyBackend?: string;
   disableYoloMode?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
@@ -584,6 +585,7 @@ export class Config {
       showColor: params.shellExecutionConfig?.showColor ?? false,
       pager: params.shellExecutionConfig?.pager ?? 'cat',
       sanitizationConfig: this.sanitizationConfig,
+      ptyBackend: params.ptyBackend ?? 'auto',
     };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
@@ -1563,6 +1565,7 @@ export class Config {
       sanitizationConfig:
         config.sanitizationConfig ??
         this.shellExecutionConfig.sanitizationConfig,
+      ptyBackend: config.ptyBackend ?? this.shellExecutionConfig.ptyBackend,
     };
   }
   getScreenReader(): boolean {

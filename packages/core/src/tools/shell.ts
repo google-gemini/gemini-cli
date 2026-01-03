@@ -254,6 +254,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           combinedController.signal,
           this.config.getEnableInteractiveShell(),
           {
+            ...this.config.getShellExecutionConfig(),
             ...shellExecutionConfig,
             pager: 'cat',
             sanitizationConfig:
