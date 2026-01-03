@@ -1,5 +1,5 @@
 # STAGE 1: Builder
-FROM node:20 AS builder
+FROM docker.io/library/node:20-slim
 
 WORKDIR /app
 
@@ -10,7 +10,6 @@ COPY . .
 RUN npm install
 
 # 2. Build the project
-# FIXED: Changed from 'npm run compile' to 'npm run build'
 RUN npm run build
 
 # 3. Create the Tarballs (.tgz)
@@ -29,7 +28,7 @@ ARG CLI_VERSION_ARG
 ENV SANDBOX="$SANDBOX_NAME"
 ENV CLI_VERSION=$CLI_VERSION_ARG
 
-# Install dependencies
+# install minimal set of packages, then clean up
 RUN apt-get update && apt-get install -y --no-install-recommends \
   python3 \
   make \
@@ -53,12 +52,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-# Setup NPM Global
+# set up npm global package folder under /usr/local/share
+# give it to non-root user node, already set up in base image
 RUN mkdir -p /usr/local/share/npm-global \
   && chown -R node:node /usr/local/share/npm-global
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
 ENV PATH=$PATH:/usr/local/share/npm-global/bin
 
+# switch to non-root user node
 USER node
 
 # Copy artifacts from Builder stage
@@ -70,4 +71,5 @@ RUN npm install -g /tmp/gemini-cli.tgz /tmp/gemini-core.tgz \
   && npm cache clean --force \
   && rm -f /tmp/gemini-{cli,core}.tgz
 
+# default entrypoint when none specified
 CMD ["gemini"]
