@@ -33,7 +33,8 @@ import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
-import type { HookDefinition, HookEventName } from '../hooks/types.js';
+import { HookEventName } from '../hooks/types.js';
+import type { HookDefinition } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import type { TelemetryTarget } from '../telemetry/index.js';
@@ -345,7 +346,10 @@ export interface ConfigParameters {
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   experiments?: Experiments;
-  hooks?: { [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] };
+  hooks?: { [K in HookEventName]?: HookDefinition[] } & {
+    disabled?: string[];
+    extensionHooksDisabled?: string[];
+  };
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
     disabled?: string[];
   };
@@ -474,6 +478,7 @@ export class Config {
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
     | undefined;
   private readonly disabledHooks: string[];
+  private readonly extensionHooksDisabled: string[];
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
@@ -599,6 +604,10 @@ export class Config {
     this.disabledHooks =
       (params.hooks && 'disabled' in params.hooks
         ? params.hooks.disabled
+        : undefined) ?? [];
+    this.extensionHooksDisabled =
+      (params.hooks && 'extensionHooksDisabled' in params.hooks
+        ? params.hooks.extensionHooksDisabled
         : undefined) ?? [];
 
     this.codebaseInvestigatorSettings = {
@@ -1735,19 +1744,37 @@ export class Config {
   }
 
   /**
-   * Get hooks configuration
+   * Get hooks configuration (filtered to only include valid hook event names)
    */
   getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
-    return this.hooks;
+    if (!this.hooks) {
+      return undefined;
+    }
+    const validEventNames = Object.values(HookEventName);
+    const filtered: { [K in HookEventName]?: HookDefinition[] } = {};
+    for (const [key, value] of Object.entries(this.hooks)) {
+      if (validEventNames.includes(key as HookEventName)) {
+        filtered[key as HookEventName] = value;
+      }
+    }
+    return Object.keys(filtered).length > 0 ? filtered : undefined;
   }
 
   /**
-   * Get project-specific hooks configuration
+   * Get project-specific hooks configuration (filtered to only include valid hook event names)
    */
-  getProjectHooks():
-    | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
-    | undefined {
-    return this.projectHooks;
+  getProjectHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
+    if (!this.projectHooks) {
+      return undefined;
+    }
+    const validEventNames = Object.values(HookEventName);
+    const filtered: { [K in HookEventName]?: HookDefinition[] } = {};
+    for (const [key, value] of Object.entries(this.projectHooks)) {
+      if (validEventNames.includes(key as HookEventName)) {
+        filtered[key as HookEventName] = value as HookDefinition[];
+      }
+    }
+    return Object.keys(filtered).length > 0 ? filtered : undefined;
   }
 
   /**
@@ -1755,6 +1782,13 @@ export class Config {
    */
   getDisabledHooks(): string[] {
     return this.disabledHooks;
+  }
+
+  /**
+   * Get list of extension names whose hooks are disabled
+   */
+  getExtensionHooksDisabled(): string[] {
+    return this.extensionHooksDisabled;
   }
 
   /**

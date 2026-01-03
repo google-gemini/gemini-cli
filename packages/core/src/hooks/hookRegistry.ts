@@ -21,6 +21,7 @@ export interface HookRegistryEntry {
   matcher?: string;
   sequential?: boolean;
   enabled: boolean;
+  extensionName?: string;
 }
 
 /**
@@ -85,6 +86,28 @@ export class HookRegistry {
     } else {
       debugLogger.warn(`No hooks found matching "${hookName}"`);
     }
+  }
+
+  /**
+   * Enable or disable all hooks from a specific extension
+   */
+  setExtensionHooksEnabled(extensionName: string, enabled: boolean): number {
+    let count = 0;
+    for (const entry of this.entries) {
+      if (entry.extensionName === extensionName) {
+        entry.enabled = enabled;
+        count++;
+      }
+    }
+
+    if (count > 0) {
+      debugLogger.log(
+        `${enabled ? 'Enabled' : 'Disabled'} ${count} hook(s) from extension "${extensionName}"`,
+      );
+    } else {
+      debugLogger.warn(`No hooks found from extension "${extensionName}"`);
+    }
+    return count;
   }
 
   /**
@@ -156,6 +179,7 @@ please review the project settings (.gemini/settings.json) and remove them.`;
         this.processHooksConfiguration(
           extension.hooks,
           ConfigSource.Extensions,
+          extension.name,
         );
       }
     }
@@ -167,6 +191,7 @@ please review the project settings (.gemini/settings.json) and remove them.`;
   private processHooksConfiguration(
     hooksConfig: { [K in HookEventName]?: HookDefinition[] },
     source: ConfigSource,
+    extensionName?: string,
   ): void {
     for (const [eventName, definitions] of Object.entries(hooksConfig)) {
       if (!this.isValidEventName(eventName)) {
@@ -184,7 +209,12 @@ please review the project settings (.gemini/settings.json) and remove them.`;
       }
 
       for (const definition of definitions) {
-        this.processHookDefinition(definition, typedEventName, source);
+        this.processHookDefinition(
+          definition,
+          typedEventName,
+          source,
+          extensionName,
+        );
       }
     }
   }
@@ -196,6 +226,7 @@ please review the project settings (.gemini/settings.json) and remove them.`;
     definition: HookDefinition,
     eventName: HookEventName,
     source: ConfigSource,
+    extensionName?: string,
   ): void {
     if (
       !definition ||
@@ -211,6 +242,8 @@ please review the project settings (.gemini/settings.json) and remove them.`;
 
     // Get disabled hooks list from settings
     const disabledHooks = this.config.getDisabledHooks() || [];
+    const extensionHooksDisabled =
+      this.config.getExtensionHooksDisabled() || [];
 
     for (const hookConfig of definition.hooks) {
       if (
@@ -222,7 +255,12 @@ please review the project settings (.gemini/settings.json) and remove them.`;
         const hookName = this.getHookName({
           config: hookConfig,
         } as HookRegistryEntry);
-        const isDisabled = disabledHooks.includes(hookName);
+        const isHookDisabled = disabledHooks.includes(hookName);
+
+        // Check if this extension's hooks are disabled
+        const isExtensionHooksDisabled =
+          extensionName !== undefined &&
+          extensionHooksDisabled.includes(extensionName);
 
         // Add source to hook config
         hookConfig.source = source;
@@ -233,7 +271,8 @@ please review the project settings (.gemini/settings.json) and remove them.`;
           eventName,
           matcher: definition.matcher,
           sequential: definition.sequential,
-          enabled: !isDisabled,
+          enabled: !isHookDisabled && !isExtensionHooksDisabled,
+          extensionName,
         });
       } else {
         // Invalid hooks are logged and discarded here, they won't reach HookRunner

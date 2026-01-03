@@ -22,6 +22,7 @@ interface HooksListProps {
     matcher?: string;
     sequential?: boolean;
     enabled: boolean;
+    extensionName?: string;
   }>;
 }
 
@@ -78,6 +79,9 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => (
                   {eventHooks.map((hook, index) => {
                     const hookName =
                       hook.config.name || hook.config.command || 'unknown';
+                    const displayName = hook.extensionName
+                      ? `${hook.extensionName}/${hookName}`
+                      : hookName;
                     const statusColor = hook.enabled ? 'green' : 'gray';
                     const statusText = hook.enabled ? 'enabled' : 'disabled';
 
@@ -85,7 +89,10 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => (
                       <Box key={`${eventName}-${index}`} flexDirection="column">
                         <Box>
                           <Text>
-                            <Text color="yellow">{hookName}</Text>
+                            {hook.extensionName && (
+                              <Text color="magenta">📦 </Text>
+                            )}
+                            <Text color="yellow">{displayName}</Text>
                             <Text
                               color={statusColor}
                             >{` [${statusText}]`}</Text>
@@ -99,6 +106,7 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => (
                           )}
                           <Text dimColor>
                             Source: {hook.source}
+                            {hook.extensionName && ` (${hook.extensionName})`}
                             {hook.config.name &&
                               hook.config.command &&
                               ` | Command: ${hook.config.command}`}
