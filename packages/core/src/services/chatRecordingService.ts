@@ -9,7 +9,7 @@ import { type Status } from '../core/coreToolScheduler.js';
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
 import path from 'node:path';
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import type {
   PartListUnion,
@@ -116,6 +116,7 @@ export class ChatRecordingService {
   private queuedThoughts: Array<ThoughtSummary & { timestamp: string }> = [];
   private queuedTokens: TokensSummary | null = null;
   private config: Config;
+  private operationQueue: Promise<void> = Promise.resolve();
 
   constructor(config: Config) {
     this.config = config;
@@ -123,58 +124,83 @@ export class ChatRecordingService {
     this.projectHash = getProjectHash(config.getProjectRoot());
   }
 
+  private async enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    const res = this.operationQueue.then(operation);
+    // Ensure operationQueue always tracks a Promise<void> that resolves regardless of success/failure
+    this.operationQueue = res.then(
+      () => {},
+      () => {},
+    );
+    return res;
+  }
+
   /**
    * Initializes the chat recording service: creates a new conversation file and associates it with
    * this service instance, or resumes from an existing session if resumedSessionData is provided.
    */
-  initialize(resumedSessionData?: ResumedSessionData): void {
-    try {
-      if (resumedSessionData) {
-        // Resume from existing session
-        this.conversationFile = resumedSessionData.filePath;
-        this.sessionId = resumedSessionData.conversation.sessionId;
+  async initialize(resumedSessionData?: ResumedSessionData): Promise<void> {
+    return this.enqueue(async () => {
+      try {
+        if (resumedSessionData) {
+          // Resume from existing session
+          const chatsDir = path.join(
+            this.config.storage.getProjectTempDir(),
+            'chats',
+          );
+          const resolvedPath = path.resolve(resumedSessionData.filePath);
+          const resolvedChatsDir = path.resolve(chatsDir);
 
-        // Update the session ID in the existing file
-        this.updateConversation((conversation) => {
-          conversation.sessionId = this.sessionId;
-        });
+          if (!resolvedPath.startsWith(resolvedChatsDir)) {
+            throw new Error(
+              `Invalid conversation file path: ${resumedSessionData.filePath}`,
+            );
+          }
 
-        // Clear any cached data to force fresh reads
-        this.cachedLastConvData = null;
-      } else {
-        // Create new session
-        const chatsDir = path.join(
-          this.config.storage.getProjectTempDir(),
-          'chats',
-        );
-        fs.mkdirSync(chatsDir, { recursive: true });
+          this.conversationFile = resumedSessionData.filePath;
+          this.sessionId = resumedSessionData.conversation.sessionId;
 
-        const timestamp = new Date()
-          .toISOString()
-          .slice(0, 16)
-          .replace(/:/g, '-');
-        const filename = `${SESSION_FILE_PREFIX}${timestamp}-${this.sessionId.slice(
-          0,
-          8,
-        )}.json`;
-        this.conversationFile = path.join(chatsDir, filename);
+          // Update the session ID in the existing file
+          await this.doUpdateConversation((conversation) => {
+            conversation.sessionId = this.sessionId;
+          });
 
-        this.writeConversation({
-          sessionId: this.sessionId,
-          projectHash: this.projectHash,
-          startTime: new Date().toISOString(),
-          lastUpdated: new Date().toISOString(),
-          messages: [],
-        });
+          // Clear any cached data to force fresh reads
+          this.cachedLastConvData = null;
+        } else {
+          // Create new session
+          const chatsDir = path.join(
+            this.config.storage.getProjectTempDir(),
+            'chats',
+          );
+          await fs.mkdir(chatsDir, { recursive: true });
+
+          const timestamp = new Date()
+            .toISOString()
+            .slice(0, 16)
+            .replace(/:/g, '-');
+          const filename = `${SESSION_FILE_PREFIX}${timestamp}-${this.sessionId.slice(
+            0,
+            8,
+          )}.json`;
+          this.conversationFile = path.join(chatsDir, filename);
+
+          await this.writeConversation({
+            sessionId: this.sessionId,
+            projectHash: this.projectHash,
+            startTime: new Date().toISOString(),
+            lastUpdated: new Date().toISOString(),
+            messages: [],
+          });
+        }
+
+        // Clear any queued data since this is a fresh start
+        this.queuedThoughts = [];
+        this.queuedTokens = null;
+      } catch (error) {
+        debugLogger.error('Error initializing chat recording service:', error);
+        throw error;
       }
-
-      // Clear any queued data since this is a fresh start
-      this.queuedThoughts = [];
-      this.queuedTokens = null;
-    } catch (error) {
-      debugLogger.error('Error initializing chat recording service:', error);
-      throw error;
-    }
+    });
   }
 
   private getLastMessage(
@@ -198,15 +224,15 @@ export class ChatRecordingService {
   /**
    * Records a message in the conversation.
    */
-  recordMessage(message: {
+  async recordMessage(message: {
     model: string | undefined;
     type: ConversationRecordExtra['type'];
     content: PartListUnion;
-  }): void {
+  }): Promise<void> {
     if (!this.conversationFile) return;
 
     try {
-      this.updateConversation((conversation) => {
+      await this.updateConversation((conversation) => {
         const msg = this.newMessage(message.type, message.content);
         if (msg.type === 'gemini') {
           // If it's a new Gemini message then incorporate any queued thoughts.
@@ -232,7 +258,7 @@ export class ChatRecordingService {
   /**
    * Records a thought from the assistant's reasoning process.
    */
-  recordThought(thought: ThoughtSummary): void {
+  async recordThought(thought: ThoughtSummary): Promise<void> {
     if (!this.conversationFile) return;
 
     try {
@@ -249,9 +275,9 @@ export class ChatRecordingService {
   /**
    * Updates the tokens for the last message in the conversation (which should be by Gemini).
    */
-  recordMessageTokens(
+  async recordMessageTokens(
     respUsageMetadata: GenerateContentResponseUsageMetadata,
-  ): void {
+  ): Promise<void> {
     if (!this.conversationFile) return;
 
     try {
@@ -263,7 +289,7 @@ export class ChatRecordingService {
         tool: respUsageMetadata.toolUsePromptTokenCount ?? 0,
         total: respUsageMetadata.totalTokenCount ?? 0,
       };
-      this.updateConversation((conversation) => {
+      await this.updateConversation((conversation) => {
         const lastMsg = this.getLastMessage(conversation);
         // If the last message already has token info, it's because this new token info is for a
         // new message that hasn't been recorded yet.
@@ -287,7 +313,10 @@ export class ChatRecordingService {
    * Adds tool calls to the last message in the conversation (which should be by Gemini).
    * This method enriches tool calls with metadata from the ToolRegistry.
    */
-  recordToolCalls(model: string, toolCalls: ToolCallRecord[]): void {
+  async recordToolCalls(
+    model: string,
+    toolCalls: ToolCallRecord[],
+  ): Promise<void> {
     if (!this.conversationFile) return;
 
     // Enrich tool calls with metadata from the ToolRegistry
@@ -303,7 +332,7 @@ export class ChatRecordingService {
     });
 
     try {
-      this.updateConversation((conversation) => {
+      await this.updateConversation((conversation) => {
         const lastMsg = this.getLastMessage(conversation);
         // If a tool call was made, but the last message isn't from Gemini, it's because Gemini is
         // calling tools without starting the message with text.  So the user submits a prompt, and
@@ -383,9 +412,12 @@ export class ChatRecordingService {
   /**
    * Loads up the conversation record from disk.
    */
-  private readConversation(): ConversationRecord {
+  private async readConversation(): Promise<ConversationRecord> {
     try {
-      this.cachedLastConvData = fs.readFileSync(this.conversationFile!, 'utf8');
+      this.cachedLastConvData = await fs.readFile(
+        this.conversationFile!,
+        'utf8',
+      );
       return JSON.parse(this.cachedLastConvData);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
@@ -407,7 +439,9 @@ export class ChatRecordingService {
   /**
    * Saves the conversation record; overwrites the file.
    */
-  private writeConversation(conversation: ConversationRecord): void {
+  private async writeConversation(
+    conversation: ConversationRecord,
+  ): Promise<void> {
     try {
       if (!this.conversationFile) return;
       // Don't write the file yet until there's at least one message.
@@ -418,7 +452,12 @@ export class ChatRecordingService {
         conversation.lastUpdated = new Date().toISOString();
         const newContent = JSON.stringify(conversation, null, 2);
         this.cachedLastConvData = newContent;
-        fs.writeFileSync(this.conversationFile, newContent);
+
+        // Ensure directory exists before writing, to prevent ENOENT if it was deleted
+        await fs.mkdir(path.dirname(this.conversationFile), {
+          recursive: true,
+        });
+        await fs.writeFile(this.conversationFile, newContent);
       }
     } catch (error) {
       debugLogger.error('Error writing conversation file.', error);
@@ -430,22 +469,28 @@ export class ChatRecordingService {
    * Convenient helper for updating the conversation without file reading and writing and time
    * updating boilerplate.
    */
-  private updateConversation(
+  private async updateConversation(
     updateFn: (conversation: ConversationRecord) => void,
-  ) {
-    const conversation = this.readConversation();
+  ): Promise<void> {
+    return this.enqueue(() => this.doUpdateConversation(updateFn));
+  }
+
+  private async doUpdateConversation(
+    updateFn: (conversation: ConversationRecord) => void,
+  ): Promise<void> {
+    const conversation = await this.readConversation();
     updateFn(conversation);
-    this.writeConversation(conversation);
+    await this.writeConversation(conversation);
   }
 
   /**
    * Saves a summary for the current session.
    */
-  saveSummary(summary: string): void {
+  async saveSummary(summary: string): Promise<void> {
     if (!this.conversationFile) return;
 
     try {
-      this.updateConversation((conversation) => {
+      await this.updateConversation((conversation) => {
         conversation.summary = summary;
       });
     } catch (error) {
@@ -457,15 +502,17 @@ export class ChatRecordingService {
   /**
    * Gets the current conversation data (for summary generation).
    */
-  getConversation(): ConversationRecord | null {
+  async getConversation(): Promise<ConversationRecord | null> {
     if (!this.conversationFile) return null;
 
-    try {
-      return this.readConversation();
-    } catch (error) {
-      debugLogger.error('Error reading conversation for summary.', error);
-      return null;
-    }
+    return this.enqueue(async () => {
+      try {
+        return await this.readConversation();
+      } catch (error) {
+        debugLogger.error('Error reading conversation for summary.', error);
+        return null;
+      }
+    });
   }
 
   /**
@@ -479,17 +526,25 @@ export class ChatRecordingService {
   /**
    * Deletes a session file by session ID.
    */
-  deleteSession(sessionId: string): void {
-    try {
-      const chatsDir = path.join(
-        this.config.storage.getProjectTempDir(),
-        'chats',
-      );
-      const sessionPath = path.join(chatsDir, `${sessionId}.json`);
-      fs.unlinkSync(sessionPath);
-    } catch (error) {
-      debugLogger.error('Error deleting session file.', error);
-      throw error;
-    }
+  async deleteSession(sessionId: string): Promise<void> {
+    return this.enqueue(async () => {
+      try {
+        const chatsDir = path.join(
+          this.config.storage.getProjectTempDir(),
+          'chats',
+        );
+        const sessionPath = path.resolve(chatsDir, `${sessionId}.json`);
+        const resolvedChatsDir = path.resolve(chatsDir);
+
+        if (!sessionPath.startsWith(resolvedChatsDir)) {
+          throw new Error(`Invalid session ID: ${sessionId}`);
+        }
+
+        await fs.unlink(sessionPath);
+      } catch (error) {
+        debugLogger.error('Error deleting session file.', error);
+        throw error;
+      }
+    });
   }
 }
