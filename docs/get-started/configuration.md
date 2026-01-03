@@ -621,6 +621,11 @@ their corresponding top-level category object in your `settings.json` file.
     shell command. Defaults to 5 minutes.
   - **Default:** `300`
 
+- **`tools.shell.enableShellOutputEfficiency`** (boolean):
+  - **Description:** Enable shell output efficiency optimizations for better
+    performance.
+  - **Default:** `true`
+
 - **`tools.autoAccept`** (boolean):
   - **Description:** Automatically accept and execute tool calls that are
     considered safe (e.g., read-only operations).
@@ -679,14 +684,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `1000`
   - **Requires restart:** Yes
 
-- **`tools.enableMessageBusIntegration`** (boolean):
-  - **Description:** Enable policy-based tool confirmation via message bus
-    integration. When enabled, tools automatically respect policy engine
-    decisions (ALLOW/DENY/ASK_USER) without requiring individual tool
-    implementations.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 - **`tools.enableHooks`** (boolean):
   - **Description:** Enable the hooks system for intercepting and customizing
     Gemini CLI behavior. When enabled, hooks configured in settings will execute
@@ -711,12 +708,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** A list of MCP servers to exclude.
   - **Default:** `undefined`
   - **Requires restart:** Yes
-
-#### `useSmartEdit`
-
-- **`useSmartEdit`** (boolean):
-  - **Description:** Enable the smart-edit tool instead of the replace tool.
-  - **Default:** `true`
 
 #### `useWriteTodos`
 
@@ -743,6 +734,22 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`security.folderTrust.enabled`** (boolean):
   - **Description:** Setting to track whether Folder trust is enabled.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`security.environmentVariableRedaction.allowed`** (array):
+  - **Description:** Environment variables to always allow (bypass redaction).
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
+- **`security.environmentVariableRedaction.blocked`** (array):
+  - **Description:** Environment variables to always redact.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
+- **`security.environmentVariableRedaction.enabled`** (boolean):
+  - **Description:** Enable redaction of environment variables that may contain
+    secrets.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -809,6 +816,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.skills`** (boolean):
+  - **Description:** Enable Agent Skills (experimental).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.codebaseInvestigatorSettings.enabled`** (boolean):
   - **Description:** Enable the Codebase Investigator agent.
   - **Default:** `true`
@@ -839,6 +851,13 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.introspectionAgentSettings.enabled`** (boolean):
   - **Description:** Enable the Introspection Agent.
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+#### `skills`
+
+- **`skills.disabled`** (array):
+  - **Description:** List of disabled skills.
+  - **Default:** `[]`
   - **Requires restart:** Yes
 
 #### `hooks`
@@ -1170,6 +1189,52 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`CODE_ASSIST_ENDPOINT`**:
   - Specifies the endpoint for the code assist server.
   - This is useful for development and testing.
+
+### Environment variable redaction
+
+To prevent accidental leakage of sensitive information, Gemini CLI automatically
+redacts potential secrets from environment variables when executing tools (such
+as shell commands). This "best effort" redaction applies to variables inherited
+from the system or loaded from `.env` files.
+
+**Default Redaction Rules:**
+
+- **By Name:** Variables are redacted if their names contain sensitive terms
+  like `TOKEN`, `SECRET`, `PASSWORD`, `KEY`, `AUTH`, `CREDENTIAL`, `PRIVATE`, or
+  `CERT`.
+- **By Value:** Variables are redacted if their values match known secret
+  patterns, such as:
+  - Private keys (RSA, OpenSSH, PGP, etc.)
+  - Certificates
+  - URLs containing credentials
+  - API keys and tokens (GitHub, Google, AWS, Stripe, Slack, etc.)
+- **Specific Blocklist:** Certain variables like `CLIENT_ID`, `DB_URI`,
+  `DATABASE_URL`, and `CONNECTION_STRING` are always redacted by default.
+
+**Allowlist (Never Redacted):**
+
+- Common system variables (e.g., `PATH`, `HOME`, `USER`, `SHELL`, `TERM`,
+  `LANG`).
+- Variables starting with `GEMINI_CLI_`.
+- GitHub Action specific variables.
+
+**Configuration:**
+
+You can customize this behavior in your `settings.json` file:
+
+- **`security.allowedEnvironmentVariables`**: A list of variable names to
+  _never_ redact, even if they match sensitive patterns.
+- **`security.blockedEnvironmentVariables`**: A list of variable names to
+  _always_ redact, even if they don't match sensitive patterns.
+
+```json
+{
+  "security": {
+    "allowedEnvironmentVariables": ["MY_PUBLIC_KEY", "NOT_A_SECRET_TOKEN"],
+    "blockedEnvironmentVariables": ["INTERNAL_IP_ADDRESS"]
+  }
+}
+```
 
 ## Command-line arguments
 

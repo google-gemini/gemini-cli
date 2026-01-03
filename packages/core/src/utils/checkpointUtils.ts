@@ -10,7 +10,7 @@ import type { GeminiClient } from '../core/client.js';
 import { getErrorMessage } from './errors.js';
 import { z } from 'zod';
 import type { Content } from '@google/genai';
-import type { ToolCallRequestInfo } from '../core/turn.js';
+import type { ToolCallRequestInfo } from '../scheduler/types.js';
 
 export interface ToolCallData<HistoryType = unknown, ArgsType = unknown> {
   history?: HistoryType;
