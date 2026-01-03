@@ -290,4 +290,165 @@ describe('ProQuotaDialog', () => {
       unmount();
     });
   });
+
+  describe('Auth fallback button visibility', () => {
+    it('should show Gemini API key fallback button when hasApiKey is true', () => {
+      const { unmount } = render(
+        <ProQuotaDialog
+          failedModel="gemini-2.5-pro"
+          fallbackModel="gemini-2.5-flash"
+          message="quota error"
+          isTerminalQuotaError={true}
+          onChoice={mockOnChoice}
+          userTier={UserTierId.FREE}
+          hasApiKey={true}
+        />,
+      );
+
+      expect(RadioButtonSelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: expect.arrayContaining([
+            expect.objectContaining({
+              label: 'Always fallback to Gemini API key',
+              value: 'gemini-api-key',
+            }),
+          ]),
+        }),
+        undefined,
+      );
+      unmount();
+    });
+
+    it('should show Vertex AI fallback button when hasVertexAI is true', () => {
+      const { unmount } = render(
+        <ProQuotaDialog
+          failedModel="gemini-2.5-pro"
+          fallbackModel="gemini-2.5-flash"
+          message="quota error"
+          isTerminalQuotaError={true}
+          onChoice={mockOnChoice}
+          userTier={UserTierId.FREE}
+          hasVertexAI={true}
+        />,
+      );
+
+      expect(RadioButtonSelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: expect.arrayContaining([
+            expect.objectContaining({
+              label: 'Always fallback to Vertex AI',
+              value: 'vertex-ai',
+            }),
+          ]),
+        }),
+        undefined,
+      );
+      unmount();
+    });
+
+    it('should show both auth fallback buttons when both env vars are present', () => {
+      const { unmount } = render(
+        <ProQuotaDialog
+          failedModel="gemini-2.5-pro"
+          fallbackModel="gemini-2.5-flash"
+          message="quota error"
+          isTerminalQuotaError={true}
+          onChoice={mockOnChoice}
+          userTier={UserTierId.FREE}
+          hasApiKey={true}
+          hasVertexAI={true}
+        />,
+      );
+
+      const items = (RadioButtonSelect as Mock).mock.calls[0][0].items;
+      expect(items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            label: 'Always fallback to Vertex AI',
+            value: 'vertex-ai',
+          }),
+          expect.objectContaining({
+            label: 'Always fallback to Gemini API key',
+            value: 'gemini-api-key',
+          }),
+        ]),
+      );
+      unmount();
+    });
+
+    it('should not show auth fallback buttons when env vars are not present', () => {
+      const { unmount } = render(
+        <ProQuotaDialog
+          failedModel="gemini-2.5-pro"
+          fallbackModel="gemini-2.5-flash"
+          message="quota error"
+          isTerminalQuotaError={true}
+          onChoice={mockOnChoice}
+          userTier={UserTierId.FREE}
+          hasApiKey={false}
+          hasVertexAI={false}
+        />,
+      );
+
+      const items = (RadioButtonSelect as Mock).mock.calls[0][0].items;
+      expect(items).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            value: 'gemini-api-key',
+          }),
+        ]),
+      );
+      expect(items).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            value: 'vertex-ai',
+          }),
+        ]),
+      );
+      unmount();
+    });
+
+    it('should show auth fallback buttons at the top of the list', () => {
+      const { unmount } = render(
+        <ProQuotaDialog
+          failedModel="gemini-2.5-pro"
+          fallbackModel="gemini-2.5-flash"
+          message="quota error"
+          isTerminalQuotaError={true}
+          onChoice={mockOnChoice}
+          userTier={UserTierId.FREE}
+          hasApiKey={true}
+          hasVertexAI={true}
+        />,
+      );
+
+      const items = (RadioButtonSelect as Mock).mock.calls[0][0].items;
+      // Auth fallback buttons should be at the start
+      expect(items[0].value).toBe('vertex-ai');
+      expect(items[1].value).toBe('gemini-api-key');
+      unmount();
+    });
+
+    it('should handle selection of auth fallback options', () => {
+      const { unmount } = render(
+        <ProQuotaDialog
+          failedModel="gemini-2.5-pro"
+          fallbackModel="gemini-2.5-flash"
+          message="quota error"
+          isTerminalQuotaError={true}
+          onChoice={mockOnChoice}
+          userTier={UserTierId.FREE}
+          hasApiKey={true}
+        />,
+      );
+
+      const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
+      act(() => {
+        onSelect('gemini-api-key');
+      });
+
+      expect(mockOnChoice).toHaveBeenCalledWith('gemini-api-key');
+      unmount();
+    });
+  });
 });

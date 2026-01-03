@@ -63,6 +63,11 @@ export const DialogManager = ({
         isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
         onChoice={uiActions.handleProQuotaChoice}
         userTier={uiState.userTier}
+        hasApiKey={!!process.env['GEMINI_API_KEY']}
+        hasVertexAI={
+          !!process.env['GOOGLE_CLOUD_PROJECT'] &&
+          !!process.env['GOOGLE_CLOUD_LOCATION']
+        }
       />
     );
   }

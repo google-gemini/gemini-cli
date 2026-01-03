@@ -446,7 +446,12 @@ export function getDisplayValue(
 
   if (definition?.type === 'enum' && definition.options) {
     const option = definition.options?.find((option) => option.value === value);
-    valueString = option?.label ?? `${value}`;
+    if (option) {
+      valueString = option.label;
+    } else {
+      // Fallback to raw value if label not found (more informative than empty string)
+      valueString = value === undefined || value === null ? '' : String(value);
+    }
   }
 
   // Check if value is different from default OR if it's in modified settings OR if there are pending changes

@@ -9,7 +9,11 @@ import { AuthType } from '../core/contentGenerator.js';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
-import type { FallbackIntent, FallbackRecommendation } from './types.js';
+import type {
+  AutoFallbackStatus,
+  FallbackIntent,
+  FallbackRecommendation,
+} from './types.js';
 import { classifyFailureKind } from '../availability/errorClassification.js';
 import {
   buildFallbackPolicyContext,
@@ -28,6 +32,54 @@ export async function handleFallback(
 ): Promise<string | boolean | null> {
   if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
     return null;
+  }
+
+  // Check for automatic auth fallback when quota is hit
+  const autoFallback = config.getAutoFallback();
+  let autoFallbackStatus: AutoFallbackStatus = { status: 'not-attempted' };
+
+  if (autoFallback.enabled) {
+    const hasGeminiApiKey = Boolean(process.env['GEMINI_API_KEY']);
+    const hasVertexAI = Boolean(
+      process.env['GOOGLE_API_KEY'] ||
+        (process.env['GOOGLE_CLOUD_PROJECT'] &&
+          process.env['GOOGLE_CLOUD_LOCATION']),
+    );
+
+    if (autoFallback.type === 'gemini-api-key') {
+      if (hasGeminiApiKey) {
+        try {
+          await config.refreshAuth(AuthType.USE_GEMINI);
+          autoFallbackStatus = {
+            status: 'success',
+            authType: 'gemini-api-key',
+          };
+        } catch (e) {
+          debugLogger.warn('Auto-fallback to Gemini API key failed:', e);
+          autoFallbackStatus = { status: 'not-attempted' };
+        }
+      } else {
+        autoFallbackStatus = {
+          status: 'missing-env-vars',
+          authType: 'gemini-api-key',
+        };
+      }
+    } else if (autoFallback.type === 'vertex-ai') {
+      if (hasVertexAI) {
+        try {
+          await config.refreshAuth(AuthType.USE_VERTEX_AI);
+          autoFallbackStatus = { status: 'success', authType: 'vertex-ai' };
+        } catch (e) {
+          debugLogger.warn('Auto-fallback to Vertex AI failed:', e);
+          autoFallbackStatus = { status: 'not-attempted' };
+        }
+      } else {
+        autoFallbackStatus = {
+          status: 'missing-env-vars',
+          authType: 'vertex-ai',
+        };
+      }
+    }
   }
 
   const chain = resolvePolicyChain(config);
@@ -94,7 +146,12 @@ export async function handleFallback(
   }
 
   try {
-    const intent = await handler(failedModel, fallbackModel, error);
+    const intent = await handler(
+      failedModel,
+      fallbackModel,
+      error,
+      autoFallbackStatus,
+    );
 
     // If the user chose to switch/retry, we apply the availability transition
     // to the failed model (e.g. marking it terminal if it had a quota error).

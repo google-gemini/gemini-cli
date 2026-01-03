@@ -706,6 +706,15 @@ export async function loadCliConfig(
     hooks: settings.hooks || {},
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
+    autoFallback: settings.security?.auth?.autoFallback
+      ? {
+          enabled: settings.security.auth.autoFallback.enabled ?? false,
+          type:
+            (settings.security.auth.autoFallback.type as
+              | 'gemini-api-key'
+              | 'vertex-ai') ?? 'gemini-api-key',
+        }
+      : undefined,
   });
 }
 

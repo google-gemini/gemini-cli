@@ -177,9 +177,10 @@ export function SettingsDialog({
     const newRestartRequired = new Set<string>();
     for (const [key, value] of globalPendingChanges.entries()) {
       const def = getSettingDefinition(key);
-      if (def?.type === 'boolean' && typeof value === 'boolean') {
-        updated = setPendingSettingValue(key, value, updated);
-      } else if (
+      if (
+        (def?.type === 'boolean' && typeof value === 'boolean') ||
+        (def?.type === 'enum' &&
+          (typeof value === 'string' || typeof value === 'number')) ||
         (def?.type === 'number' && typeof value === 'number') ||
         (def?.type === 'string' && typeof value === 'string')
       ) {
@@ -724,15 +725,20 @@ export function SettingsDialog({
                   prev,
                 ),
               );
-            } else if (defType === 'number' || defType === 'string') {
+            } else if (
+              defType === 'number' ||
+              defType === 'string' ||
+              defType === 'enum'
+            ) {
               if (
                 typeof defaultValue === 'number' ||
-                typeof defaultValue === 'string'
+                typeof defaultValue === 'string' ||
+                typeof defaultValue === 'boolean' // Enum values can technically be booleans in some cases, though usually string/number
               ) {
                 setPendingSettings((prev) =>
                   setPendingSettingValueAny(
                     currentSetting.value,
-                    defaultValue,
+                    defaultValue as SettingsValue,
                     prev,
                   ),
                 );
