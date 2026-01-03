@@ -423,9 +423,12 @@ function* emitKeys(
       }
 
       // Parse the key modifier
-      ctrl = !!(modifier & 4);
-      meta = !!(modifier & 10); // use 10 to catch both alt (2) and meta (8).
-      shift = !!(modifier & 1);
+      // Mask modifier to handle terminals (like Ghostty) that use bit 7 (0x80) for custom flags
+      // Standard modifiers only use bits 0-3, so masking with 0x0F is safe
+      const normalizedModifier = modifier & 0x0f;
+      ctrl = !!(normalizedModifier & 4);
+      meta = !!(normalizedModifier & 10); // use 10 to catch both alt (2) and meta (8).
+      shift = !!(normalizedModifier & 1);
 
       const keyInfo = KEY_INFO_MAP[code];
       if (keyInfo) {
