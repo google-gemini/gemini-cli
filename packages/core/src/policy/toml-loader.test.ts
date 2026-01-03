@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { PolicyDecision } from './types.js';
+import { PolicyDecision, ApprovalMode } from './types.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -36,7 +36,7 @@ describe('policy-toml-loader', () => {
   ): Promise<PolicyLoadResult> {
     await fs.writeFile(path.join(tempDir, fileName), tomlContent);
     const getPolicyTier = (_dir: string) => 1;
-    return loadPoliciesFromToml([tempDir], getPolicyTier);
+    return loadPoliciesFromToml([tempDir], getPolicyTier, ApprovalMode.DEFAULT);
   }
 
   describe('loadPoliciesFromToml', () => {
@@ -70,16 +70,12 @@ priority = 100
       expect(result.rules).toHaveLength(2);
       expect(result.rules[0].toolName).toBe('run_shell_command');
       expect(result.rules[1].toolName).toBe('run_shell_command');
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git status"}'),
-      ).toBe(true);
-      expect(result.rules[1].argsPattern?.test('{"command":"git log"}')).toBe(
-        true,
-      );
+      expect(result.rules[0].commandPrefix).toBe('git status');
+      expect(result.rules[1].commandPrefix).toBe('git log');
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should transform commandRegex to argsPattern', async () => {
+    it('should handle commandRegex separately via commandPattern', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
 toolName = "run_shell_command"
@@ -89,15 +85,12 @@ priority = 100
 `);
 
       expect(result.rules).toHaveLength(1);
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git status"}'),
-      ).toBe(true);
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git log --all"}'),
-      ).toBe(true);
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git branch"}'),
-      ).toBe(false);
+      expect(result.rules[0].argsPattern).toBeUndefined();
+      expect(result.rules[0].commandPattern).toBeInstanceOf(RegExp);
+
+      expect(result.rules[0].commandPattern?.test('git status')).toBe(true);
+      expect(result.rules[0].commandPattern?.test('git log --all')).toBe(true);
+      expect(result.rules[0].commandPattern?.test('git branch')).toBe(false);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -170,7 +163,11 @@ modes = ["autoEdit"]
       );
 
       const getPolicyTier = (_dir: string) => 2; // Tier 2
-      const result = await loadPoliciesFromToml([tempDir], getPolicyTier);
+      const result = await loadPoliciesFromToml(
+        [tempDir],
+        getPolicyTier,
+        ApprovalMode.DEFAULT,
+      );
 
       // It still transforms the rule, but it should also report an error
       expect(result.rules).toHaveLength(1);
@@ -252,7 +249,7 @@ priority = 100
       expect(result.errors[0].details).toContain('git (status|branch');
     });
 
-    it('should escape regex special characters in commandPrefix', async () => {
+    it('should store commandPrefix as a literal string', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
 toolName = "run_shell_command"
@@ -262,13 +259,9 @@ priority = 100
 `);
 
       expect(result.rules).toHaveLength(1);
-      // The regex should have escaped the * and .
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git log file.txt"}'),
-      ).toBe(false);
-      expect(
-        result.rules[0].argsPattern?.test('{"command":"git log *.txt"}'),
-      ).toBe(true);
+      // It should be the exact string, no regex escaping/conversion
+      expect(result.rules[0].commandPrefix).toBe('git log *.txt');
+      expect(result.rules[0].argsPattern).toBeUndefined();
       expect(result.errors).toHaveLength(0);
     });
 
@@ -294,7 +287,11 @@ priority = -1
       );
 
       const getPolicyTier = (_dir: string) => 1;
-      const result = await loadPoliciesFromToml([tempDir], getPolicyTier);
+      const result = await loadPoliciesFromToml(
+        [tempDir],
+        getPolicyTier,
+        ApprovalMode.DEFAULT,
+      );
 
       expect(result.rules).toHaveLength(1);
       expect(result.rules[0].toolName).toBe('glob');
@@ -427,7 +424,7 @@ priority = 100
       expect(error.details).toContain('run_shell_command');
     });
 
-    it('should return a rule_validation error if commandPrefix and commandRegex are combined', async () => {
+    it('should return a rule_validation error and skip the rule if commandPrefix and commandRegex are combined', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
 toolName = "run_shell_command"
@@ -437,9 +434,42 @@ decision = "allow"
 priority = 100
 `);
       expect(result.errors).toHaveLength(1);
+      expect(result.rules).toHaveLength(0); // Ensure rule is skipped
       const error = result.errors[0];
       expect(error.errorType).toBe('rule_validation');
       expect(error.details).toContain('mutually exclusive');
+    });
+
+    it('should return a rule_validation error and skip the rule if commandRegex and argsPattern are combined', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "git .*"
+argsPattern = "test"
+decision = "allow"
+priority = 100
+`);
+      expect(result.errors).toHaveLength(1);
+      expect(result.rules).toHaveLength(0); // Ensure rule is skipped
+      const error = result.errors[0];
+      expect(error.errorType).toBe('rule_validation');
+      expect(error.details).toContain('mutually exclusive');
+    });
+
+    it('should support commandRegex in safety checkers', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "run_shell_command"
+commandRegex = "git .*"
+priority = 100
+checker = { type = "in-process", name = "allowed-path" }
+`);
+
+      expect(result.checkers).toHaveLength(1);
+      expect(result.checkers[0].argsPattern).toBeUndefined();
+      expect(result.checkers[0].commandPattern).toBeInstanceOf(RegExp);
+      expect(result.checkers[0].commandPattern?.test('git status')).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
 
     it('should return a regex_compilation error for invalid argsPattern', async () => {
@@ -462,12 +492,107 @@ priority = 100
       await fs.writeFile(filePath, 'content');
 
       const getPolicyTier = (_dir: string) => 1;
-      const result = await loadPoliciesFromToml([filePath], getPolicyTier);
+      const result = await loadPoliciesFromToml(
+        [filePath],
+        getPolicyTier,
+        ApprovalMode.DEFAULT,
+      );
 
       expect(result.errors).toHaveLength(1);
       const error = result.errors[0];
       expect(error.errorType).toBe('file_read');
       expect(error.message).toContain('Failed to read policy directory');
+    });
+
+    it('should return a rule_validation error and skip the checker if safety checker combines commandRegex and argsPattern', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "run_shell_command"
+commandRegex = "git .*"
+argsPattern = "test"
+priority = 100
+checker = { type = "in-process", name = "allowed-path" }
+`);
+      expect(result.errors).toHaveLength(1);
+      expect(result.checkers).toHaveLength(0); // Ensure checker is skipped
+      const error = result.errors[0];
+      expect(error.errorType).toBe('rule_validation');
+      expect(error.message).toContain(
+        'Invalid shell command syntax in safety checker',
+      );
+      expect(error.details).toContain('mutually exclusive');
+    });
+
+    it('should return a rule_validation error and skip the checker if safety checker combines commandPrefix and commandRegex', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "run_shell_command"
+commandPrefix = "git"
+commandRegex = "git .*"
+priority = 100
+checker = { type = "in-process", name = "allowed-path" }
+`);
+      expect(result.errors).toHaveLength(1);
+      expect(result.checkers).toHaveLength(0); // Ensure checker is skipped
+      const error = result.errors[0];
+      expect(error.errorType).toBe('rule_validation');
+      expect(error.message).toContain(
+        'Invalid shell command syntax in safety checker',
+      );
+      expect(error.details).toContain('mutually exclusive');
+    });
+
+    it('should return a rule_validation error if safety checker uses commandPrefix with non-shell tool', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "read_file"
+commandPrefix = "git"
+priority = 100
+checker = { type = "in-process", name = "allowed-path" }
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('rule_validation');
+      expect(error.message).toContain(
+        'Invalid shell command syntax in safety checker',
+      );
+      expect(error.details).toContain('run_shell_command');
+    });
+
+    it('should include suggestion in regex_compilation error for safety checker commandRegex', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "run_shell_command"
+commandRegex = "git (status"
+priority = 100
+checker = { type = "in-process", name = "allowed-path" }
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('regex_compilation');
+      expect(error.message).toContain(
+        'Invalid command regex pattern in safety checker',
+      );
+      expect(error.suggestion).toBeDefined();
+      expect(error.suggestion).toContain('Check regex syntax');
+    });
+
+    it('should include suggestion in regex_compilation error for safety checker argsPattern', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "run_shell_command"
+argsPattern = "(open"
+priority = 100
+checker = { type = "in-process", name = "allowed-path" }
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('regex_compilation');
+      expect(error.message).toContain(
+        'Invalid regex pattern in safety checker',
+      );
+      expect(error.suggestion).toBeDefined();
+      expect(error.suggestion).toContain('Check regex syntax');
     });
   });
 });

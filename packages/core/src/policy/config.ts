@@ -125,8 +125,10 @@ export async function createPolicyEngineConfig(
     rules: tomlRules,
     checkers: tomlCheckers,
     errors,
-  } = await loadPoliciesFromToml(policyDirs, (dir) =>
-    getPolicyTier(dir, defaultPoliciesDir),
+  } = await loadPoliciesFromToml(
+    policyDirs,
+    (dir) => getPolicyTier(dir, defaultPoliciesDir),
+    approvalMode,
   );
 
   // Emit any errors encountered during TOML loading to the UI
