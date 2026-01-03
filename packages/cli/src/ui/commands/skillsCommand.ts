@@ -10,7 +10,11 @@ import {
   type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
-import { MessageType, type HistoryItemSkillsList } from '../types.js';
+import {
+  MessageType,
+  type HistoryItemSkillsList,
+  type HistoryItemInfo,
+} from '../types.js';
 import { SettingScope } from '../../config/settings.js';
 
 async function listAction(
@@ -104,7 +108,7 @@ async function disableAction(
   context.ui.addItem(
     {
       type: MessageType.INFO,
-      text: `Skill "${skillName}" disabled in ${scope} settings. Restart required to take effect.`,
+      text: `Skill "${skillName}" disabled in ${scope} settings. Use "/skills reload" for it to take effect.`,
     },
     Date.now(),
   );
@@ -148,10 +152,55 @@ async function enableAction(
   context.ui.addItem(
     {
       type: MessageType.INFO,
-      text: `Skill "${skillName}" enabled in ${scope} settings. Restart required to take effect.`,
+      text: `Skill "${skillName}" enabled in ${scope} settings. Use "/skills reload" for it to take effect.`,
     },
     Date.now(),
   );
+}
+
+async function reloadAction(
+  context: CommandContext,
+): Promise<void | SlashCommandActionReturn> {
+  const config = context.services.config;
+  if (!config) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: 'Could not retrieve configuration.',
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  try {
+    context.ui.setPendingItem({
+      type: MessageType.INFO,
+      text: 'Reloading agent skills...',
+    });
+
+    await config.reloadSkills();
+
+    context.ui.setPendingItem(null);
+    context.ui.addItem(
+      {
+        type: 'info',
+        text: 'Agent skills reloaded successfully.',
+        icon: '✓ ',
+        color: 'green',
+      } as HistoryItemInfo,
+      Date.now(),
+    );
+  } catch (error) {
+    context.ui.setPendingItem(null);
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Failed to reload skills: ${error instanceof Error ? error.message : String(error)}`,
+      },
+      Date.now(),
+    );
+  }
 }
 
 function disableCompletion(
@@ -185,7 +234,7 @@ function enableCompletion(
 export const skillsCommand: SlashCommand = {
   name: 'skills',
   description:
-    'List, enable, or disable Gemini CLI agent skills. Usage: /skills [list | disable <name> | enable <name>]',
+    'List, enable, disable, or reload Gemini CLI agent skills. Usage: /skills [list | disable <name> | enable <name> | reload]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [
@@ -209,6 +258,13 @@ export const skillsCommand: SlashCommand = {
       kind: CommandKind.BUILT_IN,
       action: enableAction,
       completion: enableCompletion,
+    },
+    {
+      name: 'reload',
+      description:
+        'Reload the list of discovered skills. Usage: /skills reload',
+      kind: CommandKind.BUILT_IN,
+      action: reloadAction,
     },
   ],
   action: listAction,

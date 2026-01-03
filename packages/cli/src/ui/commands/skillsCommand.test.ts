@@ -187,6 +187,73 @@ describe('skillsCommand', () => {
     });
   });
 
+  describe('reload', () => {
+    it('should reload skills successfully', async () => {
+      const reloadCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'reload',
+      )!;
+      const reloadSkillsMock = vi.fn().mockResolvedValue(undefined);
+      // @ts-expect-error Mocking reloadSkills
+      context.services.config.reloadSkills = reloadSkillsMock;
+
+      await reloadCmd.action!(context, '');
+
+      expect(context.ui.setPendingItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Reloading agent skills...',
+        }),
+      );
+      expect(reloadSkillsMock).toHaveBeenCalled();
+      expect(context.ui.setPendingItem).toHaveBeenCalledWith(null);
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Agent skills reloaded successfully.',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show error if configuration is missing', async () => {
+      const reloadCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'reload',
+      )!;
+      context.services.config = null;
+
+      await reloadCmd.action!(context, '');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Could not retrieve configuration.',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show error if reload fails', async () => {
+      const reloadCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'reload',
+      )!;
+      const error = new Error('Reload failed');
+      const reloadSkillsMock = vi.fn().mockRejectedValue(error);
+      // @ts-expect-error Mocking reloadSkills
+      context.services.config.reloadSkills = reloadSkillsMock;
+
+      await reloadCmd.action!(context, '');
+
+      expect(context.ui.setPendingItem).toHaveBeenCalledWith(null);
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Failed to reload skills: Reload failed',
+        }),
+        expect.any(Number),
+      );
+    });
+  });
+
   describe('completions', () => {
     it('should provide completions for disable (only enabled skills)', async () => {
       const disableCmd = skillsCommand.subCommands!.find(
