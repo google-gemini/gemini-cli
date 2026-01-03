@@ -217,25 +217,15 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         />
       </Box>
       <Box marginTop={1} flexDirection="column">
-        {persistMode ? (
-          <Box flexDirection="column">
-            <Text color={theme.status.success}>
-              Selection will be saved for all future sessions.
-            </Text>
-            <Text color={theme.text.secondary}>
-              (Press Tab to switch to session-only mode)
-            </Text>
-          </Box>
-        ) : (
-          <Box flexDirection="column">
-            <Text color={theme.status.success}>
-              Applies to this session only.
-            </Text>
-            <Text color={theme.text.secondary}>
-              (Press Tab to persist for future sessions)
-            </Text>
-          </Box>
-        )}
+        <Box>
+          <Text color={theme.text.secondary}>
+            Remember model for future sessions:{' '}
+          </Text>
+          <Text color={theme.text.secondary}>
+            {persistMode ? 'true' : 'false'}
+          </Text>
+        </Box>
+        <Text color={theme.text.secondary}>(Press Tab to toggle)</Text>
       </Box>
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.text.secondary}>

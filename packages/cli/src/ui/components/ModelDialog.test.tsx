@@ -89,7 +89,7 @@ describe('<ModelDialog />', () => {
   it('renders the initial "main" view correctly', () => {
     const { lastFrame } = renderComponent();
     expect(lastFrame()).toContain('Select Model');
-    expect(lastFrame()).toContain('Applies to this session only.');
+    expect(lastFrame()).toContain('Remember model for future sessions: false');
     expect(lastFrame()).toContain('Auto');
     expect(lastFrame()).toContain('Manual');
   });
@@ -173,15 +173,13 @@ describe('<ModelDialog />', () => {
   it('toggles persist mode with Tab key', async () => {
     const { lastFrame, stdin } = renderComponent();
 
-    expect(lastFrame()).toContain('Applies to this session only.');
+    expect(lastFrame()).toContain('Remember model for future sessions: false');
 
     // Press Tab to toggle persist mode
     stdin.write('\t');
     await waitForUpdate();
 
-    expect(lastFrame()).toContain(
-      'Selection will be saved for all future sessions.',
-    );
+    expect(lastFrame()).toContain('Remember model for future sessions: true');
 
     // Select "Auto" (index 0)
     stdin.write('\r');
