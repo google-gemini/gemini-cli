@@ -1227,7 +1227,7 @@ const SETTINGS_SCHEMA = {
             label: 'Enable Environment Variable Redaction',
             category: 'Security',
             requiresRestart: true,
-            default: false,
+            default: true,
             description:
               'Enable redaction of environment variables that may contain secrets.',
             showInDialog: true,
