@@ -129,7 +129,7 @@ export function getCoreSystemPrompt(
     .getAllToolNames()
     .includes(WriteTodosTool.Name);
 
-  const interactiveMode = config.isInteractiveShellEnabled();
+  const interactiveMode = config.isInteractive();
 
   const skills = config.getSkillManager().getSkills();
   let skillsPrompt = '';
