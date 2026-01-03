@@ -106,9 +106,11 @@ describe('setupUser for existing user', () => {
 describe('setupUser for new user', () => {
   let mockLoad: ReturnType<typeof vi.fn>;
   let mockOnboardUser: ReturnType<typeof vi.fn>;
+  let mockGetOperation: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.useFakeTimers();
     mockLoad = vi.fn();
     mockOnboardUser = vi.fn().mockResolvedValue({
       done: true,
@@ -118,16 +120,19 @@ describe('setupUser for new user', () => {
         },
       },
     });
+    mockGetOperation = vi.fn();
     vi.mocked(CodeAssistServer).mockImplementation(
       () =>
         ({
           loadCodeAssist: mockLoad,
           onboardUser: mockOnboardUser,
+          getOperation: mockGetOperation,
         }) as unknown as CodeAssistServer,
     );
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllEnvs();
   });
 
@@ -220,5 +225,75 @@ describe('setupUser for new user', () => {
     await expect(setupUser({} as OAuth2Client)).rejects.toThrow(
       ProjectIdRequiredError,
     );
+  });
+
+  it('should poll getOperation when onboardUser returns done=false', async () => {
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
+    mockLoad.mockResolvedValue({
+      allowedTiers: [mockPaidTier],
+    });
+
+    const operationName = 'operations/123';
+
+    mockOnboardUser.mockResolvedValueOnce({
+      name: operationName,
+      done: false,
+    });
+
+    mockGetOperation
+      .mockResolvedValueOnce({
+        name: operationName,
+        done: false,
+      })
+      .mockResolvedValueOnce({
+        name: operationName,
+        done: true,
+        response: {
+          cloudaicompanionProject: {
+            id: 'server-project',
+          },
+        },
+      });
+
+    const setupPromise = setupUser({} as OAuth2Client);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(5000);
+
+    const userData = await setupPromise;
+
+    expect(mockOnboardUser).toHaveBeenCalledTimes(1);
+    expect(mockGetOperation).toHaveBeenCalledTimes(2);
+    expect(mockGetOperation).toHaveBeenCalledWith(operationName);
+    expect(userData).toEqual({
+      projectId: 'server-project',
+      userTier: 'standard-tier',
+    });
+  });
+
+  it('should not poll getOperation when onboardUser returns done=true immediately', async () => {
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
+    mockLoad.mockResolvedValue({
+      allowedTiers: [mockPaidTier],
+    });
+
+    mockOnboardUser.mockResolvedValueOnce({
+      name: 'operations/123',
+      done: true,
+      response: {
+        cloudaicompanionProject: {
+          id: 'server-project',
+        },
+      },
+    });
+
+    const userData = await setupUser({} as OAuth2Client);
+
+    expect(mockOnboardUser).toHaveBeenCalledTimes(1);
+    expect(mockGetOperation).not.toHaveBeenCalled();
+    expect(userData).toEqual({
+      projectId: 'server-project',
+      userTier: 'standard-tier',
+    });
   });
 });
