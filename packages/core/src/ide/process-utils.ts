@@ -113,27 +113,12 @@ async function getProcessInfo(pid: number): Promise<{
  * find that shell's parent process (the IDE). To get the true IDE process,
  * we traverse one level higher to get the grandparent.
  *
- * This function can be overridden by setting the `GEMINI_CLI_IDE_PID`
- * environment variable. This is useful for launching Gemini CLI in a
- * standalone terminal while still connecting to an IDE instance.
- *
- * If `GEMINI_CLI_IDE_PID` is set, the function uses that PID and fetches
- * the command for it.
- *
  * @returns A promise that resolves to the PID and command of the IDE process.
  */
 async function getIdeProcessInfoForUnix(): Promise<{
   pid: number;
   command: string;
 }> {
-  if (process.env['GEMINI_CLI_IDE_PID']) {
-    const idePid = parseInt(process.env['GEMINI_CLI_IDE_PID'], 10);
-    if (!isNaN(idePid)) {
-      const { command } = await getProcessInfo(idePid);
-      return { pid: idePid, command };
-    }
-  }
-
   const shells = ['zsh', 'bash', 'sh', 'tcsh', 'csh', 'ksh', 'fish', 'dash'];
   let currentPid = process.pid;
 
@@ -222,6 +207,13 @@ async function getIdeProcessInfoForWindows(): Promise<{
  * to identify the main application process (e.g., the main VS Code window
  * process).
  *
+ * This function can be overridden by setting the `GEMINI_CLI_IDE_PID`
+ * environment variable. This is useful for launching Gemini CLI in a
+ * standalone terminal while still connecting to an IDE instance.
+ *
+ * If `GEMINI_CLI_IDE_PID` is set, the function uses that PID and fetches
+ * the command for it.
+ *
  * If the IDE process cannot be reliably identified, it will return the
  * top-level ancestor process ID and command as a fallback.
  *
@@ -232,6 +224,19 @@ export async function getIdeProcessInfo(): Promise<{
   command: string;
 }> {
   const platform = os.platform();
+
+  if (process.env['GEMINI_CLI_IDE_PID']) {
+    const idePid = parseInt(process.env['GEMINI_CLI_IDE_PID'], 10);
+    if (!isNaN(idePid)) {
+      if (platform === 'win32') {
+        const processMap = await getProcessTableWindows();
+        const proc = processMap.get(idePid);
+        return { pid: idePid, command: proc?.command || '' };
+      }
+      const { command } = await getProcessInfo(idePid);
+      return { pid: idePid, command };
+    }
+  }
 
   if (platform === 'win32') {
     return getIdeProcessInfoForWindows();
