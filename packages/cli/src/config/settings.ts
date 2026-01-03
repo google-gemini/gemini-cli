@@ -91,6 +91,7 @@ const MIGRATION_MAP: Record<string, string> = {
   excludeTools: 'tools.exclude',
   excludeMCPServers: 'mcp.excluded',
   excludedProjectEnvVars: 'advanced.excludedEnvVars',
+  experimentalSkills: 'experimental.skills',
   extensionManagement: 'experimental.extensionManagement',
   extensions: 'extensions',
   fileFiltering: 'context.fileFiltering',
