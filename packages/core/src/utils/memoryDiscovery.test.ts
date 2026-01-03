@@ -975,4 +975,48 @@ included directory memory
       expect.stringContaining('Always be polite.'),
     );
   });
+
+  it('should skip directories that match GEMINI.md filename without warning', async () => {
+    const consoleWarnSpy = vi
+      .spyOn(debugLogger, 'warn')
+      .mockImplementation(() => {});
+
+    // Create a directory named GEMINI.md (edge case from #4760)
+    const geminiMdDir = await createEmptyDir(
+      path.join(homedir, GEMINI_DIR, DEFAULT_CONTEXT_FILENAME),
+    );
+    // Also create a valid GEMINI.md file in the same location to ensure we can read it
+    const validGeminiMdFile = await createTestFile(
+      path.join(homedir, GEMINI_DIR, `${DEFAULT_CONTEXT_FILENAME}.md`),
+      'Valid global memory content',
+    );
+    // Create another valid file in project root
+    const projectFile = await createTestFile(
+      path.join(projectRoot, DEFAULT_CONTEXT_FILENAME),
+      'Project root content',
+    );
+
+    const result = await loadServerHierarchicalMemory(
+      cwd,
+      [],
+      false,
+      new FileDiscoveryService(projectRoot),
+      new SimpleExtensionLoader([]),
+      DEFAULT_FOLDER_TRUST,
+    );
+
+    // Should load only the valid files, not the directory
+    expect(result.fileCount).toBe(2);
+    expect(result.filePaths).toContain(validGeminiMdFile);
+    expect(result.filePaths).toContain(projectFile);
+    expect(result.filePaths).not.toContain(geminiMdDir);
+
+    // Should NOT log any warnings about the directory
+    expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('Could not read'),
+      expect.any(String),
+    );
+
+    consoleWarnSpy.mockRestore();
+  });
 });

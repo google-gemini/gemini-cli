@@ -253,6 +253,18 @@ async function readGeminiMdFiles(
     const batchPromises = batch.map(
       async (filePath): Promise<GeminiFileContent> => {
         try {
+          // Check if path is a directory before attempting to read
+          const stats = await fs.lstat(filePath);
+          if (stats.isDirectory()) {
+            // Skip directories silently - they're valid memory folders
+            if (debugMode) {
+              logger.debug(
+                `Skipping directory ${filePath} (expected file). Using parent directory for memory discovery instead.`,
+              );
+            }
+            return { filePath, content: null };
+          }
+
           const content = await fs.readFile(filePath, 'utf-8');
 
           // Process imports in the content
