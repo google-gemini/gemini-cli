@@ -182,6 +182,7 @@ describe('<ToolMessage />', () => {
       fileName: 'file.txt',
       originalContent: 'old',
       newContent: 'new',
+      filePath: 'file.txt',
     };
     const { lastFrame } = renderWithContext(
       <ToolMessage {...baseProps} resultDisplay={diffResult} />,
