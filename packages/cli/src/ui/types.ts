@@ -13,11 +13,12 @@ import type {
   ToolConfirmationOutcome,
   ToolResultDisplay,
   RetrieveUserQuotaResponse,
+  SkillDefinition,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
 
-export type { ThoughtSummary };
+export type { ThoughtSummary, SkillDefinition };
 
 export enum AuthState {
   // Attempting to authenticate or re-authenticate
@@ -205,12 +206,6 @@ export type HistoryItemToolsList = HistoryItemBase & {
   tools: ToolDefinition[];
   showDescriptions: boolean;
 };
-
-export interface SkillDefinition {
-  name: string;
-  description: string;
-  disabled?: boolean;
-}
 
 export type HistoryItemSkillsList = HistoryItemBase & {
   type: 'skills_list';
