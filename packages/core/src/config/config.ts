@@ -1523,6 +1523,31 @@ export class Config {
     return this.skillsSupport;
   }
 
+  /**
+   * Reloads skills by re-discovering them from extensions and local directories.
+   */
+  async reloadSkills(): Promise<void> {
+    if (!this.skillsSupport) {
+      return;
+    }
+
+    await this.getSkillManager().discoverSkills(
+      this.storage,
+      this.getExtensions(),
+    );
+    this.getSkillManager().setDisabledSkills(this.disabledSkills);
+
+    // Re-register ActivateSkillTool to update its schema with the newly discovered skills
+    if (this.getSkillManager().getSkills().length > 0) {
+      this.getToolRegistry().registerTool(
+        new ActivateSkillTool(this, this.messageBus),
+      );
+    }
+
+    // Notify the client that system instructions might need updating
+    await this.updateSystemInstructionIfInitialized();
+  }
+
   isInteractive(): boolean {
     return this.interactive;
   }
