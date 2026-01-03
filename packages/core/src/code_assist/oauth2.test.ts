@@ -1132,7 +1132,7 @@ describe('oauth2', () => {
         let sigIntHandler: (() => void) | undefined;
         const processOnSpy = vi
           .spyOn(process, 'on')
-          .mockImplementation((event: any, listener) => {
+          .mockImplementation((event: string | symbol, listener) => {
             if (event === 'SIGINT') {
               sigIntHandler = listener as () => void;
             }
@@ -1193,7 +1193,7 @@ describe('oauth2', () => {
         let dataHandler: ((data: Buffer) => void) | undefined;
         const stdinOnSpy = vi
           .spyOn(process.stdin, 'on')
-          .mockImplementation((event: any, listener) => {
+          .mockImplementation((event: string | symbol, listener) => {
             if (event === 'data') {
               dataHandler = listener as (data: Buffer) => void;
             }
