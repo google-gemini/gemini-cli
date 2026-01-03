@@ -707,6 +707,41 @@ export class FlashFallbackEvent implements BaseTelemetryEvent {
   }
 }
 
+export const EVENT_FALLBACK = 'gemini_cli.fallback';
+export class FallbackEvent implements BaseTelemetryEvent {
+  'event.name': 'fallback';
+  'event.timestamp': string;
+  failed_model: string;
+  fallback_model: string;
+  reason?: string;
+
+  constructor(failed_model: string, fallback_model: string, reason?: string) {
+    this['event.name'] = 'fallback';
+    this['event.timestamp'] = new Date().toISOString();
+    this.failed_model = failed_model;
+    this.fallback_model = fallback_model;
+    this.reason = reason;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_FALLBACK,
+      'event.timestamp': this['event.timestamp'],
+      failed_model: this.failed_model,
+      fallback_model: this.fallback_model,
+    };
+    if (this.reason) {
+      attributes['reason'] = this.reason;
+    }
+    return attributes;
+  }
+
+  toLogBody(): string {
+    return `Fallback from ${this.failed_model} to ${this.fallback_model}.${this.reason ? ` Reason: ${this.reason}` : ''}`;
+  }
+}
+
 export const EVENT_RIPGREP_FALLBACK = 'gemini_cli.ripgrep_fallback';
 export class RipgrepFallbackEvent implements BaseTelemetryEvent {
   'event.name': 'ripgrep_fallback';
@@ -1526,6 +1561,7 @@ export type TelemetryEvent =
   | ApiErrorEvent
   | ApiResponseEvent
   | FlashFallbackEvent
+  | FallbackEvent
   | LoopDetectedEvent
   | LoopDetectionDisabledEvent
   | NextSpeakerCheckEvent

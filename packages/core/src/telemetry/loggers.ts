@@ -23,6 +23,7 @@ import type {
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
+  FallbackEvent,
   NextSpeakerCheckEvent,
   LoopDetectedEvent,
   LoopDetectionDisabledEvent,
@@ -194,6 +195,19 @@ export function logFlashFallback(
   event: FlashFallbackEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logFlashFallbackEvent();
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+  });
+}
+
+export function logFallback(config: Config, event: FallbackEvent): void {
+  // TODO(telemetry): Add Clearcut support for generic fallback events
+  // For now, we only log to OpenTelemetry
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
