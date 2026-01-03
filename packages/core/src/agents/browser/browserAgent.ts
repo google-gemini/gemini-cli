@@ -13,6 +13,7 @@ import {
   type Tool,
   type FunctionCall,
   Type,
+  Environment,
 } from '@google/genai';
 import { GeminiChat, StreamEventType } from '../../core/geminiChat.js';
 import { parseThought } from '../../utils/thoughtUtils.js';
@@ -303,84 +304,93 @@ const semanticTools: Tool[] = [
 ];
 
 // Visual Tools (Delegate)
+// The Computer Use model requires the computerUse tool to be specified.
 const visualTools: Tool[] = [
+  // Built-in Computer Use tool - required for the Computer Use model
+  // This automatically provides: click_at, type_text_at, drag_and_drop, scroll_document, key_combination, etc.
+  // We exclude navigation tools since the semantic agent handles those
   {
-    functionDeclarations: [
-      {
-        name: 'click_at',
-        description: 'Click at specific coordinates.',
-        parameters: {
-          type: Type.OBJECT,
-          properties: {
-            x: { type: Type.NUMBER },
-            y: { type: Type.NUMBER },
-          },
-          required: ['x', 'y'],
-        },
-      },
-      {
-        name: 'type_text_at',
-        description: 'Type text at specific coordinates.',
-        parameters: {
-          type: Type.OBJECT,
-          properties: {
-            x: { type: Type.NUMBER },
-            y: { type: Type.NUMBER },
-            text: { type: Type.STRING },
-            press_enter: { type: Type.BOOLEAN },
-            clear_before_typing: { type: Type.BOOLEAN },
-          },
-          required: ['x', 'y', 'text'],
-        },
-      },
-      {
-        name: 'drag_and_drop',
-        description: 'Drag from one coordinate to another.',
-        parameters: {
-          type: Type.OBJECT,
-          properties: {
-            x: { type: Type.NUMBER },
-            y: { type: Type.NUMBER },
-            dest_x: { type: Type.NUMBER },
-            dest_y: { type: Type.NUMBER },
-          },
-          required: ['x', 'y', 'dest_x', 'dest_y'],
-        },
-      },
-      {
-        name: 'press_key', // Also useful helper for visual agent
-        description:
-          'Press a key or key combination (e.g., "Enter", "Control+A").',
-        parameters: {
-          type: Type.OBJECT,
-          properties: {
-            key: { type: Type.STRING, description: 'The key to press' },
-          },
-          required: ['key'],
-        },
-      },
-      {
-        name: 'scroll_document', // Scrolling might be needed
-        description: 'Scroll the document.',
-        parameters: {
-          type: Type.OBJECT,
-          properties: {
-            direction: {
-              type: Type.STRING,
-              enum: ['up', 'down', 'left', 'right'],
-            },
-            amount: {
-              type: Type.NUMBER,
-              description: 'Pixels to scroll (e.g. 500)',
-            },
-          },
-          required: ['direction', 'amount'],
-        },
-      },
-    ],
+    computerUse: {
+      environment: Environment.ENVIRONMENT_BROWSER,
+      excludedPredefinedFunctions: ['open_web_browser', 'search', 'navigate'],
+    },
   },
 ];
 
+/**
+ * Analyzes accessibility tree snapshot for common overlay patterns.
+ * Returns hints about detected overlays and suggested close buttons.
+ */
+function detectBlockingOverlays(snapshot: string): {
+  hasOverlay: boolean;
+  overlayInfo: string;
+  suggestedAction: string;
+} {
+  const lines = snapshot.split('\n');
+  const overlayRoles = ['dialog', 'alertdialog', 'tooltip'];
+  const closeButtonPatterns = [
+    'close',
+    'dismiss',
+    'got it',
+    'no thanks',
+    'accept',
+    'ok',
+    '×',
+    'x button',
+    'cancel',
+  ];
+
+  const overlayElements: string[] = [];
+  const closeButtons: Array<{ uid: string; text: string }> = [];
+
+  for (const line of lines) {
+    const lowerLine = line.toLowerCase();
+
+    // Detect overlay roles
+    for (const role of overlayRoles) {
+      if (
+        lowerLine.includes(`role="${role}"`) ||
+        lowerLine.includes(` ${role} `)
+      ) {
+        overlayElements.push(line.trim());
+        break;
+      }
+    }
+
+    // Look for aria-modal
+    if (lowerLine.includes('aria-modal="true"')) {
+      overlayElements.push(line.trim());
+    }
+
+    // Look for close buttons
+    const uidMatch = line.match(/uid=(\S+)/);
+    if (uidMatch) {
+      for (const closeText of closeButtonPatterns) {
+        if (
+          lowerLine.includes(closeText) &&
+          (lowerLine.includes('button') || lowerLine.includes('link'))
+        ) {
+          closeButtons.push({ uid: uidMatch[1], text: line.trim() });
+          break;
+        }
+      }
+    }
+  }
+
+  const hasOverlay = overlayElements.length > 0;
+
+  return {
+    hasOverlay,
+    overlayInfo:
+      overlayElements.length > 0
+        ? `Detected overlay elements:\n${overlayElements.slice(0, 3).join('\n')}`
+        : '',
+    suggestedAction:
+      closeButtons.length > 0
+        ? `Found potential close buttons: ${closeButtons.map((b) => `uid=${b.uid}`).join(', ')}`
+        : '',
+  };
+}
 export class BrowserAgent {
   private logger: BrowserLogger;
   private browserManager: BrowserManager;
@@ -412,6 +422,20 @@ Use these uid values directly with your tools:
 - click(uid="87_4") to click the Login button
 - fill(uid="87_2", value="john") to fill a text field
 - fill_form(elements=[{uid: "87_2", value: "john"}, {uid: "87_3", value: "pass"}]) to fill multiple fields at once
+
+PARALLEL TOOL CALLS - CRITICAL:
+- Do NOT make parallel calls for actions that change page state (click, fill, press_key, etc.)
+- Each action changes the DOM and invalidates UIDs from the current snapshot
+- Make state-changing actions ONE AT A TIME, then observe the results
+- For typing text, prefer press_key with the characters instead of clicking on-screen keyboard buttons
+
+OVERLAY/POPUP HANDLING:
+Before interacting with page content, scan the accessibility tree for blocking overlays:
+- Tooltips, popups, modals, cookie banners, newsletter prompts, promo dialogs
+- These often have: close buttons (×, X, Close, Dismiss), "Got it", "Accept", "No thanks" buttons
+- Common patterns: elements with role="dialog", role="tooltip", role="alertdialog", or aria-modal="true"
+- If you see such elements, DISMISS THEM FIRST by clicking close/dismiss buttons before proceeding
+- If a click seems to have no effect, check if an overlay appeared or is blocking the target
 
 For complex visual interactions (coordinate-based clicks, dragging) OR when you need to identify elements by visual attributes not present in the AX tree (e.g., "click the yellow button", "find the red error message"), use delegate_to_visual_agent with a clear instruction.
 
@@ -456,10 +480,39 @@ CRITICAL: When you have fully completed the user's task, you MUST call the compl
     let taskCompleted = false; // Track if complete_task was called
     let taskSummary = ''; // Store the summary from complete_task
 
-    // State carry-over to prevent stale element errors.
-    // Semantic tools (click, fill, etc.) return a snapshot of the NEW state.
-    // We must capture this and use it for the next turn instead of calling take_snapshot again.
-    let nextTurnState: string | null = null;
+    // Take initial snapshot and include it with the first message
+    try {
+      const client = await this.browserManager.getMcpClient();
+      const snapResult = await client.callTool('take_snapshot', {
+        verbose: false,
+      });
+      const snapContent = snapResult.content;
+      if (snapContent && Array.isArray(snapContent)) {
+        const initialSnapshot = snapContent
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .filter((p: any) => p.type === 'text')
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((p: any) => p.text || '')
+          .join('');
+        if (initialSnapshot) {
+          // Check for blocking overlays on initial load
+          const overlayCheck = detectBlockingOverlays(initialSnapshot);
+          if (overlayCheck.hasOverlay) {
+            debugLogger.log(
+              `Overlay detected on initial load: ${overlayCheck.overlayInfo}`,
+            );
+            currentInputParts.push({
+              text: `⚠️ BLOCKING OVERLAY DETECTED: ${overlayCheck.overlayInfo}\n${overlayCheck.suggestedAction}\nPlease dismiss this overlay before proceeding.`,
+            });
+          }
+          currentInputParts.push({
+            text: `<accessibility_tree>\n${initialSnapshot}\n</accessibility_tree>`,
+          });
+        }
+      }
+    } catch (e) {
+      debugLogger.log(`Warning: Failed to capture initial snapshot: ${e}`);
+    }
 
     while (iterationCount < MAX_ITERATIONS) {
       // Check for abort (following local-executor pattern)
@@ -469,63 +522,12 @@ CRITICAL: When you have fully completed the user's task, you MUST call the compl
         break;
       }
 
-      // Capture State
-      let domSnapshot = '';
-
-      if (nextTurnState) {
-        status = 'Using state from previous tool response...';
-        debugLogger.log(status);
-        domSnapshot = nextTurnState;
-        nextTurnState = null; // Consumed
-      } else {
-        status = 'Capturing state...';
-        debugLogger.log(status);
-
-        try {
-          const client = await this.browserManager.getMcpClient();
-
-          // 1. DOM Snapshot (Semantic Agent uses this)
-          const snapResult = await client.callTool('take_snapshot', {
-            verbose: false,
-          });
-          const snapContent = snapResult.content;
-          if (snapContent && Array.isArray(snapContent)) {
-            domSnapshot = snapContent
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .filter((p: any) => p.type === 'text')
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .map((p: any) => p.text || '')
-              .join('');
-          }
-        } catch (stateError) {
-          debugLogger.log(`Warning: State capture failed: ${stateError}`);
-        }
-
-        // Check if cancelled after state capture
-        if (signal.aborted) {
-          if (printOutput) printOutput('⚠️  Browser task cancelled');
-          debugLogger.log('Task cancelled during state capture');
-          break;
-        }
-      }
-
-      // Add State to Input Parts
-      const stateParts: Part[] = [];
-      if (domSnapshot) {
-        stateParts.push({
-          text: `<accessibility_tree>\n${domSnapshot}\n</accessibility_tree>`,
-        });
-      }
-      // Note: We only send DOM snapshot to the semantic agent.
-      // Screenshot is captured on-demand if delegation occurs.
-
-      // Combine previous tool outputs (if any) or initial prompt with state
-      // Put semantic state FIRST to avoid completion bias where the model just repeats the tree
-      const messageParts = [...stateParts, ...currentInputParts];
+      // The model manages its own state via take_snapshot tool.
+      // currentInputParts contains either the initial prompt+snapshot, or function responses from the previous turn.
+      const messageParts = [...currentInputParts];
 
       // Prepare for Model Call
-      const domSnapshotLen = domSnapshot ? domSnapshot.length : 0;
-      status = `[Turn ${iterationCount + 1}/${MAX_ITERATIONS}] Calling model (${messageParts.length} parts, DOM: ${Math.round(domSnapshotLen / 1024)}KB)...`;
+      status = `[Turn ${iterationCount + 1}/${MAX_ITERATIONS}] Calling model (${messageParts.length} parts)...`;
       debugLogger.log(status);
 
       // Call Model with Streaming
@@ -711,6 +713,15 @@ CRITICAL: When you have fully completed the user's task, you MUST call the compl
                     )
                   ).content || [];
                 break;
+              case 'hover':
+                rawContent =
+                  (
+                    await client.callTool(
+                      'hover',
+                      fnArgs as unknown as Record<string, unknown>,
+                    )
+                  ).content || [];
+                break;
               case 'fill':
                 rawContent =
                   (
@@ -803,13 +814,21 @@ CRITICAL: When you have fully completed the user's task, you MUST call the compl
                   ).content || [];
                 break;
 
+              case 'take_snapshot': {
+                const snapRes = await this.browserTools.takeSnapshot(
+                  (fnArgs['verbose'] as boolean) ?? false,
+                );
+                // Return the actual snapshot so the model can use it
+                functionResponse = snapRes.output || snapRes.error || '';
+                break;
+              }
+
               case 'complete_task': {
                 taskCompleted = true;
                 const summary =
                   (fnArgs['summary'] as string) || 'Task completed';
                 taskSummary = summary; // Store summary to return
                 functionResponse = summary;
-                nextTurnState = null;
                 if (printOutput) printOutput(`✅ ${summary}`);
                 break;
               }
@@ -822,7 +841,6 @@ CRITICAL: When you have fully completed the user's task, you MUST call the compl
                   printOutput || (() => {}),
                 );
                 functionResponse = visualRes;
-                nextTurnState = null;
                 break;
               }
 
@@ -832,7 +850,24 @@ CRITICAL: When you have fully completed the user's task, you MUST call the compl
                   fnArgs['amount'] as number,
                 );
                 functionResponse = res.output || res.error || '';
-                nextTurnState = null;
+                break;
+              }
+
+              case 'pagedown': {
+                const res = await this.browserTools.pagedown();
+                functionResponse = res.output || res.error || '';
+                break;
+              }
+
+              case 'pageup': {
+                const res = await this.browserTools.pageup();
+                functionResponse = res.output || res.error || '';
+                break;
+              }
+
+              case 'open_web_browser': {
+                const res = await this.browserTools.openWebBrowser();
+                functionResponse = res.output || res.error || '';
                 break;
               }
 
@@ -841,11 +876,12 @@ CRITICAL: When you have fully completed the user's task, you MUST call the compl
                 functionResponse = `Error: Tool ${fnName} not recognized or supported directly.`;
             }
 
-            // Post-process for Semantic Tools
+            // Post-process for Semantic Tools - extract text from MCP response
             if (
               [
                 'navigate',
                 'click',
+                'hover',
                 'fill',
                 'fill_form',
                 'get_element_text',
@@ -856,17 +892,9 @@ CRITICAL: When you have fully completed the user's task, you MUST call the compl
                 'close_page',
               ].includes(fnName)
             ) {
-              // Extract snapshot
+              // Extract text response, strip any embedded snapshots (model can call take_snapshot if needed)
               const processed = processToolResponse(rawContent);
               functionResponse = processed.text;
-              if (processed.snapshot) {
-                nextTurnState = processed.snapshot;
-                debugLogger.log(
-                  `Captured state from tool ${fnName} for next turn.`,
-                );
-              } else {
-                nextTurnState = null; // Ensure we refetch if tool didn't return state
-              }
             } else if (!functionResponse && rawContent.length > 0) {
               // Fallback for tools that populated rawContent but weren't in the semantic list
               functionResponse = rawContent
@@ -876,7 +904,19 @@ CRITICAL: When you have fully completed the user's task, you MUST call the compl
             }
           } catch (error) {
             functionResponse = `Error executing ${fnName}: ${error instanceof Error ? error.message : String(error)}`;
-            nextTurnState = null; // On error, always refetch state
+          }
+
+          // Check for click blocked by overlay
+          if (
+            typeof functionResponse === 'string' &&
+            (functionResponse.includes('not interactable') ||
+              functionResponse.includes('obscured') ||
+              functionResponse.includes('intercept') ||
+              functionResponse.includes('blocked'))
+          ) {
+            debugLogger.log(`⚠️ Click may have been blocked by overlay`);
+            functionResponse +=
+              '\n\n⚠️ This action may have been blocked by an overlay, popup, or tooltip. Look for close/dismiss buttons in the accessibility tree and click them first.';
           }
 
           currentInputParts.push({
@@ -937,8 +977,15 @@ CRITICAL: When you have fully completed the user's task, you MUST call the compl
 
     // System instruction for Visual Agent
     const systemInstruction = `You are a Visual Delegate Agent. You have been delegated a specific task: "${instruction}".
-You have access to valid screenshot of the current state.
-You MUST perform the necessary actions (click_at, type_text_at, drag_and_drop, scroll_document) to fulfill the instruction.
+
+IMPORTANT: The browser is ALREADY OPEN and navigated to the correct page. You are looking at a screenshot of the current page state. Do NOT attempt to open a browser, navigate, or search - those actions are handled by the orchestrator.
+
+Your role is to perform visual interactions on the CURRENT page using these tools:
+- click_at(x, y) - Click at coordinates
+- type_text_at(x, y, text) - Type text at coordinates  
+- drag_and_drop(x, y, dest_x, dest_y) - Drag between coordinates
+- scroll_document(direction) - Scroll to find elements
+
 If the element is not visible, use scroll_document to find it.
 Return a concise summary of your actions when done.
 `;
@@ -1056,20 +1103,61 @@ Return a concise summary of your actions when done.
               funcResult = await this.browserTools.dragAndDrop(
                 call.args!['x'] as number,
                 call.args!['y'] as number,
-                call.args!['dest_x'] as number,
-                call.args!['dest_y'] as number,
+                call.args!['destination_x'] as number,
+                call.args!['destination_y'] as number,
               );
               break;
             case 'press_key':
-              funcResult = await this.browserTools.pressKey(
-                call.args!['key'] as string,
-              );
+            case 'key_combination':
+              // Model might uses 'key_combination' with 'keys' arg, or we fallback to 'press_key' with 'key'
+              // eslint-disable-next-line no-case-declarations
+              const keys =
+                (call.args!['keys'] as string) || (call.args!['key'] as string);
+              funcResult = await this.browserTools.pressKey(keys);
               break;
             case 'scroll_document':
               funcResult = await this.browserTools.scrollDocument(
                 call.args!['direction'] as 'up' | 'down' | 'left' | 'right',
-                call.args!['amount'] as number,
               );
+              break;
+            case 'open_web_browser':
+              funcResult = await this.browserTools.openWebBrowser();
+              break;
+            case 'wait_5_seconds':
+              // Simple wait, could be enhanced with actual sleep if useful for letting page settle
+              await new Promise((resolve) => setTimeout(resolve, 5000));
+              funcResult = { output: 'Waited 5 seconds' };
+              break;
+            case 'go_back':
+              funcResult = await this.browserTools.goBack();
+              break;
+            case 'go_forward':
+              funcResult = await this.browserTools.goForward();
+              break;
+            case 'navigate':
+              funcResult = await this.browserTools.navigate(
+                call.args!['url'] as string,
+              );
+              break;
+            case 'hover_at':
+              funcResult = await this.browserTools.hoverAt(
+                call.args!['x'] as number,
+                call.args!['y'] as number,
+              );
+              break;
+            case 'scroll_at':
+              funcResult = await this.browserTools.scrollAt(
+                call.args!['x'] as number,
+                call.args!['y'] as number,
+                call.args!['direction'] as 'up' | 'down' | 'left' | 'right',
+                call.args!['magnitude'] as number,
+              );
+              break;
+            case 'search':
+              // Documentation shows "search" with empty args but undefined behavior.
+              // We log it as a request, but typically this might imply using browser search or URL bar.
+              // For now, we treat it as a no-op that acknowledges the request.
+              funcResult = { output: 'Search requested (not implemented)' };
               break;
             default:
               funcResult = { error: `Unknown visual tool: ${call.name}` };
@@ -1079,10 +1167,25 @@ Return a concise summary of your actions when done.
           funcResult = { error: message };
         }
 
+        // Computer Use model requires URL in function response
+        // Get URL from funcResult if available, otherwise get current page URL
+        let currentUrl = funcResult.url;
+        if (!currentUrl) {
+          try {
+            const page = await this.browserManager.getPage();
+            currentUrl = page?.url() || '';
+          } catch {
+            currentUrl = '';
+          }
+        }
+
         functionResponses.push({
           functionResponse: {
             name: call.name,
-            response: funcResult,
+            response: {
+              ...funcResult,
+              url: currentUrl,
+            },
           },
         });
 

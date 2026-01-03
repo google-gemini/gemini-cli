@@ -139,7 +139,7 @@ export class BrowserManager {
       const browserUrl = `http://127.0.0.1:${port}`;
       const args = [
         '-y',
-        'chrome-devtools-mcp@latest',
+        'chrome-devtools-mcp@0.12.1',
         '--browser-url',
         browserUrl,
       ];

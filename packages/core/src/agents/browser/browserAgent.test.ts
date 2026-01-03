@@ -163,4 +163,65 @@ describe('BrowserAgent', () => {
       expect.anything(),
     );
   });
+
+  it('should auto-recover from stale snapshot errors', async () => {
+    // 1. First model call: Click something
+    // 2. Tool returns "stale snapshot"
+    // 3. Agent should catch this, call take_snapshot, append it, and continue (or just return it as tool result)
+
+    const mockStream = (async function* () {
+      yield {
+        type: 'chunk',
+        value: {
+          functionCalls: [
+            {
+              name: 'click',
+              args: { uid: '123' },
+            },
+          ],
+        },
+      };
+    })();
+    mockSendMessageStream.mockReturnValueOnce(mockStream);
+
+    // Mock click returning stale error
+    (mockMcpClient.callTool as Mock).mockImplementation(
+      async (name: string) => {
+        if (name === 'click') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Error: This uid is coming from a stale snapshot.',
+              },
+            ],
+          };
+        }
+        if (name === 'take_snapshot') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: '## Latest page snapshot\nuid=124 button "New Login"',
+              },
+            ],
+          };
+        }
+        return { content: [] };
+      },
+    );
+
+    await browserAgent.runTask('Click login', new AbortController().signal);
+
+    // Verify click was called
+    expect(mockMcpClient.callTool).toHaveBeenCalledWith(
+      'click',
+      expect.anything(),
+    );
+
+    // Verify take_snapshot was called AUTOMATICALLY
+    expect(mockMcpClient.callTool).toHaveBeenCalledWith('take_snapshot', {
+      verbose: false,
+    });
+  });
 });

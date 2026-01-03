@@ -506,6 +506,102 @@ export class BrowserTools {
     return { output: 'Dragged element' };
   }
 
+  async hoverAt(x: number, y: number): Promise<ToolResult> {
+    const page = await this.browserManager.getPage();
+    try {
+      const viewport = await this.getViewportSize(page);
+      if (!viewport) {
+        return { error: 'Viewport not available', url: page.url() };
+      }
+      const actualX = (x / 1000) * viewport.width;
+      const actualY = (y / 1000) * viewport.height;
+
+      await this.moveMouse(page, actualX, actualY);
+      await this.showOverlay(page, `Hovering at ${x}, ${y}`);
+      await page.mouse.move(actualX, actualY);
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await this.removeOverlay();
+      return { output: 'Hovered', url: page.url() };
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      return { error: `Failed to hover at ${x}, ${y}: ${message}` };
+    }
+  }
+
+  async scrollAt(
+    x: number,
+    y: number,
+    direction: 'up' | 'down' | 'left' | 'right',
+    magnitude: number = 400,
+  ): Promise<ToolResult> {
+    const page = await this.browserManager.getPage();
+    try {
+      const viewport = await this.getViewportSize(page);
+      if (!viewport) {
+        return { error: 'Viewport not available', url: page.url() };
+      }
+      const actualX = (x / 1000) * viewport.width;
+      const actualY = (y / 1000) * viewport.height;
+
+      await this.moveMouse(page, actualX, actualY);
+      await this.showOverlay(
+        page,
+        `Scrolling element at ${x}, ${y} ${direction}`,
+      );
+
+      // Mouse wheel scroll relative to current hover position
+      let deltaX = 0;
+      let deltaY = 0;
+      if (direction === 'up') deltaY = -magnitude;
+      if (direction === 'down') deltaY = magnitude;
+      if (direction === 'left') deltaX = -magnitude;
+      if (direction === 'right') deltaX = magnitude;
+
+      await page.mouse.wheel(deltaX, deltaY);
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await this.removeOverlay();
+      return { output: `Scrolled at ${x}, ${y}`, url: page.url() };
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      return { error: `Failed to scroll at ${x}, ${y}: ${message}` };
+    }
+  }
+
+  async navigate(url: string): Promise<ToolResult> {
+    const page = await this.browserManager.getPage();
+    try {
+      await page.goto(url);
+      return { output: `Navigated to ${url}`, url: page.url() };
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      return { error: `Failed to navigate: ${message}` };
+    }
+  }
+
+  async goBack(): Promise<ToolResult> {
+    const page = await this.browserManager.getPage();
+    try {
+      await page.goBack();
+      return { output: 'Navigated back', url: page.url() };
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      return { error: `Failed to go back: ${message}` };
+    }
+  }
+
+  async goForward(): Promise<ToolResult> {
+    const page = await this.browserManager.getPage();
+    try {
+      await page.goForward();
+      return { output: 'Navigated forward', url: page.url() };
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      return { error: `Failed to go forward: ${message}` };
+    }
+  }
+
   // Deprecated: Use pressKey if possible, but keeping for coordinate-based/legacy support or where UID isn't known
   async keyCombination(keys: string): Promise<ToolResult> {
     return this.pressKey(keys);
