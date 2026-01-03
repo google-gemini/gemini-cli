@@ -26,9 +26,9 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
-│ Enable preview features (e.g., preview models).                                                  │
-│                                                                                                  │
 │  ▼                                                                                               │
+│                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
@@ -66,9 +66,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
-│ Enable preview features (e.g., preview models).                                                  │
-│                                                                                                  │
 │  ▼                                                                                               │
+│                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
@@ -106,9 +106,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │    Hide Window Title                                    false*                                   │
 │                                                                                                  │
-│ Enable preview features (e.g., preview models).                                                  │
-│                                                                                                  │
 │  ▼                                                                                               │
+│                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
@@ -146,9 +146,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
-│ Enable preview features (e.g., preview models).                                                  │
-│                                                                                                  │
 │  ▼                                                                                               │
+│                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
@@ -186,9 +186,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
-│ Enable preview features (e.g., preview models).                                                  │
-│                                                                                                  │
 │  ▼                                                                                               │
+│                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
@@ -226,9 +226,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
-│ Enable preview features (e.g., preview models).                                                  │
-│                                                                                                  │
 │  ▼                                                                                               │
+│                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
 │                                                                                                  │
 │  > Apply To                                                                                      │
 │  ● 1. User Settings                                                                              │
@@ -266,9 +266,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │    Hide Window Title                                    false*                                   │
 │                                                                                                  │
-│ Enable preview features (e.g., preview models).                                                  │
-│                                                                                                  │
 │  ▼                                                                                               │
+│                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
@@ -306,9 +306,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
-│ Enable preview features (e.g., preview models).                                                  │
-│                                                                                                  │
 │  ▼                                                                                               │
+│                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
@@ -346,9 +346,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │    Hide Window Title                                    true*                                    │
 │                                                                                                  │
-│ Enable preview features (e.g., preview models).                                                  │
-│                                                                                                  │
 │  ▼                                                                                               │
+│                                                                                                  │
+│ Enable preview features (e.g., preview models).                                                  │
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
