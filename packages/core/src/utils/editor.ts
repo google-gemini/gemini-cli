@@ -92,7 +92,7 @@ const editorCommands: Record<
   neovim: { win32: ['nvim'], default: ['nvim'] },
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
   emacs: { win32: ['emacs.exe'], default: ['emacs'] },
-  antigravity: { win32: ['agy.cmd'], default: ['agy'] },
+  antigravity: { win32: ['agy.cmd'], default: ['agy', 'antigravity'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
