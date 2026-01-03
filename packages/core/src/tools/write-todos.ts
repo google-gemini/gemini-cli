@@ -14,6 +14,8 @@ import {
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { WRITE_TODOS_TOOL_NAME } from './tool-names.js';
+import { getTodoStateManager } from './todo-state-manager.js';
+import type { Config } from '../config/config.js';
 
 const TODO_STATUSES = [
   'pending',
@@ -101,6 +103,7 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
 > {
   constructor(
     params: WriteTodosToolParams,
+    private readonly config: Config,
     messageBus?: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
@@ -120,13 +123,25 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
     _signal: AbortSignal,
     _updateOutput?: (output: string) => void,
   ): Promise<ToolResult> {
-    const todos = this.params.todos ?? [];
-    const todoListString = todos
-      .map(
-        (todo, index) => `${index + 1}. [${todo.status}] ${todo.description}`,
-      )
-      .join('\n');
+    const stateManager = getTodoStateManager();
 
+    // Initialize state manager if not already done
+    if (!stateManager.isInitialized()) {
+      const persistDir = this.config.storage.getProjectTempDir();
+      await stateManager.initialize(persistDir);
+    }
+
+    const todos = this.params.todos ?? [];
+    const result = await stateManager.setTodos(todos);
+
+    if (!result.success) {
+      return {
+        llmContent: `Failed to update todo list: ${result.message}`,
+        returnDisplay: { todos: result.todos },
+      };
+    }
+
+    const todoListString = stateManager.formatTodosForLLM();
     const llmContent =
       todos.length > 0
         ? `Successfully updated the todo list. The current list is now:\n${todoListString}`
@@ -134,7 +149,7 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
 
     return {
       llmContent,
-      returnDisplay: { todos },
+      returnDisplay: { todos: result.todos },
     };
   }
 }
@@ -145,7 +160,10 @@ export class WriteTodosTool extends BaseDeclarativeTool<
 > {
   static readonly Name = WRITE_TODOS_TOOL_NAME;
 
-  constructor() {
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
       WriteTodosTool.Name,
       'WriteTodos',
@@ -180,6 +198,9 @@ export class WriteTodosTool extends BaseDeclarativeTool<
         required: ['todos'],
         additionalProperties: false,
       },
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+      messageBus,
     );
   }
 
@@ -254,7 +275,8 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   ): ToolInvocation<WriteTodosToolParams, ToolResult> {
     return new WriteTodosToolInvocation(
       params,
-      _messageBus,
+      this.config,
+      this.messageBus,
       _toolName,
       _displayName,
     );
