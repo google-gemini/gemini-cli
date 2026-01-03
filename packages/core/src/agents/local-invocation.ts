@@ -15,6 +15,11 @@ import type {
   SubagentActivityEvent,
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import {
+  fireBeforeSubAgentHook,
+  fireAfterSubAgentHook,
+} from '../core/subagentHookTriggers.js';
+import { BeforeSubAgentHookOutput } from '../hooks/types.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -33,6 +38,8 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
   AgentInputs,
   ToolResult
 > {
+  private currentParams: AgentInputs;
+
   /**
    * @param definition The definition object that configures the agent.
    * @param config The global runtime configuration.
@@ -46,6 +53,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
     messageBus?: MessageBus,
   ) {
     super(params, messageBus, definition.name, definition.displayName);
+    this.currentParams = params;
   }
 
   /**
@@ -53,7 +61,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
    * Used for logging and display purposes.
    */
   getDescription(): string {
-    const inputSummary = Object.entries(this.params)
+    const inputSummary = Object.entries(this.currentParams)
       .map(
         ([key, value]) =>
           `${key}: ${String(value).slice(0, INPUT_PREVIEW_MAX_LENGTH)}`,
@@ -81,6 +89,46 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         updateOutput('Subagent starting...\n');
       }
 
+      // Fire BeforeSubAgent hook if messageBus is available
+      if (this.messageBus) {
+        const hookOutput = await fireBeforeSubAgentHook(
+          this.messageBus,
+          this.definition.name,
+          this.definition.displayName,
+          this.currentParams,
+        );
+
+        // Check if hook blocked execution
+        if (
+          hookOutput?.isBlockingDecision() ||
+          hookOutput?.shouldStopExecution()
+        ) {
+          const reason = hookOutput.getEffectiveReason();
+          return {
+            llmContent: `Subagent execution blocked by hook: ${reason}`,
+            returnDisplay: `Subagent execution blocked by hook: ${reason}`,
+            error: {
+              message: reason,
+              type: ToolErrorType.EXECUTION_FAILED,
+            },
+          };
+        }
+
+        // Apply modified inputs if provided by hook
+        if (hookOutput instanceof BeforeSubAgentHookOutput) {
+          const modifiedInputs = hookOutput.getModifiedSubagentInput();
+          if (modifiedInputs) {
+            this.currentParams = modifiedInputs as AgentInputs;
+          }
+        }
+
+        // Inject additional context if provided
+        const additionalContext = hookOutput?.getAdditionalContext();
+        if (additionalContext && updateOutput) {
+          updateOutput(`Hook context: ${additionalContext}\n`);
+        }
+      }
+
       // Create an activity callback to bridge the executor's events to the
       // tool's streaming output.
       const onActivity = (activity: SubagentActivityEvent): void => {
@@ -100,7 +148,27 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         onActivity,
       );
 
-      const output = await executor.run(this.params, signal);
+      const output = await executor.run(this.currentParams, signal);
+
+      // Fire AfterSubAgent hook if messageBus is available
+      if (this.messageBus) {
+        const afterHookOutput = await fireAfterSubAgentHook(
+          this.messageBus,
+          this.definition.name,
+          this.definition.displayName,
+          this.currentParams,
+          {
+            result: output.result,
+            terminate_reason: output.terminate_reason,
+          },
+        );
+
+        // Append additional context from AfterSubAgent hook if provided
+        const afterContext = afterHookOutput?.getAdditionalContext();
+        if (afterContext) {
+          output.result = `${output.result}\n\n${afterContext}`;
+        }
+      }
 
       const resultContent = `Subagent '${this.definition.name}' finished.
 Termination Reason: ${output.terminate_reason}

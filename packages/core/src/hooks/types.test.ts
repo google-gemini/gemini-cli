@@ -14,6 +14,7 @@ import {
   HookEventName,
   HookType,
   BeforeToolHookOutput,
+  BeforeSubAgentHookOutput,
 } from './types.js';
 import { defaultHookTranslator } from './hookTranslator.js';
 import type {
@@ -48,6 +49,8 @@ describe('Hook Types', () => {
         'BeforeAgent',
         'Notification',
         'AfterAgent',
+        'BeforeSubAgent',
+        'AfterSubAgent',
         'SessionStart',
         'SessionEnd',
         'PreCompress',
@@ -97,6 +100,17 @@ describe('Hook Output Classes', () => {
     it('should return BeforeToolHookOutput for BeforeTool event', () => {
       const output = createHookOutput(HookEventName.BeforeTool, {});
       expect(output).toBeInstanceOf(BeforeToolHookOutput);
+    });
+
+    it('should return BeforeSubAgentHookOutput for BeforeSubAgent event', () => {
+      const output = createHookOutput(HookEventName.BeforeSubAgent, {});
+      expect(output).toBeInstanceOf(BeforeSubAgentHookOutput);
+    });
+
+    it('should return DefaultHookOutput for AfterSubAgent event', () => {
+      const output = createHookOutput(HookEventName.AfterSubAgent, {});
+      expect(output).toBeInstanceOf(DefaultHookOutput);
+      expect(output).not.toBeInstanceOf(BeforeSubAgentHookOutput);
     });
   });
 
@@ -210,6 +224,45 @@ describe('Hook Output Classes', () => {
     it('getBlockingError should return blocked: false if not blocking decision', () => {
       const output = new DefaultHookOutput({ decision: 'approve' });
       expect(output.getBlockingError()).toEqual({ blocked: false, reason: '' });
+    });
+  });
+
+  describe('BeforeSubAgentHookOutput', () => {
+    it('getModifiedSubagentInput should return modified inputs if subagent_inputs is present', () => {
+      const modifiedInputs = {
+        task: 'modified task',
+        context: 'extra context',
+      };
+      const output = new BeforeSubAgentHookOutput({
+        hookSpecificOutput: { subagent_inputs: modifiedInputs },
+      });
+      expect(output.getModifiedSubagentInput()).toEqual(modifiedInputs);
+    });
+
+    it('getModifiedSubagentInput should return undefined if subagent_inputs is not present', () => {
+      const output = new BeforeSubAgentHookOutput({
+        hookSpecificOutput: { other: 'value' },
+      });
+      expect(output.getModifiedSubagentInput()).toBeUndefined();
+    });
+
+    it('getModifiedSubagentInput should return undefined if hookSpecificOutput is undefined', () => {
+      const output = new BeforeSubAgentHookOutput({});
+      expect(output.getModifiedSubagentInput()).toBeUndefined();
+    });
+
+    it('getModifiedSubagentInput should return undefined if subagent_inputs is null', () => {
+      const output = new BeforeSubAgentHookOutput({
+        hookSpecificOutput: { subagent_inputs: null },
+      });
+      expect(output.getModifiedSubagentInput()).toBeUndefined();
+    });
+
+    it('getModifiedSubagentInput should return undefined if subagent_inputs is an array', () => {
+      const output = new BeforeSubAgentHookOutput({
+        hookSpecificOutput: { subagent_inputs: ['item1', 'item2'] },
+      });
+      expect(output.getModifiedSubagentInput()).toBeUndefined();
     });
   });
 

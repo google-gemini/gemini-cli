@@ -55,6 +55,15 @@ specific event.
 - `stop_hook_active`: (`boolean`, **AfterAgent only**) Indicates if a stop hook
   is already handling a continuation.
 
+#### SubAgent Events (`BeforeSubAgent`, `AfterSubAgent`)
+
+- `subagent_name`: (`string`) The internal name of the subagent being invoked.
+- `subagent_display_name`: (`string`, optional) The display name of the
+  subagent.
+- `subagent_inputs`: (`object`) The input parameters passed to the subagent.
+- `subagent_output`: (`object`, **AfterSubAgent only**) The output from the
+  subagent containing `result` (string) and `terminate_reason` (string).
+
 #### Model Events (`BeforeModel`, `AfterModel`, `BeforeToolSelection`)
 
 - `llm_request`: (`LLMRequest`) A stable representation of the outgoing request.
@@ -96,13 +105,14 @@ If the hook exits with `0`, the CLI attempts to parse `stdout` as JSON.
 
 ### `hookSpecificOutput` Reference
 
-| Field               | Supported Events                           | Description                                                                       |
-| :------------------ | :----------------------------------------- | :-------------------------------------------------------------------------------- |
-| `additionalContext` | `SessionStart`, `BeforeAgent`, `AfterTool` | Appends text directly to the agent's context.                                     |
-| `llm_request`       | `BeforeModel`                              | A `Partial<LLMRequest>` to override parameters of the outgoing call.              |
-| `llm_response`      | `BeforeModel`                              | A **full** `LLMResponse` to bypass the model and provide a synthetic result.      |
-| `llm_response`      | `AfterModel`                               | A `Partial<LLMResponse>` to modify the model's response before the agent sees it. |
-| `toolConfig`        | `BeforeToolSelection`                      | Object containing `mode` (`AUTO`/`ANY`/`NONE`) and `allowedFunctionNames`.        |
+| Field               | Supported Events                                                              | Description                                                                       |
+| :------------------ | :---------------------------------------------------------------------------- | :-------------------------------------------------------------------------------- |
+| `additionalContext` | `SessionStart`, `BeforeAgent`, `AfterTool`, `BeforeSubAgent`, `AfterSubAgent` | Appends text directly to the agent's context.                                     |
+| `subagent_inputs`   | `BeforeSubAgent`                                                              | Modified input parameters for the subagent.                                       |
+| `llm_request`       | `BeforeModel`                                                                 | A `Partial<LLMRequest>` to override parameters of the outgoing call.              |
+| `llm_response`      | `BeforeModel`                                                                 | A **full** `LLMResponse` to bypass the model and provide a synthetic result.      |
+| `llm_response`      | `AfterModel`                                                                  | A `Partial<LLMResponse>` to modify the model's response before the agent sees it. |
+| `toolConfig`        | `BeforeToolSelection`                                                         | Object containing `mode` (`AUTO`/`ANY`/`NONE`) and `allowedFunctionNames`.        |
 
 ---
 

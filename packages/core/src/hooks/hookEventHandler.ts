@@ -23,6 +23,8 @@ import type {
   BeforeModelInput,
   AfterModelInput,
   BeforeToolSelectionInput,
+  BeforeSubAgentInput,
+  AfterSubAgentInput,
   NotificationType,
   SessionStartSource,
   SessionEndReason,
@@ -273,6 +275,79 @@ function validatePreCompressInput(input: Record<string, unknown>): {
 }
 
 /**
+ * Validates BeforeSubAgent input fields
+ */
+function validateBeforeSubAgentInput(input: Record<string, unknown>): {
+  subagentName: string;
+  subagentDisplayName: string | undefined;
+  subagentInputs: Record<string, unknown>;
+} {
+  const subagentName = input['subagent_name'];
+  const subagentDisplayName = input['subagent_display_name'];
+  const subagentInputs = input['subagent_inputs'];
+
+  if (typeof subagentName !== 'string') {
+    throw new Error(
+      'Invalid input for BeforeSubAgent hook event: subagent_name must be a string',
+    );
+  }
+  if (!isObject(subagentInputs)) {
+    throw new Error(
+      'Invalid input for BeforeSubAgent hook event: subagent_inputs must be an object',
+    );
+  }
+
+  return {
+    subagentName,
+    subagentDisplayName:
+      typeof subagentDisplayName === 'string' ? subagentDisplayName : undefined,
+    subagentInputs,
+  };
+}
+
+/**
+ * Validates AfterSubAgent input fields
+ */
+function validateAfterSubAgentInput(input: Record<string, unknown>): {
+  subagentName: string;
+  subagentDisplayName: string | undefined;
+  subagentInputs: Record<string, unknown>;
+  subagentOutput: { result: string; terminate_reason: string };
+} {
+  const subagentName = input['subagent_name'];
+  const subagentDisplayName = input['subagent_display_name'];
+  const subagentInputs = input['subagent_inputs'];
+  const subagentOutput = input['subagent_output'];
+
+  if (typeof subagentName !== 'string') {
+    throw new Error(
+      'Invalid input for AfterSubAgent hook event: subagent_name must be a string',
+    );
+  }
+  if (!isObject(subagentInputs)) {
+    throw new Error(
+      'Invalid input for AfterSubAgent hook event: subagent_inputs must be an object',
+    );
+  }
+  if (!isObject(subagentOutput)) {
+    throw new Error(
+      'Invalid input for AfterSubAgent hook event: subagent_output must be an object',
+    );
+  }
+
+  return {
+    subagentName,
+    subagentDisplayName:
+      typeof subagentDisplayName === 'string' ? subagentDisplayName : undefined,
+    subagentInputs,
+    subagentOutput: subagentOutput as {
+      result: string;
+      terminate_reason: string;
+    },
+  };
+}
+
+/**
  * Hook event bus that coordinates hook execution across the system
  */
 export class HookEventHandler {
@@ -483,6 +558,48 @@ export class HookEventHandler {
     };
 
     return this.executeHooks(HookEventName.BeforeToolSelection, input);
+  }
+
+  /**
+   * Fire a BeforeSubAgent event
+   * Called by handleHookExecutionRequest - executes hooks directly
+   */
+  async fireBeforeSubAgentEvent(
+    subagentName: string,
+    displayName: string | undefined,
+    subagentInputs: Record<string, unknown>,
+  ): Promise<AggregatedHookResult> {
+    const input: BeforeSubAgentInput = {
+      ...this.createBaseInput(HookEventName.BeforeSubAgent),
+      subagent_name: subagentName,
+      subagent_display_name: displayName,
+      subagent_inputs: subagentInputs,
+    };
+
+    const context: HookEventContext = { toolName: subagentName };
+    return this.executeHooks(HookEventName.BeforeSubAgent, input, context);
+  }
+
+  /**
+   * Fire an AfterSubAgent event
+   * Called by handleHookExecutionRequest - executes hooks directly
+   */
+  async fireAfterSubAgentEvent(
+    subagentName: string,
+    displayName: string | undefined,
+    subagentInputs: Record<string, unknown>,
+    subagentOutput: { result: string; terminate_reason: string },
+  ): Promise<AggregatedHookResult> {
+    const input: AfterSubAgentInput = {
+      ...this.createBaseInput(HookEventName.AfterSubAgent),
+      subagent_name: subagentName,
+      subagent_display_name: displayName,
+      subagent_inputs: subagentInputs,
+      subagent_output: subagentOutput,
+    };
+
+    const context: HookEventContext = { toolName: subagentName };
+    return this.executeHooks(HookEventName.AfterSubAgent, input, context);
   }
 
   /**
@@ -786,6 +903,31 @@ export class HookEventHandler {
         case HookEventName.PreCompress: {
           const { trigger } = validatePreCompressInput(enrichedInput);
           result = await this.firePreCompressEvent(trigger);
+          break;
+        }
+        case HookEventName.BeforeSubAgent: {
+          const { subagentName, subagentDisplayName, subagentInputs } =
+            validateBeforeSubAgentInput(enrichedInput);
+          result = await this.fireBeforeSubAgentEvent(
+            subagentName,
+            subagentDisplayName,
+            subagentInputs,
+          );
+          break;
+        }
+        case HookEventName.AfterSubAgent: {
+          const {
+            subagentName,
+            subagentDisplayName,
+            subagentInputs,
+            subagentOutput,
+          } = validateAfterSubAgentInput(enrichedInput);
+          result = await this.fireAfterSubAgentEvent(
+            subagentName,
+            subagentDisplayName,
+            subagentInputs,
+            subagentOutput,
+          );
           break;
         }
         default:

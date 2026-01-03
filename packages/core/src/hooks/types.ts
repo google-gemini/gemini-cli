@@ -36,6 +36,8 @@ export enum HookEventName {
   BeforeAgent = 'BeforeAgent',
   Notification = 'Notification',
   AfterAgent = 'AfterAgent',
+  BeforeSubAgent = 'BeforeSubAgent',
+  AfterSubAgent = 'AfterSubAgent',
   SessionStart = 'SessionStart',
   SessionEnd = 'SessionEnd',
   PreCompress = 'PreCompress',
@@ -135,6 +137,10 @@ export function createHookOutput(
       return new BeforeToolSelectionHookOutput(data);
     case 'BeforeTool':
       return new BeforeToolHookOutput(data);
+    case 'BeforeSubAgent':
+      return new BeforeSubAgentHookOutput(data);
+    case 'AfterSubAgent':
+      return new DefaultHookOutput(data);
     default:
       return new DefaultHookOutput(data);
   }
@@ -245,6 +251,31 @@ export class BeforeToolHookOutput extends DefaultHookOutput {
   getModifiedToolInput(): Record<string, unknown> | undefined {
     if (this.hookSpecificOutput && 'tool_input' in this.hookSpecificOutput) {
       const input = this.hookSpecificOutput['tool_input'];
+      if (
+        typeof input === 'object' &&
+        input !== null &&
+        !Array.isArray(input)
+      ) {
+        return input as Record<string, unknown>;
+      }
+    }
+    return undefined;
+  }
+}
+
+/**
+ * Specific hook output class for BeforeSubAgent events.
+ */
+export class BeforeSubAgentHookOutput extends DefaultHookOutput {
+  /**
+   * Get modified subagent input if provided by hook
+   */
+  getModifiedSubagentInput(): Record<string, unknown> | undefined {
+    if (
+      this.hookSpecificOutput &&
+      'subagent_inputs' in this.hookSpecificOutput
+    ) {
+      const input = this.hookSpecificOutput['subagent_inputs'];
       if (
         typeof input === 'object' &&
         input !== null &&
@@ -577,6 +608,49 @@ export interface BeforeToolSelectionOutput extends HookOutput {
   hookSpecificOutput?: {
     hookEventName: 'BeforeToolSelection';
     toolConfig?: HookToolConfig;
+  };
+}
+
+/**
+ * BeforeSubAgent hook input
+ */
+export interface BeforeSubAgentInput extends HookInput {
+  subagent_name: string;
+  subagent_display_name?: string;
+  subagent_inputs: Record<string, unknown>;
+}
+
+/**
+ * BeforeSubAgent hook output
+ */
+export interface BeforeSubAgentOutput extends HookOutput {
+  hookSpecificOutput?: {
+    hookEventName: 'BeforeSubAgent';
+    additionalContext?: string;
+    subagent_inputs?: Record<string, unknown>;
+  };
+}
+
+/**
+ * AfterSubAgent hook input
+ */
+export interface AfterSubAgentInput extends HookInput {
+  subagent_name: string;
+  subagent_display_name?: string;
+  subagent_inputs: Record<string, unknown>;
+  subagent_output: {
+    result: string;
+    terminate_reason: string;
+  };
+}
+
+/**
+ * AfterSubAgent hook output
+ */
+export interface AfterSubAgentOutput extends HookOutput {
+  hookSpecificOutput?: {
+    hookEventName: 'AfterSubAgent';
+    additionalContext?: string;
   };
 }
 
