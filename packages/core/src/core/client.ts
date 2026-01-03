@@ -11,6 +11,7 @@ import type {
   Tool,
   GenerateContentResponse,
 } from '@google/genai';
+import { createUserContent } from '@google/genai';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   getDirectoryContextString,
@@ -67,6 +68,10 @@ type BeforeAgentHookReturn =
   | {
       type: GeminiEventType.Error;
       value: { error: Error };
+    }
+  | {
+      type: GeminiEventType.AgentExecutionStopped;
+      value: { reason: string };
     }
   | { additionalContext: string | undefined }
   | undefined;
@@ -135,7 +140,16 @@ export class GeminiClient {
     const hookOutput = await fireBeforeAgentHook(messageBus, request);
     hookState.hasFiredBeforeAgent = true;
 
-    if (hookOutput?.isBlockingDecision() || hookOutput?.shouldStopExecution()) {
+    if (hookOutput?.shouldStopExecution()) {
+      return {
+        type: GeminiEventType.AgentExecutionStopped,
+        value: {
+          reason: hookOutput.getEffectiveReason(),
+        },
+      };
+    }
+
+    if (hookOutput?.isBlockingDecision()) {
       return {
         type: GeminiEventType.Error,
         value: {
@@ -750,6 +764,14 @@ export class GeminiClient {
         if ('type' in hookResult && hookResult.type === GeminiEventType.Error) {
           yield hookResult;
           return new Turn(this.getChat(), prompt_id);
+        } else if (
+          'type' in hookResult &&
+          hookResult.type === GeminiEventType.AgentExecutionStopped
+        ) {
+          // Add user message to history before returning so it's kept in the transcript
+          this.getChat().addHistory(createUserContent(request));
+          yield hookResult;
+          return new Turn(this.getChat(), prompt_id);
         } else if ('additionalContext' in hookResult) {
           const additionalContext = hookResult.additionalContext;
           if (additionalContext) {
@@ -781,11 +803,24 @@ export class GeminiClient {
           turn,
         );
 
-        if (
-          hookOutput?.isBlockingDecision() ||
-          hookOutput?.shouldStopExecution()
-        ) {
+        if (hookOutput?.shouldStopExecution()) {
+          yield {
+            type: GeminiEventType.AgentExecutionStopped,
+            value: {
+              reason: hookOutput.getEffectiveReason(),
+            },
+          };
+          return turn;
+        }
+
+        if (hookOutput?.isBlockingDecision()) {
           const continueReason = hookOutput.getEffectiveReason();
+          yield {
+            type: GeminiEventType.AgentExecutionBlocked,
+            value: {
+              reason: continueReason,
+            },
+          };
           const continueRequest = [{ text: continueReason }];
           yield* this.sendMessageStream(
             continueRequest,
