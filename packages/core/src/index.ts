@@ -93,6 +93,7 @@ export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
+export * from './services/planService.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';
@@ -131,6 +132,7 @@ export * from './tools/read-many-files.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 export * from './tools/write-todos.js';
+export * from './tools/present-plan.js';
 
 // MCP OAuth
 export { MCPOAuthProvider } from './mcp/oauth-provider.js';

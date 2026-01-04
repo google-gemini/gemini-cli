@@ -26,6 +26,7 @@ import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import { resolveModel, isPreviewModel } from '../config/models.js';
+import { ApprovalMode } from '../policy/types.js';
 
 export function resolvePathFromEnv(envVar?: string): {
   isSwitch: boolean;
@@ -77,10 +78,85 @@ export function resolvePathFromEnv(envVar?: string): {
   };
 }
 
+/**
+ * Returns the system prompt for Plan Mode.
+ * This prompt emphasizes read-only research and planning without code modifications.
+ */
+function getPlanModeSystemPrompt(config: Config, userMemory?: string): string {
+  const enableCodebaseInvestigator = config
+    .getToolRegistry()
+    .getAllToolNames()
+    .includes(CodebaseInvestigatorAgent.name);
+
+  const planPrompt = `# PLANNING MODE ACTIVE
+
+You are in **read-only planning mode**. Your role is to research the codebase and create detailed implementation plans WITHOUT making any code modifications.
+
+## CRITICAL RESTRICTIONS
+
+You **CANNOT**:
+- Create, edit, or delete any files
+- Execute shell commands that modify state
+- Use the '${EDIT_TOOL_NAME}', '${WRITE_FILE_TOOL_NAME}', or '${SHELL_TOOL_NAME}' tools
+
+You **CAN**:
+- Read files using '${READ_FILE_TOOL_NAME}'
+- Search the codebase using '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}'
+- Fetch web content for research
+${enableCodebaseInvestigator ? `- Delegate to the '${CodebaseInvestigatorAgent.name}' agent for complex exploration` : ''}
+
+## YOUR WORKFLOW
+
+1. **Research Phase**: Thoroughly explore the codebase to understand:
+   - Existing patterns and conventions
+   - File structure and dependencies
+   - Related code and potential impacts
+
+2. **Parallel Exploration**: Launch multiple searches in parallel when investigating:
+   - Call grep/glob/read_file for multiple patterns simultaneously
+   ${enableCodebaseInvestigator ? `- Delegate focused questions to the '${CodebaseInvestigatorAgent.name}' agent` : ''}
+   - Wait for all results before drawing conclusions
+
+3. **Plan Creation**: Create a comprehensive implementation plan including:
+   - Summary of what will be implemented
+   - Specific files that need to be created or modified
+   - Step-by-step implementation sequence
+   - Testing strategy
+   - Potential risks or edge cases
+
+## OUTPUT FORMAT
+
+Structure your plan using clear markdown:
+- **Summary**: Brief description of the implementation
+- **Files to Modify**: List specific file paths and what changes are needed
+- **Implementation Steps**: Numbered steps with details
+- **Testing Strategy**: How to verify the implementation
+- **Considerations**: Risks, edge cases, dependencies
+
+## TONE
+
+Be thorough but concise. Focus on actionable, specific information rather than general descriptions. Reference exact file paths, function names, and code patterns from your research.
+
+When you have completed your research and created a plan, present it to the user for review.
+`;
+
+  const memorySuffix =
+    userMemory && userMemory.trim().length > 0
+      ? `\n\n---\n\n${userMemory.trim()}`
+      : '';
+
+  return `${planPrompt}${memorySuffix}`;
+}
+
 export function getCoreSystemPrompt(
   config: Config,
   userMemory?: string,
 ): string {
+  // Check if we're in Plan Mode and return the planning prompt
+  if (config.getApprovalMode() === ApprovalMode.PLAN) {
+    return getPlanModeSystemPrompt(config, userMemory);
+  }
+
   // A flag to indicate whether the system prompt override is active.
   let systemMdEnabled = false;
   // The default path for the system prompt file. This can be overridden.

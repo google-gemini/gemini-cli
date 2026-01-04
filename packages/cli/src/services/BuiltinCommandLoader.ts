@@ -29,6 +29,7 @@ import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { modelCommand } from '../ui/commands/modelCommand.js';
 import { permissionsCommand } from '../ui/commands/permissionsCommand.js';
+import { planCommand } from '../ui/commands/planCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { policiesCommand } from '../ui/commands/policiesCommand.js';
 import { profileCommand } from '../ui/commands/profileCommand.js';
@@ -81,6 +82,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       memoryCommand,
       modelCommand,
       ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),
+      planCommand,
       privacyCommand,
       policiesCommand,
       ...(isDevelopment ? [profileCommand] : []),

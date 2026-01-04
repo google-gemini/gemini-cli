@@ -54,10 +54,15 @@ export function useAutoAcceptIndicator({
             ? ApprovalMode.DEFAULT
             : ApprovalMode.YOLO;
       } else if (key.shift && key.name === 'tab') {
-        nextApprovalMode =
-          config.getApprovalMode() === ApprovalMode.AUTO_EDIT
-            ? ApprovalMode.DEFAULT
-            : ApprovalMode.AUTO_EDIT;
+        // Cycle through: DEFAULT -> AUTO_EDIT -> PLAN -> DEFAULT
+        const current = config.getApprovalMode();
+        if (current === ApprovalMode.DEFAULT) {
+          nextApprovalMode = ApprovalMode.AUTO_EDIT;
+        } else if (current === ApprovalMode.AUTO_EDIT) {
+          nextApprovalMode = ApprovalMode.PLAN;
+        } else if (current === ApprovalMode.PLAN) {
+          nextApprovalMode = ApprovalMode.DEFAULT;
+        }
       }
 
       if (nextApprovalMode) {
