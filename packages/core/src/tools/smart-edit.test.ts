@@ -49,6 +49,10 @@ import {
 } from './smart-edit.js';
 import { type FileDiff, ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
+import {
+  createMockMessageBus,
+  getMockMessageBusInstance,
+} from '../test-utils/mock-message-bus.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -89,7 +93,6 @@ describe('SmartEditTool', () => {
       getUsageStatisticsEnabled: vi.fn(() => true),
       getSessionId: vi.fn(() => 'mock-session-id'),
       getContentGeneratorConfig: vi.fn(() => ({ authType: 'mock' })),
-      getUseSmartEdit: vi.fn(() => false),
       getProxy: vi.fn(() => undefined),
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
       getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
@@ -166,7 +169,9 @@ describe('SmartEditTool', () => {
       },
     );
 
-    tool = new SmartEditTool(mockConfig);
+    const bus = createMockMessageBus();
+    getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+    tool = new SmartEditTool(mockConfig, bus);
   });
 
   afterEach(() => {

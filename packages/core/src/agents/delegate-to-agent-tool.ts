@@ -30,7 +30,7 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
   constructor(
     private readonly registry: AgentRegistry,
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     const definitions = registry.getAllDefinitions();
 
@@ -119,20 +119,25 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
       registry.getToolDescription(),
       Kind.Think,
       zodToJsonSchema(schema),
+      messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
-      messageBus,
     );
   }
 
   protected createInvocation(
     params: DelegateParams,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<DelegateParams, ToolResult> {
     return new DelegateInvocation(
       params,
       this.registry,
       this.config,
-      this.messageBus,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
     );
   }
 }
@@ -145,9 +150,16 @@ class DelegateInvocation extends BaseToolInvocation<
     params: DelegateParams,
     private readonly registry: AgentRegistry,
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, DELEGATE_TO_AGENT_TOOL_NAME);
+    super(
+      params,
+      messageBus,
+      _toolName ?? DELEGATE_TO_AGENT_TOOL_NAME,
+      _toolDisplayName,
+    );
   }
 
   getDescription(): string {
