@@ -1044,7 +1044,7 @@ export class Config {
     force: boolean = false,
   ): Promise<RetrieveUserQuotaResponse | undefined> {
     const now = Date.now();
-    const THROTTLE_MS = 60000; // 60 seconds
+    const THROTTLE_MS = 60000;
 
     if (
       !force &&

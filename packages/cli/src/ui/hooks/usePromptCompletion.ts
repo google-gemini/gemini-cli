@@ -11,19 +11,18 @@ import {
   getResponseText,
   TerminalQuotaError,
   RetryableQuotaError,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
 } from '@google/gemini-cli-core';
 import type { Content } from '@google/genai';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 
 export const PROMPT_COMPLETION_MIN_LENGTH = 5;
-// Debounce increased from 250ms to 1000ms to reduce API call frequency and
-// help users stay within quota limits. Maintainers: adjust if UX feels sluggish.
 export const PROMPT_COMPLETION_DEBOUNCE_MS = 1000;
 const RPM_COOLDOWN_MS = 60000; // 1 minute cooldown on 429 RPM
 
 // Prompt completion uses the flash-lite model for cost efficiency
-const PROMPT_COMPLETION_MODEL_ID = 'gemini-2.5-flash-lite';
+const PROMPT_COMPLETION_MODEL_ID = DEFAULT_GEMINI_FLASH_LITE_MODEL;
 // Disable prompt completions when quota drops below this threshold to preserve
 // quota for core agent functionality (e.g., tool calls, main completions)
 const QUOTA_GUARDRAIL_THRESHOLD = 0.2;
@@ -107,12 +106,16 @@ export function usePromptCompletion({
 
     const geminiClient = config?.getGeminiClient();
     if (!geminiClient) {
+      debugLogger.warn(
+        '[WARN] Prompt completion skipped: Gemini client not available.',
+      );
       return;
     }
 
     // Proactive Quota Check (20% Guardrail)
     // We call refreshUserQuota which will use the cached value if within 60s
     await config?.refreshUserQuota();
+
     const lastQuota = config?.getCachedQuota();
     const liteBucket = lastQuota?.buckets?.find(
       (b) => b.modelId === PROMPT_COMPLETION_MODEL_ID,
