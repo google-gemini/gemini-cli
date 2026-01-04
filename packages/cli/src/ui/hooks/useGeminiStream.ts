@@ -1168,147 +1168,157 @@ export const useGeminiStream = (
         const planTool = newSuccessfulPlanPresentations[0];
         processedPlanToolsRef.current.add(planTool.request.callId);
 
-        // Extract plan data from tool arguments
-        const args = planTool.request.args as {
-          title?: string;
-          content?: string;
-          affected_files?: string[];
-          dependencies?: string[];
-        };
+        // Only show plan completion dialog if we're in Plan Mode
+        // After executing a plan (AUTO_EDIT mode), ignore any subsequent present_plan calls
+        if (config.getApprovalMode() !== ApprovalMode.PLAN) {
+          debugLogger.log(
+            'Ignoring present_plan result - not in Plan Mode',
+            config.getApprovalMode(),
+          );
+          // Continue processing other tools
+        } else {
+          // Extract plan data from tool arguments
+          const args = planTool.request.args as {
+            title?: string;
+            content?: string;
+            affected_files?: string[];
+            dependencies?: string[];
+          };
 
-        if (args.title && args.content) {
-          // Auto-save as draft
-          const projectRoot = config.getProjectRoot();
-          const planService = new PlanService(projectRoot);
-          const originalPrompt = lastOriginalPromptRef.current || '';
+          if (args.title && args.content) {
+            // Auto-save as draft
+            const projectRoot = config.getProjectRoot();
+            const planService = new PlanService(projectRoot);
+            const originalPrompt = lastOriginalPromptRef.current || '';
 
-          try {
-            const planId = await planService.savePlan(
-              args.content,
-              args.title,
-              originalPrompt,
-            );
+            try {
+              const planId = await planService.savePlan(
+                args.content,
+                args.title,
+                originalPrompt,
+              );
 
-            // Show plan completion dialog
-            setPlanCompletionRequest({
-              title: args.title,
-              content: args.content,
-              affectedFiles: args.affected_files || [],
-              dependencies: args.dependencies || [],
-              originalPrompt,
-              planId,
-              onChoice: async (choice, _feedback) => {
-                setPlanCompletionRequest(null);
+              // Show plan completion dialog
+              setPlanCompletionRequest({
+                title: args.title,
+                content: args.content,
+                affectedFiles: args.affected_files || [],
+                dependencies: args.dependencies || [],
+                originalPrompt,
+                planId,
+                onChoice: async (choice, _feedback) => {
+                  setPlanCompletionRequest(null);
 
-                if (choice === 'execute') {
-                  // Switch to AUTO_EDIT mode
-                  config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-                  await planService.updatePlanStatus(planId, 'executed');
-                  addItem(
-                    {
-                      type: MessageType.INFO,
-                      text: `Executing plan "${args.title}"... Mode switched to Auto Edit.`,
-                    },
-                    Date.now(),
-                  );
-                  // Use isContinuation: true to bypass the streamingState check
-                  // This is necessary because onChoice callback has a stale closure
-                  // that captures the old submitQuery with old streamingState
-                  const executeInstruction = `Please implement the plan above. Start with the first step and work through each step systematically.`;
-                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                  submitQuery([{ text: executeInstruction }], {
-                    isContinuation: true,
-                  });
-                } else if (choice === 'save') {
-                  // Plan is already saved as draft, update status to 'saved'
-                  await planService.updatePlanStatus(planId, 'saved');
-                  addItem(
-                    {
-                      type: MessageType.INFO,
-                      text: `Plan "${args.title}" saved. Use /plan resume "${args.title}" to execute later.`,
-                    },
-                    Date.now(),
-                  );
-                  setIsResponding(false);
-                } else if (choice === 'refine') {
-                  // For refine, just show a message - user will need to type feedback
-                  addItem(
-                    {
-                      type: MessageType.INFO,
-                      text: 'Please provide feedback to refine the plan.',
-                    },
-                    Date.now(),
-                  );
-                  setIsResponding(false);
-                } else {
-                  // Cancel - delete the draft plan
-                  await planService.deletePlan(planId);
-                  addItem(
-                    {
-                      type: MessageType.INFO,
-                      text: 'Plan discarded.',
-                    },
-                    Date.now(),
-                  );
-                  setIsResponding(false);
-                }
-              },
-            });
+                  if (choice === 'execute') {
+                    // Switch to AUTO_EDIT mode
+                    config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+                    await planService.updatePlanStatus(planId, 'executed');
+                    addItem(
+                      {
+                        type: MessageType.INFO,
+                        text: `Executing plan "${args.title}"... Mode switched to Auto Edit.`,
+                      },
+                      Date.now(),
+                    );
+                    // Use isContinuation: true to bypass the streamingState check
+                    // This is necessary because onChoice callback has a stale closure
+                    // that captures the old submitQuery with old streamingState
+                    const executeInstruction = `Please implement the plan above. Start with the first step and work through each step systematically.`;
+                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                    submitQuery([{ text: executeInstruction }], {
+                      isContinuation: true,
+                    });
+                  } else if (choice === 'save') {
+                    // Plan is already saved as draft, update status to 'saved'
+                    await planService.updatePlanStatus(planId, 'saved');
+                    addItem(
+                      {
+                        type: MessageType.INFO,
+                        text: `Plan "${args.title}" saved. Use /plan resume "${args.title}" to execute later.`,
+                      },
+                      Date.now(),
+                    );
+                    setIsResponding(false);
+                  } else if (choice === 'refine') {
+                    // For refine, just show a message - user will need to type feedback
+                    addItem(
+                      {
+                        type: MessageType.INFO,
+                        text: 'Please provide feedback to refine the plan.',
+                      },
+                      Date.now(),
+                    );
+                    setIsResponding(false);
+                  } else {
+                    // Cancel - delete the draft plan
+                    await planService.deletePlan(planId);
+                    addItem(
+                      {
+                        type: MessageType.INFO,
+                        text: 'Plan discarded.',
+                      },
+                      Date.now(),
+                    );
+                    setIsResponding(false);
+                  }
+                },
+              });
 
-            // Don't continue the turn until user makes a choice
-            return;
-          } catch (error) {
-            debugLogger.warn('Error saving plan as draft:', error);
-            // Even if saving fails, still show the dialog with a temporary ID
-            setPlanCompletionRequest({
-              title: args.title,
-              content: args.content,
-              affectedFiles: args.affected_files || [],
-              dependencies: args.dependencies || [],
-              originalPrompt,
-              planId: `temp-${Date.now()}`,
-              onChoice: async (choice, _feedback) => {
-                setPlanCompletionRequest(null);
-                if (choice === 'execute') {
-                  config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-                  addItem(
-                    {
-                      type: MessageType.INFO,
-                      text: `Executing plan "${args.title}"... Mode switched to Auto Edit.`,
-                    },
-                    Date.now(),
-                  );
-                  // Use isContinuation: true to bypass the streamingState check
-                  const executeInstruction = `Please implement the plan above. Start with the first step and work through each step systematically.`;
-                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                  submitQuery([{ text: executeInstruction }], {
-                    isContinuation: true,
-                  });
-                } else if (choice === 'refine') {
-                  addItem(
-                    {
-                      type: MessageType.INFO,
-                      text: 'Please provide feedback to refine the plan.',
-                    },
-                    Date.now(),
-                  );
-                  setIsResponding(false);
-                } else {
-                  addItem(
-                    {
-                      type: MessageType.INFO,
-                      text: 'Plan discarded.',
-                    },
-                    Date.now(),
-                  );
-                  setIsResponding(false);
-                }
-              },
-            });
-            // Don't continue even if save failed
-            return;
+              // Don't continue the turn until user makes a choice
+              return;
+            } catch (error) {
+              debugLogger.warn('Error saving plan as draft:', error);
+              // Even if saving fails, still show the dialog with a temporary ID
+              setPlanCompletionRequest({
+                title: args.title,
+                content: args.content,
+                affectedFiles: args.affected_files || [],
+                dependencies: args.dependencies || [],
+                originalPrompt,
+                planId: `temp-${Date.now()}`,
+                onChoice: async (choice, _feedback) => {
+                  setPlanCompletionRequest(null);
+                  if (choice === 'execute') {
+                    config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+                    addItem(
+                      {
+                        type: MessageType.INFO,
+                        text: `Executing plan "${args.title}"... Mode switched to Auto Edit.`,
+                      },
+                      Date.now(),
+                    );
+                    // Use isContinuation: true to bypass the streamingState check
+                    const executeInstruction = `Please implement the plan above. Start with the first step and work through each step systematically.`;
+                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                    submitQuery([{ text: executeInstruction }], {
+                      isContinuation: true,
+                    });
+                  } else if (choice === 'refine') {
+                    addItem(
+                      {
+                        type: MessageType.INFO,
+                        text: 'Please provide feedback to refine the plan.',
+                      },
+                      Date.now(),
+                    );
+                    setIsResponding(false);
+                  } else {
+                    addItem(
+                      {
+                        type: MessageType.INFO,
+                        text: 'Plan discarded.',
+                      },
+                      Date.now(),
+                    );
+                    setIsResponding(false);
+                  }
+                },
+              });
+              // Don't continue even if save failed
+              return;
+            }
           }
-        }
+        } // end of else block for Plan Mode check
       }
 
       const geminiTools = completedAndReadyToSubmitTools.filter(

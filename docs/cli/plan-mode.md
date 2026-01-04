@@ -144,16 +144,54 @@ directory. This is useful for:
 
 ### Plan Storage
 
-Plans are stored as Markdown files with YAML frontmatter in:
+Plans are stored locally in your project's `.gemini/plans/` directory:
 
 ```
 .gemini/plans/plan-<timestamp>-<id>.md
 ```
 
-Each plan file contains:
+> **Note:** Plans are project-specific. They are stored in the `.gemini/` folder
+> within your current working directory, not in a global location. This means
+> plans created in one project are not visible from another project.
 
-- **Metadata**: Title, creation date, status, original prompt
-- **Content**: The implementation plan in Markdown format
+#### Plan File Format
+
+Each plan file is a Markdown document with YAML frontmatter containing metadata:
+
+```markdown
+---
+id: plan-1704312000000-abc123
+title: Add user authentication
+createdAt: 2025-01-03T12:00:00.000Z
+updatedAt: 2025-01-03T12:05:00.000Z
+status: draft
+originalPrompt: Add user authentication with JWT tokens
+lastViewed: 2025-01-03T12:10:00.000Z
+---
+
+## Implementation Steps
+
+1. Create auth middleware...
+```
+
+#### Plan Status Lifecycle
+
+Plans have three possible statuses:
+
+| Status     | Description                                                    |
+| ---------- | -------------------------------------------------------------- |
+| `draft`    | Auto-saved when the agent presents a plan (before user action) |
+| `saved`    | User explicitly chose "Save" to keep the plan for later        |
+| `executed` | User chose "Execute" and implementation began                  |
+
+#### Auto-Save Behavior
+
+When the agent calls the `present_plan` tool, the plan is **automatically saved
+as a draft** before the completion dialog appears. This ensures:
+
+- Your plan is preserved if the session is interrupted
+- You can resume later with `/plan resume <title>`
+- Draft plans appear in `/plan list` with `[draft]` status
 
 ## The `present_plan` Tool
 
@@ -171,7 +209,8 @@ When the agent presents a plan, a dialog will automatically appear with options:
 
 1. **Execute**: Switch to Auto Edit mode and start implementing the plan
 2. **Save**: Save the plan for later execution (status changes to 'saved')
-3. **Refine**: Provide feedback to improve the plan
+3. **Refine**: Opens an inline text input where you can type feedback to improve
+   the plan. Press Enter to submit, or Esc to go back to the options.
 4. **Cancel**: Discard the plan and return to the prompt
 
 Plans are automatically saved as drafts when presented, so your work is
@@ -246,7 +285,7 @@ ensuring it follows the researched approach.
 5. **Choose Action from Dialog**
    - **Execute**: Starts implementation immediately (switches to Auto Edit)
    - **Save**: Marks plan as 'saved' for later
-   - **Refine**: Provide feedback to improve the plan
+   - **Refine**: Type feedback inline to improve the plan
    - **Cancel**: Discard and start over
 
 ## Troubleshooting

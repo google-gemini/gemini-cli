@@ -59,7 +59,7 @@ export const PlanList: React.FC<PlanListProps> = ({ plans }) => {
                 [{STATUS_LABELS[plan.status]}]
               </Text>
               {isLastViewed && (
-                <Text color={theme.status.info}> [last viewed]</Text>
+                <Text color={theme.text.link}> [last viewed]</Text>
               )}
             </Text>
           </Box>
