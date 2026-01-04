@@ -437,3 +437,26 @@ export interface ConfirmationRequest {
 export interface LoopDetectionConfirmationRequest {
   onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
 }
+
+/**
+ * Request to show plan completion dialog after present_plan tool executes.
+ */
+export interface PlanCompletionRequest {
+  /** The plan title */
+  title: string;
+  /** The full plan content in markdown */
+  content: string;
+  /** List of files that will be affected */
+  affectedFiles: string[];
+  /** Dependencies/commands to run first */
+  dependencies: string[];
+  /** The original user prompt that triggered planning */
+  originalPrompt: string;
+  /** The saved plan ID (auto-saved as draft) */
+  planId: string;
+  /** Callback when user makes a choice */
+  onChoice: (
+    choice: 'execute' | 'save' | 'refine' | 'cancel',
+    feedback?: string,
+  ) => void;
+}

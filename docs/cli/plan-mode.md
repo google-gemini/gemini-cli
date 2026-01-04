@@ -144,12 +144,15 @@ tool to present the implementation plan. This tool accepts:
 | `affected_files` | List of files that will be created or modified    |
 | `dependencies`   | Shell commands to run first (e.g., `npm install`) |
 
-After presenting a plan, you can:
+When the agent presents a plan, a dialog will automatically appear with options:
 
-1. **Save it**: Use `/plan save <title>` to store for later
-2. **Execute it**: Press Shift+Tab to switch to Auto Edit mode
-3. **Refine it**: Provide feedback to improve the plan
-4. **Cancel**: Start over with a different approach
+1. **Execute**: Switch to Auto Edit mode and start implementing the plan
+2. **Save**: Save the plan for later execution (status changes to 'saved')
+3. **Refine**: Provide feedback to improve the plan
+4. **Cancel**: Discard the plan and return to the prompt
+
+Plans are automatically saved as drafts when presented, so your work is
+preserved even if the session is interrupted.
 
 ## Best Practices
 
