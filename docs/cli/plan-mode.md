@@ -62,12 +62,16 @@ The following tools run without user confirmation in Plan Mode:
 
 These tools are blocked to prevent modifications:
 
-| Tool                | Reason                      |
-| ------------------- | --------------------------- |
-| `replace`           | Modifies file contents      |
-| `write_file`        | Creates or overwrites files |
-| `run_shell_command` | Could modify system state   |
-| `save_memory`       | Modifies persistent memory  |
+| Tool                | Reason                               |
+| ------------------- | ------------------------------------ |
+| `replace`           | Modifies file contents               |
+| `write_file`        | Creates or overwrites files          |
+| `run_shell_command` | Could modify system state            |
+| `save_memory`       | Modifies persistent memory           |
+| All MCP tools       | External tools may have side effects |
+
+> **Note:** All MCP (external) tools are blocked in Plan Mode regardless of
+> their function. This ensures a fully read-only research environment.
 
 ### System Prompt
 
@@ -180,13 +184,16 @@ When the agent presents a plan, review:
 
 ### 4. Save Complex Plans
 
-For large implementations, save the plan before executing:
+For large implementations, choose "Save" when the plan completion dialog
+appears. This changes the plan status from 'draft' to 'saved', making it easy to
+find later:
 
 ```
-/plan save dark-mode-implementation
+/plan list   # Shows all saved plans
+/plan resume dark-mode   # Resume a saved plan
 ```
 
-This lets you resume later if the implementation is interrupted.
+Plans are auto-saved as drafts when presented, so your work is never lost.
 
 ### 5. Execute with Context
 
@@ -217,12 +224,11 @@ ensuring it follows the researched approach.
    - Shows implementation steps
    - Notes dependencies
 
-5. **Save or Execute**
-   ```
-   /plan save jwt-auth
-   # or
-   Press Shift+Tab to switch to Auto Edit mode
-   ```
+5. **Choose Action from Dialog**
+   - **Execute**: Starts implementation immediately (switches to Auto Edit)
+   - **Save**: Marks plan as 'saved' for later
+   - **Refine**: Provide feedback to improve the plan
+   - **Cancel**: Discard and start over
 
 ## Troubleshooting
 
@@ -236,10 +242,11 @@ cannot modify files until you switch modes.
 In Plan Mode, read-only tools should run without confirmation. If you're still
 seeing prompts, check that Plan Mode is active (blue "planning mode" indicator).
 
-### Plan Not Saved
+### Plan Not Appearing in List
 
-Plans are only saved when you explicitly use `/plan save`. The agent's
-`present_plan` tool displays the plan but doesn't persist it.
+Plans are auto-saved as drafts when the agent calls `present_plan`. If a plan
+doesn't appear in `/plan list`, the agent may not have completed the planning
+phase. Check that the agent called the `present_plan` tool successfully.
 
 ## Related Documentation
 
