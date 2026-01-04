@@ -89,7 +89,6 @@ describe('SmartEditTool', () => {
       getUsageStatisticsEnabled: vi.fn(() => true),
       getSessionId: vi.fn(() => 'mock-session-id'),
       getContentGeneratorConfig: vi.fn(() => ({ authType: 'mock' })),
-      getUseSmartEdit: vi.fn(() => false),
       getProxy: vi.fn(() => undefined),
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
       getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
@@ -729,7 +728,7 @@ describe('SmartEditTool', () => {
             result.returnDisplay.diffStat?.model_removed_lines,
           );
         } else if (result.error) {
-          console.error(`Edit failed for ${file.path}:`, result.error);
+          throw result.error;
         }
       }
 

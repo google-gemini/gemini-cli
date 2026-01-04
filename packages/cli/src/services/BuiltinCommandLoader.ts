@@ -38,6 +38,7 @@ import { resumeCommand } from '../ui/commands/resumeCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
+import { skillsCommand } from '../ui/commands/skillsCommand.js';
 import { settingsCommand } from '../ui/commands/settingsCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
 import { setupGithubCommand } from '../ui/commands/setupGithubCommand.js';
@@ -81,9 +82,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       modelCommand,
       ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),
       privacyCommand,
-      ...(this.config?.getEnableMessageBusIntegration()
-        ? [policiesCommand]
-        : []),
+      policiesCommand,
       ...(isDevelopment ? [profileCommand] : []),
       quitCommand,
       restoreCommand(this.config),
@@ -91,6 +90,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       statsCommand,
       themeCommand,
       toolsCommand,
+      ...(this.config?.isSkillsSupportEnabled() ? [skillsCommand] : []),
       settingsCommand,
       vimCommand,
       setupGithubCommand,
