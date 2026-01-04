@@ -1211,11 +1211,13 @@ export const useGeminiStream = (
                     },
                     Date.now(),
                   );
-                  // Start implementation by submitting an execute instruction
+                  // Use isContinuation: true to bypass the streamingState check
+                  // This is necessary because onChoice callback has a stale closure
+                  // that captures the old submitQuery with old streamingState
                   const executeInstruction = `Please implement the plan above. Start with the first step and work through each step systematically.`;
                   // eslint-disable-next-line @typescript-eslint/no-floating-promises
                   submitQuery([{ text: executeInstruction }], {
-                    isContinuation: false,
+                    isContinuation: true,
                   });
                 } else if (choice === 'save') {
                   // Plan is already saved as draft, update status to 'saved'
@@ -1276,11 +1278,11 @@ export const useGeminiStream = (
                     },
                     Date.now(),
                   );
-                  // Start implementation
+                  // Use isContinuation: true to bypass the streamingState check
                   const executeInstruction = `Please implement the plan above. Start with the first step and work through each step systematically.`;
                   // eslint-disable-next-line @typescript-eslint/no-floating-promises
                   submitQuery([{ text: executeInstruction }], {
-                    isContinuation: false,
+                    isContinuation: true,
                   });
                 } else if (choice === 'refine') {
                   addItem(
