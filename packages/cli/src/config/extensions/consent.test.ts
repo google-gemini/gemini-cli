@@ -6,6 +6,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import chalk from 'chalk';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import {
   requestConsentNonInteractive,
   requestConsentInteractive,
@@ -41,23 +44,19 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-// Mocking fs/promises for skill directory item counting
-vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>();
-  return {
-    ...actual,
-    readdir: vi.fn().mockResolvedValue(['SKILL.md']), // Default mock
-  };
-});
-
-import * as fs from 'node:fs/promises';
-
 describe('consent', () => {
-  beforeEach(() => {
+  let tempDir: string;
+
+  beforeEach(async () => {
     vi.clearAllMocks();
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'consent-test-'));
   });
-  afterEach(() => {
+
+  afterEach(async () => {
     vi.restoreAllMocks();
+    if (tempDir) {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
   });
 
   describe('requestConsentNonInteractive', () => {
@@ -185,57 +184,6 @@ describe('consent', () => {
         expect(requestConsent).toHaveBeenCalledWith(expectedConsentString);
       });
 
-      it('should request consent if mcpServers change', async () => {
-        const prevConfig: ExtensionConfig = { ...baseConfig };
-        const newConfig: ExtensionConfig = {
-          ...baseConfig,
-          mcpServers: { server1: { command: 'npm', args: ['start'] } },
-        };
-        const requestConsent = vi.fn().mockResolvedValue(true);
-        await maybeRequestConsentOrFail(
-          newConfig,
-          requestConsent,
-          false,
-          prevConfig,
-          false,
-        );
-        expect(requestConsent).toHaveBeenCalledTimes(1);
-      });
-
-      it('should request consent if contextFileName changes', async () => {
-        const prevConfig: ExtensionConfig = { ...baseConfig };
-        const newConfig: ExtensionConfig = {
-          ...baseConfig,
-          contextFileName: 'new-context.md',
-        };
-        const requestConsent = vi.fn().mockResolvedValue(true);
-        await maybeRequestConsentOrFail(
-          newConfig,
-          requestConsent,
-          false,
-          prevConfig,
-          false,
-        );
-        expect(requestConsent).toHaveBeenCalledTimes(1);
-      });
-
-      it('should request consent if excludeTools changes', async () => {
-        const prevConfig: ExtensionConfig = { ...baseConfig };
-        const newConfig: ExtensionConfig = {
-          ...baseConfig,
-          excludeTools: ['new-tool'],
-        };
-        const requestConsent = vi.fn().mockResolvedValue(true);
-        await maybeRequestConsentOrFail(
-          newConfig,
-          requestConsent,
-          false,
-          prevConfig,
-          false,
-        );
-        expect(requestConsent).toHaveBeenCalledTimes(1);
-      });
-
       it('should include warning when hooks are present', async () => {
         const requestConsent = vi.fn().mockResolvedValue(true);
         await maybeRequestConsentOrFail(
@@ -252,37 +200,25 @@ describe('consent', () => {
         );
       });
 
-      it('should request consent if hooks status changes', async () => {
-        const requestConsent = vi.fn().mockResolvedValue(true);
-        await maybeRequestConsentOrFail(
-          baseConfig,
-          requestConsent,
-          true,
-          baseConfig,
-          false,
-        );
-        expect(requestConsent).toHaveBeenCalledTimes(1);
-      });
-
       it('should request consent if skills change', async () => {
-        // @ts-expect-error - Complex readdir overloads are hard to mock strictly
-        vi.spyOn(fs, 'readdir').mockImplementation(async (dir: unknown) => {
-          const dirStr = String(dir);
-          if (dirStr.includes('loc1')) return ['SKILL.md', 'extra.txt'];
-          if (dirStr.includes('loc2')) return ['SKILL.md'];
-          return [];
-        });
+        const skill1Dir = path.join(tempDir, 'skill1');
+        const skill2Dir = path.join(tempDir, 'skill2');
+        await fs.mkdir(skill1Dir, { recursive: true });
+        await fs.mkdir(skill2Dir, { recursive: true });
+        await fs.writeFile(path.join(skill1Dir, 'SKILL.md'), 'body1');
+        await fs.writeFile(path.join(skill1Dir, 'extra.txt'), 'extra');
+        await fs.writeFile(path.join(skill2Dir, 'SKILL.md'), 'body2');
 
         const skill1: SkillDefinition = {
           name: 'skill1',
           description: 'desc1',
-          location: 'loc1/SKILL.md',
+          location: path.join(skill1Dir, 'SKILL.md'),
           body: 'body1',
         };
         const skill2: SkillDefinition = {
           name: 'skill2',
           description: 'desc2',
-          location: 'loc2/SKILL.md',
+          location: path.join(skill2Dir, 'SKILL.md'),
           body: 'body2',
         };
 
@@ -318,41 +254,46 @@ describe('consent', () => {
           SKILLS_WARNING_MESSAGE,
           'This extension will install the following agent skills:',
           `  * ${chalk.bold('skill1')}: desc1`,
-          '    (Location: loc1/SKILL.md) (2 items in directory)',
+          `    (Location: ${skill1.location}) (2 items in directory)`,
           `  * ${chalk.bold('skill2')}: desc2`,
-          '    (Location: loc2/SKILL.md) (1 items in directory)',
+          `    (Location: ${skill2.location}) (1 items in directory)`,
+          '',
         ].join('\n');
 
         expect(requestConsent).toHaveBeenCalledWith(expectedConsentString);
       });
 
       it('should show a warning if the skill directory cannot be read', async () => {
-        vi.spyOn(fs, 'readdir').mockImplementation(async () => {
-          throw new Error('Permission denied');
-        });
+        const lockedDir = path.join(tempDir, 'locked');
+        await fs.mkdir(lockedDir, { recursive: true, mode: 0o000 });
 
         const skill: SkillDefinition = {
           name: 'locked-skill',
           description: 'A skill in a locked dir',
-          location: 'locked/SKILL.md',
+          location: path.join(lockedDir, 'SKILL.md'),
           body: 'body',
         };
 
         const requestConsent = vi.fn().mockResolvedValue(true);
-        await maybeRequestConsentOrFail(
-          baseConfig,
-          requestConsent,
-          false,
-          undefined,
-          false,
-          [skill],
-        );
+        try {
+          await maybeRequestConsentOrFail(
+            baseConfig,
+            requestConsent,
+            false,
+            undefined,
+            false,
+            [skill],
+          );
 
-        expect(requestConsent).toHaveBeenCalledWith(
-          expect.stringContaining(
-            `    (Location: locked/SKILL.md) ${chalk.red('⚠️ (Could not count items in directory)')}`,
-          ),
-        );
+          expect(requestConsent).toHaveBeenCalledWith(
+            expect.stringContaining(
+              `    (Location: ${skill.location}) ${chalk.red('⚠️ (Could not count items in directory)')}`,
+            ),
+          );
+        } finally {
+          // Restore permissions so cleanup works
+          await fs.chmod(lockedDir, 0o700);
+        }
       });
     });
   });

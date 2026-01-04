@@ -97,10 +97,7 @@ import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import {
-  SkillManager,
-  type SkillDefinition,
-} from '../skills/skillManager.js';
+import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 
 import { ApprovalMode } from '../policy/types.js';

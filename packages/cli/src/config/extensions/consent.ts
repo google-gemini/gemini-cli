@@ -163,6 +163,7 @@ async function extensionConsentString(
       }
       output.push(`    (Location: ${skill.location})${fileCountStr}`);
     }
+    output.push('');
   }
   return output.join('\n');
 }
