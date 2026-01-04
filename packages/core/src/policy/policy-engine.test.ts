@@ -20,6 +20,29 @@ import type { CheckerRunner } from '../safety/checker-runner.js';
 import { initializeShellParsers } from '../utils/shell-utils.js';
 import { buildArgsPatterns } from './utils.js';
 
+// Mock shell-utils to ensure consistent behavior across platforms (especially Windows CI)
+// We want to test PolicyEngine logic, not the shell parser's ability to parse commands
+vi.mock('../utils/shell-utils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/shell-utils.js')>();
+  return {
+    ...actual,
+    initializeShellParsers: vi.fn().mockResolvedValue(undefined),
+    splitCommands: vi.fn().mockImplementation((command: string) => {
+      // Simple mock splitting logic for test cases
+      if (command.includes('&&')) {
+        return command.split('&&').map((c) => c.trim());
+      }
+      return [command];
+    }),
+    hasRedirection: vi.fn().mockImplementation(
+      (command: string) =>
+        // Simple mock: true if '>' is present, unless it looks like "-> arrow"
+        command.includes('>') && !command.includes('-> arrow'),
+    ),
+  };
+});
+
 describe('PolicyEngine', () => {
   let engine: PolicyEngine;
   let mockCheckerRunner: CheckerRunner;
