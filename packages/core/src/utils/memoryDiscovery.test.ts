@@ -982,7 +982,7 @@ included directory memory
       .mockImplementation(() => {});
 
     // Create a directory named GEMINI.md (edge case from #4760)
-    const geminiMdDir = await createEmptyDir(
+    await createEmptyDir(
       path.join(homedir, GEMINI_DIR, DEFAULT_CONTEXT_FILENAME),
     );
     // Create a valid file that will be discovered
@@ -1000,16 +1000,14 @@ included directory memory
       DEFAULT_FOLDER_TRUST,
     );
 
-    // `loadServerHierarchicalMemory` returns all discovered paths, including directories that are skipped during reading.
-    // So we expect both the directory and the file to be in `filePaths`.
-    expect(result.filePaths).toHaveLength(2);
-    expect(result.filePaths).toContain(geminiMdDir);
+    // With EAFP pattern, directories are caught during readFile and excluded from results
+    expect(result.filePaths).toHaveLength(1);
     expect(result.filePaths).toContain(projectFile);
 
-    // `fileCount` also reflects the number of discovered paths, not successfully read files.
-    expect(result.fileCount).toBe(2);
+    // fileCount reflects successfully read files
+    expect(result.fileCount).toBe(1);
 
-    // The memory content should only contain content from the validly read file.
+    // The memory content should only contain content from the validly read file
     expect(result.memoryContent).toContain('Project root content');
 
     // Should NOT log any warnings about the directory
