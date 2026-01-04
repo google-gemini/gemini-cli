@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { glob } from 'glob';
 import yaml from 'js-yaml';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 
 /**
  * Represents the definition of an Agent Skill.
@@ -55,8 +56,22 @@ export async function loadSkillsFromDir(
         discoveredSkills.push(metadata);
       }
     }
+
+    if (discoveredSkills.length === 0) {
+      const files = await fs.readdir(absoluteSearchPath);
+      if (files.length > 0) {
+        coreEvents.emitFeedback(
+          'warning',
+          `Failed to load skills from ${absoluteSearchPath}. The directory is not empty but no valid skills were discovered. Please ensure SKILL.md files are present in subdirectories and have valid frontmatter.`,
+        );
+      }
+    }
   } catch (error) {
-    debugLogger.log(`Error discovering skills in ${dir}:`, error);
+    coreEvents.emitFeedback(
+      'warning',
+      `Error discovering skills in ${dir}:`,
+      error,
+    );
   }
 
   return discoveredSkills;
