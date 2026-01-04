@@ -23,51 +23,12 @@ interface HooksListProps {
     sequential?: boolean;
     enabled: boolean;
   }>;
-  hooksEnabled?: boolean;
 }
 
-export const HooksList: React.FC<HooksListProps> = ({
-  hooks,
-  hooksEnabled,
-}) => {
-  const isEnabled = hooksEnabled !== undefined ? hooksEnabled : true;
-  const systemStatusColor = isEnabled ? 'green' : 'red';
-  const systemStatusText = isEnabled ? 'Enabled' : 'Disabled';
-
-  if (hooksEnabled === false) {
-    return (
-      <Box flexDirection="column" marginTop={1} marginBottom={1}>
-        <Box marginBottom={1}>
-          <Text bold>Hooks System Status: </Text>
-          <Text color={systemStatusColor} bold>
-            {systemStatusText}
-          </Text>
-        </Box>
-        <Box marginTop={1}>
-          <Text dimColor>
-            All hooks are currently disabled. Use{' '}
-            <Text bold>/hooks enable-all</Text> or enable individual hooks to
-            activate them.
-          </Text>
-        </Box>
-        <Box marginTop={1}>
-          <Text dimColor>
-            Note: Restart is required after enabling the hooks system.
-          </Text>
-        </Box>
-      </Box>
-    );
-  }
-
+export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
   if (hooks.length === 0) {
     return (
       <Box flexDirection="column" marginTop={1} marginBottom={1}>
-        <Box marginBottom={1}>
-          <Text bold>Hooks System Status: </Text>
-          <Text color={systemStatusColor} bold>
-            {systemStatusText}
-          </Text>
-        </Box>
         <Box marginTop={1}>
           <Text>No hooks configured.</Text>
         </Box>
@@ -89,12 +50,6 @@ export const HooksList: React.FC<HooksListProps> = ({
 
   return (
     <Box flexDirection="column" marginTop={1} marginBottom={1}>
-      <Box marginBottom={1}>
-        <Text bold>Hooks System Status: </Text>
-        <Text color={systemStatusColor} bold>
-          {systemStatusText}
-        </Text>
-      </Box>
       <Box marginTop={1}>
         <Text bold>Configured Hooks:</Text>
       </Box>

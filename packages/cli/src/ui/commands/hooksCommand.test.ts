@@ -154,7 +154,6 @@ describe('hooksCommand', () => {
         expect.objectContaining({
           type: MessageType.HOOKS_LIST,
           hooks: [],
-          hooksEnabled: false,
         }),
         expect.any(Number),
       );
@@ -179,7 +178,6 @@ describe('hooksCommand', () => {
         expect.objectContaining({
           type: MessageType.HOOKS_LIST,
           hooks: [],
-          hooksEnabled: false,
         }),
         expect.any(Number),
       );
@@ -209,7 +207,6 @@ describe('hooksCommand', () => {
         expect.objectContaining({
           type: MessageType.HOOKS_LIST,
           hooks: mockHooks,
-          hooksEnabled: true,
         }),
         expect.any(Number),
       );
