@@ -56,22 +56,19 @@ class TestToolInvocation extends BaseToolInvocation<TestParams, TestResult> {
   override async shouldConfirmExecute(
     abortSignal: AbortSignal,
   ): Promise<false> {
-    // This conditional is here to allow testing of the case where there is no message bus.
-    if (this.messageBus) {
-      const decision = await this.getMessageBusDecision(abortSignal);
-      if (decision === 'ALLOW') {
-        return false;
-      }
-      if (decision === 'DENY') {
-        throw new Error('Tool execution denied by policy');
-      }
+    const decision = await this.getMessageBusDecision(abortSignal);
+    if (decision === 'ALLOW') {
+      return false;
+    }
+    if (decision === 'DENY') {
+      throw new Error('Tool execution denied by policy');
     }
     return false;
   }
 }
 
 class TestTool extends BaseDeclarativeTool<TestParams, TestResult> {
-  constructor(messageBus?: MessageBus) {
+  constructor(messageBus: MessageBus) {
     super(
       'test-tool',
       'Test Tool',
@@ -90,7 +87,7 @@ class TestTool extends BaseDeclarativeTool<TestParams, TestResult> {
     );
   }
 
-  protected createInvocation(params: TestParams, messageBus?: MessageBus) {
+  protected createInvocation(params: TestParams, messageBus: MessageBus) {
     return new TestToolInvocation(params, messageBus);
   }
 }
@@ -220,16 +217,6 @@ describe('Message Bus Integration', () => {
       );
     });
 
-    it('should fall back to default behavior when no message bus', async () => {
-      const tool = new TestTool(); // No message bus
-      const invocation = tool.build({ testParam: 'test-value' });
-
-      const result = await invocation.shouldConfirmExecute(
-        new AbortController().signal,
-      );
-      expect(result).toBe(false);
-    });
-
     it('should ignore responses with wrong correlation ID', async () => {
       vi.useFakeTimers();
 
@@ -257,28 +244,6 @@ describe('Message Bus Integration', () => {
       expect(result).toBe(false);
 
       vi.useRealTimers();
-    });
-  });
-
-  describe('Backward Compatibility', () => {
-    it('should work with existing tools that do not use message bus', async () => {
-      const tool = new TestTool(); // No message bus
-      const invocation = tool.build({ testParam: 'test-value' });
-
-      // Should execute normally
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.testValue).toBe('test-value');
-      expect(result.llmContent).toBe('Executed with test-value');
-    });
-
-    it('should work with tools that have message bus but use default confirmation', async () => {
-      const tool = new TestTool(messageBus);
-      const invocation = tool.build({ testParam: 'test-value' });
-
-      // Should execute normally even with message bus available
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.testValue).toBe('test-value');
-      expect(result.llmContent).toBe('Executed with test-value');
     });
   });
 

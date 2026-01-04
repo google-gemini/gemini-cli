@@ -16,6 +16,7 @@ import type { Config } from '../config/config.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { ToolErrorType } from './tool-error.js';
 import * as glob from 'glob';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 vi.mock('glob', { spy: true });
 
@@ -43,7 +44,7 @@ describe('GlobTool', () => {
     // Create a unique root directory for each test run
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'glob-tool-root-'));
     await fs.writeFile(path.join(tempRootDir, '.git'), ''); // Fake git repo
-    globTool = new GlobTool(mockConfig);
+    globTool = new GlobTool(mockConfig, createMockMessageBus());
 
     // Create some test files and directories within this root
     // Top-level files

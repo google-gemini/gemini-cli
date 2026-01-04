@@ -31,10 +31,10 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   ToolConfirmationOutcome,
   ApprovalMode,
-  MockTool,
   HookSystem,
   PREVIEW_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
+import { MockTool } from '@google/gemini-cli-core/src/test-utils/mock-tool.js';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 import { ToolCallStatus } from '../types.js';
 
