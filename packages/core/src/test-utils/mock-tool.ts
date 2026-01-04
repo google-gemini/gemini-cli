@@ -47,7 +47,7 @@ class MockToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly tool: MockTool,
     params: { [key: string]: unknown },
-    messageBus: MessageBus,
+    messageBus?: MessageBus,
   ) {
     super(params, messageBus, tool.name, tool.displayName);
   }
@@ -122,9 +122,11 @@ export class MockTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: { [key: string]: unknown },
-    messageBus: MessageBus,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<{ [key: string]: unknown }, ToolResult> {
-    return new MockToolInvocation(this, params, messageBus);
+    return new MockToolInvocation(this, params, messageBus ?? this.messageBus);
   }
 }
 
@@ -144,7 +146,7 @@ export class MockModifiableToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly tool: MockModifiableTool,
     params: Record<string, unknown>,
-    messageBus: MessageBus,
+    messageBus?: MessageBus,
   ) {
     super(params, messageBus, tool.name, tool.displayName);
   }
@@ -228,8 +230,14 @@ export class MockModifiableTool
 
   protected createInvocation(
     params: Record<string, unknown>,
-    messageBus: MessageBus,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<Record<string, unknown>, ToolResult> {
-    return new MockModifiableToolInvocation(this, params, messageBus);
+    return new MockModifiableToolInvocation(
+      this,
+      params,
+      messageBus ?? this.messageBus,
+    );
   }
 }

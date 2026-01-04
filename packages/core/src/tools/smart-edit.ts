@@ -955,11 +955,12 @@ A good instruction should concisely answer:
 
   protected createInvocation(
     params: EditToolParams,
+    messageBus?: MessageBus,
   ): ToolInvocation<EditToolParams, ToolResult> {
     return new EditToolInvocation(
       this.config,
       params,
-      this.messageBus,
+      messageBus ?? this.messageBus,
       this.name,
       this.displayName,
     );
