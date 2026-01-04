@@ -483,7 +483,7 @@ export async function main() {
     });
     loadConfigHandle?.end();
 
-    if (config.isInteractive()) {
+    if (config.isInteractive() && config.storage && config.getDebugMode()) {
       // Initialize Activity Logger (Passive JSONL logging)
       const { ActivityLogger } = await import('./utils/activityLogger.js');
       const capture = ActivityLogger.getInstance();
