@@ -47,7 +47,6 @@ export class ToolExecutor {
     const toolName = request.name;
     const callId = request.callId;
 
-    // We can only execute a tool that has reached strict validation/scheduling state, so it must have 'tool' and 'invocation'
     if (!('tool' in call) || !call.tool || !('invocation' in call)) {
       throw new Error(
         `Cannot execute tool call ${callId}: Tool or Invocation missing.`,
@@ -61,7 +60,7 @@ export class ToolExecutor {
         status: 'executing',
         tool,
         invocation,
-        startTime: call.startTime, // Preserve start time if it exists
+        startTime: call.startTime,
       };
       onUpdateToolCall(executingCall);
     }
@@ -133,12 +132,6 @@ export class ToolExecutor {
               'User cancelled tool execution.',
             );
           } else if (toolResult.error === undefined) {
-            // return await this.createSuccessResult ... createSuccessResult is async, so we can just return the promise or await it.
-            // But wait, the previous code had `return await runInDevTraceSpan`.
-            // `runInDevTraceSpan` returns `Promise<R>`.
-            // So `return await` inside `execute` (which is async) is `return await Promise`.
-            // That's redundant. `return Promise` is fine.
-            // Inside the callback (async), we return the result of `createSuccessResult`.
             return await this.createSuccessResult(call, toolResult);
           } else {
             return this.createErrorResult(
@@ -176,9 +169,9 @@ export class ToolExecutor {
     const errorMessage = `[Operation Cancelled] ${reason}`;
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
-    // Satisfy CancelledToolCall requirement for invocation/tool
     if (!('tool' in call) || !('invocation' in call)) {
-      // This should effectively never happen in execution phase, but we handle it safely
+      // This should effectively never happen in execution phase, but we handle
+      // it safely
       throw new Error('Cancelled tool call missing tool/invocation references');
     }
 
@@ -201,7 +194,7 @@ export class ToolExecutor {
         errorType: undefined,
         contentLength: errorMessage.length,
       },
-      tool: call.tool, // Asserted by check above
+      tool: call.tool,
       invocation: call.invocation,
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
@@ -269,9 +262,9 @@ export class ToolExecutor {
     };
 
     const startTime = 'startTime' in call ? call.startTime : undefined;
-    // Ensure we have invocation
-    if (!('invocation' in call)) {
-      throw new Error('Successful tool call missing invocation');
+    // Ensure we have tool and invocation
+    if (!('tool' in call) || !('invocation' in call)) {
+      throw new Error('Successful tool call missing tool or invocation');
     }
 
     return {
@@ -297,7 +290,7 @@ export class ToolExecutor {
       status: 'error',
       request: call.request,
       response,
-      tool: call.tool, // Optional in ErroredToolCall
+      tool: call.tool,
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
     };
