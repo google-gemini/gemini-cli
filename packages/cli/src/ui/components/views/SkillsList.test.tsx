@@ -7,13 +7,31 @@
 import { render } from '../../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
 import { SkillsList } from './SkillsList.js';
-import { type SkillDefinition } from '../../types.js';
+import { type SkillDefinition } from '@google/gemini-cli-core';
 
 describe('SkillsList Component', () => {
   const mockSkills: SkillDefinition[] = [
-    { name: 'skill1', description: 'description 1', disabled: false },
-    { name: 'skill2', description: 'description 2', disabled: true },
-    { name: 'skill3', description: 'description 3', disabled: false },
+    {
+      name: 'skill1',
+      description: 'description 1',
+      disabled: false,
+      location: 'loc1',
+      body: 'body1',
+    },
+    {
+      name: 'skill2',
+      description: 'description 2',
+      disabled: true,
+      location: 'loc2',
+      body: 'body2',
+    },
+    {
+      name: 'skill3',
+      description: 'description 3',
+      disabled: false,
+      location: 'loc3',
+      body: 'body3',
+    },
   ];
 
   it('should render enabled and disabled skills separately', () => {
