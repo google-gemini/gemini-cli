@@ -2800,7 +2800,7 @@ describe('InputPrompt', () => {
     });
   });
 
-  describe('Windows right-click paste protection', () => {
+  describe('Windows right-click mouse event paste protection', () => {
     const originalPlatform = process.platform;
 
     beforeEach(() => {
@@ -2826,7 +2826,7 @@ describe('InputPrompt', () => {
       });
     });
 
-    it('should prevent stdin newlines from triggering submit after right-click paste on Windows', async () => {
+    it('should prevent submit after right-click mouse event on Windows', async () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
         { mouseEventsEnabled: true, uiActions },
@@ -2847,8 +2847,8 @@ describe('InputPrompt', () => {
         await vi.advanceTimersByTimeAsync(10);
       });
 
-      // Now simulate Enter keypress from Windows stdin echo (simulating QuickEdit behavior)
-      // First set buffer text to simulate text was inserted
+      // Simulate Enter keypress arriving after mouse event paste
+      // Set buffer text to simulate text was inserted
       props.buffer.text = 'line1\nline2\nline3';
       await act(async () => {
         stdin.write('\r');
@@ -2862,7 +2862,7 @@ describe('InputPrompt', () => {
       unmount();
     });
 
-    it('should not affect non-Windows platforms', async () => {
+    it('should not set paste protection on non-Windows platforms', async () => {
       Object.defineProperty(process, 'platform', {
         value: 'darwin',
         configurable: true,
