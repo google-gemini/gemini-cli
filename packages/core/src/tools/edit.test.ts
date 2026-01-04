@@ -59,6 +59,10 @@ import { ApprovalMode } from '../policy/types.js';
 import type { Content, Part, SchemaUnion } from '@google/genai';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
+import {
+  createMockMessageBus,
+  getMockMessageBusInstance,
+} from '../test-utils/mock-message-bus.js';
 
 describe('EditTool', () => {
   let tool: EditTool;
@@ -177,7 +181,9 @@ describe('EditTool', () => {
       },
     );
 
-    tool = new EditTool(mockConfig);
+    const bus = createMockMessageBus();
+    getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+    tool = new EditTool(mockConfig, bus);
   });
 
   afterEach(() => {
@@ -1029,7 +1035,10 @@ describe('EditTool', () => {
     it('should use windows-style path examples on windows', () => {
       vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
 
-      const tool = new EditTool({} as unknown as Config);
+      const tool = new EditTool(
+        {} as unknown as Config,
+        createMockMessageBus(),
+      );
       const schema = tool.schema;
       expect(
         (schema.parametersJsonSchema as EditFileParameterSchema).properties
@@ -1040,7 +1049,10 @@ describe('EditTool', () => {
     it('should use unix-style path examples on non-windows platforms', () => {
       vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
 
-      const tool = new EditTool({} as unknown as Config);
+      const tool = new EditTool(
+        {} as unknown as Config,
+        createMockMessageBus(),
+      );
       const schema = tool.schema;
       expect(
         (schema.parametersJsonSchema as EditFileParameterSchema).properties

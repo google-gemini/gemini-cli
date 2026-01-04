@@ -172,7 +172,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
 
   protected createInvocation(
     params: ToolParams,
-    _messageBus?: MessageBus,
+    messageBus?: MessageBus,
     _toolName?: string,
     _displayName?: string,
   ): ToolInvocation<ToolParams, ToolResult> {
@@ -181,7 +181,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
       this.originalName,
       this.name,
       params,
-      _messageBus,
+      messageBus,
     );
   }
 }
@@ -194,16 +194,22 @@ export class ToolRegistry {
   private config: Config;
   private messageBus?: MessageBus;
 
-  constructor(config: Config) {
+  constructor(config: Config, messageBus?: MessageBus) {
     this.config = config;
-  }
-
-  setMessageBus(messageBus: MessageBus): void {
     this.messageBus = messageBus;
   }
 
   getMessageBus(): MessageBus | undefined {
     return this.messageBus;
+  }
+
+  /**
+   * @deprecated migration only - will be removed in PR 3 (Enforcement)
+   * TODO: DELETE ME in PR 3. This is a temporary shim to allow for soft migration
+   * of tools while the core infrastructure is updated to require a MessageBus at birth.
+   */
+  setMessageBus(messageBus: MessageBus): void {
+    this.messageBus = messageBus;
   }
 
   /**
