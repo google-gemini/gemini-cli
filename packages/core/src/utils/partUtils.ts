@@ -84,7 +84,10 @@ export function isCumulative(prev: Part[], curr: Part[]): boolean {
 
   // If the first part is text, check if it's growing
   if (p0.text !== undefined && c0.text !== undefined) {
-    return c0.text.length > p0.text.length && c0.text.startsWith(p0.text);
+    // Only return true if strictly growing. If lengths are equal, fall through to deep equality check.
+    if (c0.text.length > p0.text.length && c0.text.startsWith(p0.text)) {
+      return true;
+    }
   }
 
   // For non-text parts (like functionCall), check if they are identical
@@ -107,7 +110,10 @@ export function isCumulativeFunctionCalls(
   if (curr.length < prev.length) return false;
 
   try {
-    return JSON.stringify(prev[0]) === JSON.stringify(curr[0]);
+    // To be truly cumulative, the current array of function calls must start with the previous one.
+    const prevStr = JSON.stringify(prev);
+    const currPrefixStr = JSON.stringify(curr.slice(0, prev.length));
+    return prevStr === currPrefixStr;
   } catch {
     return false;
   }
