@@ -459,7 +459,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
     return new WebFetchToolInvocation(
       this.config,
       params,
-      messageBus,
+      messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );

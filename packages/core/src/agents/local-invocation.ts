@@ -44,8 +44,15 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
     private readonly config: Config,
     params: AgentInputs,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, definition.name, definition.displayName);
+    super(
+      params,
+      messageBus,
+      _toolName ?? definition.name,
+      _toolDisplayName ?? definition.displayName,
+    );
   }
 
   /**

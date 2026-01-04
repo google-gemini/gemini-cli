@@ -127,12 +127,17 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: DelegateParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<DelegateParams, ToolResult> {
     return new DelegateInvocation(
       params,
       this.registry,
       this.config,
-      this.messageBus,
+      messageBus ?? this.messageBus,
+      _toolName,
+      _toolDisplayName,
     );
   }
 }
@@ -146,8 +151,15 @@ class DelegateInvocation extends BaseToolInvocation<
     private readonly registry: AgentRegistry,
     private readonly config: Config,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, DELEGATE_TO_AGENT_TOOL_NAME);
+    super(
+      params,
+      messageBus,
+      _toolName ?? DELEGATE_TO_AGENT_TOOL_NAME,
+      _toolDisplayName,
+    );
   }
 
   getDescription(): string {
