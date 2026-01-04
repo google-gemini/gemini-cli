@@ -26,6 +26,8 @@ import {
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
+import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -192,11 +194,48 @@ export async function createPolicyEngineConfig(
   // Priority: 2.3 (user tier - explicit temporary allows)
   if (settings.tools?.allowed) {
     for (const tool of settings.tools.allowed) {
-      rules.push({
-        toolName: tool,
-        decision: PolicyDecision.ALLOW,
-        priority: 2.3,
-      });
+      // Check for legacy format: toolName(args)
+      const match = tool.match(/^([a-zA-Z0-9_-]+)\((.*)\)$/);
+      if (match) {
+        const [, rawToolName, args] = match;
+        // Normalize shell tool aliases
+        const toolName = SHELL_TOOL_NAMES.includes(rawToolName)
+          ? SHELL_TOOL_NAME
+          : rawToolName;
+
+        // Treat args as a command prefix for shell tool
+        if (toolName === SHELL_TOOL_NAME) {
+          const patterns = buildArgsPatterns(undefined, args);
+          for (const pattern of patterns) {
+            if (pattern) {
+              rules.push({
+                toolName,
+                decision: PolicyDecision.ALLOW,
+                priority: 2.3,
+                argsPattern: new RegExp(pattern),
+              });
+            }
+          }
+        } else {
+          // For non-shell tools, we allow the tool itself but ignore args
+          // as args matching was only supported for shell tools historically.
+          rules.push({
+            toolName,
+            decision: PolicyDecision.ALLOW,
+            priority: 2.3,
+          });
+        }
+      } else {
+        // Standard tool name
+        const toolName = SHELL_TOOL_NAMES.includes(tool)
+          ? SHELL_TOOL_NAME
+          : tool;
+        rules.push({
+          toolName,
+          decision: PolicyDecision.ALLOW,
+          priority: 2.3,
+        });
+      }
     }
   }
 

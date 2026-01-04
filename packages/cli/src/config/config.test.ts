@@ -124,6 +124,12 @@ vi.mock('@google/gemini-cli-core', async () => {
       respectGitIgnore: true,
       respectGeminiIgnore: true,
     },
+    createPolicyEngineConfig: vi.fn(async () => ({
+      rules: [],
+      checkers: [],
+      defaultDecision: ServerConfig.PolicyDecision.ASK_USER,
+      approvalMode: ServerConfig.ApprovalMode.DEFAULT,
+    })),
   };
 });
 
@@ -2354,5 +2360,55 @@ describe('PolicyEngine nonInteractive wiring', () => {
       (config.getPolicyEngine() as unknown as { nonInteractive: boolean })
         .nonInteractive,
     ).toBe(false);
+  });
+});
+
+describe('Policy Engine Integration in loadCliConfig', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should pass merged allowed tools from CLI and settings to createPolicyEngineConfig', async () => {
+    process.argv = ['node', 'script.js', '--allowed-tools', 'cli-tool'];
+    const settings: Settings = { tools: { allowed: ['settings-tool'] } };
+    const argv = await parseArguments({} as Settings);
+
+    await loadCliConfig(settings, 'test-session', argv);
+
+    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: expect.objectContaining({
+          allowed: expect.arrayContaining(['cli-tool']),
+        }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('should pass merged exclude tools from CLI logic and settings to createPolicyEngineConfig', async () => {
+    process.stdin.isTTY = false; // Non-interactive to trigger default excludes
+    process.argv = ['node', 'script.js', '-p', 'test'];
+    const settings: Settings = { tools: { exclude: ['settings-exclude'] } };
+    const argv = await parseArguments({} as Settings);
+
+    await loadCliConfig(settings, 'test-session', argv);
+
+    // In non-interactive mode, ShellTool, etc. are excluded
+    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: expect.objectContaining({
+          exclude: expect.arrayContaining([SHELL_TOOL_NAME]),
+        }),
+      }),
+      expect.anything(),
+    );
   });
 });
