@@ -16,7 +16,10 @@ import type {
   ToolCallConfirmationDetails,
   ToolResult,
 } from '../tools/tools.js';
-import { getResponseText } from '../utils/partUtils.js';
+import {
+  getResponseText,
+  isCumulativeFunctionCalls,
+} from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import {
   getErrorMessage,
@@ -211,6 +214,7 @@ export class Turn {
   readonly pendingToolCalls: ToolCallRequestInfo[] = [];
   private debugResponses: GenerateContentResponse[] = [];
   private pendingCitations = new Set<string>();
+  private previousChunkFunctionCalls: FunctionCall[] = [];
   finishReason: FinishReason | undefined = undefined;
 
   constructor(
@@ -271,12 +275,31 @@ export class Turn {
         }
 
         // Handle function calls (requesting tool execution)
-        const functionCalls = resp.functionCalls ?? [];
-        for (const fnCall of functionCalls) {
-          const event = this.handlePendingFunctionCall(fnCall, traceId);
-          if (event) {
-            yield event;
+        const currentFunctionCalls = resp.functionCalls ?? [];
+        if (currentFunctionCalls.length > 0) {
+          let newCalls: FunctionCall[];
+          // Deduplicate function calls in case the SDK provides cumulative results in stream chunks.
+          if (
+            this.previousChunkFunctionCalls.length > 0 &&
+            isCumulativeFunctionCalls(
+              this.previousChunkFunctionCalls,
+              currentFunctionCalls,
+            )
+          ) {
+            newCalls = currentFunctionCalls.slice(
+              this.previousChunkFunctionCalls.length,
+            );
+          } else {
+            newCalls = currentFunctionCalls;
           }
+
+          for (const fnCall of newCalls) {
+            const event = this.handlePendingFunctionCall(fnCall, traceId);
+            if (event) {
+              yield event;
+            }
+          }
+          this.previousChunkFunctionCalls = currentFunctionCalls;
         }
 
         for (const citation of getCitations(resp)) {

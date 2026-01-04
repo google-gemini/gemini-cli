@@ -42,6 +42,7 @@ import {
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
+import { isCumulative } from '../utils/partUtils.js';
 import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
@@ -702,6 +703,7 @@ export class GeminiChat {
     originalRequest: GenerateContentParameters,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
+    let previousChunkParts: Part[] = [];
 
     let hasToolCall = false;
     let finishReason: FinishReason | undefined;
@@ -725,9 +727,26 @@ export class GeminiChat {
             hasToolCall = true;
           }
 
-          modelResponseParts.push(
-            ...content.parts.filter((part) => !part.thought),
-          );
+          const currentParts = content.parts.filter((part) => !part.thought);
+          if (currentParts.length > 0) {
+            // Determine if the current chunk's parts are cumulative or deltas.
+            // If they are cumulative, they should start with the previous chunk's parts
+            // (or a growing version of the first part).
+            if (
+              previousChunkParts.length > 0 &&
+              isCumulative(previousChunkParts, currentParts)
+            ) {
+              // Replace the last added set of parts with the new cumulative set.
+              modelResponseParts.splice(
+                0,
+                modelResponseParts.length,
+                ...currentParts,
+              );
+            } else {
+              modelResponseParts.push(...currentParts);
+            }
+            previousChunkParts = currentParts;
+          }
         }
       }
 
