@@ -355,7 +355,7 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
     return new GlobToolInvocation(
       this.config,
       params,
-      messageBus,
+      messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );

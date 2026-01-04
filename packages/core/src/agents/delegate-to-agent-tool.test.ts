@@ -100,6 +100,8 @@ describe('DelegateToAgentTool', () => {
       config,
       { arg1: 'valid' },
       messageBus,
+      mockAgentDef.name,
+      mockAgentDef.name,
     );
   });
 

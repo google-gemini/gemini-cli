@@ -681,7 +681,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
     return new GrepToolInvocation(
       this.config,
       params,
-      messageBus,
+      messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );

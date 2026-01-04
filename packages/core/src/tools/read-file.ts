@@ -232,7 +232,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
     return new ReadFileToolInvocation(
       this.config,
       params,
-      messageBus,
+      messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );
