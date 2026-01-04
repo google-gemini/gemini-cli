@@ -18,6 +18,8 @@ import {
   BaseToolInvocation,
   Kind,
 } from '../tools/tools.js';
+import { createMockMessageBus } from './mock-message-bus.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 interface MockToolOptions {
   name: string;
@@ -35,6 +37,7 @@ interface MockToolOptions {
     updateOutput?: (output: string) => void,
   ) => Promise<ToolResult>;
   params?: object;
+  messageBus?: MessageBus;
 }
 
 class MockToolInvocation extends BaseToolInvocation<
@@ -44,8 +47,9 @@ class MockToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly tool: MockTool,
     params: { [key: string]: unknown },
+    messageBus: MessageBus,
   ) {
-    super(params);
+    super(params, messageBus, tool.name, tool.displayName);
   }
 
   execute(
@@ -96,6 +100,7 @@ export class MockTool extends BaseDeclarativeTool<
       options.params,
       options.isOutputMarkdown ?? false,
       options.canUpdateOutput ?? false,
+      options.messageBus ?? createMockMessageBus(),
     );
 
     if (options.shouldConfirmExecute) {
@@ -115,10 +120,11 @@ export class MockTool extends BaseDeclarativeTool<
     }
   }
 
-  protected createInvocation(params: {
-    [key: string]: unknown;
-  }): ToolInvocation<{ [key: string]: unknown }, ToolResult> {
-    return new MockToolInvocation(this, params);
+  protected createInvocation(
+    params: { [key: string]: unknown },
+    messageBus: MessageBus,
+  ): ToolInvocation<{ [key: string]: unknown }, ToolResult> {
+    return new MockToolInvocation(this, params, messageBus);
   }
 }
 
@@ -138,8 +144,9 @@ export class MockModifiableToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly tool: MockModifiableTool,
     params: Record<string, unknown>,
+    messageBus: MessageBus,
   ) {
-    super(params);
+    super(params, messageBus, tool.name, tool.displayName);
   }
 
   async execute(_abortSignal: AbortSignal): Promise<ToolResult> {
@@ -189,10 +196,19 @@ export class MockModifiableTool
   shouldConfirm = true;
 
   constructor(name = 'mockModifiableTool') {
-    super(name, name, 'A mock modifiable tool for testing.', Kind.Other, {
-      type: 'object',
-      properties: { param: { type: 'string' } },
-    });
+    super(
+      name,
+      name,
+      'A mock modifiable tool for testing.',
+      Kind.Other,
+      {
+        type: 'object',
+        properties: { param: { type: 'string' } },
+      },
+      true,
+      false,
+      createMockMessageBus(),
+    );
   }
 
   getModifyContext(
@@ -212,7 +228,8 @@ export class MockModifiableTool
 
   protected createInvocation(
     params: Record<string, unknown>,
+    messageBus: MessageBus,
   ): ToolInvocation<Record<string, unknown>, ToolResult> {
-    return new MockModifiableToolInvocation(this, params);
+    return new MockModifiableToolInvocation(this, params, messageBus);
   }
 }
