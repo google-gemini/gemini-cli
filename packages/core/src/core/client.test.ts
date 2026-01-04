@@ -2841,11 +2841,9 @@ ${JSON.stringify(
         const events = await fromAsync(stream);
 
         expect(events).toContainEqual({
-          type: GeminiEventType.Error,
+          type: GeminiEventType.AgentExecutionBlocked,
           value: {
-            error: new Error(
-              'BeforeAgent hook blocked processing: Blocked by hook',
-            ),
+            reason: 'Blocked by hook',
           },
         });
         expect(mockChat.addHistory).not.toHaveBeenCalled();

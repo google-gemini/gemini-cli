@@ -66,11 +66,11 @@ const MAX_TURNS = 100;
 
 type BeforeAgentHookReturn =
   | {
-      type: GeminiEventType.Error;
-      value: { error: Error };
+      type: GeminiEventType.AgentExecutionStopped;
+      value: { reason: string };
     }
   | {
-      type: GeminiEventType.AgentExecutionStopped;
+      type: GeminiEventType.AgentExecutionBlocked;
       value: { reason: string };
     }
   | { additionalContext: string | undefined }
@@ -151,11 +151,9 @@ export class GeminiClient {
 
     if (hookOutput?.isBlockingDecision()) {
       return {
-        type: GeminiEventType.Error,
+        type: GeminiEventType.AgentExecutionBlocked,
         value: {
-          error: new Error(
-            `BeforeAgent hook blocked processing: ${hookOutput.getEffectiveReason()}`,
-          ),
+          reason: hookOutput.getEffectiveReason(),
         },
       };
     }
@@ -761,15 +759,18 @@ export class GeminiClient {
         prompt_id,
       );
       if (hookResult) {
-        if ('type' in hookResult && hookResult.type === GeminiEventType.Error) {
-          yield hookResult;
-          return new Turn(this.getChat(), prompt_id);
-        } else if (
+        if (
           'type' in hookResult &&
           hookResult.type === GeminiEventType.AgentExecutionStopped
         ) {
           // Add user message to history before returning so it's kept in the transcript
           this.getChat().addHistory(createUserContent(request));
+          yield hookResult;
+          return new Turn(this.getChat(), prompt_id);
+        } else if (
+          'type' in hookResult &&
+          hookResult.type === GeminiEventType.AgentExecutionBlocked
+        ) {
           yield hookResult;
           return new Turn(this.getChat(), prompt_id);
         } else if ('additionalContext' in hookResult) {

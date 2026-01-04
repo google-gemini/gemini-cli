@@ -1849,7 +1849,7 @@ describe('runNonInteractive', () => {
       });
 
       expect(processStderrSpy).toHaveBeenCalledWith(
-        'Agent execution blocked: Blocked by hook\n',
+        '[WARNING] Agent execution blocked: Blocked by hook\n',
       );
       // sendMessageStream is called once, recursion is internal to it and transparent to the caller
       expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);

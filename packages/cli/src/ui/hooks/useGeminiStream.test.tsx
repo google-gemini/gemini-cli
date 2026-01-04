@@ -2848,7 +2848,7 @@ describe('useGeminiStream', () => {
       await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           {
-            type: MessageType.INFO,
+            type: MessageType.WARNING,
             text: 'Agent execution blocked: Blocked by hook',
           },
           expect.any(Number),

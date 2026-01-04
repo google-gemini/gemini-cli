@@ -371,7 +371,7 @@ export async function runNonInteractive({
           } else if (event.type === GeminiEventType.AgentExecutionBlocked) {
             const blockMessage = `Agent execution blocked: ${event.value.reason}`;
             if (config.getOutputFormat() === OutputFormat.TEXT) {
-              process.stderr.write(`${blockMessage}\n`);
+              process.stderr.write(`[WARNING] ${blockMessage}\n`);
             }
           }
         }

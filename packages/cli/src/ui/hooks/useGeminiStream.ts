@@ -819,7 +819,7 @@ export const useGeminiStream = (
       }
       addItem(
         {
-          type: MessageType.INFO,
+          type: MessageType.WARNING,
           text: `Agent execution blocked: ${reason}`,
         },
         userMessageTimestamp,
