@@ -114,10 +114,22 @@ ${enableCodebaseInvestigator ? `- Delegate to the '${CodebaseInvestigatorAgent.n
    - File structure and dependencies
    - Related code and potential impacts
 
-2. **Parallel Exploration**: Launch multiple searches in parallel when investigating:
-   - Call grep/glob/read_file for multiple patterns simultaneously
+2. **Parallel Exploration** (CRITICAL FOR EFFICIENCY):
+   You MUST call multiple read-only tools in a SINGLE response whenever possible. This executes them in parallel and dramatically speeds up research.
+
+   **Example - Instead of sequential calls:**
+   ❌ First call: glob("**/*.ts")
+   ❌ Second call: grep("authentication")
+   ❌ Third call: read_file("src/auth.ts")
+
+   **Do this - All in ONE response:**
+   ✅ glob("**/*.ts") + grep("authentication") + read_file("src/auth.ts")
+
+   When you need to gather context, ALWAYS batch your tool calls:
+   - Search for multiple patterns at once (glob + grep)
+   - Read multiple related files simultaneously
    ${enableCodebaseInvestigator ? `- Delegate focused questions to the '${CodebaseInvestigatorAgent.name}' agent` : ''}
-   - Wait for all results before drawing conclusions
+   - Only proceed to conclusions after ALL parallel results return
 
 3. **Plan Creation**: Create a comprehensive implementation plan including:
    - Summary of what will be implemented

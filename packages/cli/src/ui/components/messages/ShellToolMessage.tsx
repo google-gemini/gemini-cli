@@ -50,6 +50,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   isFirst,
   borderColor,
   borderDimColor,
+  treeConnector,
 }) => {
   const isThisShellFocused =
     (name === SHELL_COMMAND_NAME ||
@@ -130,6 +131,9 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         borderColor={borderColor}
         borderDimColor={borderDimColor}
       >
+        {treeConnector && (
+          <Text color={theme.text.secondary}>{treeConnector} </Text>
+        )}
         <ToolStatusIndicator status={status} name={name} />
         <ToolInfo
           name={name}

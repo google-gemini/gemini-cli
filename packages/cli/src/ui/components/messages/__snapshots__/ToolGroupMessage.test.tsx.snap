@@ -2,11 +2,13 @@
 
 exports[`<ToolGroupMessage /> > Border Color Logic > uses gray border when all tools are successful and no shell commands 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                              │
+│ ⋮ Ran 2 tools in parallel                                                    │
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ • ✓  test-tool A tool for testing                                            │
 │                                                                              │
 │ Test result                                                                  │
 │                                                                              │
-│ ✓  another-tool A tool for testing                                           │
+│ • ✓  another-tool A tool for testing                                         │
 │                                                                              │
 │ Test result                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
@@ -63,7 +65,9 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation wit
 
 exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialog for first confirming tool only 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ?  first-confirm A tool for testing                                        ← │
+│ ⋮ Ran 2 tools in parallel                                                    │
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ • ?  first-confirm A tool for testing                                      ← │
 │                                                                              │
 │ Test result                                                                  │
 │ Confirm first tool                                                           │
@@ -75,7 +79,7 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialo
 │   3. No, suggest changes (esc)                                               │
 │                                                                              │
 │                                                                              │
-│ ?  second-confirm A tool for testing                                         │
+│ • ?  second-confirm A tool for testing                                       │
 │                                                                              │
 │ Test result                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
@@ -85,11 +89,11 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls arra
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  tool-1 Description 1. This is a long description that will need to be tr… │
+│ • ✓  tool-1 Description 1. This is a long description that will need to be … │
 │──────────────────────────────────────────────────────────────────────────────│
-│ line5                                                                        │                                       █
+│ line5                                                                        │                                       ▄
 │                                                                              │                                       █
-│ ✓  tool-2 Description 2                                                      │                                       █
+│ • ✓  tool-2 Description 2                                                    │                                       █
 │                                                                              │                                       █
 │ line1                                                                        │                                       █
 │ line2                                                                        │                                       █
@@ -98,15 +102,17 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls including shell command 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  read_file Read a file                                                     │
+│ ⋮ Running 3 tools in parallel...                                             │
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ • ✓  read_file Read a file                                                   │
 │                                                                              │
 │ Test result                                                                  │
 │                                                                              │
-│ ⊷  run_shell_command Run command                                             │
+│ • ⊷  run_shell_command Run command                                           │
 │                                                                              │
 │ Test result                                                                  │
 │                                                                              │
-│ o  write_file Write to file                                                  │
+│ • o  write_file Write to file                                                │
 │                                                                              │
 │ Test result                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
@@ -114,15 +120,17 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls incl
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders multiple tool calls with different statuses 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  successful-tool This tool succeeded                                       │
+│ ⋮ Ran 3 tools in parallel                                                    │
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ • ✓  successful-tool This tool succeeded                                     │
 │                                                                              │
 │ Test result                                                                  │
 │                                                                              │
-│ o  pending-tool This tool is pending                                         │
+│ • o  pending-tool This tool is pending                                       │
 │                                                                              │
 │ Test result                                                                  │
 │                                                                              │
-│ x  error-tool This tool failed                                               │
+│ • x  error-tool This tool failed                                             │
 │                                                                              │
 │ Test result                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
@@ -188,11 +196,13 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders when not focused 1`] 
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal height 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  tool-with-result Tool with output                                         │
+│ ⋮ Ran 2 tools in parallel                                                    │
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ • ✓  tool-with-result Tool with output                                       │
 │                                                                              │
 │ This is a long result that might need height constraints                     │
 │                                                                              │
-│ ✓  another-tool Another tool                                                 │
+│ • ✓  another-tool Another tool                                               │
 │                                                                              │
 │ More output here                                                             │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
@@ -208,15 +218,17 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders with narrow terminal 
 
 exports[`<ToolGroupMessage /> > Height Calculation > calculates available height correctly with multiple tools with results 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                              │
+│ ⋮ Ran 3 tools in parallel                                                    │
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ • ✓  test-tool A tool for testing                                            │
 │                                                                              │
 │ Result 1                                                                     │
 │                                                                              │
-│ ✓  test-tool A tool for testing                                              │
+│ • ✓  test-tool A tool for testing                                            │
 │                                                                              │
 │ Result 2                                                                     │
 │                                                                              │
-│ ✓  test-tool A tool for testing                                              │
+│ • ✓  test-tool A tool for testing                                            │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
 `;

@@ -28,6 +28,9 @@ interface ToolGroupMessageProps {
   onShellInputSubmit?: (input: string) => void;
 }
 
+// Bullet character for parallel tool visualization
+const PARALLEL_BULLET = '•';
+
 // Main component renders the border and maps the tools using ToolMessage
 export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   toolCalls,
@@ -63,6 +66,12 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     hasPending && (!isShellCommand || !isEmbeddedShellFocused);
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
+
+  // Check if this is a parallel execution (multiple tools in the same group)
+  const isParallelExecution = toolCalls.length > 1;
+  const executingCount = toolCalls.filter(
+    (t) => t.status === ToolCallStatus.Executing,
+  ).length;
 
   // only prompt for tool approval on the first 'confirming' tool in the list
   // note, after the CTA, this automatically moves over to the next 'confirming' tool
@@ -102,9 +111,30 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       */
       width={terminalWidth}
     >
+      {/* Show parallel execution header for multiple tools */}
+      {isParallelExecution && (
+        <Box
+          paddingLeft={1}
+          borderStyle="round"
+          borderColor={borderColor}
+          borderDimColor={borderDimColor}
+          borderLeft={true}
+          borderRight={true}
+          borderTop={true}
+          borderBottom={false}
+        >
+          <Text color={theme.text.accent}>
+            {executingCount > 0
+              ? `⋮ Running ${toolCalls.length} tools in parallel...`
+              : `⋮ Ran ${toolCalls.length} tools in parallel`}
+          </Text>
+        </Box>
+      )}
       {toolCalls.map((tool, index) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
         const isFirst = index === 0;
+        // Bullet for parallel visualization
+        const treeConnector = isParallelExecution ? PARALLEL_BULLET : '';
         const isShellTool =
           tool.name === SHELL_COMMAND_NAME ||
           tool.name === SHELL_NAME ||
@@ -122,6 +152,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           isFirst,
           borderColor,
           borderDimColor,
+          treeConnector,
         };
 
         return (

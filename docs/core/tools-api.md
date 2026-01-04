@@ -107,6 +107,53 @@ its specific functionality.
 9.  **Display to user:** The `returnDisplay` from the `ToolResult` is sent to
     the CLI to show the user what the tool did.
 
+## Parallel tool execution
+
+When the Gemini model requests multiple tools in a single response, the core
+scheduler uses **Kind-based parallel execution** to optimize performance while
+maintaining safety:
+
+### Tool Kinds
+
+Each tool declares a `Kind` that categorizes its behavior:
+
+| Kind           | Description                      | Examples                  |
+| -------------- | -------------------------------- | ------------------------- |
+| `Kind.Read`    | Read-only file operations        | `read_file`, `ls`         |
+| `Kind.Search`  | Search operations                | `grep`, `glob`            |
+| `Kind.Fetch`   | Network fetch operations         | `web_fetch`, `web_search` |
+| `Kind.Think`   | Computation without side effects | Memory operations         |
+| `Kind.Edit`    | File modifications               | `edit`, `write_file`      |
+| `Kind.Delete`  | File deletions                   | File removal operations   |
+| `Kind.Move`    | File moves/renames               | File move operations      |
+| `Kind.Execute` | Shell command execution          | `run_shell_command`       |
+| `Kind.Other`   | External/MCP tools               | Tools from MCP servers    |
+
+### Execution strategy
+
+The scheduler separates tools into two groups based on their Kind:
+
+1. **Read-only tools** (`Kind.Read`, `Kind.Search`, `Kind.Fetch`, `Kind.Think`):
+   - Execute in **parallel** using `Promise.all()`
+   - Safe because they have no side effects
+   - Provides significant performance improvements for research-heavy tasks
+
+2. **Mutating tools** (`Kind.Edit`, `Kind.Delete`, `Kind.Move`, `Kind.Execute`,
+   `Kind.Other`):
+   - Execute **sequentially** in the order requested by the model
+   - Prevents race conditions (e.g., two edits to the same file)
+   - MCP tools (`Kind.Other`) are treated as mutating for safety
+
+### Execution order
+
+When a batch contains both read-only and mutating tools:
+
+1. All read-only tools execute first (in parallel)
+2. Then mutating tools execute one at a time (sequentially)
+
+This ensures maximum parallelism for safe operations while maintaining
+correctness for operations that modify state.
+
 ## Extending with custom tools
 
 While direct programmatic registration of new tools by users isn't explicitly

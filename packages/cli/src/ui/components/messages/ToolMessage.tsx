@@ -41,6 +41,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   embeddedShellFocused?: boolean;
   ptyId?: number;
   config?: Config;
+  treeConnector?: string;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -59,6 +60,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   embeddedShellFocused,
   ptyId,
   config,
+  treeConnector,
 }) => {
   const isThisShellFocused =
     (name === SHELL_COMMAND_NAME || name === 'Shell') &&
@@ -102,6 +104,9 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         borderColor={borderColor}
         borderDimColor={borderDimColor}
       >
+        {treeConnector && (
+          <Text color={theme.text.secondary}>{treeConnector} </Text>
+        )}
         <ToolStatusIndicator status={status} name={name} />
         <ToolInfo
           name={name}

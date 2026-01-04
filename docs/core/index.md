@@ -29,6 +29,8 @@ While the `packages/cli` portion of Gemini CLI provides the user interface,
     execution).
   - Interpreting tool use requests from the Gemini model.
   - Executing the requested tools with the provided arguments.
+  - **Parallel execution** of read-only tools for improved performance (see
+    [Tools API](./tools-api.md#parallel-tool-execution)).
   - Returning tool execution results to the Gemini model for further processing.
 - **Session and state management:** Keeping track of the conversation state,
   including history and any relevant context required for coherent interactions.
