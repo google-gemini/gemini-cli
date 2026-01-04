@@ -25,6 +25,7 @@ export interface PlanMetadata {
   updatedAt: string;
   status: 'draft' | 'saved' | 'executed';
   originalPrompt: string;
+  lastViewed?: string; // ISO timestamp of when plan was last viewed
 }
 
 /**
@@ -45,6 +46,7 @@ export interface PlanSummary {
   updatedAt: string;
   status: 'draft' | 'saved' | 'executed';
   filePath: string;
+  lastViewed?: string;
 }
 
 /**
@@ -110,7 +112,7 @@ export class PlanService {
    * Serializes plan data to Markdown with YAML frontmatter.
    */
   private serializePlan(data: PlanData): string {
-    const frontmatter = [
+    const lines = [
       '---',
       `id: "${data.metadata.id}"`,
       `title: "${data.metadata.title.replace(/"/g, '\\"')}"`,
@@ -118,11 +120,16 @@ export class PlanService {
       `updatedAt: "${data.metadata.updatedAt}"`,
       `status: "${data.metadata.status}"`,
       `originalPrompt: "${data.metadata.originalPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`,
-      '---',
-      '',
-    ].join('\n');
+    ];
 
-    return frontmatter + data.content;
+    // Only include lastViewed if it's set
+    if (data.metadata.lastViewed) {
+      lines.push(`lastViewed: "${data.metadata.lastViewed}"`);
+    }
+
+    lines.push('---', '');
+
+    return lines.join('\n') + data.content;
   }
 
   /**
@@ -165,6 +172,7 @@ export class PlanService {
         updatedAt: metadata['updatedAt'] || new Date().toISOString(),
         status: (metadata['status'] as PlanMetadata['status']) || 'saved',
         originalPrompt: metadata['originalPrompt'] || '',
+        lastViewed: metadata['lastViewed'] || undefined,
       },
     };
   }
@@ -267,6 +275,7 @@ export class PlanService {
               updatedAt: planData.metadata.updatedAt,
               status: planData.metadata.status,
               filePath,
+              lastViewed: planData.metadata.lastViewed,
             });
           }
         } catch (error) {
@@ -361,6 +370,57 @@ export class PlanService {
       return true;
     } catch (error) {
       debugLogger.error('Error updating plan status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Updates the lastViewed timestamp of a plan.
+   *
+   * @param id The plan ID.
+   * @returns True if the plan was updated, false if it didn't exist.
+   */
+  async updateLastViewed(id: string): Promise<boolean> {
+    const planData = await this.loadPlan(id);
+    if (!planData) {
+      return false;
+    }
+
+    planData.metadata.lastViewed = new Date().toISOString();
+
+    const filePath = this.getPlanPath(id);
+    try {
+      await fsPromises.writeFile(
+        filePath,
+        this.serializePlan(planData),
+        'utf8',
+      );
+      return true;
+    } catch (error) {
+      debugLogger.error('Error updating plan lastViewed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Exports a plan's content to a file.
+   *
+   * @param id The plan ID.
+   * @param targetPath The path to export to.
+   * @returns True if exported successfully.
+   */
+  async exportPlan(id: string, targetPath: string): Promise<boolean> {
+    const planData = await this.loadPlan(id);
+    if (!planData) {
+      return false;
+    }
+
+    try {
+      // Export just the content, not the frontmatter
+      await fsPromises.writeFile(targetPath, planData.content, 'utf8');
+      return true;
+    } catch (error) {
+      debugLogger.error('Error exporting plan:', error);
       throw error;
     }
   }

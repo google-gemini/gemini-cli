@@ -199,6 +199,7 @@ export interface PlanDetail {
   title: string;
   updatedAt: string;
   status: 'draft' | 'saved' | 'executed';
+  lastViewed?: string;
 }
 
 export type HistoryItemPlanList = HistoryItemBase & {

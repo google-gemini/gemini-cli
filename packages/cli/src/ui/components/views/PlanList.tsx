@@ -30,6 +30,13 @@ export const PlanList: React.FC<PlanListProps> = ({ plans }) => {
     return <Text>No saved plans found.</Text>;
   }
 
+  // Find the most recently viewed plan
+  const lastViewedPlan = plans.reduce<PlanDetail | null>((latest, plan) => {
+    if (!plan.lastViewed) return latest;
+    if (!latest || !latest.lastViewed) return plan;
+    return plan.lastViewed > latest.lastViewed ? plan : latest;
+  }, null);
+
   return (
     <Box flexDirection="column">
       <Text>Saved implementation plans:</Text>
@@ -42,6 +49,7 @@ export const PlanList: React.FC<PlanListProps> = ({ plans }) => {
         const formattedDate = match
           ? `${match[1]} ${match[2]}`
           : 'Invalid Date';
+        const isLastViewed = lastViewedPlan && plan.id === lastViewedPlan.id;
         return (
           <Box key={plan.id} flexDirection="row">
             <Text>
@@ -50,6 +58,9 @@ export const PlanList: React.FC<PlanListProps> = ({ plans }) => {
               <Text color={STATUS_COLORS[plan.status]}>
                 [{STATUS_LABELS[plan.status]}]
               </Text>
+              {isLastViewed && (
+                <Text color={theme.status.info}> [last viewed]</Text>
+              )}
             </Text>
           </Box>
         );
@@ -57,7 +68,7 @@ export const PlanList: React.FC<PlanListProps> = ({ plans }) => {
       <Box height={1} />
       <Text color={theme.text.secondary}>
         Use /plan view &lt;title&gt; to see a plan, /plan resume &lt;title&gt;
-        to execute
+        to execute, /plan export &lt;title&gt; &lt;file&gt; to export
       </Text>
     </Box>
   );

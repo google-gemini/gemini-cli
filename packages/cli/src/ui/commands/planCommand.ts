@@ -13,6 +13,7 @@ import { CommandKind } from './types.js';
 import { PlanService, ApprovalMode } from '@google/gemini-cli-core';
 import type { HistoryItemPlanList, PlanDetail } from '../types.js';
 import { MessageType } from '../types.js';
+import path from 'node:path';
 
 /**
  * Gets the PlanService instance for the current project.
@@ -39,6 +40,7 @@ const listCommand: SlashCommand = {
       title: p.title,
       updatedAt: p.updatedAt,
       status: p.status,
+      lastViewed: p.lastViewed,
     }));
 
     const item: HistoryItemPlanList = {
@@ -92,6 +94,9 @@ const viewCommand: SlashCommand = {
         content: `Error loading plan "${matchingPlan.title}".`,
       };
     }
+
+    // Update lastViewed timestamp
+    await planService.updateLastViewed(matchingPlan.id);
 
     // Display the plan content as a Gemini message
     const header = `## Plan: ${planData.metadata.title}\n\n**Status:** ${planData.metadata.status}\n**Created:** ${planData.metadata.createdAt}\n**Original prompt:** ${planData.metadata.originalPrompt}\n\n---\n\n`;
@@ -248,6 +253,88 @@ const deleteCommand: SlashCommand = {
 };
 
 /**
+ * Exports a plan to a file.
+ */
+const exportCommand: SlashCommand = {
+  name: 'export',
+  description:
+    'Export a plan to a file. Usage: /plan export <title> <filename>',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: async (context, args): Promise<SlashCommandActionReturn | void> => {
+    const parts = args.trim().split(/\s+/);
+    if (parts.length < 2) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content:
+          'Missing arguments. Usage: /plan export <title> <filename>\nTip: Use /plan view <title> first, then export will use the last viewed plan if no title is provided.',
+      };
+    }
+
+    // Last part is the filename, everything else is the title search
+    const filename = parts[parts.length - 1];
+    const searchTerm = parts.slice(0, -1).join(' ');
+
+    const planService = getPlanService(context);
+    const plans = await planService.listPlans();
+
+    // Find plan by title (case-insensitive partial match)
+    const matchingPlan = plans.find((p) =>
+      p.title.toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+
+    if (!matchingPlan) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `No plan found matching "${searchTerm}".`,
+      };
+    }
+
+    // Resolve filename relative to current working directory
+    const targetPath = path.isAbsolute(filename)
+      ? filename
+      : path.join(process.cwd(), filename);
+
+    try {
+      const exported = await planService.exportPlan(
+        matchingPlan.id,
+        targetPath,
+      );
+      if (exported) {
+        return {
+          type: 'message',
+          messageType: 'info',
+          content: `Plan "${matchingPlan.title}" exported to ${targetPath}`,
+        };
+      } else {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `Error exporting plan "${matchingPlan.title}".`,
+        };
+      }
+    } catch (error) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Error exporting plan: ${(error as Error).message}`,
+      };
+    }
+  },
+  completion: async (context, partialArg) => {
+    const planService = getPlanService(context);
+    const plans = await planService.listPlans();
+    return plans
+      .map((p) => p.title)
+      .filter((title) =>
+        title.toLowerCase().includes(partialArg.toLowerCase()),
+      );
+  },
+};
+
+/**
  * Parent command for plan management.
  */
 export const planCommand: SlashCommand = {
@@ -255,5 +342,11 @@ export const planCommand: SlashCommand = {
   description: 'Manage implementation plans',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
-  subCommands: [listCommand, viewCommand, resumeCommand, deleteCommand],
+  subCommands: [
+    listCommand,
+    viewCommand,
+    resumeCommand,
+    deleteCommand,
+    exportCommand,
+  ],
 };

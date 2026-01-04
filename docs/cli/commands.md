@@ -159,9 +159,10 @@ Slash commands provide meta-level control over the CLI itself.
   - **Description:** Manage implementation plans created in Plan Mode.
   - **Sub-commands:**
     - **`list`**:
-      - **Description:** List all saved implementation plans.
+      - **Description:** List all saved implementation plans. Shows
+        `[last viewed]` indicator for the most recently viewed plan.
     - **`view`**:
-      - **Description:** View a saved plan's content.
+      - **Description:** View a saved plan's content and mark it as last viewed.
       - **Usage:** `/plan view <title>`
     - **`resume`** (or **`execute`**):
       - **Description:** Load a saved plan and switch to Auto Edit mode for
@@ -170,6 +171,9 @@ Slash commands provide meta-level control over the CLI itself.
     - **`delete`**:
       - **Description:** Delete a saved plan.
       - **Usage:** `/plan delete <title>`
+    - **`export`**:
+      - **Description:** Export a plan's content to a file.
+      - **Usage:** `/plan export <title> <filename>`
   - **Note:** Plans are stored in `.gemini/plans/` as Markdown files. See
     [Plan Mode documentation](./plan-mode.md) for details.
 

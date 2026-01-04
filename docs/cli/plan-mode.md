@@ -96,7 +96,8 @@ Plan Mode includes a command for managing saved implementation plans:
 ```
 
 Shows all saved plans with their titles, dates, and status
-(draft/saved/executed).
+(draft/saved/executed). The most recently viewed plan is marked with
+`[last viewed]` to help you quickly find the plan you were just looking at.
 
 #### View a Plan
 
@@ -105,6 +106,7 @@ Shows all saved plans with their titles, dates, and status
 ```
 
 Displays the full content of a saved plan. Supports partial title matching.
+Viewing a plan marks it as "last viewed" so you can easily find it again.
 
 #### Resume/Execute a Plan
 
@@ -122,6 +124,23 @@ content is injected as context for the agent.
 ```
 
 Removes a saved plan from the `.gemini/plans/` directory.
+
+#### Export a Plan
+
+```
+/plan export <title> <filename>
+```
+
+Exports the plan content (without metadata) to a file in your current working
+directory. This is useful for:
+
+- Moving a plan into your project as documentation
+- Sharing a plan with team members
+- Creating a permanent record of the implementation approach
+
+**Tip:** Use `/plan view <title>` first to preview a plan, then
+`/plan export <title> plan.md` to save it. The `[last viewed]` indicator in
+`/plan list` helps you remember which plan you just looked at.
 
 ### Plan Storage
 
