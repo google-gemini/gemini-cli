@@ -1206,7 +1206,7 @@ export const useGeminiStream = (
                 dependencies: args.dependencies || [],
                 originalPrompt,
                 planId,
-                onChoice: async (choice, _feedback) => {
+                onChoice: async (choice, feedback) => {
                   setPlanCompletionRequest(null);
 
                   if (choice === 'execute') {
@@ -1239,16 +1239,32 @@ export const useGeminiStream = (
                       Date.now(),
                     );
                     setIsResponding(false);
-                  } else if (choice === 'refine') {
-                    // For refine, just show a message - user will need to type feedback
+                  } else if (choice === 'refine' && feedback) {
+                    // Refine the plan with user feedback - stay in Plan Mode
+                    // Delete the current draft since we're replacing it with a refined version
+                    await planService.deletePlan(planId);
                     addItem(
                       {
                         type: MessageType.INFO,
-                        text: 'Please provide feedback to refine the plan.',
+                        text: `Refining plan with feedback: "${feedback}"`,
                       },
                       Date.now(),
                     );
-                    setIsResponding(false);
+                    // Construct refinement prompt with context
+                    const refinePrompt = `I previously asked you to plan: "${originalPrompt}"
+
+You created this plan titled "${args.title}":
+
+${args.content}
+
+Please revise the plan based on this feedback:
+${feedback}
+
+Create an updated implementation plan addressing the feedback. Use present_plan to show me the revised plan.`;
+                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                    submitQuery([{ text: refinePrompt }], {
+                      isContinuation: true,
+                    });
                   } else {
                     // Cancel - delete the draft plan
                     await planService.deletePlan(planId);
@@ -1276,7 +1292,7 @@ export const useGeminiStream = (
                 dependencies: args.dependencies || [],
                 originalPrompt,
                 planId: `temp-${Date.now()}`,
-                onChoice: async (choice, _feedback) => {
+                onChoice: async (choice, feedback) => {
                   setPlanCompletionRequest(null);
                   if (choice === 'execute') {
                     config.setApprovalMode(ApprovalMode.AUTO_EDIT);
@@ -1293,15 +1309,30 @@ export const useGeminiStream = (
                     submitQuery([{ text: executeInstruction }], {
                       isContinuation: true,
                     });
-                  } else if (choice === 'refine') {
+                  } else if (choice === 'refine' && feedback) {
+                    // Refine the plan with user feedback - stay in Plan Mode
                     addItem(
                       {
                         type: MessageType.INFO,
-                        text: 'Please provide feedback to refine the plan.',
+                        text: `Refining plan with feedback: "${feedback}"`,
                       },
                       Date.now(),
                     );
-                    setIsResponding(false);
+                    // Construct refinement prompt with context
+                    const refinePrompt = `I previously asked you to plan: "${originalPrompt}"
+
+You created this plan titled "${args.title}":
+
+${args.content}
+
+Please revise the plan based on this feedback:
+${feedback}
+
+Create an updated implementation plan addressing the feedback. Use present_plan to show me the revised plan.`;
+                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                    submitQuery([{ text: refinePrompt }], {
+                      isContinuation: true,
+                    });
                   } else {
                     addItem(
                       {

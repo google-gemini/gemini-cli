@@ -80,10 +80,10 @@ class PresentPlanToolInvocation extends BaseToolInvocation<
     const { title, content, affected_files, dependencies } = this.params;
 
     // Build the structured output
+    // Note: We don't add a header here since the tool description already shows
+    // "Plan: <title>" and the content often includes its own heading
     const sections: string[] = [];
 
-    sections.push(`# Implementation Plan: ${title}`);
-    sections.push('');
     sections.push(content);
     sections.push('');
 
