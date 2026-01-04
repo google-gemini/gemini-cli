@@ -1204,7 +1204,6 @@ export const useGeminiStream = (
                   // Switch to AUTO_EDIT mode
                   config.setApprovalMode(ApprovalMode.AUTO_EDIT);
                   await planService.updatePlanStatus(planId, 'executed');
-                  // The plan will be executed in the next user turn
                   addItem(
                     {
                       type: MessageType.INFO,
@@ -1212,7 +1211,12 @@ export const useGeminiStream = (
                     },
                     Date.now(),
                   );
-                  setIsResponding(false);
+                  // Start implementation by submitting an execute instruction
+                  const executeInstruction = `Please implement the plan above. Start with the first step and work through each step systematically.`;
+                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                  submitQuery([{ text: executeInstruction }], {
+                    isContinuation: false,
+                  });
                 } else if (choice === 'save') {
                   // Plan is already saved as draft, update status to 'saved'
                   await planService.updatePlanStatus(planId, 'saved');
@@ -1253,6 +1257,54 @@ export const useGeminiStream = (
             return;
           } catch (error) {
             debugLogger.warn('Error saving plan as draft:', error);
+            // Even if saving fails, still show the dialog with a temporary ID
+            setPlanCompletionRequest({
+              title: args.title,
+              content: args.content,
+              affectedFiles: args.affected_files || [],
+              dependencies: args.dependencies || [],
+              originalPrompt,
+              planId: `temp-${Date.now()}`,
+              onChoice: async (choice, _feedback) => {
+                setPlanCompletionRequest(null);
+                if (choice === 'execute') {
+                  config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+                  addItem(
+                    {
+                      type: MessageType.INFO,
+                      text: `Executing plan "${args.title}"... Mode switched to Auto Edit.`,
+                    },
+                    Date.now(),
+                  );
+                  // Start implementation
+                  const executeInstruction = `Please implement the plan above. Start with the first step and work through each step systematically.`;
+                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                  submitQuery([{ text: executeInstruction }], {
+                    isContinuation: false,
+                  });
+                } else if (choice === 'refine') {
+                  addItem(
+                    {
+                      type: MessageType.INFO,
+                      text: 'Please provide feedback to refine the plan.',
+                    },
+                    Date.now(),
+                  );
+                  setIsResponding(false);
+                } else {
+                  addItem(
+                    {
+                      type: MessageType.INFO,
+                      text: 'Plan discarded.',
+                    },
+                    Date.now(),
+                  );
+                  setIsResponding(false);
+                }
+              },
+            });
+            // Don't continue even if save failed
+            return;
           }
         }
       }

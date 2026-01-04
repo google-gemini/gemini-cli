@@ -125,7 +125,16 @@ class PresentPlanToolInvocation extends BaseToolInvocation<
           dependencies: dependencies || [],
         },
       }),
-      returnDisplay: planOutput,
+      // Return structured data so UI can detect and handle plan completion
+      returnDisplay: {
+        presentedPlan: {
+          title,
+          content,
+          affectedFiles: affected_files || [],
+          dependencies: dependencies || [],
+          displayText: planOutput,
+        },
+      },
     };
   }
 }

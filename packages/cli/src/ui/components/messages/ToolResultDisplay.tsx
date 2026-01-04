@@ -114,6 +114,23 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           'todos' in truncatedResultDisplay ? (
           // display nothing, as the TodoTray will handle rendering todos
           <></>
+        ) : typeof truncatedResultDisplay === 'object' &&
+          'presentedPlan' in truncatedResultDisplay ? (
+          // Render the presented plan content as markdown
+          <Box flexDirection="column">
+            <MarkdownDisplay
+              text={
+                (
+                  truncatedResultDisplay as {
+                    presentedPlan: { displayText: string };
+                  }
+                ).presentedPlan.displayText
+              }
+              terminalWidth={childWidth}
+              renderMarkdown={renderMarkdown}
+              isPending={false}
+            />
+          </Box>
         ) : (
           <AnsiOutputText
             data={truncatedResultDisplay as AnsiOutput}

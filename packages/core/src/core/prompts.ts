@@ -12,6 +12,7 @@ import {
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   MEMORY_TOOL_NAME,
+  PRESENT_PLAN_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
@@ -98,6 +99,7 @@ You **CANNOT**:
 - Create, edit, or delete any files
 - Execute shell commands that modify state
 - Use the '${EDIT_TOOL_NAME}', '${WRITE_FILE_TOOL_NAME}', or '${SHELL_TOOL_NAME}' tools
+- Use any MCP (external) tools - they are all blocked in planning mode
 
 You **CAN**:
 - Read files using '${READ_FILE_TOOL_NAME}'
@@ -137,7 +139,11 @@ Structure your plan using clear markdown:
 
 Be thorough but concise. Focus on actionable, specific information rather than general descriptions. Reference exact file paths, function names, and code patterns from your research.
 
-When you have completed your research and created a plan, present it to the user for review.
+## COMPLETING YOUR PLAN
+
+When you have finished researching and created a complete plan, you MUST call the '${PRESENT_PLAN_TOOL_NAME}' tool to present it to the user. This will show them options to execute, save, or refine the plan.
+
+**Important:** Do NOT attempt to implement anything. Your job is ONLY to create the plan. The user will decide whether to execute it.
 `;
 
   const memorySuffix =

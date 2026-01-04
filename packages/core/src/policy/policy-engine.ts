@@ -165,6 +165,22 @@ export class PolicyEngine {
       `[PolicyEngine.check] toolCall.name: ${toolCall.name}, stringifiedArgs: ${stringifiedArgs}`,
     );
 
+    // In PLAN mode, deny all MCP tools (tools with '__' in the name)
+    // MCP tools are external and could have side effects, so we block them during planning
+    if (
+      this.approvalMode === ApprovalMode.PLAN &&
+      toolCall.name &&
+      toolCall.name.includes('__')
+    ) {
+      debugLogger.debug(
+        `[PolicyEngine.check] PLAN mode: denying MCP tool ${toolCall.name}`,
+      );
+      return {
+        decision: PolicyDecision.DENY,
+        rule: undefined,
+      };
+    }
+
     // Find the first matching rule (already sorted by priority)
     let matchedRule: PolicyRule | undefined;
     let decision: PolicyDecision | undefined;

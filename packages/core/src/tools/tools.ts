@@ -636,7 +636,22 @@ export interface TodoList {
   todos: Todo[];
 }
 
-export type ToolResultDisplay = string | FileDiff | AnsiOutput | TodoList;
+export interface PresentedPlan {
+  presentedPlan: {
+    title: string;
+    content: string;
+    affectedFiles: string[];
+    dependencies: string[];
+    displayText: string;
+  };
+}
+
+export type ToolResultDisplay =
+  | string
+  | FileDiff
+  | AnsiOutput
+  | TodoList
+  | PresentedPlan;
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 

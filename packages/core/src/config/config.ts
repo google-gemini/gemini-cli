@@ -1191,7 +1191,14 @@ export class Config {
         'Cannot enable privileged approval modes in an untrusted folder.',
       );
     }
+    const previousMode = this.policyEngine.getApprovalMode();
     this.policyEngine.setApprovalMode(mode);
+
+    // When switching to/from PLAN mode, update the system instruction
+    // since PLAN mode uses a different system prompt
+    if (previousMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN) {
+      void this.updateSystemInstructionIfInitialized();
+    }
   }
 
   isYoloModeDisabled(): boolean {
