@@ -35,6 +35,20 @@ describe('ThinkingMessage', () => {
     expect(lastFrame()).toContain('(1)');
   });
 
+  it('renders thought content', () => {
+    const { lastFrame } = render(
+      <ThinkingMessage
+        thoughts={[
+          { subject: 'Planning', description: 'I am planning the solution.' },
+        ]}
+        terminalWidth={80}
+      />,
+    );
+
+    expect(lastFrame()).toContain('Planning');
+    expect(lastFrame()).toContain('I am planning the solution.');
+  });
+
   it('renders empty state gracefully', () => {
     const { lastFrame } = render(
       <ThinkingMessage thoughts={[]} terminalWidth={80} />,
