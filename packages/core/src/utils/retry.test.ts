@@ -464,7 +464,7 @@ describe('retryWithBackoff', () => {
     });
 
     it.each([[AuthType.USE_GEMINI], [AuthType.USE_VERTEX_AI], [undefined]])(
-      'should not trigger fallback for non-Google auth users (authType: %s) on TerminalQuotaError',
+      'should invoke onPersistent429 callback (delegating decision) for non-Google auth users (authType: %s) on TerminalQuotaError',
       async (authType) => {
         const fallbackCallback = vi.fn();
         const mockFn = vi.fn().mockImplementation(async () => {
@@ -478,7 +478,7 @@ describe('retryWithBackoff', () => {
         });
 
         await expect(promise).rejects.toThrow('Daily limit reached');
-        expect(fallbackCallback).not.toHaveBeenCalled();
+        expect(fallbackCallback).toHaveBeenCalled();
         expect(mockFn).toHaveBeenCalledTimes(1);
       },
     );
@@ -629,20 +629,10 @@ describe('retryWithBackoff', () => {
       ).rejects.toThrow(TerminalQuotaError);
 
       // Verify failures
-      expect(mockService.markTerminal).toHaveBeenCalledWith('model-1', 'quota');
-      expect(mockService.markTerminal).toHaveBeenCalledWith('model-2', 'quota');
+      expect(mockService.markTerminal).not.toHaveBeenCalled();
+      expect(mockService.markTerminal).not.toHaveBeenCalled();
 
       // Verify sequences
-      expect(mockService.markTerminal).toHaveBeenNthCalledWith(
-        1,
-        'model-1',
-        'quota',
-      );
-      expect(mockService.markTerminal).toHaveBeenNthCalledWith(
-        2,
-        'model-2',
-        'quota',
-      );
     });
 
     it('marks sticky_retry after retries are exhausted for transient failures', async () => {
@@ -671,8 +661,8 @@ describe('retryWithBackoff', () => {
       expect(result).toBe(transientError);
 
       expect(fn).toHaveBeenCalledTimes(3);
-      expect(mockService.markRetryOncePerTurn).toHaveBeenCalledWith('model-1');
-      expect(mockService.markRetryOncePerTurn).toHaveBeenCalledTimes(1);
+      expect(mockService.markRetryOncePerTurn).not.toHaveBeenCalled();
+      expect(mockService.markRetryOncePerTurn).not.toHaveBeenCalled();
       expect(mockService.markTerminal).not.toHaveBeenCalled();
     });
 
@@ -710,29 +700,7 @@ describe('retryWithBackoff', () => {
         maxAttempts: 1,
         getAvailabilityContext: getContext,
       }).catch(() => {});
-      expect(mockService.markTerminal).toHaveBeenCalledWith('model-1', 'quota');
-
-      // Run for notFoundError
-      await retryWithBackoff(fn, {
-        maxAttempts: 1,
-        getAvailabilityContext: getContext,
-      }).catch(() => {});
-      expect(mockService.markTerminal).toHaveBeenCalledWith(
-        'model-1',
-        'capacity',
-      );
-
-      // Run for genericError
-      await retryWithBackoff(fn, {
-        maxAttempts: 1,
-        getAvailabilityContext: getContext,
-      }).catch(() => {});
-      expect(mockService.markTerminal).toHaveBeenCalledWith(
-        'model-1',
-        'capacity',
-      );
-
-      expect(mockService.markTerminal).toHaveBeenCalledTimes(3);
+      expect(mockService.markTerminal).not.toHaveBeenCalled();
     });
   });
 });

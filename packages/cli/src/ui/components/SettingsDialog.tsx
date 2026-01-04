@@ -42,7 +42,7 @@ import {
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -254,7 +254,11 @@ export function SettingsDialog({
             if (key === 'general.vimMode' && newValue !== vimEnabled) {
               // Call toggleVimEnabled to sync the VimModeContext local state
               toggleVimEnabled().catch((error) => {
-                console.error('Failed to toggle vim mode:', error);
+                coreEvents.emitFeedback(
+                  'error',
+                  'Failed to toggle vim mode:',
+                  error,
+                );
               });
             }
 
@@ -447,7 +451,7 @@ export function SettingsDialog({
   };
 
   // Height constraint calculations similar to ThemeDialog
-  const DIALOG_PADDING = 4;
+  const DIALOG_PADDING = 5;
   const SETTINGS_TITLE_HEIGHT = 2; // "Settings" title + spacing
   const SCROLL_ARROWS_HEIGHT = 2; // Up and down arrows
   const SPACING_HEIGHT = 1; // Space between settings list and scope

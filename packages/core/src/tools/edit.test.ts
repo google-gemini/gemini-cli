@@ -59,6 +59,10 @@ import { ApprovalMode } from '../policy/types.js';
 import type { Content, Part, SchemaUnion } from '@google/genai';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
+import {
+  createMockMessageBus,
+  getMockMessageBusInstance,
+} from '../test-utils/mock-message-bus.js';
 
 describe('EditTool', () => {
   let tool: EditTool;
@@ -156,12 +160,12 @@ describe('EditTool', () => {
         const problematicSnippet =
           snippetMatch && snippetMatch[1] ? snippetMatch[1] : '';
 
-        if (((schema as any).properties as any)?.corrected_target_snippet) {
+        if ((schema as any).properties?.corrected_target_snippet) {
           return Promise.resolve({
             corrected_target_snippet: problematicSnippet,
           });
         }
-        if (((schema as any).properties as any)?.corrected_new_string) {
+        if ((schema as any).properties?.corrected_new_string) {
           // For new_string correction, we might need more sophisticated logic,
           // but for now, returning original is a safe default if not specified by a test.
           const originalNewStringMatch = promptText.match(
@@ -177,7 +181,9 @@ describe('EditTool', () => {
       },
     );
 
-    tool = new EditTool(mockConfig);
+    const bus = createMockMessageBus();
+    getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+    tool = new EditTool(mockConfig, bus);
   });
 
   afterEach(() => {
@@ -1029,7 +1035,10 @@ describe('EditTool', () => {
     it('should use windows-style path examples on windows', () => {
       vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
 
-      const tool = new EditTool({} as unknown as Config);
+      const tool = new EditTool(
+        {} as unknown as Config,
+        createMockMessageBus(),
+      );
       const schema = tool.schema;
       expect(
         (schema.parametersJsonSchema as EditFileParameterSchema).properties
@@ -1040,7 +1049,10 @@ describe('EditTool', () => {
     it('should use unix-style path examples on non-windows platforms', () => {
       vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
 
-      const tool = new EditTool({} as unknown as Config);
+      const tool = new EditTool(
+        {} as unknown as Config,
+        createMockMessageBus(),
+      );
       const schema = tool.schema;
       expect(
         (schema.parametersJsonSchema as EditFileParameterSchema).properties
@@ -1159,7 +1171,7 @@ describe('EditTool', () => {
             result.returnDisplay.diffStat?.model_removed_lines,
           );
         } else if (result.error) {
-          console.error(`Edit failed for ${file.path}:`, result.error);
+          throw result.error;
         }
       }
 

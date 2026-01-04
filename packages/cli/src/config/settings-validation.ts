@@ -18,7 +18,7 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
   if (def.anyOf) {
     return z.union(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      def.anyOf.map((d: any) => buildZodSchemaFromJsonSchema(d)) as any,
+      def.anyOf.map((d: any) => buildZodSchemaFromJsonSchema(d)),
     );
   }
 
@@ -322,7 +322,7 @@ export function formatValidationError(
     lines.push('');
   }
 
-  lines.push('Please fix the configuration and try again.');
+  lines.push('Please fix the configuration.');
   lines.push(
     'See: https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/configuration.md',
   );

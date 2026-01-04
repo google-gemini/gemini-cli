@@ -22,7 +22,7 @@ vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
 
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 
-const renderWithMockedStats = (metrics: SessionMetrics) => {
+const renderWithMockedStats = (metrics: SessionMetrics, width?: number) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
       sessionId: 'test-session',
@@ -36,7 +36,7 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
     startNewPrompt: vi.fn(),
   });
 
-  return render(<ModelStatsDisplay />);
+  return render(<ModelStatsDisplay />, width);
 };
 
 describe('<ModelStatsDisplay />', () => {
@@ -87,6 +87,7 @@ describe('<ModelStatsDisplay />', () => {
         'gemini-2.5-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
           tokens: {
+            input: 10,
             prompt: 10,
             candidates: 20,
             total: 30,
@@ -128,6 +129,7 @@ describe('<ModelStatsDisplay />', () => {
         'gemini-2.5-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
           tokens: {
+            input: 5,
             prompt: 10,
             candidates: 20,
             total: 30,
@@ -139,6 +141,7 @@ describe('<ModelStatsDisplay />', () => {
         'gemini-2.5-flash': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 50 },
           tokens: {
+            input: 5,
             prompt: 5,
             candidates: 10,
             total: 15,
@@ -180,6 +183,7 @@ describe('<ModelStatsDisplay />', () => {
         'gemini-2.5-pro': {
           api: { totalRequests: 10, totalErrors: 1, totalLatencyMs: 1000 },
           tokens: {
+            input: 50,
             prompt: 100,
             candidates: 200,
             total: 300,
@@ -191,6 +195,7 @@ describe('<ModelStatsDisplay />', () => {
         'gemini-2.5-flash': {
           api: { totalRequests: 20, totalErrors: 2, totalLatencyMs: 500 },
           tokens: {
+            input: 100,
             prompt: 200,
             candidates: 400,
             total: 600,
@@ -235,6 +240,7 @@ describe('<ModelStatsDisplay />', () => {
             totalLatencyMs: 9876,
           },
           tokens: {
+            input: 987654321 - 123456789,
             prompt: 987654321,
             candidates: 123456789,
             total: 999999999,
@@ -272,6 +278,7 @@ describe('<ModelStatsDisplay />', () => {
         'gemini-2.5-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
           tokens: {
+            input: 5,
             prompt: 10,
             candidates: 20,
             total: 30,
@@ -303,6 +310,62 @@ describe('<ModelStatsDisplay />', () => {
     const output = lastFrame();
     expect(output).toContain('gemini-2.5-pro');
     expect(output).not.toContain('gemini-2.5-flash');
+    expect(output).toMatchSnapshot();
+  });
+
+  it('should handle models with long names (gemini-3-*-preview) without layout breaking', () => {
+    const { lastFrame } = renderWithMockedStats(
+      {
+        models: {
+          'gemini-3-pro-preview': {
+            api: { totalRequests: 10, totalErrors: 0, totalLatencyMs: 2000 },
+            tokens: {
+              input: 1000,
+              prompt: 2000,
+              candidates: 4000,
+              total: 6000,
+              cached: 500,
+              thoughts: 100,
+              tool: 50,
+            },
+          },
+          'gemini-3-flash-preview': {
+            api: { totalRequests: 20, totalErrors: 0, totalLatencyMs: 1000 },
+            tokens: {
+              input: 2000,
+              prompt: 4000,
+              candidates: 8000,
+              total: 12000,
+              cached: 1000,
+              thoughts: 200,
+              tool: 100,
+            },
+          },
+        },
+        tools: {
+          totalCalls: 0,
+          totalSuccess: 0,
+          totalFail: 0,
+          totalDurationMs: 0,
+          totalDecisions: {
+            accept: 0,
+            reject: 0,
+            modify: 0,
+            [ToolCallDecision.AUTO_ACCEPT]: 0,
+          },
+          byName: {},
+        },
+        files: {
+          totalLinesAdded: 0,
+          totalLinesRemoved: 0,
+        },
+      },
+      80,
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('gemini-3-pro-');
+    expect(output).toContain('gemini-3-flash-');
     expect(output).toMatchSnapshot();
   });
 });

@@ -242,7 +242,11 @@ ${textContent}
       urls,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          // No need to publish a policy update as the default policy for
+          // AUTO_EDIT already reflects always approving web-fetch.
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+        } else {
+          await this.publishPolicyUpdate(outcome);
         }
       },
     };
