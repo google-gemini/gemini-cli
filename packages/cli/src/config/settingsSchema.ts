@@ -1381,7 +1381,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable Agent Skills (experimental).',
-        showInDialog: false,
+        showInDialog: true,
       },
       codebaseInvestigatorSettings: {
         type: 'object',
