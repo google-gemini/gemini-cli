@@ -313,9 +313,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   // Handle clipboard image pasting with Ctrl+V or right-click
   const handleClipboardPaste = useCallback(async () => {
-    // On Windows, right-click paste triggers QuickEdit mode which also sends
-    // clipboard content as stdin keyboard input. Set paste protection to prevent
-    // the stdin newlines from being interpreted as submit commands.
+    // On Windows, set paste protection as defense-in-depth for terminals that
+    // may inject clipboard content as stdin alongside mouse events.
     if (process.platform === 'win32') {
       recentUnsafePasteTimeRef.current = Date.now();
 
