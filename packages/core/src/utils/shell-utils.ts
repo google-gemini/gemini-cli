@@ -619,3 +619,26 @@ export const spawnAsync = (
       reject(err);
     });
   });
+
+/**
+ * Detects if a shell command contains any redirection or piping operators.
+ * This is used for safety checks to prevent unauthorized file writes or data exfiltration.
+ *
+ * @param command The shell command to check.
+ * @returns true if redirection or piping is detected.
+ */
+export function hasRedirection(command: string): boolean {
+  if (!command) return false;
+
+  // Check for common redirection and piping operators: >, >>, <, |, <<, <<<, &>, &>>
+  // We use a regex that looks for these operators while trying to avoid false positives
+  // in strings (though this is a heuristic).
+  const redirectionRegex = /(?:\s|^)(?:[0-2]?>{1,2}|<|\|{1,2}|&>{1,2})(?:\s|$)/;
+
+  // Also check for bash-specific process substitution
+  const processSubstitutionRegex = /(?:<|>)\(/;
+
+  return (
+    redirectionRegex.test(command) || processSubstitutionRegex.test(command)
+  );
+}

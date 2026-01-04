@@ -154,6 +154,21 @@ modes = ["yolo"]
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should parse and transform allow_redirection property', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "echo"
+decision = "allow"
+priority = 100
+allow_redirection = true
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].allowRedirection).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
     it('should handle TOML parse errors', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]

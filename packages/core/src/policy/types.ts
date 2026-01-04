@@ -117,6 +117,18 @@ export interface PolicyRule {
    * Default is 0.
    */
   priority?: number;
+
+  /**
+   * The approval modes this rule applies to.
+   * Only used for tier 1 (default) rules.
+   */
+  modes?: ApprovalMode[];
+
+  /**
+   * Whether to allow shell redirection in commands matched by this rule.
+   * Only applies to shell tools.
+   */
+  allowRedirection?: boolean;
 }
 
 export interface SafetyCheckerRule {
@@ -215,6 +227,11 @@ export interface PolicyEngineConfig {
    * Defaults to true.
    */
   allowHooks?: boolean;
+
+  /**
+   * The current approval mode.
+   */
+  approvalMode?: ApprovalMode;
 }
 
 export interface PolicySettings {
