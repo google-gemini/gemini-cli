@@ -184,6 +184,57 @@ describe('consent', () => {
         expect(requestConsent).toHaveBeenCalledWith(expectedConsentString);
       });
 
+      it('should request consent if mcpServers change', async () => {
+        const prevConfig: ExtensionConfig = { ...baseConfig };
+        const newConfig: ExtensionConfig = {
+          ...baseConfig,
+          mcpServers: { server1: { command: 'npm', args: ['start'] } },
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          newConfig,
+          requestConsent,
+          false,
+          prevConfig,
+          false,
+        );
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+      });
+
+      it('should request consent if contextFileName changes', async () => {
+        const prevConfig: ExtensionConfig = { ...baseConfig };
+        const newConfig: ExtensionConfig = {
+          ...baseConfig,
+          contextFileName: 'new-context.md',
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          newConfig,
+          requestConsent,
+          false,
+          prevConfig,
+          false,
+        );
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+      });
+
+      it('should request consent if excludeTools changes', async () => {
+        const prevConfig: ExtensionConfig = { ...baseConfig };
+        const newConfig: ExtensionConfig = {
+          ...baseConfig,
+          excludeTools: ['new-tool'],
+        };
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          newConfig,
+          requestConsent,
+          false,
+          prevConfig,
+          false,
+        );
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+      });
+
       it('should include warning when hooks are present', async () => {
         const requestConsent = vi.fn().mockResolvedValue(true);
         await maybeRequestConsentOrFail(
@@ -198,6 +249,18 @@ describe('consent', () => {
             '⚠️  This extension contains Hooks which can automatically execute commands.',
           ),
         );
+      });
+
+      it('should request consent if hooks status changes', async () => {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          baseConfig,
+          requestConsent,
+          true,
+          baseConfig,
+          false,
+        );
+        expect(requestConsent).toHaveBeenCalledTimes(1);
       });
 
       it('should request consent if skills change', async () => {
