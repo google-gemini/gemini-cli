@@ -1533,6 +1533,20 @@
           "default": [],
           "$ref": "#/$defs/HookDefinitionArray"
         },
+        "BeforeSubAgent": {
+          "title": "Before SubAgent Hooks",
+          "description": "Hooks that execute before subagent invocation. Can intercept, validate, or modify subagent calls.",
+          "markdownDescription": "Hooks that execute before subagent invocation. Can intercept, validate, or modify subagent calls.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "$ref": "#/$defs/HookDefinitionArray"
+        },
+        "AfterSubAgent": {
+          "title": "After SubAgent Hooks",
+          "description": "Hooks that execute after subagent completion. Can process results or add context.",
+          "markdownDescription": "Hooks that execute after subagent completion. Can process results or add context.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "$ref": "#/$defs/HookDefinitionArray"
+        },
         "Notification": {
           "title": "Notification Hooks",
           "description": "Hooks that execute on notification events (errors, warnings, info). Can log or alert on specific conditions.",
