@@ -220,7 +220,6 @@ describe('useGeminiStream', () => {
       getContentGeneratorConfig: vi
         .fn()
         .mockReturnValue(contentGeneratorConfig),
-      getUseSmartEdit: () => false,
       isInteractive: () => false,
       getExperiments: () => {},
     } as unknown as Config;

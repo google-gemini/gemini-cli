@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 import { PolicyEngine } from './policy-engine.js';
 import {
   PolicyDecision,
@@ -17,10 +17,39 @@ import {
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
+import { initializeShellParsers } from '../utils/shell-utils.js';
+import { buildArgsPatterns } from './utils.js';
+
+// Mock shell-utils to ensure consistent behavior across platforms (especially Windows CI)
+// We want to test PolicyEngine logic, not the shell parser's ability to parse commands
+vi.mock('../utils/shell-utils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/shell-utils.js')>();
+  return {
+    ...actual,
+    initializeShellParsers: vi.fn().mockResolvedValue(undefined),
+    splitCommands: vi.fn().mockImplementation((command: string) => {
+      // Simple mock splitting logic for test cases
+      if (command.includes('&&')) {
+        return command.split('&&').map((c) => c.trim());
+      }
+      return [command];
+    }),
+    hasRedirection: vi.fn().mockImplementation(
+      (command: string) =>
+        // Simple mock: true if '>' is present, unless it looks like "-> arrow"
+        command.includes('>') && !command.includes('-> arrow'),
+    ),
+  };
+});
 
 describe('PolicyEngine', () => {
   let engine: PolicyEngine;
   let mockCheckerRunner: CheckerRunner;
+
+  beforeAll(async () => {
+    await initializeShellParsers();
+  });
 
   beforeEach(() => {
     mockCheckerRunner = {
@@ -455,6 +484,29 @@ describe('PolicyEngine', () => {
       expect((await engine.check({ name: 'edit' }, undefined)).decision).toBe(
         PolicyDecision.DENY,
       );
+    });
+
+    it('should correctly match commands with quotes in commandPrefix', async () => {
+      const prefix = 'git commit -m "fix"';
+      const patterns = buildArgsPatterns(undefined, prefix);
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: new RegExp(patterns[0]!),
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+      engine = new PolicyEngine({ rules });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'git commit -m "fix"' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
     it('should handle tools with no args', async () => {
@@ -945,6 +997,228 @@ describe('PolicyEngine', () => {
             {
               name: 'run_shell_command',
               args: { command: 'echo "-> arrow"' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should preserve dir_path during recursive shell command checks', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          // Rule that only allows echo in a specific directory
+          // Note: stableStringify sorts keys alphabetically and has no spaces: {"command":"echo hello","dir_path":"/safe/path"}
+          argsPattern: /"command":"echo hello".*"dir_path":"\/safe\/path"/,
+          decision: PolicyDecision.ALLOW,
+        },
+        {
+          // Catch-all ALLOW for shell but with low priority
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          priority: -100,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Compound command. The decomposition will call check() for "echo hello"
+      // which should match our specific high-priority rule IF dir_path is preserved.
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello && pwd', dir_path: '/safe/path' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should upgrade ASK_USER to ALLOW if all sub-commands are allowed', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"git status/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"ls/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          // Catch-all ASK_USER for shell
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // "git status && ls" matches the catch-all ASK_USER rule initially.
+      // But since both parts are explicitly ALLOWed, the result should be upgraded to ALLOW.
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'git status && ls' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should respect explicit DENY for compound commands even if parts are allowed', async () => {
+      const rules: PolicyRule[] = [
+        {
+          // Explicitly DENY the compound command
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"git status && ls"/,
+          decision: PolicyDecision.DENY,
+          priority: 30,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"git status/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"ls/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'git status && ls' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should propagate DENY from any sub-command', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"rm/,
+          decision: PolicyDecision.DENY,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // "echo hello && rm -rf /" -> echo is ALLOW, rm is DENY -> Result DENY
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello && rm -rf /' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should DENY redirected shell commands in non-interactive mode', async () => {
+      const config: PolicyEngineConfig = {
+        nonInteractive: true,
+        rules: [
+          {
+            toolName: 'run_shell_command',
+            decision: PolicyDecision.ALLOW,
+          },
+        ],
+      };
+
+      engine = new PolicyEngine(config);
+
+      // Redirected command should be DENIED in non-interactive mode
+      // (Normally ASK_USER, but ASK_USER -> DENY in non-interactive)
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'run_shell_command',
+              args: { command: 'echo "hello" > file.txt' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.DENY);
+    });
+
+    it('should default to ASK_USER for atomic commands when matching a wildcard ASK_USER rule', async () => {
+      // Regression test: atomic commands were auto-allowing because of optimistic initialization
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Atomic command "whoami" matches the wildcard rule (ASK_USER).
+      // It should NOT be upgraded to ALLOW.
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'run_shell_command',
+              args: { command: 'whoami' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should allow redirected shell commands in non-interactive mode if allowRedirection is true', async () => {
+      const config: PolicyEngineConfig = {
+        nonInteractive: true,
+        rules: [
+          {
+            toolName: 'run_shell_command',
+            decision: PolicyDecision.ALLOW,
+            allowRedirection: true,
+          },
+        ],
+      };
+
+      engine = new PolicyEngine(config);
+
+      // Redirected command should stay ALLOW even in non-interactive mode
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'run_shell_command',
+              args: { command: 'echo "hello" > file.txt' },
             },
             undefined,
           )
