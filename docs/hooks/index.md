@@ -520,20 +520,10 @@ Use the `/hooks panel` command to view all registered hooks:
 
 This command displays:
 
-- **Hooks System Status**: Shows whether the hooks system is globally enabled or
-  disabled
-- All active hooks organized by event
+- All configured hooks organized by event
 - Hook source (user, project, system)
 - Hook type (command or plugin)
-- Execution status and recent output
-
-The status indicator at the top shows the overall state of your hooks:
-
-- **"Enabled"** - At least one hook is currently enabled and ready to run
-- **"Disabled"** - All hooks are currently disabled (none will execute)
-
-This indicator automatically updates based on the actual state of your
-individual hooks.
+- Individual hook status (enabled/disabled)
 
 ### Enable and disable all hooks at once
 
