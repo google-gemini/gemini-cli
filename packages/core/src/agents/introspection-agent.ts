@@ -5,7 +5,7 @@
  */
 
 import type { AgentDefinition } from './types.js';
-import { GetInternalDocsTool } from '../tools/get-internal-docs.js';
+import { GET_INTERNAL_DOCS_TOOL_NAME } from '../tools/tool-names.js';
 import { GEMINI_MODEL_ALIAS_FLASH } from '../config/models.js';
 import { z } from 'zod';
 
@@ -60,7 +60,7 @@ export const IntrospectionAgent: AgentDefinition<
   },
 
   toolConfig: {
-    tools: [new GetInternalDocsTool()],
+    tools: [GET_INTERNAL_DOCS_TOOL_NAME],
   },
 
   promptConfig: {

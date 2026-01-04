@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ActivateSkillTool } from './activate-skill.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 vi.mock('../utils/getFolderStructure.js', () => ({
   getFolderStructure: vi.fn().mockResolvedValue('Mock folder structure'),
@@ -16,13 +17,10 @@ vi.mock('../utils/getFolderStructure.js', () => ({
 describe('ActivateSkillTool', () => {
   let mockConfig: Config;
   let tool: ActivateSkillTool;
-  const mockMessageBus = {
-    publish: vi.fn(),
-    subscribe: vi.fn(),
-    unsubscribe: vi.fn(),
-  } as unknown as MessageBus;
+  let mockMessageBus: MessageBus;
 
   beforeEach(() => {
+    mockMessageBus = createMockMessageBus();
     const skills = [
       {
         name: 'test-skill',

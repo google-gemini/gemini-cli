@@ -164,7 +164,10 @@ export async function handleAtCommand({
   };
 
   const toolRegistry = config.getToolRegistry();
-  const readManyFilesTool = new ReadManyFilesTool(config);
+  const readManyFilesTool = new ReadManyFilesTool(
+    config,
+    config.getMessageBus(),
+  );
   const globTool = toolRegistry.getTool('glob');
 
   if (!readManyFilesTool) {

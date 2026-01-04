@@ -9,13 +9,14 @@ import { GetInternalDocsTool } from './get-internal-docs.js';
 import { ToolErrorType } from './tool-error.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 describe('GetInternalDocsTool (Integration)', () => {
   let tool: GetInternalDocsTool;
   const abortSignal = new AbortController().signal;
 
   beforeEach(() => {
-    tool = new GetInternalDocsTool();
+    tool = new GetInternalDocsTool(createMockMessageBus());
   });
 
   it('should find the documentation root and list files', async () => {

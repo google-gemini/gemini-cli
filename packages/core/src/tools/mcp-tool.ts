@@ -70,10 +70,10 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     readonly serverName: string,
     readonly serverToolName: string,
     readonly displayName: string,
+    messageBus: MessageBus,
     readonly trust?: boolean,
     params: ToolParams = {},
     private readonly cliConfig?: Config,
-    messageBus?: MessageBus,
   ) {
     // Use composite format for policy checks: serverName__toolName
     // This enables server wildcards (e.g., "google-workspace__*")
@@ -239,12 +239,12 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     readonly serverToolName: string,
     description: string,
     override readonly parameterSchema: unknown,
+    messageBus: MessageBus,
     readonly trust?: boolean,
     nameOverride?: string,
     private readonly cliConfig?: Config,
     override readonly extensionName?: string,
     override readonly extensionId?: string,
-    messageBus?: MessageBus,
   ) {
     super(
       nameOverride ?? generateValidName(serverToolName),
@@ -252,9 +252,9 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       description,
       Kind.Other,
       parameterSchema,
+      messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput,
-      messageBus,
       extensionName,
       extensionId,
     );
@@ -271,18 +271,18 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.serverToolName,
       this.description,
       this.parameterSchema,
+      this.messageBus,
       this.trust,
       `${this.getFullyQualifiedPrefix()}${this.serverToolName}`,
       this.cliConfig,
       this.extensionName,
       this.extensionId,
-      this.messageBus,
     );
   }
 
   protected createInvocation(
     params: ToolParams,
-    _messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _displayName?: string,
   ): ToolInvocation<ToolParams, ToolResult> {
@@ -291,10 +291,10 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.serverName,
       this.serverToolName,
       _displayName ?? this.displayName,
+      messageBus,
       this.trust,
       params,
       this.cliConfig,
-      _messageBus ?? this.messageBus,
     );
   }
 }

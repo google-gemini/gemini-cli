@@ -15,6 +15,7 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { type z } from 'zod';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 vi.mock('./local-executor.js');
 
@@ -39,10 +40,12 @@ const testDefinition: LocalAgentDefinition<z.ZodUnknown> = {
 
 describe('LocalSubagentInvocation', () => {
   let mockExecutorInstance: Mocked<LocalAgentExecutor<z.ZodUnknown>>;
+  let mockMessageBus: MessageBus;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
+    mockMessageBus = createMockMessageBus();
 
     mockExecutorInstance = {
       run: vi.fn(),
@@ -55,7 +58,6 @@ describe('LocalSubagentInvocation', () => {
   });
 
   it('should pass the messageBus to the parent constructor', () => {
-    const mockMessageBus = {} as MessageBus;
     const params = { task: 'Analyze data' };
     const invocation = new LocalSubagentInvocation(
       testDefinition,
@@ -76,6 +78,7 @@ describe('LocalSubagentInvocation', () => {
         testDefinition,
         mockConfig,
         params,
+        mockMessageBus,
       );
       const description = invocation.getDescription();
       expect(description).toBe(
@@ -90,6 +93,7 @@ describe('LocalSubagentInvocation', () => {
         testDefinition,
         mockConfig,
         params,
+        mockMessageBus,
       );
       const description = invocation.getDescription();
       // Default INPUT_PREVIEW_MAX_LENGTH is 50
@@ -112,6 +116,7 @@ describe('LocalSubagentInvocation', () => {
         longNameDef,
         mockConfig,
         params,
+        mockMessageBus,
       );
       const description = invocation.getDescription();
       // Default DESCRIPTION_MAX_LENGTH is 200
@@ -137,6 +142,7 @@ describe('LocalSubagentInvocation', () => {
         testDefinition,
         mockConfig,
         params,
+        mockMessageBus,
       );
     });
 
