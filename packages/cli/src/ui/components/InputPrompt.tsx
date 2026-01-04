@@ -139,6 +139,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recentUnsafePasteTimeRef = useRef<number | null>(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastNonNewlineInputTimeRef = useRef<number>(0);
   const innerBoxRef = useRef<DOMElement>(null);
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
@@ -772,6 +773,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             return;
           }
 
+          // If Enter arrived within 30ms of last input, it's likely part of a paste
+          // operation where newlines are injected as stdin (e.g. Windows QuickEdit).
+          const timeSinceLastInput =
+            Date.now() - lastNonNewlineInputTimeRef.current;
+          if (
+            timeSinceLastInput < 30 &&
+            lastNonNewlineInputTimeRef.current !== 0
+          ) {
+            buffer.newline();
+            return;
+          }
+
           const [row, col] = buffer.cursor;
           const line = buffer.lines[row];
           const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
@@ -851,6 +864,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       ) {
         completion.promptCompletion.clear();
         setExpandedSuggestionIndex(-1);
+      }
+
+      // Update timestamp for rapid newline detection (e.g. Windows QuickEdit)
+      if (
+        !keyMatchers[Command.SUBMIT](key) &&
+        !keyMatchers[Command.NEWLINE](key)
+      ) {
+        lastNonNewlineInputTimeRef.current = Date.now();
       }
     },
     [

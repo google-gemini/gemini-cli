@@ -2902,6 +2902,111 @@ describe('InputPrompt', () => {
       unmount();
     });
   });
+
+  describe('Windows QuickEdit rapid newline detection', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should treat rapid newlines as newlines not submit (simulating QuickEdit paste)', async () => {
+      props.buffer.text = '';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { uiActions },
+      );
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      // Simulate rapid input like QuickEdit paste: characters then Enter within 30ms
+      // Send a character to set the last input time
+      await act(async () => {
+        stdin.write('a');
+      });
+
+      // Advance only 10ms (within 30ms threshold)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+      });
+
+      // Set buffer text to simulate the character was inserted
+      props.buffer.text = 'a';
+
+      // Now send Enter rapidly after the text (simulating QuickEdit pasted newline)
+      await act(async () => {
+        stdin.write('\r');
+      });
+
+      // Enter should be treated as newline, not submit
+      // because it arrived too quickly after the previous input
+      expect(props.onSubmit).not.toHaveBeenCalled();
+      expect(props.buffer.newline).toHaveBeenCalled();
+
+      unmount();
+    });
+
+    it('should submit normally when Enter is not rapid (normal typing)', async () => {
+      props.buffer.text = 'some text';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { uiActions },
+      );
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      // Simulate normal typing with delay
+      await act(async () => {
+        stdin.write('x');
+      });
+
+      // Wait longer than threshold (50ms > 30ms)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(50);
+      });
+
+      // Now send Enter after delay
+      await act(async () => {
+        stdin.write('\r');
+      });
+
+      // Should submit normally because enough time passed
+      expect(props.onSubmit).toHaveBeenCalledWith('some text');
+
+      unmount();
+    });
+
+    it('should submit on first Enter when no prior input exists', async () => {
+      props.buffer.text = 'initial text';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { uiActions },
+      );
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      // Send Enter immediately without any prior character input in this session
+      await act(async () => {
+        stdin.write('\r');
+      });
+
+      // Should submit because lastNonNewlineInputTimeRef is 0 (no prior input)
+      expect(props.onSubmit).toHaveBeenCalledWith('initial text');
+
+      unmount();
+    });
+  });
 });
 
 function clean(str: string | undefined): string {
