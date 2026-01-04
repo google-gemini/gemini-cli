@@ -45,6 +45,16 @@ describe('Storage – additional helpers', () => {
     expect(storage.getProjectCommandsDir()).toBe(expected);
   });
 
+  it('getUserSkillsDir returns ~/.gemini/skills', () => {
+    const expected = path.join(os.homedir(), GEMINI_DIR, 'skills');
+    expect(Storage.getUserSkillsDir()).toBe(expected);
+  });
+
+  it('getProjectSkillsDir returns project/.gemini/skills', () => {
+    const expected = path.join(projectRoot, GEMINI_DIR, 'skills');
+    expect(storage.getProjectSkillsDir()).toBe(expected);
+  });
+
   it('getUserAgentsDir returns ~/.gemini/agents', () => {
     const expected = path.join(os.homedir(), GEMINI_DIR, 'agents');
     expect(Storage.getUserAgentsDir()).toBe(expected);
