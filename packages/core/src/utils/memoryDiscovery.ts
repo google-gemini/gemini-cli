@@ -272,7 +272,7 @@ async function readGeminiMdFiles(
           return { filePath, content: processedResult.content };
         } catch (error: unknown) {
           // Check if it's a directory (EISDIR error) - skip silently
-          if (error instanceof Error && error.code === 'EISDIR') {
+          if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'EISDIR') {
             if (debugMode) {
               logger.debug(
                 `Skipping directory ${filePath} (expected file). Using parent directory for memory discovery instead.`,
