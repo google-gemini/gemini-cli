@@ -2903,7 +2903,7 @@ describe('InputPrompt', () => {
     });
   });
 
-  describe('Windows QuickEdit rapid newline detection', () => {
+  describe('rapid newline detection for non-bracketed paste', () => {
     beforeEach(() => {
       vi.useFakeTimers();
     });
@@ -2924,8 +2924,7 @@ describe('InputPrompt', () => {
         await vi.runAllTimersAsync();
       });
 
-      // Simulate rapid input like QuickEdit paste: characters then Enter within 30ms
-      // Send a character to set the last input time
+      // Simulate rapid input (e.g. non-bracketed paste): characters then Enter within 30ms
       await act(async () => {
         stdin.write('a');
       });
