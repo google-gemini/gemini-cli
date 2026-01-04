@@ -83,7 +83,7 @@ export abstract class BaseToolInvocation<
 {
   constructor(
     readonly params: TParams,
-    protected readonly messageBus?: MessageBus,
+    protected readonly messageBus: MessageBus,
     readonly _toolName?: string,
     readonly _toolDisplayName?: string,
     readonly _serverName?: string,
@@ -98,25 +98,24 @@ export abstract class BaseToolInvocation<
   async shouldConfirmExecute(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.messageBus) {
-      const decision = await this.getMessageBusDecision(abortSignal);
-      if (decision === 'ALLOW') {
-        return false;
-      }
-
-      if (decision === 'DENY') {
-        throw new Error(
-          `Tool execution for "${
-            this._toolDisplayName || this._toolName
-          }" denied by policy.`,
-        );
-      }
-
-      if (decision === 'ASK_USER') {
-        return this.getConfirmationDetails(abortSignal);
-      }
+    const decision = await this.getMessageBusDecision(abortSignal);
+    if (decision === 'ALLOW') {
+      return false;
     }
-    // When no message bus, use default confirmation flow
+
+    if (decision === 'DENY') {
+      throw new Error(
+        `Tool execution for "${
+          this._toolDisplayName || this._toolName
+        }" denied by policy.`,
+      );
+    }
+
+    if (decision === 'ASK_USER') {
+      return this.getConfirmationDetails(abortSignal);
+    }
+
+    // Default to confirmation details if decision is unknown (should not happen with exhaustive policy)
     return this.getConfirmationDetails(abortSignal);
   }
 
@@ -142,7 +141,7 @@ export abstract class BaseToolInvocation<
       outcome === ToolConfirmationOutcome.ProceedAlways ||
       outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
     ) {
-      if (this.messageBus && this._toolName) {
+      if (this._toolName) {
         const options = this.getPolicyUpdateOptions(outcome);
         await this.messageBus.publish({
           type: MessageBusType.UPDATE_POLICY,
@@ -206,7 +205,7 @@ export abstract class BaseToolInvocation<
           timeoutId = undefined;
         }
         abortSignal.removeEventListener('abort', abortHandler);
-        this.messageBus?.unsubscribe(
+        this.messageBus.unsubscribe(
           MessageBusType.TOOL_CONFIRMATION_RESPONSE,
           responseHandler,
         );
@@ -341,9 +340,9 @@ export abstract class DeclarativeTool<
     readonly description: string,
     readonly kind: Kind,
     readonly parameterSchema: unknown,
+    readonly messageBus: MessageBus,
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
-    readonly messageBus?: MessageBus,
     readonly extensionName?: string,
     readonly extensionId?: string,
   ) {}
@@ -496,7 +495,7 @@ export abstract class BaseDeclarativeTool<
 
   protected abstract createInvocation(
     params: TParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<TParams, TResult>;

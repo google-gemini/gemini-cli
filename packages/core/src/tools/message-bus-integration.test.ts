@@ -81,21 +81,21 @@ class TestTool extends BaseDeclarativeTool<TestParams, TestResult> {
         },
         required: ['testParam'],
       },
+      messageBus,
       true,
       false,
-      messageBus,
     );
   }
 
   protected createInvocation(
     params: TestParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
     return new TestToolInvocation(
       params,
-      messageBus ?? this.messageBus,
+      messageBus,
       _toolName,
       _toolDisplayName,
     );

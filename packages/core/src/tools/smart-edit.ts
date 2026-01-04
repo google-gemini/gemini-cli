@@ -386,7 +386,7 @@ class EditToolInvocation
   constructor(
     private readonly config: Config,
     params: EditToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     toolName?: string,
     displayName?: string,
   ) {
@@ -853,7 +853,7 @@ export class SmartEditTool
 
   constructor(
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(
       SmartEditTool.Name,
@@ -915,9 +915,9 @@ A good instruction should concisely answer:
         required: ['file_path', 'instruction', 'old_string', 'new_string'],
         type: 'object',
       },
+      messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
-      messageBus,
     );
   }
 
@@ -955,12 +955,12 @@ A good instruction should concisely answer:
 
   protected createInvocation(
     params: EditToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ): ToolInvocation<EditToolParams, ToolResult> {
     return new EditToolInvocation(
       this.config,
       params,
-      messageBus ?? this.messageBus,
+      messageBus,
       this.name,
       this.displayName,
     );

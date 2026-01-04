@@ -57,7 +57,7 @@ import type {
 } from '../utils/workspaceContext.js';
 import type { ToolRegistry } from './tool-registry.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
 import {
@@ -895,7 +895,7 @@ export async function discoverTools(
   mcpServerConfig: MCPServerConfig,
   mcpClient: Client,
   cliConfig: Config,
-  messageBus?: MessageBus,
+  messageBus: MessageBus,
   options?: { timeout?: number; signal?: AbortSignal },
 ): Promise<DiscoveredMCPTool[]> {
   try {
@@ -922,12 +922,12 @@ export async function discoverTools(
           toolDef.name,
           toolDef.description ?? '',
           toolDef.inputSchema ?? { type: 'object', properties: {} },
+          messageBus,
           mcpServerConfig.trust,
           undefined,
           cliConfig,
           mcpServerConfig.extension?.name,
           mcpServerConfig.extension?.id,
-          messageBus,
         );
 
         discoveredTools.push(tool);

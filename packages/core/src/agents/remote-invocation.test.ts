@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import type { ToolCallConfirmationDetails } from '../tools/tools.js';
 import { RemoteAgentInvocation } from './remote-invocation.js';
 import type { RemoteAgentDefinition } from './types.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 class TestableRemoteAgentInvocation extends RemoteAgentInvocation {
   override async getConfirmationDetails(
@@ -29,8 +30,14 @@ describe('RemoteAgentInvocation', () => {
     },
   };
 
+  const mockMessageBus = createMockMessageBus();
+
   it('should be instantiated with correct params', () => {
-    const invocation = new RemoteAgentInvocation(mockDefinition, {});
+    const invocation = new RemoteAgentInvocation(
+      mockDefinition,
+      {},
+      mockMessageBus,
+    );
     expect(invocation).toBeDefined();
     expect(invocation.getDescription()).toBe(
       'Calling remote agent Test Remote Agent',
@@ -38,7 +45,11 @@ describe('RemoteAgentInvocation', () => {
   });
 
   it('should return false for confirmation details (not yet implemented)', async () => {
-    const invocation = new TestableRemoteAgentInvocation(mockDefinition, {});
+    const invocation = new TestableRemoteAgentInvocation(
+      mockDefinition,
+      {},
+      mockMessageBus,
+    );
     const details = await invocation.getConfirmationDetails(
       new AbortController().signal,
     );

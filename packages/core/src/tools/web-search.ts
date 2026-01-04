@@ -65,7 +65,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: WebSearchToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
@@ -192,7 +192,7 @@ export class WebSearchTool extends BaseDeclarativeTool<
 
   constructor(
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(
       WebSearchTool.Name,
@@ -209,9 +209,9 @@ export class WebSearchTool extends BaseDeclarativeTool<
         },
         required: ['query'],
       },
+      messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
-      messageBus,
     );
   }
 
@@ -231,7 +231,7 @@ export class WebSearchTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: WebSearchToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<WebSearchToolParams, WebSearchToolResult> {
