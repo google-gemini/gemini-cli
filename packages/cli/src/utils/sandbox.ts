@@ -10,7 +10,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { quote, parse } from 'shell-quote';
-import { USER_SETTINGS_DIR } from '../config/settings.js';
 import { promisify } from 'node:util';
 import type { Config, SandboxConfig } from '@google/gemini-cli-core';
 import {
@@ -289,18 +288,23 @@ export async function start_sandbox(
 
     // mount user settings directory inside container, after creating if missing
     // note user/home changes inside sandbox and we mount at BOTH paths for consistency
-    const userSettingsDirOnHost = USER_SETTINGS_DIR;
+    const userHomeDirOnHost = homedir();
     const userSettingsDirInSandbox = getContainerPath(
       `/home/node/${GEMINI_DIR}`,
     );
-    if (!fs.existsSync(userSettingsDirOnHost)) {
-      fs.mkdirSync(userSettingsDirOnHost);
+    if (!fs.existsSync(userHomeDirOnHost)) {
+      fs.mkdirSync(userHomeDirOnHost, { recursive: true });
     }
+    const userSettingsDirOnHost = path.join(userHomeDirOnHost, GEMINI_DIR);
+    if (!fs.existsSync(userSettingsDirOnHost)) {
+      fs.mkdirSync(userSettingsDirOnHost, { recursive: true });
+    }
+
     args.push(
       '--volume',
       `${userSettingsDirOnHost}:${userSettingsDirInSandbox}`,
     );
-    if (userSettingsDirInSandbox !== userSettingsDirOnHost) {
+    if (userSettingsDirInSandbox !== getContainerPath(userSettingsDirOnHost)) {
       args.push(
         '--volume',
         `${userSettingsDirOnHost}:${getContainerPath(userSettingsDirOnHost)}`,
@@ -309,6 +313,14 @@ export async function start_sandbox(
 
     // mount os.tmpdir() as os.tmpdir() inside container
     args.push('--volume', `${os.tmpdir()}:${getContainerPath(os.tmpdir())}`);
+
+    // mount homedir() as homedir() inside container
+    if (userHomeDirOnHost !== os.homedir()) {
+      args.push(
+        '--volume',
+        `${userHomeDirOnHost}:${getContainerPath(userHomeDirOnHost)}`,
+      );
+    }
 
     // mount gcloud config directory if it exists
     const gcloudConfigDir = path.join(homedir(), '.config', 'gcloud');
