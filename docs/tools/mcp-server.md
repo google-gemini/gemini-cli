@@ -996,8 +996,8 @@ gemini mcp add --transport sse --header "Authorization: Bearer abc123" secure-ss
 ### Listing servers (`gemini mcp list`)
 
 To view all MCP servers currently configured, use the `list` command. It
-displays each server's name, configuration details, and connection status. This
-command has no flags.
+displays each server's name and configuration details. This command has no
+flags.
 
 **Command:**
 
@@ -1008,9 +1008,9 @@ gemini mcp list
 **Example output:**
 
 ```sh
-✓ stdio-server: command: python3 server.py (stdio) - Connected
-✓ http-server: https://api.example.com/mcp (http) - Connected
-✗ sse-server: https://api.example.com/sse (sse) - Disconnected
+stdio-server: command: python3 server.py (stdio)
+http-server: https://api.example.com/mcp (http)
+sse-server: https://api.example.com/sse (sse)
 ```
 
 ### Removing a server (`gemini mcp remove`)
