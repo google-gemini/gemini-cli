@@ -709,12 +709,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
-#### `useSmartEdit`
-
-- **`useSmartEdit`** (boolean):
-  - **Description:** Enable the smart-edit tool instead of the replace tool.
-  - **Default:** `true`
-
 #### `useWriteTodos`
 
 - **`useWriteTodos`** (boolean):
