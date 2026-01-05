@@ -4,15 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  DefaultHookOutput} from '@google/gemini-cli-core';
+import type { DefaultHookOutput } from '@google/gemini-cli-core';
 import {
   uiTelemetryService,
   fireSessionEndHook,
   fireSessionStartHook,
   SessionEndReason,
   SessionStartSource,
-  flushTelemetry
+  flushTelemetry,
 } from '@google/gemini-cli-core';
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
