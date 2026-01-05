@@ -347,7 +347,6 @@ async function initOauthClient(
     });
 
     try {
-      writeToStdout('Press Ctrl+C to cancel authentication...\n');
       await Promise.race([
         webLogin.loginCompletePromise,
         timeoutPromise,
