@@ -46,6 +46,7 @@ import type {
 } from '../services/modelConfigService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { HookSystem } from '../hooks/hookSystem.js';
+import type { DefaultHookOutput } from '../hooks/types.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
 
 vi.mock('../services/chatCompressionService.js');
@@ -81,6 +82,10 @@ vi.mock('node:fs', () => {
 });
 
 // --- Mocks ---
+interface MockTurnContext {
+  getResponseText: Mock<() => string>;
+}
+
 const mockTurnRunFn = vi.fn();
 
 vi.mock('./turn', async (importOriginal) => {
@@ -94,6 +99,8 @@ vi.mock('./turn', async (importOriginal) => {
     constructor() {
       // The constructor can be empty or do some mock setup
     }
+
+    getResponseText = vi.fn().mockReturnValue('Mock Response');
   }
   // Export the mock class as 'Turn'
   return {
@@ -129,6 +136,15 @@ vi.mock('../telemetry/uiTelemetry.js', () => ({
   },
 }));
 vi.mock('../hooks/hookSystem.js');
+vi.mock('./clientHookTriggers.js', () => ({
+  fireBeforeAgentHook: vi.fn(),
+  fireAfterAgentHook: vi.fn().mockResolvedValue({
+    decision: 'allow',
+    continue: false,
+    suppressOutput: false,
+    systemMessage: undefined,
+  }),
+}));
 
 /**
  * Array.fromAsync ponyfill, which will be available in es 2024.
@@ -236,7 +252,6 @@ describe('Gemini Client (client.ts)', () => {
       getEnableHooks: vi.fn().mockReturnValue(false),
       getChatCompression: vi.fn().mockReturnValue(undefined),
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
-      getUseSmartEdit: vi.fn().mockReturnValue(false),
       getShowModelInfoInChat: vi.fn().mockReturnValue(false),
       getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
@@ -543,16 +558,22 @@ describe('Gemini Client (client.ts)', () => {
       await client.tryCompressChat('prompt-1', false); // force = false
 
       // 3. Assert Step 1: Check that the flag became true
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect((client as any).hasFailedCompressionAttempt).toBe(true);
+      // 3. Assert Step 1: Check that the flag became true
+      expect(
+        (client as unknown as { hasFailedCompressionAttempt: boolean })
+          .hasFailedCompressionAttempt,
+      ).toBe(true);
 
       // 4. Test Step 2: Trigger a forced failure
 
       await client.tryCompressChat('prompt-2', true); // force = true
 
       // 5. Assert Step 2: Check that the flag REMAINS true
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect((client as any).hasFailedCompressionAttempt).toBe(true);
+      // 5. Assert Step 2: Check that the flag REMAINS true
+      expect(
+        (client as unknown as { hasFailedCompressionAttempt: boolean })
+          .hasFailedCompressionAttempt,
+      ).toBe(true);
     });
 
     it('should not trigger summarization if token count is below threshold', async () => {
@@ -2614,6 +2635,283 @@ ${JSON.stringify(
         }),
         'test-session-id',
       );
+    });
+
+    describe('Hook System', () => {
+      let mockMessageBus: { publish: Mock; subscribe: Mock };
+
+      beforeEach(() => {
+        vi.clearAllMocks();
+        mockMessageBus = { publish: vi.fn(), subscribe: vi.fn() };
+
+        // Force override config methods on the client instance
+        client['config'].getEnableHooks = vi.fn().mockReturnValue(true);
+        client['config'].getMessageBus = vi
+          .fn()
+          .mockReturnValue(mockMessageBus);
+      });
+
+      it('should fire BeforeAgent and AfterAgent exactly once for a simple turn', async () => {
+        const promptId = 'test-prompt-hook-1';
+        const request = { text: 'Hello Hooks' };
+        const signal = new AbortController().signal;
+        const { fireBeforeAgentHook, fireAfterAgentHook } = await import(
+          './clientHookTriggers.js'
+        );
+
+        mockTurnRunFn.mockImplementation(async function* (
+          this: MockTurnContext,
+        ) {
+          this.getResponseText.mockReturnValue('Hook Response');
+          yield { type: GeminiEventType.Content, value: 'Hook Response' };
+        });
+
+        const stream = client.sendMessageStream(request, signal, promptId);
+        while (!(await stream.next()).done);
+
+        expect(fireBeforeAgentHook).toHaveBeenCalledTimes(1);
+        expect(fireAfterAgentHook).toHaveBeenCalledTimes(1);
+        expect(fireAfterAgentHook).toHaveBeenCalledWith(
+          expect.anything(),
+          request,
+          'Hook Response',
+        );
+
+        // Map should be empty
+        expect(client['hookStateMap'].size).toBe(0);
+      });
+
+      it('should fire BeforeAgent once and AfterAgent once even with recursion', async () => {
+        const { checkNextSpeaker } = await import(
+          '../utils/nextSpeakerChecker.js'
+        );
+        vi.mocked(checkNextSpeaker)
+          .mockResolvedValueOnce({ next_speaker: 'model', reasoning: 'more' })
+          .mockResolvedValueOnce(null);
+
+        const promptId = 'test-prompt-hook-recursive';
+        const request = { text: 'Recursion Test' };
+        const signal = new AbortController().signal;
+        const { fireBeforeAgentHook, fireAfterAgentHook } = await import(
+          './clientHookTriggers.js'
+        );
+
+        let callCount = 0;
+        mockTurnRunFn.mockImplementation(async function* (
+          this: MockTurnContext,
+        ) {
+          callCount++;
+          const response = `Response ${callCount}`;
+          this.getResponseText.mockReturnValue(response);
+          yield { type: GeminiEventType.Content, value: response };
+        });
+
+        const stream = client.sendMessageStream(request, signal, promptId);
+        while (!(await stream.next()).done);
+
+        // BeforeAgent should fire ONLY once despite multiple internal turns
+        expect(fireBeforeAgentHook).toHaveBeenCalledTimes(1);
+
+        // AfterAgent should fire ONLY when the stack unwinds
+        expect(fireAfterAgentHook).toHaveBeenCalledTimes(1);
+
+        // Check cumulative response (separated by newline)
+        expect(fireAfterAgentHook).toHaveBeenCalledWith(
+          expect.anything(),
+          request,
+          'Response 1\nResponse 2',
+        );
+
+        expect(client['hookStateMap'].size).toBe(0);
+      });
+
+      it('should use original request in AfterAgent hook even when continuation happened', async () => {
+        const { checkNextSpeaker } = await import(
+          '../utils/nextSpeakerChecker.js'
+        );
+        vi.mocked(checkNextSpeaker)
+          .mockResolvedValueOnce({ next_speaker: 'model', reasoning: 'more' })
+          .mockResolvedValueOnce(null);
+
+        const promptId = 'test-prompt-hook-original-req';
+        const request = { text: 'Do something' };
+        const signal = new AbortController().signal;
+        const { fireAfterAgentHook } = await import('./clientHookTriggers.js');
+
+        mockTurnRunFn.mockImplementation(async function* (
+          this: MockTurnContext,
+        ) {
+          this.getResponseText.mockReturnValue('Ok');
+          yield { type: GeminiEventType.Content, value: 'Ok' };
+        });
+
+        const stream = client.sendMessageStream(request, signal, promptId);
+        while (!(await stream.next()).done);
+
+        expect(fireAfterAgentHook).toHaveBeenCalledWith(
+          expect.anything(),
+          request, // Should be 'Do something'
+          expect.stringContaining('Ok'),
+        );
+      });
+
+      it('should cleanup state when prompt_id changes', async () => {
+        const signal = new AbortController().signal;
+        mockTurnRunFn.mockImplementation(async function* (
+          this: MockTurnContext,
+        ) {
+          this.getResponseText.mockReturnValue('Ok');
+          yield { type: GeminiEventType.Content, value: 'Ok' };
+        });
+
+        client['hookStateMap'].set('old-id', {
+          hasFiredBeforeAgent: true,
+          cumulativeResponse: 'Old',
+          activeCalls: 0,
+          originalRequest: { text: 'Old' },
+        });
+        client['lastPromptId'] = 'old-id';
+
+        const stream = client.sendMessageStream(
+          { text: 'New' },
+          signal,
+          'new-id',
+        );
+        await stream.next();
+
+        expect(client['hookStateMap'].has('old-id')).toBe(false);
+        expect(client['hookStateMap'].has('new-id')).toBe(true);
+      });
+
+      it('should stop execution in BeforeAgent when hook returns continue: false', async () => {
+        const { fireBeforeAgentHook } = await import('./clientHookTriggers.js');
+        vi.mocked(fireBeforeAgentHook).mockResolvedValue({
+          shouldStopExecution: () => true,
+          getEffectiveReason: () => 'Stopped by hook',
+        } as DefaultHookOutput);
+
+        const mockChat: Partial<GeminiChat> = {
+          addHistory: vi.fn(),
+          getHistory: vi.fn().mockReturnValue([]),
+          getLastPromptTokenCount: vi.fn(),
+        };
+        client['chat'] = mockChat as GeminiChat;
+
+        const request = [{ text: 'Hello' }];
+        const stream = client.sendMessageStream(
+          request,
+          new AbortController().signal,
+          'test-prompt',
+        );
+        const events = await fromAsync(stream);
+
+        expect(events).toContainEqual({
+          type: GeminiEventType.AgentExecutionStopped,
+          value: { reason: 'Stopped by hook' },
+        });
+        expect(mockChat.addHistory).toHaveBeenCalledWith({
+          role: 'user',
+          parts: request,
+        });
+        expect(mockTurnRunFn).not.toHaveBeenCalled();
+      });
+
+      it('should block execution in BeforeAgent when hook returns decision: block', async () => {
+        const { fireBeforeAgentHook } = await import('./clientHookTriggers.js');
+        vi.mocked(fireBeforeAgentHook).mockResolvedValue({
+          shouldStopExecution: () => false,
+          isBlockingDecision: () => true,
+          getEffectiveReason: () => 'Blocked by hook',
+        } as DefaultHookOutput);
+
+        const mockChat: Partial<GeminiChat> = {
+          addHistory: vi.fn(),
+          getHistory: vi.fn().mockReturnValue([]),
+          getLastPromptTokenCount: vi.fn(),
+        };
+        client['chat'] = mockChat as GeminiChat;
+
+        const request = [{ text: 'Hello' }];
+        const stream = client.sendMessageStream(
+          request,
+          new AbortController().signal,
+          'test-prompt',
+        );
+        const events = await fromAsync(stream);
+
+        expect(events).toContainEqual({
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: {
+            reason: 'Blocked by hook',
+          },
+        });
+        expect(mockChat.addHistory).not.toHaveBeenCalled();
+        expect(mockTurnRunFn).not.toHaveBeenCalled();
+      });
+
+      it('should stop execution in AfterAgent when hook returns continue: false', async () => {
+        const { fireAfterAgentHook } = await import('./clientHookTriggers.js');
+        vi.mocked(fireAfterAgentHook).mockResolvedValue({
+          shouldStopExecution: () => true,
+          getEffectiveReason: () => 'Stopped after agent',
+        } as DefaultHookOutput);
+
+        mockTurnRunFn.mockImplementation(async function* () {
+          yield { type: GeminiEventType.Content, value: 'Hello' };
+        });
+
+        const stream = client.sendMessageStream(
+          { text: 'Hi' },
+          new AbortController().signal,
+          'test-prompt',
+        );
+        const events = await fromAsync(stream);
+
+        expect(events).toContainEqual({
+          type: GeminiEventType.AgentExecutionStopped,
+          value: { reason: 'Stopped after agent' },
+        });
+        // sendMessageStream should not recurse
+        expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
+      });
+
+      it('should yield AgentExecutionBlocked and recurse in AfterAgent when hook returns decision: block', async () => {
+        const { fireAfterAgentHook } = await import('./clientHookTriggers.js');
+        vi.mocked(fireAfterAgentHook)
+          .mockResolvedValueOnce({
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => true,
+            getEffectiveReason: () => 'Please explain',
+          } as DefaultHookOutput)
+          .mockResolvedValueOnce({
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => false,
+          } as DefaultHookOutput);
+
+        mockTurnRunFn.mockImplementation(async function* () {
+          yield { type: GeminiEventType.Content, value: 'Response' };
+        });
+
+        const stream = client.sendMessageStream(
+          { text: 'Hi' },
+          new AbortController().signal,
+          'test-prompt',
+        );
+        const events = await fromAsync(stream);
+
+        expect(events).toContainEqual({
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: { reason: 'Please explain' },
+        });
+        // Should have called turn run twice (original + re-prompt)
+        expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
+        expect(mockTurnRunFn).toHaveBeenNthCalledWith(
+          2,
+          expect.anything(),
+          [{ text: 'Please explain' }],
+          expect.anything(),
+        );
+      });
     });
   });
 });
