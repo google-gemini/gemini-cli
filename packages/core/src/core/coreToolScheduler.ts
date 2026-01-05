@@ -12,7 +12,6 @@ import {
   type ToolCallConfirmationDetails,
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
-  MUTATOR_KINDS,
   Kind,
 } from '../tools/tools.js';
 import type { EditorType } from '../utils/editor.js';
@@ -847,16 +846,23 @@ export class CoreToolScheduler {
       );
 
       // Separate read-only tools (safe for parallel) from mutating tools (must be sequential)
-      // Kind.Other (MCP tools) are treated as mutating for safety
+      // Use explicit allowlist for read-only - safer than blocklist for mutating
+      const READ_ONLY_KINDS: Kind[] = [
+        Kind.Read,
+        Kind.Search,
+        Kind.Fetch,
+        Kind.Think,
+      ];
       const readOnlyTools = callsToExecute.filter(
         (call) =>
-          !MUTATOR_KINDS.includes(call.tool.kind) &&
-          call.tool.kind !== Kind.Other,
+          call.tool.kind !== undefined &&
+          READ_ONLY_KINDS.includes(call.tool.kind),
       );
+      // Everything else runs sequentially (safe default for unknown/undefined kinds)
       const mutatingTools = callsToExecute.filter(
         (call) =>
-          MUTATOR_KINDS.includes(call.tool.kind) ||
-          call.tool.kind === Kind.Other,
+          call.tool.kind === undefined ||
+          !READ_ONLY_KINDS.includes(call.tool.kind),
       );
 
       // Execute read-only tools in PARALLEL (safe - no side effects)
