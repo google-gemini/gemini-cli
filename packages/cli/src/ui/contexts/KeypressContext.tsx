@@ -19,10 +19,12 @@ import { ESC } from '../utils/input.js';
 import { parseMouseEvent } from '../utils/mouse.js';
 import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
 export const PASTE_TIMEOUT = 30_000;
+export const FAST_RETURN_TIMEOUT = 30;
 
 // Parse the key itself
 const KEY_INFO_MAP: Record<
@@ -148,7 +150,7 @@ function nonKeyboardEventFilter(
  */
 function bufferBackslashEnter(
   keypressHandler: KeypressHandler,
-): (key: Key | null) => void {
+): KeypressHandler {
   const bufferer = (function* (): Generator<void, void, Key | null> {
     while (true) {
       const key = yield;
@@ -184,7 +186,31 @@ function bufferBackslashEnter(
 
   bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key | null) => bufferer.next(key);
+  return (key: Key) => bufferer.next(key);
+}
+
+/**
+ * Converts return keys pressed quickly after other keys into plain
+ * insertable return characters.
+ *
+ * This is to accomodate older terminals that paste text without bracketing.
+ */
+function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
+  let lastKeyTime = 0;
+  return (key: Key) => {
+    const now = Date.now();
+    if (key.name === 'return' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
+      keypressHandler({
+        ...key,
+        name: '',
+        sequence: '\r',
+        insertable: true,
+      });
+    } else {
+      keypressHandler(key);
+    }
+    lastKeyTime = now;
+  };
 }
 
 /**
@@ -192,9 +218,7 @@ function bufferBackslashEnter(
  * Will flush the buffer if no data is received for PASTE_TIMEOUT ms or
  * when a null key is received.
  */
-function bufferPaste(
-  keypressHandler: KeypressHandler,
-): (key: Key | null) => void {
+function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
   const bufferer = (function* (): Generator<void, void, Key | null> {
     while (true) {
       let key = yield;
@@ -238,7 +262,7 @@ function bufferPaste(
   })();
   bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key | null) => bufferer.next(key);
+  return (key: Key) => bufferer.next(key);
 }
 
 /**
@@ -592,10 +616,13 @@ export function KeypressProvider({
 
     process.stdin.setEncoding('utf8'); // Make data events emit strings
 
-    const mouseFilterer = nonKeyboardEventFilter(broadcast);
-    const backslashBufferer = bufferBackslashEnter(mouseFilterer);
-    const pasteBufferer = bufferPaste(backslashBufferer);
-    let dataListener = createDataListener(pasteBufferer);
+    let processor = nonKeyboardEventFilter(broadcast);
+    if (!terminalCapabilityManager.isBracketedPasteEnabled()) {
+      processor = bufferFastReturn(processor);
+    }
+    processor = bufferBackslashEnter(processor);
+    processor = bufferPaste(processor);
+    let dataListener = createDataListener(processor);
 
     if (debugKeystrokeLogging) {
       const old = dataListener;
