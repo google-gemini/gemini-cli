@@ -352,11 +352,6 @@ async function initOauthClient(
         timeoutPromise,
         cancellationPromise,
       ]);
-    } catch (err) {
-      if (err instanceof FatalCancellationError) {
-        throw err;
-      }
-      throw err;
     } finally {
       if (sigIntHandler) {
         process.removeListener('SIGINT', sigIntHandler);
