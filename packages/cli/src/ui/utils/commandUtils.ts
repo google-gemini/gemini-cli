@@ -66,13 +66,19 @@ const SCREEN_DCS_CHUNK_SIZE = 240;
 type TtyTarget = { stream: Writable; closeAfter: boolean } | null;
 
 const pickTty = (): TtyTarget => {
-  // Prefer the controlling TTY to avoid interleaving escape sequences with piped stdout.
-  try {
-    const devTty = fs.createWriteStream('/dev/tty');
-    return { stream: devTty, closeAfter: true };
-  } catch {
-    // fall through
+  // /dev/tty is only available on Unix-like systems (Linux, macOS, BSD, etc.)
+  if (process.platform !== 'win32') {
+    // Prefer the controlling TTY to avoid interleaving escape sequences with piped stdout.
+    try {
+      const devTty = fs.createWriteStream('/dev/tty');
+      // Prevent unhandled 'error' events from crashing the process.
+      devTty.on('error', () => {});
+      return { stream: devTty, closeAfter: true };
+    } catch {
+      // fall through - /dev/tty not accessible
+    }
   }
+
   if (process.stderr?.isTTY)
     return { stream: process.stderr, closeAfter: false };
   if (process.stdout?.isTTY)

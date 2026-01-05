@@ -98,6 +98,9 @@ describe('commandUtils', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    // Reset platform to default for test isolation
+    mockProcess.platform = 'darwin';
+
     // Dynamically import and set up spawn mock
     const { spawn } = await import('node:child_process');
     mockSpawn = spawn as Mock;
@@ -353,6 +356,35 @@ describe('commandUtils', () => {
       expect(mockClipboardyWrite).toHaveBeenCalledWith(text);
       expect(tty.write).not.toHaveBeenCalled();
       expect(tty.end).not.toHaveBeenCalled();
+    });
+
+    it('skips /dev/tty on Windows and uses stderr fallback for OSC-52', async () => {
+      mockProcess.platform = 'win32';
+      const stderrStream = makeWritable({ isTTY: true });
+      Object.defineProperty(process, 'stderr', {
+        value: stderrStream,
+        configurable: true,
+      });
+
+      // Set SSH environment to trigger OSC-52 path
+      process.env['SSH_CONNECTION'] = '1';
+
+      await copyToClipboard('windows-ssh-test');
+
+      expect(mockFs.createWriteStream).not.toHaveBeenCalled();
+      expect(stderrStream.write).toHaveBeenCalled();
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('uses clipboardy on native Windows without SSH/WSL', async () => {
+      mockProcess.platform = 'win32';
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      await copyToClipboard('windows-native-test');
+
+      // Fallback to clipboardy and not /dev/tty
+      expect(mockClipboardyWrite).toHaveBeenCalledWith('windows-native-test');
+      expect(mockFs.createWriteStream).not.toHaveBeenCalled();
     });
   });
 
