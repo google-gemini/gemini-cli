@@ -45,6 +45,7 @@ import {
 import {
   SmartEditTool,
   type EditToolParams,
+  applyReplacement,
   calculateReplacement,
 } from './smart-edit.js';
 import { type FileDiff, ToolConfirmationOutcome } from './tools.js';
@@ -176,6 +177,109 @@ describe('SmartEditTool', () => {
 
   afterEach(() => {
     fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  describe('applyReplacement', () => {
+    it('should return newString if isNewFile is true', () => {
+      expect(applyReplacement(null, 'old', 'new', true)).toBe('new');
+      expect(applyReplacement('existing', 'old', 'new', true)).toBe('new');
+    });
+
+    it('should return newString if currentContent is null and oldString is empty (defensive)', () => {
+      expect(applyReplacement(null, '', 'new', false)).toBe('new');
+    });
+
+    it('should return empty string if currentContent is null and oldString is not empty (defensive)', () => {
+      expect(applyReplacement(null, 'old', 'new', false)).toBe('');
+    });
+
+    it('should replace oldString with newString in currentContent', () => {
+      expect(applyReplacement('hello old world old', 'old', 'new', false)).toBe(
+        'hello new world new',
+      );
+    });
+
+    it('should return currentContent if oldString is empty and not a new file', () => {
+      expect(applyReplacement('hello world', '', 'new', false)).toBe(
+        'hello world',
+      );
+    });
+
+    it.each([
+      {
+        name: '$ literal',
+        current: "price is $100 and pattern end is ' '",
+        oldStr: 'price is $100',
+        newStr: 'price is $200',
+        expected: "price is $200 and pattern end is ' '",
+      },
+      {
+        name: "$' literal",
+        current: 'foo',
+        oldStr: 'foo',
+        newStr: "bar$'baz",
+        expected: "bar$'baz",
+      },
+      {
+        name: '$& literal',
+        current: 'hello world',
+        oldStr: 'hello',
+        newStr: '$&-replacement',
+        expected: '$&-replacement world',
+      },
+      {
+        name: '$` literal',
+        current: 'prefix-middle-suffix',
+        oldStr: 'middle',
+        newStr: 'new$`content',
+        expected: 'prefix-new$`content-suffix',
+      },
+      {
+        name: '$1, $2 capture groups literal',
+        current: 'test string',
+        oldStr: 'test',
+        newStr: '$1$2replacement',
+        expected: '$1$2replacement string',
+      },
+      {
+        name: 'normal strings without problematic $',
+        current: 'normal text replacement',
+        oldStr: 'text',
+        newStr: 'string',
+        expected: 'normal string replacement',
+      },
+      {
+        name: 'multiple occurrences with $ sequences',
+        current: 'foo bar foo baz',
+        oldStr: 'foo',
+        newStr: "test$'end",
+        expected: "test$'end bar test$'end baz",
+      },
+      {
+        name: 'complex regex patterns with $ at end',
+        current: "| select('match', '^[sv]d[a-z]$')",
+        oldStr: "'^[sv]d[a-z]$'",
+        newStr: "'^[sv]d[a-z]$' # updated",
+        expected: "| select('match', '^[sv]d[a-z]$' # updated)",
+      },
+      {
+        name: 'empty replacement with problematic $',
+        current: 'test content',
+        oldStr: 'nothing',
+        newStr: "replacement$'text",
+        expected: 'test content',
+      },
+      {
+        name: '$$ (escaped dollar)',
+        current: 'price value',
+        oldStr: 'value',
+        newStr: '$$100',
+        expected: 'price $$100',
+      },
+    ])('should handle $name', ({ current, oldStr, newStr, expected }) => {
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe(expected);
+    });
   });
 
   describe('calculateReplacement', () => {
@@ -719,7 +823,7 @@ describe('SmartEditTool', () => {
           instruction: `Remove lines from the file`,
           old_string: file.toRemove,
           new_string: '', // Removing the content
-          ai_proposed_string: '',
+          ai_proposed_content: '',
         };
         const invocation = tool.build(params);
         const result = await invocation.execute(new AbortController().signal);

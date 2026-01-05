@@ -123,7 +123,7 @@ export * from './tools/ls.js';
 export * from './tools/grep.js';
 export * from './tools/ripGrep.js';
 export * from './tools/glob.js';
-export * from './tools/edit.js';
+export * from './tools/smart-edit.js';
 export * from './tools/write-file.js';
 export * from './tools/web-fetch.js';
 export * from './tools/memoryTool.js';
