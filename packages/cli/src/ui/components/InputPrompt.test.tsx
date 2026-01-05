@@ -31,6 +31,7 @@ import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.
 import clipboardy from 'clipboardy';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
@@ -121,6 +122,10 @@ describe('InputPrompt', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(
+      terminalCapabilityManager,
+      'isBracketedPasteEnabled',
+    ).mockReturnValue(true);
 
     mockCommandContext = createMockCommandContext();
 
