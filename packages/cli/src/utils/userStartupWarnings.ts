@@ -5,11 +5,8 @@
  */
 
 import fs from 'node:fs/promises';
-
 import path from 'node:path';
-
 import process from 'node:process';
-
 import { homedir } from '@google/gemini-cli-core';
 
 type WarningCheck = {

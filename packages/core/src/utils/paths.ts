@@ -6,6 +6,7 @@
 
 import path from 'node:path';
 import os from 'node:os';
+import process from 'node:process';
 import * as crypto from 'node:crypto';
 
 export const GEMINI_DIR = '.gemini';
@@ -24,7 +25,11 @@ export const SHELL_SPECIAL_CHARS = /[ \t()[\]{};|*?$`'"#&<>!~]/;
  * Otherwise, it returns the user's home directory.
  */
 export function homedir(): string {
-  return process.env['GEMINI_CLI_HOME'] || os.homedir();
+  const envHome = process.env['GEMINI_CLI_HOME'];
+  if (envHome) {
+    return envHome;
+  }
+  return os.homedir();
 }
 
 /**
