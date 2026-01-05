@@ -1028,9 +1028,8 @@ export function SettingsDialog({
                     >
                       <Box
                         flexDirection="column"
-                        flexGrow={1}
+                        width={maxLabelOrDescriptionWidth}
                         minWidth={0}
-                        maxWidth={maxLabelOrDescriptionWidth}
                       >
                         <Text
                           color={
@@ -1045,24 +1044,24 @@ export function SettingsDialog({
                             </Text>
                           )}
                         </Text>
-                        {item.description && (
-                          <Text color={theme.text.secondary} wrap="truncate">
-                            {item.description}
-                          </Text>
-                        )}
+                        <Text color={theme.text.secondary} wrap="truncate">
+                          {item.description ?? ''}
+                        </Text>
                       </Box>
                       <Box minWidth={3} />
-                      <Text
-                        color={
-                          isActive
-                            ? theme.status.success
-                            : shouldBeGreyedOut
-                              ? theme.text.secondary
-                              : theme.text.primary
-                        }
-                      >
-                        {displayValue}
-                      </Text>
+                      <Box flexShrink={0}>
+                        <Text
+                          color={
+                            isActive
+                              ? theme.status.success
+                              : shouldBeGreyedOut
+                                ? theme.text.secondary
+                                : theme.text.primary
+                          }
+                        >
+                          {displayValue}
+                        </Text>
+                      </Box>
                     </Box>
                   </Box>
                   <Box height={1} />
