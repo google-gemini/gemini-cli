@@ -297,7 +297,7 @@ Captures startup configuration and user prompt submissions.
 
 #### Tools
 
-Captures tool executions, output truncation, and Smart Edit behavior.
+Captures tool executions, output truncation, and Edit behavior.
 
 - `gemini_cli.tool_call`: Emitted for each tool (function) call.
   - **Attributes**:
@@ -325,11 +325,11 @@ Captures tool executions, output truncation, and Smart Edit behavior.
     - `lines` (int)
     - `prompt_id` (string)
 
-- `gemini_cli.smart_edit_strategy`: Smart Edit strategy chosen.
+- `gemini_cli.edit_strategy`: Edit strategy chosen.
   - **Attributes**:
     - `strategy` (string)
 
-- `gemini_cli.smart_edit_correction`: Smart Edit correction result.
+- `gemini_cli.edit_correction`: Edit correction result.
   - **Attributes**:
     - `correction` ("success" | "failure")
 
