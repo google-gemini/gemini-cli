@@ -1201,7 +1201,7 @@ describe('oauth2', () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
 
         const dataCall = stdinOnSpy.mock.calls.find(
-          (call) => call[0] === 'data',
+          (call: [string, ...unknown[]]) => call[0] === 'data',
         );
         const dataHandler = dataCall?.[1] as
           | ((data: Buffer) => void)
