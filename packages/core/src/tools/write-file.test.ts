@@ -23,7 +23,7 @@ import type {
   ToolResult,
 } from './tools.js';
 import { ToolConfirmationOutcome } from './tools.js';
-import { type EditToolParams } from './edit.js';
+import { type EditToolParams } from './smart-edit.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { ToolRegistry } from './tool-registry.js';
