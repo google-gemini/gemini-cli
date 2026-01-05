@@ -1,15 +1,131 @@
-# Gemini CLI Changelog
+# Gemini CLI release notes
 
-Wondering what's new in Gemini CLI? This document provides key highlights and
-notable changes to Gemini CLI.
+Gemini CLI has three major release channels: nightly, preview, and stable. For
+most users, we recommend the stable release.
 
-## v0.15.0 - Gemini CLI weekly update - 2025-11-03
+On this page, you can find information regarding the current releases and
+announcements from each release.
 
-- **🎉 Seamless scrollable UI & mouse support:** We’ve given Gemini CLI a major
-  facelift to make your terminal experience smoother and much more polished. You
-  now get a flicker-free display with sticky headers that keep important context
-  visible and a stable input prompt that doesn't jump around. We even added
-  mouse support so you can click right where you need to type!
+For the full changelog, refer to
+[Releases - google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli/releases)
+on GitHub.
+
+## Current releases
+
+| Release channel       | Notes                                           |
+| :-------------------- | :---------------------------------------------- |
+| Nightly               | Nightly release with the most recent changes.   |
+| [Preview](preview.md) | Experimental features ready for early feedback. |
+| [Stable](latest.md)   | Stable, recommended for general use.            |
+
+## Announcements: v0.21.0 - 2025-12-15
+
+- **⚡️⚡️⚡️ Gemini 3 Flash + Gemini CLI:** Better, faster and cheaper than 2.5
+  Pro - and in some scenarios better than 3 Pro! For paid tiers + free tier
+  users who were on the wait list enable **Preview Features** in `/settings.`
+- For more information:
+  [Gemini 3 Flash is now available in Gemini CLI](https://developers.googleblog.com/gemini-3-flash-is-now-available-in-gemini-cli/).
+- 🎉 Gemini CLI Extensions:
+  - Rill: Utilize natural language to analyze Rill data, enabling the
+    exploration of metrics and trends without the need for manual queries.
+    `gemini extensions install https://github.com/rilldata/rill-gemini-extension`
+  - Browserbase: Interact with web pages, take screenshots, extract information,
+    and perform automated actions with atomic precision.
+    `gemini extensions install https://github.com/browserbase/mcp-server-browserbase`
+- Quota Visibility: The `/stats` command now displays quota information for all
+  available models, including those not used in the current session. (@sehoon38)
+- Fuzzy Setting Search: Users can now quickly find settings using fuzzy search
+  within the settings dialog. (@sehoon38)
+- MCP Resource Support: Users can now discover, view, and search through
+  resources using the @ command. (@MrLesk)
+- Auto-execute Simple Slash Commands: Simple slash commands are now executed
+  immediately on enter. (@jackwotherspoon)
+
+## Announcements: v0.20.0 - 2025-12-01
+
+- **Multi-file Drag & Drop:** Users can now drag and drop multiple files into
+  the terminal, and the CLI will automatically prefix each valid path with `@`.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/14832) by
+  [@jackwotherspoon](https://github.com/jackwotherspoon))
+- **Persistent "Always Allow" Policies:** Users can now save "Always Allow"
+  decisions for tool executions, with granular control over specific shell
+  commands and multi-cloud platform tools.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/14737) by
+  [@allenhutchison](https://github.com/allenhutchison))
+
+## Announcements: v0.19.0 - 2025-11-24
+
+- 🎉 **New extensions:**
+  - **Eleven Labs:** Create, play, manage your audio play tracks with the Eleven
+    Labs Gemini CLI extension:
+    `gemini extensions install https://github.com/elevenlabs/elevenlabs-mcp`
+- **Zed integration:** Users can now leverage Gemini 3 within the Zed
+  integration after enabling "Preview Features" in their CLI’s `/settings`.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/13398) by
+  [@benbrandt](https://github.com/benbrandt))
+- **Interactive shell:**
+  - **Click-to-Focus:** When "Use Alternate Buffer" setting is enabled, users
+    can click within the embedded shell output to focus it for input.
+    ([pr](https://github.com/google-gemini/gemini-cli/pull/13341) by
+    [@galz10](https://github.com/galz10))
+  - **Loading phrase:** Clearly indicates when the interactive shell is awaiting
+    user input. ([vid](https://imgur.com/a/kjK8bUK),
+    [pr](https://github.com/google-gemini/gemini-cli/pull/12535) by
+    [@jackwotherspoon](https://github.com/jackwotherspoon))
+
+## Announcements: v0.18.0 - 2025-11-17
+
+- 🎉 **New extensions:**
+  - **Google Workspace**: Integrate Gemini CLI with your Workspace data. Write
+    docs, build slides, chat with others or even get your calc on in sheets:
+    `gemini extensions install https://github.com/gemini-cli-extensions/workspace`
+    - Blog:
+      [https://allen.hutchison.org/2025/11/19/bringing-the-office-to-the-terminal/](https://allen.hutchison.org/2025/11/19/bringing-the-office-to-the-terminal/)
+  - **Redis:** Manage and search data in Redis with natural language:
+    `gemini extensions install https://github.com/redis/mcp-redis`
+  - **Anomalo:** Query your data warehouse table metadata and quality status
+    through commands and natural language:
+    `gemini extensions install https://github.com/datagravity-ai/anomalo-gemini-extension`
+- **Experimental permission improvements:** We are now experimenting with a new
+  policy engine in Gemini CLI. This allows users and administrators to create
+  fine-grained policy for tool calls. Currently behind a flag. See
+  [policy engine documentation](../core/policy-engine.md) for more information.
+  - Blog:
+    [https://allen.hutchison.org/2025/11/26/the-guardrails-of-autonomy/](https://allen.hutchison.org/2025/11/26/the-guardrails-of-autonomy/)
+- **Gemini 3 support for paid:** Gemini 3 support has been rolled out to all API
+  key, Google AI Pro or Google AI Ultra (for individuals, not businesses) and
+  Gemini Code Assist Enterprise users. Enable it via `/settings` and toggling on
+  **Preview Features**.
+- **Updated UI rollback:** We’ve temporarily rolled back our updated UI to give
+  it more time to bake. This means for a time you won’t have embedded scrolling
+  or mouse support. You can re-enable with `/settings` -> **Use Alternate Screen
+  Buffer** -> `true`.
+- **Model in history:** Users can now toggle in `/settings` to display model in
+  their chat history. ([gif](https://imgur.com/a/uEmNKnQ),
+  [pr](https://github.com/google-gemini/gemini-cli/pull/13034) by
+  [@scidomino](https://github.com/scidomino))
+- **Multi-uninstall:** Users can now uninstall multiple extensions with a single
+  command. ([pic](https://imgur.com/a/9Dtq8u2),
+  [pr](https://github.com/google-gemini/gemini-cli/pull/13016) by
+  [@JayadityaGit](https://github.com/JayadityaGit))
+
+## Announcements: v0.16.0 - 2025-11-10
+
+- **Gemini 3 + Gemini CLI:** launch 🚀🚀🚀
+- **Data Commons Gemini CLI Extension** - A new Data Commons Gemini CLI
+  extension that lets you query open-source statistical data from
+  datacommons.org. **To get started, you'll need a Data Commons API key and uv
+  installed**. These and other details to get you started with the extension can
+  be found at
+  [https://github.com/gemini-cli-extensions/datacommons](https://github.com/gemini-cli-extensions/datacommons).
+
+## Announcements: v0.15.0 - 2025-11-03
+
+- **🎉 Seamless scrollable UI and mouse support:** We’ve given Gemini CLI a
+  major facelift to make your terminal experience smoother and much more
+  polished. You now get a flicker-free display with sticky headers that keep
+  important context visible and a stable input prompt that doesn't jump around.
+  We even added mouse support so you can click right where you need to type!
   ([gif](https://imgur.com/a/O6qc7bx),
   [@jacob314](https://github.com/jacob314)).
   - **Announcement:**
@@ -49,7 +165,7 @@ notable changes to Gemini CLI.
   correctly. ([pr](https://github.com/google-gemini/gemini-cli/pull/12186) by
   [@kevinjwang1](https://github.com/kevinjwang1)).
 
-## v0.12.0 - Gemini CLI weekly update - 2025-10-27
+## Announcements: v0.12.0 - 2025-10-27
 
 ![Codebase investigator subagent in Gemini CLI.](https://i.imgur.com/4J1njsx.png)
 
@@ -112,7 +228,7 @@ notable changes to Gemini CLI.
   ([pr](https://github.com/google-gemini/gemini-cli/pull/11593) by
   [@joshualitt](https://github.com/joshualitt)).
 
-## v0.11.0 - Gemini CLI weekly update - 2025-10-20
+## Announcements: v0.11.0 - 2025-10-20
 
 ![Gemini CLI and Jules](https://storage.googleapis.com/gweb-developer-goog-blog-assets/images/Jules_Extension_-_Blog_Header_O346JNt.original.png)
 
@@ -155,7 +271,7 @@ notable changes to Gemini CLI.
     ([pr](https://github.com/google-gemini/gemini-cli/pull/11318) by
     [@allenhutchison](https://github.com/allenhutchison))
 
-## v0.10.0 - Gemini CLI weekly update - 2025-10-13
+## Announcements: v0.10.0 - 2025-10-13
 
 - **Polish:** The team has been heads down bug fixing and investing heavily into
   polishing existing flows, tools, and interactions.
@@ -172,7 +288,7 @@ notable changes to Gemini CLI.
   ([pr](https://github.com/google-gemini/gemini-cli/pull/10819) by
   [@jerop](https://github.com/jerop)).
 
-## v0.9.0 - Gemini CLI weekly update - 2025-10-06
+## Announcements: v0.9.0 - 2025-10-06
 
 - 🎉 **Interactive Shell:** Run interactive commands like `vim`, `rebase -i`, or
   even `gemini` 😎 directly in Gemini CLI:
@@ -197,7 +313,7 @@ notable changes to Gemini CLI.
   ([pr](https://github.com/google-gemini/gemini-cli/pull/10108) by
   [@sgnagnarella](https://github.com/sgnagnarella))
 
-## v0.8.0 - Gemini CLI weekly update - 2025-09-29
+## Announcements: v0.8.0 - 2025-09-29
 
 - 🎉 **Announcing Gemini CLI Extensions** 🎉
   - Completely customize your Gemini CLI experience to fit your workflow.
@@ -236,7 +352,7 @@ notable changes to Gemini CLI.
   changes, smaller features, UI updates, reliability and bug fixes + general
   polish made it in this week!
 
-## v0.7.0 - Gemini CLI weekly update - 2025-09-22
+## Announcements: v0.7.0 - 2025-09-22
 
 - 🎉**Build your own Gemini CLI IDE plugin:** We've published a spec for
   creating IDE plugins to enable rich context-aware experiences and native
@@ -274,7 +390,7 @@ notable changes to Gemini CLI.
   changes, smaller features, UI updates, reliability and bug fixes + general
   polish made it in this week!
 
-## v0.6.0 - Gemini CLI weekly update - 2025-09-15
+## Announcements: v0.6.0 - 2025-09-15
 
 - 🎉 **Higher limits for Google AI Pro and Ultra subscribers:** We’re psyched to
   finally announce that Google AI Pro and AI Ultra subscribers now get access to
@@ -355,7 +471,7 @@ notable changes to Gemini CLI.
   changes, smaller features, UI updates, reliability and bug fixes + general
   polish made it in this week!
 
-## v0.5.0 - Gemini CLI weekly update - 2025-09-08
+## Announcements: v0.5.0 - 2025-09-08
 
 - 🎉**FastMCP + Gemini CLI**🎉: Quickly install and manage your Gemini CLI MCP
   servers with FastMCP ([video](https://imgur.com/a/m8QdCPh),
@@ -400,7 +516,7 @@ notable changes to Gemini CLI.
   changes, smaller features, UI updates, reliability and bug fixes + general
   polish made it in this week!
 
-## v0.4.0 - Gemini CLI weekly update - 2025-09-01
+## Announcements: v0.4.0 - 2025-09-01
 
 - 🎉**Gemini CLI CloudRun and Security Integrations**🎉: Automate app deployment
   and security analysis with CloudRun and Security extension integrations. Once

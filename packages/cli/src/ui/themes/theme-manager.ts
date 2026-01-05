@@ -11,6 +11,7 @@ import { Dracula } from './dracula.js';
 import { GitHubDark } from './github-dark.js';
 import { GitHubLight } from './github-light.js';
 import { GoogleCode } from './googlecode.js';
+import { Holiday } from './holiday.js';
 import { DefaultLight } from './default-light.js';
 import { DefaultDark } from './default.js';
 import { ShadesOfPurple } from './shades-of-purple.js';
@@ -51,6 +52,7 @@ class ThemeManager {
       GitHubDark,
       GitHubLight,
       GoogleCode,
+      Holiday,
       ShadesOfPurple,
       XCode,
       ANSI,
@@ -224,6 +226,14 @@ class ThemeManager {
    */
   getTheme(themeName: string): Theme | undefined {
     return this.findThemeByName(themeName);
+  }
+
+  /**
+   * Gets all available themes.
+   * @returns A list of all available themes.
+   */
+  getAllThemes(): Theme[] {
+    return [...this.availableThemes, ...Array.from(this.customThemes.values())];
   }
 
   private isPath(themeName: string): boolean {

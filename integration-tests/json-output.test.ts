@@ -22,11 +22,9 @@ describe('JSON output', () => {
   });
 
   it('should return a valid JSON with response and stats', async () => {
-    const result = await rig.run(
-      'What is the capital of France?',
-      '--output-format',
-      'json',
-    );
+    const result = await rig.run({
+      args: ['What is the capital of France?', '--output-format', 'json'],
+    });
     const parsed = JSON.parse(result);
 
     expect(parsed).toHaveProperty('response');
@@ -35,6 +33,17 @@ describe('JSON output', () => {
 
     expect(parsed).toHaveProperty('stats');
     expect(typeof parsed.stats).toBe('object');
+  });
+
+  it('should return a valid JSON with a session ID', async () => {
+    const result = await rig.run({
+      args: ['Hello', '--output-format', 'json'],
+    });
+    const parsed = JSON.parse(result);
+
+    expect(parsed).toHaveProperty('session_id');
+    expect(typeof parsed.session_id).toBe('string');
+    expect(parsed.session_id).not.toBe('');
   });
 
   it('should return a JSON error for sd auth mismatch before running', async () => {
@@ -49,7 +58,7 @@ describe('JSON output', () => {
 
     let thrown: Error | undefined;
     try {
-      await rig.run('Hello', '--output-format', 'json');
+      await rig.run({ args: ['Hello', '--output-format', 'json'] });
       expect.fail('Expected process to exit with error');
     } catch (e) {
       thrown = e as Error;
@@ -87,6 +96,9 @@ describe('JSON output', () => {
       "enforced authentication type is 'gemini-api-key'",
     );
     expect(payload.error.message).toContain("current type is 'oauth-personal'");
+    expect(payload).toHaveProperty('session_id');
+    expect(typeof payload.session_id).toBe('string');
+    expect(payload.session_id).not.toBe('');
   });
 
   it('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
@@ -96,12 +108,14 @@ describe('JSON output', () => {
         'json-output.error.responses',
       ),
     });
-    const result = await rig.run(
-      `Read the contents of ${rig.testDir}/path/to/nonexistent/file.txt and tell me what it says. ` +
-        'On error, respond to the user with exactly the text "File not found".',
-      '--output-format',
-      'json',
-    );
+    const result = await rig.run({
+      args: [
+        `Read the contents of ${rig.testDir}/path/to/nonexistent/file.txt and tell me what it says. ` +
+          'On error, respond to the user with exactly the text "File not found".',
+        '--output-format',
+        'json',
+      ],
+    });
 
     const parsed = JSON.parse(result);
 
@@ -129,5 +143,9 @@ describe('JSON output', () => {
 
     // Should NOT have an error field at the top level
     expect(parsed.error).toBeUndefined();
+
+    expect(parsed).toHaveProperty('session_id');
+    expect(typeof parsed.session_id).toBe('string');
+    expect(parsed.session_id).not.toBe('');
   });
 });

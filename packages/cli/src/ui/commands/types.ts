@@ -5,13 +5,17 @@
  */
 
 import type { ReactNode } from 'react';
-import type { Content, PartListUnion } from '@google/genai';
 import type {
   HistoryItemWithoutId,
   HistoryItem,
   ConfirmationRequest,
 } from '../types.js';
-import type { Config, GitService, Logger } from '@google/gemini-cli-core';
+import type {
+  Config,
+  GitService,
+  Logger,
+  CommandActionReturn,
+} from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
@@ -86,29 +90,10 @@ export interface CommandContext {
   overwriteConfirmed?: boolean;
 }
 
-/**
- * The return type for a command action that results in scheduling a tool call.
- */
-export interface ToolActionReturn {
-  type: 'tool';
-  toolName: string;
-  toolArgs: Record<string, unknown>;
-}
-
 /** The return type for a command action that results in the app quitting. */
 export interface QuitActionReturn {
   type: 'quit';
   messages: HistoryItem[];
-}
-
-/**
- * The return type for a command action that results in a simple message
- * being displayed to the user.
- */
-export interface MessageActionReturn {
-  type: 'message';
-  messageType: 'info' | 'error';
-  content: string;
 }
 
 /**
@@ -128,25 +113,6 @@ export interface OpenDialogActionReturn {
     | 'sessionBrowser'
     | 'model'
     | 'permissions';
-}
-
-/**
- * The return type for a command action that results in replacing
- * the entire conversation history.
- */
-export interface LoadHistoryActionReturn {
-  type: 'load_history';
-  history: HistoryItemWithoutId[];
-  clientHistory: Content[]; // The history for the generative client
-}
-
-/**
- * The return type for a command action that should immediately submit
- * content as a prompt to the Gemini model.
- */
-export interface SubmitPromptActionReturn {
-  type: 'submit_prompt';
-  content: PartListUnion;
 }
 
 /**
@@ -178,16 +144,22 @@ export interface OpenCustomDialogActionReturn {
   component: ReactNode;
 }
 
+/**
+ * The return type for a command action that specifically handles logout logic,
+ * signaling the application to explicitly transition to an unauthenticated state.
+ */
+export interface LogoutActionReturn {
+  type: 'logout';
+}
+
 export type SlashCommandActionReturn =
-  | ToolActionReturn
-  | MessageActionReturn
+  | CommandActionReturn<HistoryItemWithoutId[]>
   | QuitActionReturn
   | OpenDialogActionReturn
-  | LoadHistoryActionReturn
-  | SubmitPromptActionReturn
   | ConfirmShellCommandsActionReturn
   | ConfirmActionReturn
-  | OpenCustomDialogActionReturn;
+  | OpenCustomDialogActionReturn
+  | LogoutActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
@@ -203,6 +175,14 @@ export interface SlashCommand {
   hidden?: boolean;
 
   kind: CommandKind;
+
+  /**
+   * Controls whether the command auto-executes when selected with Enter.
+   *
+   * If true, pressing Enter on the suggestion will execute the command immediately.
+   * If false or undefined, pressing Enter will autocomplete the command into the prompt window.
+   */
+  autoExecute?: boolean;
 
   // Optional metadata for extension commands
   extensionName?: string;
@@ -222,6 +202,12 @@ export interface SlashCommand {
     context: CommandContext,
     partialArg: string,
   ) => Promise<string[]> | string[];
+
+  /**
+   * Whether to show the loading indicator while fetching completions.
+   * Defaults to true. Set to false for fast completions to avoid flicker.
+   */
+  showCompletionLoading?: boolean;
 
   subCommands?: SlashCommand[];
 }

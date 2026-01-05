@@ -22,6 +22,10 @@ let mockSendMessageStream: any;
 vi.mock('fs', () => ({
   statSync: vi.fn(),
   mkdirSync: vi.fn(),
+  createWriteStream: vi.fn(() => ({
+    write: vi.fn(),
+    on: vi.fn(),
+  })),
 }));
 
 vi.mock('../core/client.js', () => ({
@@ -160,7 +164,10 @@ describe('editCorrector', () => {
     const abortSignal = new AbortController().signal;
 
     beforeEach(() => {
-      mockToolRegistry = new ToolRegistry({} as Config) as Mocked<ToolRegistry>;
+      mockToolRegistry = new ToolRegistry(
+        {} as Config,
+        {} as any,
+      ) as Mocked<ToolRegistry>;
       const configParams = {
         apiKey: 'test-api-key',
         model: 'test-model',
@@ -233,7 +240,7 @@ describe('editCorrector', () => {
       mockGeminiClientInstance = new GeminiClient(
         mockConfigInstance,
       ) as Mocked<GeminiClient>;
-      mockGeminiClientInstance.getHistory = vi.fn().mockResolvedValue([]);
+      mockGeminiClientInstance.getHistory = vi.fn().mockReturnValue([]);
       mockBaseLlmClientInstance = {
         generateJson: mockGenerateJson,
         config: {
@@ -602,9 +609,7 @@ describe('editCorrector', () => {
             ],
           },
         ];
-        (mockGeminiClientInstance.getHistory as Mock).mockResolvedValue(
-          history,
-        );
+        (mockGeminiClientInstance.getHistory as Mock).mockReturnValue(history);
 
         const result = await ensureCorrectEdit(
           filePath,

@@ -31,10 +31,10 @@ const logger = {
     debugLogger.warn('[WARN] [MemoryDiscovery]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) =>
-    console.error('[ERROR] [MemoryDiscovery]', ...args),
+    debugLogger.error('[ERROR] [MemoryDiscovery]', ...args),
 };
 
-interface GeminiFileContent {
+export interface GeminiFileContent {
   filePath: string;
   content: string | null;
 }
@@ -304,7 +304,7 @@ async function readGeminiMdFiles(
   return results;
 }
 
-function concatenateInstructions(
+export function concatenateInstructions(
   instructionContents: GeminiFileContent[],
   // CWD is needed to resolve relative paths for display markers
   currentWorkingDirectoryForDisplay: string,
@@ -436,7 +436,7 @@ export async function loadEnvironmentMemory(
         `Loading environment memory for trusted root: ${resolvedRoot} (Stopping exactly here)`,
       );
     }
-    return await findUpwardGeminiFiles(resolvedRoot, resolvedRoot, debugMode);
+    return findUpwardGeminiFiles(resolvedRoot, resolvedRoot, debugMode);
   });
 
   const pathArrays = await Promise.all(traversalPromises);
@@ -577,7 +577,7 @@ export async function refreshServerHierarchicalMemory(config: Config) {
   config.setUserMemory(finalMemory);
   config.setGeminiMdFileCount(result.fileCount);
   config.setGeminiMdFilePaths(result.filePaths);
-  coreEvents.emit(CoreEvent.MemoryChanged, result);
+  coreEvents.emit(CoreEvent.MemoryChanged, { fileCount: result.fileCount });
   return result;
 }
 

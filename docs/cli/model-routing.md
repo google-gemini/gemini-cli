@@ -1,31 +1,27 @@
-## Model Routing
+## Model routing
 
 Gemini CLI includes a model routing feature that automatically switches to a
 fallback model in case of a model failure. This feature is enabled by default
 and provides resilience when the primary model is unavailable.
 
-## How it Works
+## How it works
 
-Model routing is not based on prompt complexity, but is a fallback mechanism.
-Here's how it works:
+Model routing is managed by the `ModelAvailabilityService`, which monitors model
+health and automatically routes requests to available models based on defined
+policies.
 
-1.  **Model Failure:** If the currently selected model fails to respond (for
-    example, due to a server error or other issue), the CLI will initiate the
-    fallback process.
+1.  **Model failure:** If the currently selected model fails (e.g., due to quota
+    or server errors), the CLI will iniate the fallback process.
 
-2.  **User Consent:** The CLI will prompt you to ask if you want to switch to
-    the fallback model. This is handled by the `fallbackModelHandler`.
+2.  **User consent:** Depending on the failure and the model's policy, the CLI
+    may prompt you to switch to a fallback model (by default always prompts
+    you).
 
-3.  **Fallback Activation:** If you consent, the CLI will activate the fallback
-    mode by calling `config.setFallbackMode(true)`.
+3.  **Model switch:** If approved, or if the policy allows for silent fallback,
+    the CLI will use an available fallback model for the current turn or the
+    remainder of the session.
 
-4.  **Model Switch:** On the next request, the CLI will use the
-    `DEFAULT_GEMINI_FLASH_MODEL` as the fallback model. This is handled by the
-    `resolveModel` function in
-    `packages/cli/src/zed-integration/zedIntegration.ts` which checks if
-    `isInFallbackMode()` is true.
-
-### Model Selection Precedence
+### Model selection precedence
 
 The model used by Gemini CLI is determined by the following order of precedence:
 
@@ -37,5 +33,5 @@ The model used by Gemini CLI is determined by the following order of precedence:
 3.  **`model.name` in `settings.json`:** If neither of the above are set, the
     model specified in the `model.name` property of your `settings.json` file
     will be used.
-4.  **Default Model:** If none of the above are set, the default model will be
+4.  **Default model:** If none of the above are set, the default model will be
     used. The default model is `auto`

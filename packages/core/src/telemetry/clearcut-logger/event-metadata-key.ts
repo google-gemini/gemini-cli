@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 131
+  // Next ID: 137
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -93,11 +93,11 @@ export enum EventMetadataKey {
   // Replace Tool Call Event Keys
   // ===========================================================================
 
-  // Logs a smart edit tool strategy choice.
-  GEMINI_CLI_SMART_EDIT_STRATEGY = 109,
+  // Logs a edit tool strategy choice.
+  GEMINI_CLI_EDIT_STRATEGY = 109,
 
-  // Logs a smart edit correction event.
-  GEMINI_CLI_SMART_EDIT_CORRECTION = 110,
+  // Logs a edit correction event.
+  GEMINI_CLI_EDIT_CORRECTION = 110,
 
   // Logs the reason for web fetch fallback.
   GEMINI_CLI_WEB_FETCH_FALLBACK_REASON = 116,
@@ -196,6 +196,9 @@ export enum EventMetadataKey {
 
   // Logs the active experiment IDs for the session.
   GEMINI_CLI_EXPERIMENT_IDS = 131,
+
+  // Logs the repository name of the GitHub Action that triggered the session.
+  GEMINI_CLI_GH_REPOSITORY_NAME_HASH = 132,
 
   // ==========================================================================
   // Loop Detected Event Keys
@@ -498,4 +501,20 @@ export enum EventMetadataKey {
 
   // Logs the model that confirmed the loop.
   GEMINI_CLI_LOOP_DETECTED_CONFIRMED_BY_MODEL = 129,
+
+  // ==========================================================================
+  // Hook Call Event Keys
+  // ==========================================================================
+
+  // Logs the name of the hook event (e.g., 'BeforeTool', 'AfterModel').
+  GEMINI_CLI_HOOK_EVENT_NAME = 133,
+
+  // Logs the duration of the hook execution in milliseconds.
+  GEMINI_CLI_HOOK_DURATION_MS = 134,
+
+  // Logs whether the hook execution was successful.
+  GEMINI_CLI_HOOK_SUCCESS = 135,
+
+  // Logs the exit code of the hook script (if applicable).
+  GEMINI_CLI_HOOK_EXIT_CODE = 136,
 }

@@ -1,9 +1,9 @@
-# Local Development Guide
+# Local development guide
 
 This guide provides instructions for setting up and using local development
 features, such as development tracing.
 
-## Development Tracing
+## Development tracing
 
 Development traces (dev traces) are OpenTelemetry (OTel) traces that help you
 debug your code by instrumenting interesting events like model calls, tool
@@ -15,7 +15,7 @@ behaviour and debugging issues. They are disabled by default.
 To enable dev traces, set the `GEMINI_DEV_TRACING=true` environment variable
 when running Gemini CLI.
 
-### Viewing Dev Traces
+### Viewing dev traces
 
 You can view dev traces using either Jaeger or the Genkit Developer UI.
 
@@ -23,7 +23,7 @@ You can view dev traces using either Jaeger or the Genkit Developer UI.
 
 Genkit provides a web-based UI for viewing traces and other telemetry data.
 
-1.  **Start the Genkit Telemetry Server:**
+1.  **Start the Genkit telemetry server:**
 
     Run the following command to start the Genkit server:
 
@@ -37,7 +37,7 @@ Genkit provides a web-based UI for viewing traces and other telemetry data.
     Genkit Developer UI: http://localhost:4000
     ```
 
-2.  **Run Gemini CLI with Dev Tracing:**
+2.  **Run Gemini CLI with dev tracing:**
 
     In a separate terminal, run your Gemini CLI command with the
     `GEMINI_DEV_TRACING` environment variable:
@@ -46,7 +46,7 @@ Genkit provides a web-based UI for viewing traces and other telemetry data.
     GEMINI_DEV_TRACING=true gemini
     ```
 
-3.  **View the Traces:**
+3.  **View the traces:**
 
     Open the Genkit Developer UI URL in your browser and navigate to the
     **Traces** tab to view the traces.
@@ -84,7 +84,7 @@ You can view dev traces in the Jaeger UI. To get started, follow these steps:
 For more detailed information on telemetry, see the
 [telemetry documentation](./cli/telemetry.md).
 
-### Instrumenting Code with Dev Traces
+### Instrumenting code with dev traces
 
 You can add dev traces to your own code for more detailed instrumentation. This
 is useful for debugging and understanding the flow of execution.

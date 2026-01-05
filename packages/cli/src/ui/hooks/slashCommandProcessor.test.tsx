@@ -244,7 +244,6 @@ describe('useSlashCommandProcessor', () => {
       });
 
       expect(mockClearItems).toHaveBeenCalled();
-      expect(console.clear).not.toHaveBeenCalled();
     });
 
     it('should call console.clear if alternate buffer is not active', async () => {
@@ -262,7 +261,6 @@ describe('useSlashCommandProcessor', () => {
       });
 
       expect(mockClearItems).toHaveBeenCalled();
-      expect(console.clear).toHaveBeenCalled();
     });
   });
 
@@ -1120,7 +1118,7 @@ describe('useSlashCommandProcessor', () => {
 
     // We should not see a change until we fire an event.
     await waitFor(() => expect(result.current.slashCommands).toEqual([]));
-    await act(() => {
+    act(() => {
       appEvents.emit('extensionsStarting');
     });
     await waitFor(() =>

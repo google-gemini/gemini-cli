@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CodeAssistServer, getCodeAssistServer } from '@google/gemini-cli-core';
 import type { HistoryItemStats } from '../types.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
@@ -35,11 +34,8 @@ async function defaultSessionView(context: CommandContext) {
   };
 
   if (context.services.config) {
-    const server = getCodeAssistServer(context.services.config);
-    if (server instanceof CodeAssistServer && server.projectId) {
-      const quota = await server.retrieveUserQuota({
-        project: server.projectId,
-      });
+    const quota = await context.services.config.refreshUserQuota();
+    if (quota) {
       statsItem.quotas = quota;
     }
   }
@@ -52,6 +48,7 @@ export const statsCommand: SlashCommand = {
   altNames: ['usage'],
   description: 'Check session stats. Usage: /stats [session|model|tools]',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: async (context: CommandContext) => {
     await defaultSessionView(context);
   },
@@ -60,6 +57,7 @@ export const statsCommand: SlashCommand = {
       name: 'session',
       description: 'Show session-specific usage statistics',
       kind: CommandKind.BUILT_IN,
+      autoExecute: true,
       action: async (context: CommandContext) => {
         await defaultSessionView(context);
       },
@@ -68,6 +66,7 @@ export const statsCommand: SlashCommand = {
       name: 'model',
       description: 'Show model-specific usage statistics',
       kind: CommandKind.BUILT_IN,
+      autoExecute: true,
       action: (context: CommandContext) => {
         context.ui.addItem(
           {
@@ -81,6 +80,7 @@ export const statsCommand: SlashCommand = {
       name: 'tools',
       description: 'Show tool-specific usage statistics',
       kind: CommandKind.BUILT_IN,
+      autoExecute: true,
       action: (context: CommandContext) => {
         context.ui.addItem(
           {

@@ -18,6 +18,7 @@ import * as os from 'node:os';
 import { GEMINI_DIR } from '../packages/core/src/utils/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const BUNDLE_PATH = join(__dirname, '..', 'bundle/gemini.js');
 
 // Get timeout based on environment
 function getDefaultTimeout() {
@@ -159,6 +160,14 @@ interface ParsedLog {
     success?: boolean;
     duration_ms?: number;
     request_text?: string;
+    hook_event_name?: string;
+    hook_name?: string;
+    hook_input?: Record<string, unknown>;
+    hook_output?: Record<string, unknown>;
+    exit_code?: number;
+    stdout?: string;
+    stderr?: string;
+    error?: string;
   };
   scopeMetrics?: {
     metrics: {
@@ -187,17 +196,12 @@ export class InteractiveRun {
     if (!timeout) {
       timeout = getDefaultTimeout();
     }
-    const found = await poll(
+    await poll(
       () => stripAnsi(this.output).toLowerCase().includes(text.toLowerCase()),
       timeout,
       200,
     );
-    expect(
-      found,
-      `Did not find expected text: "${text}". Output was:\n${stripAnsi(
-        this.output,
-      )}`,
-    ).toBe(true);
+    expect(stripAnsi(this.output).toLowerCase()).toContain(text.toLowerCase());
   }
 
   // This types slowly to make sure command is correct, but only work for short
@@ -263,19 +267,14 @@ export class InteractiveRun {
 }
 
 export class TestRig {
-  bundlePath: string;
-  testDir: string | null;
+  testDir: string | null = null;
   testName?: string;
   _lastRunStdout?: string;
   // Path to the copied fake responses file for this test.
   fakeResponsesPath?: string;
   // Original fake responses file path for rewriting goldens in record mode.
   originalFakeResponsesPath?: string;
-
-  constructor() {
-    this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
-    this.testDir = null;
-  }
+  private _interactiveRuns: InteractiveRun[] = [];
 
   setup(
     testName: string,
@@ -286,7 +285,9 @@ export class TestRig {
   ) {
     this.testName = testName;
     const sanitizedName = sanitizeTestName(testName);
-    this.testDir = join(env['INTEGRATION_TEST_FILE_DIR']!, sanitizedName);
+    const testFileDir =
+      env['INTEGRATION_TEST_FILE_DIR'] || join(os.tmpdir(), 'gemini-cli-tests');
+    this.testDir = join(testFileDir, sanitizedName);
     mkdirSync(this.testDir, { recursive: true });
     if (options.fakeResponsesPath) {
       this.fakeResponsesPath = join(this.testDir, 'fake-responses.json');
@@ -366,7 +367,7 @@ export class TestRig {
     const command = isNpmReleaseTest ? 'gemini' : 'node';
     const initialArgs = isNpmReleaseTest
       ? extraInitialArgs
-      : [this.bundlePath, ...extraInitialArgs];
+      : [BUNDLE_PATH, ...extraInitialArgs];
     if (this.fakeResponsesPath) {
       if (process.env['REGENERATE_MODEL_GOLDENS'] === 'true') {
         initialArgs.push('--record-responses', this.fakeResponsesPath);
@@ -377,19 +378,13 @@ export class TestRig {
     return { command, initialArgs };
   }
 
-  run(
-    promptOrOptions:
-      | string
-      | {
-          prompt?: string;
-          stdin?: string;
-          stdinDoesNotEnd?: boolean;
-          yolo?: boolean;
-        },
-    ...args: string[]
-  ): Promise<string> {
-    const yolo =
-      typeof promptOrOptions === 'string' || promptOrOptions.yolo !== false;
+  run(options: {
+    args?: string | string[];
+    stdin?: string;
+    stdinDoesNotEnd?: boolean;
+    yolo?: boolean;
+  }): Promise<string> {
+    const yolo = options.yolo !== false;
     const { command, initialArgs } = this._getCommandAndArgs(
       yolo ? ['--yolo'] : [],
     );
@@ -403,21 +398,17 @@ export class TestRig {
       encoding: 'utf-8',
     };
 
-    if (typeof promptOrOptions === 'string') {
-      commandArgs.push(promptOrOptions);
-    } else if (
-      typeof promptOrOptions === 'object' &&
-      promptOrOptions !== null
-    ) {
-      if (promptOrOptions.prompt) {
-        commandArgs.push(promptOrOptions.prompt);
-      }
-      if (promptOrOptions.stdin) {
-        execOptions.input = promptOrOptions.stdin;
+    if (options.args) {
+      if (Array.isArray(options.args)) {
+        commandArgs.push(...options.args);
+      } else {
+        commandArgs.push(options.args);
       }
     }
 
-    commandArgs.push(...args);
+    if (options.stdin) {
+      execOptions.input = options.stdin;
+    }
 
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
@@ -433,10 +424,7 @@ export class TestRig {
       child.stdin!.write(execOptions.input);
     }
 
-    if (
-      typeof promptOrOptions === 'object' &&
-      !promptOrOptions.stdinDoesNotEnd
-    ) {
+    if (!options.stdinDoesNotEnd) {
       child.stdin!.end();
     }
 
@@ -583,6 +571,18 @@ export class TestRig {
   }
 
   async cleanup() {
+    // Kill any interactive runs that are still active
+    for (const run of this._interactiveRuns) {
+      try {
+        await run.kill();
+      } catch (error) {
+        if (env['VERBOSE'] === 'true') {
+          console.warn('Failed to kill interactive run during cleanup:', error);
+        }
+      }
+    }
+    this._interactiveRuns = [];
+
     if (
       process.env['REGENERATE_MODEL_GOLDENS'] === 'true' &&
       this.fakeResponsesPath
@@ -1016,11 +1016,25 @@ export class TestRig {
     return null;
   }
 
-  async runInteractive(...args: string[]): Promise<InteractiveRun> {
-    const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
-    const commandArgs = [...initialArgs, ...args];
+  async runInteractive(options?: {
+    args?: string | string[];
+    yolo?: boolean;
+  }): Promise<InteractiveRun> {
+    const yolo = options?.yolo !== false;
+    const { command, initialArgs } = this._getCommandAndArgs(
+      yolo ? ['--yolo'] : [],
+    );
+    const commandArgs = [...initialArgs];
 
-    const options: pty.IPtyForkOptions = {
+    if (options?.args) {
+      if (Array.isArray(options.args)) {
+        commandArgs.push(...options.args);
+      } else {
+        commandArgs.push(options.args);
+      }
+    }
+
+    const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
       rows: 80,
@@ -1031,9 +1045,10 @@ export class TestRig {
     };
 
     const executable = command === 'node' ? process.execPath : command;
-    const ptyProcess = pty.spawn(executable, commandArgs, options);
+    const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
 
     const run = new InteractiveRun(ptyProcess);
+    this._interactiveRuns.push(run);
     // Wait for the app to be ready
     await run.expectText('  Type your message or @path/to/file', 30000);
     return run;
@@ -1080,5 +1095,24 @@ export class TestRig {
     }
 
     return logs;
+  }
+
+  async pollCommand(
+    commandFn: () => Promise<void>,
+    predicateFn: () => boolean,
+    timeout: number = 30000,
+    interval: number = 1000,
+  ) {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      await commandFn();
+      // Give it a moment to process
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      if (predicateFn()) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+    throw new Error(`pollCommand timed out after ${timeout}ms`);
   }
 }

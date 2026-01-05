@@ -13,8 +13,9 @@ export const copyCommand: SlashCommand = {
   name: 'copy',
   description: 'Copy the last result or code snippet to clipboard',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async (context, _args): Promise<SlashCommandActionReturn | void> => {
-    const chat = await context.services.config?.getGeminiClient()?.getChat();
+    const chat = context.services.config?.getGeminiClient()?.getChat();
     const history = chat?.getHistory();
 
     // Get the last message from the AI (model role)

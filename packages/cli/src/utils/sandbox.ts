@@ -191,7 +191,7 @@ export async function start_sandbox(
       sandboxProcess = spawn(config.command, args, {
         stdio: 'inherit',
       });
-      return new Promise((resolve, reject) => {
+      return await new Promise((resolve, reject) => {
         sandboxProcess?.on('error', reject);
         sandboxProcess?.on('close', (code) => {
           process.stdin.resume();
@@ -251,7 +251,9 @@ export async function start_sandbox(
     }
 
     // stop if image is missing
-    if (!(await ensureSandboxImageIsPresent(config.command, image))) {
+    if (
+      !(await ensureSandboxImageIsPresent(config.command, image, cliConfig))
+    ) {
       const remedy =
         image === LOCAL_DEV_SANDBOX_IMAGE_NAME
           ? 'Try running `npm run build:all` or `npm run build:sandbox` under the gemini-cli repo to build it locally, or check the image name and your network connection.'
@@ -666,7 +668,7 @@ export async function start_sandbox(
       stdio: 'inherit',
     });
 
-    return new Promise<number>((resolve, reject) => {
+    return await new Promise<number>((resolve, reject) => {
       sandboxProcess.on('error', (err) => {
         coreEvents.emitFeedback('error', 'Sandbox process error', err);
         reject(err);
@@ -718,8 +720,12 @@ async function imageExists(sandbox: string, image: string): Promise<boolean> {
   });
 }
 
-async function pullImage(sandbox: string, image: string): Promise<boolean> {
-  console.info(`Attempting to pull image ${image} using ${sandbox}...`);
+async function pullImage(
+  sandbox: string,
+  image: string,
+  cliConfig?: Config,
+): Promise<boolean> {
+  debugLogger.debug(`Attempting to pull image ${image} using ${sandbox}...`);
   return new Promise((resolve) => {
     const args = ['pull', image];
     const pullProcess = spawn(sandbox, args, { stdio: 'pipe' });
@@ -727,11 +733,14 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
     let stderrData = '';
 
     const onStdoutData = (data: Buffer) => {
-      console.info(data.toString().trim()); // Show pull progress
+      if (cliConfig?.getDebugMode() || process.env['DEBUG']) {
+        debugLogger.log(data.toString().trim()); // Show pull progress
+      }
     };
 
     const onStderrData = (data: Buffer) => {
       stderrData += data.toString();
+      // eslint-disable-next-line no-console
       console.error(data.toString().trim()); // Show pull errors/info from the command itself
     };
 
@@ -745,7 +754,7 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
 
     const onClose = (code: number | null) => {
       if (code === 0) {
-        console.info(`Successfully pulled image ${image}.`);
+        debugLogger.log(`Successfully pulled image ${image}.`);
         cleanup();
         resolve(true);
       } else {
@@ -788,6 +797,7 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
 async function ensureSandboxImageIsPresent(
   sandbox: string,
   image: string,
+  cliConfig?: Config,
 ): Promise<boolean> {
   debugLogger.log(`Checking for sandbox image: ${image}`);
   if (await imageExists(sandbox, image)) {
@@ -801,7 +811,7 @@ async function ensureSandboxImageIsPresent(
     return false;
   }
 
-  if (await pullImage(sandbox, image)) {
+  if (await pullImage(sandbox, image, cliConfig)) {
     // After attempting to pull, check again to be certain
     if (await imageExists(sandbox, image)) {
       debugLogger.log(`Sandbox image ${image} is now available after pulling.`);
