@@ -33,6 +33,14 @@ vi.mock('node:readline', () => ({
   createInterface: mockReadline.createInterface,
 }));
 
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    readdir: vi.fn(actual.readdir),
+  };
+});
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -327,8 +335,8 @@ describe('consent', () => {
       });
 
       it('should show a warning if the skill directory cannot be read', async () => {
+        vi.mocked(fs.readdir).mockRejectedValue(new Error('Permission denied'));
         const lockedDir = path.join(tempDir, 'locked');
-        await fs.mkdir(lockedDir, { recursive: true, mode: 0o000 });
 
         const skill: SkillDefinition = {
           name: 'locked-skill',
@@ -338,25 +346,20 @@ describe('consent', () => {
         };
 
         const requestConsent = vi.fn().mockResolvedValue(true);
-        try {
-          await maybeRequestConsentOrFail(
-            baseConfig,
-            requestConsent,
-            false,
-            undefined,
-            false,
-            [skill],
-          );
+        await maybeRequestConsentOrFail(
+          baseConfig,
+          requestConsent,
+          false,
+          undefined,
+          false,
+          [skill],
+        );
 
-          expect(requestConsent).toHaveBeenCalledWith(
-            expect.stringContaining(
-              `    (Location: ${skill.location}) ${chalk.red('⚠️ (Could not count items in directory)')}`,
-            ),
-          );
-        } finally {
-          // Restore permissions so cleanup works
-          await fs.chmod(lockedDir, 0o700);
-        }
+        expect(requestConsent).toHaveBeenCalledWith(
+          expect.stringContaining(
+            `    (Location: ${skill.location}) ${chalk.red('⚠️ (Could not count items in directory)')}`,
+          ),
+        );
       });
     });
   });
