@@ -62,7 +62,6 @@ import {
   fireSessionStartHook,
   fireSessionEndHook,
   generateSummary,
-  type ConsoleLogPayload,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -1331,26 +1330,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
     coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
 
-    const handleConsoleLog = (payload: ConsoleLogPayload) => {
-      if (payload.type === 'error') {
-        historyManager.addItem(
-          {
-            type: MessageType.ERROR,
-            text: payload.content,
-          },
-          Date.now(),
-        );
-      }
-    };
-    coreEvents.on(CoreEvent.ConsoleLog, handleConsoleLog);
-
     // Flush any messages that happened during startup before this component
     // mounted.
     coreEvents.drainBacklogs();
 
     return () => {
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
-      coreEvents.off(CoreEvent.ConsoleLog, handleConsoleLog);
     };
   }, [historyManager]);
 

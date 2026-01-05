@@ -205,7 +205,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
-  [Command.SHOW_MORE_LINES]: [{ key: 'o', ctrl: true }],
+  [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],
 
   // Shell commands
   [Command.REVERSE_SEARCH]: [{ key: 'r', ctrl: true }],
