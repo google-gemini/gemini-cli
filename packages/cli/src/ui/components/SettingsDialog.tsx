@@ -70,7 +70,8 @@ interface SettingsDialogProps {
   config?: Config;
 }
 
-const maxItemsToShow = 8;
+const MAX_ITEMS_TO_SHOW = 8;
+const MIN_LABEL_WIDTH = 55;
 
 export function SettingsDialog({
   settings,
@@ -525,7 +526,7 @@ export function SettingsDialog({
   // Use the calculated maxVisibleItems or fall back to the original maxItemsToShow
   const effectiveMaxItemsToShow = availableTerminalHeight
     ? Math.min(maxVisibleItems, items.length)
-    : maxItemsToShow;
+    : MAX_ITEMS_TO_SHOW;
 
   // Ensure focus stays on settings when scope selection is hidden
   React.useEffect(() => {
@@ -984,7 +985,7 @@ export function SettingsDialog({
               );
               const scopeMessageString = scopeMessage ? ` ${scopeMessage}` : '';
               const labelWidth = Math.max(
-                50,
+                MIN_LABEL_WIDTH,
                 getCachedStringWidth(item.label + scopeMessageString),
               );
               const valueWidth = getCachedStringWidth(displayValue);
@@ -1004,7 +1005,7 @@ export function SettingsDialog({
                     </Box>
                     <Box flexDirection="column" flexGrow={1} minWidth={0}>
                       <Box flexDirection="row">
-                        <Box minWidth={50}>
+                        <Box minWidth={MIN_LABEL_WIDTH}>
                           <Text
                             color={
                               isActive
@@ -1035,7 +1036,7 @@ export function SettingsDialog({
                         </Text>
                       </Box>
                       {item.description && (
-                        <Box width={descriptionWidth}>
+                        <Box maxWidth={descriptionWidth}>
                           <Text color={theme.text.secondary} wrap="truncate">
                             {item.description}
                           </Text>
