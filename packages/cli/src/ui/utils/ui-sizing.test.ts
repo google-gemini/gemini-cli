@@ -35,8 +35,8 @@ describe('ui-sizing', () => {
       [80, true, true, 79], // -1 for alternate buffer
       [100, true, true, 99],
 
-      // Default behavior (useFullWidth undefined or true)
-      [100, undefined, false, 100],
+      // Default behavior (useFullWidth true)
+      [100, true, false, 100],
 
       // useFullWidth: false (Smart sizing)
       [80, false, false, 78], // 98% of 80
