@@ -1146,13 +1146,16 @@ describe('oauth2', () => {
           mockConfig,
         );
 
-        // Wait a tick to ensure the SIGINT handler is registered
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        const sigintCall = processOnSpy.mock.calls.find(
-          (call) => call[0] === 'SIGINT',
-        );
-        const sigIntHandler = sigintCall?.[1] as (() => void) | undefined;
+        // Wait for the SIGINT handler to be registered
+        let sigIntHandler: (() => void) | undefined;
+        await vi.waitFor(() => {
+          const sigintCall = processOnSpy.mock.calls.find(
+            (call) => call[0] === 'SIGINT',
+          );
+          sigIntHandler = sigintCall?.[1] as (() => void) | undefined;
+          if (!sigIntHandler)
+            throw new Error('SIGINT handler not registered yet');
+        });
 
         expect(sigIntHandler).toBeDefined();
 
@@ -1207,14 +1210,15 @@ describe('oauth2', () => {
           mockConfig,
         );
 
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        const dataCall = stdinOnSpy.mock.calls.find(
-          (call: [string, ...unknown[]]) => call[0] === 'data',
-        );
-        const dataHandler = dataCall?.[1] as
-          | ((data: Buffer) => void)
-          | undefined;
+        // Wait for the stdin handler to be registered
+        let dataHandler: ((data: Buffer) => void) | undefined;
+        await vi.waitFor(() => {
+          const dataCall = stdinOnSpy.mock.calls.find(
+            (call: [string, ...unknown[]]) => call[0] === 'data',
+          );
+          dataHandler = dataCall?.[1] as ((data: Buffer) => void) | undefined;
+          if (!dataHandler) throw new Error('stdin handler not registered yet');
+        });
 
         expect(dataHandler).toBeDefined();
 
