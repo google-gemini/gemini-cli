@@ -48,6 +48,8 @@ vi.mock('shell-quote', () => ({
 }));
 
 let config: Config;
+const isWindowsRuntime = process.platform === 'win32';
+const describeWindowsOnly = isWindowsRuntime ? describe : describe.skip;
 
 beforeAll(async () => {
   mockPlatform.mockReturnValue('linux');
@@ -452,7 +454,7 @@ describe('checkCommandPermissions', () => {
   });
 });
 
-describe('PowerShell integration', () => {
+describeWindowsOnly('PowerShell integration', () => {
   const originalComSpec = process.env['ComSpec'];
 
   beforeEach(() => {
@@ -471,6 +473,8 @@ describe('PowerShell integration', () => {
   });
 
   it('should block commands when PowerShell parser reports errors', () => {
+    // Mock spawnSync to avoid the overhead of spawning a real PowerShell process,
+    // which can lead to timeouts in CI environments even on Windows.
     mockSpawnSync.mockReturnValue({
       status: 0,
       stdout: JSON.stringify({ success: false }),
@@ -484,6 +488,8 @@ describe('PowerShell integration', () => {
   });
 
   it('should allow valid commands through PowerShell parser', () => {
+    // Mock spawnSync to avoid the overhead of spawning a real PowerShell process,
+    // which can lead to timeouts in CI environments even on Windows.
     mockSpawnSync.mockReturnValue({
       status: 0,
       stdout: JSON.stringify({

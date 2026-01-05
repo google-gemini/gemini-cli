@@ -335,8 +335,8 @@ describe('consent', () => {
       });
 
       it('should show a warning if the skill directory cannot be read', async () => {
-        vi.mocked(fs.readdir).mockRejectedValue(new Error('Permission denied'));
         const lockedDir = path.join(tempDir, 'locked');
+        await fs.mkdir(lockedDir, { recursive: true });
 
         const skill: SkillDefinition = {
           name: 'locked-skill',
@@ -344,6 +344,14 @@ describe('consent', () => {
           location: path.join(lockedDir, 'SKILL.md'),
           body: 'body',
         };
+
+        // Mock readdir to simulate a permission error.
+        // We do this instead of using fs.mkdir(..., { mode: 0o000 }) because
+        // directory permissions work differently on Windows and 0o000 doesn't
+        // effectively block access there, leading to test failures in Windows CI.
+        mockReaddir.mockRejectedValueOnce(
+          new Error('EACCES: permission denied, scandir'),
+        );
 
         const requestConsent = vi.fn().mockResolvedValue(true);
         await maybeRequestConsentOrFail(
