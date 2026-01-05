@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,7 +13,7 @@ import { initializeOutputListenersAndFlush } from '../gemini.js';
 export const skillsCommand: CommandModule = {
   command: 'skills <command>',
   aliases: ['skill'],
-  describe: 'Manage Gemini CLI agent skills.',
+  describe: 'Manage agent skills.',
   builder: (yargs) =>
     yargs
       .middleware(() => initializeOutputListenersAndFlush())

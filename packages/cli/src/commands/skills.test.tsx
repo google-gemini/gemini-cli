@@ -1,13 +1,12 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import { describe, it, expect, vi } from 'vitest';
 import { skillsCommand } from './skills.js';
 
-// Mock subcommands
 vi.mock('./skills/list.js', () => ({ listCommand: { command: 'list' } }));
 vi.mock('./skills/enable.js', () => ({
   enableCommand: { command: 'enable <name>' },
@@ -16,7 +15,6 @@ vi.mock('./skills/disable.js', () => ({
   disableCommand: { command: 'disable <name>' },
 }));
 
-// Mock gemini.js
 vi.mock('../gemini.js', () => ({
   initializeOutputListenersAndFlush: vi.fn(),
 }));
@@ -25,7 +23,7 @@ describe('skillsCommand', () => {
   it('should have correct command and aliases', () => {
     expect(skillsCommand.command).toBe('skills <command>');
     expect(skillsCommand.aliases).toEqual(['skill']);
-    expect(skillsCommand.describe).toBe('Manage Gemini CLI agent skills.');
+    expect(skillsCommand.describe).toBe('Manage agent skills.');
   });
 
   it('should register all subcommands in builder', () => {

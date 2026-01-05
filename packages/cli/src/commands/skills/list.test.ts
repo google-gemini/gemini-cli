@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,11 +9,9 @@ import { format } from 'node:util';
 import { handleList, listCommand } from './list.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
 import { loadCliConfig } from '../../config/config.js';
-import { getErrorMessage } from '../../utils/errors.js';
 import type { Config } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 
-// Mock dependencies
 const emitConsoleLog = vi.hoisted(() => vi.fn());
 const debugLogger = vi.hoisted(() => ({
   log: vi.fn((message, ...args) => {
@@ -38,7 +36,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
 vi.mock('../../config/settings.js');
 vi.mock('../../config/config.js');
-vi.mock('../../utils/errors.js');
 vi.mock('../utils.js', () => ({
   exitCli: vi.fn(),
 }));
@@ -46,7 +43,6 @@ vi.mock('../utils.js', () => ({
 describe('skills list command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);
   const mockLoadCliConfig = vi.mocked(loadCliConfig);
-  const mockGetErrorMessage = vi.mocked(getErrorMessage);
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -124,24 +120,10 @@ describe('skills list command', () => {
       );
     });
 
-    it('should log an error message and exit with code 1 when listing fails', async () => {
-      const mockProcessExit = vi
-        .spyOn(process, 'exit')
-        .mockImplementation((() => {}) as (
-          code?: string | number | null | undefined,
-        ) => never);
-
+    it('should throw an error when listing fails', async () => {
       mockLoadCliConfig.mockRejectedValue(new Error('List failed'));
-      mockGetErrorMessage.mockReturnValue('List failed message');
 
-      await handleList();
-
-      expect(emitConsoleLog).toHaveBeenCalledWith(
-        'error',
-        'List failed message',
-      );
-      expect(mockProcessExit).toHaveBeenCalledWith(1);
-      mockProcessExit.mockRestore();
+      await expect(handleList()).rejects.toThrow('List failed');
     });
   });
 
