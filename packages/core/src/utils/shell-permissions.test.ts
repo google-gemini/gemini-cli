@@ -33,6 +33,15 @@ vi.mock('os', () => ({
   homedir: mockHomedir,
 }));
 
+const mockSpawnSync = vi.hoisted(() => vi.fn());
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return {
+    ...actual,
+    spawnSync: mockSpawnSync,
+  };
+});
+
 const mockQuote = vi.hoisted(() => vi.fn());
 vi.mock('shell-quote', () => ({
   quote: mockQuote,
@@ -464,11 +473,33 @@ describeWindowsOnly('PowerShell integration', () => {
   });
 
   it('should block commands when PowerShell parser reports errors', () => {
+    // Mock spawnSync to avoid the overhead of spawning a real PowerShell process,
+    // which can lead to timeouts in CI environments even on Windows.
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: JSON.stringify({ success: false }),
+    });
+
     const { allowed, reason } = isCommandAllowed('Get-ChildItem |', config);
     expect(allowed).toBe(false);
     expect(reason).toBe(
       'Command rejected because it could not be parsed safely',
     );
+  });
+
+  it('should allow valid commands through PowerShell parser', () => {
+    // Mock spawnSync to avoid the overhead of spawning a real PowerShell process,
+    // which can lead to timeouts in CI environments even on Windows.
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: JSON.stringify({
+        success: true,
+        commands: [{ name: 'Get-ChildItem', text: 'Get-ChildItem' }],
+      }),
+    });
+
+    const { allowed } = isCommandAllowed('Get-ChildItem', config);
+    expect(allowed).toBe(true);
   });
 });
 
