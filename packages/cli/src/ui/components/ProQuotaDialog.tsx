@@ -50,22 +50,8 @@ export function ProQuotaDialog({
         key: 'retry_later',
       },
     ];
-  } else if (isModelNotFoundError || (isTerminalQuotaError && isPaidTier)) {
-    // out of quota
-    items = [
-      {
-        label: `Switch to ${fallbackModel}`,
-        value: 'retry_always' as const,
-        key: 'retry_always',
-      },
-      {
-        label: `Stop`,
-        value: 'retry_later' as const,
-        key: 'retry_later',
-      },
-    ];
-  } else if (isTerminalQuotaError && !isPaidTier) {
-    // free user gets an option to upgrade
+  } else if (isModelNotFoundError || isTerminalQuotaError) {
+    // free users and out of quota users on G1 pro and Cloud Console gets an option to upgrade
     items = [
       {
         label: `Switch to ${fallbackModel}`,
