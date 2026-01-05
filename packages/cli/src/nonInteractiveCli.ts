@@ -348,6 +348,31 @@ export async function runNonInteractive({
             }
           } else if (event.type === GeminiEventType.Error) {
             throw event.value.error;
+          } else if (event.type === GeminiEventType.AgentExecutionStopped) {
+            const stopMessage = `Agent execution stopped: ${event.value.reason}`;
+            if (config.getOutputFormat() === OutputFormat.TEXT) {
+              process.stderr.write(`${stopMessage}\n`);
+            }
+            // Emit final result event for streaming JSON if needed
+            if (streamFormatter) {
+              const metrics = uiTelemetryService.getMetrics();
+              const durationMs = Date.now() - startTime;
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.RESULT,
+                timestamp: new Date().toISOString(),
+                status: 'success',
+                stats: streamFormatter.convertToStreamStats(
+                  metrics,
+                  durationMs,
+                ),
+              });
+            }
+            return;
+          } else if (event.type === GeminiEventType.AgentExecutionBlocked) {
+            const blockMessage = `Agent execution blocked: ${event.value.reason}`;
+            if (config.getOutputFormat() === OutputFormat.TEXT) {
+              process.stderr.write(`[WARNING] ${blockMessage}\n`);
+            }
           }
         }
 
