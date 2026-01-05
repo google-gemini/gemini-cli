@@ -113,9 +113,9 @@ describe('extension reloading', () => {
       // Update the extension, expect the list to update, and mcp servers as well.
       await run.sendKeys('\u0015/extensions update test-extension');
       await run.expectText('/extensions update test-extension');
-      await run.sendKeys('\r');
+      await run.type('\r');
       await new Promise((resolve) => setTimeout(resolve, 500));
-      await run.sendKeys('\r');
+      await run.type('\r');
       await run.expectText(
         ` * test-server (remote): http://localhost:${portB}/mcp`,
       );
@@ -155,7 +155,7 @@ describe('extension reloading', () => {
       );
 
       await run.sendText('/quit');
-      await run.sendKeys('\r');
+      await run.type('\r');
 
       // Clean things up.
       await serverA.stop();
