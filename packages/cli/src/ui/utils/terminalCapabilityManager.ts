@@ -84,6 +84,21 @@ export class TerminalCapabilityManager {
       return;
     }
 
+    const cleanupOnExit = () => {
+      if (this.kittySupported) {
+        this.disableKittyProtocol();
+      }
+      if (this.modifyOtherKeysSupported) {
+        this.disableModifyOtherKeys();
+      }
+      if (this.bracketedPasteSupported) {
+        this.disableBracketedPaste();
+      }
+    };
+    process.on('exit', () => cleanupOnExit);
+    process.on('SIGTERM', () => cleanupOnExit);
+    process.on('SIGINT', cleanupOnExit);
+
     return new Promise((resolve) => {
       const originalRawMode = process.stdin.isRaw;
       if (!originalRawMode) {
@@ -221,17 +236,11 @@ export class TerminalCapabilityManager {
   enableSupportedModes() {
     if (this.kittySupported) {
       this.enableKittyProtocol();
-      process.on('exit', () => this.disableKittyProtocol());
-      process.on('SIGTERM', () => this.disableKittyProtocol());
     } else if (this.modifyOtherKeysSupported) {
       this.enableModifyOtherKeys();
-      process.on('exit', () => this.disableModifyOtherKeys());
-      process.on('SIGTERM', () => this.disableModifyOtherKeys());
     }
     if (this.bracketedPasteSupported) {
       this.enableBracketedPaste();
-      process.on('exit', () => this.disableBracketedPaste());
-      process.on('SIGTERM', () => this.disableBracketedPaste());
     }
   }
 
