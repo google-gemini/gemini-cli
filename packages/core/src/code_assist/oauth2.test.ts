@@ -1130,14 +1130,20 @@ describe('oauth2', () => {
 
         // Spy on process.on to capture the SIGINT handler
         let sigIntHandler: (() => void) | undefined;
+        const originalOn = process.on;
         const processOnSpy = vi
           .spyOn(process, 'on')
-          .mockImplementation((event: string | symbol, listener) => {
-            if (event === 'SIGINT') {
-              sigIntHandler = listener as () => void;
-            }
-            return process;
-          });
+          .mockImplementation(
+            (
+              event: string | symbol,
+              listener: (...args: unknown[]) => void,
+            ) => {
+              if (event === 'SIGINT') {
+                sigIntHandler = listener as () => void;
+              }
+              return originalOn.call(process, event, listener);
+            },
+          );
         const processRemoveListenerSpy = vi.spyOn(process, 'removeListener');
 
         const clientPromise = getOauthClient(
