@@ -66,10 +66,26 @@ export enum GeminiEventType {
   ContextWindowWillOverflow = 'context_window_will_overflow',
   InvalidStream = 'invalid_stream',
   ModelInfo = 'model_info',
+  AgentExecutionStopped = 'agent_execution_stopped',
+  AgentExecutionBlocked = 'agent_execution_blocked',
 }
 
 export type ServerGeminiRetryEvent = {
   type: GeminiEventType.Retry;
+};
+
+export type ServerGeminiAgentExecutionStoppedEvent = {
+  type: GeminiEventType.AgentExecutionStopped;
+  value: {
+    reason: string;
+  };
+};
+
+export type ServerGeminiAgentExecutionBlockedEvent = {
+  type: GeminiEventType.AgentExecutionBlocked;
+  value: {
+    reason: string;
+  };
 };
 
 export type ServerGeminiContextWindowWillOverflowEvent = {
@@ -204,7 +220,9 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiRetryEvent
   | ServerGeminiContextWindowWillOverflowEvent
   | ServerGeminiInvalidStreamEvent
-  | ServerGeminiModelInfoEvent;
+  | ServerGeminiModelInfoEvent
+  | ServerGeminiAgentExecutionStoppedEvent
+  | ServerGeminiAgentExecutionBlockedEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
