@@ -53,7 +53,6 @@ import {
   type ExtensionUpdateStatus,
 } from '../state/extensions.js';
 import { appEvents } from '../../utils/events.js';
-import { useAlternateBuffer } from './useAlternateBuffer.js';
 import {
   LogoutConfirmationDialog,
   LogoutChoice,
@@ -99,7 +98,6 @@ export const useSlashCommandProcessor = (
   const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
     undefined,
   );
-  const alternateBuffer = useAlternateBuffer();
   const [reloadTrigger, setReloadTrigger] = useState(0);
 
   const reloadCommands = useCallback(() => {
@@ -215,9 +213,6 @@ export const useSlashCommandProcessor = (
         addItem,
         clear: () => {
           clearItems();
-          if (!alternateBuffer) {
-            console.clear();
-          }
           refreshStatic();
           setBannerVisible(false);
         },
@@ -241,7 +236,6 @@ export const useSlashCommandProcessor = (
       },
     }),
     [
-      alternateBuffer,
       config,
       settings,
       gitService,

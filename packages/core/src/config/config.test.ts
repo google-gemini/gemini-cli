@@ -952,7 +952,7 @@ describe('Server Config (config.ts)', () => {
       expect(DelegateToAgentToolMock).toHaveBeenCalledWith(
         expect.anything(), // AgentRegistry
         config,
-        undefined,
+        expect.anything(), // MessageBus
       );
 
       const calls = registerToolMock.mock.calls;

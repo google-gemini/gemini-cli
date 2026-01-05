@@ -220,7 +220,6 @@ describe('useGeminiStream', () => {
       getContentGeneratorConfig: vi
         .fn()
         .mockReturnValue(contentGeneratorConfig),
-      getUseSmartEdit: () => false,
       isInteractive: () => false,
       getExperiments: () => {},
     } as unknown as Config;
@@ -691,6 +690,99 @@ describe('useGeminiStream', () => {
       });
       // Ensure we do NOT call back to the API
       expect(mockSendMessageStream).not.toHaveBeenCalled();
+    });
+  });
+
+  it('should stop agent execution immediately when a tool call returns STOP_EXECUTION error', async () => {
+    const stopExecutionToolCalls: TrackedToolCall[] = [
+      {
+        request: {
+          callId: 'stop-call',
+          name: 'stopTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-stop',
+        },
+        status: 'error',
+        response: {
+          callId: 'stop-call',
+          responseParts: [{ text: 'error occurred' }],
+          errorType: ToolErrorType.STOP_EXECUTION,
+          error: new Error('Stop reason from hook'),
+          resultDisplay: undefined,
+        },
+        responseSubmittedToGemini: false,
+        tool: {
+          displayName: 'stop tool',
+        },
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
+      } as unknown as TrackedCompletedToolCall,
+    ];
+    const client = new MockedGeminiClientClass(mockConfig);
+
+    // Capture the onComplete callback
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseReactToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+      ];
+    });
+
+    const { result } = renderHook(() =>
+      useGeminiStream(
+        client,
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // Trigger the onComplete callback with STOP_EXECUTION tool
+    await act(async () => {
+      if (capturedOnComplete) {
+        await (capturedOnComplete as any)(stopExecutionToolCalls);
+      }
+    });
+
+    await waitFor(() => {
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['stop-call']);
+      // Should add an info message to history
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining(
+            'Agent execution stopped: Stop reason from hook',
+          ),
+        }),
+        expect.any(Number),
+      );
+      // Ensure we do NOT call back to the API
+      expect(mockSendMessageStream).not.toHaveBeenCalled();
+      // Streaming state should be Idle
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
     });
   });
 
@@ -2703,6 +2795,63 @@ describe('useGeminiStream', () => {
       // Then verify loop detection confirmation request was set
       await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+    });
+  });
+
+  describe('Agent Execution Events', () => {
+    it('should handle AgentExecutionStopped event', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.AgentExecutionStopped,
+            value: { reason: 'Stopped by hook' },
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test stop');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Agent execution stopped: Stopped by hook',
+          },
+          expect.any(Number),
+        );
+        expect(result.current.streamingState).toBe(StreamingState.Idle);
+      });
+    });
+
+    it('should handle AgentExecutionBlocked event', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.AgentExecutionBlocked,
+            value: { reason: 'Blocked by hook' },
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test block');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.WARNING,
+            text: 'Agent execution blocked: Blocked by hook',
+          },
+          expect.any(Number),
+        );
       });
     });
   });

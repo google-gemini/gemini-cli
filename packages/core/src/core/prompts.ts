@@ -17,6 +17,7 @@ import {
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
   DELEGATE_TO_AGENT_TOOL_NAME,
+  ACTIVATE_SKILL_TOOL_NAME,
 } from '../tools/tool-names.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
@@ -130,6 +131,30 @@ export function getCoreSystemPrompt(
 
   const interactiveMode = config.isInteractiveShellEnabled();
 
+  const skills = config.getSkillManager().getSkills();
+  let skillsPrompt = '';
+  if (skills.length > 0) {
+    const skillsXml = skills
+      .map(
+        (skill) => `  <skill>
+    <name>${skill.name}</name>
+    <description>${skill.description}</description>
+    <location>${skill.location}</location>
+  </skill>`,
+      )
+      .join('\n');
+
+    skillsPrompt = `
+# Available Agent Skills
+
+You have access to the following specialized skills. To activate a skill and receive its detailed instructions, you can call the \`${ACTIVATE_SKILL_TOOL_NAME}\` tool with the skill's name.
+
+<available_skills>
+${skillsXml}
+</available_skills>
+`;
+  }
+
   let basePrompt: string;
   if (systemMdEnabled) {
     basePrompt = fs.readFileSync(systemMdPath, 'utf8');
@@ -147,14 +172,19 @@ export function getCoreSystemPrompt(
 - **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.
 - ${interactiveMode ? `**Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.` : `**Handle Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request.`}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandatesVariant}${
+- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${
+        skills.length > 0
+          ? `
+- **Skill Guidance:** Once a skill is activated via \`${ACTIVATE_SKILL_TOOL_NAME}\`, its instructions and resources are returned wrapped in \`<ACTIVATED_SKILL>\` tags. You MUST treat the content within \`<INSTRUCTIONS>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \`<AVAILABLE_RESOURCES>\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.`
+          : ''
+      }${mandatesVariant}${
         !interactiveMode
           ? `
   - **Continue the work** You are not to interact with the user. Do your best to complete the task at hand, using your best judgement and avoid asking user for any additional information.`
           : ''
       }
 
-${config.getAgentRegistry().getDirectoryContext()}`,
+${config.getAgentRegistry().getDirectoryContext()}${skillsPrompt}`,
       primaryWorkflows_prefix: `
 # Primary Workflows
 
@@ -366,7 +396,7 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
     process.env['GEMINI_WRITE_SYSTEM_MD'],
   );
 
-  // Check if the feature is enabled. This proceeds only if the environment
+  // Write the base prompt to a file if the GEMINI_WRITE_SYSTEM_MD environment
   // variable is set and is not explicitly '0' or 'false'.
   if (writeSystemMdResolution.value && !writeSystemMdResolution.isDisabled) {
     const writePath = writeSystemMdResolution.isSwitch
@@ -376,6 +406,8 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
     fs.mkdirSync(path.dirname(writePath), { recursive: true });
     fs.writeFileSync(writePath, basePrompt);
   }
+
+  basePrompt = basePrompt.trim();
 
   const memorySuffix =
     userMemory && userMemory.trim().length > 0
