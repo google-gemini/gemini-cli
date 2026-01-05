@@ -7,6 +7,7 @@
 import { exec, execSync, spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { quote, parse } from 'shell-quote';
 import { USER_SETTINGS_DIR } from '../config/settings.js';

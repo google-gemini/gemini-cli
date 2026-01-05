@@ -33,7 +33,7 @@ export function homedir(): string {
  * @returns The tildeified path.
  */
 export function tildeifyPath(path: string): string {
-  const homeDir = os.homedir();
+  const homeDir = homedir();
   if (path.startsWith(homeDir)) {
     return path.replace(homeDir, '~');
   }
