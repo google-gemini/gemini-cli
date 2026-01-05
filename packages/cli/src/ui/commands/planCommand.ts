@@ -258,38 +258,67 @@ const deleteCommand: SlashCommand = {
 const exportCommand: SlashCommand = {
   name: 'export',
   description:
-    'Export a plan to a file. Usage: /plan export <title> <filename>',
+    'Export a plan to a file. Usage: /plan export <title> [filename]',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, args): Promise<SlashCommandActionReturn | void> => {
-    const parts = args.trim().split(/\s+/);
-    if (parts.length < 2) {
+    const trimmedArgs = args.trim();
+    if (!trimmedArgs) {
       return {
         type: 'message',
         messageType: 'error',
         content:
-          'Missing arguments. Usage: /plan export <title> <filename>\nTip: Use /plan view <title> first, then export will use the last viewed plan if no title is provided.',
+          'Missing plan title. Usage: /plan export <title> [filename]\nFilename is optional - defaults to plan title with .md extension.',
       };
     }
-
-    // Last part is the filename, everything else is the title search
-    const filename = parts[parts.length - 1];
-    const searchTerm = parts.slice(0, -1).join(' ');
 
     const planService = getPlanService(context);
     const plans = await planService.listPlans();
 
-    // Find plan by title (case-insensitive partial match)
-    const matchingPlan = plans.find((p) =>
-      p.title.toLowerCase().includes(searchTerm.toLowerCase()),
+    // First, try to find a plan matching the full args string (title only, no filename)
+    let matchingPlan = plans.find((p) =>
+      p.title.toLowerCase().includes(trimmedArgs.toLowerCase()),
     );
 
-    if (!matchingPlan) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: `No plan found matching "${searchTerm}".`,
-      };
+    let filename: string;
+
+    if (matchingPlan) {
+      // Found plan with full args as title - generate default filename
+      filename =
+        matchingPlan.title
+          .replace(/[^a-zA-Z0-9\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .toLowerCase() + '.md';
+    } else {
+      // No match - try treating last word as filename
+      const parts = trimmedArgs.split(/\s+/);
+      if (parts.length < 2) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `No plan found matching "${trimmedArgs}".`,
+        };
+      }
+
+      filename = parts[parts.length - 1];
+      const searchTerm = parts.slice(0, -1).join(' ');
+
+      matchingPlan = plans.find((p) =>
+        p.title.toLowerCase().includes(searchTerm.toLowerCase()),
+      );
+
+      if (!matchingPlan) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `No plan found matching "${searchTerm}" or "${trimmedArgs}".`,
+        };
+      }
+    }
+
+    // Ensure .md extension
+    if (!filename.endsWith('.md')) {
+      filename += '.md';
     }
 
     // Resolve filename relative to current working directory
