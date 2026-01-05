@@ -371,9 +371,7 @@ describe('commandUtils', () => {
 
       await copyToClipboard('windows-ssh-test');
 
-      // Should NOT attempt to open /dev/tty on Windows
       expect(mockFs.createWriteStream).not.toHaveBeenCalled();
-      // Should use stderr as TTY fallback and write OSC-52
       expect(stderrStream.write).toHaveBeenCalled();
       expect(mockClipboardyWrite).not.toHaveBeenCalled();
     });
