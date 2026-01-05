@@ -37,4 +37,14 @@ describe('UserMessage', () => {
 
     expect(output).toMatchSnapshot();
   });
+
+  it('truncates long user message over 15 lines', () => {
+    const message = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`).join(
+      '\n',
+    );
+    const { lastFrame } = render(<UserMessage text={message} width={80} />);
+    const output = lastFrame();
+
+    expect(output).toMatchSnapshot();
+  });
 });
