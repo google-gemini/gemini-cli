@@ -988,8 +988,7 @@ export function SettingsDialog({
                 MIN_LABEL_WIDTH,
                 getCachedStringWidth(item.label + scopeMessageString),
               );
-              const valueWidth = getCachedStringWidth(displayValue);
-              const descriptionWidth = labelWidth + 3 + valueWidth;
+              const descriptionWidth = labelWidth + 3;
 
               return (
                 <React.Fragment key={item.value}>
