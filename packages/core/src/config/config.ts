@@ -25,7 +25,6 @@ import { GrepTool } from '../tools/grep.js';
 import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
 import { GlobTool } from '../tools/glob.js';
 import { ActivateSkillTool } from '../tools/activate-skill.js';
-import { EditTool } from '../tools/edit.js';
 import { SmartEditTool } from '../tools/smart-edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
@@ -98,7 +97,7 @@ import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { SkillManager } from '../services/skillManager.js';
+import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 
 import { ApprovalMode } from '../policy/types.js';
@@ -176,6 +175,7 @@ export interface GeminiCLIExtension {
   hooks?: { [K in HookEventName]?: HookDefinition[] };
   settings?: ExtensionSetting[];
   resolvedSettings?: ResolvedExtensionSetting[];
+  skills?: SkillDefinition[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -329,7 +329,6 @@ export interface ConfigParameters {
   truncateToolOutputLines?: number;
   enableToolOutputTruncation?: boolean;
   eventEmitter?: EventEmitter;
-  useSmartEdit?: boolean;
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
@@ -454,7 +453,6 @@ export class Config {
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
-  private readonly useSmartEdit: boolean;
   private readonly useWriteTodos: boolean;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
@@ -594,7 +592,6 @@ export class Config {
     this.truncateToolOutputLines =
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
-    this.useSmartEdit = params.useSmartEdit ?? true;
     // // TODO(joshualitt): Re-evaluate the todo tool for 3 family.
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
@@ -736,7 +733,10 @@ export class Config {
 
     // Discover skills if enabled
     if (this.skillsSupport) {
-      await this.getSkillManager().discoverSkills(this.storage);
+      await this.getSkillManager().discoverSkills(
+        this.storage,
+        this.getExtensions(),
+      );
       this.getSkillManager().setDisabledSkills(this.disabledSkills);
 
       // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
@@ -1594,10 +1594,6 @@ export class Config {
     return this.truncateToolOutputLines;
   }
 
-  getUseSmartEdit(): boolean {
-    return this.useSmartEdit;
-  }
-
   getUseWriteTodos(): boolean {
     return this.useWriteTodos;
   }
@@ -1641,10 +1637,7 @@ export class Config {
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this);
-
-    // Set message bus on tool registry before discovery so MCP tools can access it
-    registry.setMessageBus(this.messageBus);
+    const registry = new ToolRegistry(this, this.messageBus);
 
     // helper to create & register core tools that are enabled
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1667,9 +1660,7 @@ export class Config {
       }
 
       if (isEnabled) {
-        // Pass message bus to tools when feature flag is enabled
-        // This first implementation is only focused on the general case of
-        // the tool registry.
+        // Pass message bus to tools (required for policy engine integration)
         const toolArgs = [...args, this.getMessageBus()];
 
         registry.registerTool(new ToolClass(...toolArgs));
@@ -1699,11 +1690,7 @@ export class Config {
 
     registerCoreTool(GlobTool, this);
     registerCoreTool(ActivateSkillTool, this);
-    if (this.getUseSmartEdit()) {
-      registerCoreTool(SmartEditTool, this);
-    } else {
-      registerCoreTool(EditTool, this);
-    }
+    registerCoreTool(SmartEditTool, this);
     registerCoreTool(WriteFileTool, this);
     registerCoreTool(WebFetchTool, this);
     registerCoreTool(ShellTool, this);

@@ -37,15 +37,22 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
    * @param definition The definition object that configures the agent.
    * @param config The global runtime configuration.
    * @param params The validated input parameters for the agent.
-   * @param messageBus Optional message bus for policy enforcement.
+   * @param messageBus Message bus for policy enforcement.
    */
   constructor(
     private readonly definition: LocalAgentDefinition,
     private readonly config: Config,
     params: AgentInputs,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, definition.name, definition.displayName);
+    super(
+      params,
+      messageBus,
+      _toolName ?? definition.name,
+      _toolDisplayName ?? definition.displayName,
+    );
   }
 
   /**
