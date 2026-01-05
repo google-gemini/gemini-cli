@@ -6,6 +6,9 @@
 
 import { Storage } from '../config/storage.js';
 import { type SkillDefinition, loadSkillsFromDir } from './skillLoader.js';
+import type { GeminiCLIExtension } from '../config/config.js';
+
+export { type SkillDefinition };
 
 export class SkillManager {
   private skills: SkillDefinition[] = [];
@@ -19,17 +22,27 @@ export class SkillManager {
   }
 
   /**
-   * Discovers skills from standard user and project locations.
-   * Project skills take precedence over user skills.
+   * Discovers skills from standard user and project locations, as well as extensions.
+   * Precedence: Extensions (lowest) -> User -> Project (highest).
    */
-  async discoverSkills(storage: Storage): Promise<void> {
+  async discoverSkills(
+    storage: Storage,
+    extensions: GeminiCLIExtension[] = [],
+  ): Promise<void> {
     this.clearSkills();
 
-    // 1. User skills
+    // 1. Extension skills (lowest precedence)
+    for (const extension of extensions) {
+      if (extension.isActive && extension.skills) {
+        this.addSkillsWithPrecedence(extension.skills);
+      }
+    }
+
+    // 2. User skills
     const userSkills = await loadSkillsFromDir(Storage.getUserSkillsDir());
     this.addSkillsWithPrecedence(userSkills);
 
-    // 2. Project skills (highest precedence)
+    // 3. Project skills (highest precedence)
     const projectSkills = await loadSkillsFromDir(
       storage.getProjectSkillsDir(),
     );
