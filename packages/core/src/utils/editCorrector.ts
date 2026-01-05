@@ -7,7 +7,7 @@
 import type { Content } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
-import type { EditToolParams } from '../tools/edit.js';
+import type { EditToolParams } from '../tools/smart-edit.js';
 import {
   EDIT_TOOL_NAME,
   GREP_TOOL_NAME,
