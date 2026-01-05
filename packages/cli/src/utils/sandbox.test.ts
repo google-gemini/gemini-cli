@@ -12,13 +12,19 @@ import { start_sandbox } from './sandbox.js';
 import { FatalSandboxError, type SandboxConfig } from '@google/gemini-cli-core';
 import { EventEmitter } from 'node:events';
 
+const { mockedHomedir, mockedGetContainerPath } = vi.hoisted(() => ({
+    mockedHomedir: vi.fn().mockReturnValue('/home/user'),
+    mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
+  }));
+
 vi.mock('./sandboxUtils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./sandboxUtils.js')>();
   return {
     ...actual,
-    getContainerPath: (p: string) => p,
+    getContainerPath: mockedGetContainerPath,
   };
 });
+
 vi.mock('node:child_process');
 vi.mock('node:os');
 vi.mock('node:fs');
@@ -48,6 +54,7 @@ vi.mock('node:util', async (importOriginal) => {
     },
   };
 });
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -68,7 +75,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       }
     },
     GEMINI_DIR: '.gemini',
-    homedir: vi.fn().mockReturnValue('/home/user'),
+    homedir: mockedHomedir,
   };
 });
 
@@ -350,7 +357,6 @@ describe('sandbox', () => {
         1,
         'docker',
         expect.arrayContaining(['images', '-q']),
-        expect.any(Object),
       );
 
       // The second call is 'docker run ...'
