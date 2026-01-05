@@ -10,6 +10,7 @@
 
 import http from 'node:http';
 import https from 'node:https';
+import zlib from 'node:zlib';
 import { EventEmitter } from 'node:events';
 
 const ACTIVITY_ID_HEADER = 'x-activity-request-id';
@@ -262,21 +263,38 @@ export class ActivityLogger extends EventEmitter {
           responseChunks.push(Buffer.from(chunk)),
         );
         res.on('end', () => {
-          const resBody = Buffer.concat(responseChunks).toString('utf8');
-          const startTime = self.requestStartTimes.get(id);
-          const durationMs = startTime ? Date.now() - startTime : 0;
-          self.requestStartTimes.delete(id);
+          const buffer = Buffer.concat(responseChunks);
+          const encoding = res.headers['content-encoding'];
 
-          self.safeEmitNetwork({
-            id,
-            pending: false,
-            response: {
-              status: res.statusCode,
-              headers: self.stringifyHeaders(res.headers),
-              body: resBody,
-              durationMs,
-            },
-          });
+          const processBuffer = (finalBuffer: Buffer) => {
+            const resBody = finalBuffer.toString('utf8');
+            const startTime = self.requestStartTimes.get(id);
+            const durationMs = startTime ? Date.now() - startTime : 0;
+            self.requestStartTimes.delete(id);
+
+            self.safeEmitNetwork({
+              id,
+              pending: false,
+              response: {
+                status: res.statusCode,
+                headers: self.stringifyHeaders(res.headers),
+                body: resBody,
+                durationMs,
+              },
+            });
+          };
+
+          if (encoding === 'gzip') {
+            zlib.gunzip(buffer, (err, decompressed) => {
+              processBuffer(err ? buffer : decompressed);
+            });
+          } else if (encoding === 'deflate') {
+            zlib.inflate(buffer, (err, decompressed) => {
+              processBuffer(err ? buffer : decompressed);
+            });
+          } else {
+            processBuffer(buffer);
+          }
         });
       });
 
