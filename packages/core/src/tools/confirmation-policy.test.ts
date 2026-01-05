@@ -7,7 +7,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { SmartEditTool } from './smart-edit.js';
+import { EditTool } from './edit.js';
 import { WriteFileTool } from './write-file.js';
 import { WebFetchTool } from './web-fetch.js';
 import { ToolConfirmationOutcome } from './tools.js';
@@ -21,8 +21,8 @@ import os from 'node:os';
 
 // Mock telemetry loggers to avoid failures
 vi.mock('../telemetry/loggers.js', () => ({
-  logSmartEditStrategy: vi.fn(),
-  logSmartEditCorrectionEvent: vi.fn(),
+  logEditStrategy: vi.fn(),
+  logEditCorrectionEvent: vi.fn(),
   logFileOperation: vi.fn(),
 }));
 
@@ -81,9 +81,8 @@ describe('Tool Confirmation Policy Updates', () => {
 
   const tools = [
     {
-      name: 'SmartEditTool',
-      create: (config: Config, bus: MessageBus) =>
-        new SmartEditTool(config, bus),
+      name: 'EditTool',
+      create: (config: Config, bus: MessageBus) => new EditTool(config, bus),
       params: {
         file_path: 'test.txt',
         instruction: 'change content',

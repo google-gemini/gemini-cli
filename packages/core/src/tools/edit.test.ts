@@ -43,11 +43,11 @@ import {
   type Mock,
 } from 'vitest';
 import {
-  SmartEditTool,
+  EditTool,
   type EditToolParams,
   applyReplacement,
   calculateReplacement,
-} from './smart-edit.js';
+} from './edit.js';
 import { type FileDiff, ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import {
@@ -64,8 +64,8 @@ import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.j
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 
-describe('SmartEditTool', () => {
-  let tool: SmartEditTool;
+describe('EditTool', () => {
+  let tool: EditTool;
   let tempDir: string;
   let rootDir: string;
   let mockConfig: Config;
@@ -75,7 +75,7 @@ describe('SmartEditTool', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'smart-edit-tool-test-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-tool-test-'));
     rootDir = path.join(tempDir, 'root');
     fs.mkdirSync(rootDir);
 
@@ -172,7 +172,7 @@ describe('SmartEditTool', () => {
 
     const bus = createMockMessageBus();
     getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
-    tool = new SmartEditTool(mockConfig, bus);
+    tool = new EditTool(mockConfig, bus);
   });
 
   afterEach(() => {
@@ -393,9 +393,7 @@ describe('SmartEditTool', () => {
 
       const invocation = tool.build(params);
       const abortController = new AbortController();
-      const abortError = new Error(
-        'Abort requested during smart edit execution',
-      );
+      const abortError = new Error('Abort requested during edit execution');
 
       const calculateSpy = vi
         .spyOn(invocation as any, 'calculateEdit')
@@ -755,9 +753,7 @@ describe('SmartEditTool', () => {
 
       const invocation = tool.build(params);
       const abortController = new AbortController();
-      const abortError = new Error(
-        'Abort requested during smart edit confirmation',
-      );
+      const abortError = new Error('Abort requested during edit confirmation');
 
       const calculateSpy = vi
         .spyOn(invocation as any, 'calculateEdit')
