@@ -1728,7 +1728,7 @@ const SETTINGS_SCHEMA = {
         category: 'Admin',
         requiresRestart: false,
         default: {},
-        description: 'MCP-specific admin settings',
+        description: 'MCP-specific admin settings.',
         showInDialog: false,
         mergeStrategy: MergeStrategy.REPLACE,
         properties: {
@@ -1738,7 +1738,7 @@ const SETTINGS_SCHEMA = {
             category: 'Admin',
             requiresRestart: false,
             default: true,
-            description: 'If false, disallows MCP servers from being used',
+            description: 'If false, disallows MCP servers from being used.',
             showInDialog: false,
             mergeStrategy: MergeStrategy.REPLACE,
           },

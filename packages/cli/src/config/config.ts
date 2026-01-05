@@ -282,14 +282,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       return true;
     });
 
-  const extensionsEnabled =
-    settings.admin?.cliFeatureSetting?.extensionsSetting?.extensionsEnabled ??
-    true;
-
-  if (
-    (settings?.experimental?.extensionManagement ?? true) &&
-    extensionsEnabled
-  ) {
+  if (settings?.experimental?.extensionManagement ?? true) {
     yargsInstance.command(extensionsCommand);
   }
 
@@ -510,9 +503,7 @@ export async function loadCliConfig(
   if (settings.security?.disableYoloMode || settings.admin?.secureModeEnabled) {
     if (approvalMode === ApprovalMode.YOLO) {
       if (settings.admin?.secureModeEnabled) {
-        debugLogger.error(
-          'YOLO mode is disabled by the "admin.secureModeEnabled" setting.',
-        );
+        debugLogger.error('YOLO mode is disabled by your admin.');
       } else {
         debugLogger.error(
           'YOLO mode is disabled by the "disableYolo" setting.',
@@ -644,6 +635,7 @@ export async function loadCliConfig(
     toolCallCommand: settings.tools?.callCommand,
     mcpServerCommand: mcpEnabled ? settings.mcp?.serverCommand : undefined,
     mcpServers: mcpEnabled ? settings.mcpServers : {},
+    mcpEnabled,
     allowedMcpServers: mcpEnabled
       ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
       : undefined,
@@ -660,7 +652,8 @@ export async function loadCliConfig(
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,
     approvalMode,
-    disableYoloMode: settings.security?.disableYoloMode,
+    disableYoloMode:
+      settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,

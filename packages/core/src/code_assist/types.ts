@@ -290,7 +290,7 @@ export interface McpSetting {
 }
 
 export interface McpConfig {
-  name?: string;
+  mcpServer?: string;
 }
 
 export interface CliFeatureSetting {
