@@ -345,17 +345,26 @@ describe('sandbox', () => {
 
       await start_sandbox(config);
 
-      const runCall = vi
-        .mocked(spawn)
-        .mock.calls.find((call) => call[1]?.[0] === 'run');
-      expect(runCall).toBeDefined();
-      expect(runCall![1]).toEqual(
+      // The first call is 'docker images -q ...'
+      expect(spawn).toHaveBeenNthCalledWith(
+        1,
+        'docker',
+        expect.arrayContaining(['images', '-q']),
+        expect.any(Object),
+      );
+
+      // The second call is 'docker run ...'
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
+        'docker',
         expect.arrayContaining([
+          'run',
           '--volume',
           '/host/path:/container/path:ro',
           '--volume',
           expect.stringContaining('/home/user/.gemini'),
         ]),
+        expect.any(Object),
       );
     });
 
