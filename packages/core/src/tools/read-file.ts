@@ -184,12 +184,12 @@ export class ReadFileTool extends BaseDeclarativeTool<
           },
           respect_git_ignore: {
             description:
-              'Optional: If true, respects .gitignore rules. Defaults to global configuration.',
+              "Optional: Overrides the global setting for respecting .gitignore rules. Set to 'true' to enforce ignore rules, or 'false' to bypass them. If omitted, the global configuration is used.",
             type: 'boolean',
           },
           respect_gemini_ignore: {
             description:
-              'Optional: If true, respects .geminiignore rules. Defaults to global configuration.',
+              "Optional: Overrides the global setting for respecting .geminiignore rules. Set to 'true' to enforce ignore rules, or 'false' to bypass them. If omitted, the global configuration is used.",
             type: 'boolean',
           },
         },
