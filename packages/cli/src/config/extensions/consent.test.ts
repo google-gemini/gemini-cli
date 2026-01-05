@@ -27,11 +27,25 @@ const mockReadline = vi.hoisted(() => ({
   }),
 }));
 
+const mockReaddir = vi.hoisted(() => vi.fn());
+const originalReaddir = vi.hoisted(() => ({
+  current: null as typeof fs.readdir | null,
+}));
+
 // Mocking readline for non-interactive prompts
 vi.mock('node:readline', () => ({
   default: mockReadline,
   createInterface: mockReadline.createInterface,
 }));
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  originalReaddir.current = actual.readdir;
+  return {
+    ...actual,
+    readdir: mockReaddir,
+  };
+});
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -49,6 +63,10 @@ describe('consent', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    if (originalReaddir.current) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockReaddir.mockImplementation(originalReaddir.current as any);
+    }
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'consent-test-'));
   });
 
@@ -328,7 +346,7 @@ describe('consent', () => {
 
       it('should show a warning if the skill directory cannot be read', async () => {
         const lockedDir = path.join(tempDir, 'locked');
-        await fs.mkdir(lockedDir, { recursive: true, mode: 0o000 });
+        await fs.mkdir(lockedDir, { recursive: true });
 
         const skill: SkillDefinition = {
           name: 'locked-skill',
@@ -337,26 +355,29 @@ describe('consent', () => {
           body: 'body',
         };
 
-        const requestConsent = vi.fn().mockResolvedValue(true);
-        try {
-          await maybeRequestConsentOrFail(
-            baseConfig,
-            requestConsent,
-            false,
-            undefined,
-            false,
-            [skill],
-          );
+        // Mock readdir to simulate a permission error.
+        // We do this instead of using fs.mkdir(..., { mode: 0o000 }) because
+        // directory permissions work differently on Windows and 0o000 doesn't
+        // effectively block access there, leading to test failures in Windows CI.
+        mockReaddir.mockRejectedValueOnce(
+          new Error('EACCES: permission denied, scandir'),
+        );
 
-          expect(requestConsent).toHaveBeenCalledWith(
-            expect.stringContaining(
-              `    (Location: ${skill.location}) ${chalk.red('⚠️ (Could not count items in directory)')}`,
-            ),
-          );
-        } finally {
-          // Restore permissions so cleanup works
-          await fs.chmod(lockedDir, 0o700);
-        }
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          baseConfig,
+          requestConsent,
+          false,
+          undefined,
+          false,
+          [skill],
+        );
+
+        expect(requestConsent).toHaveBeenCalledWith(
+          expect.stringContaining(
+            `    (Location: ${skill.location}) ${chalk.red('⚠️ (Could not count items in directory)')}`,
+          ),
+        );
       });
     });
   });
