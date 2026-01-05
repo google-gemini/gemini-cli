@@ -12,9 +12,13 @@ import { start_sandbox } from './sandbox.js';
 import { FatalSandboxError, type SandboxConfig } from '@google/gemini-cli-core';
 import { EventEmitter } from 'node:events';
 
-vi.mock('../config/settings.js', () => ({
-  USER_SETTINGS_DIR: '/home/user/.gemini',
-}));
+vi.mock('./sandboxUtils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./sandboxUtils.js')>();
+  return {
+    ...actual,
+    getContainerPath: (p: string) => p,
+  };
+});
 vi.mock('node:child_process');
 vi.mock('node:os');
 vi.mock('node:fs');
@@ -64,7 +68,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       }
     },
     GEMINI_DIR: '.gemini',
-    USER_SETTINGS_DIR: '/home/user/.gemini',
+    homedir: vi.fn().mockReturnValue('/home/user'),
   };
 });
 
@@ -341,15 +345,17 @@ describe('sandbox', () => {
 
       await start_sandbox(config);
 
-      expect(spawn).toHaveBeenCalledWith(
-        'docker',
+      const runCall = vi
+        .mocked(spawn)
+        .mock.calls.find((call) => call[1]?.[0] === 'run');
+      expect(runCall).toBeDefined();
+      expect(runCall![1]).toEqual(
         expect.arrayContaining([
           '--volume',
           '/host/path:/container/path:ro',
           '--volume',
           expect.stringContaining('/home/user/.gemini'),
         ]),
-        expect.any(Object),
       );
     });
 
