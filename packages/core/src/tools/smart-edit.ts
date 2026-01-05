@@ -165,16 +165,10 @@ async function calculateFlexibleReplacement(
 
     if (isMatch) {
       flexibleOccurrences++;
-      const firstLineInMatch = window[0];
-      const indentationMatch = firstLineInMatch.match(/^(\s*)/);
-      const indentation = indentationMatch ? indentationMatch[1] : '';
-      const newBlockWithIndent = replaceLines.map(
-        (line: string) => `${indentation}${line}`,
-      );
       sourceLines.splice(
         i,
         searchLinesStripped.length,
-        newBlockWithIndent.join('\n'),
+        replaceLines.join('\n'),
       );
       i += replaceLines.length;
     } else {
