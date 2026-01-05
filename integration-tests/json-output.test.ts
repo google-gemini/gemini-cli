@@ -13,8 +13,9 @@ import { ExitCodes } from '@google/gemini-cli-core/src/index.js';
 describe.skip('JSON output', () => {
   let rig: TestRig;
 
-  beforeEach(async () => {
+  beforeEach(async (context) => {
     rig = new TestRig();
+    await rig.setup(context.task.name);
   });
 
   afterEach(async () => {
@@ -22,7 +23,12 @@ describe.skip('JSON output', () => {
   });
 
   it('should return a valid JSON with response and stats', async () => {
-    await rig.setup('json-output-response-stats');
+    await rig.setup('json-output-france', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'json-output.france.responses',
+      ),
+    });
     const result = await rig.run({
       args: ['What is the capital of France?', '--output-format', 'json'],
     });
@@ -37,7 +43,12 @@ describe.skip('JSON output', () => {
   });
 
   it('should return a valid JSON with a session ID', async () => {
-    await rig.setup('json-output-session-id');
+    await rig.setup('json-output-session-id', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'json-output.session-id.responses',
+      ),
+    });
     const result = await rig.run({
       args: ['Hello', '--output-format', 'json'],
     });
