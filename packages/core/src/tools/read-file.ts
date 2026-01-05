@@ -40,6 +40,16 @@ export interface ReadFileToolParams {
    * The number of lines to read (optional)
    */
   limit?: number;
+
+  /**
+   * Whether to respect .gitignore rules (optional)
+   */
+  respect_git_ignore?: boolean;
+
+  /**
+   * Whether to respect .geminiignore rules (optional)
+   */
+  respect_gemini_ignore?: boolean;
 }
 
 class ReadFileToolInvocation extends BaseToolInvocation<
@@ -172,6 +182,16 @@ export class ReadFileTool extends BaseDeclarativeTool<
               "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
             type: 'number',
           },
+          respect_git_ignore: {
+            description:
+              'Optional: If true, respects .gitignore rules. Defaults to global configuration.',
+            type: 'boolean',
+          },
+          respect_gemini_ignore: {
+            description:
+              'Optional: If true, respects .geminiignore rules. Defaults to global configuration.',
+            type: 'boolean',
+          },
         },
         required: ['file_path'],
         type: 'object',
@@ -215,7 +235,17 @@ export class ReadFileTool extends BaseDeclarativeTool<
     }
 
     const fileService = this.config.getFileService();
-    const fileFilteringOptions = this.config.getFileFilteringOptions();
+    const fileFilteringOptions = structuredClone(
+      this.config.getFileFilteringOptions(),
+    );
+
+    if (params.respect_git_ignore !== undefined) {
+      fileFilteringOptions.respectGitIgnore = params.respect_git_ignore;
+    }
+    if (params.respect_gemini_ignore !== undefined) {
+      fileFilteringOptions.respectGeminiIgnore = params.respect_gemini_ignore;
+    }
+
     if (fileService.shouldIgnoreFile(resolvedPath, fileFilteringOptions)) {
       return `File path '${resolvedPath}' is ignored by configured ignore patterns.`;
     }

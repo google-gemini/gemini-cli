@@ -475,4 +475,196 @@ describe('ReadFileTool', () => {
       });
     });
   });
+  describe('Ignore Override Controls', () => {
+    it('should successfully read file in .git/info/exclude when config is true but we pass respect_git_ignore: false via param', async () => {
+      // Setup git exclude
+      await fsp.mkdir(path.join(tempRootDir, '.git', 'info'), {
+        recursive: true,
+      });
+      await fsp.writeFile(
+        path.join(tempRootDir, 'ignored-by-exclude.txt'),
+        'secret content',
+        'utf-8',
+      );
+      await fsp.writeFile(
+        path.join(tempRootDir, '.git', 'info', 'exclude'),
+        'ignored-by-exclude.txt',
+        'utf-8',
+      );
+
+      const params = {
+        file_path: path.join(tempRootDir, 'ignored-by-exclude.txt'),
+        respect_git_ignore: false,
+      } as unknown as ReadFileToolParams;
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.llmContent).toBe('secret content');
+    });
+
+    it('should successfully read file in .gitignore when config is true but we pass respect_git_ignore: false via param', async () => {
+      // Setup gitignore
+      await fsp.mkdir(path.join(tempRootDir, '.git'));
+      await fsp.writeFile(
+        path.join(tempRootDir, 'ignored-by-gitignore.txt'),
+        'gitignore content',
+        'utf-8',
+      );
+      await fsp.writeFile(
+        path.join(tempRootDir, '.gitignore'),
+        'ignored-by-gitignore.txt',
+        'utf-8',
+      );
+
+      const params = {
+        file_path: path.join(tempRootDir, 'ignored-by-gitignore.txt'),
+        respect_git_ignore: false,
+      } as unknown as ReadFileToolParams;
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.llmContent).toBe('gitignore content');
+    });
+
+    it('should FAIL to read file in .gitignore when config is true and we pass respect_git_ignore: true via param', async () => {
+      // Setup gitignore
+      await fsp.mkdir(path.join(tempRootDir, '.git'));
+      await fsp.writeFile(
+        path.join(tempRootDir, 'ignored-by-gitignore.txt'),
+        'gitignore content',
+        'utf-8',
+      );
+      await fsp.writeFile(
+        path.join(tempRootDir, '.gitignore'),
+        'ignored-by-gitignore.txt',
+        'utf-8',
+      );
+
+      const params = {
+        file_path: path.join(tempRootDir, 'ignored-by-gitignore.txt'),
+        respect_git_ignore: true,
+      } as unknown as ReadFileToolParams;
+
+      expect(() => tool.build(params)).toThrow(
+        /ignored by configured ignore patterns/,
+      );
+    });
+
+    it('should FAIL to read file in .gitignore when config is true and we pass NO override param', async () => {
+      // Setup gitignore
+      await fsp.mkdir(path.join(tempRootDir, '.git'));
+      await fsp.writeFile(
+        path.join(tempRootDir, 'ignored-by-gitignore.txt'),
+        'gitignore content',
+        'utf-8',
+      );
+      await fsp.writeFile(
+        path.join(tempRootDir, '.gitignore'),
+        'ignored-by-gitignore.txt',
+        'utf-8',
+      );
+
+      const params = {
+        file_path: path.join(tempRootDir, 'ignored-by-gitignore.txt'),
+      } as unknown as ReadFileToolParams;
+
+      expect(() => tool.build(params)).toThrow(
+        /ignored by configured ignore patterns/,
+      );
+    });
+
+    it('should FAIL to read file in .git/info/exclude when config is true and we pass respect_git_ignore: true via param', async () => {
+      // Setup git exclude
+      await fsp.mkdir(path.join(tempRootDir, '.git', 'info'), {
+        recursive: true,
+      });
+      await fsp.writeFile(
+        path.join(tempRootDir, 'ignored-by-exclude.txt'),
+        'secret content',
+        'utf-8',
+      );
+      await fsp.writeFile(
+        path.join(tempRootDir, '.git', 'info', 'exclude'),
+        'ignored-by-exclude.txt',
+        'utf-8',
+      );
+
+      const params = {
+        file_path: path.join(tempRootDir, 'ignored-by-exclude.txt'),
+        respect_git_ignore: true,
+      } as unknown as ReadFileToolParams;
+
+      expect(() => tool.build(params)).toThrow(
+        /ignored by configured ignore patterns/,
+      );
+    });
+
+    it('should successfully read file in .geminiignore when config is true but we pass respect_gemini_ignore: false via param', async () => {
+      // Setup geminiignore
+      await fsp.writeFile(
+        path.join(tempRootDir, 'ignored-by-gemini.txt'),
+        'gemini secret content',
+        'utf-8',
+      );
+      await fsp.writeFile(
+        path.join(tempRootDir, '.geminiignore'),
+        'ignored-by-gemini.txt',
+        'utf-8',
+      );
+
+      const params = {
+        file_path: path.join(tempRootDir, 'ignored-by-gemini.txt'),
+        respect_gemini_ignore: false,
+      } as unknown as ReadFileToolParams;
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.llmContent).toBe('gemini secret content');
+    });
+
+    it('should FAIL to read file in .geminiignore when config is true and we pass respect_gemini_ignore: true via param', async () => {
+      // Setup geminiignore
+      await fsp.writeFile(
+        path.join(tempRootDir, 'ignored-by-gemini.txt'),
+        'gemini secret content',
+        'utf-8',
+      );
+      await fsp.writeFile(
+        path.join(tempRootDir, '.geminiignore'),
+        'ignored-by-gemini.txt',
+        'utf-8',
+      );
+
+      const params = {
+        file_path: path.join(tempRootDir, 'ignored-by-gemini.txt'),
+        respect_gemini_ignore: true,
+      } as unknown as ReadFileToolParams;
+
+      expect(() => tool.build(params)).toThrow(
+        /ignored by configured ignore patterns/,
+      );
+    });
+
+    it('should FAIL to read file in .geminiignore when config is true and we pass NO override param', async () => {
+      // Setup geminiignore
+      await fsp.writeFile(
+        path.join(tempRootDir, 'ignored-by-gemini.txt'),
+        'gemini secret content',
+        'utf-8',
+      );
+      await fsp.writeFile(
+        path.join(tempRootDir, '.geminiignore'),
+        'ignored-by-gemini.txt',
+        'utf-8',
+      );
+
+      const params = {
+        file_path: path.join(tempRootDir, 'ignored-by-gemini.txt'),
+      } as unknown as ReadFileToolParams;
+
+      expect(() => tool.build(params)).toThrow(
+        /ignored by configured ignore patterns/,
+      );
+    });
+  });
 });

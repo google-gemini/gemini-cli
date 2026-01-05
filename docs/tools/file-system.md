@@ -50,6 +50,13 @@ Other binary file types are generally skipped.
   - `limit` (number, optional): For text files, the maximum number of lines to
     read. If omitted, reads a default maximum (e.g., 2000 lines) or the entire
     file if feasible.
+  - `respect_git_ignore` (boolean, optional): Whether to respect `.gitignore`
+    and `.git/info/exclude` patterns when reading the file. Defaults to `true`
+    (or system configuration). Set to `false` to read ignored files.
+  - `respect_gemini_ignore` (boolean, optional): Whether to respect
+    `.geminiignore` patterns when reading the file. Defaults to `true` (or
+    system configuration). Set to `false` to read ignored files.
+
 - **Behavior:**
   - For text files: Returns the content. If `offset` and `limit` are used,
     returns only that slice of lines. Indicates if content was truncated due to
