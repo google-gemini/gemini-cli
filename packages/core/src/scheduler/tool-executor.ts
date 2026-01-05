@@ -31,7 +31,7 @@ import type {
   CancelledToolCall,
 } from './types.js';
 
-export interface ExecuteToolOptions {
+export interface ToolExecutionContext {
   call: ToolCall;
   signal: AbortSignal;
   outputUpdateHandler?: (callId: string, output: string | AnsiOutput) => void;
@@ -41,8 +41,8 @@ export interface ExecuteToolOptions {
 export class ToolExecutor {
   constructor(private readonly config: Config) {}
 
-  async execute(options: ExecuteToolOptions): Promise<CompletedToolCall> {
-    const { call, signal, outputUpdateHandler, onUpdateToolCall } = options;
+  async execute(context: ToolExecutionContext): Promise<CompletedToolCall> {
+    const { call, signal, outputUpdateHandler, onUpdateToolCall } = context;
     const { request } = call;
     const toolName = request.name;
     const callId = request.callId;
@@ -53,17 +53,6 @@ export class ToolExecutor {
       );
     }
     const { tool, invocation } = call;
-
-    if (call.status === 'scheduled') {
-      const executingCall: ExecutingToolCall = {
-        ...call,
-        status: 'executing',
-        tool,
-        invocation,
-        startTime: call.startTime,
-      };
-      onUpdateToolCall(executingCall);
-    }
 
     // Setup live output handling
     const liveOutputCallback =
@@ -85,44 +74,44 @@ export class ToolExecutor {
       async ({ metadata: spanMetadata }) => {
         spanMetadata.input = { request };
 
-        let promise: Promise<ToolResult>;
-        if (invocation instanceof ShellToolInvocation) {
-          const setPidCallback = (pid: number) => {
-            const executingCall: ExecutingToolCall = {
-              ...call,
-              status: 'executing',
-              tool,
-              invocation,
-              pid,
-              startTime: 'startTime' in call ? call.startTime : undefined,
-            };
-            onUpdateToolCall(executingCall);
-          };
-          promise = executeToolWithHooks(
-            invocation,
-            toolName,
-            signal,
-            messageBus,
-            hooksEnabled,
-            tool,
-            liveOutputCallback,
-            shellExecutionConfig,
-            setPidCallback,
-          );
-        } else {
-          promise = executeToolWithHooks(
-            invocation,
-            toolName,
-            signal,
-            messageBus,
-            hooksEnabled,
-            tool,
-            liveOutputCallback,
-            shellExecutionConfig,
-          );
-        }
-
         try {
+          let promise: Promise<ToolResult>;
+          if (invocation instanceof ShellToolInvocation) {
+            const setPidCallback = (pid: number) => {
+              const executingCall: ExecutingToolCall = {
+                ...call,
+                status: 'executing',
+                tool,
+                invocation,
+                pid,
+                startTime: 'startTime' in call ? call.startTime : undefined,
+              };
+              onUpdateToolCall(executingCall);
+            };
+            promise = executeToolWithHooks(
+              invocation,
+              toolName,
+              signal,
+              messageBus,
+              hooksEnabled,
+              tool,
+              liveOutputCallback,
+              shellExecutionConfig,
+              setPidCallback,
+            );
+          } else {
+            promise = executeToolWithHooks(
+              invocation,
+              toolName,
+              signal,
+              messageBus,
+              hooksEnabled,
+              tool,
+              liveOutputCallback,
+              shellExecutionConfig,
+            );
+          }
+
           const toolResult: ToolResult = await promise;
           spanMetadata.output = toolResult;
 

@@ -96,11 +96,6 @@ describe('ToolExecutor', () => {
         ?.response as Record<string, unknown>;
       expect(response).toEqual({ output: 'Tool output' });
     }
-
-    // Check that we transitioned to 'executing'
-    expect(onUpdateToolCall).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'executing' }),
-    );
   });
 
   it('should handle execution errors', async () => {

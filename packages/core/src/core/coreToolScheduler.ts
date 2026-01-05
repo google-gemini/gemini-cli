@@ -841,8 +841,18 @@ export class CoreToolScheduler {
       for (const toolCall of callsToExecute) {
         if (toolCall.status !== 'scheduled') continue;
 
+        this.setStatusInternal(toolCall.request.callId, 'executing', signal);
+        const executingCall = this.toolCalls.find(
+          (c) => c.request.callId === toolCall.request.callId,
+        );
+
+        if (!executingCall) {
+          // Should not happen, but safe guard
+          continue;
+        }
+
         const completedCall = await this.toolExecutor.execute({
-          call: toolCall,
+          call: executingCall,
           signal,
           outputUpdateHandler: (callId, output) => {
             if (this.outputUpdateHandler) {
