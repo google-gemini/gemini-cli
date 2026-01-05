@@ -114,6 +114,7 @@ vi.mock('./extension.js');
 
 const mockCoreEvents = vi.hoisted(() => ({
   emitFeedback: vi.fn(),
+  emitSettingsChanged: vi.fn(),
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {

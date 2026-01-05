@@ -534,6 +534,7 @@ export class LoadedSettings {
     setNestedProperty(settingsFile.originalSettings, key, value);
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
+    coreEvents.emitSettingsChanged();
   }
 }
 

@@ -188,6 +188,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
   const [historyRemountKey, setHistoryRemountKey] = useState(0);
+  const [settingsNonce, setSettingsNonce] = useState(0);
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
   const [isTrustedFolder, setIsTrustedFolder] = useState<boolean | undefined>(
     isWorkspaceTrusted(settings.merged).isTrusted,
@@ -367,6 +368,17 @@ export const AppContainer = (props: AppContainerProps) => {
       coreEvents.off(CoreEvent.ModelChanged, handleModelChanged);
     };
   }, [config]);
+
+  useEffect(() => {
+    const handleSettingsChanged = () => {
+      setSettingsNonce((prev) => prev + 1);
+    };
+
+    coreEvents.on(CoreEvent.SettingsChanged, handleSettingsChanged);
+    return () => {
+      coreEvents.off(CoreEvent.SettingsChanged, handleSettingsChanged);
+    };
+  }, []);
 
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();
@@ -1546,6 +1558,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerData,
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
+      settingsNonce,
     }),
     [
       isThemeDialogOpen,
@@ -1638,6 +1651,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerData,
       bannerVisible,
       config,
+      settingsNonce,
     ],
   );
 

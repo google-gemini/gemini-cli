@@ -726,6 +726,12 @@ export async function loadCliConfig(
     hooks: settings.hooks || {},
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
+    onReload: async () => {
+      const refreshedSettings = loadSettings(cwd);
+      return {
+        disabledSkills: refreshedSettings.merged.skills?.disabled,
+      };
+    },
   });
 }
 
