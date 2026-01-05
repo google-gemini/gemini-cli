@@ -67,8 +67,6 @@ type TtyTarget = { stream: Writable; closeAfter: boolean } | null;
 
 const pickTty = (): TtyTarget => {
   // /dev/tty is only available on Unix-like systems (Linux, macOS, BSD, etc.)
-  // On Windows, skip directly to stdout/stderr fallback to avoid ENOENT crash.
-  // See: https://github.com/google-gemini/gemini-cli/issues/15648
   if (process.platform !== 'win32') {
     // Prefer the controlling TTY to avoid interleaving escape sequences with piped stdout.
     try {
