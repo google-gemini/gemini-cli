@@ -26,15 +26,23 @@ import { AuthType } from '../core/contentGenerator.js';
 import type { Config } from '../config/config.js';
 import readline from 'node:readline';
 import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
-import { GEMINI_DIR } from '../utils/paths.js';
+import { GEMINI_DIR, homedir as pathsHomedir } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { writeToStdout } from '../utils/stdio.js';
 import { FatalCancellationError } from '../utils/errors.js';
 
-vi.mock('os', async (importOriginal) => {
-  const os = await importOriginal<typeof import('os')>();
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
   return {
-    ...os,
+    ...actual,
+    homedir: vi.fn(),
+  };
+});
+
+vi.mock('../utils/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+  return {
+    ...actual,
     homedir: vi.fn(),
   };
 });
@@ -88,6 +96,7 @@ describe('oauth2', () => {
         path.join(os.tmpdir(), 'gemini-cli-test-home-'),
       );
       vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+      vi.mocked(pathsHomedir).mockReturnValue(tempHomeDir);
     });
     afterEach(() => {
       fs.rmSync(tempHomeDir, { recursive: true, force: true });
@@ -1314,7 +1323,8 @@ describe('oauth2', () => {
       tempHomeDir = fs.mkdtempSync(
         path.join(os.tmpdir(), 'gemini-cli-test-home-'),
       );
-      (os.homedir as Mock).mockReturnValue(tempHomeDir);
+      vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+      vi.mocked(pathsHomedir).mockReturnValue(tempHomeDir);
     });
 
     afterEach(() => {
