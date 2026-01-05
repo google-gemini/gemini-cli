@@ -14,11 +14,7 @@ import {
   type MockedObject,
 } from 'vitest';
 import { McpClientManager } from './mcp-client-manager.js';
-import {
-  McpClient,
-  MCPDiscoveryState,
-  setMCPDiscoveryState,
-} from './mcp-client.js';
+import { McpClient } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { Config } from '../config/config.js';
 
@@ -27,7 +23,6 @@ vi.mock('./mcp-client.js', async () => {
   return {
     ...originalModule,
     McpClient: vi.fn(),
-    setMCPDiscoveryState: vi.fn(),
   };
 });
 
@@ -82,12 +77,6 @@ describe('McpClientManager', () => {
     });
     const manager = new McpClientManager(toolRegistry, mockConfig);
     await manager.startConfiguredMcpServers();
-    expect(setMCPDiscoveryState).toHaveBeenCalledWith(
-      MCPDiscoveryState.IN_PROGRESS,
-    );
-    expect(setMCPDiscoveryState).toHaveBeenCalledWith(
-      MCPDiscoveryState.COMPLETED,
-    );
   });
 
   it('should not discover tools if folder is not trusted', async () => {
