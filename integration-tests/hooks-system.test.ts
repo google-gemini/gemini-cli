@@ -950,6 +950,170 @@ try {
       }
     });
 
+    it('should fire SessionStart hook and inject context', async () => {
+      // Create hook script that outputs JSON with additionalContext
+      const hookScript = `const fs = require('fs');
+console.log(JSON.stringify({
+  decision: 'allow', 
+  systemMessage: 'Context injected via SessionStart hook', 
+  hookSpecificOutput: {
+    hookEventName: 'SessionStart', 
+    additionalContext: 'If asked about your identity, you must respond with the following: I am a protocol droid that speaks the bacchi.'
+  }
+}));`;
+
+      await rig.setup('should fire SessionStart hook and inject context', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.session-startup.responses',
+        ),
+      });
+
+      const scriptPath = join(rig.testDir!, 'session_start_context_hook.cjs');
+      writeFileSync(scriptPath, hookScript);
+
+      await rig.setup('should fire SessionStart hook and inject context', {
+        settings: {
+          tools: {
+            enableHooks: true,
+          },
+          hooks: {
+            SessionStart: [
+              {
+                matcher: 'startup',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${scriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      // Run a query - the SessionStart hook will fire during app initialization
+      const result = await rig.run({ args: 'Who are you?' });
+
+      // Check if systemMessage was displayed (in stderr, which rig.run captures)
+      expect(result).toContain('Context injected via SessionStart hook');
+
+      // Check if additionalContext influenced the model response
+      // Note: We use fake responses, but the rig records interactions.
+      // If we are using fake responses, the model won't actually respond unless we provide a fake response for the injected context.
+      // But the test rig setup uses 'hooks-system.session-startup.responses'.
+      // If I'm adding a new test, I might need to generate new fake responses or expect the context to be sent to the model (verify API logs).
+
+      // Verify hook executed
+      const hookLogs = rig.readHookLogs();
+      const sessionStartLog = hookLogs.find(
+        (log) => log.hookCall.hook_event_name === 'SessionStart',
+      );
+
+      expect(sessionStartLog).toBeDefined();
+
+      // Verify the API request contained the injected context
+      // rig.readAllApiRequest() gives us telemetry on API requests.
+      const apiRequests = rig.readAllApiRequest();
+      // We expect at least one API request
+      expect(apiRequests.length).toBeGreaterThan(0);
+
+      // The injected context should be in the request text
+      // For non-interactive mode, I prepended it to input: "context\n\ninput"
+      // The telemetry `request_text` should contain it.
+      const requestText = apiRequests[0].attributes?.request_text || '';
+      expect(requestText).toContain('protocol droid');
+    });
+
+    it('should fire SessionStart hook and display systemMessage in interactive mode', async () => {
+      // Create hook script that outputs JSON with systemMessage and additionalContext
+      const hookScript = `const fs = require('fs');
+console.log(JSON.stringify({
+  decision: 'allow', 
+  systemMessage: 'Interactive Session Start Message', 
+  hookSpecificOutput: {
+    hookEventName: 'SessionStart', 
+    additionalContext: 'The user is a Jedi Master.'
+  }
+}));`;
+
+      await rig.setup(
+        'should fire SessionStart hook and display systemMessage in interactive mode',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.session-startup.responses',
+          ),
+        },
+      );
+
+      const scriptPath = join(
+        rig.testDir!,
+        'session_start_interactive_hook.cjs',
+      );
+      writeFileSync(scriptPath, hookScript);
+
+      await rig.setup(
+        'should fire SessionStart hook and display systemMessage in interactive mode',
+        {
+          settings: {
+            tools: {
+              enableHooks: true,
+            },
+            hooks: {
+              SessionStart: [
+                {
+                  matcher: 'startup',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${scriptPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      );
+
+      const run = await rig.runInteractive();
+
+      // Verify systemMessage is displayed
+      await run.expectText('Interactive Session Start Message', 10000);
+
+      // Send a prompt to establish a session and trigger an API call
+      await run.sendKeys('Hello');
+      await run.type('\r');
+
+      // Wait for response to ensure API call happened
+      await run.expectText('Hello', 15000);
+
+      // Wait for telemetry to be written to disk
+      await rig.waitForTelemetryReady();
+
+      // Verify the API request contained the injected context
+      // We may need to poll for API requests as they are written asynchronously
+      const pollResult = await poll(
+        () => {
+          const apiRequests = rig.readAllApiRequest();
+          return apiRequests.length > 0;
+        },
+        15000,
+        500,
+      );
+
+      expect(pollResult).toBe(true);
+
+      const apiRequests = rig.readAllApiRequest();
+      // The injected context should be in the request_text of the API request
+      const requestText = apiRequests[0].attributes?.request_text || '';
+      expect(requestText).toContain('Jedi Master');
+    });
+
     it('should fire SessionEnd and SessionStart hooks on /clear command', async () => {
       // Create inline hook commands for both SessionEnd and SessionStart
       const sessionEndCommand =
@@ -1002,7 +1166,7 @@ try {
 
       // Send an initial prompt to establish a session
       await run.sendKeys('Say hello');
-      await run.sendKeys('\r');
+      await run.type('\r');
 
       // Wait for the response
       await run.expectText('Hello', 10000);
@@ -1012,14 +1176,14 @@ try {
       const numClears = 3;
       for (let i = 0; i < numClears; i++) {
         await run.sendKeys('/clear');
-        await run.sendKeys('\r');
+        await run.type('\r');
 
         // Wait a bit for clear to complete
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         // Send a prompt to establish an active session before next clear
         await run.sendKeys('Say hello');
-        await run.sendKeys('\r');
+        await run.type('\r');
 
         // Wait for response
         await run.expectText('Hello', 10000);
