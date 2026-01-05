@@ -33,6 +33,13 @@ export function homedir(): string {
 }
 
 /**
+ * Returns the operating system's default directory for temporary files.
+ */
+export function tmpdir(): string {
+  return os.tmpdir();
+}
+
+/**
  * Replaces the home directory with a tilde.
  * @param path - The path to tildeify.
  * @returns The tildeified path.
