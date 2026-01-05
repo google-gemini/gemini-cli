@@ -93,11 +93,11 @@ export enum EventMetadataKey {
   // Replace Tool Call Event Keys
   // ===========================================================================
 
-  // Logs a smart edit tool strategy choice.
-  GEMINI_CLI_SMART_EDIT_STRATEGY = 109,
+  // Logs a edit tool strategy choice.
+  GEMINI_CLI_EDIT_STRATEGY = 109,
 
-  // Logs a smart edit correction event.
-  GEMINI_CLI_SMART_EDIT_CORRECTION = 110,
+  // Logs a edit correction event.
+  GEMINI_CLI_EDIT_CORRECTION = 110,
 
   // Logs the reason for web fetch fallback.
   GEMINI_CLI_WEB_FETCH_FALLBACK_REASON = 116,
