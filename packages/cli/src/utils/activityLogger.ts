@@ -38,6 +38,7 @@ export interface NetworkLog {
 export class ActivityLogger extends EventEmitter {
   private static instance: ActivityLogger;
   private isInterceptionEnabled = false;
+  private requestStartTimes = new Map<string, number>();
 
   static getInstance(): ActivityLogger {
     if (!ActivityLogger.instance) {
@@ -100,6 +101,7 @@ export class ActivityLogger extends EventEmitter {
           reqBody = init.body.toString();
       }
 
+      this.requestStartTimes.set(id, Date.now());
       this.emit('network', {
         id,
         timestamp: Date.now(),
@@ -117,6 +119,10 @@ export class ActivityLogger extends EventEmitter {
         clonedRes
           .text()
           .then((text) => {
+            const startTime = this.requestStartTimes.get(id);
+            const durationMs = startTime ? Date.now() - startTime : 0;
+            this.requestStartTimes.delete(id);
+
             this.emit('network', {
               id,
               pending: false,
@@ -124,14 +130,22 @@ export class ActivityLogger extends EventEmitter {
                 status: response.status,
                 headers: this.stringifyHeaders(response.headers),
                 body: text.substring(0, 100000),
-                durationMs: 0,
+                durationMs,
               },
             });
           })
-          .catch(() => {});
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+            this.emit('network', {
+              id,
+              pending: false,
+              error: `Failed to read response body: ${message}`,
+            });
+          });
 
         return response;
       } catch (err: unknown) {
+        this.requestStartTimes.delete(id);
         const message = err instanceof Error ? err.message : String(err);
         this.emit('network', { id, pending: false, error: message });
         throw err;
@@ -164,6 +178,7 @@ export class ActivityLogger extends EventEmitter {
       }
 
       const id = Math.random().toString(36).substring(7);
+      self.requestStartTimes.set(id, Date.now());
       const req = originalFn.apply(http, args);
       const requestChunks: Buffer[] = [];
 
@@ -171,13 +186,24 @@ export class ActivityLogger extends EventEmitter {
       const oldEnd = req.end;
 
       req.write = function (chunk: any, ...etc: any[]) {
-        if (chunk) requestChunks.push(Buffer.from(chunk));
+        if (chunk) {
+          const encoding =
+            typeof etc[0] === 'string' ? (etc[0] as BufferEncoding) : undefined;
+          requestChunks.push(
+            Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding),
+          );
+        }
         return oldWrite.apply(this, [chunk, ...etc]);
       };
 
       req.end = function (this: any, chunk: any, ...etc: any[]) {
-        if (chunk && typeof chunk !== 'function')
-          requestChunks.push(Buffer.from(chunk));
+        if (chunk && typeof chunk !== 'function') {
+          const encoding =
+            typeof etc[0] === 'string' ? (etc[0] as BufferEncoding) : undefined;
+          requestChunks.push(
+            Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding),
+          );
+        }
         const body = Buffer.concat(requestChunks).toString('utf8');
 
         self.emit('network', {
@@ -199,6 +225,10 @@ export class ActivityLogger extends EventEmitter {
         );
         res.on('end', () => {
           const resBody = Buffer.concat(responseChunks).toString('utf8');
+          const startTime = self.requestStartTimes.get(id);
+          const durationMs = startTime ? Date.now() - startTime : 0;
+          self.requestStartTimes.delete(id);
+
           self.emit('network', {
             id,
             pending: false,
@@ -206,10 +236,16 @@ export class ActivityLogger extends EventEmitter {
               status: res.statusCode,
               headers: self.stringifyHeaders(res.headers),
               body: resBody.substring(0, 50000),
-              durationMs: 0,
+              durationMs,
             },
           });
         });
+      });
+
+      req.on('error', (err: any) => {
+        self.requestStartTimes.delete(id);
+        const message = err instanceof Error ? err.message : String(err);
+        self.emit('network', { id, pending: false, error: message });
       });
 
       return req;

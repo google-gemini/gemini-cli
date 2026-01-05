@@ -497,16 +497,60 @@ export async function main() {
       const logFile = path.join(logsDir, `session-${sessionId}.jsonl`);
       const writeToLog = (type: 'console' | 'network', payload: unknown) => {
         try {
+          // Basic redaction for sensitive data
+          let sanitizedPayload = payload;
+          if (
+            type === 'network' &&
+            typeof payload === 'object' &&
+            payload !== null
+          ) {
+            const log = { ...(payload as Record<string, unknown>) };
+            const headers = log['headers'] as
+              | Record<string, string>
+              | undefined;
+            if (headers) {
+              const redactedHeaders = { ...headers };
+              for (const key of Object.keys(redactedHeaders)) {
+                if (
+                  ['authorization', 'cookie', 'x-goog-api-key'].includes(
+                    key.toLowerCase(),
+                  )
+                ) {
+                  redactedHeaders[key] = '[REDACTED]';
+                }
+              }
+              log['headers'] = redactedHeaders;
+            }
+
+            const response = log['response'] as
+              | { headers?: Record<string, string> }
+              | undefined;
+            if (response?.headers) {
+              const resHeaders = { ...response.headers };
+              for (const key of Object.keys(resHeaders)) {
+                if (['set-cookie'].includes(key.toLowerCase())) {
+                  resHeaders[key] = '[REDACTED]';
+                }
+              }
+              log['response'] = { ...response, headers: resHeaders };
+            }
+            sanitizedPayload = log;
+          }
+
           const entry =
             JSON.stringify({
               type,
-              payload,
+              payload: sanitizedPayload,
               sessionId,
               timestamp: Date.now(),
             }) + '\n';
-          fs.appendFileSync(logFile, entry);
-        } catch {
-          /* ignore write errors */
+
+          // Use asynchronous fire-and-forget to avoid blocking the event loop
+          fs.promises.appendFile(logFile, entry).catch((err) => {
+            debugLogger.error('Failed to write to activity log:', err);
+          });
+        } catch (err) {
+          debugLogger.error('Failed to prepare activity log entry:', err);
         }
       };
 
