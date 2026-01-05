@@ -1,21 +1,22 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { skillsCommand } from './skillsCommand.js';
 import { MessageType } from '../types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { CommandContext } from './types.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { Config , SkillDefinition } from '@google/gemini-cli-core';
 import { SettingScope, type LoadedSettings } from '../../config/settings.js';
 
 describe('skillsCommand', () => {
   let context: CommandContext;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     const skills = [
       {
         name: 'skill1',
@@ -49,6 +50,11 @@ describe('skillsCommand', () => {
         } as unknown as LoadedSettings,
       },
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('should add a SKILLS_LIST item to UI with descriptions by default', async () => {
@@ -188,28 +194,91 @@ describe('skillsCommand', () => {
   });
 
   describe('reload', () => {
-    it('should reload skills successfully', async () => {
+    it('should reload skills successfully and show success message', async () => {
       const reloadCmd = skillsCommand.subCommands!.find(
         (s) => s.name === 'reload',
       )!;
-      const reloadSkillsMock = vi.fn().mockResolvedValue(undefined);
+      // Make reload take some time so timer can fire
+      const reloadSkillsMock = vi.fn().mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      });
       // @ts-expect-error Mocking reloadSkills
       context.services.config.reloadSkills = reloadSkillsMock;
 
-      await reloadCmd.action!(context, '');
+      const actionPromise = reloadCmd.action!(context, '');
 
+      // Initially, no pending item (flicker prevention)
+      expect(context.ui.setPendingItem).not.toHaveBeenCalled();
+
+      // Fast forward 100ms to trigger the pending item
+      await vi.advanceTimersByTimeAsync(100);
       expect(context.ui.setPendingItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
           text: 'Reloading agent skills...',
         }),
       );
+
+      // Fast forward another 100ms to complete the reload
+      await vi.advanceTimersByTimeAsync(100);
+      await actionPromise;
+
       expect(reloadSkillsMock).toHaveBeenCalled();
       expect(context.ui.setPendingItem).toHaveBeenCalledWith(null);
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Agent skills reloaded successfully.',
+          text: 'Agent skills reloaded successfully. No new skills found.',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show new skills count after reload', async () => {
+      const reloadCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'reload',
+      )!;
+      const reloadSkillsMock = vi.fn().mockImplementation(async () => {
+        const skillManager = context.services.config!.getSkillManager();
+        vi.mocked(skillManager.getAllSkills).mockReturnValue([
+          { name: 'skill1' },
+          { name: 'skill2' },
+          { name: 'skill3' },
+        ] as SkillDefinition[]);
+      });
+      // @ts-expect-error Mocking reloadSkills
+      context.services.config.reloadSkills = reloadSkillsMock;
+
+      await reloadCmd.action!(context, '');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Agent skills reloaded successfully. 1 new skill discovered.',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show removed skills count after reload', async () => {
+      const reloadCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'reload',
+      )!;
+      const reloadSkillsMock = vi.fn().mockImplementation(async () => {
+        const skillManager = context.services.config!.getSkillManager();
+        vi.mocked(skillManager.getAllSkills).mockReturnValue([
+          { name: 'skill1' },
+        ] as SkillDefinition[]);
+      });
+      // @ts-expect-error Mocking reloadSkills
+      context.services.config.reloadSkills = reloadSkillsMock;
+
+      await reloadCmd.action!(context, '');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Agent skills reloaded successfully. 1 skill removed.',
         }),
         expect.any(Number),
       );
@@ -237,11 +306,16 @@ describe('skillsCommand', () => {
         (s) => s.name === 'reload',
       )!;
       const error = new Error('Reload failed');
-      const reloadSkillsMock = vi.fn().mockRejectedValue(error);
+      const reloadSkillsMock = vi.fn().mockImplementation(async () => {
+        await new Promise((_, reject) => setTimeout(() => reject(error), 200));
+      });
       // @ts-expect-error Mocking reloadSkills
       context.services.config.reloadSkills = reloadSkillsMock;
 
-      await reloadCmd.action!(context, '');
+      const actionPromise = reloadCmd.action!(context, '');
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(100);
+      await actionPromise;
 
       expect(context.ui.setPendingItem).toHaveBeenCalledWith(null);
       expect(context.ui.addItem).toHaveBeenCalledWith(

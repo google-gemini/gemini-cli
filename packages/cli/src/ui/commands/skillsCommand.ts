@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -173,26 +173,52 @@ async function reloadAction(
     return;
   }
 
-  try {
+  const skillManager = config.getSkillManager();
+  const beforeCount = skillManager.getAllSkills().length;
+
+  let pendingItemSet = false;
+  const pendingTimeout = setTimeout(() => {
     context.ui.setPendingItem({
       type: MessageType.INFO,
       text: 'Reloading agent skills...',
     });
+    pendingItemSet = true;
+  }, 100);
 
+  try {
     await config.reloadSkills();
 
-    context.ui.setPendingItem(null);
+    clearTimeout(pendingTimeout);
+    if (pendingItemSet) {
+      context.ui.setPendingItem(null);
+    }
+
+    const afterCount = skillManager.getAllSkills().length;
+    let successText = 'Agent skills reloaded successfully.';
+    if (afterCount > beforeCount) {
+      const diff = afterCount - beforeCount;
+      successText += ` ${diff} new skill${diff > 1 ? 's' : ''} discovered.`;
+    } else if (afterCount < beforeCount) {
+      const diff = beforeCount - afterCount;
+      successText += ` ${diff} skill${diff > 1 ? 's' : ''} removed.`;
+    } else {
+      successText = 'Agent skills reloaded successfully. No new skills found.';
+    }
+
     context.ui.addItem(
       {
         type: 'info',
-        text: 'Agent skills reloaded successfully.',
+        text: successText,
         icon: '✓ ',
         color: 'green',
       } as HistoryItemInfo,
       Date.now(),
     );
   } catch (error) {
-    context.ui.setPendingItem(null);
+    clearTimeout(pendingTimeout);
+    if (pendingItemSet) {
+      context.ui.setPendingItem(null);
+    }
     context.ui.addItem(
       {
         type: MessageType.ERROR,

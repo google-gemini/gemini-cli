@@ -1535,9 +1535,7 @@ export class Config {
 
     if (this.onReload) {
       const refreshed = await this.onReload();
-      if (refreshed.disabledSkills) {
-        this.disabledSkills = refreshed.disabledSkills;
-      }
+      this.disabledSkills = refreshed.disabledSkills ?? [];
     }
 
     await this.getSkillManager().discoverSkills(
@@ -1551,6 +1549,8 @@ export class Config {
       this.getToolRegistry().registerTool(
         new ActivateSkillTool(this, this.messageBus),
       );
+    } else {
+      this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
     }
 
     // Notify the client that system instructions might need updating
