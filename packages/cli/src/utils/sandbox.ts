@@ -5,7 +5,6 @@
  */
 
 import { exec, execSync, spawn, type ChildProcess } from 'node:child_process';
-import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +17,7 @@ import {
   debugLogger,
   FatalSandboxError,
   GEMINI_DIR,
+  homedir,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
@@ -82,7 +82,7 @@ export async function start_sandbox(
         '-D',
         `TMP_DIR=${fs.realpathSync(os.tmpdir())}`,
         '-D',
-        `HOME_DIR=${fs.realpathSync(os.homedir())}`,
+        `HOME_DIR=${fs.realpathSync(homedir())}`,
         '-D',
         `CACHE_DIR=${fs.realpathSync((await execAsync('getconf DARWIN_USER_CACHE_DIR')).stdout.trim())}`,
       ];
@@ -310,7 +310,7 @@ export async function start_sandbox(
     args.push('--volume', `${os.tmpdir()}:${getContainerPath(os.tmpdir())}`);
 
     // mount gcloud config directory if it exists
-    const gcloudConfigDir = path.join(os.homedir(), '.config', 'gcloud');
+    const gcloudConfigDir = path.join(homedir(), '.config', 'gcloud');
     if (fs.existsSync(gcloudConfigDir)) {
       args.push(
         '--volume',
@@ -585,7 +585,7 @@ export async function start_sandbox(
       // necessary on Linux to ensure the user exists within the
       // container's /etc/passwd file, which is required by os.userInfo().
       const username = 'gemini';
-      const homeDir = getContainerPath(os.homedir());
+      const homeDir = getContainerPath(homedir());
 
       const setupUserCommands = [
         // Use -f with groupadd to avoid errors if the group already exists.
@@ -606,7 +606,7 @@ export async function start_sandbox(
       // We still need userFlag for the simpler proxy container, which does not have this issue.
       userFlag = `--user ${uid}:${gid}`;
       // When forcing a UID in the sandbox, $HOME can be reset to '/', so we copy $HOME as well.
-      args.push('--env', `HOME=${os.homedir()}`);
+      args.push('--env', `HOME=${homedir()}`);
     }
 
     // push container image name

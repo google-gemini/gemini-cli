@@ -5,8 +5,8 @@
  */
 
 import fs from 'node:fs/promises';
-import * as os from 'node:os';
 import path from 'node:path';
+import { homedir } from '@google/gemini-cli-core';
 
 type WarningCheck = {
   id: string;
@@ -20,7 +20,7 @@ const homeDirectoryCheck: WarningCheck = {
     try {
       const [workspaceRealPath, homeRealPath] = await Promise.all([
         fs.realpath(workspaceRoot),
-        fs.realpath(os.homedir()),
+        fs.realpath(homedir()),
       ]);
 
       if (workspaceRealPath === homeRealPath) {
