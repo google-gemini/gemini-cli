@@ -19,7 +19,7 @@ import {
 import type React from 'react';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';
-import { CoreEvent, coreEvents } from '@google/gemini-cli-core';
+import { coreEvents } from '@google/gemini-cli-core';
 
 // Mock the 'ink' module to control stdin
 vi.mock('ink', async (importOriginal) => {
@@ -110,10 +110,10 @@ describe('MouseContext', () => {
       stdin.write('\x1b[<32;10;20M');
     });
 
-    expect(coreEvents.emit).toHaveBeenCalledWith(CoreEvent.UserFeedback, {
-      severity: 'warning',
-      message: 'Press Ctrl-S to enter selection mode to copy text.',
-    });
+    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      'warning',
+      'Press Ctrl-S to enter selection mode to copy text.',
+    );
   });
 
   it('should not emit SelectionWarning when move event is handled', () => {
@@ -130,7 +130,7 @@ describe('MouseContext', () => {
     });
 
     expect(handler).toHaveBeenCalled();
-    expect(coreEvents.emit).not.toHaveBeenCalled();
+    expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
   });
 
   describe('SGR Mouse Events', () => {
