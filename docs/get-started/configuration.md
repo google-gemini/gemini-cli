@@ -685,11 +685,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`tools.enableHooks`** (boolean):
-  - **Description:** Enable the hooks system for intercepting and customizing
-    Gemini CLI behavior. When enabled, hooks configured in settings will execute
-    at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.).
-    Requires MessageBus integration.
-  - **Default:** `false`
+  - **Description:** Enables the hooks system experiment. When disabled, the
+    hooks system is completely deactivated regardless of other settings.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 #### `mcp`
@@ -866,6 +864,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 #### `hooks`
+
+- **`hooks.enabled`** (boolean):
+  - **Description:** Canonical toggle for the hooks system. When disabled, no
+    hooks will be executed.
+  - **Default:** `true`
 
 - **`hooks.disabled`** (array):
   - **Description:** List of hook names (commands) that should be disabled.
