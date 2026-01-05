@@ -11,7 +11,7 @@ import {
   type SlashCommand,
   type CommandContext,
 } from '../ui/commands/types.js';
-import type { MessageActionReturn , Config } from '@google/gemini-cli-core';
+import type { MessageActionReturn, Config } from '@google/gemini-cli-core';
 import { startupProfiler } from '@google/gemini-cli-core';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
@@ -93,10 +93,10 @@ export class BuiltinCommandLoader implements ICommandLoader {
               action: async (
                 _context: CommandContext,
               ): Promise<MessageActionReturn> => ({
-                  type: 'message',
-                  messageType: 'error',
-                  content: 'MCP disabled by your admin.',
-                }),
+                type: 'message',
+                messageType: 'error',
+                content: 'MCP disabled by your admin.',
+              }),
             },
           ]
         : [mcpCommand]),
