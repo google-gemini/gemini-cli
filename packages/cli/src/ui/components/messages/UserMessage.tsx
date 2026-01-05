@@ -10,6 +10,8 @@ import { theme } from '../../semantic-colors.js';
 import { SCREEN_READER_USER_PREFIX } from '../../textConstants.js';
 import { isSlashCommand as checkIsSlashCommand } from '../../utils/commandUtils.js';
 
+const MAX_DISPLAY_LINES = 15;
+
 interface UserMessageProps {
   text: string;
   width: number;
@@ -21,7 +23,6 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
   const isSlashCommand = checkIsSlashCommand(text);
 
   const lines = text.split('\n');
-  const MAX_DISPLAY_LINES = 15;
   const isTruncated = lines.length > MAX_DISPLAY_LINES;
   const displayText = isTruncated
     ? lines.slice(0, MAX_DISPLAY_LINES).join('\n')
