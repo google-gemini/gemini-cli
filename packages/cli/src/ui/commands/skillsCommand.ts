@@ -174,7 +174,7 @@ async function reloadAction(
   }
 
   const skillManager = config.getSkillManager();
-  const beforeNames = new Set(skillManager.getAllSkills().map((s) => s.name));
+  const beforeNames = new Set(skillManager.getSkills().map((s) => s.name));
 
   let pendingItemSet = false;
   const pendingTimeout = setTimeout(() => {
@@ -193,7 +193,7 @@ async function reloadAction(
       context.ui.setPendingItem(null);
     }
 
-    const afterSkills = skillManager.getAllSkills();
+    const afterSkills = skillManager.getSkills();
     const afterNames = new Set(afterSkills.map((s) => s.name));
 
     const added = afterSkills.filter((s) => !beforeNames.has(s.name));
@@ -206,19 +206,17 @@ async function reloadAction(
 
     if (added.length > 0) {
       details.push(
-        `${added.length} new skill${added.length > 1 ? 's' : ''} discovered`,
+        `${added.length} newly available skill${added.length > 1 ? 's' : ''}`,
       );
     }
     if (removedCount > 0) {
       details.push(
-        `${removedCount} skill${removedCount > 1 ? 's' : ''} removed`,
+        `${removedCount} skill${removedCount > 1 ? 's' : ''} no longer available`,
       );
     }
 
     if (details.length > 0) {
       successText += ` ${details.join(' and ')}.`;
-    } else {
-      successText = 'Agent skills reloaded successfully. No new skills found.';
     }
 
     context.ui.addItem(

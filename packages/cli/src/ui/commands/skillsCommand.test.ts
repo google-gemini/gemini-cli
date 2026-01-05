@@ -36,6 +36,7 @@ describe('skillsCommand', () => {
         config: {
           getSkillManager: vi.fn().mockReturnValue({
             getAllSkills: vi.fn().mockReturnValue(skills),
+            getSkills: vi.fn().mockReturnValue(skills),
             getSkill: vi
               .fn()
               .mockImplementation(
@@ -228,7 +229,7 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Agent skills reloaded successfully. No new skills found.',
+          text: 'Agent skills reloaded successfully.',
         }),
         expect.any(Number),
       );
@@ -240,7 +241,7 @@ describe('skillsCommand', () => {
       )!;
       const reloadSkillsMock = vi.fn().mockImplementation(async () => {
         const skillManager = context.services.config!.getSkillManager();
-        vi.mocked(skillManager.getAllSkills).mockReturnValue([
+        vi.mocked(skillManager.getSkills).mockReturnValue([
           { name: 'skill1' },
           { name: 'skill2' },
           { name: 'skill3' },
@@ -254,7 +255,7 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Agent skills reloaded successfully. 1 new skill discovered.',
+          text: 'Agent skills reloaded successfully. 1 newly available skill.',
         }),
         expect.any(Number),
       );
@@ -266,7 +267,7 @@ describe('skillsCommand', () => {
       )!;
       const reloadSkillsMock = vi.fn().mockImplementation(async () => {
         const skillManager = context.services.config!.getSkillManager();
-        vi.mocked(skillManager.getAllSkills).mockReturnValue([
+        vi.mocked(skillManager.getSkills).mockReturnValue([
           { name: 'skill1' },
         ] as SkillDefinition[]);
       });
@@ -278,7 +279,7 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Agent skills reloaded successfully. 1 skill removed.',
+          text: 'Agent skills reloaded successfully. 1 skill no longer available.',
         }),
         expect.any(Number),
       );
@@ -290,7 +291,7 @@ describe('skillsCommand', () => {
       )!;
       const reloadSkillsMock = vi.fn().mockImplementation(async () => {
         const skillManager = context.services.config!.getSkillManager();
-        vi.mocked(skillManager.getAllSkills).mockReturnValue([
+        vi.mocked(skillManager.getSkills).mockReturnValue([
           { name: 'skill2' }, // skill1 removed, skill3 added
           { name: 'skill3' },
         ] as SkillDefinition[]);
@@ -303,7 +304,7 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Agent skills reloaded successfully. 1 new skill discovered and 1 skill removed.',
+          text: 'Agent skills reloaded successfully. 1 newly available skill and 1 skill no longer available.',
         }),
         expect.any(Number),
       );
