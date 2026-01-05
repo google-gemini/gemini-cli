@@ -627,12 +627,6 @@ export class CoreToolScheduler {
             await invocation.shouldConfirmExecute(signal);
 
           if (!confirmationDetails) {
-            // This should rarely happen if PolicyEngine said ASK_USER, unless the tool
-            // implementation itself has no concept of confirmation (e.g. purely internal).
-            // In that case, we default to proceeding? Or treat as generic confirmation?
-            // For safety, if Policy says ASK and Tool says "I have no details", we should probably
-            // still ask with generic details, but existing logic proceeded.
-            // Let's stick to existing logic: if no details, proceed.
             this.setToolCallOutcome(
               reqInfo.callId,
               ToolConfirmationOutcome.ProceedAlways,

@@ -119,6 +119,13 @@ export class ShellProcessor implements IPromptProcessor {
 
       if (!command) continue;
 
+      if (
+        context.session.sessionShellAllowlist &&
+        context.session.sessionShellAllowlist.has(command)
+      ) {
+        continue;
+      }
+
       // Security check on the final, escaped command string.
       const { decision } = await config.getPolicyEngine().check(
         {

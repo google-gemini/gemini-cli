@@ -371,16 +371,56 @@ describe('ShellProcessor', () => {
 
     const result = await processor.process(prompt, context);
 
-    expect(mockPolicyEngineCheck).toHaveBeenCalledWith(
-      { name: 'run_shell_command', args: { command: 'cmd1' } },
-      undefined,
-    );
-    expect(mockPolicyEngineCheck).toHaveBeenCalledWith(
-      { name: 'run_shell_command', args: { command: 'cmd2' } },
-      undefined,
-    );
+    expect(mockPolicyEngineCheck).not.toHaveBeenCalled();
     expect(mockShellExecute).toHaveBeenCalledTimes(2);
     expect(result).toEqual([{ text: 'Run output1 and output2' }]);
+  });
+
+  it('should support the full confirmation flow (Ask -> Approve -> Retry)', async () => {
+    // 1. Initial State: Command NOT allowed
+    const processor = new ShellProcessor('test-command');
+    const prompt: PromptPipelineContent =
+      createPromptPipelineContent('!{echo "once"}');
+
+    // Policy Engine says ASK_USER
+    mockPolicyEngineCheck.mockResolvedValue({
+      decision: PolicyDecision.ASK_USER,
+    });
+
+    // 2. First Attempt: processing should fail with ConfirmationRequiredError
+    try {
+      await processor.process(prompt, context);
+      expect.fail('Should have thrown ConfirmationRequiredError');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ConfirmationRequiredError);
+      expect(mockPolicyEngineCheck).toHaveBeenCalledTimes(1);
+    }
+
+    // 3. User Approves: Add to session allowlist (simulating UI action)
+    context.session.sessionShellAllowlist.add('echo "once"');
+
+    // 4. Retry: calling process() again with the same context
+    // Reset mocks to ensure we track new calls cleanly
+    mockPolicyEngineCheck.mockClear();
+
+    // Mock successful execution
+    mockShellExecute.mockReturnValue({
+      result: Promise.resolve({ ...SUCCESS_RESULT, output: 'once' }),
+    });
+
+    const result = await processor.process(prompt, context);
+
+    // 5. Verify Success AND Policy Engine Bypass
+    expect(mockPolicyEngineCheck).not.toHaveBeenCalled();
+    expect(mockShellExecute).toHaveBeenCalledWith(
+      'echo "once"',
+      expect.any(String),
+      expect.any(Function),
+      expect.any(Object),
+      false,
+      expect.any(Object),
+    );
+    expect(result).toEqual([{ text: 'once' }]);
   });
 
   it('should trim whitespace from the command inside the injection before interpolation', async () => {

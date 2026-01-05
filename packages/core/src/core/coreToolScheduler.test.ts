@@ -294,13 +294,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
           if (
             allowed &&
             (allowed.includes(toolCall.name) ||
-              allowed.some(
-                (p) =>
-                  p.startsWith(toolCall.name) &&
-                  JSON.stringify(toolCall.args).includes(
-                    p.substring(p.indexOf('(') + 1, p.length - 1),
-                  ),
-              ))
+              allowed.some((p) => toolCall.name.startsWith(p)))
           ) {
             return { decision: PolicyDecision.ALLOW };
           }
