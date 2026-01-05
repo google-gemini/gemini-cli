@@ -34,7 +34,7 @@ npm install -g @google/gemini-cli@preview
   @adamfweidman in https://github.com/google-gemini/gemini-cli/pull/15110
 - feat(cli): Add `/auth logout` command to clear credentials and auth state by
   @CN-Scars in https://github.com/google-gemini/gemini-cli/pull/13383
-- (fix) Automated pr labeller by @DaanVersavel in
+- (fix) Automated pr labeler by @DaanVersavel in
   https://github.com/google-gemini/gemini-cli/pull/14885
 - feat: launch Gemini 3 Flash in Gemini CLI ⚡️⚡️⚡️ by @scidomino in
   https://github.com/google-gemini/gemini-cli/pull/15196

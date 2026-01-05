@@ -43,7 +43,7 @@ on GitHub.
   @adamfweidman in https://github.com/google-gemini/gemini-cli/pull/15110
 - feat(cli): Add `/auth logout` command to clear credentials and auth state by
   @CN-Scars in https://github.com/google-gemini/gemini-cli/pull/13383
-- (fix) Automated pr labeller by @DaanVersavel in
+- (fix) Automated pr labeler by @DaanVersavel in
   https://github.com/google-gemini/gemini-cli/pull/14885
 - feat: launch Gemini 3 Flash in Gemini CLI ⚡️⚡️⚡️ by @scidomino in
   https://github.com/google-gemini/gemini-cli/pull/15196
@@ -472,7 +472,7 @@ https://github.com/google-gemini/gemini-cli/compare/v0.21.3...v0.22.0
   https://github.com/google-gemini/gemini-cli/pull/13015
 - allow final:true to be returned on a2a server edit calls. by @DavidAPierce in
   https://github.com/google-gemini/gemini-cli/pull/14747
-- (fix) Automated pr labeller by @DaanVersavel in
+- (fix) Automated pr labeler by @DaanVersavel in
   https://github.com/google-gemini/gemini-cli/pull/14788
 - Update CODEOWNERS by @kklashtorny1 in
   https://github.com/google-gemini/gemini-cli/pull/14830
