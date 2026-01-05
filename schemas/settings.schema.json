@@ -1214,6 +1214,16 @@
           "default": false,
           "type": "boolean"
         },
+        "allowedExtensions": {
+          "title": "Extension Source Regex Allowlist",
+          "description": "List of Regex patterns for allowed extensions. If nonempty, only extensions in this list are allowed.",
+          "markdownDescription": "List of Regex patterns for allowed extensions. If nonempty, only extensions in this list are allowed.\n\n- Category: 'Security'\n- Requires restart: 'yes'\n- Default: 'false'",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "folderTrust": {
           "title": "Folder Trust",
           "description": "Settings for folder trust.",
