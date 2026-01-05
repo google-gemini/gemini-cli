@@ -176,6 +176,7 @@ async function reloadAction(
   const skillManager = config.getSkillManager();
   const beforeNames = new Set(skillManager.getSkills().map((s) => s.name));
 
+  const startTime = Date.now();
   let pendingItemSet = false;
   const pendingTimeout = setTimeout(() => {
     context.ui.setPendingItem({
@@ -190,6 +191,15 @@ async function reloadAction(
 
     clearTimeout(pendingTimeout);
     if (pendingItemSet) {
+      // If we showed the pending item, make sure it stays for at least 500ms
+      // total to avoid a "flicker" where it appears and immediately disappears.
+      const elapsed = Date.now() - startTime;
+      const minVisibleDuration = 500;
+      if (elapsed < minVisibleDuration) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, minVisibleDuration - elapsed),
+        );
+      }
       context.ui.setPendingItem(null);
     }
 

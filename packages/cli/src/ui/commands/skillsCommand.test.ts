@@ -220,8 +220,12 @@ describe('skillsCommand', () => {
         }),
       );
 
-      // Fast forward another 100ms to complete the reload
+      // Fast forward another 100ms (reload complete), but pending item should stay
       await vi.advanceTimersByTimeAsync(100);
+      expect(context.ui.setPendingItem).not.toHaveBeenCalledWith(null);
+
+      // Fast forward to reach 500ms total
+      await vi.advanceTimersByTimeAsync(300);
       await actionPromise;
 
       expect(reloadSkillsMock).toHaveBeenCalled();
@@ -340,7 +344,7 @@ describe('skillsCommand', () => {
 
       const actionPromise = reloadCmd.action!(context, '');
       await vi.advanceTimersByTimeAsync(100);
-      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(400);
       await actionPromise;
 
       expect(context.ui.setPendingItem).toHaveBeenCalledWith(null);
