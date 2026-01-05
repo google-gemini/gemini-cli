@@ -541,7 +541,6 @@ export async function main() {
             JSON.stringify({
               type,
               payload: sanitizedPayload,
-              sessionId,
               timestamp: Date.now(),
             }) + '\n';
 
