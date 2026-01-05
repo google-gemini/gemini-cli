@@ -95,7 +95,10 @@ describe('extension reloading', () => {
 
       // Poll for the updated list
       await rig.pollCommand(
-        () => run.sendKeys('\u0015/mcp list\r'),
+        async () => {
+          await run.sendText('/mcp list');
+          await run.type('\r');
+        },
         () => {
           const output = stripAnsi(run.output);
           return (
@@ -123,7 +126,10 @@ describe('extension reloading', () => {
 
       // Poll for the updated extension version
       await rig.pollCommand(
-        () => run.sendKeys('\u0015/extensions list\r'),
+        async () => {
+          await run.sendText('/extensions list');
+          await run.type('\r');
+        },
         () =>
           stripAnsi(run.output).includes(
             'test-extension (v0.0.2) - active (updated)',
@@ -133,7 +139,10 @@ describe('extension reloading', () => {
 
       // Poll for the updated mcp tool
       await rig.pollCommand(
-        () => run.sendKeys('\u0015/mcp list\r'),
+        async () => {
+          await run.sendText('/mcp list');
+          await run.type('\r');
+        },
         () => {
           const output = stripAnsi(run.output);
           return (
