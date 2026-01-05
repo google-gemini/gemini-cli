@@ -71,7 +71,6 @@ interface SettingsDialogProps {
 }
 
 const MAX_ITEMS_TO_SHOW = 8;
-const MIN_LABEL_WIDTH = 55;
 
 export function SettingsDialog({
   settings,
@@ -199,6 +198,31 @@ export function SettingsDialog({
     setRestartRequiredSettings(newRestartRequired);
     setShowRestartPrompt(newRestartRequired.size > 0);
   }, [selectedScope, settings, globalPendingChanges]);
+
+  // Calculate max width for the left column (Label/Description) to keep values aligned or close
+  const maxLabelOrDescriptionWidth = useMemo(() => {
+    const allKeys = getDialogSettingKeys();
+    let max = 0;
+    for (const key of allKeys) {
+      const def = getSettingDefinition(key);
+      if (!def) continue;
+
+      const scopeMessage = getScopeMessageForSetting(
+        key,
+        selectedScope,
+        settings,
+      );
+      const label = def.label || key;
+      const labelFull = label + (scopeMessage ? ` ${scopeMessage}` : '');
+      const lWidth = getCachedStringWidth(labelFull);
+      const dWidth = def.description
+        ? getCachedStringWidth(def.description)
+        : 0;
+
+      max = Math.max(max, lWidth, dWidth);
+    }
+    return max;
+  }, [selectedScope, settings]);
 
   const generateSettingsItems = () => {
     const settingKeys = searchQuery ? filteredKeys : getDialogSettingKeys();
@@ -983,12 +1007,6 @@ export function SettingsDialog({
                 selectedScope,
                 settings,
               );
-              const scopeMessageString = scopeMessage ? ` ${scopeMessage}` : '';
-              const labelWidth = Math.max(
-                MIN_LABEL_WIDTH,
-                getCachedStringWidth(item.label + scopeMessageString),
-              );
-              const descriptionWidth = labelWidth + 3;
 
               return (
                 <React.Fragment key={item.value}>
@@ -1002,45 +1020,49 @@ export function SettingsDialog({
                         {isActive ? '●' : ''}
                       </Text>
                     </Box>
-                    <Box flexDirection="column" flexGrow={1} minWidth={0}>
-                      <Box flexDirection="row">
-                        <Box minWidth={MIN_LABEL_WIDTH}>
-                          <Text
-                            color={
-                              isActive
-                                ? theme.status.success
-                                : theme.text.primary
-                            }
-                          >
-                            {item.label}
-                            {scopeMessage && (
-                              <Text color={theme.text.secondary}>
-                                {' '}
-                                {scopeMessage}
-                              </Text>
-                            )}
-                          </Text>
-                        </Box>
-                        <Box minWidth={3} />
+                    <Box
+                      flexDirection="row"
+                      flexGrow={1}
+                      minWidth={0}
+                      alignItems="flex-start"
+                    >
+                      <Box
+                        flexDirection="column"
+                        flexGrow={1}
+                        minWidth={0}
+                        maxWidth={maxLabelOrDescriptionWidth}
+                      >
                         <Text
                           color={
-                            isActive
-                              ? theme.status.success
-                              : shouldBeGreyedOut
-                                ? theme.text.secondary
-                                : theme.text.primary
+                            isActive ? theme.status.success : theme.text.primary
                           }
                         >
-                          {displayValue}
+                          {item.label}
+                          {scopeMessage && (
+                            <Text color={theme.text.secondary}>
+                              {' '}
+                              {scopeMessage}
+                            </Text>
+                          )}
                         </Text>
-                      </Box>
-                      {item.description && (
-                        <Box maxWidth={descriptionWidth}>
+                        {item.description && (
                           <Text color={theme.text.secondary} wrap="truncate">
                             {item.description}
                           </Text>
-                        </Box>
-                      )}
+                        )}
+                      </Box>
+                      <Box minWidth={3} />
+                      <Text
+                        color={
+                          isActive
+                            ? theme.status.success
+                            : shouldBeGreyedOut
+                              ? theme.text.secondary
+                              : theme.text.primary
+                        }
+                      >
+                        {displayValue}
+                      </Text>
                     </Box>
                   </Box>
                   <Box height={1} />
