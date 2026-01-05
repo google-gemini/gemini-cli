@@ -308,4 +308,20 @@ describe('TerminalCapabilityManager', () => {
       expect(manager.isBracketedPasteEnabled()).toBe(false);
     });
   });
+
+  it('should detect OSC 52 support via XTGETTCAP', async () => {
+    const manager = TerminalCapabilityManager.getInstance();
+    const promise = manager.detectCapabilities();
+
+    // Simulate XTGETTCAP response for 'Ms' (4d73)
+    // Response format: DCS 1 + r 4d73=<value> ST
+    // We'll use a dummy value for the capability
+    stdin.emit('data', Buffer.from('\x1bP1+r4d73=1234\x1b\\'));
+
+    // Complete detection with DA1
+    stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+    await promise;
+    expect(manager.isOsc52Supported()).toBe(true);
+  });
 });

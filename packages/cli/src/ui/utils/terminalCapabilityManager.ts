@@ -26,6 +26,9 @@ export class TerminalCapabilityManager {
   private static readonly DEVICE_ATTRIBUTES_QUERY = '\x1b[c';
   private static readonly MODIFY_OTHER_KEYS_QUERY = '\x1b[>4;?m';
   private static readonly BRACKETED_PASTE_QUERY = '\x1b[?2004$p';
+  // Query 'Ms' capability (OSC 52) using XTGETTCAP
+  // Ms in hex is 4d73
+  private static readonly XTGETTCAP_QUERY = '\x1bP+q4d73\x1b\\';
 
   // Kitty keyboard flags: CSI ? flags u
   // eslint-disable-next-line no-control-regex
@@ -47,6 +50,10 @@ export class TerminalCapabilityManager {
   // Ps = 1 (set), 2 (reset), 3 (permanently set), 4 (permanently reset)
   // eslint-disable-next-line no-control-regex
   private static readonly BRACKETED_PASTE_REGEX = /\x1b\[\?2004;([1-4])\$y/;
+  // XTGETTCAP response: DCS 1 + r Pt ST (or BEL)
+  // Pt is a series of hex-encoded capability strings. We look for 'Ms' (4d73).
+  // eslint-disable-next-line no-control-regex
+  private static readonly XTGETTCAP_REGEX = /\x1bP1\+r.*?4d73=.*?(\x1b\\|\x07)/;
 
   private terminalBackgroundColor: TerminalBackgroundColor;
   private kittySupported = false;
@@ -57,6 +64,7 @@ export class TerminalCapabilityManager {
   private modifyOtherKeysEnabled = false;
   private bracketedPasteSupported = false;
   private bracketedPasteEnabled = false;
+  private osc52Supported = false;
 
   private constructor() {}
 
@@ -108,6 +116,7 @@ export class TerminalCapabilityManager {
       let bgReceived = false;
       let modifyOtherKeysReceived = false;
       let bracketedPasteReceived = false;
+      let xtgettcapReceived = false;
       // eslint-disable-next-line prefer-const
       let timeoutId: NodeJS.Timeout;
 
@@ -183,6 +192,15 @@ export class TerminalCapabilityManager {
           }
         }
 
+        // check for XTGETTCAP (OSC 52) support
+        if (!xtgettcapReceived) {
+          const match = buffer.match(TerminalCapabilityManager.XTGETTCAP_REGEX);
+          if (match) {
+            xtgettcapReceived = true;
+            this.osc52Supported = true;
+          }
+        }
+
         // Check for Terminal Name/Version response.
         if (!terminalNameReceived) {
           const match = buffer.match(
@@ -220,6 +238,7 @@ export class TerminalCapabilityManager {
             TerminalCapabilityManager.TERMINAL_NAME_QUERY +
             TerminalCapabilityManager.MODIFY_OTHER_KEYS_QUERY +
             TerminalCapabilityManager.BRACKETED_PASTE_QUERY +
+            TerminalCapabilityManager.XTGETTCAP_QUERY +
             TerminalCapabilityManager.DEVICE_ATTRIBUTES_QUERY,
         );
       } catch (e) {
@@ -269,6 +288,10 @@ export class TerminalCapabilityManager {
 
   isModifyOtherKeysEnabled(): boolean {
     return this.modifyOtherKeysEnabled;
+  }
+
+  isOsc52Supported(): boolean {
+    return this.osc52Supported;
   }
 
   private parseColor(rHex: string, gHex: string, bHex: string): string {

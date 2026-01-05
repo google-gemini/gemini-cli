@@ -9,6 +9,7 @@ import clipboardy from 'clipboardy';
 import type { SlashCommand } from '../commands/types.js';
 import fs from 'node:fs';
 import type { Writable } from 'node:stream';
+import { terminalCapabilityManager } from './terminalCapabilityManager.js';
 
 /**
  * Checks if a query string potentially represents an '@' command.
@@ -115,7 +116,11 @@ const isDumbTerm = (): boolean => (process.env['TERM'] ?? '') === 'dumb';
 const shouldUseOsc52 = (tty: TtyTarget): boolean =>
   Boolean(tty) &&
   !isDumbTerm() &&
-  (isSSH() || inTmux() || inScreen() || isWSL());
+  (terminalCapabilityManager.isOsc52Supported() ||
+    isSSH() ||
+    inTmux() ||
+    inScreen() ||
+    isWSL());
 
 const safeUtf8Truncate = (buf: Buffer, maxBytes: number): Buffer => {
   if (buf.length <= maxBytes) return buf;
