@@ -119,30 +119,8 @@ export const useGeminiStream = (
   const activeQueryIdRef = useRef<string | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
-  const [thoughtsBuffer, thoughtsBufferRef, setThoughtsBuffer] = useStateAndRef<
-    ThoughtSummary[]
-  >([]);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
-
-  const flushThoughts = useCallback(
-    (userMessageTimestamp: number) => {
-      if (
-        thoughtsBufferRef.current.length > 0 &&
-        settings.merged.ui?.showInlineThinking
-      ) {
-        addItem(
-          {
-            type: 'thinking',
-            thoughts: [...thoughtsBufferRef.current],
-          } as HistoryItemThinking,
-          userMessageTimestamp,
-        );
-        setThoughtsBuffer([]);
-      }
-    },
-    [addItem, settings, setThoughtsBuffer, thoughtsBufferRef],
-  );
 
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
@@ -559,7 +537,6 @@ export const useGeminiStream = (
       currentGeminiMessageBuffer: string,
       userMessageTimestamp: number,
     ): string => {
-      flushThoughts(userMessageTimestamp);
       if (turnCancelledRef.current) {
         // Prevents additional output after a user initiated cancel.
         return '';
@@ -569,6 +546,7 @@ export const useGeminiStream = (
         pendingHistoryItemRef.current?.type !== 'gemini' &&
         pendingHistoryItemRef.current?.type !== 'gemini_content'
       ) {
+        // Flush any pending item (including thinking items) before starting gemini content
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         }
@@ -609,7 +587,41 @@ export const useGeminiStream = (
       }
       return newGeminiMessageBuffer;
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, flushThoughts],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+  );
+
+  const handleThoughtEvent = useCallback(
+    (eventValue: ThoughtSummary, userMessageTimestamp: number) => {
+      setThought(eventValue);
+
+      // Only accumulate thoughts in history if inline thinking is enabled
+      if (!settings.merged.ui?.showInlineThinking) {
+        return;
+      }
+
+      if (pendingHistoryItemRef.current?.type === 'thinking') {
+        // Accumulate thoughts in the existing thinking item
+        setPendingHistoryItem((prev) => ({
+          type: 'thinking',
+          thoughts: [...(prev as HistoryItemThinking).thoughts, eventValue],
+        }));
+      } else {
+        // Flush any existing pending item and start a new thinking item
+        if (pendingHistoryItemRef.current) {
+          addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+        }
+        setPendingHistoryItem({
+          type: 'thinking',
+          thoughts: [eventValue],
+        } as HistoryItemThinking);
+      }
+    },
+    [
+      addItem,
+      pendingHistoryItemRef,
+      setPendingHistoryItem,
+      settings.merged.ui?.showInlineThinking,
+    ],
   );
 
   const handleUserCancelledEvent = useCallback(
@@ -829,8 +841,7 @@ export const useGeminiStream = (
       for await (const event of stream) {
         switch (event.type) {
           case ServerGeminiEventType.Thought:
-            setThought(event.value);
-            setThoughtsBuffer((prev) => [...prev, event.value]);
+            handleThoughtEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.Content:
             geminiMessageBuffer = handleContentEvent(
@@ -840,15 +851,12 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.ToolCallRequest:
-            flushThoughts(userMessageTimestamp);
             toolCallRequests.push(event.value);
             break;
           case ServerGeminiEventType.UserCancelled:
-            flushThoughts(userMessageTimestamp);
             handleUserCancelledEvent(userMessageTimestamp);
             break;
           case ServerGeminiEventType.Error:
-            flushThoughts(userMessageTimestamp);
             handleErrorEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.ChatCompressed:
@@ -868,7 +876,6 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.Finished:
-            flushThoughts(userMessageTimestamp);
             handleFinishedEvent(event, userMessageTimestamp);
             break;
           case ServerGeminiEventType.Citation:
@@ -900,6 +907,7 @@ export const useGeminiStream = (
     },
     [
       handleContentEvent,
+      handleThoughtEvent,
       handleUserCancelledEvent,
       handleErrorEvent,
       scheduleToolCalls,
@@ -909,8 +917,6 @@ export const useGeminiStream = (
       handleContextWindowWillOverflowEvent,
       handleCitationEvent,
       handleChatModelEvent,
-      flushThoughts,
-      setThoughtsBuffer,
     ],
   );
   const submitQuery = useCallback(
@@ -975,7 +981,10 @@ export const useGeminiStream = (
               }
               startNewPrompt();
               setThought(null); // Reset thought when starting a new prompt
-              thoughtsBufferRef.current = [];
+              // Clear any pending thinking item from previous prompt
+              if (pendingHistoryItemRef.current?.type === 'thinking') {
+                setPendingHistoryItem(null);
+              }
             }
 
             setIsResponding(true);
@@ -1088,7 +1097,6 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
-      thoughtsBufferRef,
     ],
   );
 
@@ -1286,24 +1294,12 @@ export const useGeminiStream = (
     ],
   );
 
-  const pendingThinkingItem = useMemo(() => {
-    if (settings.merged.ui?.showInlineThinking && thoughtsBuffer.length > 0) {
-      return {
-        type: 'thinking',
-        thoughts: thoughtsBuffer,
-      } as HistoryItemWithoutId;
-    }
-    return null;
-  }, [settings.merged.ui?.showInlineThinking, thoughtsBuffer]);
-
   const pendingHistoryItems = useMemo(
     () =>
-      [
-        pendingThinkingItem,
-        pendingHistoryItem,
-        pendingToolCallGroupDisplay,
-      ].filter((i) => i !== undefined && i !== null),
-    [pendingThinkingItem, pendingHistoryItem, pendingToolCallGroupDisplay],
+      [pendingHistoryItem, pendingToolCallGroupDisplay].filter(
+        (i) => i !== undefined && i !== null,
+      ),
+    [pendingHistoryItem, pendingToolCallGroupDisplay],
   );
 
   useEffect(() => {
