@@ -74,6 +74,7 @@ export enum CoreEvent {
   Output = 'output',
   MemoryChanged = 'memory-changed',
   ExternalEditorClosed = 'external-editor-closed',
+  SettingsChanged = 'settings-changed',
 }
 
 export interface CoreEvents {
@@ -83,6 +84,7 @@ export interface CoreEvents {
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
+  [CoreEvent.SettingsChanged]: never[];
 }
 
 type EventBacklogItem = {
@@ -161,6 +163,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitModelChanged(model: string): void {
     const payload: ModelChangedPayload = { model };
     this.emit(CoreEvent.ModelChanged, payload);
+  }
+
+  /**
+   * Notifies subscribers that settings have been modified.
+   */
+  emitSettingsChanged(): void {
+    this.emit(CoreEvent.SettingsChanged);
   }
 
   /**

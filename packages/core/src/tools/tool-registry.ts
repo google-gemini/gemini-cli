@@ -226,6 +226,15 @@ export class ToolRegistry {
   }
 
   /**
+   * Unregisters a tool definition by name.
+   *
+   * @param name - The name of the tool to unregister.
+   */
+  unregisterTool(name: string): void {
+    this.allKnownTools.delete(name);
+  }
+
+  /**
    * Sorts tools as:
    * 1. Built in tools.
    * 2. Discovered tools.
