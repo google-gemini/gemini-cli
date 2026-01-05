@@ -65,6 +65,44 @@ export class ActivityLogger extends EventEmitter {
     return result;
   }
 
+  private sanitizeNetworkLog(log: any): any {
+    if (!log || typeof log !== 'object') return log;
+
+    const sanitized = { ...log };
+
+    // Sanitize request headers
+    if (sanitized.headers) {
+      const headers = { ...sanitized.headers };
+      for (const key of Object.keys(headers)) {
+        if (
+          ['authorization', 'cookie', 'x-goog-api-key'].includes(
+            key.toLowerCase(),
+          )
+        ) {
+          headers[key] = '[REDACTED]';
+        }
+      }
+      sanitized.headers = headers;
+    }
+
+    // Sanitize response headers
+    if (sanitized.response?.headers) {
+      const resHeaders = { ...sanitized.response.headers };
+      for (const key of Object.keys(resHeaders)) {
+        if (['set-cookie'].includes(key.toLowerCase())) {
+          resHeaders[key] = '[REDACTED]';
+        }
+      }
+      sanitized.response = { ...sanitized.response, headers: resHeaders };
+    }
+
+    return sanitized;
+  }
+
+  private safeEmitNetwork(payload: any) {
+    this.emit('network', this.sanitizeNetworkLog(payload));
+  }
+
   enable() {
     if (this.isInterceptionEnabled) return;
     this.isInterceptionEnabled = true;
@@ -102,7 +140,7 @@ export class ActivityLogger extends EventEmitter {
       }
 
       this.requestStartTimes.set(id, Date.now());
-      this.emit('network', {
+      this.safeEmitNetwork({
         id,
         timestamp: Date.now(),
         method,
@@ -123,7 +161,7 @@ export class ActivityLogger extends EventEmitter {
             const durationMs = startTime ? Date.now() - startTime : 0;
             this.requestStartTimes.delete(id);
 
-            this.emit('network', {
+            this.safeEmitNetwork({
               id,
               pending: false,
               response: {
@@ -136,7 +174,7 @@ export class ActivityLogger extends EventEmitter {
           })
           .catch((err) => {
             const message = err instanceof Error ? err.message : String(err);
-            this.emit('network', {
+            this.safeEmitNetwork({
               id,
               pending: false,
               error: `Failed to read response body: ${message}`,
@@ -147,7 +185,7 @@ export class ActivityLogger extends EventEmitter {
       } catch (err: unknown) {
         this.requestStartTimes.delete(id);
         const message = err instanceof Error ? err.message : String(err);
-        this.emit('network', { id, pending: false, error: message });
+        this.safeEmitNetwork({ id, pending: false, error: message });
         throw err;
       }
     };
@@ -206,7 +244,7 @@ export class ActivityLogger extends EventEmitter {
         }
         const body = Buffer.concat(requestChunks).toString('utf8');
 
-        self.emit('network', {
+        self.safeEmitNetwork({
           id,
           timestamp: Date.now(),
           method: req.method || 'GET',
@@ -229,7 +267,7 @@ export class ActivityLogger extends EventEmitter {
           const durationMs = startTime ? Date.now() - startTime : 0;
           self.requestStartTimes.delete(id);
 
-          self.emit('network', {
+          self.safeEmitNetwork({
             id,
             pending: false,
             response: {
@@ -245,7 +283,7 @@ export class ActivityLogger extends EventEmitter {
       req.on('error', (err: any) => {
         self.requestStartTimes.delete(id);
         const message = err instanceof Error ? err.message : String(err);
-        self.emit('network', { id, pending: false, error: message });
+        self.safeEmitNetwork({ id, pending: false, error: message });
       });
 
       return req;
