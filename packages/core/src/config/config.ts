@@ -345,7 +345,6 @@ export interface ConfigParameters {
   disableYoloMode?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
-  hooksEnabled?: boolean;
   experiments?: Experiments;
   hooks?: { [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] };
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
@@ -470,7 +469,6 @@ export class Config {
   private readonly disableYoloMode: boolean;
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
-  private readonly hooksEnabled: boolean;
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
@@ -603,7 +601,6 @@ export class Config {
       ? false
       : (params.useWriteTodos ?? true);
     this.enableHooks = params.enableHooks ?? false;
-    this.hooksEnabled = params.hooksEnabled ?? false;
     this.disabledHooks =
       (params.hooks && 'disabled' in params.hooks
         ? params.hooks.disabled
@@ -756,7 +753,7 @@ export class Config {
     }
 
     // Initialize hook system if enabled
-    if (this.enableHooks) {
+    if (this.getEnableHooks()) {
       this.hookSystem = new HookSystem(this);
       await this.hookSystem.initialize();
     }
@@ -1656,7 +1653,7 @@ export class Config {
   }
 
   getEnableHooks(): boolean {
-    return this.enableHooks && this.hooksEnabled;
+    return this.enableHooks;
   }
 
   getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
