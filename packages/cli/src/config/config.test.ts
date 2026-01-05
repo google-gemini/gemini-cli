@@ -2445,7 +2445,7 @@ describe('loadCliConfig secureModeEnabled', () => {
   });
 
   it('should throw an error if approval-mode=yolo is attempted when secureModeEnabled is true', async () => {
-    process.argv = ['node', 'script.js', '--approval_mode=yolo'];
+    process.argv = ['node', 'script.js', '--approval-mode=yolo'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {
       admin: {
@@ -2520,8 +2520,8 @@ describe('loadCliConfig mcpEnabled', () => {
     expect(config.getMcpEnabled()).toBe(false);
     expect(config.getMcpServerCommand()).toBeUndefined();
     expect(config.getMcpServers()).toEqual({});
-    expect(config.getAllowedMcpServers()).toBeUndefined();
-    expect(config.getBlockedMcpServers()).toBeUndefined();
+    expect(config.getAllowedMcpServers()).toEqual([]);
+    expect(config.getBlockedMcpServers()).toEqual([]);
   });
 
   it('should enable MCP when mcpEnabled is true', async () => {
