@@ -10,10 +10,12 @@ import {
   type HookExecutionRequest,
   type HookExecutionResponse,
 } from '../confirmation-bus/types.js';
-import type {
-  SessionStartSource,
-  SessionEndReason,
-  PreCompressTrigger,
+import {
+  type SessionStartSource,
+  type SessionEndReason,
+  type PreCompressTrigger,
+  createHookOutput,
+  type DefaultHookOutput,
 } from '../hooks/types.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
@@ -22,13 +24,17 @@ import { debugLogger } from '../utils/debugLogger.js';
  *
  * @param messageBus The message bus to use for hook communication
  * @param source The source/trigger of the session start
+ * @returns The output from the SessionStart hook, or undefined if failed/no output
  */
 export async function fireSessionStartHook(
   messageBus: MessageBus,
   source: SessionStartSource,
-): Promise<void> {
+): Promise<DefaultHookOutput | undefined> {
   try {
-    await messageBus.request<HookExecutionRequest, HookExecutionResponse>(
+    const response = await messageBus.request<
+      HookExecutionRequest,
+      HookExecutionResponse
+    >(
       {
         type: MessageBusType.HOOK_EXECUTION_REQUEST,
         eventName: 'SessionStart',
@@ -38,8 +44,14 @@ export async function fireSessionStartHook(
       },
       MessageBusType.HOOK_EXECUTION_RESPONSE,
     );
+
+    if (response.output) {
+      return createHookOutput('SessionStart', response.output);
+    }
+    return undefined;
   } catch (error) {
     debugLogger.debug(`SessionStart hook failed:`, error);
+    return undefined;
   }
 }
 

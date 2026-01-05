@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { DefaultHookOutput } from '@google/gemini-cli-core';
 import {
   uiTelemetryService,
   fireSessionEndHook,
@@ -14,6 +15,7 @@ import {
 } from '@google/gemini-cli-core';
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
+import { MessageType } from '../types.js';
 import { randomUUID } from 'node:crypto';
 
 export const clearCommand: SlashCommand = {
@@ -52,8 +54,9 @@ export const clearCommand: SlashCommand = {
     }
 
     // Fire SessionStart hook after clearing
+    let result: DefaultHookOutput | undefined;
     if (config?.getEnableHooks() && messageBus) {
-      await fireSessionStartHook(messageBus, SessionStartSource.Clear);
+      result = await fireSessionStartHook(messageBus, SessionStartSource.Clear);
     }
 
     // Give the event loop a chance to process any pending telemetry operations
@@ -68,5 +71,15 @@ export const clearCommand: SlashCommand = {
 
     uiTelemetryService.setLastPromptTokenCount(0);
     context.ui.clear();
+
+    if (result?.systemMessage) {
+      context.ui.addItem(
+        {
+          type: MessageType.INFO,
+          text: result.systemMessage,
+        },
+        Date.now(),
+      );
+    }
   },
 };
