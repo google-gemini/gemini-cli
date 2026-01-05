@@ -304,7 +304,7 @@ export class HookEventHandler {
   private readonly hookPlanner: HookPlanner;
   private readonly hookRunner: HookRunner;
   private readonly hookAggregator: HookAggregator;
-  private readonly messageBus?: MessageBus;
+  private readonly messageBus: MessageBus;
 
   constructor(
     config: Config,
@@ -312,7 +312,7 @@ export class HookEventHandler {
     hookPlanner: HookPlanner,
     hookRunner: HookRunner,
     hookAggregator: HookAggregator,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     this.config = config;
     this.hookPlanner = hookPlanner;

@@ -63,9 +63,7 @@ describe('executeToolCall', () => {
         DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getActiveModel: () => PREVIEW_GEMINI_MODEL,
-      getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
       getMessageBus: () => null,
       getPolicyEngine: () => null,
       isInteractive: () => false,

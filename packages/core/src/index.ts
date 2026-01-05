@@ -36,6 +36,7 @@ export * from './core/turn.js';
 export * from './core/geminiRequest.js';
 export * from './core/coreToolScheduler.js';
 export * from './scheduler/types.js';
+export * from './scheduler/tool-executor.js';
 export * from './core/nonInteractiveToolExecutor.js';
 export * from './core/recordingContentGenerator.js';
 
@@ -93,6 +94,8 @@ export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
+export * from './skills/skillManager.js';
+export * from './skills/skillLoader.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';
@@ -154,9 +157,6 @@ export { Storage } from './config/storage.js';
 
 // Export hooks system
 export * from './hooks/index.js';
-
-// Export test utils
-export * from './test-utils/index.js';
 
 // Export hook types
 export * from './hooks/types.js';

@@ -157,6 +157,21 @@ modes = ["yolo"]
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should parse and transform allow_redirection property', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "echo"
+decision = "allow"
+priority = 100
+allow_redirection = true
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].allowRedirection).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
     it('should return error if modes property is used for Tier 2 and Tier 3 policies', async () => {
       await fs.writeFile(
         path.join(tempDir, 'tier2.toml'),

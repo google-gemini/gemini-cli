@@ -15,7 +15,7 @@ import {
   calculateTransformedLine,
 } from './shared/text-buffer.js';
 import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode, debugLogger } from '@google/gemini-cli-core';
 import * as path from 'node:path';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
@@ -31,6 +31,7 @@ import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.
 import clipboardy from 'clipboardy';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
@@ -121,6 +122,10 @@ describe('InputPrompt', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(
+      terminalCapabilityManager,
+      'isBracketedPasteEnabled',
+    ).mockReturnValue(true);
 
     mockCommandContext = createMockCommandContext();
 
@@ -577,8 +582,8 @@ describe('InputPrompt', () => {
     });
 
     it('should handle errors during clipboard operations', async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
+      const debugLoggerErrorSpy = vi
+        .spyOn(debugLogger, 'error')
         .mockImplementation(() => {});
       vi.mocked(clipboardUtils.clipboardHasImage).mockRejectedValue(
         new Error('Clipboard error'),
@@ -592,14 +597,14 @@ describe('InputPrompt', () => {
         stdin.write('\x16'); // Ctrl+V
       });
       await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
           'Error handling clipboard image:',
           expect.any(Error),
         );
       });
       expect(mockBuffer.setText).not.toHaveBeenCalled();
 
-      consoleErrorSpy.mockRestore();
+      debugLoggerErrorSpy.mockRestore();
       unmount();
     });
   });

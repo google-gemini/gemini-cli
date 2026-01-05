@@ -209,6 +209,12 @@ export class InteractiveRun {
   async type(text: string) {
     let typedSoFar = '';
     for (const char of text) {
+      if (char === '\r') {
+        // wait >30ms before `enter` to avoid fast return conversion
+        // from bufferFastReturn() in KeypressContent.tsx
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
       this.ptyProcess.write(char);
       typedSoFar += char;
 
@@ -285,7 +291,9 @@ export class TestRig {
   ) {
     this.testName = testName;
     const sanitizedName = sanitizeTestName(testName);
-    this.testDir = join(env['INTEGRATION_TEST_FILE_DIR']!, sanitizedName);
+    const testFileDir =
+      env['INTEGRATION_TEST_FILE_DIR'] || join(os.tmpdir(), 'gemini-cli-tests');
+    this.testDir = join(testFileDir, sanitizedName);
     mkdirSync(this.testDir, { recursive: true });
     if (options.fakeResponsesPath) {
       this.fakeResponsesPath = join(this.testDir, 'fake-responses.json');

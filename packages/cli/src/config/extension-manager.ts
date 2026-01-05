@@ -38,12 +38,14 @@ import {
   logExtensionInstallEvent,
   logExtensionUninstall,
   logExtensionUpdateEvent,
+  loadSkillsFromDir,
   type ExtensionEvents,
   type MCPServerConfig,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
   type HookDefinition,
   type HookEventName,
+  type ResolvedExtensionSetting,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -261,10 +263,17 @@ Would you like to attempt to install via "git clone" instead?`,
         const newHasHooks = fs.existsSync(
           path.join(localSourcePath, 'hooks', 'hooks.json'),
         );
-        let previousHasHooks = false;
-        if (isUpdate && previous && previous.hooks) {
-          previousHasHooks = Object.keys(previous.hooks).length > 0;
-        }
+        const previousHasHooks = !!(
+          isUpdate &&
+          previous &&
+          previous.hooks &&
+          Object.keys(previous.hooks).length > 0
+        );
+
+        const newSkills = await loadSkillsFromDir(
+          path.join(localSourcePath, 'skills'),
+        );
+        const previousSkills = previous?.skills ?? [];
 
         await maybeRequestConsentOrFail(
           newExtensionConfig,
@@ -272,6 +281,8 @@ Would you like to attempt to install via "git clone" instead?`,
           newHasHooks,
           previousExtensionConfig,
           previousHasHooks,
+          newSkills,
+          previousSkills,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);
         const destinationPath = new ExtensionStorage(
@@ -509,6 +520,24 @@ Would you like to attempt to install via "git clone" instead?`,
       );
       config = resolveEnvVarsInObject(config, customEnv);
 
+      const resolvedSettings: ResolvedExtensionSetting[] = [];
+      if (config.settings) {
+        for (const setting of config.settings) {
+          const value = customEnv[setting.envVar];
+          resolvedSettings.push({
+            name: setting.name,
+            envVar: setting.envVar,
+            value:
+              value === undefined
+                ? '[not set]'
+                : setting.sensitive
+                  ? '***'
+                  : value,
+            sensitive: setting.sensitive ?? false,
+          });
+        }
+      }
+
       if (config.mcpServers) {
         config.mcpServers = Object.fromEntries(
           Object.entries(config.mcpServers).map(([key, value]) => [
@@ -532,7 +561,11 @@ Would you like to attempt to install via "git clone" instead?`,
         });
       }
 
-      const extension = {
+      const skills = await loadSkillsFromDir(
+        path.join(effectiveExtensionPath, 'skills'),
+      );
+
+      const extension: GeminiCLIExtension = {
         name: config.name,
         version: config.version,
         path: effectiveExtensionPath,
@@ -546,6 +579,9 @@ Would you like to attempt to install via "git clone" instead?`,
           this.workspaceDir,
         ),
         id: getExtensionId(config, installMetadata),
+        settings: config.settings,
+        resolvedSettings,
+        skills,
       };
       this.loadedExtensions = [...this.loadedExtensions, extension];
 
@@ -698,6 +734,19 @@ Would you like to attempt to install via "git clone" instead?`,
       output += `\n Excluded tools:`;
       extension.excludeTools.forEach((tool) => {
         output += `\n  ${tool}`;
+      });
+    }
+    if (extension.skills && extension.skills.length > 0) {
+      output += `\n Agent skills:`;
+      extension.skills.forEach((skill) => {
+        output += `\n  ${skill.name}: ${skill.description}`;
+      });
+    }
+    const resolvedSettings = extension.resolvedSettings;
+    if (resolvedSettings && resolvedSettings.length > 0) {
+      output += `\n Settings:`;
+      resolvedSettings.forEach((setting) => {
+        output += `\n  ${setting.name}: ${setting.value}`;
       });
     }
     return output;
