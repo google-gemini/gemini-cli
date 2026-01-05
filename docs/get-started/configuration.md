@@ -921,6 +921,21 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hooks that execute before tool selection. Can filter or
     prioritize available tools dynamically.
   - **Default:** `[]`
+
+#### `admin`
+
+- **`admin.secureModeEnabled`** (boolean):
+  - **Description:** If true, disallows yolo mode from being used.
+  - **Default:** `false`
+
+- **`admin.cliFeatureSetting.extensionsSetting.extensionsEnabled`** (boolean):
+  - **Description:** If false, disallows extensions from being installed or
+    used.
+  - **Default:** `true`
+
+- **`admin.mcpSetting.mcpEnabled`** (boolean):
+  - **Description:** If false, disallows MCP servers from being used.
+  - **Default:** `true`
   <!-- SETTINGS-AUTOGEN:END -->
 
 #### `mcpServers`
