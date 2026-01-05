@@ -291,10 +291,10 @@ export async function fireAfterToolHook(
  * @param signal Abort signal for cancellation
  * @param messageBus Optional message bus for hook communication
  * @param hooksEnabled Whether hooks are enabled
- * @param config Config to look up MCP server details for hook context
  * @param liveOutputCallback Optional callback for live output updates
  * @param shellExecutionConfig Optional shell execution config
  * @param setPidCallback Optional callback to set the PID for shell invocations
+ * @param config Config to look up MCP server details for hook context
  * @returns The tool result
  */
 export async function executeToolWithHooks(
