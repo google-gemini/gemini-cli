@@ -33,14 +33,21 @@ vi.mock('os', () => ({
   homedir: mockHomedir,
 }));
 
+const mockSpawnSync = vi.hoisted(() => vi.fn());
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return {
+    ...actual,
+    spawnSync: mockSpawnSync,
+  };
+});
+
 const mockQuote = vi.hoisted(() => vi.fn());
 vi.mock('shell-quote', () => ({
   quote: mockQuote,
 }));
 
 let config: Config;
-const isWindowsRuntime = process.platform === 'win32';
-const describeWindowsOnly = isWindowsRuntime ? describe : describe.skip;
 
 beforeAll(async () => {
   mockPlatform.mockReturnValue('linux');
@@ -445,7 +452,7 @@ describe('checkCommandPermissions', () => {
   });
 });
 
-describeWindowsOnly('PowerShell integration', () => {
+describe('PowerShell integration', () => {
   const originalComSpec = process.env['ComSpec'];
 
   beforeEach(() => {
@@ -464,11 +471,29 @@ describeWindowsOnly('PowerShell integration', () => {
   });
 
   it('should block commands when PowerShell parser reports errors', () => {
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: JSON.stringify({ success: false }),
+    });
+
     const { allowed, reason } = isCommandAllowed('Get-ChildItem |', config);
     expect(allowed).toBe(false);
     expect(reason).toBe(
       'Command rejected because it could not be parsed safely',
     );
+  });
+
+  it('should allow valid commands through PowerShell parser', () => {
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: JSON.stringify({
+        success: true,
+        commands: [{ name: 'Get-ChildItem', text: 'Get-ChildItem' }],
+      }),
+    });
+
+    const { allowed } = isCommandAllowed('Get-ChildItem', config);
+    expect(allowed).toBe(true);
   });
 });
 
