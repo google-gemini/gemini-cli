@@ -8,8 +8,8 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
-import type { OutputFormat } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
+import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
 import {
   Config,
@@ -33,8 +33,12 @@ import {
   WEB_FETCH_TOOL_NAME,
   getVersion,
   PREVIEW_GEMINI_MODEL_AUTO,
+  type HookDefinition,
+  type HookEventName,
+  type OutputFormat,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
+import { saveModelChange, loadSettings } from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
@@ -70,7 +74,6 @@ export interface CliArgs {
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
-  useSmartEdit: boolean | undefined;
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
@@ -283,6 +286,10 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     yargsInstance.command(extensionsCommand);
   }
 
+  if (settings?.experimental?.skills ?? false) {
+    yargsInstance.command(skillsCommand);
+  }
+
   // Register hooks command if hooks are enabled
   if (settings?.tools?.enableHooks) {
     yargsInstance.command(hooksCommand);
@@ -379,13 +386,23 @@ export function isDebugMode(argv: CliArgs): boolean {
   );
 }
 
+export interface LoadCliConfigOptions {
+  cwd?: string;
+  projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
+    disabled?: string[];
+  };
+}
+
 export async function loadCliConfig(
   settings: Settings,
   sessionId: string,
   argv: CliArgs,
-  cwd: string = process.cwd(),
+  options: LoadCliConfigOptions = {},
 ): Promise<Config> {
+  const { cwd = process.cwd(), projectHooks } = options;
   const debugMode = isDebugMode(argv);
+
+  const loadedSettings = loadSettings(cwd);
 
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
@@ -524,23 +541,16 @@ export async function loadCliConfig(
     throw err;
   }
 
-  const policyEngineConfig = await createPolicyEngineConfig(
-    settings,
-    approvalMode,
-  );
-
-  const enableMessageBusIntegration =
-    settings.tools?.enableMessageBusIntegration ?? true;
-
-  const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
-  const allowedToolsSet = new Set(allowedTools);
-
   // Interactive mode: explicit -i flag or (TTY + no args + no -p flag)
   const hasQuery = !!argv.query;
   const interactive =
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
     (process.stdin.isTTY && !hasQuery && !argv.prompt);
+
+  const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
+  const allowedToolsSet = new Set(allowedTools);
+
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive) {
@@ -579,6 +589,26 @@ export async function loadCliConfig(
     settings,
     extraExcludes.length > 0 ? extraExcludes : undefined,
   );
+
+  // Create a settings object that includes CLI overrides for policy generation
+  const effectiveSettings: Settings = {
+    ...settings,
+    tools: {
+      ...settings.tools,
+      allowed: allowedTools,
+      exclude: excludeTools,
+    },
+    mcp: {
+      ...settings.mcp,
+      allowed: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
+    },
+  };
+
+  const policyEngineConfig = await createPolicyEngineConfig(
+    effectiveSettings,
+    approvalMode,
+  );
+  policyEngineConfig.nonInteractive = !interactive;
 
   const defaultModel = settings.general?.previewFeatures
     ? PREVIEW_GEMINI_MODEL_AUTO
@@ -619,8 +649,12 @@ export async function loadCliConfig(
     mcpServers: settings.mcpServers,
     allowedMcpServers: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
     blockedMcpServers: argv.allowedMcpServerNames
-      ? [] // explicitly allowed servers overrides everything
+      ? undefined
       : settings.mcp?.excluded,
+    blockedEnvironmentVariables:
+      settings.security?.environmentVariableRedaction?.blocked,
+    enableEnvironmentVariableRedaction:
+      settings.security?.environmentVariableRedaction?.enabled,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,
@@ -653,6 +687,8 @@ export async function loadCliConfig(
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
+    skillsSupport: settings.experimental?.skills,
+    disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
@@ -665,18 +701,18 @@ export async function loadCliConfig(
     enableInteractiveShell:
       settings.tools?.shell?.enableInteractiveShell ?? true,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
+    enableShellOutputEfficiency:
+      settings.tools?.shell?.enableShellOutputEfficiency ?? true,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     truncateToolOutputLines: settings.tools?.truncateToolOutputLines,
     enableToolOutputTruncation: settings.tools?.enableToolOutputTruncation,
     eventEmitter: appEvents,
-    useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
-    enableMessageBusIntegration,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
     introspectionAgentSettings:
@@ -689,6 +725,8 @@ export async function loadCliConfig(
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.tools?.enableHooks ?? false,
     hooks: settings.hooks || {},
+    projectHooks: projectHooks || {},
+    onModelChange: (model: string) => saveModelChange(loadedSettings, model),
   });
 }
 

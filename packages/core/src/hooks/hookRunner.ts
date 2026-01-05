@@ -15,9 +15,11 @@ import type {
   BeforeAgentInput,
   BeforeModelInput,
   BeforeModelOutput,
+  BeforeToolInput,
 } from './types.js';
 import type { LLMRequest } from './hookTranslator.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { sanitizeEnvironment } from '../services/environmentSanitization.js';
 import {
   escapeShellArg,
   getShellConfiguration,
@@ -189,6 +191,20 @@ export class HookRunner {
           }
           break;
 
+        case HookEventName.BeforeTool:
+          if ('tool_input' in hookOutput.hookSpecificOutput) {
+            const newToolInput = hookOutput.hookSpecificOutput[
+              'tool_input'
+            ] as Record<string, unknown>;
+            if (newToolInput && 'tool_input' in modifiedInput) {
+              (modifiedInput as BeforeToolInput).tool_input = {
+                ...(modifiedInput as BeforeToolInput).tool_input,
+                ...newToolInput,
+              };
+            }
+          }
+          break;
+
         default:
           // For other events, no special input modification is needed
           break;
@@ -238,7 +254,7 @@ export class HookRunner {
 
       // Set up environment variables
       const env = {
-        ...process.env,
+        ...sanitizeEnvironment(process.env, this.config.sanitizationConfig),
         GEMINI_PROJECT_DIR: input.cwd,
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
       };
