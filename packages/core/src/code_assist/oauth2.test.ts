@@ -1129,21 +1129,7 @@ describe('oauth2', () => {
         );
 
         // Spy on process.on to capture the SIGINT handler
-        let sigIntHandler: (() => void) | undefined;
-        const originalOn = process.on;
-        const processOnSpy = vi
-          .spyOn(process, 'on')
-          .mockImplementation(
-            (
-              event: string | symbol,
-              listener: (...args: unknown[]) => void,
-            ) => {
-              if (event === 'SIGINT') {
-                sigIntHandler = listener as () => void;
-              }
-              return originalOn.call(process, event, listener);
-            },
-          );
+        const processOnSpy = vi.spyOn(process, 'on');
         const processRemoveListenerSpy = vi.spyOn(process, 'removeListener');
 
         const clientPromise = getOauthClient(
@@ -1153,6 +1139,11 @@ describe('oauth2', () => {
 
         // Wait a tick to ensure the SIGINT handler is registered
         await new Promise((resolve) => setTimeout(resolve, 0));
+
+        const sigintCall = processOnSpy.mock.calls.find(
+          (call) => call[0] === 'SIGINT',
+        );
+        const sigIntHandler = sigintCall?.[1] as (() => void) | undefined;
 
         expect(sigIntHandler).toBeDefined();
 
@@ -1196,15 +1187,7 @@ describe('oauth2', () => {
         );
 
         // Spy on process.stdin.on
-        let dataHandler: ((data: Buffer) => void) | undefined;
-        const stdinOnSpy = vi
-          .spyOn(process.stdin, 'on')
-          .mockImplementation((event: string | symbol, listener) => {
-            if (event === 'data') {
-              dataHandler = listener as (data: Buffer) => void;
-            }
-            return process.stdin;
-          });
+        const stdinOnSpy = vi.spyOn(process.stdin, 'on');
         const stdinRemoveListenerSpy = vi.spyOn(
           process.stdin,
           'removeListener',
@@ -1216,6 +1199,13 @@ describe('oauth2', () => {
         );
 
         await new Promise((resolve) => setTimeout(resolve, 0));
+
+        const dataCall = stdinOnSpy.mock.calls.find(
+          (call) => call[0] === 'data',
+        );
+        const dataHandler = dataCall?.[1] as
+          | ((data: Buffer) => void)
+          | undefined;
 
         expect(dataHandler).toBeDefined();
 
