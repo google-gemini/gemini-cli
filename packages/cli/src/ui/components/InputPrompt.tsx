@@ -157,15 +157,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const shellHistory = useShellHistory(config.getProjectRoot());
   const shellHistoryData = shellHistory.history;
 
-  const completion = useCommandCompletion(
+  const completion = useCommandCompletion({
     buffer,
-    config.getTargetDir(),
+    cwd: config.getTargetDir(),
     slashCommands,
     commandContext,
     reverseSearchActive,
     shellModeActive,
     config,
-  );
+    active: !justNavigatedHistory,
+  });
 
   const reverseSearchCompletion = useReverseSearchCompletion(
     buffer,
@@ -264,8 +265,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
 
   const customSetTextAndResetCompletionSignal = useCallback(
-    (newText: string) => {
-      buffer.setText(newText);
+    (newText: string, cursorPosition?: 'start' | 'end') => {
+      buffer.setText(newText, cursorPosition);
       setJustNavigatedHistory(true);
     },
     [buffer, setJustNavigatedHistory],
@@ -288,7 +289,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       resetReverseSearchCompletionState();
       resetCommandSearchCompletionState();
       setExpandedSuggestionIndex(-1);
-      setJustNavigatedHistory(false);
     }
   }, [
     justNavigatedHistory,
@@ -297,6 +297,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     setJustNavigatedHistory,
     resetReverseSearchCompletionState,
     resetCommandSearchCompletionState,
+    setExpandedSuggestionIndex,
   ]);
 
   // Helper function to handle loading queued messages into input
@@ -368,6 +369,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   useMouseClick(
     innerBoxRef,
     (_event, relX, relY) => {
+      setJustNavigatedHistory(false);
       if (isEmbeddedShellFocused) {
         setEmbeddedShellFocused(false);
       }
@@ -380,6 +382,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   useMouse(
     (event: MouseEvent) => {
       if (event.name === 'right-release') {
+        setJustNavigatedHistory(false);
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleClipboardPaste();
       }
@@ -389,6 +392,25 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      // Determine if this keypress is a history navigation command
+      const isHistoryUp =
+        !shellModeActive &&
+        (keyMatchers[Command.HISTORY_UP](key) ||
+          (keyMatchers[Command.NAVIGATION_UP](key) &&
+            (buffer.allVisualLines.length === 1 ||
+              (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))));
+      const isHistoryDown =
+        !shellModeActive &&
+        (keyMatchers[Command.HISTORY_DOWN](key) ||
+          (keyMatchers[Command.NAVIGATION_DOWN](key) &&
+            (buffer.allVisualLines.length === 1 ||
+              buffer.visualCursor[0] === buffer.allVisualLines.length - 1)));
+
+      // Reset completion suppression if the user performs any action other than history navigation
+      setJustNavigatedHistory((prev) =>
+        prev && !isHistoryUp && !isHistoryDown ? false : prev,
+      );
+
       // TODO(jacobr): this special case is likely not needed anymore.
       // We should probably stop supporting paste if the InputPrompt is not
       // focused.

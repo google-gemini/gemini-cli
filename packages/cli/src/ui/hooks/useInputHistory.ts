@@ -11,7 +11,7 @@ interface UseInputHistoryProps {
   onSubmit: (value: string) => void;
   isActive: boolean;
   currentQuery: string; // Renamed from query to avoid confusion
-  onChange: (value: string) => void;
+  onChange: (value: string, cursorPosition?: 'start' | 'end') => void;
 }
 
 export interface UseInputHistoryReturn {
@@ -65,7 +65,7 @@ export function useInputHistory({
     if (nextIndex !== historyIndex) {
       setHistoryIndex(nextIndex);
       const newValue = userMessages[userMessages.length - 1 - nextIndex];
-      onChange(newValue);
+      onChange(newValue, 'start');
       return true;
     }
     return false;
@@ -88,10 +88,10 @@ export function useInputHistory({
 
     if (nextIndex === -1) {
       // Reached the end of history navigation, restore original query
-      onChange(originalQueryBeforeNav);
+      onChange(originalQueryBeforeNav, 'end');
     } else {
       const newValue = userMessages[userMessages.length - 1 - nextIndex];
-      onChange(newValue);
+      onChange(newValue, 'end');
     }
     return true;
   }, [

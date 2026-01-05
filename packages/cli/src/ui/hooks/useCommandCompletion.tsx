@@ -57,15 +57,27 @@ export interface UseCommandCompletionReturn {
   getCompletedText: (suggestion: Suggestion) => string | null;
 }
 
-export function useCommandCompletion(
-  buffer: TextBuffer,
-  cwd: string,
-  slashCommands: readonly SlashCommand[],
-  commandContext: CommandContext,
-  reverseSearchActive: boolean = false,
-  shellModeActive: boolean,
-  config?: Config,
-): UseCommandCompletionReturn {
+export interface UseCommandCompletionOptions {
+  buffer: TextBuffer;
+  cwd: string;
+  slashCommands: readonly SlashCommand[];
+  commandContext: CommandContext;
+  reverseSearchActive?: boolean;
+  shellModeActive: boolean;
+  config?: Config;
+  active: boolean;
+}
+
+export function useCommandCompletion({
+  buffer,
+  cwd,
+  slashCommands,
+  commandContext,
+  reverseSearchActive = false,
+  shellModeActive,
+  config,
+  active,
+}: UseCommandCompletionOptions): UseCommandCompletionReturn {
   const {
     suggestions,
     activeSuggestionIndex,
@@ -172,7 +184,7 @@ export function useCommandCompletion(
     }, [cursorRow, cursorCol, buffer.lines, buffer.text, config]);
 
   useAtCompletion({
-    enabled: completionMode === CompletionMode.AT,
+    enabled: active && completionMode === CompletionMode.AT,
     pattern: query || '',
     config,
     cwd,
@@ -181,7 +193,8 @@ export function useCommandCompletion(
   });
 
   const slashCompletionRange = useSlashCompletion({
-    enabled: completionMode === CompletionMode.SLASH && !shellModeActive,
+    enabled:
+      active && completionMode === CompletionMode.SLASH && !shellModeActive,
     query,
     slashCommands,
     commandContext,
@@ -193,7 +206,7 @@ export function useCommandCompletion(
   const promptCompletion = usePromptCompletion({
     buffer,
     config,
-    enabled: completionMode === CompletionMode.PROMPT,
+    enabled: active && completionMode === CompletionMode.PROMPT,
   });
 
   useEffect(() => {
@@ -202,13 +215,18 @@ export function useCommandCompletion(
   }, [suggestions, setActiveSuggestionIndex, setVisibleStartIndex]);
 
   useEffect(() => {
-    if (completionMode === CompletionMode.IDLE || reverseSearchActive) {
+    if (
+      !active ||
+      completionMode === CompletionMode.IDLE ||
+      reverseSearchActive
+    ) {
       resetCompletionState();
       return;
     }
     // Show suggestions if we are loading OR if there are results to display.
     setShowSuggestions(isLoadingSuggestions || suggestions.length > 0);
   }, [
+    active,
     completionMode,
     suggestions.length,
     isLoadingSuggestions,
