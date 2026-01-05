@@ -14,7 +14,7 @@ import {
   useRef,
 } from 'react';
 import { ESC } from '../utils/input.js';
-import { debugLogger, coreEvents } from '@google/gemini-cli-core';
+import { debugLogger, coreEvents, CoreEvent } from '@google/gemini-cli-core';
 import {
   isIncompleteMouseSequence,
   parseMouseEvent,
@@ -106,10 +106,10 @@ export function MouseProvider({
         // so this always indicates a mouse drag that the user was expecting
         // would trigger text selection but does not as we are handling mouse
         // events not the terminal.
-        coreEvents.emitFeedback(
-          'warning',
-          'Press Ctrl-S to enter selection mode to copy text.',
-        );
+        coreEvents.emit(CoreEvent.UserFeedback, {
+          severity: 'warning',
+          message: 'Press Ctrl-S to enter selection mode to copy text.',
+        });
       }
     };
 

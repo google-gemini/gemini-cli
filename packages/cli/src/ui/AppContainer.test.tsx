@@ -1850,6 +1850,115 @@ describe('AppContainer State Management', () => {
       unmount!();
     });
 
+    it('prevents Paste Timeout warning from entering history but shows transient warning', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const handlers = mockCoreEvents.on.mock.calls
+        .filter((call: unknown[]) => call[0] === CoreEvent.UserFeedback)
+        .map((call: unknown[]) => call[1]);
+
+      const pasteTimeoutMsg =
+        'Paste Timed out. Possibly due to slow connection.';
+      const payload: UserFeedbackPayload = {
+        severity: 'warning',
+        message: pasteTimeoutMsg,
+      };
+
+      act(() => {
+        handlers.forEach((handler) => {
+          (handler as (payload: UserFeedbackPayload) => void)(payload);
+        });
+      });
+
+      // Assert: NOT added to history
+      expect(mockedUseHistory().addItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({ text: pasteTimeoutMsg }),
+        expect.any(Number),
+      );
+
+      // Assert: Transient warning IS set (need to advance timer for state update if applicable, but setWarningMessage is direct)
+      expect(capturedUIState.warningMessage).toBe(pasteTimeoutMsg);
+
+      unmount!();
+    });
+
+    it('prevents Selection Mode warning from entering history but shows transient warning', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const handlers = mockCoreEvents.on.mock.calls
+        .filter((call: unknown[]) => call[0] === CoreEvent.UserFeedback)
+        .map((call: unknown[]) => call[1]);
+
+      const selectionMsg = 'Press Ctrl-S to enter selection mode to copy text.';
+      const payload: UserFeedbackPayload = {
+        severity: 'warning',
+        message: selectionMsg,
+      };
+
+      act(() => {
+        handlers.forEach((handler) => {
+          (handler as (payload: UserFeedbackPayload) => void)(payload);
+        });
+      });
+
+      // Assert: NOT added to history
+      expect(mockedUseHistory().addItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({ text: selectionMsg }),
+        expect.any(Number),
+      );
+
+      // Assert: Transient warning IS set
+      expect(capturedUIState.warningMessage).toBe(selectionMsg);
+
+      unmount!();
+    });
+
+    it('allows other warnings to enter history and does NOT show transient warning', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const handlers = mockCoreEvents.on.mock.calls
+        .filter((call: unknown[]) => call[0] === CoreEvent.UserFeedback)
+        .map((call: unknown[]) => call[1]);
+
+      const otherMsg = 'Some other warning';
+      const payload: UserFeedbackPayload = {
+        severity: 'warning',
+        message: otherMsg,
+      };
+
+      act(() => {
+        handlers.forEach((handler) => {
+          (handler as (payload: UserFeedbackPayload) => void)(payload);
+        });
+      });
+
+      // Assert: IS added to history
+      expect(mockedUseHistory().addItem).toHaveBeenCalledWith(
+        expect.objectContaining({ text: otherMsg }),
+        expect.any(Number),
+      );
+
+      // Assert: Transient warning IS NOT set
+      expect(capturedUIState.warningMessage).toBeNull();
+
+      unmount!();
+    });
+
     it('updates currentModel when ModelChanged event is received', async () => {
       // Arrange: Mock initial model
       vi.spyOn(mockConfig, 'getModel').mockReturnValue('initial-model');

@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger, type Config, coreEvents } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  type Config,
+  coreEvents,
+  CoreEvent,
+} from '@google/gemini-cli-core';
 import { useStdin } from 'ink';
 import type React from 'react';
 import {
@@ -212,10 +217,10 @@ function bufferPaste(
         clearTimeout(timeoutId);
 
         if (key === null) {
-          coreEvents.emitFeedback(
-            'warning',
-            'Paste Timed out. Possibly due to slow connection.',
-          );
+          coreEvents.emit(CoreEvent.UserFeedback, {
+            severity: 'warning',
+            message: 'Paste Timed out. Possibly due to slow connection.',
+          });
           break;
         }
 
