@@ -28,7 +28,9 @@ const mockReadline = vi.hoisted(() => ({
 }));
 
 const mockReaddir = vi.hoisted(() => vi.fn());
-const originalReaddir = vi.hoisted(() => ({ current: null as unknown }));
+const originalReaddir = vi.hoisted(() => ({
+  current: null as typeof fs.readdir | null,
+}));
 
 // Mocking readline for non-interactive prompts
 vi.mock('node:readline', () => ({
@@ -61,7 +63,10 @@ describe('consent', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockReaddir.mockImplementation(originalReaddir.current);
+    if (originalReaddir.current) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockReaddir.mockImplementation(originalReaddir.current as any);
+    }
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'consent-test-'));
   });
 
