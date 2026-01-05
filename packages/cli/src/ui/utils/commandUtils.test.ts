@@ -359,7 +359,6 @@ describe('commandUtils', () => {
     });
 
     it('skips /dev/tty on Windows and uses stderr fallback for OSC-52', async () => {
-      // Simulate Windows environment
       mockProcess.platform = 'win32';
       const stderrStream = makeWritable({ isTTY: true });
       Object.defineProperty(process, 'stderr', {
