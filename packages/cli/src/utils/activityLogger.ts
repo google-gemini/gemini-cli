@@ -129,7 +129,7 @@ export class ActivityLogger extends EventEmitter {
               response: {
                 status: response.status,
                 headers: this.stringifyHeaders(response.headers),
-                body: text.substring(0, 100000),
+                body: text,
                 durationMs,
               },
             });
@@ -212,7 +212,7 @@ export class ActivityLogger extends EventEmitter {
           method: req.method || 'GET',
           url,
           headers: self.stringifyHeaders(req.getHeaders()),
-          body: body.substring(0, 50000),
+          body,
           pending: true,
         });
         return oldEnd.apply(this, [chunk, ...etc]);
@@ -235,7 +235,7 @@ export class ActivityLogger extends EventEmitter {
             response: {
               status: res.statusCode,
               headers: self.stringifyHeaders(res.headers),
-              body: resBody.substring(0, 50000),
+              body: resBody,
               durationMs,
             },
           });
