@@ -1845,8 +1845,12 @@ describe('AppContainer State Management', () => {
     });
 
     it('adds history item when ConsoleLog event with type "error" is received', async () => {
-      const { unmount } = renderAppContainer();
-      await waitFor(() => expect(capturedUIState).toBeTruthy());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+        await waitFor(() => expect(capturedUIState).toBeTruthy());
+      });
 
       // Get the registered handler for ConsoleLog
       const handler = mockCoreEvents.on.mock.calls.find(
@@ -1870,7 +1874,7 @@ describe('AppContainer State Management', () => {
         }),
         expect.any(Number),
       );
-      unmount();
+      unmount!();
     });
 
     it('updates currentModel when ModelChanged event is received', async () => {
