@@ -16,11 +16,8 @@ import {
   type PolicySettings,
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
-import {
-  loadPoliciesFromToml,
-  type PolicyFileError,
-  escapeRegex,
-} from './toml-loader.js';
+import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
+import { buildArgsPatterns } from './utils.js';
 import toml from '@iarna/toml';
 import {
   MessageBusType,
@@ -29,6 +26,8 @@ import {
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
+import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -195,11 +194,48 @@ export async function createPolicyEngineConfig(
   // Priority: 2.3 (user tier - explicit temporary allows)
   if (settings.tools?.allowed) {
     for (const tool of settings.tools.allowed) {
-      rules.push({
-        toolName: tool,
-        decision: PolicyDecision.ALLOW,
-        priority: 2.3,
-      });
+      // Check for legacy format: toolName(args)
+      const match = tool.match(/^([a-zA-Z0-9_-]+)\((.*)\)$/);
+      if (match) {
+        const [, rawToolName, args] = match;
+        // Normalize shell tool aliases
+        const toolName = SHELL_TOOL_NAMES.includes(rawToolName)
+          ? SHELL_TOOL_NAME
+          : rawToolName;
+
+        // Treat args as a command prefix for shell tool
+        if (toolName === SHELL_TOOL_NAME) {
+          const patterns = buildArgsPatterns(undefined, args);
+          for (const pattern of patterns) {
+            if (pattern) {
+              rules.push({
+                toolName,
+                decision: PolicyDecision.ALLOW,
+                priority: 2.3,
+                argsPattern: new RegExp(pattern),
+              });
+            }
+          }
+        } else {
+          // For non-shell tools, we allow the tool itself but ignore args
+          // as args matching was only supported for shell tools historically.
+          rules.push({
+            toolName,
+            decision: PolicyDecision.ALLOW,
+            priority: 2.3,
+          });
+        }
+      } else {
+        // Standard tool name
+        const toolName = SHELL_TOOL_NAMES.includes(tool)
+          ? SHELL_TOOL_NAME
+          : tool;
+        rules.push({
+          toolName,
+          decision: PolicyDecision.ALLOW,
+          priority: 2.3,
+        });
+      }
     }
   }
 
@@ -263,26 +299,19 @@ export function createPolicyUpdater(
 
       if (message.commandPrefix) {
         // Convert commandPrefix(es) to argsPatterns for in-memory rules
-        const prefixes = Array.isArray(message.commandPrefix)
-          ? message.commandPrefix
-          : [message.commandPrefix];
-
-        for (const prefix of prefixes) {
-          const escapedPrefix = escapeRegex(prefix);
-          // Use robust regex to match whole words (e.g. "git" but not "github")
-          const argsPattern = new RegExp(
-            `"command":"${escapedPrefix}(?:[\\s"]|$)`,
-          );
-
-          policyEngine.addRule({
-            toolName,
-            decision: PolicyDecision.ALLOW,
-            // User tier (2) + high priority (950/1000) = 2.95
-            // This ensures user "always allow" selections are high priority
-            // but still lose to admin policies (3.xxx) and settings excludes (200)
-            priority: 2.95,
-            argsPattern,
-          });
+        const patterns = buildArgsPatterns(undefined, message.commandPrefix);
+        for (const pattern of patterns) {
+          if (pattern) {
+            policyEngine.addRule({
+              toolName,
+              decision: PolicyDecision.ALLOW,
+              // User tier (2) + high priority (950/1000) = 2.95
+              // This ensures user "always allow" selections are high priority
+              // but still lose to admin policies (3.xxx) and settings excludes (200)
+              priority: 2.95,
+              argsPattern: new RegExp(pattern),
+            });
+          }
         }
       } else {
         const argsPattern = message.argsPattern

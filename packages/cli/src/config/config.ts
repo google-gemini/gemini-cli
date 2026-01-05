@@ -9,6 +9,7 @@ import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
+import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
 import {
   Config,
@@ -285,6 +286,10 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     yargsInstance.command(extensionsCommand);
   }
 
+  if (settings?.experimental?.skills ?? false) {
+    yargsInstance.command(skillsCommand);
+  }
+
   // Register hooks command if hooks are enabled
   if (settings?.tools?.enableHooks) {
     yargsInstance.command(hooksCommand);
@@ -536,20 +541,16 @@ export async function loadCliConfig(
     throw err;
   }
 
-  const policyEngineConfig = await createPolicyEngineConfig(
-    settings,
-    approvalMode,
-  );
-
-  const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
-  const allowedToolsSet = new Set(allowedTools);
-
   // Interactive mode: explicit -i flag or (TTY + no args + no -p flag)
   const hasQuery = !!argv.query;
   const interactive =
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
     (process.stdin.isTTY && !hasQuery && !argv.prompt);
+
+  const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
+  const allowedToolsSet = new Set(allowedTools);
+
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive) {
@@ -588,6 +589,26 @@ export async function loadCliConfig(
     settings,
     extraExcludes.length > 0 ? extraExcludes : undefined,
   );
+
+  // Create a settings object that includes CLI overrides for policy generation
+  const effectiveSettings: Settings = {
+    ...settings,
+    tools: {
+      ...settings.tools,
+      allowed: allowedTools,
+      exclude: excludeTools,
+    },
+    mcp: {
+      ...settings.mcp,
+      allowed: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
+    },
+  };
+
+  const policyEngineConfig = await createPolicyEngineConfig(
+    effectiveSettings,
+    approvalMode,
+  );
+  policyEngineConfig.nonInteractive = !interactive;
 
   const defaultModel = settings.general?.previewFeatures
     ? PREVIEW_GEMINI_MODEL_AUTO
