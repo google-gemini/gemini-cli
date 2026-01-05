@@ -37,7 +37,12 @@ import {
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import chalk from 'chalk';
-import { cpSlice, cpLen, stripUnsafeCharacters } from '../utils/textUtils.js';
+import {
+  cpSlice,
+  cpLen,
+  stripUnsafeCharacters,
+  getCachedStringWidth,
+} from '../utils/textUtils.js';
 import {
   type SettingsValue,
   TOGGLE_TYPES,
@@ -202,6 +207,7 @@ export function SettingsDialog({
 
       return {
         label: definition?.label || key,
+        description: definition?.description,
         value: key,
         type: definition?.type,
         toggle: () => {
@@ -478,8 +484,8 @@ export function SettingsDialog({
     currentAvailableTerminalHeight - totalFixedHeight,
   );
 
-  // Each setting item takes 2 lines (the setting row + spacing)
-  let maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 2));
+  // Each setting item takes up to 3 lines (label/value row, description row, and spacing)
+  let maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 3));
 
   // Decide whether to show scope selection based on remaining space
   let showScopeSelection = true;
@@ -492,7 +498,7 @@ export function SettingsDialog({
       1,
       currentAvailableTerminalHeight - totalWithScope,
     );
-    const maxItemsWithScope = Math.max(1, Math.floor(availableWithScope / 2));
+    const maxItemsWithScope = Math.max(1, Math.floor(availableWithScope / 3));
 
     // If hiding scope selection allows us to show significantly more settings, do it
     if (maxVisibleItems > maxItemsWithScope + 1) {
@@ -504,7 +510,7 @@ export function SettingsDialog({
         1,
         currentAvailableTerminalHeight - totalFixedHeight,
       );
-      maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 2));
+      maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 3));
     }
   } else {
     // For normal height, include scope selection
@@ -513,7 +519,7 @@ export function SettingsDialog({
       1,
       currentAvailableTerminalHeight - totalFixedHeight,
     );
-    maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 2));
+    maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 3));
   }
 
   // Use the calculated maxVisibleItems or fall back to the original maxItemsToShow
@@ -976,10 +982,17 @@ export function SettingsDialog({
                 selectedScope,
                 settings,
               );
+              const scopeMessageString = scopeMessage ? ` ${scopeMessage}` : '';
+              const labelWidth = Math.max(
+                50,
+                getCachedStringWidth(item.label + scopeMessageString),
+              );
+              const valueWidth = getCachedStringWidth(displayValue);
+              const descriptionWidth = labelWidth + 3 + valueWidth;
 
               return (
                 <React.Fragment key={item.value}>
-                  <Box marginX={1} flexDirection="row" alignItems="center">
+                  <Box marginX={1} flexDirection="row" alignItems="flex-start">
                     <Box minWidth={2} flexShrink={0}>
                       <Text
                         color={
@@ -989,33 +1002,46 @@ export function SettingsDialog({
                         {isActive ? '●' : ''}
                       </Text>
                     </Box>
-                    <Box minWidth={50}>
-                      <Text
-                        color={
-                          isActive ? theme.status.success : theme.text.primary
-                        }
-                      >
-                        {item.label}
-                        {scopeMessage && (
-                          <Text color={theme.text.secondary}>
-                            {' '}
-                            {scopeMessage}
+                    <Box flexDirection="column" flexGrow={1} minWidth={0}>
+                      <Box flexDirection="row">
+                        <Box minWidth={50}>
+                          <Text
+                            color={
+                              isActive
+                                ? theme.status.success
+                                : theme.text.primary
+                            }
+                          >
+                            {item.label}
+                            {scopeMessage && (
+                              <Text color={theme.text.secondary}>
+                                {' '}
+                                {scopeMessage}
+                              </Text>
+                            )}
                           </Text>
-                        )}
-                      </Text>
+                        </Box>
+                        <Box minWidth={3} />
+                        <Text
+                          color={
+                            isActive
+                              ? theme.status.success
+                              : shouldBeGreyedOut
+                                ? theme.text.secondary
+                                : theme.text.primary
+                          }
+                        >
+                          {displayValue}
+                        </Text>
+                      </Box>
+                      {item.description && (
+                        <Box width={descriptionWidth}>
+                          <Text color={theme.text.secondary} wrap="truncate">
+                            {item.description}
+                          </Text>
+                        </Box>
+                      )}
                     </Box>
-                    <Box minWidth={3} />
-                    <Text
-                      color={
-                        isActive
-                          ? theme.status.success
-                          : shouldBeGreyedOut
-                            ? theme.text.secondary
-                            : theme.text.primary
-                      }
-                    >
-                      {displayValue}
-                    </Text>
                   </Box>
                   <Box height={1} />
                 </React.Fragment>
