@@ -19,8 +19,8 @@ import {
 } from '../confirmation-bus/types.js';
 
 class MockInvocation extends BaseToolInvocation<{ key?: string }, ToolResult> {
-  constructor(params: { key?: string }) {
-    super(params);
+  constructor(params: { key?: string }, messageBus: MessageBus) {
+    super(params, messageBus);
   }
   getDescription() {
     return 'mock';
@@ -47,12 +47,14 @@ describe('executeToolWithHooks', () => {
       unsubscribe: vi.fn(),
     } as unknown as MessageBus;
     mockTool = {
-      build: vi.fn().mockImplementation((params) => new MockInvocation(params)),
+      build: vi
+        .fn()
+        .mockImplementation((params) => new MockInvocation(params, messageBus)),
     } as unknown as AnyDeclarativeTool;
   });
 
   it('should prioritize continue: false over decision: block in BeforeTool', async () => {
-    const invocation = new MockInvocation({});
+    const invocation = new MockInvocation({}, messageBus);
     const abortSignal = new AbortController().signal;
 
     vi.mocked(messageBus.request).mockResolvedValue({
@@ -81,7 +83,7 @@ describe('executeToolWithHooks', () => {
   });
 
   it('should block execution in BeforeTool if decision is block', async () => {
-    const invocation = new MockInvocation({});
+    const invocation = new MockInvocation({}, messageBus);
     const abortSignal = new AbortController().signal;
 
     vi.mocked(messageBus.request).mockResolvedValue({
@@ -108,7 +110,7 @@ describe('executeToolWithHooks', () => {
   });
 
   it('should handle continue: false in AfterTool', async () => {
-    const invocation = new MockInvocation({});
+    const invocation = new MockInvocation({}, messageBus);
     const abortSignal = new AbortController().signal;
     const spy = vi.spyOn(invocation, 'execute');
 
@@ -146,7 +148,7 @@ describe('executeToolWithHooks', () => {
   });
 
   it('should block result in AfterTool if decision is deny', async () => {
-    const invocation = new MockInvocation({});
+    const invocation = new MockInvocation({}, messageBus);
     const abortSignal = new AbortController().signal;
 
     // BeforeTool allow
@@ -183,7 +185,7 @@ describe('executeToolWithHooks', () => {
 
   it('should apply modified tool input from BeforeTool hook', async () => {
     const params = { key: 'original' };
-    const invocation = new MockInvocation(params);
+    const invocation = new MockInvocation(params, messageBus);
     const toolName = 'test-tool';
     const abortSignal = new AbortController().signal;
 
@@ -235,7 +237,7 @@ describe('executeToolWithHooks', () => {
 
   it('should not modify input if hook does not provide tool_input', async () => {
     const params = { key: 'original' };
-    const invocation = new MockInvocation(params);
+    const invocation = new MockInvocation(params, messageBus);
     const toolName = 'test-tool';
     const abortSignal = new AbortController().signal;
 

@@ -34,7 +34,6 @@ import {
 } from './modifiable-tool.js';
 import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
-import { applyReplacement } from './edit.js';
 import { safeLiteralReplace } from '../utils/textUtils.js';
 import { SmartEditStrategyEvent } from '../telemetry/types.js';
 import { logSmartEditStrategy } from '../telemetry/loggers.js';
@@ -55,6 +54,28 @@ interface ReplacementResult {
   occurrences: number;
   finalOldString: string;
   finalNewString: string;
+}
+
+export function applyReplacement(
+  currentContent: string | null,
+  oldString: string,
+  newString: string,
+  isNewFile: boolean,
+): string {
+  if (isNewFile) {
+    return newString;
+  }
+  if (currentContent === null) {
+    // Should not happen if not a new file, but defensively return empty or newString if oldString is also empty
+    return oldString === '' ? newString : '';
+  }
+  // If oldString is empty and it's not a new file, do not modify the content.
+  if (oldString === '' && !isNewFile) {
+    return currentContent;
+  }
+
+  // Use intelligent replacement that handles $ sequences safely
+  return safeLiteralReplace(currentContent, oldString, newString);
 }
 
 /**
@@ -357,7 +378,7 @@ export interface EditToolParams {
   /**
    * The instruction for what needs to be done.
    */
-  instruction: string;
+  instruction?: string;
 
   /**
    * Whether the edit was modified manually by the user.
@@ -365,9 +386,9 @@ export interface EditToolParams {
   modified_by_user?: boolean;
 
   /**
-   * Initially proposed string.
+   * Initially proposed content.
    */
-  ai_proposed_string?: string;
+  ai_proposed_content?: string;
 }
 
 interface CalculatedEdit {
@@ -386,7 +407,7 @@ class EditToolInvocation
   constructor(
     private readonly config: Config,
     params: EditToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     toolName?: string,
     displayName?: string,
   ) {
@@ -423,7 +444,7 @@ class EditToolInvocation
     }
 
     const fixedEdit = await FixLLMEditWithInstruction(
-      params.instruction,
+      params.instruction ?? 'Apply the requested edit.',
       params.old_string,
       params.new_string,
       errorForLlmEditFixer,
@@ -853,7 +874,7 @@ export class SmartEditTool
 
   constructor(
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(
       SmartEditTool.Name,
@@ -915,9 +936,9 @@ A good instruction should concisely answer:
         required: ['file_path', 'instruction', 'old_string', 'new_string'],
         type: 'object',
       },
+      messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
-      messageBus,
     );
   }
 
@@ -955,11 +976,12 @@ A good instruction should concisely answer:
 
   protected createInvocation(
     params: EditToolParams,
+    messageBus: MessageBus,
   ): ToolInvocation<EditToolParams, ToolResult> {
     return new EditToolInvocation(
       this.config,
       params,
-      this.messageBus,
+      messageBus,
       this.name,
       this.displayName,
     );
@@ -1002,7 +1024,7 @@ A good instruction should concisely answer:
         const content = originalParams.new_string;
         return {
           ...originalParams,
-          ai_proposed_string: content,
+          ai_proposed_content: content,
           old_string: oldContent,
           new_string: modifiedProposedContent,
           modified_by_user: true,

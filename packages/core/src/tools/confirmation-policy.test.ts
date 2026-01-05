@@ -7,7 +7,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { EditTool } from './edit.js';
 import { SmartEditTool } from './smart-edit.js';
 import { WriteFileTool } from './write-file.js';
 import { WebFetchTool } from './web-fetch.js';
@@ -81,15 +80,6 @@ describe('Tool Confirmation Policy Updates', () => {
   });
 
   const tools = [
-    {
-      name: 'EditTool',
-      create: (config: Config, bus: MessageBus) => new EditTool(config, bus),
-      params: {
-        file_path: 'test.txt',
-        old_string: 'existing',
-        new_string: 'new',
-      },
-    },
     {
       name: 'SmartEditTool',
       create: (config: Config, bus: MessageBus) =>
