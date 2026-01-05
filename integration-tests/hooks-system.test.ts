@@ -1087,7 +1087,7 @@ console.log(JSON.stringify({
 
       // Send a prompt to establish a session and trigger an API call
       await run.sendKeys('Hello');
-      await run.sendKeys('\r');
+      await run.type('\r');
 
       // Wait for response to ensure API call happened
       await run.expectText('Hello', 15000);
@@ -1166,7 +1166,7 @@ console.log(JSON.stringify({
 
       // Send an initial prompt to establish a session
       await run.sendKeys('Say hello');
-      await run.sendKeys('\r');
+      await run.type('\r');
 
       // Wait for the response
       await run.expectText('Hello', 10000);
@@ -1176,14 +1176,14 @@ console.log(JSON.stringify({
       const numClears = 3;
       for (let i = 0; i < numClears; i++) {
         await run.sendKeys('/clear');
-        await run.sendKeys('\r');
+        await run.type('\r');
 
         // Wait a bit for clear to complete
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         // Send a prompt to establish an active session before next clear
         await run.sendKeys('Say hello');
-        await run.sendKeys('\r');
+        await run.type('\r');
 
         // Wait for response
         await run.expectText('Hello', 10000);

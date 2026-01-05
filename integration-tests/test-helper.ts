@@ -209,6 +209,12 @@ export class InteractiveRun {
   async type(text: string) {
     let typedSoFar = '';
     for (const char of text) {
+      if (char === '\r') {
+        // wait >30ms before `enter` to avoid fast return conversion
+        // from bufferFastReturn() in KeypressContent.tsx
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
       this.ptyProcess.write(char);
       typedSoFar += char;
 

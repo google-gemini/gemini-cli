@@ -91,7 +91,6 @@ import { useVim } from './hooks/vim.js';
 import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
-import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { keyMatchers, Command } from './keyMatchers.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
@@ -123,7 +122,6 @@ import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
-import { enableBracketedPaste } from './utils/bracketedPaste.js';
 import { useBanner } from './hooks/useBanner.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
@@ -424,8 +422,7 @@ export const AppContainer = (props: AppContainerProps) => {
       disableLineWrapping();
       app.rerender();
     }
-    enableBracketedPaste();
-    terminalCapabilityManager.enableKittyProtocol();
+    terminalCapabilityManager.enableSupportedModes();
     refreshStatic();
   }, [refreshStatic, isAlternateBuffer, app, config]);
 
@@ -925,7 +922,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   });
 
   const isFocused = useFocus();
-  useBracketedPaste();
 
   // Context file names computation
   const contextFileNames = useMemo(() => {
