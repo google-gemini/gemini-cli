@@ -34,7 +34,8 @@ import type {
   GenerateContentResponse,
 } from '@google/genai';
 import * as readline from 'node:readline';
-import type { ContentGenerator } from '../core/contentGenerator.js';
+import type { ContentGenerator, Model } from '../core/contentGenerator.js';
+
 import { UserTierId } from './types.js';
 import type {
   CaCountTokenResponse,
@@ -206,6 +207,10 @@ export class CodeAssistServer implements ContentGenerator {
     _req: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
     throw Error();
+  }
+
+  async listModels(): Promise<Model[]> {
+    return [];
   }
 
   async listExperiments(

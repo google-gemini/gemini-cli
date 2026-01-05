@@ -18,6 +18,7 @@ import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { loadApiKey } from './apiKeyCredentialStorage.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
+import { GeminiContentGenerator } from './geminiContentGenerator.js';
 
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('@google/genai');
@@ -147,7 +148,10 @@ describe('createContentGenerator', () => {
       },
     });
     expect(generator).toEqual(
-      new LoggingContentGenerator(mockGenerator.models, mockConfig),
+      new LoggingContentGenerator(
+        new GeminiContentGenerator(mockGenerator, 'test-api-key'),
+        mockConfig,
+      ),
     );
   });
 
@@ -333,7 +337,10 @@ describe('createContentGenerator', () => {
       },
     });
     expect(generator).toEqual(
-      new LoggingContentGenerator(mockGenerator.models, mockConfig),
+      new LoggingContentGenerator(
+        new GeminiContentGenerator(mockGenerator, 'test-api-key'),
+        mockConfig,
+      ),
     );
   });
 });

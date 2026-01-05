@@ -28,8 +28,9 @@ import {
   logApiRequest,
   logApiResponse,
 } from '../telemetry/loggers.js';
-import type { ContentGenerator } from './contentGenerator.js';
+import type { ContentGenerator, Model } from './contentGenerator.js';
 import { CodeAssistServer } from '../code_assist/server.js';
+
 import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
 import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
@@ -366,5 +367,9 @@ export class LoggingContentGenerator implements ContentGenerator {
         return output;
       },
     );
+  }
+
+  async listModels(): Promise<Model[]> {
+    return this.wrapped.listModels();
   }
 }

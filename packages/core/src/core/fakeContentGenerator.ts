@@ -33,6 +33,10 @@ export type FakeResponse =
   | {
       method: 'embedContent';
       response: EmbedContentResponse;
+    }
+  | {
+      method: 'listModels';
+      response: Array<import('./contentGenerator.js').Model>;
     };
 
 // A ContentGenerator that responds with canned responses.
@@ -112,5 +116,9 @@ export class FakeContentGenerator implements ContentGenerator {
       this.getNextResponse('embedContent', request),
       EmbedContentResponse.prototype,
     );
+  }
+
+  async listModels(): Promise<Array<import('./contentGenerator.js').Model>> {
+    return this.getNextResponse('listModels', {});
   }
 }

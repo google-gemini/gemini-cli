@@ -1,7 +1,9 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * @license
  */
 
 import type {
@@ -34,6 +36,7 @@ describe('RecordingContentGenerator', () => {
       generateContentStream: vi.fn(),
       countTokens: vi.fn(),
       embedContent: vi.fn(),
+      listModels: vi.fn(),
     };
     recorder = new RecordingContentGenerator(mockRealGenerator, filePath);
     vi.clearAllMocks();
@@ -144,6 +147,29 @@ describe('RecordingContentGenerator', () => {
       filePath,
       safeJsonStringify({
         method: 'embedContent',
+        response: mockResponse,
+      }) + '\n',
+    );
+  });
+
+  it('should record listModels responses', async () => {
+    const mockResponse = [
+      {
+        name: 'model1',
+        displayName: 'Model 1',
+        description: 'Description 1',
+        supportedGenerationMethods: ['generateContent'],
+      },
+    ];
+    (mockRealGenerator.listModels as Mock).mockResolvedValue(mockResponse);
+
+    const response = await recorder.listModels();
+    expect(response).toEqual(mockResponse);
+    expect(mockRealGenerator.listModels).toHaveBeenCalled();
+    expect(appendFileSync).toHaveBeenCalledWith(
+      filePath,
+      safeJsonStringify({
+        method: 'listModels',
         response: mockResponse,
       }) + '\n',
     );

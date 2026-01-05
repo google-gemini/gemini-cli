@@ -109,4 +109,14 @@ export class RecordingContentGenerator implements ContentGenerator {
     appendFileSync(this.filePath, `${safeJsonStringify(recordedResponse)}\n`);
     return response;
   }
+
+  async listModels(): Promise<Array<import('./contentGenerator.js').Model>> {
+    const response = await this.realGenerator.listModels();
+    const recordedResponse: FakeResponse = {
+      method: 'listModels',
+      response,
+    };
+    appendFileSync(this.filePath, `${safeJsonStringify(recordedResponse)}\n`);
+    return response;
+  }
 }
