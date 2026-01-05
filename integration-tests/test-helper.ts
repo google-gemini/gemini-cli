@@ -310,6 +310,9 @@ export class TestRig {
     // The container mounts the test directory at the same path as the host
     const telemetryPath = join(this.testDir, 'telemetry.log'); // Always use test directory for telemetry
 
+    // Ensure the CLI uses our test directory as its home
+    process.env['GEMINI_CLI_HOME'] = this.testDir;
+
     const settings = {
       general: {
         // Nightly releases sometimes becomes out of sync with local code and
