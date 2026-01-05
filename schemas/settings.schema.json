@@ -1587,6 +1587,67 @@
         "type": "array",
         "items": {}
       }
+    },
+    "admin": {
+      "title": "Admin",
+      "description": "Settings configured remotely by enterprise admins.",
+      "markdownDescription": "Settings configured remotely by enterprise admins.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "secureModeEnabled": {
+          "title": "Secure Mode Enabled",
+          "description": "If true, disallows yolo mode from being used.",
+          "markdownDescription": "If true, disallows yolo mode from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "cliFeatureSetting": {
+          "title": "CLI Feature Settings",
+          "description": "CLI feature settings.",
+          "markdownDescription": "CLI feature settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "extensionsSetting": {
+              "title": "Extensions Settings",
+              "description": "Extensions-specific admin settings.",
+              "markdownDescription": "Extensions-specific admin settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "extensionsEnabled": {
+                  "title": "Extensions Enabled",
+                  "description": "If false, disallows extensions from being installed or used.",
+                  "markdownDescription": "If false, disallows extensions from being installed or used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
+                  "default": true,
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "mcpSetting": {
+          "title": "MCP Settings",
+          "description": "MCP-specific admin settings.",
+          "markdownDescription": "MCP-specific admin settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "mcpEnabled": {
+              "title": "MCP Enabled",
+              "description": "If false, disallows MCP servers from being used.",
+              "markdownDescription": "If false, disallows MCP servers from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "$defs": {
