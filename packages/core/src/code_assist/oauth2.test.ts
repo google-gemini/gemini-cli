@@ -1138,13 +1138,10 @@ describe('oauth2', () => {
           () => mockHttpServer as unknown as http.Server,
         );
 
-        // Mock process.on to immediately trigger SIGINT
+        // Mock process.on to capture SIGINT handler
         const processOnSpy = vi
           .spyOn(process, 'on')
-          .mockImplementation((event, listener: () => void) => {
-            if (event === 'SIGINT') {
-              listener();
-            }
+          .mockImplementation(() => {
             return process;
           });
 
@@ -1154,6 +1151,24 @@ describe('oauth2', () => {
           AuthType.LOGIN_WITH_GOOGLE,
           mockConfig,
         );
+
+        // Wait for the SIGINT handler to be registered
+        let sigIntHandler: (() => void) | undefined;
+        await vi.waitFor(() => {
+          const sigintCall = processOnSpy.mock.calls.find(
+            (call) => call[0] === 'SIGINT',
+          );
+          sigIntHandler = sigintCall?.[1] as (() => void) | undefined;
+          if (!sigIntHandler)
+            throw new Error('SIGINT handler not registered yet');
+        });
+
+        expect(sigIntHandler).toBeDefined();
+
+        // Trigger SIGINT
+        if (sigIntHandler) {
+          sigIntHandler();
+        }
 
         await expect(clientPromise).rejects.toThrow(FatalCancellationError);
         expect(processRemoveListenerSpy).toHaveBeenCalledWith(
@@ -1189,17 +1204,12 @@ describe('oauth2', () => {
           () => mockHttpServer as unknown as http.Server,
         );
 
-        // Spy on process.stdin.on and immediately trigger Ctrl+C
+        // Spy on process.stdin.on to capture data handler
         const stdinOnSpy = vi
           .spyOn(process.stdin, 'on')
-          .mockImplementation(
-            (event: string, listener: (data: Buffer) => void) => {
-              if (event === 'data') {
-                listener(Buffer.from([0x03]));
-              }
-              return process.stdin;
-            },
-          );
+          .mockImplementation(() => {
+            return process.stdin;
+          });
 
         const stdinRemoveListenerSpy = vi.spyOn(
           process.stdin,
@@ -1210,6 +1220,23 @@ describe('oauth2', () => {
           AuthType.LOGIN_WITH_GOOGLE,
           mockConfig,
         );
+
+        // Wait for the stdin handler to be registered
+        let dataHandler: ((data: Buffer) => void) | undefined;
+        await vi.waitFor(() => {
+          const dataCall = stdinOnSpy.mock.calls.find(
+            (call: [string, ...unknown[]]) => call[0] === 'data',
+          );
+          dataHandler = dataCall?.[1] as ((data: Buffer) => void) | undefined;
+          if (!dataHandler) throw new Error('stdin handler not registered yet');
+        });
+
+        expect(dataHandler).toBeDefined();
+
+        // Trigger Ctrl+C
+        if (dataHandler) {
+          dataHandler(Buffer.from([0x03]));
+        }
 
         await expect(clientPromise).rejects.toThrow(FatalCancellationError);
         expect(stdinRemoveListenerSpy).toHaveBeenCalledWith(
