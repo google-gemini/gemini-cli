@@ -174,7 +174,7 @@ async function reloadAction(
   }
 
   const skillManager = config.getSkillManager();
-  const beforeCount = skillManager.getAllSkills().length;
+  const beforeNames = new Set(skillManager.getAllSkills().map((s) => s.name));
 
   let pendingItemSet = false;
   const pendingTimeout = setTimeout(() => {
@@ -193,14 +193,30 @@ async function reloadAction(
       context.ui.setPendingItem(null);
     }
 
-    const afterCount = skillManager.getAllSkills().length;
+    const afterSkills = skillManager.getAllSkills();
+    const afterNames = new Set(afterSkills.map((s) => s.name));
+
+    const added = afterSkills.filter((s) => !beforeNames.has(s.name));
+    const removedCount = [...beforeNames].filter(
+      (name) => !afterNames.has(name),
+    ).length;
+
     let successText = 'Agent skills reloaded successfully.';
-    if (afterCount > beforeCount) {
-      const diff = afterCount - beforeCount;
-      successText += ` ${diff} new skill${diff > 1 ? 's' : ''} discovered.`;
-    } else if (afterCount < beforeCount) {
-      const diff = beforeCount - afterCount;
-      successText += ` ${diff} skill${diff > 1 ? 's' : ''} removed.`;
+    const details: string[] = [];
+
+    if (added.length > 0) {
+      details.push(
+        `${added.length} new skill${added.length > 1 ? 's' : ''} discovered`,
+      );
+    }
+    if (removedCount > 0) {
+      details.push(
+        `${removedCount} skill${removedCount > 1 ? 's' : ''} removed`,
+      );
+    }
+
+    if (details.length > 0) {
+      successText += ` ${details.join(' and ')}.`;
     } else {
       successText = 'Agent skills reloaded successfully. No new skills found.';
     }

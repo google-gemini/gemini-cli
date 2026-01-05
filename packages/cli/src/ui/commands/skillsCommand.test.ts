@@ -9,7 +9,7 @@ import { skillsCommand } from './skillsCommand.js';
 import { MessageType } from '../types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { CommandContext } from './types.js';
-import type { Config , SkillDefinition } from '@google/gemini-cli-core';
+import type { Config, SkillDefinition } from '@google/gemini-cli-core';
 import { SettingScope, type LoadedSettings } from '../../config/settings.js';
 
 describe('skillsCommand', () => {
@@ -279,6 +279,31 @@ describe('skillsCommand', () => {
         expect.objectContaining({
           type: MessageType.INFO,
           text: 'Agent skills reloaded successfully. 1 skill removed.',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show both added and removed skills count after reload', async () => {
+      const reloadCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'reload',
+      )!;
+      const reloadSkillsMock = vi.fn().mockImplementation(async () => {
+        const skillManager = context.services.config!.getSkillManager();
+        vi.mocked(skillManager.getAllSkills).mockReturnValue([
+          { name: 'skill2' }, // skill1 removed, skill3 added
+          { name: 'skill3' },
+        ] as SkillDefinition[]);
+      });
+      // @ts-expect-error Mocking reloadSkills
+      context.services.config.reloadSkills = reloadSkillsMock;
+
+      await reloadCmd.action!(context, '');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Agent skills reloaded successfully. 1 new skill discovered and 1 skill removed.',
         }),
         expect.any(Number),
       );
