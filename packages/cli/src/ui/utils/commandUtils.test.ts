@@ -384,9 +384,8 @@ describe('commandUtils', () => {
 
       await copyToClipboard('windows-native-test');
 
-      // Not in SSH/tmux/screen/WSL, so should use clipboardy
+      // Fallback to clipboardy and not /dev/tty
       expect(mockClipboardyWrite).toHaveBeenCalledWith('windows-native-test');
-      // Should NOT attempt /dev/tty
       expect(mockFs.createWriteStream).not.toHaveBeenCalled();
     });
   });
