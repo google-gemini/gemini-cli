@@ -44,10 +44,14 @@ vi.mock('./text-buffer.js', () => {
         );
       }
     }),
-    setText: vi.fn((newText) => {
+    setText: vi.fn((newText, cursorPosition) => {
       mockTextBuffer.text = newText;
       mockTextBuffer.viewportVisualLines = [newText];
-      mockTextBuffer.visualCursor[1] = newText.length;
+      if (typeof cursorPosition === 'number') {
+        mockTextBuffer.visualCursor[1] = cursorPosition;
+      } else {
+        mockTextBuffer.visualCursor[1] = newText.length;
+      }
     }),
   };
 
@@ -92,10 +96,14 @@ describe('TextInput', () => {
           );
         }
       }),
-      setText: vi.fn((newText) => {
+      setText: vi.fn((newText, cursorPosition) => {
         buffer.text = newText;
         buffer.viewportVisualLines = [newText];
-        buffer.visualCursor[1] = newText.length;
+        if (typeof cursorPosition === 'number') {
+          buffer.visualCursor[1] = cursorPosition;
+        } else {
+          buffer.visualCursor[1] = newText.length;
+        }
       }),
     };
     mockBuffer = buffer as unknown as TextBuffer;
