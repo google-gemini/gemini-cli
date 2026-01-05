@@ -27,6 +27,9 @@ const mockReadline = vi.hoisted(() => ({
   }),
 }));
 
+const mockReaddir = vi.hoisted(() => vi.fn());
+const originalReaddir = vi.hoisted(() => ({ current: null as unknown }));
+
 // Mocking readline for non-interactive prompts
 vi.mock('node:readline', () => ({
   default: mockReadline,
@@ -35,9 +38,10 @@ vi.mock('node:readline', () => ({
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
+  originalReaddir.current = actual.readdir;
   return {
     ...actual,
-    readdir: vi.fn(actual.readdir),
+    readdir: mockReaddir,
   };
 });
 
@@ -57,6 +61,7 @@ describe('consent', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockReaddir.mockImplementation(originalReaddir.current);
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'consent-test-'));
   });
 
