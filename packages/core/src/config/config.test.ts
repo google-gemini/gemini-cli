@@ -1630,19 +1630,19 @@ describe('Config getHooks', () => {
       expect(config.getActiveModel()).toBe(originalModel);
     });
 
-    it('should call onModelChange when a new model is set', () => {
+    it('should call onModelChange when a new model is set and should persist', () => {
       const onModelChange = vi.fn();
       const config = new Config({
         ...baseParams,
         onModelChange,
       });
 
-      config.setModel(DEFAULT_GEMINI_MODEL);
+      config.setModel(DEFAULT_GEMINI_MODEL, false);
 
       expect(onModelChange).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
     });
 
-    it('should NOT call onModelChange when a new model is set as a fallback', () => {
+    it('should NOT call onModelChange when a new model is temporary', () => {
       const onModelChange = vi.fn();
       const config = new Config({
         ...baseParams,
