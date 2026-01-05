@@ -19,6 +19,10 @@ import * as os from 'node:os';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { GEMINI_DIR } from '../utils/paths.js';
+import {
+  createMockMessageBus,
+  getMockMessageBusInstance,
+} from '../test-utils/mock-message-bus.js';
 
 // Mock dependencies
 vi.mock(import('node:fs/promises'), async (importOriginal) => {
@@ -200,7 +204,7 @@ describe('MemoryTool', () => {
     let performAddMemoryEntrySpy: Mock<typeof MemoryTool.performAddMemoryEntry>;
 
     beforeEach(() => {
-      memoryTool = new MemoryTool();
+      memoryTool = new MemoryTool(createMockMessageBus());
       // Spy on the static method for these tests
       performAddMemoryEntrySpy = vi
         .spyOn(MemoryTool, 'performAddMemoryEntry')
@@ -300,7 +304,9 @@ describe('MemoryTool', () => {
     let memoryTool: MemoryTool;
 
     beforeEach(() => {
-      memoryTool = new MemoryTool();
+      const bus = createMockMessageBus();
+      getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+      memoryTool = new MemoryTool(bus);
       // Clear the allowlist before each test
       const invocation = memoryTool.build({ fact: 'mock-fact' });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

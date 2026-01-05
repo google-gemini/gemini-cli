@@ -1608,7 +1608,7 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       });
 
       const result = await rig.run({
-        args: 'Run tool',
+        args: 'Use write_file to create test.txt',
       });
 
       // The hook should have stopped execution message (returned from tool)

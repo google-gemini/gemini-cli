@@ -858,4 +858,41 @@ name = "invalid-name"
     // Priority 10 in default tier → 1.010
     expect(discoveredRule?.priority).toBeCloseTo(1.01, 5);
   });
+
+  it('should normalize legacy "ShellTool" alias to "run_shell_command"', async () => {
+    vi.resetModules();
+
+    // Mock fs to return empty for policies
+    const actualFs =
+      await vi.importActual<typeof import('node:fs/promises')>(
+        'node:fs/promises',
+      );
+    const mockReaddir = vi.fn(
+      async () => [] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>,
+    );
+    vi.doMock('node:fs/promises', () => ({
+      ...actualFs,
+      default: { ...actualFs, readdir: mockReaddir },
+      readdir: mockReaddir,
+    }));
+
+    const { createPolicyEngineConfig } = await import('./config.js');
+    const settings: PolicySettings = {
+      tools: { allowed: ['ShellTool'] },
+    };
+    const config = await createPolicyEngineConfig(
+      settings,
+      ApprovalMode.DEFAULT,
+      '/tmp/mock/default/policies',
+    );
+    const rule = config.rules?.find(
+      (r) =>
+        r.toolName === 'run_shell_command' &&
+        r.decision === PolicyDecision.ALLOW,
+    );
+    expect(rule).toBeDefined();
+    expect(rule?.priority).toBeCloseTo(2.3, 5); // Command line allow
+
+    vi.doUnmock('node:fs/promises');
+  });
 });
