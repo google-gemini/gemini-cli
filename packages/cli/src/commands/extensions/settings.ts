@@ -47,7 +47,6 @@ const setCommand: CommandModule<object, SetArgs> = {
     const { name, setting, scope } = args;
     const { extension, extensionManager } = await getExtensionAndManager(name);
     if (!extension || !extensionManager) {
-      debugLogger.error(`Unable to find extension ${name}.`);
       await exitCli();
       return;
     }
@@ -90,7 +89,6 @@ const listCommand: CommandModule<object, ListArgs> = {
     const { name } = args;
     const { extension, extensionManager } = await getExtensionAndManager(name);
     if (!extension || !extensionManager) {
-      debugLogger.error(`Unable to find extension ${name}.`);
       await exitCli();
       return;
     }

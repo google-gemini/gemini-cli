@@ -19,10 +19,11 @@ import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import type { getExtensionAndManager } from './utils.js';
 import type {
   updateSetting,
-  getScopedEnvContents} from '../../config/extensions/extensionSettings.js';
+  getScopedEnvContents,
+} from '../../config/extensions/extensionSettings.js';
 import {
   promptForSetting,
-  ExtensionSettingScope
+  ExtensionSettingScope,
 } from '../../config/extensions/extensionSettings.js';
 import type { exitCli } from '../utils.js';
 import type { ExtensionManager } from '../../config/extension-manager.js';
@@ -84,9 +85,6 @@ describe('settings command', () => {
         .command(settingsCommand)
         .parseAsync('settings set foo bar');
 
-      expect(debugErrorSpy).toHaveBeenCalledWith(
-        'Unable to find extension foo.',
-      );
       expect(mockExitCli).toHaveBeenCalled();
     });
 
@@ -143,9 +141,6 @@ describe('settings command', () => {
 
       await yargs([]).command(settingsCommand).parseAsync('settings list foo');
 
-      expect(debugErrorSpy).toHaveBeenCalledWith(
-        'Unable to find extension foo.',
-      );
       expect(mockExitCli).toHaveBeenCalled();
     });
 
