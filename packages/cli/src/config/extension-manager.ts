@@ -467,6 +467,12 @@ Would you like to attempt to install via "git clone" instead?`,
     if (this.loadedExtensions) {
       throw new Error('Extensions already loaded, only load extensions once.');
     }
+
+    if (this.settings.admin?.extensions?.enabled === false) {
+      this.loadedExtensions = [];
+      return this.loadedExtensions;
+    }
+
     const extensionsDir = ExtensionStorage.getUserExtensionsDir();
     this.loadedExtensions = [];
     if (!fs.existsSync(extensionsDir)) {
