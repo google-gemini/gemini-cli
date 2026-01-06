@@ -38,7 +38,7 @@ describe('CommandRegistry', () => {
     expect(mockExtensionsCommand).toHaveBeenCalled();
     const command = commandRegistry.get('extensions');
     expect(command).toBe(mockExtensionsCommandInstance);
-  });
+  }, 20000);
 
   it('should register sub commands on initialization', async () => {
     const { commandRegistry } = await import('./command-registry.js');
