@@ -85,18 +85,14 @@ export class TerminalCapabilityManager {
     }
 
     const cleanupOnExit = () => {
-      if (this.kittySupported) {
-        this.disableKittyProtocol();
-      }
-      if (this.modifyOtherKeysSupported) {
-        this.disableModifyOtherKeys();
-      }
-      if (this.bracketedPasteSupported) {
-        this.disableBracketedPaste();
-      }
+      // don't bother catching errors since if one write
+      // fails, the other probably will too
+      disableKittyKeyboardProtocol();
+      disableModifyOtherKeys();
+      disableBracketedPasteMode();
     };
-    process.on('exit', () => cleanupOnExit);
-    process.on('SIGTERM', () => cleanupOnExit);
+    process.on('exit', cleanupOnExit);
+    process.on('SIGTERM', cleanupOnExit);
     process.on('SIGINT', cleanupOnExit);
 
     return new Promise((resolve) => {
@@ -234,13 +230,20 @@ export class TerminalCapabilityManager {
   }
 
   enableSupportedModes() {
-    if (this.kittySupported) {
-      this.enableKittyProtocol();
-    } else if (this.modifyOtherKeysSupported) {
-      this.enableModifyOtherKeys();
-    }
-    if (this.bracketedPasteSupported) {
-      this.enableBracketedPaste();
+    try {
+      if (this.kittySupported) {
+        enableKittyKeyboardProtocol();
+        this.kittyEnabled = true;
+      } else if (this.modifyOtherKeysSupported) {
+        enableModifyOtherKeys();
+        this.modifyOtherKeysEnabled = true;
+      }
+      if (this.bracketedPasteSupported) {
+        enableBracketedPasteMode();
+        this.bracketedPasteEnabled = true;
+      }
+    } catch (e) {
+      debugLogger.warn('Failed to enable keyboard protocols:', e);
     }
   }
 
@@ -262,72 +265,6 @@ export class TerminalCapabilityManager {
 
   isBracketedPasteEnabled(): boolean {
     return this.bracketedPasteEnabled;
-  }
-
-  enableBracketedPaste(): void {
-    try {
-      if (this.bracketedPasteSupported) {
-        enableBracketedPasteMode();
-        this.bracketedPasteEnabled = true;
-      }
-    } catch (e) {
-      debugLogger.warn('Failed to enable bracketed paste mode:', e);
-    }
-  }
-
-  disableBracketedPaste(): void {
-    try {
-      if (this.bracketedPasteEnabled) {
-        disableBracketedPasteMode();
-        this.bracketedPasteEnabled = false;
-      }
-    } catch (e) {
-      debugLogger.warn('Failed to disable bracketed paste mode:', e);
-    }
-  }
-
-  enableKittyProtocol(): void {
-    try {
-      if (this.kittySupported) {
-        enableKittyKeyboardProtocol();
-        this.kittyEnabled = true;
-      }
-    } catch (e) {
-      debugLogger.warn('Failed to enable Kitty protocol:', e);
-    }
-  }
-
-  disableKittyProtocol(): void {
-    try {
-      if (this.kittyEnabled) {
-        disableKittyKeyboardProtocol();
-        this.kittyEnabled = false;
-      }
-    } catch (e) {
-      debugLogger.warn('Failed to disable Kitty protocol:', e);
-    }
-  }
-
-  enableModifyOtherKeys(): void {
-    try {
-      if (this.modifyOtherKeysSupported) {
-        enableModifyOtherKeys();
-        this.modifyOtherKeysEnabled = true;
-      }
-    } catch (e) {
-      debugLogger.warn('Failed to enable modifyOtherKeys protocol:', e);
-    }
-  }
-
-  disableModifyOtherKeys(): void {
-    try {
-      if (this.modifyOtherKeysEnabled) {
-        disableModifyOtherKeys();
-        this.modifyOtherKeysEnabled = false;
-      }
-    } catch (e) {
-      debugLogger.warn('Failed to disable modifyOtherKeys protocol:', e);
-    }
   }
 
   isModifyOtherKeysEnabled(): boolean {
