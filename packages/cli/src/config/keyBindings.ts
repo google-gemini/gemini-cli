@@ -71,6 +71,8 @@ export enum Command {
   SUBMIT_REVERSE_SEARCH = 'submitReverseSearch',
   ACCEPT_SUGGESTION_REVERSE_SEARCH = 'acceptSuggestionReverseSearch',
   TOGGLE_SHELL_INPUT_FOCUS = 'toggleShellInputFocus',
+  TOGGLE_BACKGROUND_SHELL = 'toggleBackgroundShell',
+  TOGGLE_BACKGROUND_SHELL_LIST = 'toggleBackgroundShellList',
 
   // Suggestion expansion
   EXPAND_SUGGESTION = 'expandSuggestion',
@@ -213,6 +215,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
   [Command.TOGGLE_SHELL_INPUT_FOCUS]: [{ key: 'f', ctrl: true }],
+  [Command.TOGGLE_BACKGROUND_SHELL]: [{ key: 'b', ctrl: true }],
+  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [{ key: 'o', ctrl: true }],
 
   // Suggestion expansion
   [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
@@ -307,6 +311,8 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.TOGGLE_COPY_MODE,
       Command.SHOW_MORE_LINES,
       Command.TOGGLE_SHELL_INPUT_FOCUS,
+      Command.TOGGLE_BACKGROUND_SHELL,
+      Command.TOGGLE_BACKGROUND_SHELL_LIST,
     ],
   },
   {
@@ -364,6 +370,10 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Accept a suggestion while reverse searching.',
   [Command.TOGGLE_SHELL_INPUT_FOCUS]:
     'Toggle focus between the shell and Gemini input.',
+  [Command.TOGGLE_BACKGROUND_SHELL]:
+    'Move current shell command to background or toggle background shell view.',
+  [Command.TOGGLE_BACKGROUND_SHELL_LIST]:
+    'Toggle the list of background shell processes.',
   [Command.EXPAND_SUGGESTION]: 'Expand an inline suggestion.',
   [Command.COLLAPSE_SUGGESTION]: 'Collapse an inline suggestion.',
 };

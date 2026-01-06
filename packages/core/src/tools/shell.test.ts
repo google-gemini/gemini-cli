@@ -18,8 +18,12 @@ import {
 const mockPlatform = vi.hoisted(() => vi.fn());
 
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
+const mockShellBackground = vi.hoisted(() => vi.fn());
 vi.mock('../services/shellExecutionService.js', () => ({
-  ShellExecutionService: { execute: mockShellExecutionService },
+  ShellExecutionService: {
+    execute: mockShellExecutionService,
+    background: mockShellBackground,
+  },
 }));
 
 vi.mock('node:os', async (importOriginal) => {
@@ -38,6 +42,7 @@ vi.mock('../utils/summarizer.js');
 
 import { initializeShellParsers } from '../utils/shell-utils.js';
 import { ShellTool } from './shell.js';
+import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
 import {
   type ShellExecutionResult,
@@ -145,6 +150,20 @@ describe('ShellTool', () => {
           resolveExecutionPromise = resolve;
         }),
       };
+    });
+
+    mockShellBackground.mockImplementation(() => {
+      resolveExecutionPromise({
+        output: '',
+        rawOutput: Buffer.from(''),
+        exitCode: null,
+        signal: null,
+        error: null,
+        aborted: false,
+        pid: 12345,
+        executionMethod: 'child_process',
+        backgrounded: true,
+      });
     });
   });
 
@@ -428,6 +447,26 @@ describe('ShellTool', () => {
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
       expect(fs.existsSync(tmpFile)).toBe(false);
+    });
+
+    it('should not log "missing pgrep output" when process is backgrounded', async () => {
+      vi.useFakeTimers();
+      const debugErrorSpy = vi.spyOn(debugLogger, 'error');
+
+      const invocation = shellTool.build({
+        command: 'sleep 10',
+        is_background: true,
+      });
+      const promise = invocation.execute(mockAbortSignal);
+
+      // Advance time to trigger backgrounding
+      await vi.advanceTimersByTimeAsync(200);
+
+      await promise;
+
+      expect(debugErrorSpy).not.toHaveBeenCalledWith('missing pgrep output');
+
+      vi.useRealTimers();
     });
 
     describe('Streaming to `updateOutput`', () => {

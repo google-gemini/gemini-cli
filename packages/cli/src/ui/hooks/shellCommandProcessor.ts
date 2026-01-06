@@ -9,7 +9,7 @@ import type {
   IndividualToolCallDisplay,
 } from '../types.js';
 import { ToolCallStatus } from '../types.js';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import type {
   AnsiOutput,
   Config,
@@ -29,6 +29,14 @@ import { themeManager } from '../../ui/themes/theme-manager.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const MAX_OUTPUT_LENGTH = 10000;
+
+export interface BackgroundShell {
+  pid: number;
+  command: string;
+  output: string | AnsiOutput;
+  isBinary: boolean;
+  binaryBytesReceived: number;
+}
 
 function addShellCommandToGeminiHistory(
   geminiClient: GeminiClient,
@@ -75,9 +83,89 @@ export const useShellCommandProcessor = (
   setShellInputFocused: (value: boolean) => void,
   terminalWidth?: number,
   terminalHeight?: number,
+  activeToolPtyId?: number,
 ) => {
   const [activeShellPtyId, setActiveShellPtyId] = useState<number | null>(null);
   const [lastShellOutputTime, setLastShellOutputTime] = useState<number>(0);
+
+  // Background shell state management
+  const backgroundShellsRef = useRef<Map<number, BackgroundShell>>(new Map());
+  const [backgroundShellCount, setBackgroundShellCount] = useState(0);
+  const [isBackgroundShellVisible, setIsBackgroundShellVisible] =
+    useState(false);
+  // Used to force re-render when background shell output updates while visible
+  const [, setTick] = useState(0);
+
+  const toggleBackgroundShell = useCallback(() => {
+    if (backgroundShellsRef.current.size > 0) {
+      setIsBackgroundShellVisible((prev) => !prev);
+    }
+  }, []);
+
+  const backgroundCurrentShell = useCallback(() => {
+    const pidToBackground = activeShellPtyId || activeToolPtyId;
+    if (pidToBackground) {
+      // Prevent multiple background shells for now
+      // if (backgroundShellsRef.current.size >= 1) {
+      //   return;
+      // }
+      ShellExecutionService.background(pidToBackground);
+      // The rest of the logic happens in the execution callback and promise resolution
+    }
+  }, [activeShellPtyId, activeToolPtyId]);
+
+  const killBackgroundShell = useCallback((pid: number) => {
+    if (backgroundShellsRef.current.has(pid)) {
+      ShellExecutionService.kill(pid);
+      backgroundShellsRef.current.delete(pid);
+      setBackgroundShellCount(backgroundShellsRef.current.size);
+      if (backgroundShellsRef.current.size === 0) {
+        setIsBackgroundShellVisible(false);
+      }
+    }
+  }, []);
+
+  const registerBackgroundShell = useCallback(
+    (pid: number, command: string, initialOutput: string | AnsiOutput) => {
+      if (backgroundShellsRef.current.has(pid)) {
+        return;
+      }
+      // if (backgroundShellsRef.current.size >= 1) {
+      //   // Only support 1 for now
+      //   return;
+      // }
+
+      // Initialize background shell state
+      backgroundShellsRef.current.set(pid, {
+        pid,
+        command,
+        output: initialOutput,
+        isBinary: false, // Assume text for now unless initialOutput says otherwise or updated later
+        binaryBytesReceived: 0,
+      });
+
+      // Subscribe to future updates
+      ShellExecutionService.subscribe(pid, (event) => {
+        const shell = backgroundShellsRef.current.get(pid);
+        if (!shell) return;
+
+        if (event.type === 'data') {
+          // For PTY, the event.chunk is the full buffer state usually
+          shell.output = event.chunk;
+        } else if (event.type === 'binary_detected') {
+          shell.isBinary = true;
+        } else if (event.type === 'binary_progress') {
+          shell.isBinary = true;
+          shell.binaryBytesReceived = event.bytesReceived;
+        }
+        // Force re-render
+        setTick((t) => t + 1);
+      });
+
+      setBackgroundShellCount(backgroundShellsRef.current.size);
+    },
+    [],
+  );
 
   const handleShellCommand = useCallback(
     (rawQuery: PartListUnion, abortSignal: AbortSignal): boolean => {
@@ -188,6 +276,24 @@ export const useShellCommandProcessor = (
                 }
               }
 
+              // Update background shell state if applicable
+              if (
+                executionPid &&
+                backgroundShellsRef.current.has(executionPid)
+              ) {
+                backgroundShellsRef.current.set(executionPid, {
+                  pid: executionPid,
+                  command: rawQuery,
+                  output: cumulativeStdout,
+                  isBinary: isBinaryStream,
+                  binaryBytesReceived,
+                });
+                // Force re-render if this is the visible background shell
+                setTick((t) => t + 1);
+                // If backgrounded, we don't update pending history item anymore
+                return;
+              }
+
               // Compute the display string based on the *current* state.
               let currentDisplayOutput: string | AnsiOutput;
               if (isBinaryStream) {
@@ -246,6 +352,19 @@ export const useShellCommandProcessor = (
             .then((result: ShellExecutionResult) => {
               setPendingHistoryItem(null);
 
+              if (result.backgrounded && result.pid) {
+                // Add to background shells
+                backgroundShellsRef.current.set(result.pid, {
+                  pid: result.pid,
+                  command: rawQuery,
+                  output: cumulativeStdout,
+                  isBinary: isBinaryStream,
+                  binaryBytesReceived,
+                });
+                setBackgroundShellCount(backgroundShellsRef.current.size);
+                setActiveShellPtyId(null);
+              }
+
               let mainContent: string;
 
               if (isBinary(result.rawOutput)) {
@@ -265,6 +384,9 @@ export const useShellCommandProcessor = (
               } else if (result.aborted) {
                 finalStatus = ToolCallStatus.Canceled;
                 finalOutput = `Command was cancelled.\n${finalOutput}`;
+              } else if (result.backgrounded) {
+                finalStatus = ToolCallStatus.Success; // Technically success as a tool call
+                finalOutput = `Command moved to background (PID: ${result.pid}). Output hidden.`;
               } else if (result.signal) {
                 finalStatus = ToolCallStatus.Error;
                 finalOutput = `Command terminated by signal: ${result.signal}.\n${finalOutput}`;
@@ -324,6 +446,14 @@ export const useShellCommandProcessor = (
               if (pwdFilePath && fs.existsSync(pwdFilePath)) {
                 fs.unlinkSync(pwdFilePath);
               }
+
+              // If it wasn't backgrounded, clear the active PTY
+              // If it WAS backgrounded, we cleared activePtyId in the .then block, but we check here too
+              // to ensure we don't clear it if another command somehow started? (unlikely due to await)
+              // But simpler: if backgrounded, activeShellPtyId is already null.
+              // If not backgrounded, we want to clear it.
+              // Since we set it to null in .then for backgrounded, and .finally runs after,
+              // this is safe.
               setActiveShellPtyId(null);
               setShellInputFocused(false);
               resolve();
@@ -371,5 +501,17 @@ export const useShellCommandProcessor = (
     ],
   );
 
-  return { handleShellCommand, activeShellPtyId, lastShellOutputTime };
+  const backgroundShells = backgroundShellsRef.current;
+  return {
+    handleShellCommand,
+    activeShellPtyId,
+    lastShellOutputTime,
+    backgroundShellCount,
+    isBackgroundShellVisible,
+    toggleBackgroundShell,
+    backgroundCurrentShell,
+    registerBackgroundShell,
+    killBackgroundShell,
+    backgroundShells,
+  };
 };

@@ -15,6 +15,7 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
+import { BackgroundShellDisplay } from '../components/BackgroundShellDisplay.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
@@ -39,6 +40,20 @@ export const DefaultAppLayout: React.FC = () => {
     >
       <MainContent />
 
+      {uiState.backgroundShells.size > 0 &&
+        uiState.activeBackgroundShellPid &&
+        uiState.backgroundShellHeight > 0 && (
+          <Box height={uiState.backgroundShellHeight} flexShrink={0}>
+            <BackgroundShellDisplay
+              shells={uiState.backgroundShells}
+              activePid={uiState.activeBackgroundShellPid}
+              width={width}
+              height={uiState.backgroundShellHeight}
+              isFocused={uiState.embeddedShellFocused}
+              isListOpenProp={uiState.isBackgroundShellListOpen}
+            />
+          </Box>
+        )}
       <Box
         flexDirection="column"
         ref={uiState.mainControlsRef}

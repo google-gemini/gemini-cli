@@ -48,6 +48,7 @@ export interface ShellToolParams {
   command: string;
   description?: string;
   dir_path?: string;
+  is_background?: boolean;
 }
 
 export class ShellToolInvocation extends BaseToolInvocation<
@@ -76,6 +77,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     // append optional (description), replacing any line breaks with spaces
     if (this.params.description) {
       description += ` (${this.params.description.replace(/\n/g, ' ')})`;
+    }
+    if (this.params.is_background) {
+      description += ' [background]';
     }
     return description;
   }
@@ -248,8 +252,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
           },
         );
 
-      if (pid && setPidCallback) {
-        setPidCallback(pid);
+      if (pid) {
+        if (setPidCallback) {
+          setPidCallback(pid);
+        }
+
+        // If the model requested to run in the background, do so after a short delay.
+        if (this.params.is_background) {
+          setTimeout(() => {
+            // This call will resolve the `resultPromise` with `backgrounded: true`
+            // if the process is still running. If it has already exited, this is a no-op.
+            ShellExecutionService.background(pid);
+          }, 200);
+        }
       }
 
       const result = await resultPromise;
@@ -271,11 +286,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           }
         } else {
-          if (!signal.aborted) {
+          if (!signal.aborted && !result.backgrounded) {
             debugLogger.error('missing pgrep output');
           }
         }
       }
+
+      let data: Record<string, unknown> | undefined;
 
       let llmContent = '';
       let timeoutMessage = '';
@@ -294,6 +311,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
+      } else if (result.backgrounded) {
+        llmContent = `Command moved to background (PID: ${result.pid}). Use 'fg' (conceptually) to bring it back, or check the footer for status. Output is hidden from this conversation but continues in the background.`;
+        data = {
+          pid: result.pid,
+          command: this.params.command,
+          initialOutput: result.output,
+        };
       } else {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
@@ -319,7 +343,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (this.config.getDebugMode()) {
         returnDisplayMessage = llmContent;
       } else {
-        if (result.output.trim()) {
+        if (result.backgrounded) {
+          returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden.`;
+        } else if (result.output.trim()) {
           returnDisplayMessage = result.output;
         } else {
           if (result.aborted) {
@@ -369,6 +395,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return {
         llmContent,
         returnDisplay: returnDisplayMessage,
+        data,
         ...executionError,
       };
     } finally {
@@ -446,6 +473,11 @@ export class ShellTool extends BaseDeclarativeTool<
             type: 'string',
             description:
               '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
+          },
+          is_background: {
+            type: 'boolean',
+            description:
+              'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
           },
         },
         required: ['command'],
