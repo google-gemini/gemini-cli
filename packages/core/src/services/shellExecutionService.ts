@@ -258,6 +258,8 @@ export class ShellExecutionService {
         env: {
           ...sanitizeEnvironment(process.env, sanitizationConfig),
           GEMINI_CLI: '1',
+          CI: 'true',
+          DEBIAN_FRONTEND: 'noninteractive',
           TERM: 'xterm-256color',
           PAGER: 'cat',
           GIT_PAGER: 'cat',
@@ -475,6 +477,8 @@ export class ShellExecutionService {
             shellExecutionConfig.sanitizationConfig,
           ),
           GEMINI_CLI: '1',
+          CI: 'true',
+          DEBIAN_FRONTEND: 'noninteractive',
           TERM: 'xterm-256color',
           PAGER: shellExecutionConfig.pager ?? 'cat',
           GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
