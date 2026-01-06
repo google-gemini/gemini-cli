@@ -848,6 +848,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"auto"`
   - **Requires restart:** Yes
 
+- **`experimental.useOSC52Paste`** (boolean):
+  - **Description:** Use OSC 52 sequence for pasting instead of clipboardy
+    (useful for remote sessions).
+  - **Default:** `false`
+
 - **`experimental.introspectionAgentSettings.enabled`** (boolean):
   - **Description:** Enable the Introspection Agent.
   - **Default:** `false`
