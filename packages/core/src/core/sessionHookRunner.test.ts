@@ -68,11 +68,11 @@ describe('SessionHookRunner', () => {
   });
 
   describe('NoOpSessionHookRunner', () => {
-    it('should not call any hook functions for fireSessionStart', async () => {
+    it('should return undefined for fireSessionStart', async () => {
       const runner = new NoOpSessionHookRunner();
-      await runner.fireSessionStart(SessionStartSource.Startup);
+      const result = await runner.fireSessionStart(SessionStartSource.Startup);
 
-      expect(sessionHookTriggers.fireSessionStartHook).not.toHaveBeenCalled();
+      expect(result).toBeUndefined();
     });
 
     it('should not call any hook functions for fireSessionEnd', async () => {
