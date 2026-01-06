@@ -298,3 +298,24 @@ async function clearSettings(
   }
   return;
 }
+
+export async function getMissingSettings(
+  extensionConfig: ExtensionConfig,
+  extensionId: string,
+): Promise<ExtensionSetting[]> {
+  const { settings } = extensionConfig;
+  if (!settings || settings.length === 0) {
+    return [];
+  }
+
+  const existingSettings = await getEnvContents(extensionConfig, extensionId);
+  const missingSettings: ExtensionSetting[] = [];
+
+  for (const setting of settings) {
+    if (existingSettings[setting.envVar] === undefined) {
+      missingSettings.push(setting);
+    }
+  }
+
+  return missingSettings;
+}

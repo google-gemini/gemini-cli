@@ -1428,22 +1428,13 @@ export class Config {
    * 'false' for untrusted.
    */
   isTrustedFolder(): boolean {
-    // isWorkspaceTrusted in cli/src/config/trustedFolder.js returns undefined
-    // when the file based trust value is unavailable, since it is mainly used
-    // in the initialization for trust dialogs, etc. Here we return true since
-    // config.isTrustedFolder() is used for the main business logic of blocking
-    // tool calls etc in the rest of the application.
-    //
-    // Default value is true since we load with trusted settings to avoid
-    // restarts in the more common path. If the user chooses to mark the folder
-    // as untrusted, the CLI will restart and we will have the trust value
-    // reloaded.
     const context = ideContextStore.get();
     if (context?.workspaceState?.isTrusted !== undefined) {
       return context.workspaceState.isTrusted;
     }
 
-    return this.trustedFolder ?? true;
+    // Default to untrusted if folder trust is enabled and no explicit value is set.
+    return this.folderTrust ? (this.trustedFolder ?? false) : true;
   }
 
   setIdeMode(value: boolean): void {
@@ -1734,7 +1725,7 @@ export class Config {
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
     if (this.getUseWriteTodos()) {
-      registerCoreTool(WriteTodosTool, this);
+      registerCoreTool(WriteTodosTool);
     }
 
     // Register Subagents as Tools
