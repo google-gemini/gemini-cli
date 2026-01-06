@@ -97,9 +97,13 @@ describe('RemoteAgentInvocation', () => {
         parts: [{ kind: 'text', text: 'Hello' }],
       });
 
-      const invocation = new RemoteAgentInvocation(mockDefinition, {
-        query: 'hi',
-      }, mockMessageBus);
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        {
+          query: 'hi',
+        },
+        mockMessageBus,
+      );
       await invocation.execute(new AbortController().signal);
 
       expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
@@ -121,9 +125,13 @@ describe('RemoteAgentInvocation', () => {
         parts: [{ kind: 'text', text: 'Hello' }],
       });
 
-      const invocation = new RemoteAgentInvocation(mockDefinition, {
-        query: 'hi',
-      }, mockMessageBus);
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        {
+          query: 'hi',
+        },
+        mockMessageBus,
+      );
       await invocation.execute(new AbortController().signal);
 
       expect(mockClientManager.loadAgent).not.toHaveBeenCalled();
@@ -142,9 +150,13 @@ describe('RemoteAgentInvocation', () => {
         taskId: 'task-1',
       });
 
-      const invocation1 = new RemoteAgentInvocation(mockDefinition, {
-        query: 'first',
-      }, mockMessageBus);
+      const invocation1 = new RemoteAgentInvocation(
+        mockDefinition,
+        {
+          query: 'first',
+        },
+        mockMessageBus,
+      );
 
       // Execute first time
       const result1 = await invocation1.execute(new AbortController().signal);
@@ -165,9 +177,13 @@ describe('RemoteAgentInvocation', () => {
         taskId: 'task-2',
       });
 
-      const invocation2 = new RemoteAgentInvocation(mockDefinition, {
-        query: 'second',
-      }, mockMessageBus);
+      const invocation2 = new RemoteAgentInvocation(
+        mockDefinition,
+        {
+          query: 'second',
+        },
+        mockMessageBus,
+      );
       const result2 = await invocation2.execute(new AbortController().signal);
       expect(result2.returnDisplay).toBe('Response 2');
 
@@ -187,9 +203,13 @@ describe('RemoteAgentInvocation', () => {
         history: [],
       });
 
-      const invocation3 = new RemoteAgentInvocation(mockDefinition, {
-        query: 'third',
-      }, mockMessageBus);
+      const invocation3 = new RemoteAgentInvocation(
+        mockDefinition,
+        {
+          query: 'third',
+        },
+        mockMessageBus,
+      );
       await invocation3.execute(new AbortController().signal);
 
       // Fourth call: Should start new task (taskId undefined)
@@ -200,9 +220,13 @@ describe('RemoteAgentInvocation', () => {
         parts: [{ kind: 'text', text: 'New Task' }],
       });
 
-      const invocation4 = new RemoteAgentInvocation(mockDefinition, {
-        query: 'fourth',
-      }, mockMessageBus);
+      const invocation4 = new RemoteAgentInvocation(
+        mockDefinition,
+        {
+          query: 'fourth',
+        },
+        mockMessageBus,
+      );
       await invocation4.execute(new AbortController().signal);
 
       expect(mockClientManager.sendMessage).toHaveBeenLastCalledWith(
@@ -218,9 +242,13 @@ describe('RemoteAgentInvocation', () => {
         new Error('Network error'),
       );
 
-      const invocation = new RemoteAgentInvocation(mockDefinition, {
-        query: 'hi',
-      }, mockMessageBus);
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        {
+          query: 'hi',
+        },
+        mockMessageBus,
+      );
       const result = await invocation.execute(new AbortController().signal);
 
       expect(result.error).toBeDefined();
@@ -241,9 +269,13 @@ describe('RemoteAgentInvocation', () => {
         ],
       });
 
-      const invocation = new RemoteAgentInvocation(mockDefinition, {
-        query: 'hi',
-      }, mockMessageBus);
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        {
+          query: 'hi',
+        },
+        mockMessageBus,
+      );
       const result = await invocation.execute(new AbortController().signal);
 
       // Just check that text is present, exact formatting depends on helper
@@ -253,9 +285,13 @@ describe('RemoteAgentInvocation', () => {
 
   describe('Confirmations', () => {
     it('should return info confirmation details', async () => {
-      const invocation = new RemoteAgentInvocation(mockDefinition, {
-        query: 'hi',
-      }, mockMessageBus);
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        {
+          query: 'hi',
+        },
+        mockMessageBus,
+      );
       // @ts-expect-error - getConfirmationDetails is protected
       const confirmation = await invocation.getConfirmationDetails(
         new AbortController().signal,
