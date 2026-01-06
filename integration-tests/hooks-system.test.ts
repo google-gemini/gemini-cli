@@ -948,10 +948,8 @@ console.log(JSON.stringify({
 
       await rig.setup('should fire SessionStart hook and inject context', {
         settings: {
-          tools: {
-            enableHooks: true,
-          },
           hooks: {
+            enabled: true,
             SessionStart: [
               {
                 matcher: 'startup',
@@ -1033,10 +1031,8 @@ console.log(JSON.stringify({
         'should fire SessionStart hook and display systemMessage in interactive mode',
         {
           settings: {
-            tools: {
-              enableHooks: true,
-            },
             hooks: {
+              enabled: true,
               SessionStart: [
                 {
                   matcher: 'startup',
