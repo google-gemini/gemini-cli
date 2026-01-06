@@ -423,6 +423,7 @@ describe('ChatRecordingService', () => {
 
       const result = chatRecordingService.rewindTo('2');
 
+      if (!result) throw new Error('Result should not be null');
       expect(result.messages).toHaveLength(1);
       expect(result.messages[0].id).toBe('1');
       expect(writeFileSyncSpy).toHaveBeenCalled();
@@ -448,6 +449,7 @@ describe('ChatRecordingService', () => {
 
       const result = chatRecordingService.rewindTo('non-existent');
 
+      if (!result) throw new Error('Result should not be null');
       expect(result.messages).toHaveLength(1);
       expect(writeFileSyncSpy).not.toHaveBeenCalled();
     });
