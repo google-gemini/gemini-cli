@@ -1443,6 +1443,16 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      useOSC52Paste: {
+        type: 'boolean',
+        label: 'Use OSC 52 Paste',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).',
+        showInDialog: true,
+      },
       introspectionAgentSettings: {
         type: 'object',
         label: 'Introspection Agent Settings',
