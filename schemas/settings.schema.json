@@ -1441,6 +1441,30 @@
             }
           },
           "additionalProperties": false
+        },
+        "adaptiveThinking": {
+          "title": "Adaptive Thinking Settings",
+          "description": "Configuration for Adaptive Thinking Budget.",
+          "markdownDescription": "Configuration for Adaptive Thinking Budget.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Adaptive Thinking",
+              "description": "Enable adaptive thinking budget based on task complexity.",
+              "markdownDescription": "Enable adaptive thinking budget based on task complexity.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "classifierModel": {
+              "title": "Classifier Model",
+              "description": "The model (or alias) to use for complexity classification.",
+              "markdownDescription": "The model (or alias) to use for complexity classification.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `classifier`",
+              "default": "classifier",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

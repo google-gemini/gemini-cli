@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { GenerateContentConfig } from '@google/genai';
+import type { GenerateContentConfig, ThinkingLevel } from '@google/genai';
 
 // The primary key for the ModelConfig is the model string. However, we also
 // support a secondary key to limit the override scope, typically an agent name.
@@ -26,6 +26,10 @@ export interface ModelConfigKey {
   // This allows overrides to specify different settings (e.g., higher temperature)
   // specifically for retry scenarios.
   isRetry?: boolean;
+
+  // Dynamic thinking configuration determined at runtime (e.g. via complexity classification)
+  thinkingBudget?: number;
+  thinkingLevel?: ThinkingLevel;
 }
 
 export interface ModelConfig {
@@ -203,6 +207,22 @@ export class ModelConfigService {
           match.modelConfig.generateContentConfig,
         );
       }
+    }
+
+    // Apply dynamic thinking parameters from context if present
+    if (
+      context.thinkingBudget !== undefined ||
+      context.thinkingLevel !== undefined
+    ) {
+      resolvedConfig.thinkingConfig = {
+        ...(resolvedConfig.thinkingConfig as object),
+        ...(context.thinkingBudget !== undefined
+          ? { thinkingBudget: context.thinkingBudget }
+          : {}),
+        ...(context.thinkingLevel !== undefined
+          ? { thinkingLevel: context.thinkingLevel }
+          : {}),
+      };
     }
 
     return {

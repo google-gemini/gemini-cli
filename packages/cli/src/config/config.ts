@@ -716,6 +716,7 @@ export async function loadCliConfig(
       settings.experimental?.codebaseInvestigatorSettings,
     introspectionAgentSettings:
       settings.experimental?.introspectionAgentSettings,
+    adaptiveThinking: settings.experimental?.adaptiveThinking,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,

@@ -1473,6 +1473,37 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      adaptiveThinking: {
+        type: 'object',
+        label: 'Adaptive Thinking Settings',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: {},
+        description: 'Configuration for Adaptive Thinking Budget.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Adaptive Thinking',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: false,
+            description:
+              'Enable adaptive thinking budget based on task complexity.',
+            showInDialog: true,
+          },
+          classifierModel: {
+            type: 'string',
+            label: 'Classifier Model',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: 'classifier',
+            description:
+              'The model (or alias) to use for complexity classification.',
+            showInDialog: false,
+          },
+        },
+      },
     },
   },
 

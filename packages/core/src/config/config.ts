@@ -73,6 +73,7 @@ import type { ModelConfigServiceConfig } from '../services/modelConfigService.js
 import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
+import { AdaptiveBudgetService } from '../services/adaptiveBudgetService.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
@@ -335,6 +336,10 @@ export interface ConfigParameters {
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   introspectionAgentSettings?: IntrospectionAgentSettings;
+  adaptiveThinking?: {
+    enabled?: boolean;
+    classifierModel?: string;
+  };
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -460,6 +465,10 @@ export class Config {
   private readonly outputSettings: OutputSettings;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
   private readonly introspectionAgentSettings: IntrospectionAgentSettings;
+  private readonly adaptiveThinking: {
+    enabled: boolean;
+    classifierModel: string;
+  };
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -491,6 +500,7 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
+  private adaptiveBudgetService!: AdaptiveBudgetService;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -617,6 +627,10 @@ export class Config {
     };
     this.introspectionAgentSettings = {
       enabled: params.introspectionAgentSettings?.enabled ?? false,
+    };
+    this.adaptiveThinking = {
+      enabled: params.adaptiveThinking?.enabled ?? false,
+      classifierModel: params.adaptiveThinking?.classifierModel ?? 'classifier',
     };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
@@ -763,11 +777,22 @@ export class Config {
       await this.contextManager.refresh();
     }
 
+    this.adaptiveBudgetService = new AdaptiveBudgetService(this);
+    if (this.adaptiveThinking.enabled) {
+      debugLogger.debug(
+        `Adaptive Thinking Budget enabled (classifier: ${this.adaptiveThinking.classifierModel})`,
+      );
+    }
+
     await this.geminiClient.initialize();
   }
 
   getContentGenerator(): ContentGenerator {
     return this.contentGenerator;
+  }
+
+  getAdaptiveBudgetService(): AdaptiveBudgetService {
+    return this.adaptiveBudgetService;
   }
 
   async refreshAuth(authMethod: AuthType) {
@@ -1662,6 +1687,10 @@ export class Config {
 
   getIntrospectionAgentSettings(): IntrospectionAgentSettings {
     return this.introspectionAgentSettings;
+  }
+
+  getAdaptiveThinkingConfig(): { enabled: boolean; classifierModel: string } {
+    return this.adaptiveThinking;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {

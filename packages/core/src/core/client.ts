@@ -28,6 +28,7 @@ import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
+import { partListUnionToString } from './geminiRequest.js';
 import type {
   ChatRecordingService,
   ResumedSessionData,
@@ -620,6 +621,25 @@ export class GeminiClient {
 
     // availability logic
     const modelConfigKey: ModelConfigKey = { model: modelToUse };
+
+    // Adaptive Thinking Budget Integration
+    if (
+      !isInvalidStreamRetry &&
+      this.config.getAdaptiveThinkingConfig().enabled
+    ) {
+      const userMessage = partListUnionToString(request);
+      if (userMessage) {
+        const adaptiveConfig = await this.config
+          .getAdaptiveBudgetService()
+          .determineAdaptiveConfig(userMessage, modelToUse);
+
+        if (adaptiveConfig) {
+          modelConfigKey.thinkingBudget = adaptiveConfig.thinkingBudget;
+          modelConfigKey.thinkingLevel = adaptiveConfig.thinkingLevel;
+        }
+      }
+    }
+
     const { model: finalModel } = applyModelSelection(
       this.config,
       modelConfigKey,
