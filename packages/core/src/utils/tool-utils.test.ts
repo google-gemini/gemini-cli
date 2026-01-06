@@ -6,9 +6,15 @@
 
 import { expect, describe, it } from 'vitest';
 import { doesToolInvocationMatch, getToolSuggestion } from './tool-utils.js';
-import type { AnyToolInvocation, Config } from '../index.js';
+import {
+  type AnyToolInvocation,
+  type Config,
+  DiscoveredMCPTool,
+} from '../index.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { CallableTool } from '@google/genai';
 
 describe('getToolSuggestion', () => {
   it('should suggest the top N closest tool names for a typo', () => {
@@ -81,6 +87,29 @@ describe('doesToolInvocationMatch', () => {
       patterns,
     );
     expect(result).toBe(true);
+  });
+
+  describe('for MCP tools', () => {
+    const mockMcpTool = new DiscoveredMCPTool(
+      {} as CallableTool,
+      'myServer',
+      'myTool',
+      'description',
+      {},
+      {} as MessageBus,
+    );
+
+    it('should NOT match by simple name', () => {
+      const patterns = ['myTool'];
+      const result = doesToolInvocationMatch(mockMcpTool, 'ignored', patterns);
+      expect(result).toBe(false);
+    });
+
+    it('should match by fully qualified name', () => {
+      const patterns = ['myServer__myTool'];
+      const result = doesToolInvocationMatch(mockMcpTool, 'ignored', patterns);
+      expect(result).toBe(true);
+    });
   });
 
   describe('for non-shell tools', () => {

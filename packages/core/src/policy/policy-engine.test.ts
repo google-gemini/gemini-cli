@@ -231,6 +231,57 @@ describe('PolicyEngine', () => {
         PolicyDecision.ASK_USER,
       );
     });
+
+    it('should NOT match a simple tool name against a composite tool call name (strict matching)', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'notify_user',
+          decision: PolicyDecision.ALLOW,
+          priority: 2.3,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules, nonInteractive: true });
+
+      // Composite name should NOT match the simple name (must be exact)
+      expect(
+        (await engine.check({ name: 'craftMCP__notify_user' }, 'craftMCP'))
+          .decision,
+      ).toBe(PolicyDecision.DENY);
+    });
+
+    it('should match regular tools exactly with --allowed-tools', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          priority: 2.3,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules, nonInteractive: true });
+
+      expect(
+        (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should match MCP tools only with fully qualified name', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'craftMCP__notify_user',
+          decision: PolicyDecision.ALLOW,
+          priority: 2.3,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules, nonInteractive: true });
+
+      expect(
+        (await engine.check({ name: 'craftMCP__notify_user' }, 'craftMCP'))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
   });
 
   describe('addRule', () => {

@@ -5,7 +5,7 @@
  */
 
 import type { AnyDeclarativeTool, AnyToolInvocation } from '../index.js';
-import { isTool } from '../index.js';
+import { isTool, DiscoveredMCPTool } from '../index.js';
 import { SHELL_TOOL_NAMES } from './shell-utils.js';
 import levenshtein from 'fast-levenshtein';
 
@@ -65,7 +65,14 @@ export function doesToolInvocationMatch(
 ): boolean {
   let toolNames: string[];
   if (isTool(toolOrToolName)) {
-    toolNames = [toolOrToolName.name, toolOrToolName.constructor.name];
+    if (toolOrToolName instanceof DiscoveredMCPTool) {
+      // MCP tools MUST match via their fully qualified name for security.
+      toolNames = [
+        `${toolOrToolName.getFullyQualifiedPrefix()}${toolOrToolName.serverToolName}`,
+      ];
+    } else {
+      toolNames = [toolOrToolName.name, toolOrToolName.constructor.name];
+    }
   } else {
     toolNames = [toolOrToolName];
   }
