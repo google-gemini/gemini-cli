@@ -1075,12 +1075,12 @@ const SETTINGS_SCHEMA = {
       },
       enableHooks: {
         type: 'boolean',
-        label: 'Enable Hooks System',
+        label: 'Enable Hooks System (Experimental)',
         category: 'Advanced',
         requiresRestart: true,
-        default: false,
+        default: true,
         description:
-          'Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.',
+          'Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.',
         showInDialog: false,
       },
     },
@@ -1544,6 +1544,16 @@ const SETTINGS_SCHEMA = {
       'Hook configurations for intercepting and customizing agent behavior.',
     showInDialog: false,
     properties: {
+      enabled: {
+        type: 'boolean',
+        label: 'Enable Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Canonical toggle for the hooks system. When disabled, no hooks will be executed.',
+        showInDialog: false,
+      },
       disabled: {
         type: 'array',
         label: 'Disabled Hooks',
@@ -1558,6 +1568,15 @@ const SETTINGS_SCHEMA = {
           description: 'Hook command name',
         },
         mergeStrategy: MergeStrategy.UNION,
+      },
+      notifications: {
+        type: 'boolean',
+        label: 'Hook Notifications',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: true,
+        description: 'Show visual indicators when hooks are executing.',
+        showInDialog: true,
       },
       BeforeTool: {
         type: 'array',
@@ -2116,3 +2135,9 @@ type InferSettings<T extends SettingsSchema> = {
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;
+
+export function getEnableHooks(settings: Settings): boolean {
+  return (
+    (settings.tools?.enableHooks ?? true) && (settings.hooks?.enabled ?? false)
+  );
+}

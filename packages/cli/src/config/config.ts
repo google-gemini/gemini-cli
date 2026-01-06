@@ -53,6 +53,7 @@ import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
+import { getEnableHooks } from './settingsSchema.js';
 
 export interface CliArgs {
   query: string | undefined;
@@ -291,7 +292,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
   }
 
   // Register hooks command if hooks are enabled
-  if (settings?.tools?.enableHooks) {
+  if (getEnableHooks(settings)) {
     yargsInstance.command(hooksCommand);
   }
 
@@ -413,7 +414,7 @@ export async function loadCliConfig(
   const ideMode = settings.ide?.enabled ?? false;
 
   const folderTrust = settings.security?.folderTrust?.enabled ?? false;
-  const trustedFolder = isWorkspaceTrusted(settings)?.isTrusted ?? true;
+  const trustedFolder = isWorkspaceTrusted(settings)?.isTrusted ?? false;
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
@@ -740,7 +741,7 @@ export async function loadCliConfig(
     ptyInfo: ptyInfo?.name,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
-    enableHooks: settings.tools?.enableHooks,
+    enableHooks: getEnableHooks(settings),
     hooks: settings.hooks || {},
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
