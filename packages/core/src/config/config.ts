@@ -193,10 +193,21 @@ export interface AgentRunConfig {
   maxTurns?: number;
 }
 
+/**
+ * Override configuration for a specific agent.
+ * Generic fields (modelConfig, runConfig, enabled) are standard across all agents.
+ * Agent-specific settings go in customConfig - each agent defines its own type.
+ */
 export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
   enabled?: boolean;
+  /**
+   * Agent-specific custom configuration.
+   * Each agent defines and documents its own customConfig structure.
+   * Example: browser_agent uses BrowserAgentCustomConfig for sessionMode, headless, etc.
+   */
+  customConfig?: Record<string, unknown>;
 }
 
 export interface AgentSettings {
@@ -252,6 +263,21 @@ export interface CustomTheme {
   Gray?: string;
   DarkGray?: string;
   GradientColors?: string[];
+}
+
+/**
+ * Browser agent custom configuration.
+ * Used in agents.overrides.browser_agent.customConfig
+ */
+export interface BrowserAgentCustomConfig {
+  /** Session mode: 'isolated' (launch new browser) or 'existing' (attach to Chrome M144+). Default: 'isolated' */
+  sessionMode?: 'isolated' | 'existing';
+  /** Run browser in headless mode. Default: false */
+  headless?: boolean;
+  /** Path to Chrome profile directory for session persistence. */
+  chromeProfilePath?: string;
+  /** Model override for the visual agent. */
+  visualModel?: string;
 }
 
 /**
@@ -2486,6 +2512,39 @@ export class Config {
 
   getEnableHooksUI(): boolean {
     return this.enableHooksUI;
+  }
+
+  /**
+   * Get override settings for a specific agent.
+   * Reads from agents.overrides.<agentName>.
+   */
+  getAgentOverride(agentName: string): AgentOverride | undefined {
+    return this.getAgentsSettings()?.overrides?.[agentName];
+  }
+
+  /**
+   * Get browser agent configuration.
+   * Combines generic AgentOverride fields with browser-specific customConfig.
+   * This is the canonical way to access browser agent settings.
+   */
+  getBrowserAgentConfig(): {
+    enabled: boolean;
+    model?: string;
+    customConfig: BrowserAgentCustomConfig;
+  } {
+    const override = this.getAgentOverride('browser_agent');
+    const customConfig = (override?.customConfig ??
+      {}) as BrowserAgentCustomConfig;
+    return {
+      enabled: override?.enabled ?? false,
+      model: override?.modelConfig?.model,
+      customConfig: {
+        sessionMode: customConfig.sessionMode ?? 'isolated',
+        headless: customConfig.headless ?? false,
+        chromeProfilePath: customConfig.chromeProfilePath,
+        visualModel: customConfig.visualModel,
+      },
+    };
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {

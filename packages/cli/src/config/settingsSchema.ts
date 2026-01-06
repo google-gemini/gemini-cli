@@ -2275,6 +2275,12 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         type: 'boolean',
         description: 'Whether to enable the agent.',
       },
+      customConfig: {
+        type: 'object',
+        description:
+          'Agent-specific custom configuration. Each agent defines its own schema.',
+        additionalProperties: true,
+      },
     },
   },
   CustomTheme: {
