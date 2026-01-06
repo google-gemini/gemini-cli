@@ -505,11 +505,19 @@ export async function loadCliConfig(
   }
 
   // Override approval mode if disableYoloMode is set.
-  if (settings.security?.disableYoloMode) {
+  if (settings.security?.disableYoloMode || settings.admin?.secureModeEnabled) {
     if (approvalMode === ApprovalMode.YOLO) {
-      debugLogger.error('YOLO mode is disabled by the "disableYolo" setting.');
+      if (settings.admin?.secureModeEnabled) {
+        debugLogger.error(
+          'YOLO mode is disabled by "secureModeEnabled" setting.',
+        );
+      } else {
+        debugLogger.error(
+          'YOLO mode is disabled by the "disableYolo" setting.',
+        );
+      }
       throw new FatalConfigError(
-        'Cannot start in YOLO mode when it is disabled by settings',
+        'Cannot start in YOLO mode since it is disabled by your admin',
       );
     }
     approvalMode = ApprovalMode.DEFAULT;
@@ -628,6 +636,8 @@ export async function loadCliConfig(
 
   const ptyInfo = await getPty();
 
+  const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
+
   return new Config({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -646,12 +656,17 @@ export async function loadCliConfig(
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
-    mcpServerCommand: settings.mcp?.serverCommand,
-    mcpServers: settings.mcpServers,
-    allowedMcpServers: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
-    blockedMcpServers: argv.allowedMcpServerNames
-      ? undefined
-      : settings.mcp?.excluded,
+    mcpServerCommand: mcpEnabled ? settings.mcp?.serverCommand : undefined,
+    mcpServers: mcpEnabled ? settings.mcpServers : {},
+    mcpEnabled,
+    allowedMcpServers: mcpEnabled
+      ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
+      : undefined,
+    blockedMcpServers: mcpEnabled
+      ? argv.allowedMcpServerNames
+        ? undefined
+        : settings.mcp?.excluded
+      : undefined,
     blockedEnvironmentVariables:
       settings.security?.environmentVariableRedaction?.blocked,
     enableEnvironmentVariableRedaction:
@@ -660,7 +675,8 @@ export async function loadCliConfig(
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,
     approvalMode,
-    disableYoloMode: settings.security?.disableYoloMode,
+    disableYoloMode:
+      settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,
