@@ -1,17 +1,17 @@
-name: Label Child Issues for Project Rollup
+name: 'Label Child Issues for Project Rollup'
 
 on:
   issues:
-    types: [opened, edited]
+    types: ['opened', 'edited']
 
 jobs:
   labeler:
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
     permissions:
-      issues: write
+      issues: 'write'
     steps:
-      - name: Check for Parent Workstream and Apply Label
-        uses: actions/github-script@v7
+      - name: 'Check for Parent Workstream and Apply Label'
+        uses: 'actions/github-script@v7'
         with:
           script: |
             const issue = context.payload.issue;
