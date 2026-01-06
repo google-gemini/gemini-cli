@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ClassifierStrategy } from './classifierStrategy.js';
 import type { RoutingContext } from '../routingStrategy.js';
 import type { Config } from '../../config/config.js';
@@ -61,14 +61,21 @@ describe('ClassifierStrategy', () => {
     vi.mocked(promptIdContext.getStore).mockReturnValue('test-prompt-id');
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('should call generateJson with the correct parameters', async () => {
     const mockApiResponse = {
       reasoning: 'Simple task',
-      model_choice: 'flash',
+      complexity_score: 10,
     };
     vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
       mockApiResponse,
     );
+    vi.spyOn(Math, 'random').mockReturnValue(0.9); // Control Group (>= 0.5 is strict? No, < 0.5 is strict. Wait. Code says < 0.5 is strict.)
+    // Code: const isStrict = Math.random() < 0.5;
+    // So 0.9 is >= 0.5, so NOT strict -> Control.
 
     await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
 
@@ -80,56 +87,109 @@ describe('ClassifierStrategy', () => {
     );
   });
 
-  it('should route to FLASH model for a simple task', async () => {
-    const mockApiResponse = {
-      reasoning: 'This is a simple task.',
-      model_choice: 'flash',
-    };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
+  describe('A/B Testing Logic', () => {
+    it('Control Group (Threshold 50): Score 40 -> FLASH', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.6); // >= 0.5 -> Control
+      const mockApiResponse = {
+        reasoning: 'Standard task',
+        complexity_score: 40,
+      };
+      vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+        mockApiResponse,
+      );
 
-    const decision = await strategy.route(
-      mockContext,
-      mockConfig,
-      mockBaseLlmClient,
-    );
+      const decision = await strategy.route(
+        mockContext,
+        mockConfig,
+        mockBaseLlmClient,
+      );
 
-    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledOnce();
-    expect(decision).toEqual({
-      model: DEFAULT_GEMINI_FLASH_MODEL,
-      metadata: {
-        source: 'Classifier',
-        latencyMs: expect.any(Number),
-        reasoning: mockApiResponse.reasoning,
-      },
+      expect(decision).toEqual({
+        model: DEFAULT_GEMINI_FLASH_MODEL,
+        metadata: {
+          source: 'Classifier (Control)',
+          latencyMs: expect.any(Number),
+          reasoning: expect.stringContaining('Score: 40 / Threshold: 50'),
+        },
+      });
     });
-  });
 
-  it('should route to PRO model for a complex task', async () => {
-    const mockApiResponse = {
-      reasoning: 'This is a complex task.',
-      model_choice: 'pro',
-    };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
-    mockContext.request = [{ text: 'how do I build a spaceship?' }];
+    it('Control Group (Threshold 50): Score 60 -> PRO', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.6); // >= 0.5 -> Control
+      const mockApiResponse = {
+        reasoning: 'Complex task',
+        complexity_score: 60,
+      };
+      vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+        mockApiResponse,
+      );
 
-    const decision = await strategy.route(
-      mockContext,
-      mockConfig,
-      mockBaseLlmClient,
-    );
+      const decision = await strategy.route(
+        mockContext,
+        mockConfig,
+        mockBaseLlmClient,
+      );
 
-    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledOnce();
-    expect(decision).toEqual({
-      model: DEFAULT_GEMINI_MODEL,
-      metadata: {
-        source: 'Classifier',
-        latencyMs: expect.any(Number),
-        reasoning: mockApiResponse.reasoning,
-      },
+      expect(decision).toEqual({
+        model: DEFAULT_GEMINI_MODEL,
+        metadata: {
+          source: 'Classifier (Control)',
+          latencyMs: expect.any(Number),
+          reasoning: expect.stringContaining('Score: 60 / Threshold: 50'),
+        },
+      });
+    });
+
+    it('Strict Group (Threshold 80): Score 60 -> FLASH', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.5 -> Strict
+      const mockApiResponse = {
+        reasoning: 'Complex task',
+        complexity_score: 60,
+      };
+      vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+        mockApiResponse,
+      );
+
+      const decision = await strategy.route(
+        mockContext,
+        mockConfig,
+        mockBaseLlmClient,
+      );
+
+      expect(decision).toEqual({
+        model: DEFAULT_GEMINI_FLASH_MODEL, // Routed to Flash because 60 < 80
+        metadata: {
+          source: 'Classifier (Strict)',
+          latencyMs: expect.any(Number),
+          reasoning: expect.stringContaining('Score: 60 / Threshold: 80'),
+        },
+      });
+    });
+
+    it('Strict Group (Threshold 80): Score 90 -> PRO', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.5 -> Strict
+      const mockApiResponse = {
+        reasoning: 'Extreme task',
+        complexity_score: 90,
+      };
+      vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+        mockApiResponse,
+      );
+
+      const decision = await strategy.route(
+        mockContext,
+        mockConfig,
+        mockBaseLlmClient,
+      );
+
+      expect(decision).toEqual({
+        model: DEFAULT_GEMINI_MODEL,
+        metadata: {
+          source: 'Classifier (Strict)',
+          latencyMs: expect.any(Number),
+          reasoning: expect.stringContaining('Score: 90 / Threshold: 80'),
+        },
+      });
     });
   });
 
@@ -148,7 +208,6 @@ describe('ClassifierStrategy', () => {
 
     expect(decision).toBeNull();
     expect(consoleWarnSpy).toHaveBeenCalled();
-    consoleWarnSpy.mockRestore();
   });
 
   it('should return null if the classifier returns a malformed JSON object', async () => {
@@ -157,7 +216,7 @@ describe('ClassifierStrategy', () => {
       .mockImplementation(() => {});
     const malformedApiResponse = {
       reasoning: 'This is a simple task.',
-      // model_choice is missing, which will cause a Zod parsing error.
+      // complexity_score is missing
     };
     vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
       malformedApiResponse,
@@ -171,7 +230,6 @@ describe('ClassifierStrategy', () => {
 
     expect(decision).toBeNull();
     expect(consoleWarnSpy).toHaveBeenCalled();
-    consoleWarnSpy.mockRestore();
   });
 
   it('should filter out tool-related history before sending to classifier', async () => {
@@ -188,7 +246,7 @@ describe('ClassifierStrategy', () => {
     ];
     const mockApiResponse = {
       reasoning: 'Simple.',
-      model_choice: 'flash',
+      complexity_score: 10,
     };
     vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
       mockApiResponse,
@@ -224,7 +282,7 @@ describe('ClassifierStrategy', () => {
     mockContext.history = longHistory;
     const mockApiResponse = {
       reasoning: 'Simple.',
-      model_choice: 'flash',
+      complexity_score: 10,
     };
     vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
       mockApiResponse,
@@ -260,7 +318,7 @@ describe('ClassifierStrategy', () => {
     vi.mocked(promptIdContext.getStore).mockReturnValue(undefined);
     const mockApiResponse = {
       reasoning: 'Simple.',
-      model_choice: 'flash',
+      complexity_score: 10,
     };
     vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
       mockApiResponse,
@@ -279,6 +337,5 @@ describe('ClassifierStrategy', () => {
         'Could not find promptId in context. This is unexpected. Using a fallback ID:',
       ),
     );
-    consoleWarnSpy.mockRestore();
   });
 });

@@ -29,77 +29,61 @@ const FLASH_MODEL = 'flash';
 const PRO_MODEL = 'pro';
 
 const CLASSIFIER_SYSTEM_PROMPT = `
-You are a specialized Task Routing AI. Your sole function is to analyze the user's request and classify its complexity. Choose between \`${FLASH_MODEL}\` (SIMPLE) or \`${PRO_MODEL}\` (COMPLEX).
-1.  \`${FLASH_MODEL}\`: A fast, efficient model for simple, well-defined tasks.
-2.  \`${PRO_MODEL}\`: A powerful, advanced model for complex, open-ended, or multi-step tasks.
+You are a specialized Task Routing AI. Your sole function is to analyze the user's request and assign a **Complexity Score** from 1 to 100.
 <complexity_rubric>
-A task is COMPLEX (Choose \`${PRO_MODEL}\`) if it meets ONE OR MORE of the following criteria:
-1.  **High Operational Complexity (Est. 4+ Steps/Tool Calls):** Requires dependent actions, significant planning, or multiple coordinated changes.
-2.  **Strategic Planning & Conceptual Design:** Asking "how" or "why." Requires advice, architecture, or high-level strategy.
-3.  **High Ambiguity or Large Scope (Extensive Investigation):** Broadly defined requests requiring extensive investigation.
-4.  **Deep Debugging & Root Cause Analysis:** Diagnosing unknown or complex problems from symptoms.
-A task is SIMPLE (Choose \`${FLASH_MODEL}\`) if it is highly specific, bounded, and has Low Operational Complexity (Est. 1-3 tool calls). Operational simplicity overrides strategic phrasing.
+**1-20: Trivial / Direct (Low Risk)**
+*   Simple, read-only commands (e.g., "read file", "list dir").
+*   Exact, explicit instructions with zero ambiguity.
+*   Single-step operations.
+
+**21-50: Standard / Routine (Moderate Risk)**
+*   Single-file edits or simple refactors.
+*   "Fix this error" where the error is clear and local.
+*   Standard boilerplate generation.
+*   Multi-step but linear tasks (e.g., "create file, then edit it").
+
+**51-80: High Complexity / Analytical (High Risk)**
+*   Multi-file dependencies (changing X requires updating Y and Z).
+*   "Why is this broken?" (Debugging unknown causes).
+*   Feature implementation requiring understanding of broader context.
+*   Refactoring complex logic.
+
+**81-100: Extreme / Strategic (Critical Risk)**
+*   "Architect a new system" or "Migrate database".
+*   Highly ambiguous requests ("Make this better").
+*   Tasks requiring deep reasoning, safety checks, or novel invention.
+*   Massive scale changes (10+ files).
 </complexity_rubric>
+
 **Output Format:**
-Respond *only* in JSON format according to the following schema. Do not include any text outside the JSON structure.
+Respond *only* in JSON format according to the following schema.
 {
   "type": "object",
   "properties": {
     "reasoning": {
       "type": "string",
-      "description": "A brief, step-by-step explanation for the model choice, referencing the rubric."
+      "description": "Brief explanation for the score."
     },
-    "model_choice": {
-      "type": "string",
-      "enum": ["${FLASH_MODEL}", "${PRO_MODEL}"]
+    "complexity_score": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
     }
   },
-  "required": ["reasoning", "model_choice"]
+  "required": ["reasoning", "complexity_score"]
 }
 --- EXAMPLES ---
-**Example 1 (Strategic Planning):**
-*User Prompt:* "How should I architect the data pipeline for this new analytics service?"
-*Your JSON Output:*
-{
-  "reasoning": "The user is asking for high-level architectural design and strategy. This falls under 'Strategic Planning & Conceptual Design'.",
-  "model_choice": "${PRO_MODEL}"
-}
-**Example 2 (Simple Tool Use):**
-*User Prompt:* "list the files in the current directory"
-*Your JSON Output:*
-{
-  "reasoning": "This is a direct command requiring a single tool call (ls). It has Low Operational Complexity (1 step).",
-  "model_choice": "${FLASH_MODEL}"
-}
-**Example 3 (High Operational Complexity):**
-*User Prompt:* "I need to add a new 'email' field to the User schema in 'src/models/user.ts', migrate the database, and update the registration endpoint."
-*Your JSON Output:*
-{
-  "reasoning": "This request involves multiple coordinated steps across different files and systems. This meets the criteria for High Operational Complexity (4+ steps).",
-  "model_choice": "${PRO_MODEL}"
-}
-**Example 4 (Simple Read):**
-*User Prompt:* "Read the contents of 'package.json'."
-*Your JSON Output:*
-{
-  "reasoning": "This is a direct command requiring a single read. It has Low Operational Complexity (1 step).",
-  "model_choice": "${FLASH_MODEL}"
-}
+*Prompt:* "read package.json"
+*JSON:* {"reasoning": "Simple read operation.", "complexity_score": 10}
 
-**Example 5 (Deep Debugging):**
-*User Prompt:* "I'm getting an error 'Cannot read property 'map' of undefined' when I click the save button. Can you fix it?"
-*Your JSON Output:*
-{
-  "reasoning": "The user is reporting an error symptom without a known cause. This requires investigation and falls under 'Deep Debugging'.",
-  "model_choice": "${PRO_MODEL}"
-}
-**Example 6 (Simple Edit despite Phrasing):**
-*User Prompt:* "What is the best way to rename the variable 'data' to 'userData' in 'src/utils.js'?"
-*Your JSON Output:*
-{
-  "reasoning": "Although the user uses strategic language ('best way'), the underlying task is a localized edit. The operational complexity is low (1-2 steps).",
-  "model_choice": "${FLASH_MODEL}"
-}
+*Prompt:* "Rename the 'data' variable to 'userData' in utils.ts"
+*JSON:* {"reasoning": "Single file, specific edit.", "complexity_score": 30}
+
+*Prompt:* "I'm getting a null pointer in the auth service. Debug it."
+*JSON:* {"reasoning": "Requires investigation and debugging unknown cause.", "complexity_score": 65}
+
+*Prompt:* "Design a microservices backend for this app."
+*JSON:* {"reasoning": "High-level architecture and strategic planning.", "complexity_score": 95}
 `;
 
 const RESPONSE_SCHEMA = {
@@ -107,20 +91,19 @@ const RESPONSE_SCHEMA = {
   properties: {
     reasoning: {
       type: Type.STRING,
-      description:
-        'A brief, step-by-step explanation for the model choice, referencing the rubric.',
+      description: 'Brief explanation for the score.',
     },
-    model_choice: {
-      type: Type.STRING,
-      enum: [FLASH_MODEL, PRO_MODEL],
+    complexity_score: {
+      type: Type.INTEGER,
+      description: 'Complexity score from 1-100.',
     },
   },
-  required: ['reasoning', 'model_choice'],
+  required: ['reasoning', 'complexity_score'],
 };
 
 const ClassifierResponseSchema = z.object({
   reasoning: z.string(),
-  model_choice: z.enum([FLASH_MODEL, PRO_MODEL]),
+  complexity_score: z.number().min(1).max(100),
 });
 
 export class ClassifierStrategy implements RoutingStrategy {
@@ -144,14 +127,9 @@ export class ClassifierStrategy implements RoutingStrategy {
       }
 
       const historySlice = context.history.slice(-HISTORY_SEARCH_WINDOW);
-
-      // Filter out tool-related turns.
-      // TODO - Consider using function req/res if they help accuracy.
       const cleanHistory = historySlice.filter(
         (content) => !isFunctionCall(content) && !isFunctionResponse(content),
       );
-
-      // Take the last N turns from the *cleaned* history.
       const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
       const jsonResponse = await baseLlmClient.generateJson({
@@ -164,26 +142,35 @@ export class ClassifierStrategy implements RoutingStrategy {
       });
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
+      const score = routerResponse.complexity_score;
 
-      const reasoning = routerResponse.reasoning;
-      const latencyMs = Date.now() - startTime;
+      // A/B Test Thresholds
+      // Control (Conservative): 50 (Everything above "Standard" goes to Pro)
+      // Strict (Aggressive): 80 (Only "Extreme" goes to Pro)
+      const isStrict = Math.random() < 0.5;
+      const threshold = isStrict ? 80 : 50;
+      const groupLabel = isStrict ? 'Strict' : 'Control';
+
+      // Select Model based on Score vs Threshold
+      const modelAlias = score >= threshold ? PRO_MODEL : FLASH_MODEL;
+
       const selectedModel = resolveClassifierModel(
         config.getModel(),
-        routerResponse.model_choice,
+        modelAlias,
         config.getPreviewFeatures(),
       );
+
+      const latencyMs = Date.now() - startTime;
 
       return {
         model: selectedModel,
         metadata: {
-          source: 'Classifier',
+          source: `Classifier (${groupLabel})`,
           latencyMs,
-          reasoning,
+          reasoning: `[Score: ${score} / Threshold: ${threshold}] ${routerResponse.reasoning}`,
         },
       };
     } catch (error) {
-      // If the classifier fails for any reason (API error, parsing error, etc.),
-      // we log it and return null to allow the composite strategy to proceed.
       debugLogger.warn(`[Routing] ClassifierStrategy failed:`, error);
       return null;
     }
