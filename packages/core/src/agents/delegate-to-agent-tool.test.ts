@@ -14,6 +14,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 import { RemoteAgentInvocation } from './remote-invocation.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 vi.mock('./local-invocation.js', () => ({
   LocalSubagentInvocation: vi.fn().mockImplementation(() => ({
@@ -82,11 +83,7 @@ describe('DelegateToAgentTool', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (registry as any).agents.set(mockRemoteAgentDef.name, mockRemoteAgentDef);
 
-    messageBus = {
-      publish: vi.fn(),
-      subscribe: vi.fn(),
-      unsubscribe: vi.fn(),
-    } as unknown as MessageBus;
+    messageBus = createMockMessageBus();
 
     tool = new DelegateToAgentTool(registry, config, messageBus);
   });
@@ -124,6 +121,8 @@ describe('DelegateToAgentTool', () => {
       config,
       { arg1: 'valid' },
       messageBus,
+      mockAgentDef.name,
+      mockAgentDef.name,
     );
   });
 
@@ -177,7 +176,7 @@ describe('DelegateToAgentTool', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (registry as any).agents.set(invalidAgentDef.name, invalidAgentDef);
 
-    expect(() => new DelegateToAgentTool(registry, config)).toThrow(
+    expect(() => new DelegateToAgentTool(registry, config, messageBus)).toThrow(
       "Agent 'invalid_agent' cannot have an input parameter named 'agent_name' as it is a reserved parameter for delegation.",
     );
   });

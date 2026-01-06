@@ -41,8 +41,8 @@ import type {
   ExtensionUninstallEvent,
   ExtensionInstallEvent,
   ModelSlashCommandEvent,
-  SmartEditStrategyEvent,
-  SmartEditCorrectionEvent,
+  EditStrategyEvent,
+  EditCorrectionEvent,
   AgentStartEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
@@ -568,11 +568,11 @@ export async function logExtensionDisable(
   });
 }
 
-export function logSmartEditStrategy(
+export function logEditStrategy(
   config: Config,
-  event: SmartEditStrategyEvent,
+  event: EditStrategyEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logSmartEditStrategyEvent(event);
+  ClearcutLogger.getInstance(config)?.logEditStrategyEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -583,11 +583,11 @@ export function logSmartEditStrategy(
   });
 }
 
-export function logSmartEditCorrectionEvent(
+export function logEditCorrectionEvent(
   config: Config,
-  event: SmartEditCorrectionEvent,
+  event: EditCorrectionEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logSmartEditCorrectionEvent(event);
+  ClearcutLogger.getInstance(config)?.logEditCorrectionEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {

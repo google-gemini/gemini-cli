@@ -84,7 +84,9 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
   constructor(
     private readonly definition: RemoteAgentDefinition,
     params: AgentInputs,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
     const query = params['query'];
     if (typeof query !== 'string') {
@@ -93,7 +95,12 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       );
     }
     // Safe to pass strict object to super
-    super({ query }, messageBus, definition.name, definition.displayName);
+    super(
+      { query },
+      messageBus,
+      _toolName ?? definition.name,
+      _toolDisplayName ?? definition.displayName,
+    );
   }
 
   getDescription(): string {

@@ -709,12 +709,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
-#### `useSmartEdit`
-
-- **`useSmartEdit`** (boolean):
-  - **Description:** Enable the smart-edit tool instead of the replace tool.
-  - **Default:** `true`
-
 #### `useWriteTodos`
 
 - **`useWriteTodos`** (boolean):
@@ -822,6 +816,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.skills`** (boolean):
+  - **Description:** Enable Agent Skills (experimental).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.codebaseInvestigatorSettings.enabled`** (boolean):
   - **Description:** Enable the Codebase Investigator agent.
   - **Default:** `true`
@@ -849,9 +848,21 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"auto"`
   - **Requires restart:** Yes
 
+- **`experimental.useOSC52Paste`** (boolean):
+  - **Description:** Use OSC 52 sequence for pasting instead of clipboardy
+    (useful for remote sessions).
+  - **Default:** `false`
+
 - **`experimental.introspectionAgentSettings.enabled`** (boolean):
   - **Description:** Enable the Introspection Agent.
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+#### `skills`
+
+- **`skills.disabled`** (array):
+  - **Description:** List of disabled skills.
+  - **Default:** `[]`
   - **Requires restart:** Yes
 
 #### `hooks`
