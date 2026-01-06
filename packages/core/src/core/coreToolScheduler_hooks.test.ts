@@ -160,14 +160,16 @@ describe('CoreToolScheduler Hooks', () => {
     // Wait for update
     await vi.waitFor(() => {
       expect(onToolCallsUpdate).toHaveBeenCalled();
-      const calls = onToolCallsUpdate.mock.calls.at(-1)[0] as ToolCall[];
-      const call = calls.find((c) => c.request.callId === '1');
+      const lastCall = onToolCallsUpdate.mock.calls.at(-1);
+      const calls = lastCall ? (lastCall[0] as ToolCall[]) : undefined; // Add check for undefined
+      const call = calls?.find((c) => c.request.callId === '1'); // Use optional chaining
       expect(call).toBeDefined();
       if (call) {
         // Should be awaiting approval despite YOLO mode
         expect(call.status).toBe('awaiting_approval');
         if (call.status === 'awaiting_approval') {
-          expect(call.confirmationDetails.systemMessage).toBe(
+          expect(call.confirmationDetails?.systemMessage).toBe(
+            // Use optional chaining
             'Security policy requires manual confirmation',
           );
         }
@@ -257,9 +259,10 @@ describe('CoreToolScheduler Hooks', () => {
       .calls[0][0] as ToolCall[];
     expect(completedCalls[0].status).toBe('error');
     const erroredCall = completedCalls[0] as ErroredToolCall;
-    // @ts-expect-error - accessing internal structure of FunctionResponsePart
     const errorMsg =
-      erroredCall.response.responseParts[0].functionResponse.response.error;
+      erroredCall.response?.responseParts?.[0]?.functionResponse?.response?.[
+        'error'
+      ]; // Use optional chaining and bracket notation for 'error'
     expect(errorMsg).toContain(
       'Agent execution stopped by hook: Policy violation',
     );

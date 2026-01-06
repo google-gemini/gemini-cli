@@ -11,7 +11,27 @@ import {
   type Message,
   type HookExecutionRequest,
   type HookExecutionResponse,
+  type ToolConfirmationRequest,
+  type ToolConfirmationResponse,
 } from '../confirmation-bus/types.js';
+
+/**
+ * Type guard to check if a message has a correlationId.
+ */
+function hasCorrelationId(
+  message: Message,
+): message is
+  | ToolConfirmationRequest
+  | ToolConfirmationResponse
+  | HookExecutionRequest
+  | HookExecutionResponse {
+  return (
+    message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST ||
+    message.type === MessageBusType.TOOL_CONFIRMATION_RESPONSE ||
+    message.type === MessageBusType.HOOK_EXECUTION_REQUEST ||
+    message.type === MessageBusType.HOOK_EXECUTION_RESPONSE
+  );
+}
 
 /**
  * Mock MessageBus for testing hook execution through MessageBus
@@ -35,9 +55,12 @@ export class MockMessageBus {
     ): Promise<TResponse> => {
       this.publish(message);
       // Return a default success response
+      const correlationId = hasCorrelationId(message)
+        ? message.correlationId
+        : undefined;
       return {
         type: MessageBusType.HOOK_EXECUTION_RESPONSE,
-        correlationId: message.correlationId,
+        correlationId, // Use the extracted correlationId
         success: true,
         output: {
           decision: 'allow',
@@ -59,7 +82,7 @@ export class MockMessageBus {
       // Auto-respond with success for testing
       const response: HookExecutionResponse = {
         type: MessageBusType.HOOK_EXECUTION_RESPONSE,
-        correlationId: message.correlationId,
+        correlationId: message.correlationId, // This is safe because HOOK_EXECUTION_REQUEST always has correlationId
         success: true,
         output: {
           decision: 'allow',
