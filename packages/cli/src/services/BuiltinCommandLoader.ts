@@ -112,7 +112,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
               ): Promise<MessageActionReturn> => ({
                 type: 'message',
                 messageType: 'error',
-                content: 'MCP disabled by your admin.',
+                content: 'MCP is disabled by your admin.',
               }),
             },
           ]
