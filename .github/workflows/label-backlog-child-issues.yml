@@ -1,0 +1,34 @@
+name: Label Child Issues for Project Rollup
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  labeler:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Check for Parent Workstream and Apply Label
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const issue = context.payload.issue;
+            // Define the parent workstream issue numbers
+            const parentWorkstreamNumbers = [15374, 15456, 15324];
+            // Define the label to add
+            const labelToAdd = "workstream-rollup";
+
+            // Check if the issue has a parent and if that parent is in our list
+            if (issue.parent && parentWorkstreamNumbers.includes(issue.parent.number)) {
+              console.log(`Issue #${issue.number} is a child of a target workstream. Adding label.`);
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: [labelToAdd]
+              });
+            } else {
+              console.log(`Issue #${issue.number} is not a child of a target workstream. No action taken.`);
+            }
