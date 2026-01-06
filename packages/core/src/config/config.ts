@@ -25,7 +25,7 @@ import { GrepTool } from '../tools/grep.js';
 import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
 import { GlobTool } from '../tools/glob.js';
 import { ActivateSkillTool } from '../tools/activate-skill.js';
-import { SmartEditTool } from '../tools/smart-edit.js';
+import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
@@ -88,6 +88,7 @@ import type { PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
+import type { GeminiCodeAssistSetting } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
@@ -356,6 +357,8 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   experimentalJitContext?: boolean;
   onModelChange?: (model: string) => void;
+  mcpEnabled?: boolean;
+  onReload?: () => Promise<{ disabledSkills?: string[] }>;
 }
 
 export class Config {
@@ -388,6 +391,7 @@ export class Config {
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
+  private readonly mcpEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
@@ -479,14 +483,18 @@ export class Config {
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
+  private readonly onReload:
+    | (() => Promise<{ disabledSkills?: string[] }>)
+    | undefined;
 
   private readonly enableAgents: boolean;
   private readonly skillsSupport: boolean;
-  private readonly disabledSkills: string[];
+  private disabledSkills: string[];
 
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
+  private remoteAdminSettings: GeminiCodeAssistSetting | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -508,6 +516,7 @@ export class Config {
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
+    this.mcpEnabled = params.mcpEnabled ?? true;
     this.allowedMcpServers = params.allowedMcpServers ?? [];
     this.blockedMcpServers = params.blockedMcpServers ?? [];
     this.allowedEnvironmentVariables = params.allowedEnvironmentVariables ?? [];
@@ -643,6 +652,7 @@ export class Config {
     this.projectHooks = params.projectHooks;
     this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
+    this.onReload = params.onReload;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -748,7 +758,7 @@ export class Config {
     }
 
     // Initialize hook system if enabled
-    if (this.enableHooks) {
+    if (this.getEnableHooks()) {
       this.hookSystem = new HookSystem(this);
       await this.hookSystem.initialize();
     }
@@ -889,6 +899,14 @@ export class Config {
     return this.terminalBackground;
   }
 
+  getRemoteAdminSettings(): GeminiCodeAssistSetting | undefined {
+    return this.remoteAdminSettings;
+  }
+
+  setRemoteAdminSettings(settings: GeminiCodeAssistSetting): void {
+    this.remoteAdminSettings = settings;
+  }
+
   shouldLoadMemoryFromIncludeDirectories(): boolean {
     return this.loadMemoryFromIncludeDirectories;
   }
@@ -909,13 +927,13 @@ export class Config {
     return this.model;
   }
 
-  setModel(newModel: string, isFallbackModel: boolean = false): void {
+  setModel(newModel: string, isTemporary: boolean = true): void {
     if (this.model !== newModel || this._activeModel !== newModel) {
       this.model = newModel;
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
-      if (this.onModelChange && !isFallbackModel) {
+      if (this.onModelChange && !isTemporary) {
         this.onModelChange(newModel);
       }
     }
@@ -1118,6 +1136,10 @@ export class Config {
    */
   getMcpServers(): Record<string, MCPServerConfig> | undefined {
     return this.mcpServers;
+  }
+
+  getMcpEnabled(): boolean {
+    return this.mcpEnabled;
   }
 
   getMcpClientManager(): McpClientManager | undefined {
@@ -1423,22 +1445,13 @@ export class Config {
    * 'false' for untrusted.
    */
   isTrustedFolder(): boolean {
-    // isWorkspaceTrusted in cli/src/config/trustedFolder.js returns undefined
-    // when the file based trust value is unavailable, since it is mainly used
-    // in the initialization for trust dialogs, etc. Here we return true since
-    // config.isTrustedFolder() is used for the main business logic of blocking
-    // tool calls etc in the rest of the application.
-    //
-    // Default value is true since we load with trusted settings to avoid
-    // restarts in the more common path. If the user chooses to mark the folder
-    // as untrusted, the CLI will restart and we will have the trust value
-    // reloaded.
     const context = ideContextStore.get();
     if (context?.workspaceState?.isTrusted !== undefined) {
       return context.workspaceState.isTrusted;
     }
 
-    return this.trustedFolder ?? true;
+    // Default to untrusted if folder trust is enabled and no explicit value is set.
+    return this.folderTrust ? (this.trustedFolder ?? false) : true;
   }
 
   setIdeMode(value: boolean): void {
@@ -1518,6 +1531,38 @@ export class Config {
 
   isSkillsSupportEnabled(): boolean {
     return this.skillsSupport;
+  }
+
+  /**
+   * Reloads skills by re-discovering them from extensions and local directories.
+   */
+  async reloadSkills(): Promise<void> {
+    if (!this.skillsSupport) {
+      return;
+    }
+
+    if (this.onReload) {
+      const refreshed = await this.onReload();
+      this.disabledSkills = refreshed.disabledSkills ?? [];
+    }
+
+    await this.getSkillManager().discoverSkills(
+      this.storage,
+      this.getExtensions(),
+    );
+    this.getSkillManager().setDisabledSkills(this.disabledSkills);
+
+    // Re-register ActivateSkillTool to update its schema with the newly discovered skills
+    if (this.getSkillManager().getSkills().length > 0) {
+      this.getToolRegistry().registerTool(
+        new ActivateSkillTool(this, this.messageBus),
+      );
+    } else {
+      this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
+    }
+
+    // Notify the client that system instructions might need updating
+    await this.updateSystemInstructionIfInitialized();
   }
 
   isInteractive(): boolean {
@@ -1690,14 +1735,14 @@ export class Config {
 
     registerCoreTool(GlobTool, this);
     registerCoreTool(ActivateSkillTool, this);
-    registerCoreTool(SmartEditTool, this);
+    registerCoreTool(EditTool, this);
     registerCoreTool(WriteFileTool, this);
     registerCoreTool(WebFetchTool, this);
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
     if (this.getUseWriteTodos()) {
-      registerCoreTool(WriteTodosTool, this);
+      registerCoreTool(WriteTodosTool);
     }
 
     // Register Subagents as Tools

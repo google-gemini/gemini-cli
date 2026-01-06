@@ -277,3 +277,26 @@ export interface ConversationInteraction {
   language?: string;
   isAgentic?: boolean;
 }
+
+export interface GeminiCodeAssistSetting {
+  secureModeEnabled?: boolean;
+  mcpSetting?: McpSetting;
+  cliFeatureSetting?: CliFeatureSetting;
+}
+
+export interface McpSetting {
+  mcpEnabled?: boolean;
+  allowedMcpConfigs?: McpConfig[];
+}
+
+export interface McpConfig {
+  mcpServer?: string;
+}
+
+export interface CliFeatureSetting {
+  extensionsSetting?: ExtensionsSetting;
+}
+
+export interface ExtensionsSetting {
+  extensionsEnabled?: boolean;
+}

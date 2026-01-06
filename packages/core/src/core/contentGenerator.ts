@@ -114,7 +114,10 @@ export async function createContentGenerator(
 ): Promise<ContentGenerator> {
   const generator = await (async () => {
     if (gcConfig.fakeResponses) {
-      return FakeContentGenerator.fromFile(gcConfig.fakeResponses);
+      return new LoggingContentGenerator(
+        await FakeContentGenerator.fromFile(gcConfig.fakeResponses),
+        gcConfig,
+      );
     }
     const version = await getVersion();
     const model = resolveModel(
