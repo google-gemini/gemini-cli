@@ -19,6 +19,7 @@ import {
   GEMINI_MODEL_ALIAS_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
   isPreviewModel,
+  isAutoModel,
 } from '../config/models.js';
 import type { ModelConfigAlias } from '../services/modelConfigService.js';
 
@@ -206,24 +207,46 @@ export class AgentRegistry {
       model = this.config.getModel();
     }
 
-    const runtimeAlias: ModelConfigAlias = {
-      modelConfig: {
-        model,
-        generateContentConfig: {
-          temperature: modelConfig.temp,
-          topP: modelConfig.top_p,
-          thinkingConfig: {
-            includeThoughts: true,
-            thinkingBudget: modelConfig.thinkingBudget ?? -1,
-          },
-        },
+    const generateContentConfig = {
+      temperature: modelConfig.temp,
+      topP: modelConfig.top_p,
+      thinkingConfig: {
+        includeThoughts: true,
+        thinkingBudget: modelConfig.thinkingBudget ?? -1,
       },
     };
 
-    this.config.modelConfigService.registerRuntimeModelConfig(
-      getModelConfigAlias(definition),
-      runtimeAlias,
-    );
+    if (isAutoModel(model)) {
+      this.config.modelConfigService.registerRuntimeModelOverride({
+        match: {
+          model: getModelConfigAlias(definition),
+        },
+        modelConfig: {
+          model,
+          generateContentConfig,
+        },
+      });
+      this.config.modelConfigService.registerRuntimeModelOverride({
+        match: {
+          overrideScope: definition.name,
+        },
+        modelConfig: {
+          generateContentConfig,
+        },
+      });
+    } else {
+      const runtimeAlias: ModelConfigAlias = {
+        modelConfig: {
+          model,
+          generateContentConfig,
+        },
+      };
+
+      this.config.modelConfigService.registerRuntimeModelConfig(
+        getModelConfigAlias(definition),
+        runtimeAlias,
+      );
+    }
   }
 
   /**

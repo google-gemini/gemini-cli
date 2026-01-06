@@ -24,11 +24,11 @@ export class OverrideStrategy implements RoutingStrategy {
   readonly name = 'override';
 
   async route(
-    _context: RoutingContext,
+    context: RoutingContext,
     config: Config,
     _baseLlmClient: BaseLlmClient,
   ): Promise<RoutingDecision | null> {
-    const overrideModel = config.getModel();
+    const overrideModel = context.requestedModel || config.getModel();
 
     // If the model is 'auto' we should pass to the next strategy.
     if (

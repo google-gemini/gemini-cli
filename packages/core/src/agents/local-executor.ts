@@ -40,6 +40,8 @@ import type {
 } from './types.js';
 import { AgentTerminateMode } from './types.js';
 import { templateString } from './utils.js';
+import { isAutoModel } from '../config/models.js';
+import type { RoutingContext } from '../routing/routingStrategy.js';
 import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
@@ -589,9 +591,34 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     signal: AbortSignal,
     promptId: string,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+    const modelConfigAlias = getModelConfigAlias(this.definition);
+
+    // Resolve the model config early to get the concrete model string (which may be `auto`).
+    const resolvedConfig =
+      this.runtimeContext.modelConfigService.getResolvedConfig({
+        model: modelConfigAlias,
+        overrideScope: this.definition.name,
+      });
+    const requestedModel = resolvedConfig.model;
+
+    let modelToUse: string;
+    if (isAutoModel(requestedModel)) {
+      const routingContext: RoutingContext = {
+        history: chat.getHistory(/*curated=*/ true),
+        request: message.parts || [],
+        signal,
+        requestedModel,
+      };
+      const router = this.runtimeContext.getModelRouterService();
+      const decision = await router.route(routingContext);
+      modelToUse = decision.model;
+    } else {
+      modelToUse = requestedModel;
+    }
+
     const responseStream = await chat.sendMessageStream(
       {
-        model: getModelConfigAlias(this.definition),
+        model: modelToUse,
         overrideScope: this.definition.name,
       },
       message.parts || [],
