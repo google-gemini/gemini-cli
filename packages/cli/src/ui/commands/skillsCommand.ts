@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,7 +10,11 @@ import {
   type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
-import { MessageType, type HistoryItemSkillsList } from '../types.js';
+import {
+  MessageType,
+  type HistoryItemSkillsList,
+  type HistoryItemInfo,
+} from '../types.js';
 import { SettingScope } from '../../config/settings.js';
 
 async function listAction(
@@ -104,7 +108,7 @@ async function disableAction(
   context.ui.addItem(
     {
       type: MessageType.INFO,
-      text: `Skill "${skillName}" disabled in ${scope} settings. Restart required to take effect.`,
+      text: `Skill "${skillName}" disabled in ${scope} settings. Use "/skills reload" for it to take effect.`,
     },
     Date.now(),
   );
@@ -148,10 +152,105 @@ async function enableAction(
   context.ui.addItem(
     {
       type: MessageType.INFO,
-      text: `Skill "${skillName}" enabled in ${scope} settings. Restart required to take effect.`,
+      text: `Skill "${skillName}" enabled in ${scope} settings. Use "/skills reload" for it to take effect.`,
     },
     Date.now(),
   );
+}
+
+async function reloadAction(
+  context: CommandContext,
+): Promise<void | SlashCommandActionReturn> {
+  const config = context.services.config;
+  if (!config) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: 'Could not retrieve configuration.',
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  const skillManager = config.getSkillManager();
+  const beforeNames = new Set(skillManager.getSkills().map((s) => s.name));
+
+  const startTime = Date.now();
+  let pendingItemSet = false;
+  const pendingTimeout = setTimeout(() => {
+    context.ui.setPendingItem({
+      type: MessageType.INFO,
+      text: 'Reloading agent skills...',
+    });
+    pendingItemSet = true;
+  }, 100);
+
+  try {
+    await config.reloadSkills();
+
+    clearTimeout(pendingTimeout);
+    if (pendingItemSet) {
+      // If we showed the pending item, make sure it stays for at least 500ms
+      // total to avoid a "flicker" where it appears and immediately disappears.
+      const elapsed = Date.now() - startTime;
+      const minVisibleDuration = 500;
+      if (elapsed < minVisibleDuration) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, minVisibleDuration - elapsed),
+        );
+      }
+      context.ui.setPendingItem(null);
+    }
+
+    const afterSkills = skillManager.getSkills();
+    const afterNames = new Set(afterSkills.map((s) => s.name));
+
+    const added = afterSkills.filter((s) => !beforeNames.has(s.name));
+    const removedCount = [...beforeNames].filter(
+      (name) => !afterNames.has(name),
+    ).length;
+
+    let successText = 'Agent skills reloaded successfully.';
+    const details: string[] = [];
+
+    if (added.length > 0) {
+      details.push(
+        `${added.length} newly available skill${added.length > 1 ? 's' : ''}`,
+      );
+    }
+    if (removedCount > 0) {
+      details.push(
+        `${removedCount} skill${removedCount > 1 ? 's' : ''} no longer available`,
+      );
+    }
+
+    if (details.length > 0) {
+      successText += ` ${details.join(' and ')}.`;
+    }
+
+    context.ui.addItem(
+      {
+        type: 'info',
+        text: successText,
+        icon: '✓ ',
+        color: 'green',
+      } as HistoryItemInfo,
+      Date.now(),
+    );
+  } catch (error) {
+    clearTimeout(pendingTimeout);
+    if (pendingItemSet) {
+      context.ui.setPendingItem(null);
+    }
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Failed to reload skills: ${error instanceof Error ? error.message : String(error)}`,
+      },
+      Date.now(),
+    );
+  }
 }
 
 function disableCompletion(
@@ -185,7 +284,7 @@ function enableCompletion(
 export const skillsCommand: SlashCommand = {
   name: 'skills',
   description:
-    'List, enable, or disable Gemini CLI agent skills. Usage: /skills [list | disable <name> | enable <name>]',
+    'List, enable, disable, or reload Gemini CLI agent skills. Usage: /skills [list | disable <name> | enable <name> | reload]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [
@@ -209,6 +308,13 @@ export const skillsCommand: SlashCommand = {
       kind: CommandKind.BUILT_IN,
       action: enableAction,
       completion: enableCompletion,
+    },
+    {
+      name: 'reload',
+      description:
+        'Reload the list of discovered skills. Usage: /skills reload',
+      kind: CommandKind.BUILT_IN,
+      action: reloadAction,
     },
   ],
   action: listAction,
