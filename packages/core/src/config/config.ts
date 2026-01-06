@@ -99,6 +99,11 @@ import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
+import type { SessionHookRunner } from '../core/sessionHookRunner.js';
+import {
+  createSessionHookRunner,
+  NoOpSessionHookRunner,
+} from '../core/sessionHookRunner.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 
 export interface AccessibilitySettings {
@@ -482,6 +487,7 @@ export class Config {
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
+  private sessionHookRunner?: SessionHookRunner;
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
     | (() => Promise<{ disabledSkills?: string[] }>)
@@ -1676,6 +1682,20 @@ export class Config {
 
   getEnableHooks(): boolean {
     return this.enableHooks;
+  }
+
+  getHookRunner(): SessionHookRunner {
+    if (!this.sessionHookRunner) {
+      const hooksEnabled = this.getEnableHooks();
+      const messageBus = this.getMessageBus();
+
+      if (hooksEnabled && messageBus) {
+        this.sessionHookRunner = createSessionHookRunner(messageBus);
+      } else {
+        this.sessionHookRunner = new NoOpSessionHookRunner();
+      }
+    }
+    return this.sessionHookRunner;
   }
 
   getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
