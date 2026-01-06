@@ -67,6 +67,36 @@ export interface MemoryChangedPayload {
   fileCount: number;
 }
 
+/**
+ * Base payload for hook-related events.
+ */
+export interface HookPayload {
+  hookName: string;
+  eventName: string;
+}
+
+/**
+ * Payload for the 'hook-start' event.
+ */
+export interface HookStartPayload extends HookPayload {
+  /**
+   * The 1-based index of the current hook in the execution sequence.
+   * Used for progress indication (e.g. "Hook 1/3").
+   */
+  hookIndex?: number;
+  /**
+   * The total number of hooks in the current execution sequence.
+   */
+  totalHooks?: number;
+}
+
+/**
+ * Payload for the 'hook-end' event.
+ */
+export interface HookEndPayload extends HookPayload {
+  success: boolean;
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
@@ -75,6 +105,8 @@ export enum CoreEvent {
   MemoryChanged = 'memory-changed',
   ExternalEditorClosed = 'external-editor-closed',
   SettingsChanged = 'settings-changed',
+  HookStart = 'hook-start',
+  HookEnd = 'hook-end',
 }
 
 export interface CoreEvents {
@@ -85,6 +117,8 @@ export interface CoreEvents {
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
   [CoreEvent.SettingsChanged]: never[];
+  [CoreEvent.HookStart]: [HookStartPayload];
+  [CoreEvent.HookEnd]: [HookEndPayload];
 }
 
 type EventBacklogItem = {
@@ -170,6 +204,20 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    */
   emitSettingsChanged(): void {
     this.emit(CoreEvent.SettingsChanged);
+  }
+
+  /**
+   * Notifies subscribers that a hook execution has started.
+   */
+  emitHookStart(payload: HookStartPayload): void {
+    this.emit(CoreEvent.HookStart, payload);
+  }
+
+  /**
+   * Notifies subscribers that a hook execution has ended.
+   */
+  emitHookEnd(payload: HookEndPayload): void {
+    this.emit(CoreEvent.HookEnd, payload);
   }
 
   /**
