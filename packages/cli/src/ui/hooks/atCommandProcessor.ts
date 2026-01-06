@@ -164,7 +164,10 @@ export async function handleAtCommand({
   };
 
   const toolRegistry = config.getToolRegistry();
-  const readManyFilesTool = new ReadManyFilesTool(config);
+  const readManyFilesTool = new ReadManyFilesTool(
+    config,
+    config.getMessageBus(),
+  );
   const globTool = toolRegistry.getTool('glob');
 
   if (!readManyFilesTool) {
@@ -502,7 +505,7 @@ export async function handleAtCommand({
     const errorMessages = resourceReadDisplays
       .filter((d) => d.status === ToolCallStatus.Error)
       .map((d) => d.resultDisplay);
-    console.error(errorMessages);
+    debugLogger.error(errorMessages);
     const errorMsg = `Exiting due to an error processing the @ command: ${firstError.resultDisplay}`;
     return { processedQuery: null, error: errorMsg };
   }
