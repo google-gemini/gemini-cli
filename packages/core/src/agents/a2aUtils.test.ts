@@ -141,8 +141,8 @@ describe('a2aUtils', () => {
       };
 
       const result = extractTaskText(task);
-      expect(result).toContain('ID:      task-1');
-      expect(result).toContain('State:   working');
+      expect(result).toContain('ID: task-1');
+      expect(result).toContain('State: working');
       expect(result).toContain('Status Message: Processing...');
     });
 

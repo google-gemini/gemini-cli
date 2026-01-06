@@ -60,8 +60,8 @@ export function extractPartText(part: Part): string {
  * Includes status, ID, and any artifact content.
  */
 export function extractTaskText(task: Task): string {
-  let output = `ID:      ${task.id}\n`;
-  output += `State:   ${task.status.state}\n`;
+  let output = `ID: ${task.id}\n`;
+  output += `State: ${task.status.state}\n`;
 
   // Status Message
   const statusMessageText = extractMessageText(task.status.message);

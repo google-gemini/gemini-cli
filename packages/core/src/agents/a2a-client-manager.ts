@@ -278,7 +278,11 @@ export function createAdapterFetch(baseFetch: typeof fetch): typeof fetch {
         }
 
         body = JSON.stringify(jsonBody);
-      } catch (_e) {
+      } catch (error) {
+        debugLogger.debug(
+          '[A2AClientManager] Failed to parse request body for dialect translation:',
+          error,
+        );
         // Non-JSON or parse error; let the baseFetch handle it.
       }
     }
