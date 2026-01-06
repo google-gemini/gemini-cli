@@ -35,7 +35,7 @@ async function panelAction(
       type: 'message',
       messageType: 'info',
       content:
-        'Hook system is not enabled. Enable it in settings with tools.enableHooks',
+        'Hook system is not enabled. Enable it in settings with hooks.enabled.',
     };
   }
 

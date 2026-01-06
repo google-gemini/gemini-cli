@@ -750,8 +750,8 @@ describe('extension tests', () => {
         );
 
         const settings = loadSettings(tempWorkspaceDir).merged;
-        if (!settings.tools) settings.tools = {};
-        settings.tools.enableHooks = true;
+        if (!settings.hooks) settings.hooks = {};
+        settings.hooks.enabled = true;
 
         extensionManager = new ExtensionManager({
           workspaceDir: tempWorkspaceDir,
@@ -771,7 +771,7 @@ describe('extension tests', () => {
         );
       });
 
-      it('should not load hooks if enableHooks is false', async () => {
+      it('should not load hooks if hooks.enabled is false', async () => {
         const extDir = createExtension({
           extensionsDir: userExtensionsDir,
           name: 'hook-extension-disabled',
@@ -786,8 +786,8 @@ describe('extension tests', () => {
         );
 
         const settings = loadSettings(tempWorkspaceDir).merged;
-        if (!settings.tools) settings.tools = {};
-        settings.tools.enableHooks = false;
+        if (!settings.hooks) settings.hooks = {};
+        settings.hooks.enabled = false;
 
         extensionManager = new ExtensionManager({
           workspaceDir: tempWorkspaceDir,
