@@ -120,6 +120,7 @@ describe('EditTool', () => {
       setGeminiMdFileCount: vi.fn(),
       getToolRegistry: () => ({}) as any,
       isInteractive: () => false,
+      getDisableLLMCorrection: vi.fn(() => false),
       getExperiments: () => {},
     } as unknown as Config;
 

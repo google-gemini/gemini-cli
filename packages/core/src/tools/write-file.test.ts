@@ -106,6 +106,7 @@ const mockConfigInternal = {
       discoverTools: vi.fn(),
     }) as unknown as ToolRegistry,
   isInteractive: () => false,
+  getDisableLLMCorrection: vi.fn(() => false),
 };
 const mockConfig = mockConfigInternal as unknown as Config;
 
@@ -293,6 +294,7 @@ describe('WriteFileTool', () => {
         proposedContent,
         mockBaseLlmClientInstance,
         abortSignal,
+        false,
       );
       expect(mockEnsureCorrectEdit).not.toHaveBeenCalled();
       expect(result.correctedContent).toBe(correctedContent);
@@ -337,6 +339,7 @@ describe('WriteFileTool', () => {
         mockGeminiClientInstance,
         mockBaseLlmClientInstance,
         abortSignal,
+        false,
       );
       expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
       expect(result.correctedContent).toBe(correctedProposedContent);
@@ -414,6 +417,7 @@ describe('WriteFileTool', () => {
         proposedContent,
         mockBaseLlmClientInstance,
         abortSignal,
+        false,
       );
       expect(confirmation).toEqual(
         expect.objectContaining({
@@ -455,16 +459,26 @@ describe('WriteFileTool', () => {
 
       expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
         filePath,
+
         originalContent,
+
         {
           old_string: originalContent,
+
           new_string: proposedContent,
+
           file_path: filePath,
         },
+
         mockGeminiClientInstance,
+
         mockBaseLlmClientInstance,
+
         abortSignal,
+
+        false,
       );
+
       expect(confirmation).toEqual(
         expect.objectContaining({
           title: `Confirm Write: ${path.basename(filePath)}`,
@@ -656,9 +670,14 @@ describe('WriteFileTool', () => {
 
       expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
         proposedContent,
+
         mockBaseLlmClientInstance,
+
         abortSignal,
+
+        false,
       );
+
       expect(result.llmContent).toMatch(
         /Successfully created and wrote to new file/,
       );
@@ -706,17 +725,28 @@ describe('WriteFileTool', () => {
 
       expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
         filePath,
+
         initialContent,
+
         {
           old_string: initialContent,
+
           new_string: proposedContent,
+
           file_path: filePath,
         },
+
         mockGeminiClientInstance,
+
         mockBaseLlmClientInstance,
+
         abortSignal,
+
+        false,
       );
+
       expect(result.llmContent).toMatch(/Successfully overwrote file/);
+
       const writtenContent = await fsService.readTextFile(filePath);
       expect(writtenContent).toBe(correctedProposedContent);
       const display = result.returnDisplay as FileDiff;
@@ -898,5 +928,74 @@ describe('WriteFileTool', () => {
         }
       },
     );
+  });
+
+  describe('disableLLMCorrection', () => {
+    const abortSignal = new AbortController().signal;
+
+    it('should call ensureCorrectFileContent with disableLLMCorrection=true for a new file when disabled', async () => {
+      const filePath = path.join(rootDir, 'new_file_no_correction.txt');
+      const proposedContent = 'Proposed content.';
+
+      mockConfigInternal.getDisableLLMCorrection.mockReturnValue(true);
+      // Ensure the mock returns the content passed to it (simulating no change or unescaped change)
+      mockEnsureCorrectFileContent.mockResolvedValue(proposedContent);
+
+      const result = await getCorrectedFileContent(
+        mockConfig,
+        filePath,
+        proposedContent,
+        abortSignal,
+      );
+
+      expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
+        proposedContent,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        true,
+      );
+      expect(mockEnsureCorrectEdit).not.toHaveBeenCalled();
+      expect(result.correctedContent).toBe(proposedContent);
+      expect(result.fileExists).toBe(false);
+    });
+
+    it('should call ensureCorrectEdit with disableLLMCorrection=true for an existing file when disabled', async () => {
+      const filePath = path.join(rootDir, 'existing_file_no_correction.txt');
+      const originalContent = 'Original content.';
+      const proposedContent = 'Proposed content.';
+      fs.writeFileSync(filePath, originalContent, 'utf8');
+
+      mockConfigInternal.getDisableLLMCorrection.mockReturnValue(true);
+      // Ensure the mock returns the content passed to it
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: {
+          file_path: filePath,
+          old_string: originalContent,
+          new_string: proposedContent,
+        },
+        occurrences: 1,
+      });
+
+      const result = await getCorrectedFileContent(
+        mockConfig,
+        filePath,
+        proposedContent,
+        abortSignal,
+      );
+
+      expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
+        filePath,
+        originalContent,
+        expect.anything(), // params object
+        mockGeminiClientInstance,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        true,
+      );
+      expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
+      expect(result.correctedContent).toBe(proposedContent);
+      expect(result.originalContent).toBe(originalContent);
+      expect(result.fileExists).toBe(true);
+    });
   });
 });

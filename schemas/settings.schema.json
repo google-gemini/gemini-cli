@@ -1128,6 +1128,13 @@
           "default": 1000,
           "type": "number"
         },
+        "disableLLMCorrection": {
+          "title": "Disable LLM Correction",
+          "description": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.",
+          "markdownDescription": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "enableHooks": {
           "title": "Enable Hooks System",
           "description": "Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.",
