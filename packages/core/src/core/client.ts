@@ -60,6 +60,7 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
+import { resolveModel } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 
 const MAX_TURNS = 100;
@@ -508,7 +509,9 @@ export class GeminiClient {
 
     // Availability logic: The configured model is the source of truth,
     // including any permanent fallbacks (config.setModel) or manual overrides.
-    return this.config.getActiveModel();
+    // Resolve auto model names (e.g., "auto-gemini-3") to concrete model names
+    // (e.g., "gemini-3-pro-preview") so that API calls like countTokens work correctly.
+    return resolveModel(this.config.getActiveModel());
   }
 
   private async *processTurn(
