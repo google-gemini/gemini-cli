@@ -163,8 +163,7 @@ export class McpClientManager {
       return;
     }
 
-    const currentDiscoveryPromise = new Promise<void>((resolve, _reject) => {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    const currentDiscoveryPromise = new Promise<void>((resolve, reject) => {
       (async () => {
         try {
           if (existing) {
@@ -212,6 +211,13 @@ export class McpClientManager {
               );
             }
           }
+        } catch (error) {
+          const errorMessage = getErrorMessage(error);
+          coreEvents.emitFeedback(
+            'error',
+            `Error initializing MCP server '${name}': ${errorMessage}`,
+            error,
+          );
         } finally {
           // This is required to update the content generator configuration with the
           // new tool configuration.
@@ -221,28 +227,30 @@ export class McpClientManager {
           }
           resolve();
         }
-      })();
+      })().catch(reject);
     });
 
     if (this.discoveryPromise) {
-      this.discoveryPromise = this.discoveryPromise.then(
-        () => currentDiscoveryPromise,
-      );
+      // Ensure the next discovery starts regardless of the previous one's success/failure
+      this.discoveryPromise = this.discoveryPromise
+        .catch(() => {})
+        .then(() => currentDiscoveryPromise);
     } else {
       this.discoveryState = MCPDiscoveryState.IN_PROGRESS;
       this.discoveryPromise = currentDiscoveryPromise;
     }
     this.eventEmitter?.emit('mcp-client-update', this.clients);
     const currentPromise = this.discoveryPromise;
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    currentPromise.then((_) => {
-      // If we are the last recorded discoveryPromise, then we are done, reset
-      // the world.
-      if (currentPromise === this.discoveryPromise) {
-        this.discoveryPromise = undefined;
-        this.discoveryState = MCPDiscoveryState.COMPLETED;
-      }
-    });
+    void currentPromise
+      .finally(() => {
+        // If we are the last recorded discoveryPromise, then we are done, reset
+        // the world.
+        if (currentPromise === this.discoveryPromise) {
+          this.discoveryPromise = undefined;
+          this.discoveryState = MCPDiscoveryState.COMPLETED;
+        }
+      })
+      .catch(() => {}); // Prevents unhandled rejection from the .finally branch
     return currentPromise;
   }
 

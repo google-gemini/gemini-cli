@@ -18,6 +18,19 @@ import { RELAUNCH_EXIT_CODE } from './processUtils.js';
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
 
+const mocks = vi.hoisted(() => ({
+  writeToStderr: vi.fn(),
+}));
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    writeToStderr: mocks.writeToStderr,
+  };
+});
+
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
   return {
@@ -33,23 +46,21 @@ import { relaunchAppInChildProcess, relaunchOnExitCode } from './relaunch.js';
 
 describe('relaunchOnExitCode', () => {
   let processExitSpy: MockInstance;
-  let consoleErrorSpy: MockInstance;
   let stdinResumeSpy: MockInstance;
 
   beforeEach(() => {
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('PROCESS_EXIT_CALLED');
     });
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     stdinResumeSpy = vi
       .spyOn(process.stdin, 'resume')
       .mockImplementation(() => process.stdin);
     vi.clearAllMocks();
+    mocks.writeToStderr.mockClear();
   });
 
   afterEach(() => {
     processExitSpy.mockRestore();
-    consoleErrorSpy.mockRestore();
     stdinResumeSpy.mockRestore();
   });
 
@@ -90,9 +101,10 @@ describe('relaunchOnExitCode', () => {
     );
 
     expect(runner).toHaveBeenCalledTimes(1);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Fatal error: Failed to relaunch the CLI process.',
-      error,
+    expect(mocks.writeToStderr).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Fatal error: Failed to relaunch the CLI process.',
+      ),
     );
     expect(stdinResumeSpy).toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(1);
@@ -101,7 +113,6 @@ describe('relaunchOnExitCode', () => {
 
 describe('relaunchAppInChildProcess', () => {
   let processExitSpy: MockInstance;
-  let consoleErrorSpy: MockInstance;
   let stdinPauseSpy: MockInstance;
   let stdinResumeSpy: MockInstance;
 
@@ -113,6 +124,7 @@ describe('relaunchAppInChildProcess', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.writeToStderr.mockClear();
 
     process.env = { ...originalEnv };
     delete process.env['GEMINI_CLI_NO_RELAUNCH'];
@@ -124,7 +136,6 @@ describe('relaunchAppInChildProcess', () => {
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('PROCESS_EXIT_CALLED');
     });
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     stdinPauseSpy = vi
       .spyOn(process.stdin, 'pause')
       .mockImplementation(() => process.stdin);
@@ -140,7 +151,6 @@ describe('relaunchAppInChildProcess', () => {
     process.execPath = originalExecPath;
 
     processExitSpy.mockRestore();
-    consoleErrorSpy.mockRestore();
     stdinPauseSpy.mockRestore();
     stdinResumeSpy.mockRestore();
   });
