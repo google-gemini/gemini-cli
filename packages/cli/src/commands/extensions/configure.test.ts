@@ -133,7 +133,7 @@ describe('extensions configure command', () => {
       ]);
       (updateSetting as Mock).mockResolvedValue(undefined);
 
-      await runCommand('configure test-ext TEST_VAR');
+      await runCommand('config test-ext TEST_VAR');
 
       expect(updateSetting).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'test-ext' }),
@@ -150,18 +150,18 @@ describe('extensions configure command', () => {
         extensionManager: null,
       });
 
-      await runCommand('configure missing-ext TEST_VAR');
+      await runCommand('config missing-ext TEST_VAR');
 
       expect(updateSetting).not.toHaveBeenCalled();
     });
 
     it('should reject invalid extension names', async () => {
-      await runCommand('configure ../invalid TEST_VAR');
+      await runCommand('config ../invalid TEST_VAR');
       expect(debugLogger.error).toHaveBeenCalledWith(
         expect.stringContaining('Invalid extension name'),
       );
 
-      await runCommand('configure ext/with/slash TEST_VAR');
+      await runCommand('config ext/with/slash TEST_VAR');
       expect(debugLogger.error).toHaveBeenCalledWith(
         expect.stringContaining('Invalid extension name'),
       );
@@ -175,7 +175,7 @@ describe('extensions configure command', () => {
       (getScopedEnvContents as Mock).mockResolvedValue({});
       (updateSetting as Mock).mockResolvedValue(undefined);
 
-      await runCommand('configure test-ext');
+      await runCommand('config test-ext');
 
       expect(debugLogger.log).toHaveBeenCalledWith(
         'Configuring settings for "test-ext"...',
@@ -201,7 +201,7 @@ describe('extensions configure command', () => {
       (prompts as unknown as Mock).mockResolvedValue({ overwrite: true });
       (updateSetting as Mock).mockResolvedValue(undefined);
 
-      await runCommand('configure test-ext');
+      await runCommand('config test-ext');
 
       expect(prompts).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -223,7 +223,7 @@ describe('extensions configure command', () => {
       );
       (updateSetting as Mock).mockResolvedValue(undefined);
 
-      await runCommand('configure test-ext');
+      await runCommand('config test-ext');
 
       expect(debugLogger.log).toHaveBeenCalledWith(
         expect.stringContaining('is already configured in the workspace scope'),
@@ -236,7 +236,7 @@ describe('extensions configure command', () => {
       (getScopedEnvContents as Mock).mockResolvedValue({ VAR_1: 'existing' });
       (prompts as unknown as Mock).mockResolvedValue({ overwrite: false });
 
-      await runCommand('configure test-ext');
+      await runCommand('config test-ext');
 
       expect(prompts).toHaveBeenCalled();
       expect(updateSetting).not.toHaveBeenCalled();
@@ -272,7 +272,7 @@ describe('extensions configure command', () => {
       (getScopedEnvContents as Mock).mockResolvedValue({});
       (updateSetting as Mock).mockResolvedValue(undefined);
 
-      await runCommand('configure');
+      await runCommand('config');
 
       expect(debugLogger.log).toHaveBeenCalledWith(
         expect.stringContaining('Configuring settings for "ext1"'),
@@ -285,7 +285,7 @@ describe('extensions configure command', () => {
 
     it('should log if no extensions installed', async () => {
       mockExtensionManager.getExtensions.mockReturnValue([]);
-      await runCommand('configure');
+      await runCommand('config');
       expect(debugLogger.log).toHaveBeenCalledWith('No extensions installed.');
     });
   });
