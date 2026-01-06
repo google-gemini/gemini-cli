@@ -91,7 +91,6 @@ import { useVim } from './hooks/vim.js';
 import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
-import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { keyMatchers, Command } from './keyMatchers.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
@@ -123,7 +122,6 @@ import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
-import { enableBracketedPaste } from './utils/bracketedPaste.js';
 import { useBanner } from './hooks/useBanner.js';
 import { useNotification } from './hooks/useNotification.js';
 
@@ -194,6 +192,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
   const [historyRemountKey, setHistoryRemountKey] = useState(0);
+  const [settingsNonce, setSettingsNonce] = useState(0);
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
   const [isTrustedFolder, setIsTrustedFolder] = useState<boolean | undefined>(
     isWorkspaceTrusted(settings.merged).isTrusted,
@@ -257,10 +256,7 @@ export const AppContainer = (props: AppContainerProps) => {
     [],
   );
 
-  // Helper to determine the effective model, considering the fallback state.
-  const getEffectiveModel = useCallback(() => config.getModel(), [config]);
-
-  const [currentModel, setCurrentModel] = useState(getEffectiveModel());
+  const [currentModel, setCurrentModel] = useState(config.getModel());
 
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
 
@@ -307,7 +303,31 @@ export const AppContainer = (props: AppContainerProps) => {
         const sessionStartSource = resumedSessionData
           ? SessionStartSource.Resume
           : SessionStartSource.Startup;
-        await fireSessionStartHook(hookMessageBus, sessionStartSource);
+        const result = await fireSessionStartHook(
+          hookMessageBus,
+          sessionStartSource,
+        );
+
+        if (result) {
+          if (result.systemMessage) {
+            historyManager.addItem(
+              {
+                type: MessageType.INFO,
+                text: result.systemMessage,
+              },
+              Date.now(),
+            );
+          }
+
+          const additionalContext = result.getAdditionalContext();
+          const geminiClient = config.getGeminiClient();
+          if (additionalContext && geminiClient) {
+            await geminiClient.addHistory({
+              role: 'user',
+              parts: [{ text: additionalContext }],
+            });
+          }
+        }
       }
 
       // Fire-and-forget: generate summary for previous session in background
@@ -328,6 +348,12 @@ export const AppContainer = (props: AppContainerProps) => {
         await fireSessionEndHook(hookMessageBus, SessionEndReason.Exit);
       }
     });
+    // Disable the dependencies check here. historyManager gets flagged
+    // but we don't want to react to changes to it because each new history
+    // item, including the ones from the start session hook will cause a
+    // re-render and an error when we try to reload config.
+    //
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, resumedSessionData]);
 
   useEffect(
@@ -345,7 +371,18 @@ export const AppContainer = (props: AppContainerProps) => {
     return () => {
       coreEvents.off(CoreEvent.ModelChanged, handleModelChanged);
     };
-  }, [getEffectiveModel, config]);
+  }, [config]);
+
+  useEffect(() => {
+    const handleSettingsChanged = () => {
+      setSettingsNonce((prev) => prev + 1);
+    };
+
+    coreEvents.on(CoreEvent.SettingsChanged, handleSettingsChanged);
+    return () => {
+      coreEvents.off(CoreEvent.SettingsChanged, handleSettingsChanged);
+    };
+  }, []);
 
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();
@@ -401,8 +438,7 @@ export const AppContainer = (props: AppContainerProps) => {
       disableLineWrapping();
       app.rerender();
     }
-    enableBracketedPaste();
-    terminalCapabilityManager.enableKittyProtocol();
+    terminalCapabilityManager.enableSupportedModes();
     refreshStatic();
   }, [refreshStatic, isAlternateBuffer, app, config]);
 
@@ -849,16 +885,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const handleClearScreen = useCallback(() => {
     historyManager.clearItems();
     clearConsoleMessagesState();
-    if (!isAlternateBuffer) {
-      console.clear();
-    }
     refreshStatic();
-  }, [
-    historyManager,
-    clearConsoleMessagesState,
-    refreshStatic,
-    isAlternateBuffer,
-  ]);
+  }, [historyManager, clearConsoleMessagesState, refreshStatic]);
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
@@ -906,10 +934,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ),
     pager: settings.merged.tools?.shell?.pager,
     showColor: settings.merged.tools?.shell?.showColor,
+    sanitizationConfig: config.sanitizationConfig,
   });
 
   const isFocused = useFocus();
-  useBracketedPaste();
   useNotification(streamingState, isFocused, settings.merged);
 
   // Context file names computation
@@ -1535,6 +1563,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerData,
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
+      settingsNonce,
     }),
     [
       isThemeDialogOpen,
@@ -1627,6 +1656,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerData,
       bannerVisible,
       config,
+      settingsNonce,
     ],
   );
 
