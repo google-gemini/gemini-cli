@@ -818,11 +818,11 @@ class EditToolInvocation
         displayResult = {
           fileDiff,
           fileName,
-          filePath:  this.params.file_path, 
+          filePath: this.params.file_path,
           originalContent: editData.currentContent,
           newContent: editData.newContent,
           diffStat,
-          isNewFile: editData.isNewFile
+          isNewFile: editData.isNewFile,
         };
       }
 
