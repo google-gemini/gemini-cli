@@ -6,8 +6,12 @@
 
 import { isDevelopment } from '../utils/installationInfo.js';
 import type { ICommandLoader } from './types.js';
-import type { SlashCommand } from '../ui/commands/types.js';
-import type { Config } from '@google/gemini-cli-core';
+import {
+  CommandKind,
+  type SlashCommand,
+  type CommandContext,
+} from '../ui/commands/types.js';
+import type { MessageActionReturn, Config } from '@google/gemini-cli-core';
 import { startupProfiler } from '@google/gemini-cli-core';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
@@ -78,7 +82,25 @@ export class BuiltinCommandLoader implements ICommandLoader {
       ...(this.config?.getEnableHooks() ? [hooksCommand] : []),
       await ideCommand(),
       initCommand,
-      mcpCommand,
+      ...(this.config?.getMcpEnabled() === false
+        ? [
+            {
+              name: 'mcp',
+              description:
+                'Manage configured Model Context Protocol (MCP) servers',
+              kind: CommandKind.BUILT_IN,
+              autoExecute: false,
+              subCommands: [],
+              action: async (
+                _context: CommandContext,
+              ): Promise<MessageActionReturn> => ({
+                type: 'message',
+                messageType: 'error',
+                content: 'MCP disabled by your admin.',
+              }),
+            },
+          ]
+        : [mcpCommand]),
       memoryCommand,
       modelCommand,
       ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),

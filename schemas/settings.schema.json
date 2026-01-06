@@ -1129,10 +1129,10 @@
           "type": "number"
         },
         "enableHooks": {
-          "title": "Enable Hooks System",
-          "description": "Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.",
-          "markdownDescription": "Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "title": "Enable Hooks System (Experimental)",
+          "description": "Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.",
+          "markdownDescription": "Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         }
       },
@@ -1502,6 +1502,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "enabled": {
+          "title": "Enable Hooks",
+          "description": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.",
+          "markdownDescription": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "disabled": {
           "title": "Disabled Hooks",
           "description": "List of hook names (commands) that should be disabled. Hooks in this list will not execute even if configured.",
@@ -1511,6 +1518,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "notifications": {
+          "title": "Hook Notifications",
+          "description": "Show visual indicators when hooks are executing.",
+          "markdownDescription": "Show visual indicators when hooks are executing.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
         },
         "BeforeTool": {
           "title": "Before Tool Hooks",
@@ -1594,6 +1608,57 @@
         "type": "array",
         "items": {}
       }
+    },
+    "admin": {
+      "title": "Admin",
+      "description": "Settings configured remotely by enterprise admins.",
+      "markdownDescription": "Settings configured remotely by enterprise admins.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "secureModeEnabled": {
+          "title": "Secure Mode Enabled",
+          "description": "If true, disallows yolo mode from being used.",
+          "markdownDescription": "If true, disallows yolo mode from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "extensions": {
+          "title": "Extensions Settings",
+          "description": "Extensions-specific admin settings.",
+          "markdownDescription": "Extensions-specific admin settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Extensions Enabled",
+              "description": "If false, disallows extensions from being installed or used.",
+              "markdownDescription": "If false, disallows extensions from being installed or used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mcp": {
+          "title": "MCP Settings",
+          "description": "MCP-specific admin settings.",
+          "markdownDescription": "MCP-specific admin settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "MCP Enabled",
+              "description": "If false, disallows MCP servers from being used.",
+              "markdownDescription": "If false, disallows MCP servers from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "$defs": {
