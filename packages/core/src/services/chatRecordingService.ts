@@ -501,7 +501,10 @@ export class ChatRecordingService {
    * Rewinds the conversation to the state just before the specified message ID.
    * All messages from (and including) the specified ID onwards are removed.
    */
-  rewindTo(messageId: string): ConversationRecord {
+  rewindTo(messageId: string): ConversationRecord | null {
+    if (!this.conversationFile) {
+      return null;
+    }
     const conversation = this.readConversation();
     const messageIndex = conversation.messages.findIndex(
       (m) => m.id === messageId,
