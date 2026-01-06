@@ -11,7 +11,7 @@ jobs:
       issues: write
     steps:
       - name: Check for Parent Workstream and Apply Label
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             const issue = context.payload.issue;
@@ -20,8 +20,8 @@ jobs:
             // Define the label to add
             const labelToAdd = "workstream-rollup";
 
-            // Check if the issue has a parent and if that parent is in our list
-            if (issue.parent && parentWorkstreamNumbers.includes(issue.parent.number)) {
+            // Check if the issue has a body and a parent, and if that parent is in our list
+            if (issue && issue.body && issue.parent && parentWorkstreamNumbers.includes(issue.parent.number)) {
               console.log(`Issue #${issue.number} is a child of a target workstream. Adding label.`);
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
@@ -30,5 +30,5 @@ jobs:
                 labels: [labelToAdd]
               });
             } else {
-              console.log(`Issue #${issue.number} is not a child of a target workstream. No action taken.`);
+              console.log(`Issue #${issue.number} is not a valid child of a target workstream or has no body. No action taken.`);
             }
