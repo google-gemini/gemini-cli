@@ -15,10 +15,10 @@ describe('calculateRequestTokenCount', () => {
 
   const model = 'gemini-pro';
 
-  it('should use countTokens API for media requests (images/files)', async () => {
-    vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
-      totalTokens: 100,
-    });
+  it('should use local tokenizer for media requests (images/files)', async () => {
+    // Local tokenizer calculates image tokens based on dimensions, not API calls
+    // For unsupported/small image data, it uses default dimensions (512x512)
+    // which gives: (512*512)/(28*28) + 2 = 336 tokens
     const request = [{ inlineData: { mimeType: 'image/png', data: 'data' } }];
 
     const count = await calculateRequestTokenCount(
@@ -27,8 +27,12 @@ describe('calculateRequestTokenCount', () => {
       model,
     );
 
-    expect(count).toBe(100);
-    expect(mockContentGenerator.countTokens).toHaveBeenCalled();
+    // Should return tokens calculated by local tokenizer, not API
+    // Default 512x512 image: ~336 tokens (rounded based on 28x28 pixel grid)
+    expect(count).toBeGreaterThan(0);
+    expect(count).toBeLessThan(1000); // Much less than base64-based estimation
+    // API should NOT be called - we use local calculation now
+    expect(mockContentGenerator.countTokens).not.toHaveBeenCalled();
   });
 
   it('should estimate tokens locally for tool calls', async () => {
@@ -106,10 +110,8 @@ describe('calculateRequestTokenCount', () => {
     expect(count).toBe(0);
   });
 
-  it('should fallback to local estimation when countTokens API fails', async () => {
-    vi.mocked(mockContentGenerator.countTokens).mockRejectedValue(
-      new Error('API error'),
-    );
+  it('should calculate tokens locally for mixed text and image content', async () => {
+    vi.mocked(mockContentGenerator.countTokens).mockClear();
     const request = [
       { text: 'Hello' },
       { inlineData: { mimeType: 'image/png', data: 'data' } },
@@ -121,10 +123,11 @@ describe('calculateRequestTokenCount', () => {
       model,
     );
 
-    // Should fallback to estimation:
-    // 'Hello': 5 chars * 0.25 = 1.25
-    // inlineData: JSON.stringify length / 4
+    // Local tokenizer calculates:
+    // 'Hello': 5 chars * 0.25 = 1 token
+    // Image: ~336 tokens (512x512 default for invalid data)
     expect(count).toBeGreaterThan(0);
-    expect(mockContentGenerator.countTokens).toHaveBeenCalled();
+    // API should NOT be called - we use local calculation now
+    expect(mockContentGenerator.countTokens).not.toHaveBeenCalled();
   });
 });
