@@ -50,6 +50,7 @@ export * from './code_assist/telemetry.js';
 export * from './core/apiKeyCredentialStorage.js';
 
 // Export utilities
+export { homedir, tmpdir } from './utils/paths.js';
 export * from './utils/paths.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
