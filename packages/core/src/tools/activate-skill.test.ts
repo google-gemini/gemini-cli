@@ -29,6 +29,9 @@ describe('ActivateSkillTool', () => {
       },
     ];
     mockConfig = {
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        addDirectory: vi.fn(),
+      }),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue(skills),
         getAllSkills: vi.fn().mockReturnValue(skills),
@@ -80,6 +83,9 @@ describe('ActivateSkillTool', () => {
 
     expect(mockConfig.getSkillManager().activateSkill).toHaveBeenCalledWith(
       'test-skill',
+    );
+    expect(mockConfig.getWorkspaceContext().addDirectory).toHaveBeenCalledWith(
+      '/path/to/test-skill',
     );
     expect(result.llmContent).toContain('<ACTIVATED_SKILL name="test-skill">');
     expect(result.llmContent).toContain('<INSTRUCTIONS>');
