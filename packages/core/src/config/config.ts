@@ -25,7 +25,7 @@ import { GrepTool } from '../tools/grep.js';
 import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
 import { GlobTool } from '../tools/glob.js';
 import { ActivateSkillTool } from '../tools/activate-skill.js';
-import { SmartEditTool } from '../tools/smart-edit.js';
+import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
@@ -356,6 +356,7 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   experimentalJitContext?: boolean;
   onModelChange?: (model: string) => void;
+  onReload?: () => Promise<{ disabledSkills?: string[] }>;
 }
 
 export class Config {
@@ -479,10 +480,13 @@ export class Config {
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
+  private readonly onReload:
+    | (() => Promise<{ disabledSkills?: string[] }>)
+    | undefined;
 
   private readonly enableAgents: boolean;
   private readonly skillsSupport: boolean;
-  private readonly disabledSkills: string[];
+  private disabledSkills: string[];
 
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
@@ -643,6 +647,7 @@ export class Config {
     this.projectHooks = params.projectHooks;
     this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
+    this.onReload = params.onReload;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -909,13 +914,13 @@ export class Config {
     return this.model;
   }
 
-  setModel(newModel: string, isFallbackModel: boolean = false): void {
+  setModel(newModel: string, isTemporary: boolean = true): void {
     if (this.model !== newModel || this._activeModel !== newModel) {
       this.model = newModel;
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
-      if (this.onModelChange && !isFallbackModel) {
+      if (this.onModelChange && !isTemporary) {
         this.onModelChange(newModel);
       }
     }
@@ -1520,6 +1525,38 @@ export class Config {
     return this.skillsSupport;
   }
 
+  /**
+   * Reloads skills by re-discovering them from extensions and local directories.
+   */
+  async reloadSkills(): Promise<void> {
+    if (!this.skillsSupport) {
+      return;
+    }
+
+    if (this.onReload) {
+      const refreshed = await this.onReload();
+      this.disabledSkills = refreshed.disabledSkills ?? [];
+    }
+
+    await this.getSkillManager().discoverSkills(
+      this.storage,
+      this.getExtensions(),
+    );
+    this.getSkillManager().setDisabledSkills(this.disabledSkills);
+
+    // Re-register ActivateSkillTool to update its schema with the newly discovered skills
+    if (this.getSkillManager().getSkills().length > 0) {
+      this.getToolRegistry().registerTool(
+        new ActivateSkillTool(this, this.messageBus),
+      );
+    } else {
+      this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
+    }
+
+    // Notify the client that system instructions might need updating
+    await this.updateSystemInstructionIfInitialized();
+  }
+
   isInteractive(): boolean {
     return this.interactive;
   }
@@ -1690,7 +1727,7 @@ export class Config {
 
     registerCoreTool(GlobTool, this);
     registerCoreTool(ActivateSkillTool, this);
-    registerCoreTool(SmartEditTool, this);
+    registerCoreTool(EditTool, this);
     registerCoreTool(WriteFileTool, this);
     registerCoreTool(WebFetchTool, this);
     registerCoreTool(ShellTool, this);
