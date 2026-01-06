@@ -23,7 +23,7 @@ interface ConfigureArgs {
 }
 
 export const configureCommand: CommandModule<object, ConfigureArgs> = {
-  command: 'configure [name] [setting]',
+  command: 'config [name] [setting]',
   describe: 'Configure extension settings.',
   builder: (yargs) =>
     yargs
