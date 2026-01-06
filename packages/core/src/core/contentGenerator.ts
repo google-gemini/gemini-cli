@@ -173,7 +173,12 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
-      const httpOptions = { headers };
+      // Support custom base URL for local LLM proxies (Ollama, LiteLLM, etc.)
+      const baseUrl = process.env['GEMINI_API_BASE_URL'] || undefined;
+      const httpOptions = {
+        headers,
+        ...(baseUrl && { baseUrl }),
+      };
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
