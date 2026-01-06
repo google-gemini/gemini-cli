@@ -51,11 +51,14 @@ export interface TerminalSetupResult {
   requiresRestart?: boolean;
 }
 
-type SupportedTerminal = 'vscode' | 'cursor' | 'windsurf';
+type SupportedTerminal = 'vscode' | 'cursor' | 'windsurf' | 'ghostty';
 
 export function getTerminalProgram(): SupportedTerminal | null {
   const termProgram = process.env['TERM_PROGRAM'];
 
+  if (process.env['GHOSTTY_BIN_DIR'] || process.env['GHOSTTY_RESOURCES_DIR']) {
+    return 'ghostty';
+  }
   // Check VS Code and its forks - check forks first to avoid false positives
   // Check for Cursor-specific indicators
   if (
@@ -90,6 +93,9 @@ async function detectTerminal(): Promise<SupportedTerminal | null> {
       const { stdout } = await execAsync('ps -o comm= -p $PPID');
       const parentName = stdout.trim();
 
+      // Check Ghostty
+      if (parentName.includes('ghostty') || parentName.includes('Ghostty'))
+        return 'ghostty';
       // Check forks before VS Code to avoid false positives
       if (parentName.includes('windsurf') || parentName.includes('Windsurf'))
         return 'windsurf';
@@ -302,6 +308,70 @@ async function configureWindsurf(): Promise<TerminalSetupResult> {
   return configureVSCodeStyle('Windsurf', 'Windsurf');
 }
 
+async function configureGhostty(): Promise<TerminalSetupResult> {
+  const platform = os.platform();
+  let configPath: string;
+
+  if (platform === 'darwin') {
+    configPath = path.join(
+      os.homedir(),
+      'Library',
+      'Application Support',
+      'com.mitchellh.ghostty',
+      'config',
+    );
+  } else {
+    configPath = path.join(os.homedir(), '.config', 'ghostty', 'config');
+  }
+
+  try {
+    let content = '';
+    try {
+      content = await fs.readFile(configPath, 'utf8');
+      await backupFile(configPath);
+    } catch {
+      // Config doesn't exist, we'll create it
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+    }
+
+    const optionAsAlt = 'macos-option-as-alt = true';
+
+    if (content.includes('macos-option-as-alt')) {
+      if (content.includes(optionAsAlt)) {
+        return {
+          success: true,
+          message:
+            'Ghostty is already configured with macos-option-as-alt = true.',
+        };
+      } else {
+        return {
+          success: false,
+          message:
+            'Ghostty config already contains a macos-option-as-alt setting. Please manually set it to true.\n' +
+            `File: ${configPath}`,
+        };
+      }
+    }
+
+    const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
+    await fs.appendFile(configPath, `${separator}${optionAsAlt}\n`);
+
+    return {
+      success: true,
+      message:
+        `Successfully added "${optionAsAlt}" to Ghostty configuration.\n` +
+        `This enables improved input mechanics like word deletion (Alt+Backspace).\n` +
+        `Modified: ${configPath}`,
+      requiresRestart: true,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to configure Ghostty.\nFile: ${configPath}\nError: ${error}`,
+    };
+  }
+}
+
 /**
  * Main terminal setup function that detects and configures the current terminal.
  *
@@ -322,22 +392,26 @@ async function configureWindsurf(): Promise<TerminalSetupResult> {
  * }
  */
 export async function terminalSetup(): Promise<TerminalSetupResult> {
-  // Check if terminal already has optimal keyboard support
-  if (terminalCapabilityManager.isKittyProtocolEnabled()) {
-    return {
-      success: true,
-      message:
-        'Your terminal is already configured for an optimal experience with multiline input (Shift+Enter and Ctrl+Enter).',
-    };
-  }
-
   const terminal = await detectTerminal();
 
   if (!terminal) {
     return {
       success: false,
       message:
-        'Could not detect terminal type. Supported terminals: VS Code, Cursor, and Windsurf.',
+        'Could not detect terminal type. Supported terminals: VS Code, Cursor, Windsurf, and Ghostty.',
+    };
+  }
+
+  // Check if terminal already has optimal keyboard support (only for VSCode styles for now)
+  // Ghostty might have Kitty protocol but still need macos-option-as-alt for Meta keys
+  if (
+    terminal !== 'ghostty' &&
+    terminalCapabilityManager.isKittyProtocolEnabled()
+  ) {
+    return {
+      success: true,
+      message:
+        'Your terminal is already configured for an optimal experience with multiline input (Shift+Enter and Ctrl+Enter).',
     };
   }
 
@@ -348,6 +422,8 @@ export async function terminalSetup(): Promise<TerminalSetupResult> {
       return configureCursor();
     case 'windsurf':
       return configureWindsurf();
+    case 'ghostty':
+      return configureGhostty();
     default:
       return {
         success: false,

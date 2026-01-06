@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   mkdir: vi.fn(),
   readFile: vi.fn(),
   writeFile: vi.fn(),
+  appendFile: vi.fn(),
   copyFile: vi.fn(),
   homedir: vi.fn(),
   platform: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('node:fs', () => ({
     mkdir: mocks.mkdir,
     readFile: mocks.readFile,
     writeFile: mocks.writeFile,
+    appendFile: mocks.appendFile,
     copyFile: mocks.copyFile,
   },
 }));
@@ -42,9 +44,11 @@ vi.mock('node:os', () => ({
   platform: mocks.platform,
 }));
 
+import { terminalCapabilityManager } from './terminalCapabilityManager.js';
+
 vi.mock('./terminalCapabilityManager.js', () => ({
   terminalCapabilityManager: {
-    isKittyProtocolEnabled: vi.fn().mockReturnValue(false),
+    isKittyProtocolEnabled: vi.fn(),
   },
 }));
 
@@ -59,8 +63,12 @@ describe('terminalSetup', () => {
     mocks.homedir.mockReturnValue('/home/user');
     mocks.platform.mockReturnValue('darwin');
     mocks.mkdir.mockResolvedValue(undefined);
+    mocks.appendFile.mockResolvedValue(undefined);
     mocks.copyFile.mockResolvedValue(undefined);
     mocks.exec.mockImplementation((cmd, cb) => cb(null, { stdout: '' }));
+    vi.mocked(terminalCapabilityManager.isKittyProtocolEnabled).mockReturnValue(
+      false,
+    );
   });
 
   afterEach(() => {
@@ -84,6 +92,12 @@ describe('terminalSetup', () => {
       process.env['VSCODE_GIT_ASKPASS_MAIN'] = '/path/to/windsurf/askpass';
       const result = await terminalSetup();
       expect(result.message).toContain('Windsurf');
+    });
+
+    it('should detect Ghostty from env var', async () => {
+      process.env['GHOSTTY_BIN_DIR'] = '/path/to/ghostty';
+      const result = await terminalSetup();
+      expect(result.message).toContain('Ghostty');
     });
 
     it('should detect from parent process', async () => {
@@ -163,6 +177,49 @@ describe('terminalSetup', () => {
 
       expect(result.success).toBe(true);
       expect(mocks.writeFile).toHaveBeenCalled();
+    });
+  });
+
+  describe('configureGhostty', () => {
+    beforeEach(() => {
+      process.env['GHOSTTY_BIN_DIR'] = '/path/to/ghostty';
+    });
+
+    it('should create new ghostty config if none exists', async () => {
+      mocks.readFile.mockRejectedValue(new Error('ENOENT'));
+      mocks.platform.mockReturnValue('darwin');
+      mocks.homedir.mockReturnValue('/home/user');
+
+      const result = await terminalSetup();
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('word deletion (Alt+Backspace)');
+      expect(mocks.mkdir).toHaveBeenCalledWith(
+        expect.stringContaining('com.mitchellh.ghostty'),
+        { recursive: true },
+      );
+      // It uses fs.appendFile but implementation uses fs.writeFile in some versions
+      // terminalSetup.ts uses fs.appendFile
+    });
+
+    it('should skip if macos-option-as-alt is already true', async () => {
+      mocks.readFile.mockResolvedValue('macos-option-as-alt = true\n');
+
+      const result = await terminalSetup();
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('already configured');
+    });
+
+    it('should fail if macos-option-as-alt exists but is not true', async () => {
+      mocks.readFile.mockResolvedValue('macos-option-as-alt = false\n');
+
+      const result = await terminalSetup();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain(
+        'already contains a macos-option-as-alt setting',
+      );
     });
   });
 });
