@@ -1418,6 +1418,13 @@
           },
           "additionalProperties": false
         },
+        "useOSC52Paste": {
+          "title": "Use OSC 52 Paste",
+          "description": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).",
+          "markdownDescription": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "introspectionAgentSettings": {
           "title": "Introspection Agent Settings",
           "description": "Configuration for Introspection Agent.",
