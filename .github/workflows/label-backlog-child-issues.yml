@@ -15,14 +15,22 @@ jobs:
         with:
           script: |
             const issue = context.payload.issue;
-            // Define the parent workstream issue numbers
             const parentWorkstreamNumbers = [15374, 15456, 15324];
-            // Define the label to add
             const labelToAdd = 'workstream-rollup';
 
-            // Check if the issue has a parent and if that parent is in our list
+            // --- START DEBUGGING ---
+            console.log('--- Full Issue Object from Payload ---');
+            console.log(JSON.stringify(issue, null, 2));
+            console.log('--- End of Full Issue Object ---');
+            
+            console.log(`Value of issue.parent is: ${issue.parent}`);
+            if (issue.parent) {
+              console.log(`Value of issue.parent.number is: ${issue.parent.number}`);
+            }
+            // --- END DEBUGGING ---
+
             if (issue.parent && parentWorkstreamNumbers.includes(issue.parent.number)) {
-              console.log(`Issue #${issue.number} is a child of a target workstream. Adding label.`);
+              console.log(`SUCCESS: Issue #${issue.number} is a child of a target workstream. Adding label.`);
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -30,5 +38,5 @@ jobs:
                 labels: [labelToAdd]
               });
             } else {
-              console.log(`Issue #${issue.number} is not a child of a target workstream. No action taken.`);
+              console.log(`FAILURE: Issue #${issue.number} is not a child of a target workstream. No action taken.`);
             }
