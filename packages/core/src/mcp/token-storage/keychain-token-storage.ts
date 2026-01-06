@@ -324,7 +324,11 @@ export class KeychainTokenStorage
         .filter((cred) => cred.account.startsWith(SECRET_PREFIX))
         .map((cred) => cred.account.substring(SECRET_PREFIX.length));
     } catch (error) {
-      console.error('Failed to list secrets from keychain:', error);
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to list secrets from keychain',
+        error,
+      );
       return [];
     }
   }

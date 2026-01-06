@@ -19,6 +19,7 @@ import {
   ToolErrorType,
   ApprovalMode,
   HookSystem,
+  PREVIEW_GEMINI_MODEL,
 } from '../index.js';
 import type { Part } from '@google/genai';
 import { MockTool } from '../test-utils/mock-tool.js';
@@ -61,9 +62,8 @@ describe('executeToolCall', () => {
       getTruncateToolOutputThreshold: () =>
         DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-      getUseSmartEdit: () => false,
+      getActiveModel: () => PREVIEW_GEMINI_MODEL,
       getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
       getMessageBus: () => null,
       getPolicyEngine: () => null,
       isInteractive: () => false,
@@ -321,12 +321,10 @@ describe('executeToolCall', () => {
           functionResponse: {
             name: 'testTool',
             id: 'call6',
-            response: {
-              output: 'Binary content of type image/png was processed.',
-            },
+            response: { output: 'Binary content provided (1 item(s)).' },
+            parts: [imageDataPart],
           },
         },
-        imageDataPart,
       ],
     });
   });

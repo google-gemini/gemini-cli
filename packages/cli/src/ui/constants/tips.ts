@@ -75,7 +75,6 @@ export const INFORMATIVE_TIPS = [
   'Set the character threshold for truncating tool outputs (/settings)...',
   'Set the number of lines to keep when truncating outputs (/settings)...',
   'Enable policy-based tool confirmation via message bus (/settings)...',
-  'Enable smart-edit tool for more precise editing (/settings)...',
   'Enable write_todos_list tool to generate task lists (/settings)...',
   'Enable model routing based on complexity (/settings)...',
   'Enable experimental subagents for task delegation (/settings)...',
@@ -160,8 +159,6 @@ export const INFORMATIVE_TIPS = [
   'Set up GitHub Actions with /setup-github...',
   'Configure terminal keybindings for multiline input with /terminal-setup...',
   'Find relevant documentation with /find-docs...',
-  'Review a pull request with /oncall:pr-review...',
-  'Go back to main and clean up the branch with /github:cleanup-back-to-main...',
   'Execute any shell command with !<command>...',
   // Command tips end here
 ];

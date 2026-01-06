@@ -9,13 +9,14 @@ import { DelegateToAgentTool } from './delegate-to-agent-tool.js';
 import { AgentRegistry } from './registry.js';
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
-import { SubagentInvocation } from './invocation.js';
+import { LocalSubagentInvocation } from './local-invocation.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
-vi.mock('./invocation.js', () => ({
-  SubagentInvocation: vi.fn().mockImplementation(() => ({
+vi.mock('./local-invocation.js', () => ({
+  LocalSubagentInvocation: vi.fn().mockImplementation(() => ({
     execute: vi
       .fn()
       .mockResolvedValue({ content: [{ type: 'text', text: 'Success' }] }),
@@ -29,6 +30,7 @@ describe('DelegateToAgentTool', () => {
   let messageBus: MessageBus;
 
   const mockAgentDef: AgentDefinition = {
+    kind: 'local',
     name: 'test_agent',
     description: 'A test agent',
     promptConfig: {},
@@ -46,6 +48,7 @@ describe('DelegateToAgentTool', () => {
   beforeEach(() => {
     config = {
       getDebugMode: () => false,
+      getActiveModel: () => 'test-model',
       modelConfigService: {
         registerRuntimeModelConfig: vi.fn(),
       },
@@ -56,11 +59,7 @@ describe('DelegateToAgentTool', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (registry as any).agents.set(mockAgentDef.name, mockAgentDef);
 
-    messageBus = {
-      publish: vi.fn(),
-      subscribe: vi.fn(),
-      unsubscribe: vi.fn(),
-    } as unknown as MessageBus;
+    messageBus = createMockMessageBus();
 
     tool = new DelegateToAgentTool(registry, config, messageBus);
   });
@@ -93,11 +92,13 @@ describe('DelegateToAgentTool', () => {
 
     const result = await invocation.execute(new AbortController().signal);
     expect(result).toEqual({ content: [{ type: 'text', text: 'Success' }] });
-    expect(SubagentInvocation).toHaveBeenCalledWith(
-      { arg1: 'valid' },
+    expect(LocalSubagentInvocation).toHaveBeenCalledWith(
       mockAgentDef,
       config,
+      { arg1: 'valid' },
       messageBus,
+      mockAgentDef.name,
+      mockAgentDef.name,
     );
   });
 
@@ -151,7 +152,7 @@ describe('DelegateToAgentTool', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (registry as any).agents.set(invalidAgentDef.name, invalidAgentDef);
 
-    expect(() => new DelegateToAgentTool(registry, config)).toThrow(
+    expect(() => new DelegateToAgentTool(registry, config, messageBus)).toThrow(
       "Agent 'invalid_agent' cannot have an input parameter named 'agent_name' as it is a reserved parameter for delegation.",
     );
   });

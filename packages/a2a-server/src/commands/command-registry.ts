@@ -5,6 +5,7 @@
  */
 
 import { MemoryCommand } from './memory.js';
+import { debugLogger } from '@google/gemini-cli-core';
 import { ExtensionsCommand } from './extensions.js';
 import { InitCommand } from './init.js';
 import { RestoreCommand } from './restore.js';
@@ -22,7 +23,7 @@ class CommandRegistry {
 
   register(command: Command) {
     if (this.commands.has(command.name)) {
-      console.warn(`Command ${command.name} already registered. Skipping.`);
+      debugLogger.warn(`Command ${command.name} already registered. Skipping.`);
       return;
     }
 

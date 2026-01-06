@@ -120,7 +120,7 @@ async function initOauthClient(
     const auth = new GoogleAuth({
       scopes: OAUTH_SCOPE,
     });
-    const byoidClient = await auth.fromJSON({
+    const byoidClient = auth.fromJSON({
       ...credentials,
       refresh_token: credentials.refresh_token ?? undefined,
     });
@@ -325,7 +325,41 @@ async function initOauthClient(
       }, authTimeout);
     });
 
-    await Promise.race([webLogin.loginCompletePromise, timeoutPromise]);
+    // Listen for SIGINT to stop waiting for auth so the terminal doesn't hang
+    // if the user chooses not to auth.
+    let sigIntHandler: (() => void) | undefined;
+    let stdinHandler: ((data: Buffer) => void) | undefined;
+    const cancellationPromise = new Promise<never>((_, reject) => {
+      sigIntHandler = () =>
+        reject(new FatalCancellationError('Authentication cancelled by user.'));
+      process.on('SIGINT', sigIntHandler);
+
+      // Note that SIGINT might not get raised on Ctrl+C in raw mode
+      // so we also need to look for Ctrl+C directly in stdin.
+      stdinHandler = (data) => {
+        if (data.includes(0x03)) {
+          reject(
+            new FatalCancellationError('Authentication cancelled by user.'),
+          );
+        }
+      };
+      process.stdin.on('data', stdinHandler);
+    });
+
+    try {
+      await Promise.race([
+        webLogin.loginCompletePromise,
+        timeoutPromise,
+        cancellationPromise,
+      ]);
+    } finally {
+      if (sigIntHandler) {
+        process.removeListener('SIGINT', sigIntHandler);
+      }
+      if (stdinHandler) {
+        process.stdin.removeListener('data', stdinHandler);
+      }
+    }
 
     coreEvents.emit(CoreEvent.UserFeedback, {
       severity: 'info',

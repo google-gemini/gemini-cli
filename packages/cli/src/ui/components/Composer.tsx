@@ -120,6 +120,7 @@ export const Composer = () => {
                 blockedMcpServers={
                   config.getMcpClientManager()?.getBlockedMcpServers() ?? []
                 }
+                skillCount={config.getSkillManager().getSkills().length}
               />
             )
           )}
@@ -173,7 +174,9 @@ export const Composer = () => {
           placeholder={
             vimEnabled
               ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
-              : '  Type your message or @path/to/file'
+              : uiState.shellModeActive
+                ? '  Type your shell command'
+                : '  Type your message or @path/to/file'
           }
           setQueueErrorMessage={uiActions.setQueueErrorMessage}
           streamingState={uiState.streamingState}
