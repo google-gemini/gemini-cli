@@ -1069,7 +1069,7 @@ describe('Approval mode tool exclusion logic', () => {
     };
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode when it is disabled by settings',
+      'Cannot start in YOLO mode since it is disabled by your admin',
     );
   });
 
@@ -2410,5 +2410,136 @@ describe('Policy Engine Integration in loadCliConfig', () => {
       }),
       expect.anything(),
     );
+  });
+});
+
+describe('loadCliConfig secureModeEnabled', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: undefined,
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should throw an error if YOLO mode is attempted when secureModeEnabled is true', async () => {
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      admin: {
+        secureModeEnabled: true,
+      },
+    };
+
+    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
+      'Cannot start in YOLO mode since it is disabled by your admin',
+    );
+  });
+
+  it('should throw an error if approval-mode=yolo is attempted when secureModeEnabled is true', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode=yolo'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      admin: {
+        secureModeEnabled: true,
+      },
+    };
+
+    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
+      'Cannot start in YOLO mode since it is disabled by your admin',
+    );
+  });
+
+  it('should set disableYoloMode to true when secureModeEnabled is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      admin: {
+        secureModeEnabled: true,
+      },
+    };
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.isYoloModeDisabled()).toBe(true);
+  });
+});
+
+describe('loadCliConfig mcpEnabled', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  const mcpSettings = {
+    mcp: {
+      serverCommand: 'mcp-server',
+      allowed: ['serverA'],
+      excluded: ['serverB'],
+    },
+    mcpServers: { serverA: { url: 'http://a' } },
+  };
+
+  it('should enable MCP by default', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = { ...mcpSettings };
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getMcpEnabled()).toBe(true);
+    expect(config.getMcpServerCommand()).toBe('mcp-server');
+    expect(config.getMcpServers()).toEqual({ serverA: { url: 'http://a' } });
+    expect(config.getAllowedMcpServers()).toEqual(['serverA']);
+    expect(config.getBlockedMcpServers()).toEqual(['serverB']);
+  });
+
+  it('should disable MCP when mcpEnabled is false', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ...mcpSettings,
+      admin: {
+        mcp: {
+          enabled: false,
+        },
+      },
+    };
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getMcpEnabled()).toBe(false);
+    expect(config.getMcpServerCommand()).toBeUndefined();
+    expect(config.getMcpServers()).toEqual({});
+    expect(config.getAllowedMcpServers()).toEqual([]);
+    expect(config.getBlockedMcpServers()).toEqual([]);
+  });
+
+  it('should enable MCP when mcpEnabled is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ...mcpSettings,
+      admin: {
+        mcp: {
+          enabled: true,
+        },
+      },
+    };
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getMcpEnabled()).toBe(true);
+    expect(config.getMcpServerCommand()).toBe('mcp-server');
+    expect(config.getMcpServers()).toEqual({ serverA: { url: 'http://a' } });
+    expect(config.getAllowedMcpServers()).toEqual(['serverA']);
+    expect(config.getBlockedMcpServers()).toEqual(['serverB']);
   });
 });
