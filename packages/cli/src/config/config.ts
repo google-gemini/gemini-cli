@@ -51,7 +51,7 @@ import { ExtensionManager } from './extension-manager.js';
 import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
 import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
-import type { EventEmitter } from 'node:events';
+import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
 
 export interface CliArgs {
