@@ -23,20 +23,25 @@ import {
 } from '../../config/extensions/extensionSettings.js';
 import prompts from 'prompts';
 
-const { mockExtensionManager, mockGetExtensionAndManager, mockLoadSettings } =
-  vi.hoisted(() => {
-    const extensionManager = {
-      loadExtensionConfig: vi.fn(),
-      getExtensions: vi.fn(),
-      loadExtensions: vi.fn(),
-      getSettings: vi.fn(),
-    };
-    return {
-      mockExtensionManager: extensionManager,
-      mockGetExtensionAndManager: vi.fn(),
-      mockLoadSettings: vi.fn().mockReturnValue({ merged: {} }),
-    };
-  });
+const {
+  mockExtensionManager,
+  mockGetExtensionAndManager,
+  mockGetExtensionManager,
+  mockLoadSettings,
+} = vi.hoisted(() => {
+  const extensionManager = {
+    loadExtensionConfig: vi.fn(),
+    getExtensions: vi.fn(),
+    loadExtensions: vi.fn(),
+    getSettings: vi.fn(),
+  };
+  return {
+    mockExtensionManager: extensionManager,
+    mockGetExtensionAndManager: vi.fn(),
+    mockGetExtensionManager: vi.fn(),
+    mockLoadSettings: vi.fn().mockReturnValue({ merged: {} }),
+  };
+});
 
 vi.mock('../../config/extension-manager.js', () => ({
   ExtensionManager: vi.fn().mockImplementation(() => mockExtensionManager),
@@ -56,9 +61,9 @@ vi.mock('../utils.js', () => ({
   exitCli: vi.fn(),
 }));
 
-// Create a separate mock for utils.js to avoid hoisting issues with the configure.ts import
 vi.mock('./utils.js', () => ({
   getExtensionAndManager: mockGetExtensionAndManager,
+  getExtensionManager: mockGetExtensionManager,
 }));
 
 vi.mock('prompts');
@@ -85,6 +90,7 @@ describe('extensions configure command', () => {
       extension: null,
       extensionManager: null,
     });
+    mockGetExtensionManager.mockResolvedValue(mockExtensionManager);
     (ExtensionManager as unknown as Mock).mockImplementation(
       () => mockExtensionManager,
     );
@@ -139,33 +145,26 @@ describe('extensions configure command', () => {
     });
 
     it('should handle missing extension', async () => {
-      // Setup default mock to return null/null (already done in beforeEach but implicit here)
       mockGetExtensionAndManager.mockResolvedValue({
         extension: null,
         extensionManager: null,
       });
-      // But actually getExtensionAndManager logs error in original code?
-      // No, my implementation calls getExtensionAndManager then checks.
-      // Wait, getExtensionAndManager implementation in original code logs error if not found.
-      // But here I mocked it. So *I* am responsible for logging error or handling the null return.
-      // configureCommand handler:
-      // const { extension, extensionManager } = await getExtensionAndManager(extensionName);
-      // if (!extension || !extensionManager) { return; }
-      // So it just returns. The logging happens INSIDE getExtensionAndManager in real code.
-      // Since I mocked it, it won't log unless I make the mock log.
-      // However, check configureSpecificSetting:
-      // if (!extensionConfig) { debugLogger.error... }
-
-      // If getExtensionAndManager returns null, configureSpecificSetting returns immediately.
-      // So debugLogger.error is NOT called in configureSpecificSetting if getExtensionAndManager returns null.
-      // It assumes getExtensionAndManager logged it.
-
-      // So ensuring the test expectation matches my mock behavior.
-      // If I want to test "missing extension", I should simulate getExtensionAndManager returning null.
-      // And expect NOTHING (because logging is bypassed).
 
       await runCommand('configure missing-ext TEST_VAR');
-      // expect(debugErrorSpy).not.toHaveBeenCalled(); // This matches my mock behavior
+
+      expect(updateSetting).not.toHaveBeenCalled();
+    });
+
+    it('should reject invalid extension names', async () => {
+      await runCommand('configure ../invalid TEST_VAR');
+      expect(debugLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid extension name'),
+      );
+
+      await runCommand('configure ext/with/slash TEST_VAR');
+      expect(debugLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid extension name'),
+      );
     });
   });
 

@@ -11,12 +11,11 @@ import {
   ExtensionSettingScope,
   getScopedEnvContents,
 } from '../../config/extensions/extensionSettings.js';
-import { getExtensionAndManager } from './utils.js';
+import { getExtensionAndManager, getExtensionManager } from './utils.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
 import prompts from 'prompts';
 import type { ExtensionConfig } from '../../config/extension.js';
-
 interface ConfigureArgs {
   name?: string;
   setting?: string;
@@ -44,6 +43,15 @@ export const configureCommand: CommandModule<object, ConfigureArgs> = {
       }),
   handler: async (args) => {
     const { name, setting, scope } = args;
+
+    if (name) {
+      if (name.includes('/') || name.includes('\\') || name.includes('..')) {
+        debugLogger.error(
+          'Invalid extension name. Names cannot contain path separators or "..".',
+        );
+        return;
+      }
+    }
 
     // Case 1: Configure specific setting for an extension
     if (name && setting) {
@@ -123,29 +131,7 @@ async function configureExtension(
 }
 
 async function configureAllExtensions(scope: ExtensionSettingScope) {
-  // We need to get the extension manager differently here since we don't have a specific extension name yet.
-  // We can reuse getExtensionAndManager with a dummy name or refactor,
-  // but let's just create a new manager instance similar to getExtensionAndManager.
-  // Actually, getExtensionAndManager is specific. Let's import the logic or just instantiate.
-  // Since we need to iterate all extensions, we should refactor getExtensionAndManager or just copy basic instantiation.
-  // Let's copy basic instantiation from utils.ts but without the find logic.
-
-  const { ExtensionManager } = await import(
-    '../../config/extension-manager.js'
-  );
-  const { requestConsentNonInteractive } = await import(
-    '../../config/extensions/consent.js'
-  );
-  const { loadSettings } = await import('../../config/settings.js');
-
-  const workspaceDir = process.cwd();
-  const extensionManager = new ExtensionManager({
-    workspaceDir,
-    requestConsent: requestConsentNonInteractive,
-    requestSetting: promptForSetting,
-    settings: loadSettings(workspaceDir).merged,
-  });
-  await extensionManager.loadExtensions();
+  const extensionManager = await getExtensionManager();
   const extensions = extensionManager.getExtensions();
 
   if (extensions.length === 0) {
@@ -173,7 +159,6 @@ async function configureExtensionSettings(
   extensionId: string,
   scope: ExtensionSettingScope,
 ) {
-  // We need current values in the target scope to know if we should prompt for overwrite.
   const currentScopedSettings = await getScopedEnvContents(
     extensionConfig,
     extensionId,
