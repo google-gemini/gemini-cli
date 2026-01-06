@@ -1665,7 +1665,10 @@ describe('RipGrepTool', () => {
         getFileFilteringRespectGitIgnore: () => false,
         getFileFilteringRespectGeminiIgnore: () => true,
       } as unknown as Config;
-      const gitIgnoreDisabledTool = new RipGrepTool(configWithoutGitIgnore);
+      const gitIgnoreDisabledTool = new RipGrepTool(
+        configWithoutGitIgnore,
+        createMockMessageBus(),
+      );
 
       mockSpawn.mockImplementationOnce(
         createMockSpawn({
