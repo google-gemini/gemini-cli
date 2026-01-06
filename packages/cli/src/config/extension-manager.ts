@@ -64,6 +64,7 @@ import {
   type ExtensionSetting,
 } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
+import { getEnableHooks } from './settingsSchema.js';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
@@ -551,7 +552,7 @@ Would you like to attempt to install via "git clone" instead?`,
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
       let hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
-      if (this.settings.tools?.enableHooks) {
+      if (getEnableHooks(this.settings)) {
         hooks = await this.loadExtensionHooks(effectiveExtensionPath, {
           extensionPath: effectiveExtensionPath,
           workspacePath: this.workspaceDir,
