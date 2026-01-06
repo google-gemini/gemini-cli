@@ -115,6 +115,12 @@ ${folderStructure}`,
 
     skillManager.activateSkill(skillName);
 
+    // Add the skill's directory to the workspace context so the agent has permission
+    // to read its bundled resources.
+    this.config
+      .getWorkspaceContext()
+      .addDirectory(path.dirname(skill.location));
+
     const folderStructure = await this.getOrFetchFolderStructure(
       skill.location,
     );
