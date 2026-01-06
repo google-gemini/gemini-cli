@@ -85,6 +85,7 @@ export enum CoreEvent {
   ExtensionsStarting = 'extensionsStarting',
   ExtensionsStopping = 'extensionsStopping',
   OauthDisplayMessage = 'oauth-display-message',
+  SettingsChanged = 'settings-changed',
 }
 
 export interface CoreEvents {
@@ -100,6 +101,7 @@ export interface CoreEvents {
   [CoreEvent.ExtensionsStarting]: [ExtensionsStartingEvent];
   [CoreEvent.ExtensionsStopping]: [ExtensionsStoppingEvent];
   [CoreEvent.OauthDisplayMessage]: string[];
+  [CoreEvent.SettingsChanged]: never[];
 }
 
 type EventBacklogItem = {
@@ -178,6 +180,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitModelChanged(model: string): void {
     const payload: ModelChangedPayload = { model };
     this.emit(CoreEvent.ModelChanged, payload);
+  }
+
+  /**
+   * Notifies subscribers that settings have been modified.
+   */
+  emitSettingsChanged(): void {
+    this.emit(CoreEvent.SettingsChanged);
   }
 
   /**
