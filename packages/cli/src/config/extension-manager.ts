@@ -304,21 +304,13 @@ Would you like to attempt to install via "git clone" instead?`,
           extensionId,
         );
         if (missingSettings.length > 0) {
-          debugLogger.warn(
-            `Extension "${newExtensionConfig.name}" has missing settings: ${missingSettings
-              .map((s) => s.name)
-              .join(
-                ', ',
-              )}. Please run "gemini extensions settings ${newExtensionConfig.name} <setting-name>" to configure them.`,
-          );
-          coreEvents.emitFeedback(
-            'warning',
-            `Extension "${newExtensionConfig.name}" has missing settings: ${missingSettings
-              .map((s) => s.name)
-              .join(
-                ', ',
-              )}. Please run "gemini extensions settings ${newExtensionConfig.name} <setting-name>" to configure them.`,
-          );
+           const message = `Extension "${newExtensionConfig.name}" has missing settings: ${missingSettings
+            .map((s) => s.name)
+            .join(
+              ', '
+            )}. Please run "gemini extensions settings ${newExtensionConfig.name} <setting-name>" to configure them.`;
+          debugLogger.warn(message);
+          coreEvents.emitFeedback('warning', message);
         }
 
         if (
