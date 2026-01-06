@@ -31,10 +31,22 @@ export function estimateTokenCountSync(parts: Part[]): number {
         }
       }
     } else {
-      // For non-text parts (functionCall, functionResponse, executableCode, etc.),
-      // we fallback to the JSON string length heuristic.
-      // Note: This is an approximation.
-      totalTokens += JSON.stringify(part).length / 4;
+      // For images we use a safe fallback
+      const inlineData = 'inlineData' in part ? part.inlineData : undefined;
+      const fileData = 'fileData' in part ? part.fileData : undefined;
+      const mimeType = inlineData?.mimeType || fileData?.mimeType;
+
+      if (mimeType?.startsWith('image/')) {
+        // For images, we use a fixed safe estimate (3,000 tokens) covering
+        // up to 4K resolution on Gemini 3.
+        // See: https://ai.google.dev/gemini-api/docs/vision#token_counting
+        totalTokens += 3000;
+      } else {
+        // For other non-text parts (functionCall, functionResponse, etc.),
+        // we fallback to the JSON string length heuristic.
+        // Note: This is an approximation.
+        totalTokens += JSON.stringify(part).length / 4;
+      }
     }
   }
   return Math.floor(totalTokens);
