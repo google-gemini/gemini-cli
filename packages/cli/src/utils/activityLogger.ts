@@ -11,7 +11,11 @@
 import http from 'node:http';
 import https from 'node:https';
 import zlib from 'node:zlib';
+import fs from 'node:fs';
+import path from 'node:path';
 import { EventEmitter } from 'node:events';
+import { CoreEvent, coreEvents, debugLogger } from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
 
 const ACTIVITY_ID_HEADER = 'x-activity-request-id';
 
@@ -315,5 +319,53 @@ export class ActivityLogger extends EventEmitter {
 
   logConsole(payload: unknown) {
     this.emit('console', payload);
+  }
+}
+
+/**
+ * Registers the activity logger if debug mode and interactive session are enabled.
+ * Captures network and console logs to a session-specific JSONL file.
+ *
+ * @param config The CLI configuration
+ */
+export function registerActivityLogger(config: Config) {
+  if (config.isInteractive() && config.storage && config.getDebugMode()) {
+    const capture = ActivityLogger.getInstance();
+    capture.enable();
+
+    const logsDir = config.storage.getProjectTempLogsDir();
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+
+    const logFile = path.join(
+      logsDir,
+      `session-${config.getSessionId()}.jsonl`,
+    );
+    const writeToLog = (type: 'console' | 'network', payload: unknown) => {
+      try {
+        const entry =
+          JSON.stringify({
+            type,
+            payload,
+            timestamp: Date.now(),
+          }) + '\n';
+
+        // Use asynchronous fire-and-forget to avoid blocking the event loop
+        fs.promises.appendFile(logFile, entry).catch((err) => {
+          debugLogger.error('Failed to write to activity log:', err);
+        });
+      } catch (err) {
+        debugLogger.error('Failed to prepare activity log entry:', err);
+      }
+    };
+
+    capture.on('console', (payload) => writeToLog('console', payload));
+    capture.on('network', (payload) => writeToLog('network', payload));
+
+    // Bridge CoreEvents to local capture
+    coreEvents.on(CoreEvent.ConsoleLog, (payload) => {
+      capture.logConsole(payload);
+    });
   }
 }

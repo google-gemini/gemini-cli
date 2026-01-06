@@ -143,6 +143,10 @@ export class Storage {
     return path.join(this.getProjectTempDir(), 'checkpoints');
   }
 
+  getProjectTempLogsDir(): string {
+    return path.join(this.getProjectTempDir(), 'logs');
+  }
+
   getExtensionsDir(): string {
     return path.join(this.getGeminiDir(), 'extensions');
   }

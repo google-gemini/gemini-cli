@@ -11,8 +11,6 @@ import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
-import * as path from 'node:path';
-import * as fs from 'node:fs';
 import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
@@ -484,41 +482,10 @@ export async function main() {
     loadConfigHandle?.end();
 
     if (config.isInteractive() && config.storage && config.getDebugMode()) {
-      // Initialize Activity Logger (Passive JSONL logging)
-      const { ActivityLogger } = await import('./utils/activityLogger.js');
-      const capture = ActivityLogger.getInstance();
-      capture.enable();
-
-      const logsDir = path.join(config.storage.getProjectTempDir(), 'logs');
-      if (!fs.existsSync(logsDir)) {
-        fs.mkdirSync(logsDir, { recursive: true });
-      }
-
-      const logFile = path.join(logsDir, `session-${sessionId}.jsonl`);
-      const writeToLog = (type: 'console' | 'network', payload: unknown) => {
-        try {
-          const entry =
-            JSON.stringify({
-              type,
-              payload,
-              timestamp: Date.now(),
-            }) + '\n';
-
-          // Use asynchronous fire-and-forget to avoid blocking the event loop
-          fs.promises.appendFile(logFile, entry).catch((err) => {
-            debugLogger.error('Failed to write to activity log:', err);
-          });
-        } catch (err) {
-          debugLogger.error('Failed to prepare activity log entry:', err);
-        }
-      };
-
-      capture.on('console', (payload) => writeToLog('console', payload));
-      capture.on('network', (payload) => writeToLog('network', payload));
-      // Bridge CoreEvents to local capture
-      coreEvents.on(CoreEvent.ConsoleLog, (payload) => {
-        capture.logConsole(payload);
-      });
+      const { registerActivityLogger } = await import(
+        './utils/activityLogger.js'
+      );
+      registerActivityLogger(config);
     }
 
     // Register config for telemetry shutdown
