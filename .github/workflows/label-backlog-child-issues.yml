@@ -2,7 +2,7 @@ name: 'Label Child Issues for Project Rollup'
 
 on:
   issues:
-    types: ['opened', 'edited']
+    types: ['opened', 'edited', 'reopened']
 
 jobs:
   labeler:
