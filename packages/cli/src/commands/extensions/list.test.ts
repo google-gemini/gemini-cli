@@ -6,7 +6,6 @@
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
-import { type CommandModule } from 'yargs';
 import { handleList, listCommand } from './list.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
@@ -124,7 +123,7 @@ describe('extensions list command', () => {
   });
 
   describe('listCommand', () => {
-    const command = listCommand as CommandModule;
+    const command = listCommand;
 
     it('should have correct command and describe', () => {
       expect(command.command).toBe('list');

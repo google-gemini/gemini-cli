@@ -31,7 +31,7 @@ const logger = {
     debugLogger.warn('[WARN] [MemoryDiscovery]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) =>
-    console.error('[ERROR] [MemoryDiscovery]', ...args),
+    debugLogger.error('[ERROR] [MemoryDiscovery]', ...args),
 };
 
 export interface GeminiFileContent {
@@ -577,7 +577,7 @@ export async function refreshServerHierarchicalMemory(config: Config) {
   config.setUserMemory(finalMemory);
   config.setGeminiMdFileCount(result.fileCount);
   config.setGeminiMdFilePaths(result.filePaths);
-  coreEvents.emit(CoreEvent.MemoryChanged, result);
+  coreEvents.emit(CoreEvent.MemoryChanged, { fileCount: result.fileCount });
   return result;
 }
 

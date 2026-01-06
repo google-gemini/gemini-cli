@@ -370,12 +370,7 @@ describe('Task', () => {
       };
 
       // @ts-expect-error - Calling private constructor
-      task = new Task(
-        'task-id',
-        'context-id',
-        mockConfig as Config,
-        mockEventBus,
-      );
+      task = new Task('task-id', 'context-id', mockConfig, mockEventBus);
 
       // Spy on the method we want to check calls for
       setTaskStateAndPublishUpdateSpy = vi.spyOn(

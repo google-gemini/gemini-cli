@@ -35,6 +35,8 @@ export * from './core/tokenLimits.js';
 export * from './core/turn.js';
 export * from './core/geminiRequest.js';
 export * from './core/coreToolScheduler.js';
+export * from './scheduler/types.js';
+export * from './scheduler/tool-executor.js';
 export * from './core/nonInteractiveToolExecutor.js';
 export * from './core/recordingContentGenerator.js';
 
@@ -44,6 +46,7 @@ export * from './code_assist/codeAssist.js';
 export * from './code_assist/oauth2.js';
 export * from './code_assist/server.js';
 export * from './code_assist/types.js';
+export * from './code_assist/telemetry.js';
 export * from './core/apiKeyCredentialStorage.js';
 
 // Export utilities
@@ -63,6 +66,7 @@ export * from './utils/googleQuotaErrors.js';
 export * from './utils/fileUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
+export * from './utils/shell-permissions.js';
 export * from './utils/terminalSerializer.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
@@ -71,6 +75,7 @@ export * from './utils/generateContentResponseUtilities.js';
 export * from './utils/filesearch/fileSearch.js';
 export * from './utils/errorParsing.js';
 export * from './utils/workspaceContext.js';
+export * from './utils/environmentContext.js';
 export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';
 export * from './utils/promptIdContext.js';
@@ -89,6 +94,8 @@ export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
+export * from './skills/skillManager.js';
+export * from './skills/skillLoader.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';
@@ -150,9 +157,6 @@ export { Storage } from './config/storage.js';
 
 // Export hooks system
 export * from './hooks/index.js';
-
-// Export test utils
-export * from './test-utils/index.js';
 
 // Export hook types
 export * from './hooks/types.js';

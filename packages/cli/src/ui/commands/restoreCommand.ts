@@ -22,7 +22,6 @@ import {
   CommandKind,
 } from './types.js';
 import type { HistoryItem } from '../types.js';
-import type { Content } from '@google/genai';
 
 const HistoryItemSchema = z
   .object({
@@ -117,9 +116,7 @@ async function restoreAction(
       } else if (action.type === 'load_history' && loadHistory) {
         loadHistory(action.history);
         if (action.clientHistory) {
-          await config
-            ?.getGeminiClient()
-            ?.setHistory(action.clientHistory as Content[]);
+          config?.getGeminiClient()?.setHistory(action.clientHistory);
         }
       }
     }

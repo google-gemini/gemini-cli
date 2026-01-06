@@ -5,7 +5,6 @@
  */
 
 import { EventEmitter } from 'node:events';
-import type { LoadServerHierarchicalMemoryResponse } from './memoryDiscovery.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -32,16 +31,6 @@ export interface UserFeedbackPayload {
    * or verbose output, while keeping the 'message' field clean for end users.
    */
   error?: unknown;
-}
-
-/**
- * Payload for the 'fallback-mode-changed' event.
- */
-export interface FallbackModeChangedPayload {
-  /**
-   * Whether fallback mode is now active.
-   */
-  isInFallbackMode: boolean;
 }
 
 /**
@@ -74,26 +63,28 @@ export interface OutputPayload {
 /**
  * Payload for the 'memory-changed' event.
  */
-export type MemoryChangedPayload = LoadServerHierarchicalMemoryResponse;
+export interface MemoryChangedPayload {
+  fileCount: number;
+}
 
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
-  FallbackModeChanged = 'fallback-mode-changed',
   ModelChanged = 'model-changed',
   ConsoleLog = 'console-log',
   Output = 'output',
   MemoryChanged = 'memory-changed',
   ExternalEditorClosed = 'external-editor-closed',
+  SettingsChanged = 'settings-changed',
 }
 
 export interface CoreEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
-  [CoreEvent.FallbackModeChanged]: [FallbackModeChangedPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
+  [CoreEvent.SettingsChanged]: never[];
 }
 
 type EventBacklogItem = {
@@ -167,20 +158,18 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   }
 
   /**
-   * Notifies subscribers that fallback mode has changed.
-   * This is synchronous and doesn't use backlog (UI should already be initialized).
-   */
-  emitFallbackModeChanged(isInFallbackMode: boolean): void {
-    const payload: FallbackModeChangedPayload = { isInFallbackMode };
-    this.emit(CoreEvent.FallbackModeChanged, payload);
-  }
-
-  /**
    * Notifies subscribers that the model has changed.
    */
   emitModelChanged(model: string): void {
     const payload: ModelChangedPayload = { model };
     this.emit(CoreEvent.ModelChanged, payload);
+  }
+
+  /**
+   * Notifies subscribers that settings have been modified.
+   */
+  emitSettingsChanged(): void {
+    this.emit(CoreEvent.SettingsChanged);
   }
 
   /**

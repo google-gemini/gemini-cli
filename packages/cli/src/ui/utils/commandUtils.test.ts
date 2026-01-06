@@ -98,6 +98,9 @@ describe('commandUtils', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    // Reset platform to default for test isolation
+    mockProcess.platform = 'darwin';
+
     // Dynamically import and set up spawn mock
     const { spawn } = await import('node:child_process');
     mockSpawn = spawn as Mock;
@@ -231,7 +234,7 @@ describe('commandUtils', () => {
       const expected = `${ESC}]52;c;${b64}${BEL}`;
 
       expect(tty.write).toHaveBeenCalledTimes(1);
-      expect((tty.write as Mock).mock.calls[0][0]).toBe(expected);
+      expect(tty.write.mock.calls[0][0]).toBe(expected);
       expect(tty.end).toHaveBeenCalledTimes(1); // /dev/tty closed after write
       expect(mockClipboardyWrite).not.toHaveBeenCalled();
     });
@@ -245,7 +248,7 @@ describe('commandUtils', () => {
 
       await copyToClipboard(testText);
 
-      const written = (tty.write as Mock).mock.calls[0][0] as string;
+      const written = tty.write.mock.calls[0][0] as string;
       // Starts with tmux DCS wrapper and ends with ST
       expect(written.startsWith(`${ESC}Ptmux;`)).toBe(true);
       expect(written.endsWith(ST)).toBe(true);
@@ -264,7 +267,7 @@ describe('commandUtils', () => {
 
       await copyToClipboard(testText);
 
-      const written = (tty.write as Mock).mock.calls[0][0] as string;
+      const written = tty.write.mock.calls[0][0] as string;
       const chunkStarts = (written.match(new RegExp(`${ESC}P`, 'g')) || [])
         .length;
       const chunkEnds = written.split(ST).length - 1;
@@ -353,6 +356,35 @@ describe('commandUtils', () => {
       expect(mockClipboardyWrite).toHaveBeenCalledWith(text);
       expect(tty.write).not.toHaveBeenCalled();
       expect(tty.end).not.toHaveBeenCalled();
+    });
+
+    it('skips /dev/tty on Windows and uses stderr fallback for OSC-52', async () => {
+      mockProcess.platform = 'win32';
+      const stderrStream = makeWritable({ isTTY: true });
+      Object.defineProperty(process, 'stderr', {
+        value: stderrStream,
+        configurable: true,
+      });
+
+      // Set SSH environment to trigger OSC-52 path
+      process.env['SSH_CONNECTION'] = '1';
+
+      await copyToClipboard('windows-ssh-test');
+
+      expect(mockFs.createWriteStream).not.toHaveBeenCalled();
+      expect(stderrStream.write).toHaveBeenCalled();
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('uses clipboardy on native Windows without SSH/WSL', async () => {
+      mockProcess.platform = 'win32';
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      await copyToClipboard('windows-native-test');
+
+      // Fallback to clipboardy and not /dev/tty
+      expect(mockClipboardyWrite).toHaveBeenCalledWith('windows-native-test');
+      expect(mockFs.createWriteStream).not.toHaveBeenCalled();
     });
   });
 
