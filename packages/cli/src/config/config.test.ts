@@ -16,6 +16,7 @@ import {
   WEB_FETCH_TOOL_NAME,
   type ExtensionLoader,
   debugLogger,
+  ApprovalMode,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import type { Settings } from './settings.js';
@@ -25,13 +26,11 @@ import { ExtensionManager } from './extension-manager.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 vi.mock('./trustedFolders.js', () => ({
-  isWorkspaceTrusted: vi
-    .fn()
-    .mockReturnValue({ isTrusted: true, source: 'file' }), // Default to trusted
+  isWorkspaceTrusted: vi.fn(() => ({ isTrusted: true, source: 'file' })), // Default to trusted
 }));
 
 vi.mock('./sandboxConfig.js', () => ({
-  loadSandboxConfig: vi.fn().mockResolvedValue(undefined),
+  loadSandboxConfig: vi.fn(async () => undefined),
 }));
 
 vi.mock('fs', async (importOriginal) => {
@@ -125,6 +124,12 @@ vi.mock('@google/gemini-cli-core', async () => {
       respectGitIgnore: true,
       respectGeminiIgnore: true,
     },
+    createPolicyEngineConfig: vi.fn(async () => ({
+      rules: [],
+      checkers: [],
+      defaultDecision: ServerConfig.PolicyDecision.ASK_USER,
+      approvalMode: ServerConfig.ApprovalMode.DEFAULT,
+    })),
   };
 });
 
@@ -631,14 +636,7 @@ describe('loadCliConfig', () => {
     expect(config.getFileFilteringRespectGeminiIgnore()).toBe(
       DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
     );
-  });
-
-  it('should default enableMessageBusIntegration to true when unconfigured', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config['enableMessageBusIntegration']).toBe(true);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });
 });
 
@@ -1071,7 +1069,7 @@ describe('Approval mode tool exclusion logic', () => {
     };
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode when it is disabled by settings',
+      'Cannot start in YOLO mode since it is disabled by your admin',
     );
   });
 
@@ -2323,5 +2321,225 @@ describe('Telemetry configuration via environment variables', () => {
       argv,
     );
     expect(config.getTelemetryLogPromptsEnabled()).toBe(false);
+  });
+});
+
+describe('PolicyEngine nonInteractive wiring', () => {
+  const originalIsTTY = process.stdin.isTTY;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    process.stdin.isTTY = originalIsTTY;
+    vi.restoreAllMocks();
+  });
+
+  it('should set nonInteractive to true in one-shot mode', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', 'echo hello']; // Positional query makes it one-shot
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.isInteractive()).toBe(false);
+    expect(
+      (config.getPolicyEngine() as unknown as { nonInteractive: boolean })
+        .nonInteractive,
+    ).toBe(true);
+  });
+
+  it('should set nonInteractive to false in interactive mode', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.isInteractive()).toBe(true);
+    expect(
+      (config.getPolicyEngine() as unknown as { nonInteractive: boolean })
+        .nonInteractive,
+    ).toBe(false);
+  });
+});
+
+describe('Policy Engine Integration in loadCliConfig', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should pass merged allowed tools from CLI and settings to createPolicyEngineConfig', async () => {
+    process.argv = ['node', 'script.js', '--allowed-tools', 'cli-tool'];
+    const settings: Settings = { tools: { allowed: ['settings-tool'] } };
+    const argv = await parseArguments({} as Settings);
+
+    await loadCliConfig(settings, 'test-session', argv);
+
+    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: expect.objectContaining({
+          allowed: expect.arrayContaining(['cli-tool']),
+        }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('should pass merged exclude tools from CLI logic and settings to createPolicyEngineConfig', async () => {
+    process.stdin.isTTY = false; // Non-interactive to trigger default excludes
+    process.argv = ['node', 'script.js', '-p', 'test'];
+    const settings: Settings = { tools: { exclude: ['settings-exclude'] } };
+    const argv = await parseArguments({} as Settings);
+
+    await loadCliConfig(settings, 'test-session', argv);
+
+    // In non-interactive mode, ShellTool, etc. are excluded
+    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: expect.objectContaining({
+          exclude: expect.arrayContaining([SHELL_TOOL_NAME]),
+        }),
+      }),
+      expect.anything(),
+    );
+  });
+});
+
+describe('loadCliConfig secureModeEnabled', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: undefined,
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should throw an error if YOLO mode is attempted when secureModeEnabled is true', async () => {
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      admin: {
+        secureModeEnabled: true,
+      },
+    };
+
+    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
+      'Cannot start in YOLO mode since it is disabled by your admin',
+    );
+  });
+
+  it('should throw an error if approval-mode=yolo is attempted when secureModeEnabled is true', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode=yolo'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      admin: {
+        secureModeEnabled: true,
+      },
+    };
+
+    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
+      'Cannot start in YOLO mode since it is disabled by your admin',
+    );
+  });
+
+  it('should set disableYoloMode to true when secureModeEnabled is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      admin: {
+        secureModeEnabled: true,
+      },
+    };
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.isYoloModeDisabled()).toBe(true);
+  });
+});
+
+describe('loadCliConfig mcpEnabled', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  const mcpSettings = {
+    mcp: {
+      serverCommand: 'mcp-server',
+      allowed: ['serverA'],
+      excluded: ['serverB'],
+    },
+    mcpServers: { serverA: { url: 'http://a' } },
+  };
+
+  it('should enable MCP by default', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = { ...mcpSettings };
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getMcpEnabled()).toBe(true);
+    expect(config.getMcpServerCommand()).toBe('mcp-server');
+    expect(config.getMcpServers()).toEqual({ serverA: { url: 'http://a' } });
+    expect(config.getAllowedMcpServers()).toEqual(['serverA']);
+    expect(config.getBlockedMcpServers()).toEqual(['serverB']);
+  });
+
+  it('should disable MCP when mcpEnabled is false', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ...mcpSettings,
+      admin: {
+        mcp: {
+          enabled: false,
+        },
+      },
+    };
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getMcpEnabled()).toBe(false);
+    expect(config.getMcpServerCommand()).toBeUndefined();
+    expect(config.getMcpServers()).toEqual({});
+    expect(config.getAllowedMcpServers()).toEqual([]);
+    expect(config.getBlockedMcpServers()).toEqual([]);
+  });
+
+  it('should enable MCP when mcpEnabled is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ...mcpSettings,
+      admin: {
+        mcp: {
+          enabled: true,
+        },
+      },
+    };
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getMcpEnabled()).toBe(true);
+    expect(config.getMcpServerCommand()).toBe('mcp-server');
+    expect(config.getMcpServers()).toEqual({ serverA: { url: 'http://a' } });
+    expect(config.getAllowedMcpServers()).toEqual(['serverA']);
+    expect(config.getBlockedMcpServers()).toEqual(['serverB']);
   });
 });
