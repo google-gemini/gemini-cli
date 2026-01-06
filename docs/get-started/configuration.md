@@ -928,12 +928,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** If true, disallows yolo mode from being used.
   - **Default:** `false`
 
-- **`admin.cliFeatureSetting.extensionsSetting.extensionsEnabled`** (boolean):
+- **`admin.extensions.enabled`** (boolean):
   - **Description:** If false, disallows extensions from being installed or
     used.
   - **Default:** `true`
 
-- **`admin.mcpSetting.mcpEnabled`** (boolean):
+- **`admin.mcp.enabled`** (boolean):
   - **Description:** If false, disallows MCP servers from being used.
   - **Default:** `true`
   <!-- SETTINGS-AUTOGEN:END -->

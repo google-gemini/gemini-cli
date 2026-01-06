@@ -1602,41 +1602,31 @@
           "default": false,
           "type": "boolean"
         },
-        "cliFeatureSetting": {
-          "title": "CLI Feature Settings",
-          "description": "CLI feature settings.",
-          "markdownDescription": "CLI feature settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+        "extensions": {
+          "title": "Extensions Settings",
+          "description": "Extensions-specific admin settings.",
+          "markdownDescription": "Extensions-specific admin settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
           "default": {},
           "type": "object",
           "properties": {
-            "extensionsSetting": {
-              "title": "Extensions Settings",
-              "description": "Extensions-specific admin settings.",
-              "markdownDescription": "Extensions-specific admin settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
-              "default": {},
-              "type": "object",
-              "properties": {
-                "extensionsEnabled": {
-                  "title": "Extensions Enabled",
-                  "description": "If false, disallows extensions from being installed or used.",
-                  "markdownDescription": "If false, disallows extensions from being installed or used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
-                  "default": true,
-                  "type": "boolean"
-                }
-              },
-              "additionalProperties": false
+            "enabled": {
+              "title": "Extensions Enabled",
+              "description": "If false, disallows extensions from being installed or used.",
+              "markdownDescription": "If false, disallows extensions from being installed or used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
             }
           },
           "additionalProperties": false
         },
-        "mcpSetting": {
+        "mcp": {
           "title": "MCP Settings",
           "description": "MCP-specific admin settings.",
           "markdownDescription": "MCP-specific admin settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
           "default": {},
           "type": "object",
           "properties": {
-            "mcpEnabled": {
+            "enabled": {
               "title": "MCP Enabled",
               "description": "If false, disallows MCP servers from being used.",
               "markdownDescription": "If false, disallows MCP servers from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",

@@ -1069,7 +1069,7 @@ describe('Approval mode tool exclusion logic', () => {
     };
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode when it is disabled by settings',
+      'Cannot start in YOLO mode since it is disabled by your admin',
     );
   });
 
@@ -2440,7 +2440,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     };
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode when it is disabled by settings',
+      'Cannot start in YOLO mode since it is disabled by your admin',
     );
   });
 
@@ -2454,7 +2454,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     };
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode when it is disabled by settings',
+      'Cannot start in YOLO mode since it is disabled by your admin',
     );
   });
 
@@ -2511,8 +2511,8 @@ describe('loadCliConfig mcpEnabled', () => {
     const settings: Settings = {
       ...mcpSettings,
       admin: {
-        mcpSetting: {
-          mcpEnabled: false,
+        mcp: {
+          enabled: false,
         },
       },
     };
@@ -2530,8 +2530,8 @@ describe('loadCliConfig mcpEnabled', () => {
     const settings: Settings = {
       ...mcpSettings,
       admin: {
-        mcpSetting: {
-          mcpEnabled: true,
+        mcp: {
+          enabled: true,
         },
       },
     };

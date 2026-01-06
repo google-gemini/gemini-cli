@@ -507,14 +507,16 @@ export async function loadCliConfig(
   if (settings.security?.disableYoloMode || settings.admin?.secureModeEnabled) {
     if (approvalMode === ApprovalMode.YOLO) {
       if (settings.admin?.secureModeEnabled) {
-        debugLogger.error('YOLO mode is disabled by your admin.');
+        debugLogger.error(
+          'YOLO mode is disabled by "secureModeEnabled" setting.',
+        );
       } else {
         debugLogger.error(
           'YOLO mode is disabled by the "disableYolo" setting.',
         );
       }
       throw new FatalConfigError(
-        'Cannot start in YOLO mode when it is disabled by settings',
+        'Cannot start in YOLO mode since it is disabled by your admin',
       );
     }
     approvalMode = ApprovalMode.DEFAULT;
@@ -633,7 +635,7 @@ export async function loadCliConfig(
 
   const ptyInfo = await getPty();
 
-  const mcpEnabled = settings.admin?.mcpSetting?.mcpEnabled ?? true;
+  const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
 
   return new Config({
     sessionId,

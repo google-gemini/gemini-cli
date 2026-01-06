@@ -1710,42 +1710,30 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         mergeStrategy: MergeStrategy.REPLACE,
       },
-      cliFeatureSetting: {
+      extensions: {
         type: 'object',
-        label: 'CLI Feature Settings',
+        label: 'Extensions Settings',
         category: 'Admin',
         requiresRestart: false,
         default: {},
-        description: 'CLI feature settings.',
+        description: 'Extensions-specific admin settings.',
         showInDialog: false,
         mergeStrategy: MergeStrategy.REPLACE,
         properties: {
-          extensionsSetting: {
-            type: 'object',
-            label: 'Extensions Settings',
+          enabled: {
+            type: 'boolean',
+            label: 'Extensions Enabled',
             category: 'Admin',
             requiresRestart: false,
-            default: {},
-            description: 'Extensions-specific admin settings.',
+            default: true,
+            description:
+              'If false, disallows extensions from being installed or used.',
             showInDialog: false,
             mergeStrategy: MergeStrategy.REPLACE,
-            properties: {
-              extensionsEnabled: {
-                type: 'boolean',
-                label: 'Extensions Enabled',
-                category: 'Admin',
-                requiresRestart: false,
-                default: true,
-                description:
-                  'If false, disallows extensions from being installed or used.',
-                showInDialog: false,
-                mergeStrategy: MergeStrategy.REPLACE,
-              },
-            },
           },
         },
       },
-      mcpSetting: {
+      mcp: {
         type: 'object',
         label: 'MCP Settings',
         category: 'Admin',
@@ -1755,7 +1743,7 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         mergeStrategy: MergeStrategy.REPLACE,
         properties: {
-          mcpEnabled: {
+          enabled: {
             type: 'boolean',
             label: 'MCP Enabled',
             category: 'Admin',
