@@ -215,6 +215,8 @@ describe('DelegateToAgentTool', () => {
       mockRemoteAgentDef,
       { query: 'hello remote' },
       messageBus,
+      'remote_agent',
+      'remote_agent',
     );
   });
 });
