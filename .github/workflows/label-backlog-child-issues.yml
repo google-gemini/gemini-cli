@@ -16,7 +16,7 @@ jobs:
           script: |
             const issue = context.payload.issue;
             const labelToAdd = 'workstream-rollup';
-            
+
             // --- Define the FULL URLs of the allowed parent workstreams ---
             const allowedParentUrls = [
               'https://api.github.com/repos/google-gemini/gemini-cli/issues/15374',
