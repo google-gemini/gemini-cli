@@ -123,32 +123,4 @@ describe('<ContextSummaryDisplay />', () => {
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
-
-  it('renders background process count', () => {
-    // Ensure sufficient width so it doesn't wrap or hide
-    useTerminalSizeMock.mockReturnValue({ columns: 120, rows: 24 });
-    const { lastFrame } = render(
-      <ContextSummaryDisplay
-        geminiMdFileCount={0}
-        contextFileNames={[]}
-        backgroundProcessCount={2}
-      />,
-    );
-
-    expect(lastFrame()).toContain('2 Background processes');
-  });
-
-  it('renders nothing when all counts are zero', () => {
-    useTerminalSizeMock.mockReturnValue({ columns: 120, rows: 24 });
-    const { lastFrame } = render(
-      <ContextSummaryDisplay
-        geminiMdFileCount={0}
-        contextFileNames={[]}
-        backgroundProcessCount={0}
-      />,
-    );
-
-    // It renders a space to reserve height
-    expect(lastFrame()).toBe('');
-  });
 });

@@ -1,12 +1,12 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`StatusDisplay > does NOT render HookStatusDisplay if notifications are disabled in settings 1`] = `"Mock Context Summary Display (Skills: 2)"`;
+exports[`StatusDisplay > does NOT render HookStatusDisplay if notifications are disabled in settings 1`] = `"Mock Context Summary Display (Skills: 2, Shells: 0)"`;
 
 exports[`StatusDisplay > prioritizes Ctrl+C prompt over everything else (except system md) 1`] = `"Press Ctrl+C again to exit."`;
 
 exports[`StatusDisplay > prioritizes warning over Ctrl+D 1`] = `"Warning"`;
 
-exports[`StatusDisplay > renders ContextSummaryDisplay by default 1`] = `"Mock Context Summary Display (Skills: 2)"`;
+exports[`StatusDisplay > renders ContextSummaryDisplay by default 1`] = `"Mock Context Summary Display (Skills: 2, Shells: 0)"`;
 
 exports[`StatusDisplay > renders Ctrl+D prompt 1`] = `"Press Ctrl+D again to exit."`;
 

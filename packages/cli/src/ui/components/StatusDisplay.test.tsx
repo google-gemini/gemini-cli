@@ -14,8 +14,14 @@ import { SettingsContext } from '../contexts/SettingsContext.js';
 
 // Mock child components to simplify testing
 vi.mock('./ContextSummaryDisplay.js', () => ({
-  ContextSummaryDisplay: (props: { skillCount: number }) => (
-    <Text>Mock Context Summary Display (Skills: {props.skillCount})</Text>
+  ContextSummaryDisplay: (props: {
+    skillCount: number;
+    backgroundProcessCount: number;
+  }) => (
+    <Text>
+      Mock Context Summary Display (Skills: {props.skillCount}, Shells:{' '}
+      {props.backgroundProcessCount})
+    </Text>
   ),
 }));
 
@@ -35,6 +41,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     ideContextState: null,
     geminiMdFileCount: 0,
     contextFileNames: [],
+    backgroundShellCount: 0,
     ...overrides,
   }) as UIState;
 
@@ -204,5 +211,16 @@ describe('StatusDisplay', () => {
       settings,
     );
     expect(lastFrame()).toBe('');
+  });
+
+  it('passes backgroundShellCount to ContextSummaryDisplay', () => {
+    const uiState = createMockUIState({
+      backgroundShellCount: 3,
+    });
+    const { lastFrame } = renderStatusDisplay(
+      { hideContextSummary: false },
+      uiState,
+    );
+    expect(lastFrame()).toContain('Shells: 3');
   });
 });
