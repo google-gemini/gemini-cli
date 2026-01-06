@@ -55,12 +55,7 @@ describe('<ContextSummaryDisplay />', () => {
       },
     };
     const { lastFrame, unmount } = renderWithWidth(120, props);
-    const output = lastFrame()!;
-    expect(output).toContain(
-      '1 open file (ctrl+g to view) | 1 GEMINI.md file | 1 MCP server | 1 skill',
-    );
-    expect(output).not.toContain('Using:');
-    expect(output.includes('\n')).toBe(false);
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
@@ -77,15 +72,7 @@ describe('<ContextSummaryDisplay />', () => {
       },
     };
     const { lastFrame, unmount } = renderWithWidth(60, props);
-    const output = lastFrame()!;
-    const expectedLines = [
-      ' - 1 open file (ctrl+g to view)',
-      ' - 1 GEMINI.md file',
-      ' - 1 MCP server',
-      ' - 1 skill',
-    ];
-    const actualLines = output.split('\n');
-    expect(actualLines).toEqual(expectedLines);
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
@@ -133,9 +120,7 @@ describe('<ContextSummaryDisplay />', () => {
       },
     };
     const { lastFrame, unmount } = renderWithWidth(60, props);
-    const expectedLines = [' - 1 open file (ctrl+g to view)'];
-    const actualLines = lastFrame()!.split('\n');
-    expect(actualLines).toEqual(expectedLines);
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 });

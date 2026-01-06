@@ -14,11 +14,13 @@ import { SettingsContext } from '../contexts/SettingsContext.js';
 
 // Mock child components to simplify testing
 vi.mock('./ContextSummaryDisplay.js', () => ({
-  ContextSummaryDisplay: () => <Text>ContextSummaryDisplay</Text>,
+  ContextSummaryDisplay: (props: { skillCount: number }) => (
+    <Text>Mock Context Summary Display (Skills: {props.skillCount})</Text>
+  ),
 }));
 
 vi.mock('./HookStatusDisplay.js', () => ({
-  HookStatusDisplay: () => <Text>HookStatusDisplay</Text>,
+  HookStatusDisplay: () => <Text>Mock Hook Status Display</Text>,
 }));
 
 // Create mock context providers
@@ -40,6 +42,9 @@ const createMockConfig = (overrides = {}) => ({
   getMcpClientManager: vi.fn().mockImplementation(() => ({
     getBlockedMcpServers: vi.fn(() => []),
     getMcpServers: vi.fn(() => ({})),
+  })),
+  getSkillManager: vi.fn().mockImplementation(() => ({
+    getSkills: vi.fn(() => ['skill1', 'skill2']),
   })),
   ...overrides,
 });
@@ -85,13 +90,13 @@ describe('StatusDisplay', () => {
 
   it('renders ContextSummaryDisplay by default', () => {
     const { lastFrame } = renderStatusDisplay();
-    expect(lastFrame()).toContain('ContextSummaryDisplay');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders system md indicator if env var is set', () => {
     process.env['GEMINI_SYSTEM_MD'] = 'true';
     const { lastFrame } = renderStatusDisplay();
-    expect(lastFrame()).toContain('|⌐■_■|');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('prioritizes Ctrl+C prompt over everything else (except system md)', () => {
@@ -104,9 +109,7 @@ describe('StatusDisplay', () => {
       { hideContextSummary: false },
       uiState,
     );
-    expect(lastFrame()).toContain('Press Ctrl+C again to exit');
-    expect(lastFrame()).not.toContain('Warning');
-    expect(lastFrame()).not.toContain('HookStatusDisplay');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders warning message', () => {
@@ -117,7 +120,7 @@ describe('StatusDisplay', () => {
       { hideContextSummary: false },
       uiState,
     );
-    expect(lastFrame()).toContain('This is a warning');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('prioritizes warning over Ctrl+D', () => {
@@ -129,8 +132,7 @@ describe('StatusDisplay', () => {
       { hideContextSummary: false },
       uiState,
     );
-    expect(lastFrame()).toContain('Warning');
-    expect(lastFrame()).not.toContain('Press Ctrl+D again to exit');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Ctrl+D prompt', () => {
@@ -141,7 +143,7 @@ describe('StatusDisplay', () => {
       { hideContextSummary: false },
       uiState,
     );
-    expect(lastFrame()).toContain('Press Ctrl+D again to exit');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Escape prompt', () => {
@@ -152,7 +154,7 @@ describe('StatusDisplay', () => {
       { hideContextSummary: false },
       uiState,
     );
-    expect(lastFrame()).toContain('Press Esc again to clear');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Queue Error Message', () => {
@@ -163,7 +165,7 @@ describe('StatusDisplay', () => {
       { hideContextSummary: false },
       uiState,
     );
-    expect(lastFrame()).toContain('Queue Error');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders HookStatusDisplay when hooks are active', () => {
@@ -174,7 +176,7 @@ describe('StatusDisplay', () => {
       { hideContextSummary: false },
       uiState,
     );
-    expect(lastFrame()).toContain('HookStatusDisplay');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('does NOT render HookStatusDisplay if notifications are disabled in settings', () => {
@@ -189,9 +191,7 @@ describe('StatusDisplay', () => {
       uiState,
       settings,
     );
-    // Should fall back to ContextSummaryDisplay
-    expect(lastFrame()).toContain('ContextSummaryDisplay');
-    expect(lastFrame()).not.toContain('HookStatusDisplay');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('hides ContextSummaryDisplay if configured in settings', () => {
