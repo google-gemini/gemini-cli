@@ -89,11 +89,13 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
     };
   }
 
-  // Poll onboardUser until long running operation is complete.
   let lroRes = await caServer.onboardUser(onboardReq);
-  while (!lroRes.done) {
-    await new Promise((f) => setTimeout(f, 5000));
-    lroRes = await caServer.onboardUser(onboardReq);
+  if (!lroRes.done && lroRes.name) {
+    const operationName = lroRes.name;
+    while (!lroRes.done) {
+      await new Promise((f) => setTimeout(f, 5000));
+      lroRes = await caServer.getOperation(operationName);
+    }
   }
 
   if (!lroRes.response?.cloudaicompanionProject?.id) {
