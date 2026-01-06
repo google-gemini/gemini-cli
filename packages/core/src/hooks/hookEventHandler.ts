@@ -11,6 +11,7 @@ import type { HookRunner } from './hookRunner.js';
 import type { HookAggregator, AggregatedHookResult } from './hookAggregator.js';
 import { HookEventName } from './types.js';
 import type {
+  HookConfig,
   HookInput,
   BeforeToolInput,
   AfterToolInput,
@@ -507,17 +508,38 @@ export class HookEventHandler {
         };
       }
 
+      const onHookStart = (config: HookConfig, index: number) => {
+        coreEvents.emitHookStart({
+          hookName: this.getHookName(config),
+          eventName,
+          hookIndex: index + 1,
+          totalHooks: plan.hookConfigs.length,
+        });
+      };
+
+      const onHookEnd = (config: HookConfig, result: HookExecutionResult) => {
+        coreEvents.emitHookEnd({
+          hookName: this.getHookName(config),
+          eventName,
+          success: result.success,
+        });
+      };
+
       // Execute hooks according to the plan's strategy
       const results = plan.sequential
         ? await this.hookRunner.executeHooksSequential(
             plan.hookConfigs,
             eventName,
             input,
+            onHookStart,
+            onHookEnd,
           )
         : await this.hookRunner.executeHooksParallel(
             plan.hookConfigs,
             eventName,
             input,
+            onHookStart,
+            onHookEnd,
           );
 
       // Aggregate results
@@ -660,10 +682,17 @@ export class HookEventHandler {
   }
 
   /**
+   * Get hook name from config for display or telemetry
+   */
+  private getHookName(config: HookConfig): string {
+    return config.name || config.command || 'unknown-command';
+  }
+
+  /**
    * Get hook name from execution result for telemetry
    */
   private getHookNameFromResult(result: HookExecutionResult): string {
-    return result.hookConfig.command || 'unknown-command';
+    return this.getHookName(result.hookConfig);
   }
 
   /**

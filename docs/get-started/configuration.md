@@ -872,6 +872,10 @@ their corresponding top-level category object in your `settings.json` file.
     Hooks in this list will not execute even if configured.
   - **Default:** `[]`
 
+- **`hooks.notifications`** (boolean):
+  - **Description:** Show visual indicators when hooks are executing.
+  - **Default:** `true`
+
 - **`hooks.BeforeTool`** (array):
   - **Description:** Hooks that execute before tool execution. Can intercept,
     validate, or modify tool calls.

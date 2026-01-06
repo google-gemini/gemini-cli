@@ -5,9 +5,9 @@
  */
 
 import { useState } from 'react';
-import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import { Box, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
-import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
+import { StatusDisplay } from './StatusDisplay.js';
 import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
@@ -17,7 +17,6 @@ import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
-import { theme } from '../semantic-colors.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
@@ -43,7 +42,7 @@ export const Composer = () => {
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
 
   const isAlternateBuffer = useAlternateBuffer();
-  const { contextFileNames, showAutoAcceptIndicator } = uiState;
+  const { showAutoAcceptIndicator } = uiState;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
   const hideContextSummary =
     suggestionsVisible && suggestionsPosition === 'above';
@@ -92,38 +91,7 @@ export const Composer = () => {
         alignItems={isNarrow ? 'flex-start' : 'center'}
       >
         <Box marginRight={1}>
-          {process.env['GEMINI_SYSTEM_MD'] && (
-            <Text color={theme.status.error}>|⌐■_■| </Text>
-          )}
-          {uiState.ctrlCPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+C again to exit.
-            </Text>
-          ) : uiState.warningMessage ? (
-            <Text color={theme.status.warning}>{uiState.warningMessage}</Text>
-          ) : uiState.ctrlDPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+D again to exit.
-            </Text>
-          ) : uiState.showEscapePrompt ? (
-            <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
-          ) : uiState.queueErrorMessage ? (
-            <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
-          ) : (
-            !settings.merged.ui?.hideContextSummary &&
-            !hideContextSummary && (
-              <ContextSummaryDisplay
-                ideContext={uiState.ideContextState}
-                geminiMdFileCount={uiState.geminiMdFileCount}
-                contextFileNames={contextFileNames}
-                mcpServers={config.getMcpClientManager()?.getMcpServers() ?? {}}
-                blockedMcpServers={
-                  config.getMcpClientManager()?.getBlockedMcpServers() ?? []
-                }
-                skillCount={config.getSkillManager().getSkills().length}
-              />
-            )
-          )}
+          <StatusDisplay hideContextSummary={hideContextSummary} />
         </Box>
         <Box paddingTop={isNarrow ? 1 : 0}>
           {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
