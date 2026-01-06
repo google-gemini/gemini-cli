@@ -13,6 +13,7 @@ import { LocalSubagentInvocation } from './local-invocation.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
+import { RemoteAgentInvocation } from './remote-invocation.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 vi.mock('./local-invocation.js', () => ({
@@ -20,6 +21,15 @@ vi.mock('./local-invocation.js', () => ({
     execute: vi
       .fn()
       .mockResolvedValue({ content: [{ type: 'text', text: 'Success' }] }),
+  })),
+}));
+
+vi.mock('./remote-invocation.js', () => ({
+  RemoteAgentInvocation: vi.fn().mockImplementation(() => ({
+    execute: vi.fn().mockResolvedValue({
+      content: [{ type: 'text', text: 'Remote Success' }],
+    }),
+    shouldConfirmExecute: vi.fn().mockResolvedValue(true),
   })),
 }));
 
@@ -45,6 +55,18 @@ describe('DelegateToAgentTool', () => {
     toolConfig: { tools: [] },
   };
 
+  const mockRemoteAgentDef: AgentDefinition = {
+    kind: 'remote',
+    name: 'remote_agent',
+    description: 'A remote agent',
+    agentCardUrl: 'https://example.com/agent.json',
+    inputConfig: {
+      inputs: {
+        query: { type: 'string', description: 'Query', required: true },
+      },
+    },
+  };
+
   beforeEach(() => {
     config = {
       getDebugMode: () => false,
@@ -58,6 +80,8 @@ describe('DelegateToAgentTool', () => {
     // Manually register the mock agent (bypassing protected method for testing)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (registry as any).agents.set(mockAgentDef.name, mockAgentDef);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (registry as any).agents.set(mockRemoteAgentDef.name, mockRemoteAgentDef);
 
     messageBus = createMockMessageBus();
 
@@ -174,6 +198,25 @@ describe('DelegateToAgentTool', () => {
           name: DELEGATE_TO_AGENT_TOOL_NAME,
         }),
       }),
+    );
+  });
+
+  it('should delegate to remote agent correctly', async () => {
+    const invocation = tool.build({
+      agent_name: 'remote_agent',
+      query: 'hello remote',
+    });
+
+    const result = await invocation.execute(new AbortController().signal);
+    expect(result).toEqual({
+      content: [{ type: 'text', text: 'Remote Success' }],
+    });
+    expect(RemoteAgentInvocation).toHaveBeenCalledWith(
+      mockRemoteAgentDef,
+      { query: 'hello remote' },
+      messageBus,
+      'remote_agent',
+      'remote_agent',
     );
   });
 });
