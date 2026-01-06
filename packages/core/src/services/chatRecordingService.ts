@@ -410,7 +410,7 @@ export class ChatRecordingService {
    */
   private writeConversation(
     conversation: ConversationRecord,
-    allowEmpty: boolean = false,
+    { allowEmpty = false }: { allowEmpty?: boolean } = {},
   ): void {
     try {
       if (!this.conversationFile) return;
@@ -502,22 +502,20 @@ export class ChatRecordingService {
    * All messages from (and including) the specified ID onwards are removed.
    */
   rewindTo(messageId: string): ConversationRecord {
-    try {
-      const conversation = this.readConversation();
-      const messageIndex = conversation.messages.findIndex(
-        (m) => m.id === messageId,
+    const conversation = this.readConversation();
+    const messageIndex = conversation.messages.findIndex(
+      (m) => m.id === messageId,
+    );
+
+    if (messageIndex === -1) {
+      debugLogger.error(
+        'Message to rewind to not found in conversation history',
       );
-
-      if (messageIndex === -1) {
-        return conversation;
-      }
-
-      conversation.messages = conversation.messages.slice(0, messageIndex);
-      this.writeConversation(conversation, true);
       return conversation;
-    } catch (error) {
-      debugLogger.error('Error rewinding conversation.', error);
-      throw error;
     }
+
+    conversation.messages = conversation.messages.slice(0, messageIndex);
+    this.writeConversation(conversation, { allowEmpty: true });
+    return conversation;
   }
 }
