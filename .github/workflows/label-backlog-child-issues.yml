@@ -15,28 +15,26 @@ jobs:
         with:
           script: |
             const issue = context.payload.issue;
-            const parentWorkstreamNumbers = [15374, 15456, 15324];
             const labelToAdd = 'workstream-rollup';
-
-            // --- START DEBUGGING ---
-            console.log('--- Full Issue Object from Payload ---');
-            console.log(JSON.stringify(issue, null, 2));
-            console.log('--- End of Full Issue Object ---');
             
-            console.log(`Value of issue.parent is: ${issue.parent}`);
-            if (issue.parent) {
-              console.log(`Value of issue.parent.number is: ${issue.parent.number}`);
-            }
-            // --- END DEBUGGING ---
+            // --- Define the FULL URLs of the allowed parent workstreams ---
+            const allowedParentUrls = [
+              'https://api.github.com/repos/google-gemini/gemini-cli/issues/15374',
+              'https://api.github.com/repos/google-gemini/gemini-cli/issues/15456',
+              'https://api.github.com/repos/google-gemini/gemini-cli/issues/15324'
+            ];
 
-            if (issue.parent && parentWorkstreamNumbers.includes(issue.parent.number)) {
-              console.log(`SUCCESS: Issue #${issue.number} is a child of a target workstream. Adding label.`);
+            // Check if the issue has a parent_issue_url and if it's in our allowed list.
+            if (issue && issue.parent_issue_url && allowedParentUrls.includes(issue.parent_issue_url)) {
+              console.log(`SUCCESS: Issue #${issue.number} is a child of a target workstream (${issue.parent_issue_url}). Adding label.`);
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
                 labels: [labelToAdd]
               });
+            } else if (issue && issue.parent_issue_url) {
+              console.log(`FAILURE: Issue #${issue.number} has a parent, but it's not a target workstream. Parent URL: ${issue.parent_issue_url}`);
             } else {
-              console.log(`FAILURE: Issue #${issue.number} is not a child of a target workstream. No action taken.`);
+              console.log(`FAILURE: Issue #${issue.number} is not a child of any issue. No action taken.`);
             }
