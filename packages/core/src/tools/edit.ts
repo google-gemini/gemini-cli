@@ -35,10 +35,10 @@ import {
 import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
 import { safeLiteralReplace } from '../utils/textUtils.js';
-import { SmartEditStrategyEvent } from '../telemetry/types.js';
-import { logSmartEditStrategy } from '../telemetry/loggers.js';
-import { SmartEditCorrectionEvent } from '../telemetry/types.js';
-import { logSmartEditCorrectionEvent } from '../telemetry/loggers.js';
+import { EditStrategyEvent } from '../telemetry/types.js';
+import { logEditStrategy } from '../telemetry/loggers.js';
+import { EditCorrectionEvent } from '../telemetry/types.js';
+import { logEditCorrectionEvent } from '../telemetry/loggers.js';
 
 import { correctPath } from '../utils/pathCorrector.js';
 import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
@@ -289,22 +289,22 @@ export async function calculateReplacement(
 
   const exactResult = await calculateExactReplacement(context);
   if (exactResult) {
-    const event = new SmartEditStrategyEvent('exact');
-    logSmartEditStrategy(config, event);
+    const event = new EditStrategyEvent('exact');
+    logEditStrategy(config, event);
     return exactResult;
   }
 
   const flexibleResult = await calculateFlexibleReplacement(context);
   if (flexibleResult) {
-    const event = new SmartEditStrategyEvent('flexible');
-    logSmartEditStrategy(config, event);
+    const event = new EditStrategyEvent('flexible');
+    logEditStrategy(config, event);
     return flexibleResult;
   }
 
   const regexResult = await calculateRegexReplacement(context);
   if (regexResult) {
-    const event = new SmartEditStrategyEvent('regex');
-    logSmartEditStrategy(config, event);
+    const event = new EditStrategyEvent('regex');
+    logEditStrategy(config, event);
     return regexResult;
   }
 
@@ -500,8 +500,8 @@ class EditToolInvocation
 
     if (secondError) {
       // The fix failed, log failure and return the original error
-      const event = new SmartEditCorrectionEvent('failure');
-      logSmartEditCorrectionEvent(this.config, event);
+      const event = new EditCorrectionEvent('failure');
+      logEditCorrectionEvent(this.config, event);
 
       return {
         currentContent: contentForLlmEditFixer,
@@ -513,8 +513,8 @@ class EditToolInvocation
       };
     }
 
-    const event = new SmartEditCorrectionEvent('success');
-    logSmartEditCorrectionEvent(this.config, event);
+    const event = new EditCorrectionEvent('success');
+    logEditCorrectionEvent(this.config, event);
 
     return {
       currentContent: contentForLlmEditFixer,
@@ -703,7 +703,7 @@ class EditToolInvocation
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           // No need to publish a policy update as the default policy for
-          // AUTO_EDIT already reflects always approving smart-edit.
+          // AUTO_EDIT already reflects always approving edit.
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
         } else {
           await this.publishPolicyUpdate(outcome);
@@ -866,7 +866,7 @@ class EditToolInvocation
 /**
  * Implementation of the Edit tool logic
  */
-export class SmartEditTool
+export class EditTool
   extends BaseDeclarativeTool<EditToolParams, ToolResult>
   implements ModifiableDeclarativeTool<EditToolParams>
 {
@@ -877,7 +877,7 @@ export class SmartEditTool
     messageBus: MessageBus,
   ) {
     super(
-      SmartEditTool.Name,
+      EditTool.Name,
       'Edit',
       `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
       
