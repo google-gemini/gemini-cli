@@ -1141,9 +1141,7 @@ describe('oauth2', () => {
         // Mock process.on to capture SIGINT handler
         const processOnSpy = vi
           .spyOn(process, 'on')
-          .mockImplementation(() => {
-            return process;
-          });
+          .mockImplementation(() => process);
 
         const processRemoveListenerSpy = vi.spyOn(process, 'removeListener');
 
@@ -1207,9 +1205,7 @@ describe('oauth2', () => {
         // Spy on process.stdin.on to capture data handler
         const stdinOnSpy = vi
           .spyOn(process.stdin, 'on')
-          .mockImplementation(() => {
-            return process.stdin;
-          });
+          .mockImplementation(() => process.stdin);
 
         const stdinRemoveListenerSpy = vi.spyOn(
           process.stdin,
