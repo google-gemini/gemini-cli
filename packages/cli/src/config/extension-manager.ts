@@ -46,6 +46,7 @@ import {
   type HookDefinition,
   type HookEventName,
   type ResolvedExtensionSetting,
+  coreEvents,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -59,6 +60,7 @@ import {
 import {
   getEnvContents,
   maybePromptForSettings,
+  getMissingSettings,
   type ExtensionSetting,
 } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
@@ -227,25 +229,6 @@ Would you like to attempt to install via "git clone" instead?`,
       try {
         newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
 
-        if (isUpdate && installMetadata.autoUpdate) {
-          const oldSettings = new Set(
-            previousExtensionConfig.settings?.map((s) => s.name) || [],
-          );
-          const newSettings = new Set(
-            newExtensionConfig.settings?.map((s) => s.name) || [],
-          );
-
-          const settingsAreEqual =
-            oldSettings.size === newSettings.size &&
-            [...oldSettings].every((value) => newSettings.has(value));
-
-          if (!settingsAreEqual && installMetadata.autoUpdate) {
-            throw new Error(
-              `Extension "${newExtensionConfig.name}" has settings changes and cannot be auto-updated. Please update manually.`,
-            );
-          }
-        }
-
         const newExtensionName = newExtensionConfig.name;
         const previous = this.getExtensions().find(
           (installed) => installed.name === newExtensionName,
@@ -314,6 +297,20 @@ Would you like to attempt to install via "git clone" instead?`,
               this.requestSetting,
             );
           }
+        }
+
+        const missingSettings = await getMissingSettings(
+          newExtensionConfig,
+          extensionId,
+        );
+        if (missingSettings.length > 0) {
+          const message = `Extension "${newExtensionConfig.name}" has missing settings: ${missingSettings
+            .map((s) => s.name)
+            .join(
+              ', ',
+            )}. Please run "gemini extensions settings ${newExtensionConfig.name} <setting-name>" to configure them.`;
+          debugLogger.warn(message);
+          coreEvents.emitFeedback('warning', message);
         }
 
         if (
