@@ -37,6 +37,10 @@ export async function loadConfig(
   const workspaceDir = process.cwd();
   const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
 
+  const folderTrust =
+    settings.folderTrust === true ||
+    process.env['GEMINI_FOLDER_TRUST'] === 'true';
+
   const configParams: ConfigParameters = {
     sessionId: taskId,
     model: settings.general?.previewFeatures
@@ -72,7 +76,8 @@ export async function loadConfig(
         settings.fileFiltering?.enableRecursiveFileSearch,
     },
     ideMode: false,
-    folderTrust: settings.folderTrust === true,
+    folderTrust,
+    trustedFolder: true,
     extensionLoader,
     checkpointing: process.env['CHECKPOINTING']
       ? process.env['CHECKPOINTING'] === 'true'
@@ -89,7 +94,7 @@ export async function loadConfig(
       false,
       fileService,
       extensionLoader,
-      settings.folderTrust === true,
+      folderTrust,
     );
   configParams.userMemory = memoryContent;
   configParams.geminiMdFileCount = fileCount;

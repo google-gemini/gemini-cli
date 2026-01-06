@@ -16,6 +16,12 @@ import type {
   CommandExecutionResponse,
 } from './types.js';
 
+const DEFAULT_SANITIZATION_CONFIG = {
+  allowedEnvironmentVariables: [],
+  blockedEnvironmentVariables: [],
+  enableEnvironmentVariableRedaction: false,
+};
+
 export class MemoryCommand implements Command {
   readonly name = 'memory';
   readonly description = 'Manage memory.';
@@ -94,7 +100,9 @@ export class AddMemoryCommand implements Command {
     if (tool) {
       const abortController = new AbortController();
       const signal = abortController.signal;
-      await tool.buildAndExecute(result.toolArgs, signal, undefined, {});
+      await tool.buildAndExecute(result.toolArgs, signal, undefined, {
+        sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
+      });
       await refreshMemory(context.config);
       return {
         name: this.name,

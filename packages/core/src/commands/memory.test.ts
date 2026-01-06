@@ -28,6 +28,7 @@ describe('memory commands', () => {
       getUserMemory: vi.fn(),
       getGeminiMdFileCount: vi.fn(),
       getGeminiMdFilePaths: vi.fn(),
+      isJitContextEnabled: vi.fn(),
       updateSystemInstructionIfInitialized: vi
         .fn()
         .mockResolvedValue(undefined),

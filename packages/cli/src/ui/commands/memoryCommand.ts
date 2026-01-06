@@ -80,25 +80,6 @@ export const memoryCommand: SlashCommand = {
           const config = context.services.config;
           if (config) {
             const result = await refreshMemory(config);
-            let memoryContent = '';
-            let fileCount = 0;
-
-            if (config.isJitContextEnabled()) {
-              await config.getContextManager()?.refresh();
-              memoryContent = config.getUserMemory();
-              fileCount = config.getGeminiMdFileCount();
-            } else {
-              const result = await refreshServerHierarchicalMemory(config);
-              memoryContent = result.memoryContent;
-              fileCount = result.fileCount;
-            }
-
-            await config.updateSystemInstructionIfInitialized();
-
-            const successMessage =
-              memoryContent.length > 0
-                ? `Memory refreshed successfully. Loaded ${memoryContent.length} characters from ${fileCount} file(s).`
-                : 'Memory refreshed successfully. No memory content found.';
 
             context.ui.addItem(
               {

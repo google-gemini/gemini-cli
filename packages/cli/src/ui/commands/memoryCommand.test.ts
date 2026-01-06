@@ -13,6 +13,7 @@ import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import {
   refreshMemory,
+  refreshServerHierarchicalMemory,
   SimpleExtensionLoader,
   type FileDiscoveryService,
 } from '@google/gemini-cli-core';
@@ -26,11 +27,30 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       if (error instanceof Error) return error.message;
       return String(error);
     }),
-    refreshMemory: vi.fn(),
+    refreshMemory: vi.fn(async (config) => {
+      if (config.isJitContextEnabled()) {
+        await config.getContextManager()?.refresh();
+        const memoryContent = config.getUserMemory() || '';
+        const fileCount = config.getGeminiMdFileCount() || 0;
+        return {
+          type: 'message',
+          messageType: 'info',
+          content: `Memory refreshed successfully. Loaded ${memoryContent.length} characters from ${fileCount} file(s).`,
+        };
+      }
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: 'Memory refreshed successfully.',
+      };
+    }),
+    refreshServerHierarchicalMemory: vi.fn(),
   };
 });
 
 const mockRefreshMemory = refreshMemory as Mock;
+const mockRefreshServerHierarchicalMemory =
+  refreshServerHierarchicalMemory as Mock;
 
 describe('memoryCommand', () => {
   let mockContext: CommandContext;

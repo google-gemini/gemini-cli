@@ -46,8 +46,19 @@ export function addMemory(
 export async function refreshMemory(
   config: Config,
 ): Promise<MessageActionReturn> {
-  const { memoryContent, fileCount } =
-    await refreshServerHierarchicalMemory(config);
+  let memoryContent = '';
+  let fileCount = 0;
+
+  if (config.isJitContextEnabled()) {
+    await config.getContextManager()?.refresh();
+    memoryContent = config.getUserMemory();
+    fileCount = config.getGeminiMdFileCount();
+  } else {
+    const result = await refreshServerHierarchicalMemory(config);
+    memoryContent = result.memoryContent;
+    fileCount = result.fileCount;
+  }
+
   await config.updateSystemInstructionIfInitialized();
   let content: string;
 

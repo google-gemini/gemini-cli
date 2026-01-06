@@ -176,7 +176,13 @@ describe('a2a-server memory commands', () => {
         { fact },
         expect.any(AbortSignal),
         undefined,
-        {},
+        {
+          sanitizationConfig: {
+            allowedEnvironmentVariables: [],
+            blockedEnvironmentVariables: [],
+            enableEnvironmentVariableRedaction: false,
+          },
+        },
       );
       expect(mockRefreshMemory).toHaveBeenCalledWith(mockContext.config);
       expect(response.name).toBe('memory add');
