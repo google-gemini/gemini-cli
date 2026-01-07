@@ -10,7 +10,7 @@ import { loadSettings } from '../../config/settings.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { debugLogger } from '@google/gemini-cli-core';
 
-export async function getExtensionAndManager(name: string) {
+export async function getExtensionManager() {
   const workspaceDir = process.cwd();
   const extensionManager = new ExtensionManager({
     workspaceDir,
@@ -19,6 +19,11 @@ export async function getExtensionAndManager(name: string) {
     settings: loadSettings(workspaceDir).merged,
   });
   await extensionManager.loadExtensions();
+  return extensionManager;
+}
+
+export async function getExtensionAndManager(name: string) {
+  const extensionManager = await getExtensionManager();
   const extension = extensionManager
     .getExtensions()
     .find((ext) => ext.name === name);
