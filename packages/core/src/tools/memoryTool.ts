@@ -72,9 +72,15 @@ export function setGeminiMdFilename(newFilename: string | string[]): void {
   const validateFilename = (name: string): string => {
     const trimmed = name.trim();
     // Prevent path traversal by ensuring the filename doesn't contain path separators
-    if (trimmed.includes('/') || trimmed.includes('\\')) {
+    // Also prevent '.' and '..' which can be used for path traversal
+    if (
+      trimmed.includes('/') ||
+      trimmed.includes('\\') ||
+      trimmed === '.' ||
+      trimmed === '..'
+    ) {
       throw new Error(
-        `Invalid GEMINI.md filename: ${trimmed}. Filenames cannot contain path separators.`,
+        `Invalid GEMINI.md filename: ${trimmed}. Filenames cannot contain path separators or be '.' or '..'.`,
       );
     }
     return trimmed;
