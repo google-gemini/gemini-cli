@@ -64,7 +64,7 @@ describe('ProQuotaDialog', () => {
 
   describe('for non-flash model failures', () => {
     describe('when it is a terminal quota error', () => {
-      it('should render switch and stop options for paid tiers', () => {
+      it('should render switch, upgrade, and stop options for paid tiers', () => {
         const { unmount } = render(
           <ProQuotaDialog
             failedModel="gemini-2.5-pro"
