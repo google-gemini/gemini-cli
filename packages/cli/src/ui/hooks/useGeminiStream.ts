@@ -38,6 +38,8 @@ import {
   runInDevTraceSpan,
   EDIT_TOOL_NAMES,
   processRestorableToolCalls,
+  recordToolCallInteractions,
+  ToolErrorType,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -163,6 +165,11 @@ export const useGeminiStream = (
               currentModel,
               completedToolCallsFromScheduler,
             );
+
+          await recordToolCallInteractions(
+            config,
+            completedToolCallsFromScheduler,
+          );
         } catch (error) {
           debugLogger.warn(
             `Error recording completed tool call information: ${error}`,
@@ -785,6 +792,41 @@ export const useGeminiStream = (
     [addItem, pendingHistoryItemRef, setPendingHistoryItem, settings],
   );
 
+  const handleAgentExecutionStoppedEvent = useCallback(
+    (reason: string, userMessageTimestamp: number) => {
+      if (pendingHistoryItemRef.current) {
+        addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+        setPendingHistoryItem(null);
+      }
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: `Agent execution stopped: ${reason}`,
+        },
+        userMessageTimestamp,
+      );
+      setIsResponding(false);
+    },
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, setIsResponding],
+  );
+
+  const handleAgentExecutionBlockedEvent = useCallback(
+    (reason: string, userMessageTimestamp: number) => {
+      if (pendingHistoryItemRef.current) {
+        addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+        setPendingHistoryItem(null);
+      }
+      addItem(
+        {
+          type: MessageType.WARNING,
+          text: `Agent execution blocked: ${reason}`,
+        },
+        userMessageTimestamp,
+      );
+    },
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+  );
+
   const processGeminiStreamEvents = useCallback(
     async (
       stream: AsyncIterable<GeminiEvent>,
@@ -813,6 +855,18 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.Error:
             handleErrorEvent(event.value, userMessageTimestamp);
+            break;
+          case ServerGeminiEventType.AgentExecutionStopped:
+            handleAgentExecutionStoppedEvent(
+              event.value.reason,
+              userMessageTimestamp,
+            );
+            break;
+          case ServerGeminiEventType.AgentExecutionBlocked:
+            handleAgentExecutionBlockedEvent(
+              event.value.reason,
+              userMessageTimestamp,
+            );
             break;
           case ServerGeminiEventType.ChatCompressed:
             handleChatCompressionEvent(event.value, userMessageTimestamp);
@@ -871,6 +925,8 @@ export const useGeminiStream = (
       handleContextWindowWillOverflowEvent,
       handleCitationEvent,
       handleChatModelEvent,
+      handleAgentExecutionStoppedEvent,
+      handleAgentExecutionBlockedEvent,
     ],
   );
   const submitQuery = useCallback(
@@ -1143,6 +1199,28 @@ export const useGeminiStream = (
       );
 
       if (geminiTools.length === 0) {
+        return;
+      }
+
+      // Check if any tool requested to stop execution immediately
+      const stopExecutionTool = geminiTools.find(
+        (tc) => tc.response.errorType === ToolErrorType.STOP_EXECUTION,
+      );
+
+      if (stopExecutionTool && stopExecutionTool.response.error) {
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: `Agent execution stopped: ${stopExecutionTool.response.error.message}`,
+          },
+          Date.now(),
+        );
+        setIsResponding(false);
+
+        const callIdsToMarkAsSubmitted = geminiTools.map(
+          (toolCall) => toolCall.request.callId,
+        );
+        markToolsAsSubmitted(callIdsToMarkAsSubmitted);
         return;
       }
 

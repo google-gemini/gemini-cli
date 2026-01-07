@@ -147,7 +147,7 @@ describe('hooksCommand', () => {
         type: 'message',
         messageType: 'info',
         content:
-          'Hook system is not enabled. Enable it in settings with tools.enableHooks',
+          'Hook system is not enabled. Enable it in settings with hooks.enabled.',
       });
     });
 
@@ -308,6 +308,24 @@ describe('hooksCommand', () => {
         messageType: 'error',
         content: 'Failed to enable hook: Failed to save settings',
       });
+    });
+
+    it('should complete hook names using friendly names', () => {
+      const enableCmd = hooksCommand.subCommands!.find(
+        (cmd) => cmd.name === 'enable',
+      )!;
+
+      const hookEntry = createMockHook(
+        './hooks/test.sh',
+        HookEventName.BeforeTool,
+        true,
+      );
+      hookEntry.config.name = 'friendly-name';
+
+      mockHookSystem.getAllHooks.mockReturnValue([hookEntry]);
+
+      const completions = enableCmd.completion!(mockContext, 'frie');
+      expect(completions).toContain('friendly-name');
     });
   });
 

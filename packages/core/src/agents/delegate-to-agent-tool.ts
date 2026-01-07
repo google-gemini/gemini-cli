@@ -18,7 +18,7 @@ import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 import type { AgentRegistry } from './registry.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { SubagentInvocation } from './invocation.js';
+import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
 import type { AgentInputs } from './types.js';
 
 type DelegateParams = { agent_name: string } & Record<string, unknown>;
@@ -30,7 +30,7 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
   constructor(
     private readonly registry: AgentRegistry,
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     const definitions = registry.getAllDefinitions();
 
@@ -119,20 +119,25 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
       registry.getToolDescription(),
       Kind.Think,
       zodToJsonSchema(schema),
+      messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
-      messageBus,
     );
   }
 
   protected createInvocation(
     params: DelegateParams,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<DelegateParams, ToolResult> {
     return new DelegateInvocation(
       params,
       this.registry,
       this.config,
-      this.messageBus,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
     );
   }
 }
@@ -145,9 +150,16 @@ class DelegateInvocation extends BaseToolInvocation<
     params: DelegateParams,
     private readonly registry: AgentRegistry,
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, DELEGATE_TO_AGENT_TOOL_NAME);
+    super(
+      params,
+      messageBus,
+      _toolName ?? DELEGATE_TO_AGENT_TOOL_NAME,
+      _toolDisplayName,
+    );
   }
 
   getDescription(): string {
@@ -169,14 +181,18 @@ class DelegateInvocation extends BaseToolInvocation<
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { agent_name, ...agentArgs } = this.params;
 
-    // Instantiate the Subagent Loop
-    const subagentInvocation = new SubagentInvocation(
-      agentArgs as AgentInputs,
+    // Delegate the creation of the specific invocation (Local or Remote) to the wrapper.
+    // This centralizes the logic and ensures consistent handling.
+    const wrapper = new SubagentToolWrapper(
       definition,
       this.config,
       this.messageBus,
     );
 
-    return subagentInvocation.execute(signal, updateOutput);
+    // We could skip extra validation here if we trust the Registry's schema,
+    // but build() will do a safety check anyway.
+    const invocation = wrapper.build(agentArgs as AgentInputs);
+
+    return invocation.execute(signal, updateOutput);
   }
 }

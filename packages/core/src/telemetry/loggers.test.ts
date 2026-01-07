@@ -17,6 +17,7 @@ import {
   ToolConfirmationOutcome,
   ToolErrorType,
   ToolRegistry,
+  type MessageBus,
 } from '../index.js';
 import { OutputFormat } from '../output/types.js';
 import { logs } from '@opentelemetry/api-logs';
@@ -43,6 +44,7 @@ import {
   logAgentFinish,
   logWebFetchFallbackAttempt,
   logExtensionUpdateEvent,
+  logHookCall,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -87,10 +89,13 @@ import {
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
   EVENT_EXTENSION_UPDATE,
+  HookCallEvent,
+  EVENT_HOOK_CALL,
 } from './types.js';
 import * as metrics from './metrics.js';
 import { FileOperation } from './metrics.js';
 import * as sdk from './sdk.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { vi, describe, beforeEach, it, expect, afterEach } from 'vitest';
 import { type GeminiCLIExtension } from '../config/config.js';
 import {
@@ -996,7 +1001,8 @@ describe('loggers', () => {
         },
       }),
       getQuestion: () => 'test-question',
-      getToolRegistry: () => new ToolRegistry(cfg1),
+      getToolRegistry: () =>
+        new ToolRegistry(cfg1, {} as unknown as MessageBus),
 
       getUserMemory: () => 'user-memory',
     } as unknown as Config;
@@ -1028,7 +1034,7 @@ describe('loggers', () => {
     });
 
     it('should log a tool call with all fields', () => {
-      const tool = new EditTool(mockConfig);
+      const tool = new EditTool(mockConfig, createMockMessageBus());
       const call: CompletedToolCall = {
         status: 'success',
         request: {
@@ -1244,7 +1250,7 @@ describe('loggers', () => {
           contentLength: 13,
         },
         outcome: ToolConfirmationOutcome.ModifyWithEditor,
-        tool: new EditTool(mockConfig),
+        tool: new EditTool(mockConfig, createMockMessageBus()),
         invocation: {} as AnyToolInvocation,
         durationMs: 100,
       };
@@ -1323,7 +1329,7 @@ describe('loggers', () => {
           errorType: undefined,
           contentLength: 13,
         },
-        tool: new EditTool(mockConfig),
+        tool: new EditTool(mockConfig, createMockMessageBus()),
         invocation: {} as AnyToolInvocation,
         durationMs: 100,
       };
@@ -1475,6 +1481,7 @@ describe('loggers', () => {
           },
           required: ['arg1', 'arg2'],
         },
+        createMockMessageBus(),
         false,
         undefined,
         undefined,
@@ -1745,7 +1752,6 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
-      getUseSmartEdit: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 
@@ -1796,7 +1802,6 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
-      getUseSmartEdit: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 
@@ -1849,7 +1854,6 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
-      getUseSmartEdit: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 
@@ -2101,6 +2105,66 @@ describe('loggers', () => {
       });
     });
   });
+
+  describe('logHookCall', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      isInteractive: () => false,
+      getTelemetryLogPromptsEnabled: () => false,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logHookCallEvent');
+      vi.spyOn(metrics, 'recordHookCallMetrics');
+    });
+
+    it('should log hook call event to Clearcut and OTEL', () => {
+      const event = new HookCallEvent(
+        'before-tool',
+        'command',
+        '/path/to/script.sh',
+        { arg: 'val' },
+        150,
+        true,
+        { out: 'res' },
+        0,
+      );
+
+      logHookCall(mockConfig, event);
+
+      expect(ClearcutLogger.prototype.logHookCallEvent).toHaveBeenCalledWith(
+        event,
+      );
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Hook call before-tool./path/to/script.sh succeeded in 150ms',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          'event.name': EVENT_HOOK_CALL,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
+          hook_event_name: 'before-tool',
+          hook_type: 'command',
+          hook_name: 'script.sh', // Sanitized because logPrompts is false
+          duration_ms: 150,
+          success: true,
+          exit_code: 0,
+        },
+      });
+
+      expect(metrics.recordHookCallMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        'before-tool',
+        '/path/to/script.sh',
+        150,
+        true,
+      );
+    });
+  });
+
   describe('Telemetry Buffering', () => {
     it('should buffer events when SDK is not initialized', () => {
       vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(false);

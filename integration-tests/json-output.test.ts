@@ -14,7 +14,6 @@ describe('JSON output', () => {
 
   beforeEach(async () => {
     rig = new TestRig();
-    await rig.setup('json-output-test');
   });
 
   afterEach(async () => {
@@ -22,6 +21,7 @@ describe('JSON output', () => {
   });
 
   it('should return a valid JSON with response and stats', async () => {
+    await rig.setup('json-output-response-stats');
     const result = await rig.run({
       args: ['What is the capital of France?', '--output-format', 'json'],
     });
@@ -36,6 +36,7 @@ describe('JSON output', () => {
   });
 
   it('should return a valid JSON with a session ID', async () => {
+    await rig.setup('json-output-session-id');
     const result = await rig.run({
       args: ['Hello', '--output-format', 'json'],
     });
@@ -47,7 +48,6 @@ describe('JSON output', () => {
   });
 
   it('should return a JSON error for sd auth mismatch before running', async () => {
-    process.env['GOOGLE_GENAI_USE_GCA'] = 'true';
     await rig.setup('json-output-auth-mismatch', {
       settings: {
         security: {
@@ -58,12 +58,13 @@ describe('JSON output', () => {
 
     let thrown: Error | undefined;
     try {
-      await rig.run({ args: ['Hello', '--output-format', 'json'] });
+      await rig.run({
+        args: ['Hello', '--output-format', 'json'],
+        env: { GOOGLE_GENAI_USE_GCA: 'true' },
+      });
       expect.fail('Expected process to exit with error');
     } catch (e) {
       thrown = e as Error;
-    } finally {
-      delete process.env['GOOGLE_GENAI_USE_GCA'];
     }
 
     expect(thrown).toBeDefined();
