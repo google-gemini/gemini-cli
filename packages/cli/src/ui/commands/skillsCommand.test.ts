@@ -12,6 +12,15 @@ import type { CommandContext } from './types.js';
 import type { Config, SkillDefinition } from '@google/gemini-cli-core';
 import { SettingScope, type LoadedSettings } from '../../config/settings.js';
 
+vi.mock('../../config/settings.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../config/settings.js')>();
+  return {
+    ...actual,
+    isLoadableSettingScope: vi.fn((s) => s === 'User' || s === 'Workspace'),
+  };
+});
+
 describe('skillsCommand', () => {
   let context: CommandContext;
 
@@ -135,6 +144,28 @@ describe('skillsCommand', () => {
       ).workspace = {
         path: '/workspace',
       };
+
+      interface MockSettings {
+        user: { settings: unknown; path: string };
+        workspace: { settings: unknown; path: string };
+        forScope: unknown;
+      }
+
+      const settings = context.services.settings as unknown as MockSettings;
+
+      settings.forScope = vi.fn((scope) => {
+        if (scope === SettingScope.User) return settings.user;
+        if (scope === SettingScope.Workspace) return settings.workspace;
+        return { settings: {}, path: '' };
+      });
+      settings.user = {
+        settings: {},
+        path: '/user/settings.json',
+      };
+      settings.workspace = {
+        settings: {},
+        path: '/workspace',
+      };
     });
 
     it('should disable a skill', async () => {
@@ -151,7 +182,7 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: expect.stringContaining('Skill "skill1" disabled'),
+          text: 'Skill "skill1" disabled by adding it to the disabled list in project settings. Use "/skills reload" for it to take effect.',
         }),
         expect.any(Number),
       );
@@ -162,6 +193,15 @@ describe('skillsCommand', () => {
         (s) => s.name === 'enable',
       )!;
       context.services.settings.merged.skills = { disabled: ['skill1'] };
+      // Also need to mock the scope-specific disabled list
+      (
+        context.services.settings as unknown as {
+          workspace: { settings: { skills: { disabled: string[] } } };
+        }
+      ).workspace.settings = {
+        skills: { disabled: ['skill1'] },
+      };
+
       await enableCmd.action!(context, 'skill1');
 
       expect(context.services.settings.setValue).toHaveBeenCalledWith(
@@ -172,7 +212,7 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: expect.stringContaining('Skill "skill1" enabled'),
+          text: 'Skill "skill1" enabled by removing it from the disabled list in project settings. Use "/skills reload" for it to take effect.',
         }),
         expect.any(Number),
       );

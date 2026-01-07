@@ -16,6 +16,8 @@ import {
   type HistoryItemInfo,
 } from '../types.js';
 import { SettingScope } from '../../config/settings.js';
+import { enableSkill, disableSkill } from '../../utils/skillSettings.js';
+import { renderSkillActionFeedback } from '../../utils/skillUtils.js';
 
 async function listAction(
   context: CommandContext,
@@ -86,29 +88,24 @@ async function disableAction(
     return;
   }
 
-  const currentDisabled =
-    context.services.settings.merged.skills?.disabled ?? [];
-  if (currentDisabled.includes(skillName)) {
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: `Skill "${skillName}" is already disabled.`,
-      },
-      Date.now(),
-    );
-    return;
-  }
-
-  const newDisabled = [...currentDisabled, skillName];
   const scope = context.services.settings.workspace.path
     ? SettingScope.Workspace
     : SettingScope.User;
 
-  context.services.settings.setValue(scope, 'skills.disabled', newDisabled);
+  const result = disableSkill(context.services.settings, skillName, scope);
+
+  let feedback = renderSkillActionFeedback(
+    result,
+    (label, _path) => `${label}`,
+  );
+  if (result.status === 'success') {
+    feedback += ' Use "/skills reload" for it to take effect.';
+  }
+
   context.ui.addItem(
     {
       type: MessageType.INFO,
-      text: `Skill "${skillName}" disabled in ${scope} settings. Use "/skills reload" for it to take effect.`,
+      text: feedback,
     },
     Date.now(),
   );
@@ -130,29 +127,24 @@ async function enableAction(
     return;
   }
 
-  const currentDisabled =
-    context.services.settings.merged.skills?.disabled ?? [];
-  if (!currentDisabled.includes(skillName)) {
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: `Skill "${skillName}" is not disabled.`,
-      },
-      Date.now(),
-    );
-    return;
-  }
-
-  const newDisabled = currentDisabled.filter((name) => name !== skillName);
   const scope = context.services.settings.workspace.path
     ? SettingScope.Workspace
     : SettingScope.User;
 
-  context.services.settings.setValue(scope, 'skills.disabled', newDisabled);
+  const result = enableSkill(context.services.settings, skillName, scope);
+
+  let feedback = renderSkillActionFeedback(
+    result,
+    (label, _path) => `${label}`,
+  );
+  if (result.status === 'success') {
+    feedback += ' Use "/skills reload" for it to take effect.';
+  }
+
   context.ui.addItem(
     {
       type: MessageType.INFO,
-      text: `Skill "${skillName}" enabled in ${scope} settings. Use "/skills reload" for it to take effect.`,
+      text: feedback,
     },
     Date.now(),
   );
