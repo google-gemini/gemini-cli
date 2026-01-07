@@ -28,9 +28,9 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { isKittyProtocolEnabled } from './kittyProtocolDetector.js';
+import { terminalCapabilityManager } from './terminalCapabilityManager.js';
 
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, homedir } from '@google/gemini-cli-core';
 
 export const VSCODE_SHIFT_ENTER_SEQUENCE = '\\\r\n';
 
@@ -124,7 +124,7 @@ function getVSCodeStyleConfigDir(appName: string): string | null {
 
   if (platform === 'darwin') {
     return path.join(
-      os.homedir(),
+      homedir(),
       'Library',
       'Application Support',
       appName,
@@ -136,7 +136,7 @@ function getVSCodeStyleConfigDir(appName: string): string | null {
     }
     return path.join(process.env['APPDATA'], appName, 'User');
   } else {
-    return path.join(os.homedir(), '.config', appName, 'User');
+    return path.join(homedir(), '.config', appName, 'User');
   }
 }
 
@@ -323,7 +323,7 @@ async function configureWindsurf(): Promise<TerminalSetupResult> {
  */
 export async function terminalSetup(): Promise<TerminalSetupResult> {
   // Check if terminal already has optimal keyboard support
-  if (isKittyProtocolEnabled()) {
+  if (terminalCapabilityManager.isKittyProtocolEnabled()) {
     return {
       success: true,
       message:

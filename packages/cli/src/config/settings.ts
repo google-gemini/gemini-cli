@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { homedir, platform } from 'node:os';
+import { platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
@@ -16,6 +16,7 @@ import {
   getErrorMessage,
   Storage,
   coreEvents,
+  homedir,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -85,13 +86,13 @@ const MIGRATION_MAP: Record<string, string> = {
   disableAutoUpdate: 'general.disableAutoUpdate',
   disableUpdateNag: 'general.disableUpdateNag',
   dnsResolutionOrder: 'advanced.dnsResolutionOrder',
-  enableMessageBusIntegration: 'tools.enableMessageBusIntegration',
   enableHooks: 'tools.enableHooks',
   enablePromptCompletion: 'general.enablePromptCompletion',
   enforcedAuthType: 'security.auth.enforcedType',
   excludeTools: 'tools.exclude',
   excludeMCPServers: 'mcp.excluded',
   excludedProjectEnvVars: 'advanced.excludedEnvVars',
+  experimentalSkills: 'experimental.skills',
   extensionManagement: 'experimental.extensionManagement',
   extensions: 'extensions',
   fileFiltering: 'context.fileFiltering',
@@ -233,6 +234,7 @@ export interface SessionRetentionSettings {
 export interface SettingsError {
   message: string;
   path: string;
+  severity: 'error' | 'warning';
 }
 
 export interface SettingsFile {
@@ -423,6 +425,24 @@ export function migrateSettingsToV1(
   return v1Settings;
 }
 
+export function getDefaultsFromSchema(
+  schema: SettingsSchema = getSettingsSchema(),
+): Settings {
+  const defaults: Record<string, unknown> = {};
+  for (const key in schema) {
+    const definition = schema[key];
+    if (definition.properties) {
+      const childDefaults = getDefaultsFromSchema(definition.properties);
+      if (Object.keys(childDefaults).length > 0) {
+        defaults[key] = childDefaults;
+      }
+    } else if (definition.default !== undefined) {
+      defaults[key] = definition.default;
+    }
+  }
+  return defaults as Settings;
+}
+
 function mergeSettings(
   system: Settings,
   systemDefaults: Settings,
@@ -431,16 +451,18 @@ function mergeSettings(
   isTrusted: boolean,
 ): Settings {
   const safeWorkspace = isTrusted ? workspace : ({} as Settings);
+  const schemaDefaults = getDefaultsFromSchema();
 
   // Settings are merged with the following precedence (last one wins for
   // single values):
-  // 1. System Defaults
-  // 2. User Settings
-  // 3. Workspace Settings
-  // 4. System Settings (as overrides)
+  // 1. Schema Defaults (Built-in)
+  // 2. System Defaults
+  // 3. User Settings
+  // 4. Workspace Settings
+  // 5. System Settings (as overrides)
   return customDeepMerge(
     getMergeStrategyForPath,
-    {}, // Start with an empty object
+    schemaDefaults,
     systemDefaults,
     user,
     safeWorkspace,
@@ -456,6 +478,7 @@ export class LoadedSettings {
     workspace: SettingsFile,
     isTrusted: boolean,
     migratedInMemoryScopes: Set<SettingScope>,
+    errors: SettingsError[] = [],
   ) {
     this.system = system;
     this.systemDefaults = systemDefaults;
@@ -463,6 +486,7 @@ export class LoadedSettings {
     this.workspace = workspace;
     this.isTrusted = isTrusted;
     this.migratedInMemoryScopes = migratedInMemoryScopes;
+    this.errors = errors;
     this._merged = this.computeMergedSettings();
   }
 
@@ -472,6 +496,7 @@ export class LoadedSettings {
   readonly workspace: SettingsFile;
   readonly isTrusted: boolean;
   readonly migratedInMemoryScopes: Set<SettingScope>;
+  readonly errors: SettingsError[];
 
   private _merged: Settings;
 
@@ -510,6 +535,7 @@ export class LoadedSettings {
     setNestedProperty(settingsFile.originalSettings, key, value);
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
+    coreEvents.emitSettingsChanged();
   }
 }
 
@@ -658,6 +684,7 @@ export function loadSettings(
           settingsErrors.push({
             message: 'Settings file is not a valid JSON object.',
             path: filePath,
+            severity: 'error',
           });
           return { settings: {} };
         }
@@ -695,19 +722,20 @@ export function loadSettings(
             validationResult.error,
             filePath,
           );
-          throw new FatalConfigError(errorMessage);
+          settingsErrors.push({
+            message: errorMessage,
+            path: filePath,
+            severity: 'warning',
+          });
         }
 
         return { settings: settingsObject as Settings, rawJson: content };
       }
     } catch (error: unknown) {
-      // Preserve FatalConfigError with formatted validation messages
-      if (error instanceof FatalConfigError) {
-        throw error;
-      }
       settingsErrors.push({
         message: getErrorMessage(error),
         path: filePath,
+        severity: 'error',
       });
     }
     return { settings: {} };
@@ -779,10 +807,10 @@ export function loadSettings(
   // the settings to avoid a cycle
   loadEnvironment(tempMergedSettings);
 
-  // Create LoadedSettings first
-
-  if (settingsErrors.length > 0) {
-    const errorMessages = settingsErrors.map(
+  // Check for any fatal errors before proceeding
+  const fatalErrors = settingsErrors.filter((e) => e.severity === 'error');
+  if (fatalErrors.length > 0) {
+    const errorMessages = fatalErrors.map(
       (error) => `Error in ${error.path}: ${error.message}`,
     );
     throw new FatalConfigError(
@@ -817,6 +845,7 @@ export function loadSettings(
     },
     isTrusted,
     migratedInMemoryScopes,
+    settingsErrors,
   );
 }
 
@@ -870,6 +899,21 @@ export function saveSettings(settingsFile: SettingsFile): void {
     coreEvents.emitFeedback(
       'error',
       'There was an error saving your latest settings changes.',
+      error,
+    );
+  }
+}
+
+export function saveModelChange(
+  loadedSettings: LoadedSettings,
+  model: string,
+): void {
+  try {
+    loadedSettings.setValue(SettingScope.User, 'model.name', model);
+  } catch (error) {
+    coreEvents.emitFeedback(
+      'error',
+      'There was an error saving your preferred model.',
       error,
     );
   }

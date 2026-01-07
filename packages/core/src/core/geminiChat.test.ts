@@ -17,15 +17,10 @@ import {
 } from './geminiChat.js';
 import type { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
-import {
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
-  DEFAULT_THINKING_MODE,
-  PREVIEW_GEMINI_MODEL,
-} from '../config/models.js';
+import { DEFAULT_THINKING_MODE } from '../config/models.js';
 import { AuthType } from './contentGenerator.js';
 import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
-import { retryWithBackoff, type RetryOptions } from '../utils/retry.js';
+import { type RetryOptions } from '../utils/retry.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { HookSystem } from '../hooks/hookSystem.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
@@ -127,19 +122,25 @@ describe('GeminiChat', () => {
       }
       return result;
     });
+    let currentModel = 'gemini-pro';
+    let currentActiveModel = 'gemini-pro';
+
     mockConfig = {
       getSessionId: () => 'test-session-id',
       getTelemetryLogPromptsEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getPreviewFeatures: () => false,
-      getContentGeneratorConfig: vi.fn().mockReturnValue({
-        authType: 'oauth-personal', // Ensure this is set for fallback tests
-        model: 'test-model',
+      getContentGeneratorConfig: vi.fn().mockImplementation(() => ({
+        authType: 'oauth-personal',
+        model: currentModel,
+      })),
+      getModel: vi.fn().mockImplementation(() => currentModel),
+      setModel: vi.fn().mockImplementation((m: string) => {
+        currentModel = m;
+        // When model is explicitly set, active model usually resets or updates to it
+        currentActiveModel = m;
       }),
-      getModel: vi.fn().mockReturnValue('gemini-pro'),
-      setModel: vi.fn(),
-      isInFallbackMode: vi.fn().mockReturnValue(false),
       getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
       setQuotaErrorOccurred: vi.fn(),
       flashFallbackHandler: undefined,
@@ -155,7 +156,8 @@ describe('GeminiChat', () => {
       getUserTier: vi.fn().mockReturnValue(undefined),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {
-          const thinkingConfig = modelConfigKey.model.startsWith('gemini-3')
+          const model = modelConfigKey.model ?? mockConfig.getModel();
+          const thinkingConfig = model.startsWith('gemini-3')
             ? {
                 thinkingLevel: ThinkingLevel.HIGH,
               }
@@ -163,24 +165,23 @@ describe('GeminiChat', () => {
                 thinkingBudget: DEFAULT_THINKING_MODE,
               };
           return {
-            model: modelConfigKey.model,
+            model,
             generateContentConfig: {
-              temperature: 0,
+              temperature: modelConfigKey.isRetry ? 1 : 0,
               thinkingConfig,
             },
           };
         }),
       },
-      isPreviewModelBypassMode: vi.fn().mockReturnValue(false),
-      setPreviewModelBypassMode: vi.fn(),
-      isPreviewModelFallbackMode: vi.fn().mockReturnValue(false),
-      setPreviewModelFallbackMode: vi.fn(),
       isInteractive: vi.fn().mockReturnValue(false),
       getEnableHooks: vi.fn().mockReturnValue(false),
-      isModelAvailabilityServiceEnabled: vi.fn().mockReturnValue(false),
-      getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
-      setActiveModel: vi.fn(),
-      getModelAvailabilityService: vi.fn(),
+      getActiveModel: vi.fn().mockImplementation(() => currentActiveModel),
+      setActiveModel: vi
+        .fn()
+        .mockImplementation((m: string) => (currentActiveModel = m)),
+      getModelAvailabilityService: vi
+        .fn()
+        .mockReturnValue(createAvailabilityServiceMock()),
     } as unknown as Config;
 
     // Use proper MessageBus mocking for Phase 3 preparation
@@ -534,128 +535,6 @@ describe('GeminiChat', () => {
       expect(modelTurn?.parts?.length).toBe(1);
       expect(modelTurn?.parts![0].text).toBe(
         'This is the visible text that should not be lost.',
-      );
-    });
-
-    it('should use maxAttempts=1 for retryWithBackoff when in Preview Model Fallback Mode', async () => {
-      vi.mocked(mockConfig.isPreviewModelFallbackMode).mockReturnValue(true);
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        (async function* () {
-          yield {
-            candidates: [
-              {
-                content: { parts: [{ text: 'Success' }] },
-                finishReason: 'STOP',
-              },
-            ],
-          } as unknown as GenerateContentResponse;
-        })(),
-      );
-
-      const stream = await chat.sendMessageStream(
-        { model: PREVIEW_GEMINI_MODEL },
-        'test',
-        'prompt-id-fast-retry',
-        new AbortController().signal,
-      );
-      for await (const _ of stream) {
-        // consume stream
-      }
-
-      expect(mockRetryWithBackoff).toHaveBeenCalledWith(
-        expect.any(Function),
-        expect.objectContaining({
-          maxAttempts: 1,
-        }),
-      );
-    });
-
-    it('should NOT use maxAttempts=1 for other models even in Preview Model Fallback Mode', async () => {
-      vi.mocked(mockConfig.isPreviewModelFallbackMode).mockReturnValue(true);
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        (async function* () {
-          yield {
-            candidates: [
-              {
-                content: { parts: [{ text: 'Success' }] },
-                finishReason: 'STOP',
-              },
-            ],
-          } as unknown as GenerateContentResponse;
-        })(),
-      );
-
-      const stream = await chat.sendMessageStream(
-        { model: DEFAULT_GEMINI_FLASH_MODEL },
-        'test',
-        'prompt-id-normal-retry',
-        new AbortController().signal,
-      );
-      for await (const _ of stream) {
-        // consume stream
-      }
-
-      expect(mockRetryWithBackoff).toHaveBeenCalledWith(
-        expect.any(Function),
-        expect.objectContaining({
-          maxAttempts: undefined, // Should use default
-        }),
-      );
-    });
-
-    it('should pass DEFAULT_GEMINI_MODEL to handleFallback when Preview Model is bypassed (downgraded)', async () => {
-      // ARRANGE
-      vi.mocked(mockConfig.isPreviewModelBypassMode).mockReturnValue(true);
-      // Mock retryWithBackoff to simulate catching the error and calling onPersistent429
-      vi.mocked(retryWithBackoff).mockImplementation(
-        async (apiCall, options) => {
-          const onPersistent429 = options?.onPersistent429;
-          try {
-            await apiCall();
-          } catch (error) {
-            if (onPersistent429) {
-              await onPersistent429(AuthType.LOGIN_WITH_GOOGLE, error);
-            }
-            throw error;
-          }
-        },
-      );
-
-      // We need the API call to fail so retryWithBackoff calls the callback.
-      vi.mocked(mockContentGenerator.generateContentStream).mockRejectedValue(
-        new TerminalQuotaError('Simulated Quota Error', {
-          code: 429,
-          message: 'Simulated Quota Error',
-          details: [],
-        }),
-      );
-
-      // ACT
-      const consumeStream = async () => {
-        const stream = await chat.sendMessageStream(
-          { model: PREVIEW_GEMINI_MODEL },
-          'test',
-          'prompt-id-bypass',
-          new AbortController().signal,
-        );
-        // Consume the stream to trigger execution
-        for await (const _ of stream) {
-          // do nothing
-        }
-      };
-
-      await expect(consumeStream()).rejects.toThrow('Simulated Quota Error');
-
-      expect(retryWithBackoff).toHaveBeenCalled();
-
-      // ASSERT
-      // handleFallback is called via onPersistent429Callback
-      // We verify it was called with DEFAULT_GEMINI_MODEL
-      expect(mockHandleFallback).toHaveBeenCalledWith(
-        expect.anything(),
-        DEFAULT_GEMINI_MODEL, // This is the key assertion
-        expect.anything(),
-        expect.anything(),
       );
     });
 
@@ -1848,45 +1727,6 @@ describe('GeminiChat', () => {
     expect(turn4.parts[0].text).toBe('second response');
   });
 
-  describe('Model Resolution', () => {
-    const mockResponse = {
-      candidates: [
-        {
-          content: { parts: [{ text: 'response' }], role: 'model' },
-          finishReason: 'STOP',
-        },
-      ],
-    } as unknown as GenerateContentResponse;
-
-    it('should use the FLASH model when in fallback mode (sendMessageStream)', async () => {
-      vi.mocked(mockConfig.getModel).mockReturnValue('gemini-pro');
-      vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(true);
-      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
-        async () =>
-          (async function* () {
-            yield mockResponse;
-          })(),
-      );
-
-      const stream = await chat.sendMessageStream(
-        { model: 'test-model' },
-        'test message',
-        'prompt-id-res3',
-        new AbortController().signal,
-      );
-      for await (const _ of stream) {
-        // consume stream
-      }
-
-      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: DEFAULT_GEMINI_FLASH_MODEL,
-        }),
-        'prompt-id-res3',
-      );
-    });
-  });
-
   describe('Fallback Integration (Retries)', () => {
     const error429 = new ApiError({
       message: 'API Error 429: Quota exceeded',
@@ -1931,9 +1771,6 @@ describe('GeminiChat', () => {
         authType,
       });
 
-      const isInFallbackModeSpy = vi.spyOn(mockConfig, 'isInFallbackMode');
-      isInFallbackModeSpy.mockReturnValue(false);
-
       vi.mocked(mockContentGenerator.generateContentStream)
         .mockRejectedValueOnce(error429) // Attempt 1 fails
         .mockResolvedValueOnce(
@@ -1950,10 +1787,9 @@ describe('GeminiChat', () => {
           })(),
         );
 
-      mockHandleFallback.mockImplementation(async () => {
-        isInFallbackModeSpy.mockReturnValue(true);
-        return true; // Signal retry
-      });
+      mockHandleFallback.mockImplementation(
+        async () => true, // Signal retry
+      );
 
       const stream = await chat.sendMessageStream(
         { model: 'test-model' },
@@ -1981,120 +1817,6 @@ describe('GeminiChat', () => {
       const history = chat.getHistory();
       const modelTurn = history[1];
       expect(modelTurn.parts![0].text).toBe('Success on retry');
-    });
-
-    it('should switch to DEFAULT_GEMINI_FLASH_MODEL and use thinkingBudget when falling back from a gemini-3 model', async () => {
-      // ARRANGE
-      const authType = AuthType.LOGIN_WITH_GOOGLE;
-      vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
-        authType,
-      });
-
-      // Initial state: Not in fallback mode
-      const isInFallbackModeSpy = vi.spyOn(mockConfig, 'isInFallbackMode');
-      isInFallbackModeSpy.mockReturnValue(false);
-
-      // Mock API calls:
-      // 1. Fails with 429 (simulating gemini-3 failure)
-      // 2. Succeeds (simulating fallback success)
-      vi.mocked(mockContentGenerator.generateContentStream)
-        .mockRejectedValueOnce(error429)
-        .mockResolvedValueOnce(
-          (async function* () {
-            yield {
-              candidates: [
-                {
-                  content: { parts: [{ text: 'Fallback success' }] },
-                  finishReason: 'STOP',
-                },
-              ],
-            } as unknown as GenerateContentResponse;
-          })(),
-        );
-
-      // Mock handleFallback to enable fallback mode and signal retry
-      mockHandleFallback.mockImplementation(async () => {
-        isInFallbackModeSpy.mockReturnValue(true); // Next call will see fallback mode = true
-        return true;
-      });
-
-      // ACT
-      const stream = await chat.sendMessageStream(
-        { model: 'gemini-3-test-model' }, // Start with a gemini-3 model
-        'test fallback thinking',
-        'prompt-id-fb3',
-        new AbortController().signal,
-      );
-      for await (const _ of stream) {
-        // consume stream
-      }
-
-      // ASSERT
-      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        2,
-      );
-
-      // First call: gemini-3 model, thinkingLevel set
-      expect(
-        mockContentGenerator.generateContentStream,
-      ).toHaveBeenNthCalledWith(
-        1,
-        expect.objectContaining({
-          model: 'gemini-3-test-model',
-          config: expect.objectContaining({
-            thinkingConfig: {
-              thinkingBudget: undefined,
-              thinkingLevel: ThinkingLevel.HIGH,
-            },
-          }),
-        }),
-        'prompt-id-fb3',
-      );
-
-      // Second call: DEFAULT_GEMINI_FLASH_MODEL (due to fallback), thinkingBudget set (due to fix)
-      expect(
-        mockContentGenerator.generateContentStream,
-      ).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          model: DEFAULT_GEMINI_FLASH_MODEL,
-          config: expect.objectContaining({
-            thinkingConfig: {
-              thinkingBudget: DEFAULT_THINKING_MODE,
-              thinkingLevel: undefined,
-            },
-          }),
-        }),
-        'prompt-id-fb3',
-      );
-    });
-
-    it('should stop retrying if handleFallback returns false (e.g., auth intent)', async () => {
-      vi.mocked(mockConfig.getModel).mockReturnValue('gemini-pro');
-      vi.mocked(mockContentGenerator.generateContentStream).mockRejectedValue(
-        error429,
-      );
-      mockHandleFallback.mockResolvedValue(false);
-
-      const stream = await chat.sendMessageStream(
-        { model: 'gemini-2.0-flash' },
-        'test stop',
-        'prompt-id-fb2',
-        new AbortController().signal,
-      );
-
-      await expect(
-        (async () => {
-          for await (const _ of stream) {
-            /* consume stream */
-          }
-        })(),
-      ).rejects.toThrow(error429);
-
-      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        1,
-      );
-      expect(mockHandleFallback).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -2200,92 +1922,6 @@ describe('GeminiChat', () => {
     });
   });
 
-  describe('Preview Model Fallback Logic', () => {
-    it('should reset previewModelBypassMode to false at the start of sendMessageStream', async () => {
-      const stream = (async function* () {
-        yield {
-          candidates: [
-            {
-              content: { role: 'model', parts: [{ text: 'Success' }] },
-              finishReason: 'STOP',
-            },
-          ],
-        } as unknown as GenerateContentResponse;
-      })();
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        stream,
-      );
-
-      await chat.sendMessageStream(
-        { model: 'test-model' },
-        'test',
-        'prompt-id-preview-model-reset',
-        new AbortController().signal,
-      );
-
-      expect(mockConfig.setPreviewModelBypassMode).toHaveBeenCalledWith(false);
-    });
-
-    it('should reset previewModelFallbackMode to false upon successful Preview Model usage', async () => {
-      const stream = (async function* () {
-        yield {
-          candidates: [
-            {
-              content: { role: 'model', parts: [{ text: 'Success' }] },
-              finishReason: 'STOP',
-            },
-          ],
-        } as unknown as GenerateContentResponse;
-      })();
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        stream,
-      );
-
-      const resultStream = await chat.sendMessageStream(
-        { model: PREVIEW_GEMINI_MODEL },
-        'test',
-        'prompt-id-preview-model-healing',
-        new AbortController().signal,
-      );
-      for await (const _ of resultStream) {
-        // consume stream
-      }
-
-      expect(mockConfig.setPreviewModelFallbackMode).toHaveBeenCalledWith(
-        false,
-      );
-    });
-    it('should NOT reset previewModelFallbackMode if Preview Model was bypassed (downgraded)', async () => {
-      const stream = (async function* () {
-        yield {
-          candidates: [
-            {
-              content: { role: 'model', parts: [{ text: 'Success' }] },
-              finishReason: 'STOP',
-            },
-          ],
-        } as unknown as GenerateContentResponse;
-      })();
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        stream,
-      );
-      // Simulate bypass mode being active (downgrade happened)
-      vi.mocked(mockConfig.isPreviewModelBypassMode).mockReturnValue(true);
-
-      const resultStream = await chat.sendMessageStream(
-        { model: PREVIEW_GEMINI_MODEL },
-        'test',
-        'prompt-id-bypass-no-healing',
-        new AbortController().signal,
-      );
-      for await (const _ of resultStream) {
-        // consume stream
-      }
-
-      expect(mockConfig.setPreviewModelFallbackMode).not.toHaveBeenCalled();
-    });
-  });
-
   describe('ensureActiveLoopHasThoughtSignatures', () => {
     it('should add thoughtSignature to the first functionCall in each model turn of the active loop', () => {
       const chat = new GeminiChat(mockConfig, '', [], []);
@@ -2383,9 +2019,6 @@ describe('GeminiChat', () => {
       mockAvailabilityService = createAvailabilityServiceMock();
       vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
         mockAvailabilityService,
-      );
-      vi.mocked(mockConfig.isModelAvailabilityServiceEnabled).mockReturnValue(
-        true,
       );
 
       // Stateful mock for activeModel
@@ -2558,13 +2191,18 @@ describe('GeminiChat', () => {
       });
 
       // Different configs per model
-      vi.mocked(mockConfig.modelConfigService.getResolvedConfig)
-        .mockReturnValueOnce(
-          makeResolvedModelConfig('model-a', { temperature: 0.1 }),
-        )
-        .mockReturnValueOnce(
-          makeResolvedModelConfig('model-b', { temperature: 0.9 }),
-        );
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation((key) => {
+        if (key.model === 'model-a') {
+          return makeResolvedModelConfig('model-a', { temperature: 0.1 });
+        }
+        if (key.model === 'model-b') {
+          return makeResolvedModelConfig('model-b', { temperature: 0.9 });
+        }
+        // Default for the initial requested model in this test
+        return makeResolvedModelConfig('model-a', { temperature: 0.1 });
+      });
 
       // First attempt uses model-a, then simulate availability switching to model-b
       mockRetryWithBackoff.mockImplementation(async (apiCall) => {
