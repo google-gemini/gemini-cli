@@ -111,3 +111,4 @@ they appear in the UI.
 | ----------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------ | ------- |
 | Enable Codebase Investigator        | `experimental.codebaseInvestigatorSettings.enabled`     | Enable the Codebase Investigator agent.                      | `true`  |
 | Codebase Investigator Max Num Turns | `experimental.codebaseInvestigatorSettings.maxNumTurns` | Maximum number of turns for the Codebase Investigator agent. | `10`    |
+| Agent Skills                        | `experimental.skills`                                   | Enable Agent Skills (experimental).                          | `false` |
