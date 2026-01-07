@@ -19,24 +19,40 @@ process_pr() {
     local PR_NUMBER=$1
     echo "🔄 Processing PR #${PR_NUMBER}"
 
-    # Get closing issue number with error handling
-    local ISSUE_NUMBER
-    if ! ISSUE_NUMBER=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json closingIssuesReferences -q '.closingIssuesReferences[0].number' 2>/dev/null); then
-        echo "   ⚠️ Could not fetch closing issue for PR #${PR_NUMBER}"
+    # Get PR details: closing issue and draft status
+    local PR_DATA
+    if ! PR_DATA=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json closingIssuesReferences,isDraft 2>/dev/null); then
+        echo "   ⚠️ Could not fetch data for PR #${PR_NUMBER}"
+        return 0
     fi
 
+    local ISSUE_NUMBER
+    ISSUE_NUMBER=$(echo "${PR_DATA}" | jq -r '.closingIssuesReferences[0].number // empty')
+
+    local IS_DRAFT
+    IS_DRAFT=$(echo "${PR_DATA}" | jq -r '.isDraft')
+
     if [[ -z "${ISSUE_NUMBER}" ]]; then
-        echo "⚠️  No linked issue found for PR #${PR_NUMBER}, adding status/need-issue label"
-        if ! gh pr edit "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --add-label "status/need-issue" 2>/dev/null; then
-            echo "   ⚠️ Failed to add label (may already exist or have permission issues)"
-        fi
-        # Add PR number to the list
-        if [[ -z "${PRS_NEEDING_COMMENT}" ]]; then
-            PRS_NEEDING_COMMENT="${PR_NUMBER}"
+        if [[ "${IS_DRAFT}" == "true" ]]; then
+            echo "📝 PR #${PR_NUMBER} is a draft and has no linked issue, skipping status/need-issue label"
+            # Remove status/need-issue label if it was previously added
+            if ! gh pr edit "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --remove-label "status/need-issue" 2>/dev/null; then
+                echo "   status/need-issue label not present or could not be removed"
+            fi
+            echo "needs_comment=false" >> "${GITHUB_OUTPUT}"
         else
-            PRS_NEEDING_COMMENT="${PRS_NEEDING_COMMENT},${PR_NUMBER}"
+            echo "⚠️  No linked issue found for PR #${PR_NUMBER}, adding status/need-issue label"
+            if ! gh pr edit "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --add-label "status/need-issue" 2>/dev/null; then
+                echo "   ⚠️ Failed to add label (may already exist or have permission issues)"
+            fi
+            # Add PR number to the list
+            if [[ -z "${PRS_NEEDING_COMMENT}" ]]; then
+                PRS_NEEDING_COMMENT="${PR_NUMBER}"
+            else
+                PRS_NEEDING_COMMENT="${PRS_NEEDING_COMMENT},${PR_NUMBER}"
+            fi
+            echo "needs_comment=true" >> "${GITHUB_OUTPUT}"
         fi
-        echo "needs_comment=true" >> "${GITHUB_OUTPUT}"
     else
         echo "🔗 Found linked issue #${ISSUE_NUMBER}"
 
