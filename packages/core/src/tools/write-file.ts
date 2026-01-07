@@ -287,15 +287,13 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       }
 
       let finalContent = fileContent;
-      if (!isNewFile && originalContent) {
-        const lineEnding = detectLineEnding(originalContent);
-        if (lineEnding === '\r\n') {
-          finalContent = finalContent.replace(/\r?\n/g, '\r\n');
-        }
-      } else {
-        if (os.EOL === '\r\n') {
-          finalContent = finalContent.replace(/\r?\n/g, '\r\n');
-        }
+      const useCRLF =
+        !isNewFile && originalContent
+          ? detectLineEnding(originalContent) === '\r\n'
+          : os.EOL === '\r\n';
+
+      if (useCRLF) {
+        finalContent = finalContent.replace(/\r?\n/g, '\r\n');
       }
 
       await this.config
