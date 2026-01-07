@@ -281,8 +281,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
 
   // Patch the policy engine to use the final config if not overridden
   if (!overrides.getPolicyEngine) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (finalConfig as any).getPolicyEngine = () =>
+    finalConfig.getPolicyEngine = () =>
       ({
         check: async (toolCall: { name: string; args: object }) => {
           // Mock simple policy logic for tests
