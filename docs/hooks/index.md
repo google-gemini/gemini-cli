@@ -7,6 +7,9 @@ the CLI's source code.
 See [writing hooks guide](writing-hooks.md) for a tutorial on creating your
 first hook and a comprehensive example.
 
+See [hooks reference](reference.md) for the technical specification of the I/O
+schemas.
+
 See [best practices](best-practices.md) for guidelines on security, performance,
 and debugging.
 
@@ -23,6 +26,28 @@ With hooks, you can:
 
 Hooks run synchronously as part of the agent loop—when a hook event fires,
 Gemini CLI waits for all matching hooks to complete before continuing.
+
+## Security and Risks
+
+> [!WARNING] **Hooks execute arbitrary code with your user privileges.**
+
+By configuring hooks, you are explicitly allowing Gemini CLI to run shell
+commands on your machine. Malicious or poorly configured hooks can:
+
+- **Exfiltrate data**: Read sensitive files (`.env`, ssh keys) and send them to
+  remote servers.
+- **Modify system**: Delete files, install malware, or change system settings.
+- **Consume resources**: Run infinite loops or crash your system.
+
+**Project-level hooks** (in `.gemini/settings.json`) and **Extension hooks** are
+particularly risky when opening third-party projects or extensions from
+untrusted authors. Gemini CLI will **warn you** the first time it detects a new
+project hook (identified by its name and command), but it is **your
+responsibility** to review these hooks (and any installed extensions) before
+trusting them.
+
+See [Security Considerations](best-practices.md#using-hooks-securely) for a
+detailed threat model and mitigation strategies.
 
 ## Core concepts
 
@@ -411,13 +436,22 @@ precedence rules.
 
 ### Configuration layers
 
-Hook configurations are applied in the following order of precedence (higher
-numbers override lower numbers):
+Hook configurations are applied in the following order of execution (lower
+numbers run first):
 
-1. **System defaults:** Built-in default settings (lowest precedence)
-2. **User settings:** `~/.gemini/settings.json`
-3. **Project settings:** `.gemini/settings.json` in your project directory
-4. **System settings:** `/etc/gemini-cli/settings.json` (highest precedence)
+1.  **Project settings:** `.gemini/settings.json` in your project directory
+    (highest priority)
+2.  **User settings:** `~/.gemini/settings.json`
+3.  **System settings:** `/etc/gemini-cli/settings.json`
+4.  **Extensions:** Internal hooks defined by installed extensions (lowest
+    priority)
+
+#### Deduplication and shadowing
+
+If multiple hooks with the identical **name** and **command** are discovered
+across different configuration layers, Gemini CLI deduplicates them. The hook
+from the higher-priority layer (e.g., Project) will be kept, and others will be
+ignored.
 
 Within each level, hooks run in the order they are declared in the
 configuration.
@@ -447,8 +481,9 @@ configuration.
 
 **Configuration properties:**
 
-- **`name`** (string, required): Unique identifier for the hook used in
-  `/hooks enable/disable` commands
+- **`name`** (string, recommended): Unique identifier for the hook used in
+  `/hooks enable/disable` commands. If omitted, the `command` path is used as
+  the identifier.
 - **`type`** (string, required): Hook type - currently only `"command"` is
   supported
 - **`command`** (string, required): Path to the script or command to execute
@@ -495,6 +530,8 @@ You can temporarily enable or disable individual hooks using commands:
 
 These commands allow you to control hook execution without editing configuration
 files. The hook name should match the `name` field in your hook configuration.
+Changes made via these commands are persisted to your global User settings
+(`~/.gemini/settings.json`).
 
 ### Disabled hooks configuration
 

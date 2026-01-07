@@ -18,6 +18,7 @@ import {
   SessionStartSource,
   type HookExecutionResult,
 } from './types.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 // Mock debugLogger
 const mockDebugLogger = vi.hoisted(() => ({
@@ -27,8 +28,27 @@ const mockDebugLogger = vi.hoisted(() => ({
   debug: vi.fn(),
 }));
 
+// Mock coreEvents
+const mockCoreEvents = vi.hoisted(() => ({
+  emitFeedback: vi.fn(),
+  emitHookStart: vi.fn(),
+  emitHookEnd: vi.fn(),
+}));
+
 vi.mock('../utils/debugLogger.js', () => ({
   debugLogger: mockDebugLogger,
+}));
+
+vi.mock('../utils/events.js', () => ({
+  coreEvents: mockCoreEvents,
+}));
+
+vi.mock('../telemetry/clearcut-logger/clearcut-logger.js', () => ({
+  ClearcutLogger: {
+    getInstance: vi.fn().mockReturnValue({
+      logHookCallEvent: vi.fn(),
+    }),
+  },
 }));
 
 describe('HookEventHandler', () => {
@@ -75,6 +95,7 @@ describe('HookEventHandler', () => {
       mockHookPlanner,
       mockHookRunner,
       mockHookAggregator,
+      createMockMessageBus(),
     );
   });
 
@@ -139,7 +160,30 @@ describe('HookEventHandler', () => {
           tool_name: 'EditTool',
           tool_input: { file: 'test.txt' },
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
+
+      // Verify event emission via callbacks
+      const onHookStart = vi.mocked(mockHookRunner.executeHooksParallel).mock
+        .calls[0][3];
+      const onHookEnd = vi.mocked(mockHookRunner.executeHooksParallel).mock
+        .calls[0][4];
+
+      if (onHookStart) onHookStart(mockPlan[0].hookConfig, 0);
+      expect(mockCoreEvents.emitHookStart).toHaveBeenCalledWith({
+        hookName: './test.sh',
+        eventName: HookEventName.BeforeTool,
+        hookIndex: 1,
+        totalHooks: 1,
+      });
+
+      if (onHookEnd) onHookEnd(mockPlan[0].hookConfig, mockResults[0]);
+      expect(mockCoreEvents.emitHookEnd).toHaveBeenCalledWith({
+        hookName: './test.sh',
+        eventName: HookEventName.BeforeTool,
+        success: true,
+      });
 
       expect(result).toBe(mockAggregated);
     });
@@ -166,6 +210,53 @@ describe('HookEventHandler', () => {
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0].message).toBe('Planning failed');
       expect(mockDebugLogger.error).toHaveBeenCalled();
+    });
+
+    it('should emit feedback when some hooks fail', async () => {
+      const mockPlan = [
+        {
+          type: HookType.Command,
+          command: './fail.sh',
+        } as HookConfig,
+      ];
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: false,
+          duration: 50,
+          hookConfig: mockPlan[0],
+          eventName: HookEventName.BeforeTool,
+          error: new Error('Failed to execute'),
+        },
+      ];
+      const mockAggregated = {
+        success: false,
+        allOutputs: [],
+        errors: [new Error('Failed to execute')],
+        totalDuration: 50,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.BeforeTool,
+        hookConfigs: mockPlan,
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      await hookEventHandler.fireBeforeToolEvent('EditTool', {});
+
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('./fail.sh'),
+      );
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('F12'),
+      );
     });
   });
 
@@ -228,6 +319,8 @@ describe('HookEventHandler', () => {
           tool_input: toolInput,
           tool_response: toolResponse,
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
 
       expect(result).toBe(mockAggregated);
@@ -286,6 +379,8 @@ describe('HookEventHandler', () => {
         expect.objectContaining({
           prompt,
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
 
       expect(result).toBe(mockAggregated);
@@ -349,6 +444,8 @@ describe('HookEventHandler', () => {
           notification_type: 'ToolPermission',
           details: { type: 'ToolPermission', title: 'Test Permission' },
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
 
       expect(result).toBe(mockAggregated);
@@ -412,6 +509,8 @@ describe('HookEventHandler', () => {
         expect.objectContaining({
           source: 'startup',
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
 
       expect(result).toBe(mockAggregated);
@@ -482,6 +581,8 @@ describe('HookEventHandler', () => {
             ]),
           }),
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
 
       expect(result).toBe(mockAggregated);
@@ -525,6 +626,8 @@ describe('HookEventHandler', () => {
           hook_event_name: 'BeforeTool',
           timestamp: expect.any(String),
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
     });
   });

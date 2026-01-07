@@ -14,7 +14,10 @@ import type { SlashCommand, CommandContext } from './types.js';
 import { CommandKind } from './types.js';
 import { MessageType, type HistoryItem } from '../types.js';
 import { refreshServerHierarchicalMemory } from '@google/gemini-cli-core';
-import { expandHomeDir } from '../utils/directoryUtils.js';
+import {
+  expandHomeDir,
+  getDirectorySuggestions,
+} from '../utils/directoryUtils.js';
 import type { Config } from '@google/gemini-cli-core';
 
 async function finishAddingDirectories(
@@ -80,6 +83,27 @@ export const directoryCommand: SlashCommand = {
         'Add directories to the workspace. Use comma to separate multiple paths',
       kind: CommandKind.BUILT_IN,
       autoExecute: false,
+      showCompletionLoading: false,
+      completion: async (context: CommandContext, partialArg: string) => {
+        // Support multiple paths separated by commas
+        const parts = partialArg.split(',');
+        const lastPart = parts[parts.length - 1];
+        const leadingWhitespace = lastPart.match(/^\s*/)?.[0] ?? '';
+        const trimmedLastPart = lastPart.trimStart();
+
+        if (trimmedLastPart === '') {
+          return [];
+        }
+
+        const suggestions = await getDirectorySuggestions(trimmedLastPart);
+
+        if (parts.length > 1) {
+          const prefix = parts.slice(0, -1).join(',') + ',';
+          return suggestions.map((s) => prefix + leadingWhitespace + s);
+        }
+
+        return suggestions.map((s) => leadingWhitespace + s);
+      },
       action: async (context: CommandContext, args: string) => {
         const {
           ui: { addItem },
