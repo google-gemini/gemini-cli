@@ -130,6 +130,12 @@ export function getCoreSystemPrompt(
 
   const interactiveMode = config.isInteractive();
 
+  const isWindows = process.platform === 'win32';
+  const commandSeparator = isWindows ? ';' : '&&';
+  const grepCommand = isWindows ? 'Select-String' : 'grep';
+  const tailCommand = isWindows ? 'Get-Content -Tail 10' : 'tail';
+  const headCommand = isWindows ? 'Get-Content -TotalCount 10' : 'head';
+
   const skills = config.getSkillManager().getSkills();
   let skillsPrompt = '';
   if (skills.length > 0) {
@@ -260,7 +266,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - If a command is expected to produce a lot of output, use quiet or silent flags where available and appropriate.
 - Always consider the trade-off between output verbosity and the need for information. If a command's full output is essential for understanding the result, avoid overly aggressive quieting that might obscure important details.
 - If a command does not have quiet/silent flags or for commands with potentially long output that may not be useful, redirect stdout and stderr to temp files in the project's temporary directory. For example: 'command > <temp_dir>/out.log 2> <temp_dir>/err.log'.
-- After the command runs, inspect the temp files (e.g. '<temp_dir>/out.log' and '<temp_dir>/err.log') using commands like 'grep', 'tail', 'head', ... (or platform equivalents). Remove the temp files when done.
+- After the command runs, inspect the temp files (e.g. '<temp_dir>/out.log' and '<temp_dir>/err.log') using commands like '${grepCommand}', '${tailCommand}', '${headCommand}', ... (or platform equivalents). Remove the temp files when done.
 `;
   }
   return '';
@@ -337,7 +343,7 @@ ${(function () {
   - \`git diff HEAD\` to review all changes (including unstaged changes) to tracked files in work tree since last commit.
     - \`git diff --staged\` to review only staged changes when a partial commit makes sense or was requested by the user.
   - \`git log -n 3\` to review recent commit messages and match their style (verbosity, formatting, signature line, etc.)
-- Combine shell commands whenever possible to save time/steps, e.g. \`git status && git diff HEAD && git log -n 3\`.
+- Combine shell commands whenever possible to save time/steps, e.g. \`git status ${commandSeparator} git diff HEAD ${commandSeparator} git log -n 3\`.
 - Always propose a draft commit message. Never just ask the user to give you the full commit message.
 - Prefer commit messages that are clear, concise, and focused more on "why" and less on "what".${
       interactiveMode
