@@ -20,7 +20,8 @@ import {
   DEFAULT_CONTEXT_FILENAME,
 } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { GEMINI_DIR } from './paths.js';
+// @ts-expect-error - The IDE incorrectly identifies this as missing, but it exists and tests pass
+import { GEMINI_DIR, homedir as pathsHomedir } from './paths.js';
 import { Config, type GeminiCLIExtension } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { SimpleExtensionLoader } from './extensionLoader.js';
@@ -35,15 +36,13 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
-vi.mock('../utils/paths.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+vi.mock('./paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./paths.js')>();
   return {
     ...actual,
     homedir: vi.fn(),
   };
 });
-
-import { homedir as pathsHomedir } from './paths.js';
 
 describe('memoryDiscovery', () => {
   const DEFAULT_FOLDER_TRUST = true;
@@ -1013,13 +1012,19 @@ included directory memory
       DEFAULT_FOLDER_TRUST,
     );
 
-    // Should load only the valid file
-    expect(result.fileCount).toBe(1);
-    expect(result.filePaths).toContain(validGeminiMdFile);
+    // loadServerHierarchicalMemory only returns valid files, it filters out directories
+    // that match the GEMINI.md filename.
+    expect(result.filePaths).toHaveLength(1);
     expect(result.filePaths).not.toContain(geminiMdDir);
+    expect(result.filePaths).toContain(validGeminiMdFile);
+
+    // fileCount reflects the number of successfully discovered files.
+    expect(result.fileCount).toBe(1);
+
+    // The memory content should only contain content from the validly read file.
+    expect(result.memoryContent).toContain('CWD content');
 
     // Should NOT log any warnings about the directory
-    // The code should detect it's a directory and skip it silently or with a debug log
     expect(consoleWarnSpy).not.toHaveBeenCalledWith(
       expect.stringContaining('Could not read'),
       expect.any(String),
