@@ -21,7 +21,7 @@ process_pr() {
 
     # Get closing issue number with error handling
     local ISSUE_NUMBER
-    if ! ISSUE_NUMBER=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json closingIssuesReferences -q '.closingIssuesReferences.nodes[0].number' 2>/dev/null); then
+    if ! ISSUE_NUMBER=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json closingIssuesReferences -q '.closingIssuesReferences[0].number' 2>/dev/null); then
         echo "   ⚠️ Could not fetch closing issue for PR #${PR_NUMBER}"
     fi
 
@@ -46,9 +46,9 @@ process_pr() {
         fi
 
         # Get issue labels
-        echo "📥 Fetching labels from issue #${ISSUE_NUMBER}"
+        echo "📥 Fetching area and priority labels from issue #${ISSUE_NUMBER}"
         local ISSUE_LABELS=""
-        if ! ISSUE_LABELS=$(gh issue view "${ISSUE_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json labels -q '.labels[].name' 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo ""); then
+        if ! ISSUE_LABELS=$(gh issue view "${ISSUE_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json labels -q '.labels[].name' 2>/dev/null | grep -E "^(area|priority)/" | tr '\n' ',' | sed 's/,$//' || echo ""); then
             echo "   ⚠️ Could not fetch issue #${ISSUE_NUMBER} (may not exist or be in different repo)"
             ISSUE_LABELS=""
         fi
@@ -61,18 +61,18 @@ process_pr() {
             PR_LABELS=""
         fi
 
-        echo "   Issue labels: ${ISSUE_LABELS}"
+        echo "   Issue labels (area/priority): ${ISSUE_LABELS}"
         echo "   PR labels: ${PR_LABELS}"
 
         # Convert comma-separated strings to arrays
         local ISSUE_LABEL_ARRAY PR_LABEL_ARRAY
         IFS=',' read -ra ISSUE_LABEL_ARRAY <<< "${ISSUE_LABELS}"
-        IFS=',' read -ra PR_LABEL_ARRAY <<< "${PR_LABELS}"
+        IFS=',' read -ra PR_LABEL_ARRAY <<< "${PR_LABELS:-}"
 
         # Find labels to add (on issue but not on PR)
         local LABELS_TO_ADD=""
         for label in "${ISSUE_LABEL_ARRAY[@]}"; do
-            if [[ -n "${label}" ]] && [[ " ${PR_LABEL_ARRAY[*]} " != *" ${label} "* ]]; then
+            if [[ -n "${label}" ]] && [[ " ${PR_LABEL_ARRAY[*]:-}" != *" ${label} "* ]]; then
                 if [[ -z "${LABELS_TO_ADD}" ]]; then
                     LABELS_TO_ADD="${label}"
                 else
