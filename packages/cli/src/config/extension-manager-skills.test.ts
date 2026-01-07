@@ -24,6 +24,15 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    homedir: mockHomedir,
+  };
+});
+
 describe('ExtensionManager skills validation', () => {
   let tempHomeDir: string;
   let tempWorkspaceDir: string;

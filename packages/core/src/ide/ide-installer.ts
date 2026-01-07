@@ -8,9 +8,9 @@ import * as child_process from 'node:child_process';
 import * as process from 'node:process';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
 import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
+import { homedir } from '../utils/paths.js';
 
 export interface IdeInstaller {
   install(): Promise<InstallResult>;
@@ -49,7 +49,7 @@ async function findCommand(
 
   // 2. Check common installation locations.
   const locations: string[] = [];
-  const homeDir = os.homedir();
+  const homeDir = homedir();
 
   if (command === 'code' || command === 'code.cmd') {
     if (platform === 'darwin') {

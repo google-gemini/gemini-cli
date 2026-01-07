@@ -27,6 +27,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     coreEvents: mockCoreEvents,
+    homedir: () => '/mock/home/user',
     Storage: class extends actual.Storage {
       static override getGlobalSettingsPath = () =>
         '/mock/home/user/.gemini/settings.json';
@@ -52,11 +53,15 @@ vi.mock('./trustedFolders.js', () => ({
   },
 }));
 
-vi.mock('os', () => ({
-  homedir: () => '/mock/home/user',
-  platform: () => 'linux',
-  totalmem: () => 16 * 1024 * 1024 * 1024,
-}));
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    homedir: () => '/mock/home/user',
+    platform: () => 'linux',
+    totalmem: () => 16 * 1024 * 1024 * 1024,
+  };
+});
 
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof fs>();

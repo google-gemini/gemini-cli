@@ -6,7 +6,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import { stat } from 'node:fs/promises';
 import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
@@ -39,6 +38,7 @@ import {
   logExtensionUninstall,
   logExtensionUpdateEvent,
   loadSkillsFromDir,
+  homedir,
   type ExtensionEvents,
   type MCPServerConfig,
   type ExtensionInstallMetadata,
@@ -692,7 +692,7 @@ Would you like to attempt to install via "git clone" instead?`,
   toOutputString(extension: GeminiCLIExtension): string {
     const userEnabled = this.extensionEnablementManager.isEnabled(
       extension.name,
-      os.homedir(),
+      homedir(),
     );
     const workspaceEnabled = this.extensionEnablementManager.isEnabled(
       extension.name,
@@ -766,7 +766,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
     if (scope !== SettingScope.Session) {
       const scopePath =
-        scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
+        scope === SettingScope.Workspace ? this.workspaceDir : homedir();
       this.extensionEnablementManager.disable(name, true, scopePath);
     }
     await logExtensionDisable(
@@ -801,7 +801,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
     if (scope !== SettingScope.Session) {
       const scopePath =
-        scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
+        scope === SettingScope.Workspace ? this.workspaceDir : homedir();
       this.extensionEnablementManager.enable(name, true, scopePath);
     }
     await logExtensionEnable(

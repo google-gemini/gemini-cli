@@ -24,8 +24,11 @@ const projectHash = crypto
   .update(projectRoot)
   .digest('hex');
 
+// Returns the home directory, respecting GEMINI_CLI_HOME
+const homedir = () => process.env['GEMINI_CLI_HOME'] || os.homedir();
+
 // User-level .gemini directory in home
-const USER_GEMINI_DIR = path.join(os.homedir(), GEMINI_DIR);
+const USER_GEMINI_DIR = path.join(homedir(), GEMINI_DIR);
 // Project-level .gemini directory in the workspace
 const WORKSPACE_GEMINI_DIR = path.join(projectRoot, GEMINI_DIR);
 

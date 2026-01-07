@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { opendir } from 'node:fs/promises';
+import { homedir } from '@google/gemini-cli-core';
 
 const MAX_SUGGESTIONS = 50;
 const MATCH_BUFFER_MULTIPLIER = 3;
@@ -18,9 +18,9 @@ export function expandHomeDir(p: string): string {
   }
   let expandedPath = p;
   if (p.toLowerCase().startsWith('%userprofile%')) {
-    expandedPath = os.homedir() + p.substring('%userprofile%'.length);
+    expandedPath = homedir() + p.substring('%userprofile%'.length);
   } else if (p === '~' || p.startsWith('~/')) {
-    expandedPath = os.homedir() + p.substring(1);
+    expandedPath = homedir() + p.substring(1);
   }
   return path.normalize(expandedPath);
 }
@@ -56,7 +56,7 @@ function parsePartialPath(partialPath: string): ParsedPath {
       !partialPath.includes('/') &&
       !partialPath.includes(path.sep)
     ) {
-      searchDir = os.homedir();
+      searchDir = homedir();
       filter = partialPath.substring(1);
     }
   }

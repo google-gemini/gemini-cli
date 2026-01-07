@@ -6,13 +6,13 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { homedir } from 'node:os';
 import {
   FatalConfigError,
   getErrorMessage,
   isWithinRoot,
   ideContextStore,
   GEMINI_DIR,
+  homedir,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';

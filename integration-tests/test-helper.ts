@@ -274,6 +274,7 @@ export class InteractiveRun {
 
 export class TestRig {
   testDir: string | null = null;
+  homeDir: string | null = null;
   testName?: string;
   _lastRunStdout?: string;
   // Path to the copied fake responses file for this test.
@@ -294,7 +295,9 @@ export class TestRig {
     const testFileDir =
       env['INTEGRATION_TEST_FILE_DIR'] || join(os.tmpdir(), 'gemini-cli-tests');
     this.testDir = join(testFileDir, sanitizedName);
+    this.homeDir = join(testFileDir, sanitizedName + '-home');
     mkdirSync(this.testDir, { recursive: true });
+    mkdirSync(this.homeDir, { recursive: true });
     if (options.fakeResponsesPath) {
       this.fakeResponsesPath = join(this.testDir, 'fake-responses.json');
       this.originalFakeResponsesPath = options.fakeResponsesPath;
@@ -304,11 +307,15 @@ export class TestRig {
     }
 
     // Create a settings file to point the CLI to the local collector
-    const geminiDir = join(this.testDir, GEMINI_DIR);
-    mkdirSync(geminiDir, { recursive: true });
+    const projectGeminiDir = join(this.testDir, GEMINI_DIR);
+    mkdirSync(projectGeminiDir, { recursive: true });
+
     // In sandbox mode, use an absolute path for telemetry inside the container
     // The container mounts the test directory at the same path as the host
-    const telemetryPath = join(this.testDir, 'telemetry.log'); // Always use test directory for telemetry
+    const telemetryPath = join(this.homeDir, 'telemetry.log'); // Always use home directory for telemetry
+
+    // Ensure the CLI uses our separate home directory for global state
+    process.env['GEMINI_CLI_HOME'] = this.homeDir;
 
     const settings = {
       general: {
@@ -339,7 +346,7 @@ export class TestRig {
       ...options.settings, // Allow tests to override/add settings
     };
     writeFileSync(
-      join(geminiDir, 'settings.json'),
+      join(projectGeminiDir, 'settings.json'),
       JSON.stringify(settings, null, 2),
     );
   }
@@ -595,10 +602,20 @@ export class TestRig {
     ) {
       fs.copyFileSync(this.fakeResponsesPath, this.originalFakeResponsesPath!);
     }
-    // Clean up test directory
+    // Clean up test directory and home directory
     if (this.testDir && !env['KEEP_OUTPUT']) {
       try {
         fs.rmSync(this.testDir, { recursive: true, force: true });
+      } catch (error) {
+        // Ignore cleanup errors
+        if (env['VERBOSE'] === 'true') {
+          console.warn('Cleanup warning:', (error as Error).message);
+        }
+      }
+    }
+    if (this.homeDir && !env['KEEP_OUTPUT']) {
+      try {
+        fs.rmSync(this.homeDir, { recursive: true, force: true });
       } catch (error) {
         // Ignore cleanup errors
         if (env['VERBOSE'] === 'true') {
@@ -610,7 +627,7 @@ export class TestRig {
 
   async waitForTelemetryReady() {
     // Telemetry is always written to the test directory
-    const logFilePath = join(this.testDir!, 'telemetry.log');
+    const logFilePath = join(this.homeDir!, 'telemetry.log');
 
     if (!logFilePath) return;
 
@@ -861,7 +878,7 @@ export class TestRig {
 
   private _readAndParseTelemetryLog(): ParsedLog[] {
     // Telemetry is always written to the test directory
-    const logFilePath = join(this.testDir!, 'telemetry.log');
+    const logFilePath = join(this.homeDir!, 'telemetry.log');
 
     if (!logFilePath || !fs.existsSync(logFilePath)) {
       return [];
@@ -903,7 +920,7 @@ export class TestRig {
     // If not, fall back to parsing from stdout
     if (env['GEMINI_SANDBOX'] === 'podman') {
       // Try reading from file first
-      const logFilePath = join(this.testDir!, 'telemetry.log');
+      const logFilePath = join(this.homeDir!, 'telemetry.log');
 
       if (fs.existsSync(logFilePath)) {
         try {
