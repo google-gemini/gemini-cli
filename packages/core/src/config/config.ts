@@ -156,6 +156,15 @@ export interface IntrospectionAgentSettings {
   enabled?: boolean;
 }
 
+export interface GeneralSubagentSettings {
+  enabled?: boolean;
+  maxNumTurns?: number;
+  maxTimeMinutes?: number;
+  thinkingBudget?: number;
+  model?: string;
+  temp?: number;
+}
+
 /**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
@@ -335,6 +344,7 @@ export interface ConfigParameters {
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   introspectionAgentSettings?: IntrospectionAgentSettings;
+  generalSubagentSettings?: GeneralSubagentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -460,6 +470,7 @@ export class Config {
   private readonly outputSettings: OutputSettings;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
   private readonly introspectionAgentSettings: IntrospectionAgentSettings;
+  private readonly generalSubagentSettings: GeneralSubagentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -617,6 +628,15 @@ export class Config {
     };
     this.introspectionAgentSettings = {
       enabled: params.introspectionAgentSettings?.enabled ?? false,
+    };
+    this.generalSubagentSettings = {
+      enabled: params.generalSubagentSettings?.enabled ?? true,
+      maxNumTurns: params.generalSubagentSettings?.maxNumTurns ?? 100,
+      maxTimeMinutes: params.generalSubagentSettings?.maxTimeMinutes ?? 30,
+      thinkingBudget:
+        params.generalSubagentSettings?.thinkingBudget ?? DEFAULT_THINKING_MODE,
+      model: params.generalSubagentSettings?.model,
+      temp: params.generalSubagentSettings?.temp ?? 0.7,
     };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
@@ -1664,6 +1684,10 @@ export class Config {
     return this.introspectionAgentSettings;
   }
 
+  getGeneralSubagentSettings(): GeneralSubagentSettings {
+    return this.generalSubagentSettings;
+  }
+
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this, this.messageBus);
 
@@ -1732,7 +1756,8 @@ export class Config {
     // Register DelegateToAgentTool if agents are enabled
     if (
       this.isAgentsEnabled() ||
-      this.getCodebaseInvestigatorSettings().enabled
+      this.getCodebaseInvestigatorSettings().enabled ||
+      this.getGeneralSubagentSettings().enabled
     ) {
       // Check if the delegate tool itself is allowed (if allowedTools is set)
       const allowedTools = this.getAllowedTools();
