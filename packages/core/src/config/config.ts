@@ -151,7 +151,7 @@ export interface ResolvedExtensionSetting {
   sensitive: boolean;
 }
 
-export interface IntrospectionAgentSettings {
+export interface CliHelpAgentSettings {
   enabled?: boolean;
 }
 
@@ -333,7 +333,7 @@ export interface ConfigParameters {
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
-  introspectionAgentSettings?: IntrospectionAgentSettings;
+  cliHelpAgentSettings?: CliHelpAgentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -461,7 +461,7 @@ export class Config {
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
-  private readonly introspectionAgentSettings: IntrospectionAgentSettings;
+  private readonly cliHelpAgentSettings: CliHelpAgentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -621,8 +621,8 @@ export class Config {
         DEFAULT_THINKING_MODE,
       model: params.codebaseInvestigatorSettings?.model,
     };
-    this.introspectionAgentSettings = {
-      enabled: params.introspectionAgentSettings?.enabled ?? false,
+    this.cliHelpAgentSettings = {
+      enabled: params.cliHelpAgentSettings?.enabled ?? true,
     };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
@@ -1682,8 +1682,8 @@ export class Config {
     return this.codebaseInvestigatorSettings;
   }
 
-  getIntrospectionAgentSettings(): IntrospectionAgentSettings {
-    return this.introspectionAgentSettings;
+  getCliHelpAgentSettings(): CliHelpAgentSettings {
+    return this.cliHelpAgentSettings;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
@@ -1754,7 +1754,8 @@ export class Config {
     // Register DelegateToAgentTool if agents are enabled
     if (
       this.isAgentsEnabled() ||
-      this.getCodebaseInvestigatorSettings().enabled
+      this.getCodebaseInvestigatorSettings().enabled ||
+      this.getCliHelpAgentSettings().enabled
     ) {
       // Check if the delegate tool itself is allowed (if allowedTools is set)
       const allowedTools = this.getAllowedTools();
