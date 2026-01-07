@@ -81,12 +81,12 @@ vi.mock('./shared/ScrollableList.js', () => ({
         index: number;
       }) => React.ReactNode;
     }) => (
-        <Box flexDirection="column">
-          {data.map((item: BackgroundShell, index: number) => (
-            <Box key={index}>{renderItem({ item, index })}</Box>
-          ))}
-        </Box>
-      ),
+      <Box flexDirection="column">
+        {data.map((item: BackgroundShell, index: number) => (
+          <Box key={index}>{renderItem({ item, index })}</Box>
+        ))}
+      </Box>
+    ),
   ),
 }));
 
