@@ -2,6 +2,10 @@
 
 This page contains tutorials for interacting with Gemini CLI.
 
+## Agent Skills
+
+- [Getting Started with Agent Skills](./tutorials/skills-getting-started.md)
+
 ## Setting up a Model Context Protocol (MCP) server
 
 > [!CAUTION] Before using a third-party MCP server, ensure you trust its source

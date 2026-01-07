@@ -6,7 +6,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import { stat } from 'node:fs/promises';
 import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
@@ -39,6 +38,7 @@ import {
   logExtensionUninstall,
   logExtensionUpdateEvent,
   loadSkillsFromDir,
+  homedir,
   type ExtensionEvents,
   type MCPServerConfig,
   type ExtensionInstallMetadata,
@@ -309,7 +309,7 @@ Would you like to attempt to install via "git clone" instead?`,
             .map((s) => s.name)
             .join(
               ', ',
-            )}. Please run "gemini extensions settings ${newExtensionConfig.name} <setting-name>" to configure them.`;
+            )}. Please run "gemini extensions config ${newExtensionConfig.name} [setting-name]" to configure them.`;
           debugLogger.warn(message);
           coreEvents.emitFeedback('warning', message);
         }
@@ -465,6 +465,12 @@ Would you like to attempt to install via "git clone" instead?`,
     if (this.loadedExtensions) {
       throw new Error('Extensions already loaded, only load extensions once.');
     }
+
+    if (this.settings.admin?.extensions?.enabled === false) {
+      this.loadedExtensions = [];
+      return this.loadedExtensions;
+    }
+
     const extensionsDir = ExtensionStorage.getUserExtensionsDir();
     this.loadedExtensions = [];
     if (!fs.existsSync(extensionsDir)) {
@@ -537,12 +543,16 @@ Would you like to attempt to install via "git clone" instead?`,
       }
 
       if (config.mcpServers) {
-        config.mcpServers = Object.fromEntries(
-          Object.entries(config.mcpServers).map(([key, value]) => [
-            key,
-            filterMcpConfig(value),
-          ]),
-        );
+        if (this.settings.admin?.mcp?.enabled === false) {
+          config.mcpServers = undefined;
+        } else {
+          config.mcpServers = Object.fromEntries(
+            Object.entries(config.mcpServers).map(([key, value]) => [
+              key,
+              filterMcpConfig(value),
+            ]),
+          );
+        }
       }
 
       const contextFiles = getContextFileNames(config)
@@ -692,7 +702,7 @@ Would you like to attempt to install via "git clone" instead?`,
   toOutputString(extension: GeminiCLIExtension): string {
     const userEnabled = this.extensionEnablementManager.isEnabled(
       extension.name,
-      os.homedir(),
+      homedir(),
     );
     const workspaceEnabled = this.extensionEnablementManager.isEnabled(
       extension.name,
@@ -766,7 +776,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
     if (scope !== SettingScope.Session) {
       const scopePath =
-        scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
+        scope === SettingScope.Workspace ? this.workspaceDir : homedir();
       this.extensionEnablementManager.disable(name, true, scopePath);
     }
     await logExtensionDisable(
@@ -801,7 +811,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
     if (scope !== SettingScope.Session) {
       const scopePath =
-        scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
+        scope === SettingScope.Workspace ? this.workspaceDir : homedir();
       this.extensionEnablementManager.enable(name, true, scopePath);
     }
     await logExtensionEnable(
