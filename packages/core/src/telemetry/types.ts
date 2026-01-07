@@ -1548,7 +1548,9 @@ export type TelemetryEvent =
   | RecoveryAttemptEvent
   | LlmLoopCheckEvent
   | StartupStatsEvent
-  | WebFetchFallbackAttemptEvent;
+  | WebFetchFallbackAttemptEvent
+  | EditStrategyEvent
+  | EditCorrectionEvent;
 
 export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
 export class ExtensionDisableEvent implements BaseTelemetryEvent {
@@ -1588,14 +1590,14 @@ export class ExtensionDisableEvent implements BaseTelemetryEvent {
   }
 }
 
-export const EVENT_SMART_EDIT_STRATEGY = 'gemini_cli.smart_edit_strategy';
-export class SmartEditStrategyEvent implements BaseTelemetryEvent {
-  'event.name': 'smart_edit_strategy';
+export const EVENT_EDIT_STRATEGY = 'gemini_cli.edit_strategy';
+export class EditStrategyEvent implements BaseTelemetryEvent {
+  'event.name': 'edit_strategy';
   'event.timestamp': string;
   strategy: string;
 
   constructor(strategy: string) {
-    this['event.name'] = 'smart_edit_strategy';
+    this['event.name'] = 'edit_strategy';
     this['event.timestamp'] = new Date().toISOString();
     this.strategy = strategy;
   }
@@ -1603,25 +1605,25 @@ export class SmartEditStrategyEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      'event.name': EVENT_SMART_EDIT_STRATEGY,
+      'event.name': EVENT_EDIT_STRATEGY,
       'event.timestamp': this['event.timestamp'],
       strategy: this.strategy,
     };
   }
 
   toLogBody(): string {
-    return `Smart Edit Tool Strategy: ${this.strategy}`;
+    return `Edit Tool Strategy: ${this.strategy}`;
   }
 }
 
-export const EVENT_SMART_EDIT_CORRECTION = 'gemini_cli.smart_edit_correction';
-export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
-  'event.name': 'smart_edit_correction';
+export const EVENT_EDIT_CORRECTION = 'gemini_cli.edit_correction';
+export class EditCorrectionEvent implements BaseTelemetryEvent {
+  'event.name': 'edit_correction';
   'event.timestamp': string;
   correction: 'success' | 'failure';
 
   constructor(correction: 'success' | 'failure') {
-    this['event.name'] = 'smart_edit_correction';
+    this['event.name'] = 'edit_correction';
     this['event.timestamp'] = new Date().toISOString();
     this.correction = correction;
   }
@@ -1629,14 +1631,14 @@ export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      'event.name': EVENT_SMART_EDIT_CORRECTION,
+      'event.name': EVENT_EDIT_CORRECTION,
       'event.timestamp': this['event.timestamp'],
       correction: this.correction,
     };
   }
 
   toLogBody(): string {
-    return `Smart Edit Tool Correction: ${this.correction}`;
+    return `Edit Tool Correction: ${this.correction}`;
   }
 }
 

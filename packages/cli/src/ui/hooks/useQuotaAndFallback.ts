@@ -130,10 +130,10 @@ export function useQuotaAndFallback({
       isDialogPending.current = false; // Reset the flag here
 
       if (choice === 'retry_always') {
-        // Explicitly set the model to the fallback model to persist the user's choice.
+        // Set the model to the fallback model for the current session.
         // This ensures the Footer updates and future turns use this model.
-        config.setModel(proQuotaRequest.fallbackModel);
-
+        // The change is not persisted, so the original model is restored on restart.
+        config.activateFallbackMode(proQuotaRequest.fallbackModel);
         historyManager.addItem(
           {
             type: MessageType.INFO,

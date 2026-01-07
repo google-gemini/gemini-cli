@@ -16,6 +16,7 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   GeminiClient,
   HookSystem,
+  PolicyDecision,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 import type { Config, Storage } from '@google/gemini-cli-core';
@@ -59,7 +60,6 @@ export function createMockConfig(
     getEmbeddingModel: vi.fn().mockReturnValue('text-embedding-004'),
     getSessionId: vi.fn().mockReturnValue('test-session-id'),
     getUserTier: vi.fn(),
-    getEnableMessageBusIntegration: vi.fn().mockReturnValue(false),
     getMessageBus: vi.fn(),
     getPolicyEngine: vi.fn(),
     getEnableExtensionReloading: vi.fn().mockReturnValue(false),
@@ -78,6 +78,17 @@ export function createMockConfig(
   mockConfig.getGeminiClient = vi
     .fn()
     .mockReturnValue(new GeminiClient(mockConfig));
+
+  mockConfig.getPolicyEngine = vi.fn().mockReturnValue({
+    check: async () => {
+      const mode = mockConfig.getApprovalMode();
+      if (mode === ApprovalMode.YOLO) {
+        return { decision: PolicyDecision.ALLOW };
+      }
+      return { decision: PolicyDecision.ASK_USER };
+    },
+  });
+
   return mockConfig;
 }
 

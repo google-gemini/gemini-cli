@@ -75,6 +75,15 @@ export enum HookType {
 }
 
 /**
+ * Generate a unique key for a hook configuration
+ */
+export function getHookKey(hook: HookConfig): string {
+  const name = hook.name || '';
+  const command = hook.command || '';
+  return `${name}:${command}`;
+}
+
+/**
  * Decision types for hook outputs
  */
 export type HookDecision =
@@ -124,6 +133,8 @@ export function createHookOutput(
       return new AfterModelHookOutput(data);
     case 'BeforeToolSelection':
       return new BeforeToolSelectionHookOutput(data);
+    case 'BeforeTool':
+      return new BeforeToolHookOutput(data);
     default:
       return new DefaultHookOutput(data);
   }
@@ -169,7 +180,7 @@ export class DefaultHookOutput implements HookOutput {
    * Get the effective reason for blocking or stopping
    */
   getEffectiveReason(): string {
-    return this.reason || this.stopReason || 'No reason provided';
+    return this.stopReason || this.reason || 'No reason provided';
   }
 
   /**
@@ -227,7 +238,24 @@ export class DefaultHookOutput implements HookOutput {
 /**
  * Specific hook output class for BeforeTool events.
  */
-export class BeforeToolHookOutput extends DefaultHookOutput {}
+export class BeforeToolHookOutput extends DefaultHookOutput {
+  /**
+   * Get modified tool input if provided by hook
+   */
+  getModifiedToolInput(): Record<string, unknown> | undefined {
+    if (this.hookSpecificOutput && 'tool_input' in this.hookSpecificOutput) {
+      const input = this.hookSpecificOutput['tool_input'];
+      if (
+        typeof input === 'object' &&
+        input !== null &&
+        !Array.isArray(input)
+      ) {
+        return input as Record<string, unknown>;
+      }
+    }
+    return undefined;
+  }
+}
 
 /**
  * Specific hook output class for BeforeModel events
@@ -359,6 +387,7 @@ export interface BeforeToolInput extends HookInput {
 export interface BeforeToolOutput extends HookOutput {
   hookSpecificOutput?: {
     hookEventName: 'BeforeTool';
+    tool_input?: Record<string, unknown>;
   };
 }
 
