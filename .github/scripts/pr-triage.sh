@@ -48,9 +48,14 @@ process_pr() {
         # Get issue labels
         echo "📥 Fetching area and priority labels from issue #${ISSUE_NUMBER}"
         local ISSUE_LABELS=""
-        if ! ISSUE_LABELS=$(gh issue view "${ISSUE_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json labels -q '.labels[].name' 2>/dev/null | grep -E "^(area|priority)/" | tr '\n' ',' | sed 's/,$//' || echo ""); then
+        local gh_output
+        if ! gh_output=$(gh issue view "${ISSUE_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json labels -q '.labels[].name' 2>/dev/null); then
             echo "   ⚠️ Could not fetch issue #${ISSUE_NUMBER} (may not exist or be in different repo)"
             ISSUE_LABELS=""
+        else
+            # If grep finds no matches, it exits with 1, which pipefail would treat as an error.
+            # `|| echo ""` ensures the command succeeds with an empty string in that case.
+            ISSUE_LABELS=$(echo "${gh_output}" | grep -E "^(area|priority)/" | tr '\n' ',' | sed 's/,$//' || echo "")
         fi
 
         # Get PR labels
