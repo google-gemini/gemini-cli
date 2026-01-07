@@ -8,16 +8,41 @@ import type { Config } from '../config/config.js';
 import type {
   RoutingContext,
   RoutingDecision,
+  RoutingStrategy,
   TerminalStrategy,
 } from './routingStrategy.js';
 import { DefaultStrategy } from './strategies/defaultStrategy.js';
 import { ClassifierStrategy } from './strategies/classifierStrategy.js';
+import { NumericalClassifierStrategy } from './strategies/numericalClassifierStrategy.js';
 import { CompositeStrategy } from './strategies/compositeStrategy.js';
 import { FallbackStrategy } from './strategies/fallbackStrategy.js';
 import { OverrideStrategy } from './strategies/overrideStrategy.js';
 
 import { logModelRouting } from '../telemetry/loggers.js';
 import { ModelRoutingEvent } from '../telemetry/types.js';
+import type { BaseLlmClient } from '../core/baseLlmClient.js';
+import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
+
+class DynamicClassifierStrategy implements RoutingStrategy {
+  readonly name = 'dynamic_classifier';
+  private oldStrategy = new ClassifierStrategy();
+  private newStrategy = new NumericalClassifierStrategy();
+
+  async route(
+    context: RoutingContext,
+    config: Config,
+    client: BaseLlmClient,
+  ): Promise<RoutingDecision | null> {
+    const experiments = await config.getExperimentsAsync();
+    const useNumerical =
+      experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]?.boolValue;
+
+    if (useNumerical) {
+      return this.newStrategy.route(context, config, client);
+    }
+    return this.oldStrategy.route(context, config, client);
+  }
+}
 
 /**
  * A centralized service for making model routing decisions.
@@ -38,7 +63,7 @@ export class ModelRouterService {
       [
         new FallbackStrategy(),
         new OverrideStrategy(),
-        new ClassifierStrategy(),
+        new DynamicClassifierStrategy(),
         new DefaultStrategy(),
       ],
       'agent-router',
