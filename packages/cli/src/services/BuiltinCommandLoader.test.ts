@@ -101,6 +101,7 @@ describe('BuiltinCommandLoader', () => {
       getFolderTrust: vi.fn().mockReturnValue(true),
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
+      getEnableHooksUI: () => false,
       isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
       getMcpEnabled: vi.fn().mockReturnValue(true),
       getSkillManager: vi.fn().mockReturnValue({
@@ -199,6 +200,7 @@ describe('BuiltinCommandLoader profile', () => {
       getCheckpointingEnabled: () => false,
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
+      getEnableHooksUI: () => false,
       isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
       getMcpEnabled: vi.fn().mockReturnValue(true),
       getSkillManager: vi.fn().mockReturnValue({
