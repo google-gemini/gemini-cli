@@ -33,6 +33,7 @@ import {
   ApprovalMode,
   HookSystem,
   PREVIEW_GEMINI_MODEL,
+  PolicyDecision,
 } from '@google/gemini-cli-core';
 import { MockTool } from '@google/gemini-cli-core/src/test-utils/mock-tool.js';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
@@ -80,13 +81,21 @@ const mockConfig = {
   getGeminiClient: () => null, // No client needed for these tests
   getShellExecutionConfig: () => ({ terminalWidth: 80, terminalHeight: 24 }),
   getMessageBus: () => null,
-  getPolicyEngine: () => null,
   isInteractive: () => false,
   getExperiments: () => {},
   getEnableHooks: () => false,
 } as unknown as Config;
 mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
 mockConfig.getHookSystem = vi.fn().mockReturnValue(new HookSystem(mockConfig));
+mockConfig.getPolicyEngine = vi.fn().mockReturnValue({
+  check: async () => {
+    const mode = mockConfig.getApprovalMode();
+    if (mode === ApprovalMode.YOLO) {
+      return { decision: PolicyDecision.ALLOW };
+    }
+    return { decision: PolicyDecision.ASK_USER };
+  },
+});
 
 function createMockConfigOverride(overrides: Partial<Config> = {}): Config {
   return { ...mockConfig, ...overrides } as Config;
