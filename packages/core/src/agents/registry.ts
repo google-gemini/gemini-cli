@@ -10,7 +10,7 @@ import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './toml-loader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
-import { IntrospectionAgent } from './introspection-agent.js';
+import { CliHelpAgent } from './cli-help-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
 import { type z } from 'zod';
@@ -106,7 +106,7 @@ export class AgentRegistry {
 
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
-    const introspectionSettings = this.config.getIntrospectionAgentSettings();
+    const cliHelpSettings = this.config.getCliHelpAgentSettings();
 
     // Only register the agent if it's enabled in the settings.
     if (investigatorSettings?.enabled) {
@@ -145,9 +145,9 @@ export class AgentRegistry {
       this.registerLocalAgent(agentDef);
     }
 
-    // Register the introspection agent if it's explicitly enabled.
-    if (introspectionSettings.enabled) {
-      this.registerLocalAgent(IntrospectionAgent);
+    // Register the CLI help agent if it's explicitly enabled.
+    if (cliHelpSettings.enabled) {
+      this.registerLocalAgent(CliHelpAgent(this.config));
     }
   }
 

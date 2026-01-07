@@ -1453,22 +1453,22 @@ const SETTINGS_SCHEMA = {
           'Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).',
         showInDialog: true,
       },
-      introspectionAgentSettings: {
+      cliHelpAgentSettings: {
         type: 'object',
-        label: 'Introspection Agent Settings',
+        label: 'CLI Help Agent Settings',
         category: 'Experimental',
         requiresRestart: true,
         default: {},
-        description: 'Configuration for Introspection Agent.',
+        description: 'Configuration for CLI Help Agent.',
         showInDialog: false,
         properties: {
           enabled: {
             type: 'boolean',
-            label: 'Enable Introspection Agent',
+            label: 'Enable CLI Help Agent',
             category: 'Experimental',
             requiresRestart: true,
             default: false,
-            description: 'Enable the Introspection Agent.',
+            description: 'Enable the CLI Help Agent.',
             showInDialog: true,
           },
         },

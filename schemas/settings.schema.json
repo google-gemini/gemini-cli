@@ -1425,17 +1425,17 @@
           "default": false,
           "type": "boolean"
         },
-        "introspectionAgentSettings": {
-          "title": "Introspection Agent Settings",
-          "description": "Configuration for Introspection Agent.",
-          "markdownDescription": "Configuration for Introspection Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+        "cliHelpAgentSettings": {
+          "title": "CLI Help Agent Settings",
+          "description": "Configuration for CLI Help Agent.",
+          "markdownDescription": "Configuration for CLI Help Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
           "default": {},
           "type": "object",
           "properties": {
             "enabled": {
-              "title": "Enable Introspection Agent",
-              "description": "Enable the Introspection Agent.",
-              "markdownDescription": "Enable the Introspection Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "title": "Enable CLI Help Agent",
+              "description": "Enable the CLI Help Agent.",
+              "markdownDescription": "Enable the CLI Help Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             }
