@@ -163,7 +163,11 @@ export async function revertFileChanges(
               currentContent = await fs.readFile(filePath, 'utf8');
             } catch (e) {
               // File might not exist
-              coreEvents.emitFeedback('error', `File does not exist ${e}`);
+              coreEvents.emitFeedback(
+                'error',
+                `File does not exist : ${e instanceof Error ? e.message : String(e)}`,
+                e,
+              );
             }
 
             // 1. Exact Match: Safe to revert directly
