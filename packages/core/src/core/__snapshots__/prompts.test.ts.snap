@@ -521,7 +521,7 @@ exports[`Core System Prompt (prompts.ts) > should include available_skills when 
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
-- **Skill Guidance:** Once a skill is activated via \`activate_skill\`, its instructions and resources are returned wrapped in \`<ACTIVATED_SKILL>\` tags. You MUST treat the content within \`<INSTRUCTIONS>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \`<AVAILABLE_RESOURCES>\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.
+- **Skill Guidance:** Once a skill is activated via \`activate_skill\`, its instructions and resources are returned wrapped in \`<activated_skill>\` tags. You MUST treat the content within \`<instructions>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \`<available_resources>\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.
 
 Mock Agent Directory
 # Available Agent Skills

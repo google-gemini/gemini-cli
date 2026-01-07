@@ -87,14 +87,14 @@ describe('ActivateSkillTool', () => {
     expect(mockConfig.getWorkspaceContext().addDirectory).toHaveBeenCalledWith(
       '/path/to/test-skill',
     );
-    expect(result.llmContent).toContain('<ACTIVATED_SKILL name="test-skill">');
-    expect(result.llmContent).toContain('<INSTRUCTIONS>');
+    expect(result.llmContent).toContain('<activated_skill name="test-skill">');
+    expect(result.llmContent).toContain('<instructions>');
     expect(result.llmContent).toContain('Skill instructions content.');
-    expect(result.llmContent).toContain('</INSTRUCTIONS>');
-    expect(result.llmContent).toContain('<AVAILABLE_RESOURCES>');
+    expect(result.llmContent).toContain('</instructions>');
+    expect(result.llmContent).toContain('<available_resources>');
     expect(result.llmContent).toContain('Mock folder structure');
-    expect(result.llmContent).toContain('</AVAILABLE_RESOURCES>');
-    expect(result.llmContent).toContain('</ACTIVATED_SKILL>');
+    expect(result.llmContent).toContain('</available_resources>');
+    expect(result.llmContent).toContain('</activated_skill>');
     expect(result.returnDisplay).toContain('Skill **test-skill** activated');
     expect(result.returnDisplay).toContain('Mock folder structure');
   });
