@@ -199,6 +199,12 @@ describe('extension tests', () => {
   });
 
   afterEach(() => {
+    const loadedSettings = loadSettings(tempWorkspaceDir);
+    loadedSettings.setValue(
+      SettingScope.System,
+      'admin.extensions.enabled',
+      true,
+    );
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
     fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     vi.restoreAllMocks();
@@ -630,6 +636,77 @@ describe('extension tests', () => {
       const extension = extensions.find((e) => e.name === 'my-ext');
 
       expect(extension).toBeUndefined();
+    });
+
+    it('should not load any extensions if admin.extensions.enabled is false', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'test-extension',
+        version: '1.0.0',
+      });
+      const loadedSettings = loadSettings(tempWorkspaceDir);
+      loadedSettings.setValue(
+        SettingScope.System,
+        'admin.extensions.enabled',
+        false,
+      );
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: loadedSettings.merged,
+      });
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toEqual([]);
+    });
+
+    it('should not load mcpServers if admin.mcp.enabled is false', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'test-extension',
+        version: '1.0.0',
+        mcpServers: {
+          'test-server': { command: 'echo', args: ['hello'] },
+        },
+      });
+      const loadedSettings = loadSettings(tempWorkspaceDir);
+      loadedSettings.setValue(SettingScope.System, 'admin.mcp.enabled', false);
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: loadedSettings.merged,
+      });
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].mcpServers).toBeUndefined();
+    });
+
+    it('should load mcpServers if admin.mcp.enabled is true', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'test-extension',
+        version: '1.0.0',
+        mcpServers: {
+          'test-server': { command: 'echo', args: ['hello'] },
+        },
+      });
+      const loadedSettings = loadSettings(tempWorkspaceDir);
+      loadedSettings.setValue(SettingScope.System, 'admin.mcp.enabled', true);
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: loadedSettings.merged,
+      });
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].mcpServers).toEqual({
+        'test-server': { command: 'echo', args: ['hello'] },
+      });
     });
 
     describe('id generation', () => {
