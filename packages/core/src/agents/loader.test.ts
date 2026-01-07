@@ -50,9 +50,7 @@ You are a markdown agent.`);
         name: 'test-agent-md',
         description: 'A markdown agent',
         kind: 'local',
-        prompts: {
-          system_prompt: 'You are a markdown agent.',
-        },
+        system_prompt: 'You are a markdown agent.',
       });
     });
 
@@ -78,9 +76,40 @@ System prompt content.`);
           model: 'gemini-pro',
           temperature: 0.7,
         },
-        prompts: {
-          system_prompt: 'System prompt content.',
-        },
+        system_prompt: 'System prompt content.',
+      });
+    });
+
+    it('should parse system_prompt from frontmatter', async () => {
+      const filePath = await writeAgentMarkdown(`---
+name: frontmatter-prompt
+description: Agent with prompt in frontmatter
+system_prompt: You are defined in frontmatter.
+---
+Ignored body content.`);
+
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        name: 'frontmatter-prompt',
+        system_prompt: 'You are defined in frontmatter.',
+      });
+    });
+
+    it('should parse query from frontmatter', async () => {
+      const filePath = await writeAgentMarkdown(`---
+name: query-agent
+description: Agent with query
+query: What is the weather?
+---
+System prompt.`);
+
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        name: 'query-agent',
+        system_prompt: 'System prompt.',
+        query: 'What is the weather?',
       });
     });
 
@@ -188,9 +217,7 @@ agent_card_url: https://example.com/card
         kind: 'local' as const,
         name: 'test-agent',
         description: 'A test agent',
-        prompts: {
-          system_prompt: 'You are a test agent.',
-        },
+        system_prompt: 'You are a test agent.',
       };
 
       const result = markdownToAgentDefinition(markdown);
@@ -226,9 +253,7 @@ agent_card_url: https://example.com/card
         model: {
           model: GEMINI_MODEL_ALIAS_PRO,
         },
-        prompts: {
-          system_prompt: 'You are a test agent.',
-        },
+        system_prompt: 'You are a test agent.',
       };
 
       const result = markdownToAgentDefinition(
@@ -245,9 +270,7 @@ agent_card_url: https://example.com/card
         model: {
           model: 'auto',
         },
-        prompts: {
-          system_prompt: 'You are a test agent.',
-        },
+        system_prompt: 'You are a test agent.',
       };
 
       const result = markdownToAgentDefinition(

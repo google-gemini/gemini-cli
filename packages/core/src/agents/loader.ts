@@ -28,10 +28,8 @@ interface FrontmatterLocalAgentDefinition
   kind: 'local';
   description: string;
   tools?: string[];
-  prompts: {
-    system_prompt: string;
-    query?: string;
-  };
+  system_prompt: string;
+  query?: string;
   model?: {
     model?: string;
     temperature?: number;
@@ -91,11 +89,8 @@ const localAgentSchema = z
         }),
       )
       .optional(),
-    prompts: z
-      .object({
-        query: z.string().optional(),
-      })
-      .optional(),
+    system_prompt: z.string().optional(),
+    query: z.string().optional(),
     model: z
       .object({
         model: z.string().optional(),
@@ -234,10 +229,8 @@ export async function parseAgentMarkdown(
   const agentDef: FrontmatterLocalAgentDefinition = {
     ...frontmatter,
     kind: 'local',
-    prompts: {
-      system_prompt: body.trim(),
-      query: frontmatter.prompts?.query,
-    },
+    system_prompt: frontmatter.system_prompt || body.trim(),
+    query: frontmatter.query,
   };
 
   return [agentDef];
@@ -282,8 +275,8 @@ export function markdownToAgentDefinition(
     description: markdown.description,
     displayName: markdown.display_name,
     promptConfig: {
-      systemPrompt: markdown.prompts.system_prompt,
-      query: markdown.prompts.query,
+      systemPrompt: markdown.system_prompt,
+      query: markdown.query,
     },
     modelConfig: {
       model: modelName,
