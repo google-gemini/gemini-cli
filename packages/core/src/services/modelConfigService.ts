@@ -95,20 +95,66 @@ export class ModelConfigService {
       ...customAliases,
       ...this.runtimeAliases,
     };
+
+    const {
+      aliasChain,
+      baseModel: initialBaseModel,
+      baseModelWeight: initialBaseModelWeight,
+      resolvedConfig: initialResolvedConfig,
+    } = this.resolveAliasChain(context.model, allAliases);
+
+    let baseModel = initialBaseModel;
+    let baseModelWeight = initialBaseModelWeight;
+    let resolvedConfig = initialResolvedConfig;
+
+    const modelToWeight = this.buildModelWeightMap(aliasChain, baseModel);
     const allOverrides = [
       ...overrides,
       ...customOverrides,
       ...this.runtimeOverrides,
     ];
+    const matches = this.findMatchingOverrides(
+      allOverrides,
+      context,
+      modelToWeight,
+    );
 
+    this.sortOverrides(matches);
+
+    for (const match of matches) {
+      if (match.modelConfig.model) {
+        if (baseModel === undefined || match.weight <= baseModelWeight) {
+          baseModel = match.modelConfig.model;
+          baseModelWeight = match.weight;
+        }
+      }
+      if (match.modelConfig.generateContentConfig) {
+        resolvedConfig = this.deepMerge(
+          resolvedConfig,
+          match.modelConfig.generateContentConfig,
+        );
+      }
+    }
+
+    return { model: baseModel, generateContentConfig: resolvedConfig };
+  }
+
+  private resolveAliasChain(
+    requestedModel: string,
+    allAliases: Record<string, ModelConfigAlias>,
+  ): {
+    aliasChain: string[];
+    baseModel: string | undefined;
+    baseModelWeight: number;
+    resolvedConfig: GenerateContentConfig;
+  } {
     let baseModel: string | undefined = undefined;
     let baseModelWeight = Infinity;
     let resolvedConfig: GenerateContentConfig = {};
     const aliasChain: string[] = [];
 
-    // 1. Resolve alias chain and base configuration.
-    if (allAliases[context.model]) {
-      let current: string | undefined = context.model;
+    if (allAliases[requestedModel]) {
+      let current: string | undefined = requestedModel;
       const visited = new Set<string>();
       while (current) {
         const alias: ModelConfigAlias = allAliases[current];
@@ -130,7 +176,6 @@ export class ModelConfigService {
         current = alias.extends;
       }
 
-      // Merge configurations from the root of the chain down to the requested alias.
       for (let i = aliasChain.length - 1; i >= 0; i--) {
         const alias = allAliases[aliasChain[i]];
         if (alias.modelConfig.model) {
@@ -143,21 +188,37 @@ export class ModelConfigService {
         );
       }
     } else {
-      // If not an alias, the requested model name is the starting point.
-      aliasChain.push(context.model);
-      baseModel = context.model;
+      aliasChain.push(requestedModel);
+      baseModel = requestedModel;
       baseModelWeight = 0;
     }
 
-    // 2. Identify and weight matching overrides.
-    // Precedence weight: Requested Alias (0) > Resolved Model Name (0.5) > Parents (1..N).
+    return { aliasChain, baseModel, baseModelWeight, resolvedConfig };
+  }
+
+  private buildModelWeightMap(
+    aliasChain: string[],
+    baseModel: string | undefined,
+  ): Map<string, number> {
     const modelToWeight = new Map<string, number>();
     aliasChain.forEach((name, i) => modelToWeight.set(name, i));
     if (baseModel && !modelToWeight.has(baseModel)) {
       modelToWeight.set(baseModel, 0.5);
     }
+    return modelToWeight;
+  }
 
-    const matches = allOverrides
+  private findMatchingOverrides(
+    overrides: ModelConfigOverride[],
+    context: ModelConfigKey,
+    modelToWeight: Map<string, number>,
+  ): Array<{
+    specificity: number;
+    weight: number;
+    modelConfig: ModelConfig;
+    index: number;
+  }> {
+    return overrides
       .map((override, index) => {
         const matchEntries = Object.entries(override.match);
         if (matchEntries.length === 0) return null;
@@ -186,10 +247,11 @@ export class ModelConfigService {
           : null;
       })
       .filter((m): m is NonNullable<typeof m> => m !== null);
+  }
 
-    // 3. Sort overrides: higher specificity wins. If specificity is tied:
-    //    - If both match a model in the hierarchy, closer to leaf (smaller weight) wins.
-    //    - Otherwise, configuration order (index) wins.
+  private sortOverrides(
+    matches: Array<{ specificity: number; weight: number; index: number }>,
+  ): void {
     matches.sort((a, b) => {
       if (a.specificity !== b.specificity) {
         return a.specificity - b.specificity;
@@ -199,29 +261,10 @@ export class ModelConfigService {
         a.weight !== Infinity &&
         b.weight !== Infinity
       ) {
-        return b.weight - a.weight; // Larger weight (further from leaf) applied first
+        return b.weight - a.weight;
       }
       return a.index - b.index;
     });
-
-    // 4. Apply matching overrides.
-    for (const match of matches) {
-      if (match.modelConfig.model) {
-        // Protect child-defined models from parent or broad overrides.
-        if (baseModel === undefined || match.weight <= baseModelWeight) {
-          baseModel = match.modelConfig.model;
-          baseModelWeight = match.weight;
-        }
-      }
-      if (match.modelConfig.generateContentConfig) {
-        resolvedConfig = this.deepMerge(
-          resolvedConfig,
-          match.modelConfig.generateContentConfig,
-        );
-      }
-    }
-
-    return { model: baseModel, generateContentConfig: resolvedConfig };
   }
 
   getResolvedConfig(context: ModelConfigKey): ResolvedModelConfig {
