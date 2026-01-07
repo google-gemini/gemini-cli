@@ -31,22 +31,34 @@ export class SkillManager {
   ): Promise<void> {
     this.clearSkills();
 
-    // 1. Extension skills (lowest precedence)
+    // 1. Built-in skills (lowest precedence)
+    await this.discoverBuiltinSkills();
+
+    // 2. Extension skills
     for (const extension of extensions) {
       if (extension.isActive && extension.skills) {
         this.addSkillsWithPrecedence(extension.skills);
       }
     }
 
-    // 2. User skills
+    // 3. User skills
     const userSkills = await loadSkillsFromDir(Storage.getUserSkillsDir());
     this.addSkillsWithPrecedence(userSkills);
 
-    // 3. Project skills (highest precedence)
+    // 4. Project skills (highest precedence)
     const projectSkills = await loadSkillsFromDir(
       storage.getProjectSkillsDir(),
     );
     this.addSkillsWithPrecedence(projectSkills);
+  }
+
+  /**
+   * Discovers built-in skills.
+   */
+  private async discoverBuiltinSkills(): Promise<void> {
+    // Built-in skills can be added here.
+    // For now, this is a placeholder for where built-in skills will be loaded from.
+    // They could be loaded from a specific directory within the package.
   }
 
   private addSkillsWithPrecedence(newSkills: SkillDefinition[]): void {
@@ -62,6 +74,14 @@ export class SkillManager {
    */
   getSkills(): SkillDefinition[] {
     return this.skills.filter((s) => !s.disabled);
+  }
+
+  /**
+   * Returns the list of enabled discovered skills that should be displayed in the UI.
+   * This excludes built-in skills.
+   */
+  getDisplayableSkills(): SkillDefinition[] {
+    return this.skills.filter((s) => !s.disabled && !s.isBuiltin);
   }
 
   /**

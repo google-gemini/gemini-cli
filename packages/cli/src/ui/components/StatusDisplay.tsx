@@ -69,7 +69,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
         blockedMcpServers={
           config.getMcpClientManager()?.getBlockedMcpServers() ?? []
         }
-        skillCount={config.getSkillManager().getSkills().length}
+        skillCount={config.getSkillManager().getDisplayableSkills().length}
       />
     );
   }
