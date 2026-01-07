@@ -21,7 +21,8 @@ const ACTIONLINT_VERSION = '1.7.7';
 const SHELLCHECK_VERSION = '0.11.0';
 const YAMLLINT_VERSION = '1.35.1';
 
-const TEMP_DIR = join(tmpdir(), 'gemini-cli-linters');
+const TEMP_DIR =
+  process.env.GEMINI_LINT_TEMP_DIR || join(tmpdir(), 'gemini-cli-linters');
 
 function getPlatformArch() {
   const platform = process.platform;
@@ -134,7 +135,9 @@ function runCommand(command, stdio = 'inherit') {
 
 export function setupLinters() {
   console.log('Setting up linters...');
-  rmSync(TEMP_DIR, { recursive: true, force: true });
+  if (!process.env.GEMINI_LINT_TEMP_DIR) {
+    rmSync(TEMP_DIR, { recursive: true, force: true });
+  }
   mkdirSync(TEMP_DIR, { recursive: true });
 
   for (const linter in LINTERS) {
@@ -183,6 +186,9 @@ export function runYamllint() {
 export function runPrettier() {
   console.log('\nRunning Prettier...');
   if (!runCommand('prettier --check .')) {
+    console.log(
+      'Prettier check failed. Please run "npm run format" to fix formatting issues.',
+    );
     process.exit(1);
   }
 }
