@@ -1,0 +1,7 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<HookStatusDisplay /> > should render a single executing hook 1`] = `"Executing Hook: test-hook"`;
+
+exports[`<HookStatusDisplay /> > should render multiple executing hooks 1`] = `"Executing Hooks: h1, h2"`;
+
+exports[`<HookStatusDisplay /> > should render sequential hook progress 1`] = `"Executing Hook: step (1/3)"`;
