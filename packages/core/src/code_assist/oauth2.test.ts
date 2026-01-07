@@ -1132,9 +1132,9 @@ describe('oauth2', () => {
         // Mock process.on to immediately trigger SIGINT
         const processOnSpy = vi
           .spyOn(process, 'on')
-          .mockImplementation((event, listener) => {
+          .mockImplementation((event, listener: () => void) => {
             if (event === 'SIGINT') {
-              (listener as () => void)();
+              listener();
             }
             return process;
           });
@@ -1184,9 +1184,9 @@ describe('oauth2', () => {
         const stdinOnSpy = vi
           .spyOn(process.stdin, 'on')
           .mockImplementation(
-            (event: string, listener: (...args: unknown[]) => void) => {
+            (event: string, listener: (data: Buffer) => void) => {
               if (event === 'data') {
-                (listener as (data: Buffer) => void)(Buffer.from([0x03]));
+                listener(Buffer.from([0x03]));
               }
               return process.stdin;
             },
