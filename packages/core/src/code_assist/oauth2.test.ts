@@ -30,6 +30,7 @@ import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { writeToStdout } from '../utils/stdio.js';
 import { FatalCancellationError } from '../utils/errors.js';
+import process from 'node:process';
 
 vi.mock('os', async (importOriginal) => {
   const os = await importOriginal<typeof import('os')>();
@@ -1128,29 +1129,22 @@ describe('oauth2', () => {
           () => mockHttpServer as unknown as http.Server,
         );
 
-        // Spy on process.on to capture the SIGINT handler
-        const processOnSpy = vi.spyOn(process, 'on');
+        // Mock process.on to immediately trigger SIGINT
+        const processOnSpy = vi
+          .spyOn(process, 'on')
+          .mockImplementation((event, listener: () => void) => {
+            if (event === 'SIGINT') {
+              listener();
+            }
+            return process;
+          });
+
         const processRemoveListenerSpy = vi.spyOn(process, 'removeListener');
 
         const clientPromise = getOauthClient(
           AuthType.LOGIN_WITH_GOOGLE,
           mockConfig,
         );
-
-        // Wait a tick to ensure the SIGINT handler is registered
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        const sigintCall = processOnSpy.mock.calls.find(
-          (call) => call[0] === 'SIGINT',
-        );
-        const sigIntHandler = sigintCall?.[1] as (() => void) | undefined;
-
-        expect(sigIntHandler).toBeDefined();
-
-        // Trigger SIGINT
-        if (sigIntHandler) {
-          sigIntHandler();
-        }
 
         await expect(clientPromise).rejects.toThrow(FatalCancellationError);
         expect(processRemoveListenerSpy).toHaveBeenCalledWith(
@@ -1186,8 +1180,18 @@ describe('oauth2', () => {
           () => mockHttpServer as unknown as http.Server,
         );
 
-        // Spy on process.stdin.on
-        const stdinOnSpy = vi.spyOn(process.stdin, 'on');
+        // Spy on process.stdin.on and immediately trigger Ctrl+C
+        const stdinOnSpy = vi
+          .spyOn(process.stdin, 'on')
+          .mockImplementation(
+            (event: string, listener: (data: Buffer) => void) => {
+              if (event === 'data') {
+                listener(Buffer.from([0x03]));
+              }
+              return process.stdin;
+            },
+          );
+
         const stdinRemoveListenerSpy = vi.spyOn(
           process.stdin,
           'removeListener',
@@ -1197,22 +1201,6 @@ describe('oauth2', () => {
           AuthType.LOGIN_WITH_GOOGLE,
           mockConfig,
         );
-
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        const dataCall = stdinOnSpy.mock.calls.find(
-          (call: [string, ...unknown[]]) => call[0] === 'data',
-        );
-        const dataHandler = dataCall?.[1] as
-          | ((data: Buffer) => void)
-          | undefined;
-
-        expect(dataHandler).toBeDefined();
-
-        // Trigger Ctrl+C
-        if (dataHandler) {
-          dataHandler(Buffer.from([0x03]));
-        }
 
         await expect(clientPromise).rejects.toThrow(FatalCancellationError);
         expect(stdinRemoveListenerSpy).toHaveBeenCalledWith(
@@ -1420,7 +1408,7 @@ describe('oauth2', () => {
       await clientPromise;
 
       expect(
-        OAuthCredentialStorage.saveCredentials as Mock,
+        vi.mocked(OAuthCredentialStorage.saveCredentials),
       ).toHaveBeenCalledWith(mockTokens);
       const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
       expect(fs.existsSync(credsPath)).toBe(false);
@@ -1431,7 +1419,7 @@ describe('oauth2', () => {
         './oauth-credential-storage.js'
       );
       const cachedCreds = { refresh_token: 'cached-encrypted-token' };
-      (OAuthCredentialStorage.loadCredentials as Mock).mockResolvedValue(
+      vi.mocked(OAuthCredentialStorage.loadCredentials).mockResolvedValue(
         cachedCreds,
       );
 
@@ -1455,7 +1443,9 @@ describe('oauth2', () => {
 
       await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
 
-      expect(OAuthCredentialStorage.loadCredentials as Mock).toHaveBeenCalled();
+      expect(
+        vi.mocked(OAuthCredentialStorage.loadCredentials),
+      ).toHaveBeenCalled();
       expect(mockClient.setCredentials).toHaveBeenCalledWith(cachedCreds);
       expect(mockClient.setCredentials).not.toHaveBeenCalledWith(
         unencryptedCreds,
