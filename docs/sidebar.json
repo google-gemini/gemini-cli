@@ -65,6 +65,10 @@
         "slug": "docs/cli/custom-commands"
       },
       {
+        "label": "Evals",
+        "slug": "docs/cli/evals"
+      },
+      {
         "label": "Enterprise",
         "slug": "docs/cli/enterprise"
       },
