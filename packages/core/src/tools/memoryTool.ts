@@ -71,8 +71,6 @@ let currentGeminiMdFilename: string | string[] = DEFAULT_CONTEXT_FILENAME;
 export function setGeminiMdFilename(newFilename: string | string[]): void {
   const validateFilename = (name: string): string => {
     const trimmed = name.trim();
-    // Prevent path traversal by ensuring the filename doesn't contain path separators
-    // Also prevent '.' and '..' which can be used for path traversal
     if (
       trimmed.includes('/') ||
       trimmed.includes('\\') ||
