@@ -17,6 +17,7 @@ import {
   Storage,
   coreEvents,
   homedir,
+  type GeminiCodeAssistSetting,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -499,19 +500,37 @@ export class LoadedSettings {
   readonly errors: SettingsError[];
 
   private _merged: Settings;
+  private _remoteAdminSettings: Partial<Settings> | undefined;
 
   get merged(): Settings {
     return this._merged;
   }
 
   private computeMergedSettings(): Settings {
-    return mergeSettings(
+    const merged = mergeSettings(
       this.system.settings,
       this.systemDefaults.settings,
       this.user.settings,
       this.workspace.settings,
       this.isTrusted,
     );
+
+    // Remote admin settings always take precedence and file-based admin settings
+    // are ignored.
+    const adminSettingSchema = getSettingsSchema().admin;
+    if (adminSettingSchema?.properties) {
+      const adminSchema = adminSettingSchema.properties;
+      const adminDefaults = getDefaultsFromSchema(adminSchema);
+
+      // The final admin settings are the defaults overridden by remote settings.
+      // Any admin settings from files are ignored.
+      merged.admin = customDeepMerge(
+        (path: string[]) => getMergeStrategyForPath(['admin', ...path]),
+        adminDefaults,
+        this._remoteAdminSettings?.admin ?? {},
+      ) as Settings['admin'];
+    }
+    return merged;
   }
 
   forScope(scope: LoadableSettingScope): SettingsFile {
@@ -536,6 +555,31 @@ export class LoadedSettings {
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
     coreEvents.emitSettingsChanged();
+  }
+
+  setRemoteAdminSettings(remoteSettings: GeminiCodeAssistSetting): void {
+    const admin: Settings['admin'] = {};
+
+    if (remoteSettings.secureModeEnabled !== undefined) {
+      admin.secureModeEnabled = remoteSettings.secureModeEnabled;
+    }
+
+    if (remoteSettings.mcpSetting?.mcpEnabled !== undefined) {
+      admin.mcp = { enabled: remoteSettings.mcpSetting.mcpEnabled };
+    }
+
+    if (
+      remoteSettings.cliFeatureSetting?.extensionsSetting?.extensionsEnabled !==
+      undefined
+    ) {
+      admin.extensions = {
+        enabled:
+          remoteSettings.cliFeatureSetting.extensionsSetting.extensionsEnabled,
+      };
+    }
+
+    this._remoteAdminSettings = { admin };
+    this._merged = this.computeMergedSettings();
   }
 }
 
