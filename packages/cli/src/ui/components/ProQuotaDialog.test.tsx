@@ -86,6 +86,11 @@ describe('ProQuotaDialog', () => {
                 key: 'retry_always',
               },
               {
+                label: 'Upgrade for higher limits',
+                value: 'upgrade',
+                key: 'upgrade',
+              },
+              {
                 label: 'Stop',
                 value: 'retry_later',
                 key: 'retry_later',
