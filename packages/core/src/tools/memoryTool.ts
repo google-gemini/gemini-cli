@@ -310,14 +310,13 @@ export class MemoryTool
   static readonly Name = MEMORY_TOOL_NAME;
 
   constructor(messageBus: MessageBus) {
-    // Standard initialization for MemoryTool with messageBus for confirmation
+    // Initialize the tool with its specific properties
     super(
       MemoryTool.Name,
       'SaveMemory',
       memoryToolDescription,
       Kind.Think,
       memoryToolSchemaData.parametersJsonSchema as Record<string, unknown>,
-      // @ts-expect-error - The IDE incorrectly shifts parameter positions in the constructor hierarchy, but runtime/tsc are correct
       messageBus,
       true,
       false,

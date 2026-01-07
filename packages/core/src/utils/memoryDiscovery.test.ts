@@ -20,7 +20,6 @@ import {
   DEFAULT_CONTEXT_FILENAME,
 } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-// @ts-expect-error - The IDE incorrectly identifies this as missing, but it exists and tests pass
 import { GEMINI_DIR, homedir as pathsHomedir } from './paths.js';
 import { Config, type GeminiCLIExtension } from '../config/config.js';
 import { Storage } from '../config/storage.js';
