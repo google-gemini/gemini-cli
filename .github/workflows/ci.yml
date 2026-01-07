@@ -50,6 +50,8 @@ jobs:
     runs-on: 'gemini-cli-ubuntu-16-core'
     needs: 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    env:
+      GEMINI_LINT_TEMP_DIR: ${{ github.workspace }}/.gemini-linters
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -62,6 +64,12 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
+
+      - name: 'Cache Linters'
+        uses: 'actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9' # ratchet:actions/cache@v4
+        with:
+          path: '${{ env.GEMINI_LINT_TEMP_DIR }}'
+          key: '${{ runner.os }}-${{ runner.arch }}-linters-${{ hashFiles(''scripts/lint.js'') }}'
 
       - name: 'Install dependencies'
         run: 'npm ci'
@@ -114,7 +122,6 @@ jobs:
     name: 'Test (Linux)'
     runs-on: 'gemini-cli-ubuntu-16-core'
     needs:
-      - 'lint'
       - 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     permissions:
@@ -179,7 +186,6 @@ jobs:
     name: 'Test (Mac)'
     runs-on: '${{ matrix.os }}'
     needs:
-      - 'lint'
       - 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     permissions:

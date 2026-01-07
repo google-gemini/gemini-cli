@@ -21,7 +21,8 @@ const ACTIONLINT_VERSION = '1.7.7';
 const SHELLCHECK_VERSION = '0.11.0';
 const YAMLLINT_VERSION = '1.35.1';
 
-const TEMP_DIR = join(tmpdir(), 'gemini-cli-linters');
+const TEMP_DIR =
+  process.env.GEMINI_LINT_TEMP_DIR || join(tmpdir(), 'gemini-cli-linters');
 
 function getPlatformArch() {
   const platform = process.platform;
