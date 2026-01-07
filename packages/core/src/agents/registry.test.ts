@@ -209,6 +209,7 @@ describe('AgentRegistry', () => {
       const disabledConfig = makeFakeConfig({
         enableAgents: false,
         codebaseInvestigatorSettings: { enabled: false },
+        cliHelpAgentSettings: { enabled: false },
       });
       const disabledRegistry = new TestableAgentRegistry(disabledConfig);
 
@@ -220,10 +221,8 @@ describe('AgentRegistry', () => {
       ).not.toHaveBeenCalled();
     });
 
-    it('should register CLI help agent if enabled', async () => {
-      const config = makeFakeConfig({
-        cliHelpAgentSettings: { enabled: true },
-      });
+    it('should register CLI help agent by default', async () => {
+      const config = makeFakeConfig();
       const registry = new TestableAgentRegistry(config);
 
       await registry.initialize();

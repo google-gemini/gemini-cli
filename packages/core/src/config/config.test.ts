@@ -941,6 +941,7 @@ describe('Server Config (config.ts)', () => {
       const params: ConfigParameters = {
         ...baseParams,
         codebaseInvestigatorSettings: { enabled: false },
+        cliHelpAgentSettings: { enabled: false },
       };
       const config = new Config(params);
 
