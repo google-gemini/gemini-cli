@@ -972,7 +972,19 @@ export class GeminiClient {
         this.hasFailedCompressionAttempt || !force;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
-        this.chat = await this.startChat(newHistory);
+        // capture current session data before resetting
+        const currentRecordingService =
+          this.getChat().getChatRecordingService();
+        const conversation = currentRecordingService.getConversation();
+        const filePath = currentRecordingService.getConversationFilePath();
+
+        let resumedData: ResumedSessionData | undefined;
+
+        if (conversation && filePath) {
+          resumedData = { conversation, filePath };
+        }
+
+        this.chat = await this.startChat(newHistory, resumedData);
         this.updateTelemetryTokenCount();
         this.forceFullIdeContext = true;
       }

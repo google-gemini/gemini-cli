@@ -16,6 +16,7 @@ import type {
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { ToolResultDisplay } from '../tools/tools.js';
 
 export const SESSION_FILE_PREFIX = 'session-';
 
@@ -53,7 +54,7 @@ export interface ToolCallRecord {
   // UI-specific fields for display purposes
   displayName?: string;
   description?: string;
-  resultDisplay?: string;
+  resultDisplay?: ToolResultDisplay;
   renderOutputAsMarkdown?: boolean;
 }
 
@@ -407,11 +408,14 @@ export class ChatRecordingService {
   /**
    * Saves the conversation record; overwrites the file.
    */
-  private writeConversation(conversation: ConversationRecord): void {
+  private writeConversation(
+    conversation: ConversationRecord,
+    { allowEmpty = false }: { allowEmpty?: boolean } = {},
+  ): void {
     try {
       if (!this.conversationFile) return;
       // Don't write the file yet until there's at least one message.
-      if (conversation.messages.length === 0) return;
+      if (conversation.messages.length === 0 && !allowEmpty) return;
 
       // Only write the file if this change would change the file.
       if (this.cachedLastConvData !== JSON.stringify(conversation, null, 2)) {
@@ -491,5 +495,30 @@ export class ChatRecordingService {
       debugLogger.error('Error deleting session file.', error);
       throw error;
     }
+  }
+
+  /**
+   * Rewinds the conversation to the state just before the specified message ID.
+   * All messages from (and including) the specified ID onwards are removed.
+   */
+  rewindTo(messageId: string): ConversationRecord | null {
+    if (!this.conversationFile) {
+      return null;
+    }
+    const conversation = this.readConversation();
+    const messageIndex = conversation.messages.findIndex(
+      (m) => m.id === messageId,
+    );
+
+    if (messageIndex === -1) {
+      debugLogger.error(
+        'Message to rewind to not found in conversation history',
+      );
+      return conversation;
+    }
+
+    conversation.messages = conversation.messages.slice(0, messageIndex);
+    this.writeConversation(conversation, { allowEmpty: true });
+    return conversation;
   }
 }

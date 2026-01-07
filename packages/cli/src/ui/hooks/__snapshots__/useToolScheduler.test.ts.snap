@@ -64,6 +64,7 @@ exports[`useReactToolScheduler > should handle tool requiring confirmation - can
   "resultDisplay": {
     "fileDiff": "Mock tool requires confirmation",
     "fileName": "mockToolRequiresConfirmation.ts",
+    "filePath": undefined,
     "newContent": undefined,
     "originalContent": undefined,
   },

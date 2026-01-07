@@ -38,6 +38,7 @@ import { ideContextStore } from '../ide/ideContext.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
+import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import type {
@@ -397,6 +398,10 @@ describe('Gemini Client (client.ts)', () => {
         getHistory: vi.fn((_curated?: boolean) => chatHistory),
         setHistory: vi.fn(),
         getLastPromptTokenCount: vi.fn().mockReturnValue(originalTokenCount),
+        getChatRecordingService: vi.fn().mockReturnValue({
+          getConversation: vi.fn().mockReturnValue(null),
+          getConversationFilePath: vi.fn().mockReturnValue(null),
+        }),
       };
       client['chat'] = mockOriginalChat as GeminiChat;
 
@@ -616,6 +621,34 @@ describe('Gemini Client (client.ts)', () => {
         originalTokenCount: 50,
         newTokenCount: 50,
       });
+    });
+
+    it('should resume the session file when compression succeeds', async () => {
+      const { client, mockOriginalChat } = setup({
+        compressionStatus: CompressionStatus.COMPRESSED,
+      });
+
+      const mockConversation = { some: 'conversation' };
+      const mockFilePath = '/tmp/session.json';
+
+      // Override the mock to return values
+      const mockRecordingService = {
+        getConversation: vi.fn().mockReturnValue(mockConversation),
+        getConversationFilePath: vi.fn().mockReturnValue(mockFilePath),
+      };
+      vi.mocked(mockOriginalChat.getChatRecordingService!).mockReturnValue(
+        mockRecordingService as unknown as ChatRecordingService,
+      );
+
+      await client.tryCompressChat('prompt-id', false);
+
+      expect(client['startChat']).toHaveBeenCalledWith(
+        expect.anything(), // newHistory
+        {
+          conversation: mockConversation,
+          filePath: mockFilePath,
+        },
+      );
     });
   });
 
