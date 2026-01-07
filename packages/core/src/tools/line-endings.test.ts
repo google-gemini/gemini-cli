@@ -204,8 +204,8 @@ describe('Line Ending Preservation', () => {
       expect(writtenContent).toBe('line1\r\nline2\r\nline3\r\n');
     });
 
-    it('should use LF for new files (default)', async () => {
-      const filePath = path.join(rootDir, 'new_lf_file.txt');
+    it('should use OS EOL for new files', async () => {
+      const filePath = path.join(rootDir, 'new_os_eol_file.txt');
       const proposedContent = 'line1\nline2\n';
 
       mockEnsureCorrectFileContent.mockResolvedValue(proposedContent);
@@ -225,7 +225,12 @@ describe('Line Ending Preservation', () => {
       await invocation.execute(abortSignal);
 
       const writtenContent = fs.readFileSync(filePath, 'utf8');
-      expect(writtenContent).toBe('line1\nline2\n');
+
+      if (os.EOL === '\r\n') {
+        expect(writtenContent).toBe('line1\r\nline2\r\n');
+      } else {
+        expect(writtenContent).toBe('line1\nline2\n');
+      }
     });
   });
 

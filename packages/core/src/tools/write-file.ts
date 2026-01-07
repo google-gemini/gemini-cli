@@ -6,6 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import * as Diff from 'diff';
 import { WRITE_FILE_TOOL_NAME } from './tool-names.js';
 import type { Config } from '../config/config.js';
@@ -289,6 +290,10 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       if (!isNewFile && originalContent) {
         const lineEnding = detectLineEnding(originalContent);
         if (lineEnding === '\r\n') {
+          finalContent = finalContent.replace(/\r?\n/g, '\r\n');
+        }
+      } else {
+        if (os.EOL === '\r\n') {
           finalContent = finalContent.replace(/\r?\n/g, '\r\n');
         }
       }

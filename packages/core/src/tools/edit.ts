@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as Diff from 'diff';
 import {
@@ -777,6 +778,10 @@ class EditToolInvocation
       // Restore original line endings if they were CRLF
       if (!editData.isNewFile && editData.originalLineEnding === '\r\n') {
         finalContent = finalContent.replace(/\n/g, '\r\n');
+      } else if (editData.isNewFile) {
+        if (os.EOL === '\r\n') {
+          finalContent = finalContent.replace(/\r?\n/g, '\r\n');
+        }
       }
       await this.config
         .getFileSystemService()
