@@ -60,8 +60,11 @@ import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import { logRipgrepFallback } from '../telemetry/loggers.js';
-import { RipgrepFallbackEvent } from '../telemetry/types.js';
+import { logRipgrepFallback, logFlashFallback } from '../telemetry/loggers.js';
+import {
+  RipgrepFallbackEvent,
+  FlashFallbackEvent,
+} from '../telemetry/types.js';
 import type { FallbackModelHandler } from '../fallback/types.js';
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
@@ -867,6 +870,14 @@ export class Config {
       coreEvents.emitModelChanged(newModel);
     }
     this.modelAvailabilityService.reset();
+  }
+
+  activateFallbackMode(model: string): void {
+    this.setModel(model);
+    const authType = this.getContentGeneratorConfig()?.authType;
+    if (authType) {
+      logFlashFallback(this, new FlashFallbackEvent(authType));
+    }
   }
 
   getActiveModel(): string {
