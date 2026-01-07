@@ -14,7 +14,7 @@ import {
 } from '../tools/tools.js';
 import type { EditorType } from '../utils/editor.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../policy/types.js';
+import { PolicyDecision } from '../policy/types.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolCallEvent } from '../telemetry/types.js';
@@ -25,12 +25,7 @@ import {
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
 import * as Diff from 'diff';
-import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
-import {
-  doesToolInvocationMatch,
-  getToolSuggestion,
-} from '../utils/tool-utils.js';
-import { isShellInvocationAllowlisted } from '../utils/shell-permissions.js';
+import { getToolSuggestion } from '../utils/tool-utils.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -592,17 +587,46 @@ export class CoreToolScheduler {
           return;
         }
 
-        const confirmationDetails =
-          await invocation.shouldConfirmExecute(signal);
+        // Policy Check using PolicyEngine
+        // We must reconstruct the FunctionCall format expected by PolicyEngine
+        const toolCallForPolicy = {
+          name: toolCall.request.name,
+          args: toolCall.request.args,
+        };
+        const { decision } = await this.config
+          .getPolicyEngine()
+          .check(toolCallForPolicy, undefined); // Server name undefined for local tools
 
-        if (!confirmationDetails) {
+        if (decision === PolicyDecision.DENY) {
+          const errorMessage = `Tool execution denied by policy.`;
+          this.setStatusInternal(
+            reqInfo.callId,
+            'error',
+            signal,
+            createErrorResponse(
+              reqInfo,
+              new Error(errorMessage),
+              ToolErrorType.POLICY_VIOLATION,
+            ),
+          );
+          await this.checkAndNotifyCompletion(signal);
+          return;
+        }
+
+        if (decision === PolicyDecision.ALLOW) {
           this.setToolCallOutcome(
             reqInfo.callId,
             ToolConfirmationOutcome.ProceedAlways,
           );
           this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
         } else {
-          if (this.isAutoApproved(toolCall)) {
+          // PolicyDecision.ASK_USER
+
+          // We need confirmation details to show to the user
+          const confirmationDetails =
+            await invocation.shouldConfirmExecute(signal);
+
+          if (!confirmationDetails) {
             this.setToolCallOutcome(
               reqInfo.callId,
               ToolConfirmationOutcome.ProceedAlways,
@@ -616,6 +640,7 @@ export class CoreToolScheduler {
                 }" requires user confirmation, which is not supported in non-interactive mode.`,
               );
             }
+
             // Fire Notification hook before showing confirmation to user
             const messageBus = this.config.getMessageBus();
             const hooksEnabled = this.config.getEnableHooks();
@@ -1013,21 +1038,5 @@ export class CoreToolScheduler {
         outcome,
       };
     });
-  }
-
-  private isAutoApproved(toolCall: ValidatingToolCall): boolean {
-    if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
-      return true;
-    }
-
-    const allowedTools = this.config.getAllowedTools() || [];
-    const { tool, invocation } = toolCall;
-    const toolName = typeof tool === 'string' ? tool : tool.name;
-
-    if (SHELL_TOOL_NAMES.includes(toolName)) {
-      return isShellInvocationAllowlisted(invocation, allowedTools);
-    }
-
-    return doesToolInvocationMatch(tool, invocation, allowedTools);
   }
 }

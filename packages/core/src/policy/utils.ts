@@ -38,7 +38,10 @@ export function buildArgsPatterns(
     // always followed by a space or a closing quote.
     return prefixes.map((prefix) => {
       const jsonPrefix = JSON.stringify(prefix).slice(1, -1);
-      return `"command":"${escapeRegex(jsonPrefix)}(?:[\\s"]|$)`;
+      // We allow [\s], ["], or the specific sequence [\"] (for escaped quotes
+      // in JSON). We do NOT allow generic [\\], which would match "git\status"
+      // -> "gitstatus".
+      return `"command":"${escapeRegex(jsonPrefix)}(?:[\\s"]|\\\\")`;
     });
   }
 
