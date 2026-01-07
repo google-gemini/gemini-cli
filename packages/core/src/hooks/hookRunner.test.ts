@@ -434,6 +434,37 @@ describe('HookRunner', () => {
       expect(spawn).toHaveBeenCalledTimes(2);
     });
 
+    it('should call onHookStart and onHookEnd callbacks', async () => {
+      const configs: HookConfig[] = [
+        { name: 'hook1', type: HookType.Command, command: './hook1.sh' },
+      ];
+
+      mockSpawn.mockProcessOn.mockImplementation(
+        (event: string, callback: (code: number) => void) => {
+          if (event === 'close') {
+            setImmediate(() => callback(0));
+          }
+        },
+      );
+
+      const onStart = vi.fn();
+      const onEnd = vi.fn();
+
+      await hookRunner.executeHooksParallel(
+        configs,
+        HookEventName.BeforeTool,
+        mockInput,
+        onStart,
+        onEnd,
+      );
+
+      expect(onStart).toHaveBeenCalledWith(configs[0], 0);
+      expect(onEnd).toHaveBeenCalledWith(
+        configs[0],
+        expect.objectContaining({ success: true }),
+      );
+    });
+
     it('should handle mixed success and failure', async () => {
       const configs: HookConfig[] = [
         { type: HookType.Command, command: './hook1.sh' },
@@ -496,6 +527,37 @@ describe('HookRunner', () => {
       expect(spawn).toHaveBeenCalledTimes(2);
       // Verify they were called sequentially
       expect(executionOrder).toEqual(['./hook1.sh', './hook2.sh']);
+    });
+
+    it('should call onHookStart and onHookEnd callbacks sequentially', async () => {
+      const configs: HookConfig[] = [
+        { name: 'hook1', type: HookType.Command, command: './hook1.sh' },
+        { name: 'hook2', type: HookType.Command, command: './hook2.sh' },
+      ];
+
+      mockSpawn.mockProcessOn.mockImplementation(
+        (event: string, callback: (code: number) => void) => {
+          if (event === 'close') {
+            setImmediate(() => callback(0));
+          }
+        },
+      );
+
+      const onStart = vi.fn();
+      const onEnd = vi.fn();
+
+      await hookRunner.executeHooksSequential(
+        configs,
+        HookEventName.BeforeTool,
+        mockInput,
+        onStart,
+        onEnd,
+      );
+
+      expect(onStart).toHaveBeenCalledTimes(2);
+      expect(onEnd).toHaveBeenCalledTimes(2);
+      expect(onStart).toHaveBeenNthCalledWith(1, configs[0], 0);
+      expect(onStart).toHaveBeenNthCalledWith(2, configs[1], 1);
     });
 
     it('should continue execution even if a hook fails', async () => {

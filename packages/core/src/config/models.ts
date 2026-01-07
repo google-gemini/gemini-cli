@@ -110,17 +110,15 @@ export function getDisplayString(
     case DEFAULT_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 2.5)';
     case GEMINI_MODEL_ALIAS_PRO:
-      return `Manual (${
-        previewFeaturesEnabled ? PREVIEW_GEMINI_MODEL : DEFAULT_GEMINI_MODEL
-      })`;
+      return previewFeaturesEnabled
+        ? PREVIEW_GEMINI_MODEL
+        : DEFAULT_GEMINI_MODEL;
     case GEMINI_MODEL_ALIAS_FLASH:
-      return `Manual (${
-        previewFeaturesEnabled
-          ? PREVIEW_GEMINI_FLASH_MODEL
-          : DEFAULT_GEMINI_FLASH_MODEL
-      })`;
+      return previewFeaturesEnabled
+        ? PREVIEW_GEMINI_FLASH_MODEL
+        : DEFAULT_GEMINI_FLASH_MODEL;
     default:
-      return `Manual (${model})`;
+      return model;
   }
 }
 

@@ -16,7 +16,7 @@ const GUI_EDITORS = [
   'zed',
   'antigravity',
 ] as const;
-const TERMINAL_EDITORS = ['vim', 'neovim', 'emacs'] as const;
+const TERMINAL_EDITORS = ['vim', 'neovim', 'emacs', 'hx'] as const;
 const EDITORS = [...GUI_EDITORS, ...TERMINAL_EDITORS] as const;
 
 const GUI_EDITORS_SET = new Set<string>(GUI_EDITORS);
@@ -49,6 +49,7 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   zed: 'Zed',
   emacs: 'Emacs',
   antigravity: 'Antigravity',
+  hx: 'Helix',
 };
 
 export function getEditorDisplayName(editor: EditorType): string {
@@ -96,6 +97,7 @@ const editorCommands: Record<
     win32: ['agy.cmd', 'antigravity.cmd'],
     default: ['agy', 'antigravity'],
   },
+  hx: { win32: ['hx'], default: ['hx'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
@@ -184,6 +186,11 @@ export function getDiffCommand(
       return {
         command: 'emacs',
         args: ['--eval', `(ediff "${oldPath}" "${newPath}")`],
+      };
+    case 'hx':
+      return {
+        command: 'hx',
+        args: ['--vsplit', '--', oldPath, newPath],
       };
     default:
       return null;
