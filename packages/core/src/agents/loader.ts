@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import TOML from '@iarna/toml';
+import yaml from 'js-yaml';
 import * as fs from 'node:fs/promises';
 import { type Dirent } from 'node:fs';
 import * as path from 'node:path';
@@ -16,14 +16,15 @@ import {
 } from '../tools/tool-names.js';
 
 /**
- * DTO for TOML parsing - represents the raw structure of the TOML file.
+ * DTO for Markdown parsing - represents the structure from frontmatter.
  */
-interface TomlBaseAgentDefinition {
+interface FrontmatterBaseAgentDefinition {
   name: string;
   display_name?: string;
 }
 
-interface TomlLocalAgentDefinition extends TomlBaseAgentDefinition {
+interface FrontmatterLocalAgentDefinition
+  extends FrontmatterBaseAgentDefinition {
   kind: 'local';
   description: string;
   tools?: string[];
@@ -41,13 +42,16 @@ interface TomlLocalAgentDefinition extends TomlBaseAgentDefinition {
   };
 }
 
-interface TomlRemoteAgentDefinition extends TomlBaseAgentDefinition {
-  description?: string;
+interface FrontmatterRemoteAgentDefinition
+  extends FrontmatterBaseAgentDefinition {
   kind: 'remote';
+  description?: string;
   agent_card_url: string;
 }
 
-type TomlAgentDefinition = TomlLocalAgentDefinition | TomlRemoteAgentDefinition;
+type FrontmatterAgentDefinition =
+  | FrontmatterLocalAgentDefinition
+  | FrontmatterRemoteAgentDefinition;
 
 /**
  * Error thrown when an agent definition is invalid or cannot be loaded.
@@ -87,10 +91,11 @@ const localAgentSchema = z
         }),
       )
       .optional(),
-    prompts: z.object({
-      system_prompt: z.string().min(1),
-      query: z.string().optional(),
-    }),
+    prompts: z
+      .object({
+        query: z.string().optional(),
+      })
+      .optional(),
     model: z
       .object({
         model: z.string().optional(),
@@ -116,22 +121,14 @@ const remoteAgentSchema = z
   })
   .strict();
 
-const remoteAgentsConfigSchema = z
-  .object({
-    remote_agents: z.array(remoteAgentSchema),
-  })
-  .strict();
-
 // Use a Zod union to automatically discriminate between local and remote
-// agent types. This is more robust than manually checking the 'kind' field,
-// as it correctly handles cases where 'kind' is omitted by relying on
-// the presence of unique fields like `agent_card_url` or `prompts`.
+// agent types.
 const agentUnionOptions = [
   { schema: localAgentSchema, label: 'Local Agent' },
   { schema: remoteAgentSchema, label: 'Remote Agent' },
 ] as const;
 
-const singleAgentSchema = z.union([
+const markdownFrontmatterSchema = z.union([
   agentUnionOptions[0].schema,
   agentUnionOptions[1].schema,
 ]);
@@ -159,15 +156,15 @@ function formatZodError(error: z.ZodError, context: string): string {
 }
 
 /**
- * Parses and validates an agent TOML file. Returns a validated array of RemoteAgentDefinitions or a single LocalAgentDefinition.
+ * Parses and validates an agent Markdown file with frontmatter.
  *
- * @param filePath Path to the TOML file.
- * @returns An array of parsed and validated TomlAgentDefinitions.
+ * @param filePath Path to the Markdown file.
+ * @returns An array containing the single parsed agent definition.
  * @throws AgentLoadError if parsing or validation fails.
  */
-export async function parseAgentToml(
+export async function parseAgentMarkdown(
   filePath: string,
-): Promise<TomlAgentDefinition[]> {
+): Promise<FrontmatterAgentDefinition[]> {
   let content: string;
   try {
     content = await fs.readFile(filePath, 'utf-8');
@@ -178,34 +175,30 @@ export async function parseAgentToml(
     );
   }
 
-  let raw: unknown;
-  try {
-    raw = TOML.parse(content);
-  } catch (error) {
+  // Split frontmatter and body
+  // Matches "---", newline, content, newline, "---", optional newline, optional rest
+  const match = content.match(/^---\n([\s\S]*?)\n---(?:\n([\s\S]*))?$/);
+  if (!match) {
     throw new AgentLoadError(
       filePath,
-      `TOML parsing failed: ${(error as Error).message}`,
+      'Invalid markdown format. File must start with YAML frontmatter enclosed in "---".',
     );
   }
 
-  // Check for `remote_agents` array
-  if (
-    typeof raw === 'object' &&
-    raw !== null &&
-    'remote_agents' in (raw as Record<string, unknown>)
-  ) {
-    const result = remoteAgentsConfigSchema.safeParse(raw);
-    if (!result.success) {
-      throw new AgentLoadError(
-        filePath,
-        `Validation failed: ${formatZodError(result.error, 'Remote Agents Config')}`,
-      );
-    }
-    return result.data.remote_agents as TomlAgentDefinition[];
+  const frontmatterStr = match[1];
+  const body = match[2] || '';
+
+  let rawFrontmatter: unknown;
+  try {
+    rawFrontmatter = yaml.load(frontmatterStr);
+  } catch (error) {
+    throw new AgentLoadError(
+      filePath,
+      `YAML frontmatter parsing failed: ${(error as Error).message}`,
+    );
   }
 
-  // Single Agent Logic
-  const result = singleAgentSchema.safeParse(raw);
+  const result = markdownFrontmatterSchema.safeParse(rawFrontmatter);
 
   if (!result.success) {
     throw new AgentLoadError(
@@ -214,27 +207,50 @@ export async function parseAgentToml(
     );
   }
 
-  const toml = result.data as TomlAgentDefinition;
+  const frontmatter = result.data;
 
-  // Prevent sub-agents from delegating to other agents (to prevent recursion/complexity)
-  if ('tools' in toml && toml.tools?.includes(DELEGATE_TO_AGENT_TOOL_NAME)) {
+  if (frontmatter.kind === 'remote') {
+    return [
+      {
+        ...frontmatter,
+        kind: 'remote',
+      },
+    ];
+  }
+
+  // Local agent validation
+  // Validate tools
+  if (
+    frontmatter.tools &&
+    frontmatter.tools.includes(DELEGATE_TO_AGENT_TOOL_NAME)
+  ) {
     throw new AgentLoadError(
       filePath,
       `Validation failed: tools list cannot include '${DELEGATE_TO_AGENT_TOOL_NAME}'. Sub-agents cannot delegate to other agents.`,
     );
   }
 
-  return [toml];
+  // Construct the local agent definition
+  const agentDef: FrontmatterLocalAgentDefinition = {
+    ...frontmatter,
+    kind: 'local',
+    prompts: {
+      system_prompt: body.trim(),
+      query: frontmatter.prompts?.query,
+    },
+  };
+
+  return [agentDef];
 }
 
 /**
- * Converts a TomlAgentDefinition DTO to the internal AgentDefinition structure.
+ * Converts a FrontmatterAgentDefinition DTO to the internal AgentDefinition structure.
  *
- * @param toml The parsed TOML definition.
+ * @param markdown The parsed Markdown/Frontmatter definition.
  * @returns The internal AgentDefinition.
  */
-export function tomlToAgentDefinition(
-  toml: TomlAgentDefinition,
+export function markdownToAgentDefinition(
+  markdown: FrontmatterAgentDefinition,
 ): AgentDefinition {
   const inputConfig = {
     inputs: {
@@ -246,41 +262,41 @@ export function tomlToAgentDefinition(
     },
   };
 
-  if (toml.kind === 'remote') {
+  if (markdown.kind === 'remote') {
     return {
       kind: 'remote',
-      name: toml.name,
-      description: toml.description || '(Loading description...)',
-      displayName: toml.display_name,
-      agentCardUrl: toml.agent_card_url,
+      name: markdown.name,
+      description: markdown.description || '(Loading description...)',
+      displayName: markdown.display_name,
+      agentCardUrl: markdown.agent_card_url,
       inputConfig,
     };
   }
 
   // If a model is specified, use it. Otherwise, inherit
-  const modelName = toml.model?.model || 'inherit';
+  const modelName = markdown.model?.model || 'inherit';
 
   return {
     kind: 'local',
-    name: toml.name,
-    description: toml.description,
-    displayName: toml.display_name,
+    name: markdown.name,
+    description: markdown.description,
+    displayName: markdown.display_name,
     promptConfig: {
-      systemPrompt: toml.prompts.system_prompt,
-      query: toml.prompts.query,
+      systemPrompt: markdown.prompts.system_prompt,
+      query: markdown.prompts.query,
     },
     modelConfig: {
       model: modelName,
-      temp: toml.model?.temperature ?? 1,
+      temp: markdown.model?.temperature ?? 1,
       top_p: 0.95,
     },
     runConfig: {
-      max_turns: toml.run?.max_turns,
-      max_time_minutes: toml.run?.timeout_mins || 5,
+      max_turns: markdown.run?.max_turns,
+      max_time_minutes: markdown.run?.timeout_mins || 5,
     },
-    toolConfig: toml.tools
+    toolConfig: markdown.tools
       ? {
-          tools: toml.tools,
+          tools: markdown.tools,
         }
       : undefined,
     inputConfig,
@@ -289,7 +305,8 @@ export function tomlToAgentDefinition(
 
 /**
  * Loads all agents from a specific directory.
- * Ignores non-TOML files and files starting with _.
+ * Ignores files starting with _ and non-supported extensions.
+ * Supported extensions: .md
  *
  * @param dir Directory path to scan.
  * @returns Object containing successfully loaded agents and any errors.
@@ -319,21 +336,19 @@ export async function loadAgentsFromDirectory(
     return result;
   }
 
-  const files = dirEntries
-    .filter(
-      (entry) =>
-        entry.isFile() &&
-        entry.name.endsWith('.toml') &&
-        !entry.name.startsWith('_'),
-    )
-    .map((entry) => entry.name);
+  const files = dirEntries.filter(
+    (entry) =>
+      entry.isFile() &&
+      !entry.name.startsWith('_') &&
+      entry.name.endsWith('.md'),
+  );
 
-  for (const file of files) {
-    const filePath = path.join(dir, file);
+  for (const entry of files) {
+    const filePath = path.join(dir, entry.name);
     try {
-      const tomls = await parseAgentToml(filePath);
-      for (const toml of tomls) {
-        const agent = tomlToAgentDefinition(toml);
+      const agentDefs = await parseAgentMarkdown(filePath);
+      for (const def of agentDefs) {
+        const agent = markdownToAgentDefinition(def);
         result.agents.push(agent);
       }
     } catch (error) {
