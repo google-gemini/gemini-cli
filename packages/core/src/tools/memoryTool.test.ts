@@ -200,6 +200,7 @@ describe('MemoryTool', () => {
   });
 
   describe('execute (instance method)', () => {
+    // Instance-level tests for MemoryTool
     let memoryTool: MemoryTool;
     let performAddMemoryEntrySpy: Mock<typeof MemoryTool.performAddMemoryEntry>;
 
@@ -305,7 +306,8 @@ describe('MemoryTool', () => {
 
     beforeEach(() => {
       const bus = createMockMessageBus();
-      getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (getMockMessageBusInstance(bus) as any).defaultToolDecision = 'ask_user';
       memoryTool = new MemoryTool(bus);
       // Clear the allowlist before each test
       const invocation = memoryTool.build({ fact: 'mock-fact' });

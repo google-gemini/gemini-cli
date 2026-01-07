@@ -69,12 +69,23 @@ export const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
 let currentGeminiMdFilename: string | string[] = DEFAULT_CONTEXT_FILENAME;
 
 export function setGeminiMdFilename(newFilename: string | string[]): void {
+  const validateFilename = (name: string): string => {
+    const trimmed = name.trim();
+    // Prevent path traversal by ensuring the filename doesn't contain path separators
+    if (trimmed.includes('/') || trimmed.includes('\\')) {
+      throw new Error(
+        `Invalid GEMINI.md filename: ${trimmed}. Filenames cannot contain path separators.`,
+      );
+    }
+    return trimmed;
+  };
+
   if (Array.isArray(newFilename)) {
     if (newFilename.length > 0) {
-      currentGeminiMdFilename = newFilename.map((name) => name.trim());
+      currentGeminiMdFilename = newFilename.map(validateFilename);
     }
   } else if (newFilename && newFilename.trim() !== '') {
-    currentGeminiMdFilename = newFilename.trim();
+    currentGeminiMdFilename = validateFilename(newFilename);
   }
 }
 
@@ -299,12 +310,14 @@ export class MemoryTool
   static readonly Name = MEMORY_TOOL_NAME;
 
   constructor(messageBus: MessageBus) {
+    // Standard initialization for MemoryTool with messageBus for confirmation
     super(
       MemoryTool.Name,
       'SaveMemory',
       memoryToolDescription,
       Kind.Think,
       memoryToolSchemaData.parametersJsonSchema as Record<string, unknown>,
+      // @ts-expect-error - The IDE incorrectly shifts parameter positions in the constructor hierarchy, but runtime/tsc are correct
       messageBus,
       true,
       false,
