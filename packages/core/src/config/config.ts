@@ -356,6 +356,7 @@ export interface ConfigParameters {
   experimentalJitContext?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
+  extensionsEnabled?: boolean;
   onReload?: () => Promise<{ disabledSkills?: string[] }>;
 }
 
@@ -390,6 +391,7 @@ export class Config {
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
   private readonly mcpEnabled: boolean;
+  private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
@@ -515,6 +517,7 @@ export class Config {
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
     this.mcpEnabled = params.mcpEnabled ?? true;
+    this.extensionsEnabled = params.extensionsEnabled ?? true;
     this.allowedMcpServers = params.allowedMcpServers ?? [];
     this.blockedMcpServers = params.blockedMcpServers ?? [];
     this.allowedEnvironmentVariables = params.allowedEnvironmentVariables ?? [];
@@ -1138,6 +1141,10 @@ export class Config {
 
   getMcpEnabled(): boolean {
     return this.mcpEnabled;
+  }
+
+  getExtensionsEnabled(): boolean {
+    return this.extensionsEnabled;
   }
 
   getMcpClientManager(): McpClientManager | undefined {
