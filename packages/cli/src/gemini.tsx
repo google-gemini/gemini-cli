@@ -64,8 +64,6 @@ import {
   ExitCodes,
   SessionStartSource,
   SessionEndReason,
-  fireSessionStartHook,
-  fireSessionEndHook,
   getVersion,
 } from '@google/gemini-cli-core';
 import {
@@ -491,11 +489,9 @@ export async function main() {
 
     // Register SessionEnd hook to fire on graceful exit
     // This runs before telemetry shutdown in runExitCleanup()
-    if (config.getEnableHooks() && messageBus) {
-      registerCleanup(async () => {
-        await fireSessionEndHook(messageBus, SessionEndReason.Exit);
-      });
-    }
+    registerCleanup(async () => {
+      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
+    });
 
     // Cleanup sessions after config initialization
     try {
@@ -646,35 +642,28 @@ export async function main() {
 
     // Fire SessionStart hook through MessageBus (only if hooks are enabled)
     // Must be called AFTER config.initialize() to ensure HookRegistry is loaded
-    const hooksEnabled = config.getEnableHooks();
-    const hookMessageBus = config.getMessageBus();
-    if (hooksEnabled && hookMessageBus) {
-      const sessionStartSource = resumedSessionData
-        ? SessionStartSource.Resume
-        : SessionStartSource.Startup;
-      const result = await fireSessionStartHook(
-        hookMessageBus,
-        sessionStartSource,
-      );
+    const sessionStartSource = resumedSessionData
+      ? SessionStartSource.Resume
+      : SessionStartSource.Startup;
+    const result = await config
+      .getHookSystem()
+      ?.fireSessionStartEvent(sessionStartSource);
 
-      if (result) {
-        if (result.systemMessage) {
-          writeToStderr(result.systemMessage + '\n');
-        }
-        const additionalContext = result.getAdditionalContext();
-        if (additionalContext) {
-          // Prepend context to input (System Context -> Stdin -> Question)
-          input = input
-            ? `${additionalContext}\n\n${input}`
-            : additionalContext;
-        }
+    if (result?.finalOutput) {
+      if (result.finalOutput.systemMessage) {
+        writeToStderr(result.finalOutput.systemMessage + '\n');
       }
-
-      // Register SessionEnd hook for graceful exit
-      registerCleanup(async () => {
-        await fireSessionEndHook(hookMessageBus, SessionEndReason.Exit);
-      });
+      const additionalContext = result.finalOutput.getAdditionalContext();
+      if (additionalContext) {
+        // Prepend context to input (System Context -> Stdin -> Question)
+        input = input ? `${additionalContext}\n\n${input}` : additionalContext;
+      }
     }
+
+    // Register SessionEnd hook for graceful exit
+    registerCleanup(async () => {
+      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
+    });
 
     if (!input) {
       debugLogger.error(
