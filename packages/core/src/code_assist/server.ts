@@ -20,7 +20,6 @@ import type {
   ConversationInteraction,
   StreamingLatency,
   RecordCodeAssistMetricsRequest,
-  ReceiveEventRequest,
 } from './types.js';
 import type {
   ListExperimentsRequest,
@@ -285,7 +284,7 @@ export class CodeAssistServer implements ContentGenerator {
   ): Promise<void> {
     return this.requestPost<void>('recordCodeAssistMetrics', request);
   }
-  
+
   async requestPost<T>(
     method: string,
     req: object,
@@ -322,8 +321,15 @@ export class CodeAssistServer implements ContentGenerator {
     return res.data as T;
   }
 
-  async requestGet<T>(method: string, signal?: AbortSignal): Promise<T> {
-    return this.makeGetRequest<T>(this.getMethodUrl(method), signal);
+  async requestGet<T>(
+    method: string,
+    requiresColonFormat?: boolean,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    return this.makeGetRequest<T>(
+      this.getMethodUrl(method, requiresColonFormat),
+      signal,
+    );
   }
 
   async requestGetOperation<T>(name: string, signal?: AbortSignal): Promise<T> {
@@ -378,8 +384,10 @@ export class CodeAssistServer implements ContentGenerator {
     return `${endpoint}/${CODE_ASSIST_API_VERSION}`;
   }
 
-  getMethodUrl(method: string): string {
-    return `${this.getBaseUrl()}:${method}`;
+  getMethodUrl(method: string, requiresColonFormat?: boolean): string {
+    return requiresColonFormat !== false
+      ? `${this.getBaseUrl()}:${method}`
+      : `${this.getBaseUrl()}/${method}`;
   }
 
   getOperationUrl(name: string): string {
