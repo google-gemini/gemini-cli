@@ -304,7 +304,7 @@ describe('RemoteAgentInvocation', () => {
         confirmation.type === 'info'
       ) {
         expect(confirmation.title).toContain('Test Agent');
-        expect(confirmation.prompt).toContain('http://test-agent/card');
+        expect(confirmation.prompt).toContain('Calling remote agent: "hi"');
       } else {
         throw new Error('Expected confirmation to be of type info');
       }
