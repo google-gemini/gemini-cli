@@ -193,7 +193,6 @@ describe('skillsCommand', () => {
         (s) => s.name === 'enable',
       )!;
       context.services.settings.merged.skills = { disabled: ['skill1'] };
-      // Also need to mock the scope-specific disabled list
       (
         context.services.settings as unknown as {
           workspace: { settings: { skills: { disabled: string[] } } };
@@ -212,7 +211,47 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Skill "skill1" enabled by removing it from the disabled list in project settings. Use "/skills reload" for it to take effect.',
+          text: 'Skill "skill1" enabled by removing it from the disabled list in project and user settings. Use "/skills reload" for it to take effect.',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should enable a skill across multiple scopes', async () => {
+      const enableCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'enable',
+      )!;
+      (
+        context.services.settings as unknown as {
+          user: { settings: { skills: { disabled: string[] } } };
+        }
+      ).user.settings = {
+        skills: { disabled: ['skill1'] },
+      };
+      (
+        context.services.settings as unknown as {
+          workspace: { settings: { skills: { disabled: string[] } } };
+        }
+      ).workspace.settings = {
+        skills: { disabled: ['skill1'] },
+      };
+
+      await enableCmd.action!(context, 'skill1');
+
+      expect(context.services.settings.setValue).toHaveBeenCalledWith(
+        SettingScope.User,
+        'skills.disabled',
+        [],
+      );
+      expect(context.services.settings.setValue).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'skills.disabled',
+        [],
+      );
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Skill "skill1" enabled by removing it from the disabled list in project and user settings. Use "/skills reload" for it to take effect.',
         }),
         expect.any(Number),
       );
