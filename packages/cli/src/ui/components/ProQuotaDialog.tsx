@@ -30,7 +30,6 @@ export function ProQuotaDialog({
   isTerminalQuotaError,
   isModelNotFoundError,
   onChoice,
-  userTier,
 }: ProQuotaDialogProps): React.JSX.Element {
   let items;
   // Do not provide a fallback option if failed model and fallbackmodel are same.
