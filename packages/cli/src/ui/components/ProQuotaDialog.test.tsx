@@ -15,7 +15,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 
-ƒ// Mock the child component to make it easier to test the parent
+// Mock the child component to make it easier to test the parent
 vi.mock('./shared/RadioButtonSelect.js', () => ({
   RadioButtonSelect: vi.fn(),
 }));
@@ -220,6 +220,11 @@ describe('ProQuotaDialog', () => {
                 key: 'retry_always',
               },
               {
+                label: 'Upgrade for higher limits',
+                value: 'upgrade',
+                key: 'upgrade',
+              },
+              {
                 label: 'Stop',
                 value: 'retry_later',
                 key: 'retry_later',
@@ -250,6 +255,11 @@ describe('ProQuotaDialog', () => {
                 label: 'Switch to gemini-2.5-pro',
                 value: 'retry_always',
                 key: 'retry_always',
+              },
+              {
+                label: 'Upgrade for higher limits',
+                value: 'upgrade',
+                key: 'upgrade',
               },
               {
                 label: 'Stop',
