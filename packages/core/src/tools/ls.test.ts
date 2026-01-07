@@ -13,6 +13,7 @@ import type { Config } from '../config/config.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { ToolErrorType } from './tool-error.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 describe('LSTool', () => {
   let lsTool: LSTool;
@@ -39,7 +40,7 @@ describe('LSTool', () => {
       }),
     } as unknown as Config;
 
-    lsTool = new LSTool(mockConfig);
+    lsTool = new LSTool(mockConfig, createMockMessageBus());
   });
 
   afterEach(async () => {

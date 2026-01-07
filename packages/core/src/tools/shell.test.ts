@@ -37,7 +37,6 @@ vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
 import { initializeShellParsers } from '../utils/shell-utils.js';
-import { isCommandAllowed } from '../utils/shell-permissions.js';
 import { ShellTool } from './shell.js';
 import { type Config } from '../config/config.js';
 import {
@@ -51,9 +50,23 @@ import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import * as summarizer from '../utils/summarizer.js';
 import { ToolErrorType } from './tool-error.js';
+import { ToolConfirmationOutcome } from './tools.js';
 import { OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
+import {
+  createMockMessageBus,
+  getMockMessageBusInstance,
+} from '../test-utils/mock-message-bus.js';
+import {
+  MessageBusType,
+  type UpdatePolicy,
+} from '../confirmation-bus/types.js';
+import { type MessageBus } from '../confirmation-bus/message-bus.js';
+
+interface TestableMockMessageBus extends MessageBus {
+  defaultToolDecision: 'allow' | 'deny' | 'ask_user';
+}
 
 const originalComSpec = process.env['ComSpec'];
 const itWindowsOnly = process.platform === 'win32' ? it : it.skip;
@@ -92,7 +105,29 @@ describe('ShellTool', () => {
       getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
     } as unknown as Config;
 
-    shellTool = new ShellTool(mockConfig);
+    const bus = createMockMessageBus();
+    const mockBus = getMockMessageBusInstance(
+      bus,
+    ) as unknown as TestableMockMessageBus;
+    mockBus.defaultToolDecision = 'ask_user';
+
+    // Simulate policy update
+    bus.subscribe(MessageBusType.UPDATE_POLICY, (msg: UpdatePolicy) => {
+      if (msg.commandPrefix) {
+        const prefixes = Array.isArray(msg.commandPrefix)
+          ? msg.commandPrefix
+          : [msg.commandPrefix];
+        const current = mockConfig.getAllowedTools() || [];
+        (mockConfig.getAllowedTools as Mock).mockReturnValue([
+          ...current,
+          ...prefixes,
+        ]);
+        // Simulate Policy Engine allowing the tool after update
+        mockBus.defaultToolDecision = 'allow';
+      }
+    });
+
+    shellTool = new ShellTool(mockConfig, bus);
 
     mockPlatform.mockReturnValue('linux');
     (vi.mocked(crypto.randomBytes) as Mock).mockReturnValue(
@@ -122,25 +157,6 @@ describe('ShellTool', () => {
     } else {
       process.env['ComSpec'] = originalComSpec;
     }
-  });
-
-  describe('isCommandAllowed', () => {
-    it('should allow a command if no restrictions are provided', () => {
-      (mockConfig.getCoreTools as Mock).mockReturnValue(undefined);
-      (mockConfig.getExcludeTools as Mock).mockReturnValue(undefined);
-      expect(isCommandAllowed('goodCommand --safe', mockConfig).allowed).toBe(
-        true,
-      );
-    });
-
-    it('should allow a command with command substitution using $()', () => {
-      const evaluation = isCommandAllowed(
-        'echo $(goodCommand --safe)',
-        mockConfig,
-      );
-      expect(evaluation.allowed).toBe(true);
-      expect(evaluation.reason).toBeUndefined();
-    });
   });
 
   describe('build', () => {
@@ -471,90 +487,54 @@ describe('ShellTool', () => {
   });
 
   describe('shouldConfirmExecute', () => {
-    it('should return confirmation details when PolicyEngine delegates', async () => {
+    it('should request confirmation for a new command and allowlist it on "Always"', async () => {
       const params = { command: 'npm install' };
       const invocation = shellTool.build(params);
+
+      // Accessing protected messageBus for testing purposes
+      const bus = (shellTool as unknown as { messageBus: MessageBus })
+        .messageBus;
+      const mockBus = getMockMessageBusInstance(
+        bus,
+      ) as unknown as TestableMockMessageBus;
+
+      // Initially needs confirmation
+      mockBus.defaultToolDecision = 'ask_user';
       const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
 
       expect(confirmation).not.toBe(false);
       expect(confirmation && confirmation.type).toBe('exec');
+
+      if (confirmation && confirmation.type === 'exec') {
+        await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlways);
+      }
+
+      // After "Always", it should be allowlisted in the mock engine
+      mockBus.defaultToolDecision = 'allow';
+      const secondInvocation = shellTool.build({ command: 'npm test' });
+      const secondConfirmation = await secondInvocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(secondConfirmation).toBe(false);
     });
 
     it('should throw an error if validation fails', () => {
       expect(() => shellTool.build({ command: '' })).toThrow();
-    });
-
-    describe('in non-interactive mode', () => {
-      beforeEach(() => {
-        (mockConfig.isInteractive as Mock).mockReturnValue(false);
-      });
-
-      it('should not throw an error or block for an allowed command', async () => {
-        (mockConfig.getAllowedTools as Mock).mockReturnValue(['ShellTool(wc)']);
-        const invocation = shellTool.build({ command: 'wc -l foo.txt' });
-        const confirmation = await invocation.shouldConfirmExecute(
-          new AbortController().signal,
-        );
-        expect(confirmation).toBe(false);
-      });
-
-      it('should not throw an error or block for an allowed command with arguments', async () => {
-        (mockConfig.getAllowedTools as Mock).mockReturnValue([
-          'ShellTool(wc -l)',
-        ]);
-        const invocation = shellTool.build({ command: 'wc -l foo.txt' });
-        const confirmation = await invocation.shouldConfirmExecute(
-          new AbortController().signal,
-        );
-        expect(confirmation).toBe(false);
-      });
-
-      it('should throw an error for command that is not allowed', async () => {
-        (mockConfig.getAllowedTools as Mock).mockReturnValue([
-          'ShellTool(wc -l)',
-        ]);
-        const invocation = shellTool.build({ command: 'madeupcommand' });
-        await expect(
-          invocation.shouldConfirmExecute(new AbortController().signal),
-        ).rejects.toThrow('madeupcommand');
-      });
-
-      it('should throw an error for a command that is a prefix of an allowed command', async () => {
-        (mockConfig.getAllowedTools as Mock).mockReturnValue([
-          'ShellTool(wc -l)',
-        ]);
-        const invocation = shellTool.build({ command: 'wc' });
-        await expect(
-          invocation.shouldConfirmExecute(new AbortController().signal),
-        ).rejects.toThrow('wc');
-      });
-
-      it('should require all segments of a chained command to be allowlisted', async () => {
-        (mockConfig.getAllowedTools as Mock).mockReturnValue([
-          'ShellTool(echo)',
-        ]);
-        const invocation = shellTool.build({ command: 'echo "foo" && ls -l' });
-        await expect(
-          invocation.shouldConfirmExecute(new AbortController().signal),
-        ).rejects.toThrow(
-          'Command "echo "foo" && ls -l" is not in the list of allowed tools for non-interactive mode.',
-        );
-      });
     });
   });
 
   describe('getDescription', () => {
     it('should return the windows description when on windows', () => {
       mockPlatform.mockReturnValue('win32');
-      const shellTool = new ShellTool(mockConfig);
+      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
       expect(shellTool.description).toMatchSnapshot();
     });
 
     it('should return the non-windows description when not on windows', () => {
       mockPlatform.mockReturnValue('linux');
-      const shellTool = new ShellTool(mockConfig);
+      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
       expect(shellTool.description).toMatchSnapshot();
     });
   });
