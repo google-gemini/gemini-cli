@@ -105,6 +105,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     logExtensionUninstall: mockLogExtensionUninstall,
     logExtensionUpdateEvent: mockLogExtensionUpdateEvent,
     logExtensionDisable: mockLogExtensionDisable,
+    homedir: mockHomedir,
     ExtensionEnableEvent: vi.fn(),
     ExtensionInstallEvent: vi.fn(),
     ExtensionUninstallEvent: vi.fn(),

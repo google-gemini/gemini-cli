@@ -6,7 +6,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { homedir } from 'node:os';
 import * as dotenv from 'dotenv';
 
 import type { TelemetryTarget } from '@google/gemini-cli-core';
@@ -23,6 +22,7 @@ import {
   type ExtensionLoader,
   startupProfiler,
   PREVIEW_GEMINI_MODEL,
+  homedir,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';

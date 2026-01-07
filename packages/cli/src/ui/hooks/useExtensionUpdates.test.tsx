@@ -30,6 +30,15 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    homedir: () => os.homedir(),
+  };
+});
+
 vi.mock('../../config/extensions/update.js', () => ({
   checkForAllExtensionUpdates: vi.fn(),
   updateExtension: vi.fn(),

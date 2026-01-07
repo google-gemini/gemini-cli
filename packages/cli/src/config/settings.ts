@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { homedir, platform } from 'node:os';
+import { platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
@@ -16,6 +16,7 @@ import {
   getErrorMessage,
   Storage,
   coreEvents,
+  homedir,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
