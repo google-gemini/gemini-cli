@@ -186,6 +186,8 @@ export function runYamllint() {
 export function runPrettier() {
   console.log('\nRunning Prettier...');
   if (!runCommand('prettier --check .')) {
+    console.log('Prettier check failed. Running with --list-different to see files...');
+    runCommand('prettier --list-different .');
     process.exit(1);
   }
 }
