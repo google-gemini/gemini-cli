@@ -1467,7 +1467,7 @@ const SETTINGS_SCHEMA = {
             label: 'Enable CLI Help Agent',
             category: 'Experimental',
             requiresRestart: true,
-            default: false,
+            default: true,
             description: 'Enable the CLI Help Agent.',
             showInDialog: true,
           },
