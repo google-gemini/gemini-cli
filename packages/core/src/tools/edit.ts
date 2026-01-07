@@ -34,7 +34,7 @@ import {
 } from './modifiable-tool.js';
 import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
-import { safeLiteralReplace } from '../utils/textUtils.js';
+import { safeLiteralReplace, detectLineEnding } from '../utils/textUtils.js';
 import { EditStrategyEvent } from '../telemetry/types.js';
 import { logEditStrategy } from '../telemetry/loggers.js';
 import { EditCorrectionEvent } from '../telemetry/types.js';
@@ -256,17 +256,6 @@ async function calculateRegexReplacement(
     finalOldString: normalizedSearch,
     finalNewString: normalizedReplace,
   };
-}
-
-/**
- * Detects the line ending style of a string.
- * @param content The string content to analyze.
- * @returns '\r\n' for Windows-style, '\n' for Unix-style.
- */
-function detectLineEnding(content: string): '\r\n' | '\n' {
-  // If a Carriage Return is found, assume Windows-style endings.
-  // This is a simple but effective heuristic.
-  return content.includes('\r\n') ? '\r\n' : '\n';
 }
 
 export async function calculateReplacement(

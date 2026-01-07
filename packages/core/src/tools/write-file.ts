@@ -32,6 +32,7 @@ import {
   ensureCorrectEdit,
   ensureCorrectFileContent,
 } from '../utils/editCorrector.js';
+import { detectLineEnding } from '../utils/textUtils.js';
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import type {
   ModifiableDeclarativeTool,
@@ -284,9 +285,17 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         fs.mkdirSync(dirName, { recursive: true });
       }
 
+      let finalContent = fileContent;
+      if (!isNewFile && originalContent) {
+        const lineEnding = detectLineEnding(originalContent);
+        if (lineEnding === '\r\n') {
+          finalContent = finalContent.replace(/\r?\n/g, '\r\n');
+        }
+      }
+
       await this.config
         .getFileSystemService()
-        .writeTextFile(this.resolvedPath, fileContent);
+        .writeTextFile(this.resolvedPath, finalContent);
 
       // Generate diff for display result
       const fileName = path.basename(this.resolvedPath);
