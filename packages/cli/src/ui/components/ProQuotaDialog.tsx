@@ -9,8 +9,6 @@ import { Box, Text } from 'ink';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { theme } from '../semantic-colors.js';
 
-import { UserTierId } from '@google/gemini-cli-core';
-
 interface ProQuotaDialogProps {
   failedModel: string;
   fallbackModel: string;
@@ -20,7 +18,6 @@ interface ProQuotaDialogProps {
   onChoice: (
     choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
   ) => void;
-  userTier: UserTierId | undefined;
 }
 
 export function ProQuotaDialog({
