@@ -32,9 +32,6 @@ export function ProQuotaDialog({
   onChoice,
   userTier,
 }: ProQuotaDialogProps): React.JSX.Element {
-  // Use actual user tier if available; otherwise, default to FREE tier behavior (safe default)
-  const isPaidTier =
-    userTier === UserTierId.LEGACY || userTier === UserTierId.STANDARD;
   let items;
   // Do not provide a fallback option if failed model and fallbackmodel are same.
   if (failedModel === fallbackModel) {
