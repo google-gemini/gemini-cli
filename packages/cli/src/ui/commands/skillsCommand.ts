@@ -127,11 +127,7 @@ async function enableAction(
     return;
   }
 
-  const scope = context.services.settings.workspace.path
-    ? SettingScope.Workspace
-    : SettingScope.User;
-
-  const result = enableSkill(context.services.settings, skillName, scope);
+  const result = enableSkill(context.services.settings, skillName);
 
   let feedback = renderSkillActionFeedback(
     result,
