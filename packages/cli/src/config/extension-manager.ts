@@ -465,12 +465,6 @@ Would you like to attempt to install via "git clone" instead?`,
     if (this.loadedExtensions) {
       throw new Error('Extensions already loaded, only load extensions once.');
     }
-
-    if (this.settings.admin?.extensions?.enabled === false) {
-      this.loadedExtensions = [];
-      return this.loadedExtensions;
-    }
-
     const extensionsDir = ExtensionStorage.getUserExtensionsDir();
     this.loadedExtensions = [];
     if (!fs.existsSync(extensionsDir)) {
@@ -543,16 +537,12 @@ Would you like to attempt to install via "git clone" instead?`,
       }
 
       if (config.mcpServers) {
-        if (this.settings.admin?.mcp?.enabled === false) {
-          config.mcpServers = undefined;
-        } else {
-          config.mcpServers = Object.fromEntries(
-            Object.entries(config.mcpServers).map(([key, value]) => [
-              key,
-              filterMcpConfig(value),
-            ]),
-          );
-        }
+        config.mcpServers = Object.fromEntries(
+          Object.entries(config.mcpServers).map(([key, value]) => [
+            key,
+            filterMcpConfig(value),
+          ]),
+        );
       }
 
       const contextFiles = getContextFileNames(config)
