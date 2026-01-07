@@ -25,6 +25,16 @@ export function registerSyncCleanup(fn: () => void) {
   syncCleanupFunctions.push(fn);
 }
 
+/**
+ * Resets the internal cleanup state for testing purposes.
+ * This allows tests to run in isolation without vi.resetModules().
+ */
+export function resetCleanupForTesting() {
+  cleanupFunctions.length = 0;
+  syncCleanupFunctions.length = 0;
+  configForTelemetry = null;
+}
+
 export function runSyncCleanup() {
   for (const fn of syncCleanupFunctions) {
     try {
