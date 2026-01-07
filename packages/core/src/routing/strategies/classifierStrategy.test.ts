@@ -53,6 +53,7 @@ describe('ClassifierStrategy', () => {
       },
       getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       getPreviewFeatures: () => false,
+      getSessionId: vi.fn().mockReturnValue('control-group-id'), // Default to Control Group (Hash 71 >= 50)
     } as unknown as Config;
     mockBaseLlmClient = {
       generateJson: vi.fn(),
@@ -65,7 +66,7 @@ describe('ClassifierStrategy', () => {
     vi.restoreAllMocks();
   });
 
-  it('should call generateJson with the correct parameters', async () => {
+  it('should call generateJson with the correct parameters and wrapped user content', async () => {
     const mockApiResponse = {
       reasoning: 'Simple task',
       complexity_score: 10,
@@ -73,23 +74,30 @@ describe('ClassifierStrategy', () => {
     vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
       mockApiResponse,
     );
-    vi.spyOn(Math, 'random').mockReturnValue(0.9); // Control Group (>= 0.5 is strict? No, < 0.5 is strict. Wait. Code says < 0.5 is strict.)
-    // Code: const isStrict = Math.random() < 0.5;
-    // So 0.9 is >= 0.5, so NOT strict -> Control.
 
     await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
 
-    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
-      expect.objectContaining({
-        modelConfigKey: { model: mockResolvedConfig.model },
-        promptId: 'test-prompt-id',
-      }),
-    );
+    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
+      .calls[0][0];
+
+    expect(generateJsonCall).toMatchObject({
+      modelConfigKey: { model: mockResolvedConfig.model },
+      promptId: 'test-prompt-id',
+    });
+
+    // Verify user content wrapping for security
+    const userContent = generateJsonCall.contents[
+      generateJsonCall.contents.length - 1
+    ];
+    const textPart = userContent.parts[0];
+    expect(textPart.text).toContain('<user_request>');
+    expect(textPart.text).toContain('simple task');
+    expect(textPart.text).toContain('</user_request>');
   });
 
-  describe('A/B Testing Logic', () => {
-    it('Control Group (Threshold 50): Score 40 -> FLASH', async () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.6); // >= 0.5 -> Control
+  describe('A/B Testing Logic (Deterministic)', () => {
+    it('Control Group (SessionID "control-group-id" -> Threshold 50): Score 40 -> FLASH', async () => {
+      vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id'); // Hash 71 -> Control
       const mockApiResponse = {
         reasoning: 'Standard task',
         complexity_score: 40,
@@ -114,8 +122,8 @@ describe('ClassifierStrategy', () => {
       });
     });
 
-    it('Control Group (Threshold 50): Score 60 -> PRO', async () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.6); // >= 0.5 -> Control
+    it('Control Group (SessionID "control-group-id" -> Threshold 50): Score 60 -> PRO', async () => {
+      vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id');
       const mockApiResponse = {
         reasoning: 'Complex task',
         complexity_score: 60,
@@ -140,8 +148,8 @@ describe('ClassifierStrategy', () => {
       });
     });
 
-    it('Strict Group (Threshold 80): Score 60 -> FLASH', async () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.5 -> Strict
+    it('Strict Group (SessionID "test-session-1" -> Threshold 80): Score 60 -> FLASH', async () => {
+      vi.mocked(mockConfig.getSessionId).mockReturnValue('test-session-1'); // Hash 35 -> Strict
       const mockApiResponse = {
         reasoning: 'Complex task',
         complexity_score: 60,
@@ -166,8 +174,8 @@ describe('ClassifierStrategy', () => {
       });
     });
 
-    it('Strict Group (Threshold 80): Score 90 -> PRO', async () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.5 -> Strict
+    it('Strict Group (SessionID "test-session-1" -> Threshold 80): Score 90 -> PRO', async () => {
+      vi.mocked(mockConfig.getSessionId).mockReturnValue('test-session-1');
       const mockApiResponse = {
         reasoning: 'Extreme task',
         complexity_score: 90,
@@ -261,7 +269,11 @@ describe('ClassifierStrategy', () => {
     const expectedContents = [
       { role: 'user', parts: [{ text: 'call a tool' }] },
       { role: 'user', parts: [{ text: 'another user turn' }] },
-      { role: 'user', parts: [{ text: 'simple task' }] },
+      // The last user turn is wrapped
+      {
+        role: 'user',
+        parts: [{ text: '<user_request>\nsimple task\n</user_request>' }],
+      },
     ];
 
     expect(contents).toEqual(expectedContents);
@@ -303,11 +315,13 @@ describe('ClassifierStrategy', () => {
     );
     const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
-    expect(contents).toEqual([
-      ...finalHistory,
-      { role: 'user', parts: mockContext.request },
-    ]);
-    // There should be 4 history items + the current request
+    // Last part is the wrapped request
+    const requestPart = {
+      role: 'user',
+      parts: [{ text: '<user_request>\nsimple task\n</user_request>' }],
+    };
+
+    expect(contents).toEqual([...finalHistory, requestPart]);
     expect(contents).toHaveLength(5);
   });
 
