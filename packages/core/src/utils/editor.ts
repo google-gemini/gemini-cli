@@ -108,9 +108,16 @@ export function checkHasEditorType(editor: EditorType): boolean {
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
-  const notUsingSandbox = !process.env['SANDBOX'];
+  const notUsingSandbox =
+    !process.env['SANDBOX'] &&
+    !process.env['GEMINI_SANDBOX'] &&
+    !process.env['GEMINI_SANDBOX_COMMAND'];
   if (isGuiEditor(editor)) {
-    return notUsingSandbox;
+    return (
+      notUsingSandbox ||
+      process.env['GEMINI_SANDBOX'] === 'false' ||
+      process.env['GEMINI_SANDBOX'] === '0'
+    );
   }
   // For terminal-based editors like vim and emacs, allow in sandbox.
   return true;
