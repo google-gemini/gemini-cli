@@ -38,6 +38,7 @@ import {
   logExtensionInstallEvent,
   logExtensionUninstall,
   logExtensionUpdateEvent,
+  loadSkillsFromDir,
   type ExtensionEvents,
   type MCPServerConfig,
   type ExtensionInstallMetadata,
@@ -45,6 +46,7 @@ import {
   type HookDefinition,
   type HookEventName,
   type ResolvedExtensionSetting,
+  coreEvents,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -58,9 +60,11 @@ import {
 import {
   getEnvContents,
   maybePromptForSettings,
+  getMissingSettings,
   type ExtensionSetting,
 } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
+import { getEnableHooks } from './settingsSchema.js';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
@@ -226,25 +230,6 @@ Would you like to attempt to install via "git clone" instead?`,
       try {
         newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
 
-        if (isUpdate && installMetadata.autoUpdate) {
-          const oldSettings = new Set(
-            previousExtensionConfig.settings?.map((s) => s.name) || [],
-          );
-          const newSettings = new Set(
-            newExtensionConfig.settings?.map((s) => s.name) || [],
-          );
-
-          const settingsAreEqual =
-            oldSettings.size === newSettings.size &&
-            [...oldSettings].every((value) => newSettings.has(value));
-
-          if (!settingsAreEqual && installMetadata.autoUpdate) {
-            throw new Error(
-              `Extension "${newExtensionConfig.name}" has settings changes and cannot be auto-updated. Please update manually.`,
-            );
-          }
-        }
-
         const newExtensionName = newExtensionConfig.name;
         const previous = this.getExtensions().find(
           (installed) => installed.name === newExtensionName,
@@ -262,10 +247,17 @@ Would you like to attempt to install via "git clone" instead?`,
         const newHasHooks = fs.existsSync(
           path.join(localSourcePath, 'hooks', 'hooks.json'),
         );
-        let previousHasHooks = false;
-        if (isUpdate && previous && previous.hooks) {
-          previousHasHooks = Object.keys(previous.hooks).length > 0;
-        }
+        const previousHasHooks = !!(
+          isUpdate &&
+          previous &&
+          previous.hooks &&
+          Object.keys(previous.hooks).length > 0
+        );
+
+        const newSkills = await loadSkillsFromDir(
+          path.join(localSourcePath, 'skills'),
+        );
+        const previousSkills = previous?.skills ?? [];
 
         await maybeRequestConsentOrFail(
           newExtensionConfig,
@@ -273,6 +265,8 @@ Would you like to attempt to install via "git clone" instead?`,
           newHasHooks,
           previousExtensionConfig,
           previousHasHooks,
+          newSkills,
+          previousSkills,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);
         const destinationPath = new ExtensionStorage(
@@ -304,6 +298,20 @@ Would you like to attempt to install via "git clone" instead?`,
               this.requestSetting,
             );
           }
+        }
+
+        const missingSettings = await getMissingSettings(
+          newExtensionConfig,
+          extensionId,
+        );
+        if (missingSettings.length > 0) {
+          const message = `Extension "${newExtensionConfig.name}" has missing settings: ${missingSettings
+            .map((s) => s.name)
+            .join(
+              ', ',
+            )}. Please run "gemini extensions settings ${newExtensionConfig.name} <setting-name>" to configure them.`;
+          debugLogger.warn(message);
+          coreEvents.emitFeedback('warning', message);
         }
 
         if (
@@ -544,12 +552,16 @@ Would you like to attempt to install via "git clone" instead?`,
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
       let hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
-      if (this.settings.tools?.enableHooks) {
+      if (getEnableHooks(this.settings)) {
         hooks = await this.loadExtensionHooks(effectiveExtensionPath, {
           extensionPath: effectiveExtensionPath,
           workspacePath: this.workspaceDir,
         });
       }
+
+      const skills = await loadSkillsFromDir(
+        path.join(effectiveExtensionPath, 'skills'),
+      );
 
       const extension: GeminiCLIExtension = {
         name: config.name,
@@ -567,6 +579,7 @@ Would you like to attempt to install via "git clone" instead?`,
         id: getExtensionId(config, installMetadata),
         settings: config.settings,
         resolvedSettings,
+        skills,
       };
       this.loadedExtensions = [...this.loadedExtensions, extension];
 
@@ -719,6 +732,12 @@ Would you like to attempt to install via "git clone" instead?`,
       output += `\n Excluded tools:`;
       extension.excludeTools.forEach((tool) => {
         output += `\n  ${tool}`;
+      });
+    }
+    if (extension.skills && extension.skills.length > 0) {
+      output += `\n Agent skills:`;
+      extension.skills.forEach((skill) => {
+        output += `\n  ${skill.name}: ${skill.description}`;
       });
     }
     const resolvedSettings = extension.resolvedSettings;

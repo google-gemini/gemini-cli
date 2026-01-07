@@ -750,8 +750,8 @@ describe('extension tests', () => {
         );
 
         const settings = loadSettings(tempWorkspaceDir).merged;
-        if (!settings.tools) settings.tools = {};
-        settings.tools.enableHooks = true;
+        if (!settings.hooks) settings.hooks = {};
+        settings.hooks.enabled = true;
 
         extensionManager = new ExtensionManager({
           workspaceDir: tempWorkspaceDir,
@@ -771,7 +771,7 @@ describe('extension tests', () => {
         );
       });
 
-      it('should not load hooks if enableHooks is false', async () => {
+      it('should not load hooks if hooks.enabled is false', async () => {
         const extDir = createExtension({
           extensionsDir: userExtensionsDir,
           name: 'hook-extension-disabled',
@@ -786,8 +786,8 @@ describe('extension tests', () => {
         );
 
         const settings = loadSettings(tempWorkspaceDir).merged;
-        if (!settings.tools) settings.tools = {};
-        settings.tools.enableHooks = false;
+        if (!settings.hooks) settings.hooks = {};
+        settings.hooks.enabled = false;
 
         extensionManager = new ExtensionManager({
           workspaceDir: tempWorkspaceDir,
@@ -1447,7 +1447,7 @@ This extension will run the following MCP servers:
       expect(envContent).toContain('NEW_SETTING=new-setting-value');
     });
 
-    it('should fail auto-update if settings have changed', async () => {
+    it('should auto-update if settings have changed', async () => {
       // 1. Install initial version with autoUpdate: true
       const oldSourceExtDir = createExtension({
         extensionsDir: tempHomeDir,
@@ -1469,7 +1469,7 @@ This extension will run the following MCP servers:
       });
 
       // 2. Create new version with different settings
-      const newSourceExtDir = createExtension({
+      const extensionDir = createExtension({
         extensionsDir: tempHomeDir,
         name: 'my-auto-update-ext',
         version: '1.1.0',
@@ -1488,14 +1488,17 @@ This extension will run the following MCP servers:
         );
 
       // 3. Attempt to update and assert it fails
-      await expect(
-        extensionManager.installOrUpdateExtension(
-          { source: newSourceExtDir, type: 'local', autoUpdate: true },
-          previousExtensionConfig,
-        ),
-      ).rejects.toThrow(
-        'Extension "my-auto-update-ext" has settings changes and cannot be auto-updated. Please update manually.',
+      const updatedExtension = await extensionManager.installOrUpdateExtension(
+        {
+          source: extensionDir,
+          type: 'local',
+          autoUpdate: true,
+        },
+        previousExtensionConfig,
       );
+
+      expect(updatedExtension.version).toBe('1.1.0');
+      expect(extensionManager.getExtensions()[0].version).toBe('1.1.0');
     });
 
     it('should throw an error for invalid extension names', async () => {

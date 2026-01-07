@@ -68,10 +68,14 @@ export class A2AClientManager {
       throw new Error(`Agent with name '${name}' is already loaded.`);
     }
 
-    let fetchImpl = fetch;
+    let fetchImpl: typeof fetch = fetch;
     if (authHandler) {
       fetchImpl = createAuthenticatingFetchWithRetry(fetch, authHandler);
     }
+
+    // Wrap with custom adapter for ADK Reasoning Engine compatibility
+    // TODO: Remove this when a2a-js fixes compatibility
+    fetchImpl = createAdapterFetch(fetchImpl);
 
     const resolver = new DefaultAgentCardResolver({ fetchImpl });
 
@@ -206,4 +210,149 @@ export class A2AClientManager {
       throw new Error(`${prefix}: Unexpected error: ${String(error)}`);
     }
   }
+}
+
+/**
+ * Maps TaskState proto-JSON enums to lower-case strings.
+ */
+function mapTaskState(state: string | undefined): string | undefined {
+  if (!state) return state;
+  if (state.startsWith('TASK_STATE_')) {
+    return state.replace('TASK_STATE_', '').toLowerCase();
+  }
+  return state.toLowerCase();
+}
+
+/**
+ * Creates a fetch implementation that adapts standard A2A SDK requests to the
+ * proto-JSON dialect and endpoint shapes required by Vertex AI Agent Engine.
+ */
+export function createAdapterFetch(baseFetch: typeof fetch): typeof fetch {
+  return async (
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response> => {
+    const urlStr = input as string;
+
+    // 2. Dialect Mapping (Request)
+    let body = init?.body;
+    let isRpc = false;
+    let rpcId: string | number | undefined;
+
+    if (typeof body === 'string') {
+      try {
+        let jsonBody = JSON.parse(body);
+
+        // Unwrap JSON-RPC if present
+        if (jsonBody.jsonrpc === '2.0') {
+          isRpc = true;
+          rpcId = jsonBody.id;
+          jsonBody = jsonBody.params;
+        }
+
+        // Apply dialect translation to the message object
+        const message = jsonBody.message || jsonBody;
+        if (message && typeof message === 'object') {
+          // Role: user -> ROLE_USER, agent/model -> ROLE_AGENT
+          if (message.role === 'user') message.role = 'ROLE_USER';
+          if (message.role === 'agent' || message.role === 'model') {
+            message.role = 'ROLE_AGENT';
+          }
+
+          // Strip SDK-specific 'kind' field
+          delete message.kind;
+
+          // Map 'parts' to 'content' (Proto-JSON dialect often uses 'content' or typed parts)
+          // Also strip 'kind' from parts.
+          if (Array.isArray(message.parts)) {
+            message.content = message.parts.map(
+              (p: { kind?: string; text?: string }) => {
+                const { kind: _k, ...rest } = p;
+                // If it's a simple text part, ensure it matches { text: "..." }
+                if (p.kind === 'text') return { text: p.text };
+                return rest;
+              },
+            );
+            delete message.parts;
+          }
+        }
+
+        body = JSON.stringify(jsonBody);
+      } catch (error) {
+        debugLogger.debug(
+          '[A2AClientManager] Failed to parse request body for dialect translation:',
+          error,
+        );
+        // Non-JSON or parse error; let the baseFetch handle it.
+      }
+    }
+
+    const response = await baseFetch(urlStr, { ...init, body });
+
+    // Map response back
+    if (response.ok) {
+      try {
+        const responseData = await response.clone().json();
+
+        const result =
+          responseData.task || responseData.message || responseData;
+
+        // Restore 'kind' for the SDK and a2aUtils parsing
+        if (result && typeof result === 'object' && !result.kind) {
+          if (responseData.task || (result.id && result.status)) {
+            result.kind = 'task';
+          } else if (responseData.message || result.messageId) {
+            result.kind = 'message';
+          }
+        }
+
+        // Restore 'kind' on parts so extractMessageText works
+        if (result?.parts && Array.isArray(result.parts)) {
+          for (const part of result.parts) {
+            if (!part.kind) {
+              if (part.file) part.kind = 'file';
+              else if (part.data) part.kind = 'data';
+              else if (part.text) part.kind = 'text';
+            }
+          }
+        }
+
+        // Recursively restore 'kind' on artifact parts
+        if (result?.artifacts && Array.isArray(result.artifacts)) {
+          for (const artifact of result.artifacts) {
+            if (artifact.parts && Array.isArray(artifact.parts)) {
+              for (const part of artifact.parts) {
+                if (!part.kind) {
+                  if (part.file) part.kind = 'file';
+                  else if (part.data) part.kind = 'data';
+                  else if (part.text) part.kind = 'text';
+                }
+              }
+            }
+          }
+        }
+
+        // Map Task States back to SDK expectations
+        if (result && typeof result === 'object' && result.status) {
+          result.status.state = mapTaskState(result.status.state);
+        }
+
+        if (isRpc) {
+          return new Response(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              id: rpcId,
+              result,
+            }),
+            response,
+          );
+        }
+        return new Response(JSON.stringify(result), response);
+      } catch (_e) {
+        // Non-JSON response or unwrapping failure
+      }
+    }
+
+    return response;
+  };
 }
