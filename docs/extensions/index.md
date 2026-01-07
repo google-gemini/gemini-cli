@@ -263,6 +263,54 @@ Would provide these commands:
 - `/deploy` - Shows as `[gcp] Custom command from deploy.toml` in help
 - `/gcs:sync` - Shows as `[gcp] Custom command from sync.toml` in help
 
+### Hooks
+
+Extensions can provide [hooks](../hooks/index.md) to intercept and customize
+Gemini CLI behavior at specific lifecycle events. Hooks provided by an extension
+must be defined in a `hooks/hooks.json` file within the extension directory.
+
+> [!IMPORTANT] Hooks are not defined directly in `gemini-extension.json`. The
+> CLI specifically looks for the `hooks/hooks.json` file.
+
+#### Directory structure
+
+```
+.gemini/extensions/my-extension/
+├── gemini-extension.json
+└── hooks/
+    └── hooks.json
+```
+
+#### `hooks/hooks.json` format
+
+The `hooks.json` file contains a `hooks` object where keys are
+[event names](../hooks/reference.md#supported-events) and values are arrays of
+[hook definitions](../hooks/reference.md#hook-definition).
+
+```json
+{
+  "hooks": {
+    "before_agent": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${extensionPath}/scripts/setup.js",
+            "name": "Extension Setup"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### Supported variables
+
+Just like `gemini-extension.json`, the `hooks/hooks.json` file supports
+[variable substitution](#variables). This is particularly useful for referencing
+scripts within the extension directory using `${extensionPath}`.
+
 ### Conflict resolution
 
 Extension commands have the lowest precedence. When a conflict occurs with user
@@ -278,11 +326,12 @@ For example, if both a user and the `gcp` extension define a `deploy` command:
 - `/gcp.deploy` - Executes the extension's deploy command (marked with `[gcp]`
   tag)
 
-## Variables
+### Variables
 
-Gemini CLI extensions allow variable substitution in `gemini-extension.json`.
-This can be useful if e.g., you need the current directory to run an MCP server
-using `"cwd": "${extensionPath}${/}run.ts"`.
+Gemini CLI extensions allow variable substitution in both
+`gemini-extension.json` and `hooks/hooks.json`. This can be useful if e.g., you
+need the current directory to run an MCP server or hook script using
+`"cwd": "${extensionPath}${/}run.ts"`.
 
 **Supported variables:**
 
@@ -291,3 +340,4 @@ using `"cwd": "${extensionPath}${/}run.ts"`.
 | `${extensionPath}`         | The fully-qualified path of the extension in the user's filesystem e.g., '/Users/username/.gemini/extensions/example-extension'. This will not unwrap symlinks. |
 | `${workspacePath}`         | The fully-qualified path of the current workspace.                                                                                                              |
 | `${/} or ${pathSeparator}` | The path separator (differs per OS).                                                                                                                            |
+| `${process.execPath}`      | The path to the Node.js binary executing the CLI.                                                                                                               |
