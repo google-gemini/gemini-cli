@@ -36,6 +36,7 @@ vi.mock('../../config/settings.js', async (importOriginal) => {
   return {
     ...actual,
     loadSettings: vi.fn(),
+    isLoadableSettingScope: vi.fn((s) => s === 'User' || s === 'Workspace'),
   };
 });
 
@@ -78,7 +79,7 @@ describe('skills enable command', () => {
       );
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'log',
-        'Skill "skill1" successfully enabled in scope "User".',
+        'Skill "skill1" enabled by removing it from the disabled list in user settings.',
       );
     });
 
@@ -86,22 +87,20 @@ describe('skills enable command', () => {
       const mockSettings = {
         forScope: vi.fn().mockReturnValue({
           settings: { skills: { disabled: [] } },
+          path: '/user/settings.json',
         }),
         setValue: vi.fn(),
       };
-      mockLoadSettings.mockReturnValue(
+      vi.mocked(loadSettings).mockReturnValue(
         mockSettings as unknown as LoadedSettings,
       );
 
-      await handleEnable({
-        name: 'skill1',
-        scope: SettingScope.User as LoadableSettingScope,
-      });
+      await handleEnable({ name: 'skill1', scope: SettingScope.User });
 
       expect(mockSettings.setValue).not.toHaveBeenCalled();
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'log',
-        'Skill "skill1" is already enabled in scope "User".',
+        'Skill "skill1" is already enabled.',
       );
     });
   });

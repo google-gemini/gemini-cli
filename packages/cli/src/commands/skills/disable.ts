@@ -12,6 +12,8 @@ import {
 } from '../../config/settings.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
+import { disableSkill } from '../../utils/skillSettings.js';
+import { renderSkillActionFeedback } from '../../utils/skillUtils.js';
 
 interface DisableArgs {
   name: string;
@@ -23,17 +25,8 @@ export async function handleDisable(args: DisableArgs) {
   const workspaceDir = process.cwd();
   const settings = loadSettings(workspaceDir);
 
-  const currentDisabled =
-    settings.forScope(scope).settings.skills?.disabled || [];
-
-  if (currentDisabled.includes(name)) {
-    debugLogger.log(`Skill "${name}" is already disabled in scope "${scope}".`);
-    return;
-  }
-
-  const newDisabled = [...currentDisabled, name];
-  settings.setValue(scope, 'skills.disabled', newDisabled);
-  debugLogger.log(`Skill "${name}" successfully disabled in scope "${scope}".`);
+  const result = disableSkill(settings, name, scope);
+  debugLogger.log(renderSkillActionFeedback(result, (label, _path) => label));
 }
 
 export const disableCommand: CommandModule = {
