@@ -135,7 +135,9 @@ function runCommand(command, stdio = 'inherit') {
 
 export function setupLinters() {
   console.log('Setting up linters...');
-  rmSync(TEMP_DIR, { recursive: true, force: true });
+  if (!process.env.GEMINI_LINT_TEMP_DIR) {
+    rmSync(TEMP_DIR, { recursive: true, force: true });
+  }
   mkdirSync(TEMP_DIR, { recursive: true });
 
   for (const linter in LINTERS) {
