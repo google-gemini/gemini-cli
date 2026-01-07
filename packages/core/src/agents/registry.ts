@@ -12,6 +12,7 @@ import { loadAgentsFromDirectory } from './toml-loader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { IntrospectionAgent } from './introspection-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
+import { ADCHandler } from './remote-invocation.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
@@ -251,9 +252,12 @@ export class AgentRegistry {
     // Log remote A2A agent registration for visibility.
     try {
       const clientManager = A2AClientManager.getInstance();
+      // Use ADCHandler to ensure we can load agents hosted on secure platforms (e.g. Vertex AI)
+      const authHandler = new ADCHandler();
       const agentCard = await clientManager.loadAgent(
         definition.name,
         definition.agentCardUrl,
+        authHandler,
       );
       if (agentCard.skills && agentCard.skills.length > 0) {
         definition.description = agentCard.skills
