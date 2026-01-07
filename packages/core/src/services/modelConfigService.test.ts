@@ -577,6 +577,81 @@ describe('ModelConfigService', () => {
     });
   });
 
+  describe('runtime overrides', () => {
+    it('should resolve a simple runtime-registered override', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {},
+        overrides: [],
+      };
+      const service = new ModelConfigService(config);
+
+      service.registerRuntimeModelOverride({
+        match: { model: 'gemini-pro' },
+        modelConfig: {
+          generateContentConfig: {
+            temperature: 0.99,
+          },
+        },
+      });
+
+      const resolved = service.getResolvedConfig({ model: 'gemini-pro' });
+
+      expect(resolved.model).toBe('gemini-pro');
+      expect(resolved.generateContentConfig.temperature).toBe(0.99);
+    });
+
+    it('should prioritize runtime overrides over default overrides when they have the same specificity', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {},
+        overrides: [
+          {
+            match: { model: 'gemini-pro' },
+            modelConfig: { generateContentConfig: { temperature: 0.1 } },
+          },
+        ],
+      };
+      const service = new ModelConfigService(config);
+
+      service.registerRuntimeModelOverride({
+        match: { model: 'gemini-pro' },
+        modelConfig: { generateContentConfig: { temperature: 0.9 } },
+      });
+
+      const resolved = service.getResolvedConfig({ model: 'gemini-pro' });
+
+      // Runtime overrides are appended after overrides/customOverrides, so they should win.
+      expect(resolved.generateContentConfig.temperature).toBe(0.9);
+    });
+
+    it('should still respect specificity with runtime overrides', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {},
+        overrides: [],
+      };
+      const service = new ModelConfigService(config);
+
+      // Register a more specific runtime override
+      service.registerRuntimeModelOverride({
+        match: { model: 'gemini-pro', overrideScope: 'my-agent' },
+        modelConfig: { generateContentConfig: { temperature: 0.1 } },
+      });
+
+      // Register a less specific runtime override later
+      service.registerRuntimeModelOverride({
+        match: { model: 'gemini-pro' },
+        modelConfig: { generateContentConfig: { temperature: 0.9 } },
+      });
+
+      const resolved = service.getResolvedConfig({
+        model: 'gemini-pro',
+        overrideScope: 'my-agent',
+      });
+
+      // Specificity should win over order
+      expect(resolved.generateContentConfig.temperature).toBe(0.1);
+    });
+  });
+
   describe('custom aliases', () => {
     it('should resolve a custom alias', () => {
       const config: ModelConfigServiceConfig = {
