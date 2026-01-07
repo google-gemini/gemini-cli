@@ -89,6 +89,10 @@
         "slug": "docs/cli/session-management"
       },
       {
+        "label": "Agent Skills",
+        "slug": "docs/cli/skills"
+      },
+      {
         "label": "Settings",
         "slug": "docs/cli/settings"
       },
