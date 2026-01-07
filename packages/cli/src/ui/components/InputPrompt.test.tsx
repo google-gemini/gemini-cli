@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderWithProviders } from '../../test-utils/render.js';
+import {
+  renderWithProviders,
+  createMockSettings,
+} from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { act } from 'react';
 import type { InputPromptProps } from './InputPrompt.js';
@@ -15,7 +18,7 @@ import {
   calculateTransformedLine,
 } from './shared/text-buffer.js';
 import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode, debugLogger } from '@google/gemini-cli-core';
 import * as path from 'node:path';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
@@ -31,6 +34,7 @@ import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.
 import clipboardy from 'clipboardy';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
@@ -121,6 +125,10 @@ describe('InputPrompt', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(
+      terminalCapabilityManager,
+      'isBracketedPasteEnabled',
+    ).mockReturnValue(true);
 
     mockCommandContext = createMockCommandContext();
 
@@ -577,8 +585,8 @@ describe('InputPrompt', () => {
     });
 
     it('should handle errors during clipboard operations', async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
+      const debugLoggerErrorSpy = vi
+        .spyOn(debugLogger, 'error')
         .mockImplementation(() => {});
       vi.mocked(clipboardUtils.clipboardHasImage).mockRejectedValue(
         new Error('Clipboard error'),
@@ -592,14 +600,14 @@ describe('InputPrompt', () => {
         stdin.write('\x16'); // Ctrl+V
       });
       await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Error handling clipboard image:',
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+          'Error handling paste:',
           expect.any(Error),
         );
       });
       expect(mockBuffer.setText).not.toHaveBeenCalled();
 
-      consoleErrorSpy.mockRestore();
+      debugLoggerErrorSpy.mockRestore();
       unmount();
     });
   });
@@ -626,6 +634,31 @@ describe('InputPrompt', () => {
           'pasted text',
         );
       });
+      unmount();
+    });
+
+    it('should use OSC 52 when useOSC52Paste setting is enabled', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+      const settings = createMockSettings({
+        experimental: { useOSC52Paste: true },
+      });
+
+      const { stdout, stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { settings },
+      );
+
+      const writeSpy = vi.spyOn(stdout, 'write');
+
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
+
+      await waitFor(() => {
+        expect(writeSpy).toHaveBeenCalledWith('\x1b]52;c;?\x07');
+      });
+      // Should NOT call clipboardy.read()
+      expect(clipboardy.read).not.toHaveBeenCalled();
       unmount();
     });
   });

@@ -17,7 +17,8 @@ import type {
 } from '@google/genai';
 import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { type ToolCallRequestInfo, CompressionStatus } from '../core/turn.js';
+import { CompressionStatus } from '../core/turn.js';
+import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -98,7 +99,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     onActivity?: ActivityCallback,
   ): Promise<LocalAgentExecutor<TOutput>> {
     // Create an isolated tool registry for this agent instance.
-    const agentToolRegistry = new ToolRegistry(runtimeContext);
+    const agentToolRegistry = new ToolRegistry(
+      runtimeContext,
+      runtimeContext.getMessageBus(),
+    );
     const parentToolRegistry = runtimeContext.getToolRegistry();
 
     if (definition.toolConfig) {

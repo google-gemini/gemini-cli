@@ -29,6 +29,8 @@ import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { writeToStdout } from '../utils/stdio.js';
+import { FatalCancellationError } from '../utils/errors.js';
+import process from 'node:process';
 
 vi.mock('os', async (importOriginal) => {
   const os = await importOriginal<typeof import('os')>();
@@ -296,6 +298,7 @@ describe('oauth2', () => {
         generateAuthUrl: mockGenerateAuthUrl,
         getToken: mockGetToken,
         generateCodeVerifierAsync: mockGenerateCodeVerifierAsync,
+        getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
         on: vi.fn(),
         credentials: {},
       } as unknown as OAuth2Client;
@@ -1100,6 +1103,116 @@ describe('oauth2', () => {
       });
     });
 
+    describe('cancellation', () => {
+      it('should cancel when SIGINT is received', async () => {
+        const mockAuthUrl = 'https://example.com/auth';
+        const mockState = 'test-state';
+        const mockOAuth2Client = {
+          generateAuthUrl: vi.fn().mockReturnValue(mockAuthUrl),
+          on: vi.fn(),
+        } as unknown as OAuth2Client;
+        vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+
+        vi.spyOn(crypto, 'randomBytes').mockReturnValue(mockState as never);
+        vi.mocked(open).mockImplementation(
+          async () => ({ on: vi.fn() }) as never,
+        );
+
+        // Mock createServer to return a server that doesn't do anything (keeps promise pending)
+        const mockHttpServer = {
+          listen: vi.fn(),
+          close: vi.fn(),
+          on: vi.fn(),
+          address: () => ({ port: 3000 }),
+        };
+        (http.createServer as Mock).mockImplementation(
+          () => mockHttpServer as unknown as http.Server,
+        );
+
+        // Mock process.on to immediately trigger SIGINT
+        const processOnSpy = vi
+          .spyOn(process, 'on')
+          .mockImplementation((event, listener: () => void) => {
+            if (event === 'SIGINT') {
+              listener();
+            }
+            return process;
+          });
+
+        const processRemoveListenerSpy = vi.spyOn(process, 'removeListener');
+
+        const clientPromise = getOauthClient(
+          AuthType.LOGIN_WITH_GOOGLE,
+          mockConfig,
+        );
+
+        await expect(clientPromise).rejects.toThrow(FatalCancellationError);
+        expect(processRemoveListenerSpy).toHaveBeenCalledWith(
+          'SIGINT',
+          expect.any(Function),
+        );
+
+        processOnSpy.mockRestore();
+        processRemoveListenerSpy.mockRestore();
+      });
+
+      it('should cancel when Ctrl+C (0x03) is received on stdin', async () => {
+        const mockAuthUrl = 'https://example.com/auth';
+        const mockState = 'test-state';
+        const mockOAuth2Client = {
+          generateAuthUrl: vi.fn().mockReturnValue(mockAuthUrl),
+          on: vi.fn(),
+        } as unknown as OAuth2Client;
+        vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+
+        vi.spyOn(crypto, 'randomBytes').mockReturnValue(mockState as never);
+        vi.mocked(open).mockImplementation(
+          async () => ({ on: vi.fn() }) as never,
+        );
+
+        const mockHttpServer = {
+          listen: vi.fn(),
+          close: vi.fn(),
+          on: vi.fn(),
+          address: () => ({ port: 3000 }),
+        };
+        (http.createServer as Mock).mockImplementation(
+          () => mockHttpServer as unknown as http.Server,
+        );
+
+        // Spy on process.stdin.on and immediately trigger Ctrl+C
+        const stdinOnSpy = vi
+          .spyOn(process.stdin, 'on')
+          .mockImplementation(
+            (event: string, listener: (data: Buffer) => void) => {
+              if (event === 'data') {
+                listener(Buffer.from([0x03]));
+              }
+              return process.stdin;
+            },
+          );
+
+        const stdinRemoveListenerSpy = vi.spyOn(
+          process.stdin,
+          'removeListener',
+        );
+
+        const clientPromise = getOauthClient(
+          AuthType.LOGIN_WITH_GOOGLE,
+          mockConfig,
+        );
+
+        await expect(clientPromise).rejects.toThrow(FatalCancellationError);
+        expect(stdinRemoveListenerSpy).toHaveBeenCalledWith(
+          'data',
+          expect.any(Function),
+        );
+
+        stdinOnSpy.mockRestore();
+        stdinRemoveListenerSpy.mockRestore();
+      });
+    });
+
     describe('clearCachedCredentialFile', () => {
       it('should clear cached credentials and Google account', async () => {
         const cachedCreds = { refresh_token: 'test-token' };
@@ -1295,7 +1408,7 @@ describe('oauth2', () => {
       await clientPromise;
 
       expect(
-        OAuthCredentialStorage.saveCredentials as Mock,
+        vi.mocked(OAuthCredentialStorage.saveCredentials),
       ).toHaveBeenCalledWith(mockTokens);
       const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
       expect(fs.existsSync(credsPath)).toBe(false);
@@ -1306,7 +1419,7 @@ describe('oauth2', () => {
         './oauth-credential-storage.js'
       );
       const cachedCreds = { refresh_token: 'cached-encrypted-token' };
-      (OAuthCredentialStorage.loadCredentials as Mock).mockResolvedValue(
+      vi.mocked(OAuthCredentialStorage.loadCredentials).mockResolvedValue(
         cachedCreds,
       );
 
@@ -1330,7 +1443,9 @@ describe('oauth2', () => {
 
       await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
 
-      expect(OAuthCredentialStorage.loadCredentials as Mock).toHaveBeenCalled();
+      expect(
+        vi.mocked(OAuthCredentialStorage.loadCredentials),
+      ).toHaveBeenCalled();
       expect(mockClient.setCredentials).toHaveBeenCalledWith(cachedCreds);
       expect(mockClient.setCredentials).not.toHaveBeenCalledWith(
         unencryptedCreds,
