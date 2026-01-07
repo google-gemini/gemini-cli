@@ -5,7 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { theme } from '../semantic-colors.js';
 import {
@@ -16,6 +16,10 @@ import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
 import { AnsiOutputText } from './AnsiOutput.js';
 import { Command, keyMatchers } from '../keyMatchers.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import {
+  ScrollableList,
+  type ScrollableListRef,
+} from './shared/ScrollableList.js';
 
 interface BackgroundShellDisplayProps {
   shells: Map<number, BackgroundShell>;
@@ -51,6 +55,7 @@ export const BackgroundShellDisplay = ({
     activeShell?.output || '',
   );
   const [listSelectionIndex, setListSelectionIndex] = useState(0);
+  const listRef = useRef<ScrollableListRef<BackgroundShell>>(null);
 
   useEffect(() => {
     if (!activePid) return;
@@ -96,6 +101,12 @@ export const BackgroundShellDisplay = ({
       }
     }
   }, [isListOpenProp, activeShell, shells]);
+
+  useEffect(() => {
+    if (isListOpenProp && listRef.current) {
+      listRef.current.scrollToIndex({ index: listSelectionIndex });
+    }
+  }, [listSelectionIndex, isListOpenProp]);
 
   useKeypress(
     (key) => {
@@ -227,44 +238,56 @@ export const BackgroundShellDisplay = ({
     const headerText = 'Select Process (Enter to select, Esc to cancel):';
     const maxCommandLength = Math.max(
       0,
-      width - BORDER_WIDTH - headerText.length - 10,
+      width - BORDER_WIDTH - CONTENT_PADDING_X * 2 - 10,
     );
 
     return (
-      <Box flexDirection="column" padding={1}>
-        <Text bold underline>
-          {headerText}
-        </Text>
-        {shellList.map((shell, index) => {
-          const isSelected = index === listSelectionIndex;
-          const commandText = shell.command.split('\n')[0];
-          const truncatedCommand =
-            commandText.length > maxCommandLength
-              ? `${commandText.substring(0, maxCommandLength - 3)}...`
-              : commandText;
-          return (
-            <Text key={shell.pid}>
-              <Text color={isSelected ? theme.status.success : undefined}>
-                {isSelected ? '> ' : '  '}
-              </Text>
-              {index + 1}: {truncatedCommand} (PID: {shell.pid})
-              {shell.status === 'exited' ? (
-                <Text
-                  color={
-                    isSelected
-                      ? theme.text.primary
-                      : shell.exitCode === 0
-                        ? theme.status.success
-                        : theme.status.error
-                  }
-                >
-                  {' '}
-                  (Exit Code: {shell.exitCode})
+      <Box flexDirection="column" height="100%" width="100%">
+        <Box flexShrink={0} marginBottom={1} paddingTop={1}>
+          <Text bold underline>
+            {headerText}
+          </Text>
+        </Box>
+        <Box flexGrow={1} width="100%">
+          <ScrollableList
+            ref={listRef}
+            data={shellList}
+            renderItem={({ item: shell, index }) => {
+              const isSelected = index === listSelectionIndex;
+              const commandText = shell.command.split('\n')[0];
+              const truncatedCommand =
+                commandText.length > maxCommandLength
+                  ? `${commandText.substring(0, maxCommandLength - 3)}...`
+                  : commandText;
+              return (
+                <Text>
+                  <Text color={isSelected ? theme.status.success : undefined}>
+                    {isSelected ? '> ' : '  '}
+                  </Text>
+                  {index + 1}: {truncatedCommand} (PID: {shell.pid})
+                  {shell.status === 'exited' ? (
+                    <Text
+                      color={
+                        shell.exitCode === 0
+                          ? theme.status.success
+                          : theme.status.error
+                      }
+                    >
+                      {' '}
+                      (Exit Code: {shell.exitCode})
+                    </Text>
+                  ) : null}
                 </Text>
-              ) : null}
-            </Text>
-          );
-        })}
+              );
+            }}
+            estimatedItemHeight={() => 1}
+            keyExtractor={(shell) => shell.pid.toString()}
+            hasFocus={isFocused}
+            initialScrollIndex={
+              listSelectionIndex >= 0 ? listSelectionIndex : 0
+            }
+          />
+        </Box>
       </Box>
     );
   };

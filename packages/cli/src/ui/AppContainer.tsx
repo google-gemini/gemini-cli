@@ -1387,22 +1387,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
           if (!isBackgroundShellVisible) {
             // We are about to show it, so focus it
             setEmbeddedShellFocused(true);
+            if (backgroundShells.size > 1) {
+              setIsBackgroundShellListOpen(true);
+            }
           }
         }
       } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL_LIST](key)) {
-        if (backgroundShells.size > 0) {
-          // Only toggle if shells exist
-          if (!isBackgroundShellVisible) {
-            toggleBackgroundShell();
-          }
+        if (backgroundShells.size > 0 && isBackgroundShellVisible) {
           if (!embeddedShellFocused) {
             setEmbeddedShellFocused(true);
           }
-          // If already focused and list open, maybe close it? Or toggle?
-          // The behavior requested is global Ctrl+O opens the list.
-          // Let's make it a toggle or an open.
-          // "i need to press ctrl+f inorder to press ctrl+o" -> user implies it should just work.
-          // So if not visible/focused, we make it visible/focused AND open the list.
           setIsBackgroundShellListOpen(true);
         }
       }
