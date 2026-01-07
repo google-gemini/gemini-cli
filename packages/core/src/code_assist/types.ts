@@ -255,6 +255,13 @@ export enum ActionStatus {
   ACTION_STATUS_EMPTY = 4,
 }
 
+export enum InitiationMethod {
+  INITIATION_METHOD_UNSPECIFIED = 0,
+  TAB = 1,
+  COMMAND = 2,
+  AGENT = 3,
+}
+
 export interface ConversationOffered {
   citationCount?: string;
   includedCode?: boolean;
@@ -262,6 +269,7 @@ export interface ConversationOffered {
   traceId?: string;
   streamingLatency?: StreamingLatency;
   isAgentic?: boolean;
+  initiationMethod?: InitiationMethod;
 }
 
 export interface StreamingLatency {
